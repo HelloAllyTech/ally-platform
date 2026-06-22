@@ -123,11 +123,11 @@ export const useStartSimulation = (): UseStartSimulationReturn => {
         const result = await request(MICROPHONE_PERMISSION);
         if (result === RESULTS.BLOCKED) {
           showSettingsAlert(
-            'Common.permissions.microphoneRequired',
-            'Common.permissions.microphoneMessage',
+            'simulationPage.allowMicrophone',
+            'simulationPage.microphonePrompt',
             {
-              cancelKey: 'Common.cancel',
-              settingsKey: 'Common.ok',
+              cancelKey: 'common.cancel',
+              settingsKey: 'common.ok',
               onCancel: undefined,
               onOpenSettings: () => openSettings(),
             },
@@ -136,7 +136,7 @@ export const useStartSimulation = (): UseStartSimulationReturn => {
         }
         if (result !== RESULTS.GRANTED) {
           showErrorToast(
-            new Error(t('Common.permissions.microphoneMessage')),
+            new Error(t('simulationPage.microphonePrompt')),
             'Errors.permission',
           );
           return;

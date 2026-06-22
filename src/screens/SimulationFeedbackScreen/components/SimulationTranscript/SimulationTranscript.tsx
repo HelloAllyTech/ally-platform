@@ -162,10 +162,10 @@ export const SimulationTranscript: React.FC<{
   }) => {
     const {time, message, isLearner, startSeconds, tags} = item;
     const speakerLabel = isLearner
-      ? t('CallTranscript.you')
+      ? t('transcription.youLabel')
       : agentName
-        ? `${agentName} (${t('CallTranscript.aiClient')})`
-        : t('CallTranscript.aiClient');
+        ? `${agentName} (${t('transcription.aiClientSuffix')})`
+        : t('transcription.aiClientSuffix');
 
     return (
       <SimulationTranscriptItem
@@ -194,7 +194,7 @@ export const SimulationTranscript: React.FC<{
   };
 
   return (
-    <SummaryCard title={t('SimulationFeedback.annotatedTranscription')}>
+    <SummaryCard title={t('postSim.tabs.annotatedTranscript')}>
       {recordingUrlLoading ? (
         <ActivityIndicator
           color={colors.ds.theme.primary}
@@ -212,7 +212,7 @@ export const SimulationTranscript: React.FC<{
         />
       ) : (
         <Text style={styles.noRecordingText}>
-          {t('SimulationFeedback.noSessionRecording')}
+          {t('postSim.noSessionRecording')}
         </Text>
       )}
       <FlatList

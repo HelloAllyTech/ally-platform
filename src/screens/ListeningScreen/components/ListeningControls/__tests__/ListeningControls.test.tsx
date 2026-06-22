@@ -88,7 +88,7 @@ describe('ListeningControls', () => {
 
     expect(getByTestId('btn-pause-resume')).toBeTruthy();
     expect(getByTestId('btn-end')).toBeTruthy();
-    expect(getByText('ListeningScreen.endSession')).toBeTruthy();
+    expect(getByText('listeningScreen.endSession')).toBeTruthy();
   });
 
   it('shows resume label when call is paused', () => {
@@ -96,7 +96,7 @@ describe('ListeningControls', () => {
       <ListeningControls {...defaultProps} isCallPaused={true} />,
     );
 
-    expect(getByText('ListeningScreen.resumeTranscription')).toBeTruthy();
+    expect(getByText('listeningScreen.resumeTranscription')).toBeTruthy();
   });
 
   it('shows pause label when call is active', () => {
@@ -104,7 +104,7 @@ describe('ListeningControls', () => {
       <ListeningControls {...defaultProps} isCallPaused={false} />,
     );
 
-    expect(getByText('ListeningScreen.pauseTranscription')).toBeTruthy();
+    expect(getByText('listeningScreen.pauseTranscription')).toBeTruthy();
   });
 
   it('renders focus mode button when showFocusModeButton is true', () => {
@@ -128,7 +128,7 @@ describe('ListeningControls', () => {
       <ListeningControls {...defaultProps} />,
     );
 
-    expect(getByText('ListeningScreen.dataSafe')).toBeTruthy();
+    expect(getByText('listeningScreen.dataSafe')).toBeTruthy();
   });
 
   it('shows mute tooltip when showMuteTooltip is true', () => {
@@ -136,7 +136,7 @@ describe('ListeningControls', () => {
       <ListeningControls {...defaultProps} showMuteTooltip={true} />,
     );
 
-    expect(getByText('ListeningScreen.muteTooltip')).toBeTruthy();
+    expect(getByText('listeningScreen.muteTooltip')).toBeTruthy();
   });
 
   it('does not show mute tooltip by default', () => {
@@ -144,6 +144,6 @@ describe('ListeningControls', () => {
       <ListeningControls {...defaultProps} />,
     );
 
-    expect(queryByText('ListeningScreen.muteTooltip')).toBeNull();
+    expect(queryByText('listeningScreen.muteTooltip')).toBeNull();
   });
 });

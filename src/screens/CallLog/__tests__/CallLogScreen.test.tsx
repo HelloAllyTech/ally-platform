@@ -146,7 +146,7 @@ describe('CallLogScreen', () => {
   it('renders empty state when no logs', () => {
     const {getByText} = render(<CallLogScreen />);
     // Should show "no call logs" key via t()
-    expect(getByText('CallLogs.noCallLogs')).toBeTruthy();
+    expect(getByText('calls.fallback.callEmptyTitle')).toBeTruthy();
   });
 
   it('shows TabView when multiple log types available', () => {

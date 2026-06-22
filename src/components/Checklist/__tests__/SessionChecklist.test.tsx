@@ -46,7 +46,7 @@ describe('SessionChecklist', () => {
     const {getByText} = render(
       <SessionChecklist items={mockItems} />,
     );
-    expect(getByText('SimulationFeedback.checklistHeader')).toBeTruthy();
+    expect(getByText('learn.evaluationChecklist')).toBeTruthy();
     expect(getByText('67%')).toBeTruthy();
   });
 

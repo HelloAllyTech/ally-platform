@@ -38,8 +38,8 @@ describe('CallEndConfirmationModal', () => {
       />,
     );
 
-    expect(getByText('ListeningScreen.microphoneModeEndConfirmation')).toBeTruthy();
-    fireEvent.press(getByText('ListeningScreen.endSession'));
+    expect(getByText('audioCall.endDialog.content')).toBeTruthy();
+    fireEvent.press(getByText('audioCall.endDialog.endSession'));
     expect(onConfirm).toHaveBeenCalled();
   });
 
@@ -53,8 +53,8 @@ describe('CallEndConfirmationModal', () => {
       />,
     );
 
-    expect(getByText('ListeningScreen.callEndConfirmation')).toBeTruthy();
-    expect(getByText('ListeningScreen.endCall')).toBeTruthy();
+    expect(getByText('audioCall.endDialog.content')).toBeTruthy();
+    expect(getByText('listeningScreen.endCall')).toBeTruthy();
   });
 });
 

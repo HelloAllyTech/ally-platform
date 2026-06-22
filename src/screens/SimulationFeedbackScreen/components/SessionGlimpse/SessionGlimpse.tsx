@@ -35,7 +35,7 @@ export const SessionGlimpse: React.FC<SessionGlimpseProps> = ({content}) => {
           />
         </View>
         <Text style={styles.headerText}>
-          {t('SimulationFeedback.sessionGlimpse')}
+          {t('callFeedback.sessionGlimpse')}
         </Text>
       </TouchableOpacity>
 

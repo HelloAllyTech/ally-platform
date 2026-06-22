@@ -120,11 +120,9 @@ export const EmailLogin: React.FC<EmailLoginProps> = ({
         extraScrollHeight={0}
         showsVerticalScrollIndicator={false}>
         <View style={styles.contentContainer}>
-          <Text style={styles.headerText}>
-            {t('SplashScreen.enterYourEmail')}
-          </Text>
+          <Text style={styles.headerText}>{t('auth.login.subtitle')}</Text>
           <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>{t('SplashScreen.email')}</Text>
+            <Text style={styles.inputLabel}>{t('auth.login.email.label')}</Text>
             <TextInput
               style={[
                 styles.input,
@@ -144,7 +142,7 @@ export const EmailLogin: React.FC<EmailLoginProps> = ({
               placeholderTextColor={colors.mediumGray}
             />
             <Button
-              label={t('Common.next')}
+              label={t('common.next')}
               onPress={handleSubmit}
               isDisabled={!isValidEmail(email)}
               isLoading={isOtpLoading}
@@ -153,7 +151,7 @@ export const EmailLogin: React.FC<EmailLoginProps> = ({
 
           <View style={styles.dividerContainer}>
             <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>{t('Common.or')}</Text>
+            <Text style={styles.dividerText}>{t('common.or')}</Text>
             <View style={styles.dividerLine} />
           </View>
 
@@ -174,17 +172,17 @@ export const EmailLogin: React.FC<EmailLoginProps> = ({
         <View style={styles.bottomContainer}>
           <View style={styles.termsContainer}>
             <Text style={styles.termsText}>
-              {t('SplashScreen.byTappingNext')}{' '}
+              {t('auth.login.proceedAgree')}{' '}
               <Text
                 style={styles.termsLink}
                 onPress={() => Linking.openURL(TERMS_AND_CONDITIONS_URL)}>
-                {t('SplashScreen.termsAndConditions')}
+                {t('auth.login.terms')}
               </Text>{' '}
-              {t('SplashScreen.andAcknowledge')}{' '}
+              {t('auth.login.and')}{' '}
               <Text
                 style={styles.termsLink}
                 onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}>
-                {t('SplashScreen.privacyPolicy')}
+                {t('auth.login.privacy')}
               </Text>
               .
             </Text>

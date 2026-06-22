@@ -43,10 +43,10 @@ export const useListeningScreen = ({
   // Tooltip content
   const tooltipContentList = useMemo(
     () => [
-      t('ListeningScreen.dataSafeTooltip.noAudioRecordings'),
-      t('ListeningScreen.dataSafeTooltip.dataEncrypted'),
-      t('ListeningScreen.dataSafeTooltip.noTrainingData'),
-      t('ListeningScreen.dataSafeTooltip.personalInfoRemoved'),
+      t('audioCall.privacy.noRecording'),
+      t('audioCall.privacy.encrypted'),
+      t('audioCall.privacy.noTrainingData'),
+      t('audioCall.privacy.personalInfoRemoved'),
     ],
     [t],
   );

@@ -6,7 +6,7 @@ import {ReviewComment} from '../ReviewComment';
 jest.mock('@/hooks', () => ({
   useTranslate: () => ({
     t: (key: string, opts?: {count?: number}) =>
-      key === 'ReviewComment.replies' && opts?.count !== undefined
+      key === 'review.details.comment_one' && opts?.count !== undefined
         ? `${opts.count} replies`
         : key,
   }),
@@ -77,28 +77,28 @@ describe('ReviewComment', () => {
     const {getByText} = render(
       <ReviewComment {...defaultProps} hidden />,
     );
-    expect(getByText('ReviewComment.hidden')).toBeTruthy();
+    expect(getByText('review.hidden')).toBeTruthy();
   });
 
   it('does not show hidden badge when hidden is false', () => {
     const {queryByText} = render(
       <ReviewComment {...defaultProps} hidden={false} />,
     );
-    expect(queryByText('ReviewComment.hidden')).toBeNull();
+    expect(queryByText('review.hidden')).toBeNull();
   });
 
   it('shows reply button when showReplyButton is true', () => {
     const {getByText} = render(
       <ReviewComment {...defaultProps} showReplyButton />,
     );
-    expect(getByText('ReviewComment.reply')).toBeTruthy();
+    expect(getByText('review.details.replyLabel')).toBeTruthy();
   });
 
   it('does not show reply button when showReplyButton is false', () => {
     const {queryByText} = render(
       <ReviewComment {...defaultProps} showReplyButton={false} />,
     );
-    expect(queryByText('ReviewComment.reply')).toBeNull();
+    expect(queryByText('review.details.replyLabel')).toBeNull();
   });
 
   it('calls onReplyPress when reply button is pressed', () => {
@@ -106,15 +106,15 @@ describe('ReviewComment', () => {
     const {getByText} = render(
       <ReviewComment {...defaultProps} onReplyPress={onReplyPress} />,
     );
-    fireEvent.press(getByText('ReviewComment.reply'));
+    fireEvent.press(getByText('review.details.replyLabel'));
     expect(onReplyPress).toHaveBeenCalledTimes(1);
   });
 
   it('shows "1 reply" when replyCount is 1', () => {
-    const {getByText} = render(
+    const {getAllByText} = render(
       <ReviewComment {...defaultProps} replyCount={1} />,
     );
-    expect(getByText('ReviewComment.repliesOne')).toBeTruthy();
+    expect(getAllByText('review.details.replyLabel').length).toBeGreaterThan(0);
   });
 
   it('shows plural replies text when replyCount is greater than 1', () => {

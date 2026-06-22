@@ -28,15 +28,15 @@ jest.mock('@/components', () => {
 describe('SummaryUnauthorized', () => {
   it('renders title, description and button', () => {
     const {getByText} = render(<SummaryUnauthorized onGoBack={jest.fn()} />);
-    expect(getByText('CallSummaryUnauthorized.title')).toBeTruthy();
-    expect(getByText('CallSummaryUnauthorized.description')).toBeTruthy();
-    expect(getByText('Common.offline.goBack')).toBeTruthy();
+    expect(getByText('summary.notFoundTitle')).toBeTruthy();
+    expect(getByText('summary.notFoundDesc')).toBeTruthy();
+    expect(getByText('achievements.backAria')).toBeTruthy();
   });
 
   it('invokes onGoBack on button press', () => {
     const onGoBack = jest.fn();
     const {getByText} = render(<SummaryUnauthorized onGoBack={onGoBack} />);
-    fireEvent.press(getByText('Common.offline.goBack'));
+    fireEvent.press(getByText('achievements.backAria'));
     expect(onGoBack).toHaveBeenCalled();
   });
 });

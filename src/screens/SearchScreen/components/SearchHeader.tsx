@@ -31,7 +31,7 @@ export const SearchHeader = ({isFocused}: {isFocused: boolean}) => {
     <View style={styles.logoContainer}>
       <AllyLogoIcon />
       <Animated.Text style={[styles.subHeader, subHeaderStyle]}>
-        {t('SearchScreen.header.subTitle')}
+        {t('search.headerDescription')}
       </Animated.Text>
     </View>
   );

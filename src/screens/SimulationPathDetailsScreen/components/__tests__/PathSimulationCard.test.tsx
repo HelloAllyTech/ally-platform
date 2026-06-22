@@ -9,8 +9,8 @@ jest.mock('@/hooks', () => ({
   useTranslate: jest.fn(() => ({
     t: (key: string) => {
       const translations: Record<string, string> = {
-        'Simulations.simulation': 'Role-play',
-        'Common.next': 'Next',
+        'postSim.titlePrefix': 'Role-play',
+        'common.next': 'Next',
       };
       return translations[key] || key;
     },

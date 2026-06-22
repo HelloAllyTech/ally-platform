@@ -24,7 +24,7 @@ describe('CallSummaryScreen/AddNotesSection', () => {
       <AddNotesSection savedNotes="hello" onNoteChange={onNoteChange} />,
     );
 
-    fireEvent.press(getByText('CallSummaryProgress.addNotes'));
+    fireEvent.press(getByText('summaryLoading.addNotes'));
     const input = getByPlaceholderText('Enter note');
     fireEvent.changeText(input, 'updated');
     expect(onNoteChange).toHaveBeenCalledWith('updated');

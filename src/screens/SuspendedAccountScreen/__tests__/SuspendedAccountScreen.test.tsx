@@ -20,7 +20,7 @@ jest.mock('@/hooks', () => ({
 describe('SuspendedAccountScreen', () => {
   it('resets navigation to Splash on button press', () => {
     const {getByText} = render(<SuspendedAccountScreen />);
-    fireEvent.press(getByText('SuspendedAccount.goToLogin'));
+    fireEvent.press(getByText('suspended.goToLogin'));
     expect(mockReset).toHaveBeenCalledWith({
       index: 0,
       routes: [{name: 'Splash'}],

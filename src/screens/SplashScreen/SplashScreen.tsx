@@ -272,16 +272,14 @@ export const SplashScreen: React.FC<
         <Animated.View style={[styles.titleContainer, textStyle]}>
           {currentStep === 'EMAIL' ? (
             <>
-              <Text style={styles.title}>{t('SplashScreen.hey')}</Text>
+              <Text style={styles.title}>{t('auth.login.greetingLine1')}</Text>
               <Text style={styles.title}>
-                {t('SplashScreen.welcome')}{' '}
-                <Text style={styles.allyText}>{t('SplashScreen.ally')}</Text>
+                {t('auth.login.welcome')}{' '}
+                <Text style={styles.allyText}>{t('common.appName')}</Text>
               </Text>
             </>
           ) : (
-            <Text style={styles.title}>
-              {t('SplashScreen.verifyYourEmail')}
-            </Text>
+            <Text style={styles.title}>{t('auth.login.otp.title')}</Text>
           )}
         </Animated.View>
 

@@ -176,7 +176,7 @@ describe('AskAI', () => {
       <AskAI clientName="Alex" scenarioSessionId="sess-1" />,
     );
     expect(getByText('Network error')).toBeTruthy();
-    expect(getByText('SimulationFeedback.askAIRetry')).toBeTruthy();
+    expect(getByText('common.retry')).toBeTruthy();
   });
 
   it('shows character limit warning when input exceeds 2000 chars', async () => {
@@ -185,6 +185,6 @@ describe('AskAI', () => {
     );
     const input = UNSAFE_getByType(TextInput);
     fireEvent.changeText(input, 'x'.repeat(2001));
-    expect(getByText('SimulationFeedback.askAIMaxMessages')).toBeTruthy();
+    expect(getByText('askAi.askAIMaxMessages')).toBeTruthy();
   });
 });

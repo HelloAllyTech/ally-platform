@@ -20,7 +20,7 @@ export const getErrorDetails = (
   const apiError = (error ?? {}) as Partial<ApiError>;
   const {data, status} = apiError;
   const message =
-    data?.message || data?.error || t('Common.somethingWentWrong');
+    data?.message || data?.error || t('common.somethingWentWrong');
 
   return {message, status, error: data?.error};
 };

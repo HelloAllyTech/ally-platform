@@ -53,16 +53,14 @@ export const ExpandableFeedbackSection: React.FC<
         {displayItems.length > 0 ? (
           displayItems.map(renderFeedbackItem)
         ) : (
-          <Text style={styles.noDataText}>
-            {t('SimulationFeedback.noDataAvailable')}
-          </Text>
+          <Text style={styles.noDataText}>{t('postSim.feedback.noData')}</Text>
         )}
         {items.length > collapsedItemCount && (
           <TouchableOpacity
             style={styles.viewMoreButton}
             onPress={() => setIsExpanded(prev => !prev)}>
             <Text style={styles.viewMoreText}>
-              {isExpanded ? t('Common.viewLess') : t('Common.viewMore')}
+              {isExpanded ? t('common.viewLess') : t('common.viewMore')}
             </Text>
             <ArrowDown
               width={10}

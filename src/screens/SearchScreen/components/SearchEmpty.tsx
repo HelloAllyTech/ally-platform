@@ -28,10 +28,10 @@ export const SearchEmpty: React.FC<SearchEmptyProps> = ({
     <View style={themedStyles.emptyComponent}>
       {searchText.length > 0 && (
         <Text style={themedStyles.emptyComponentText}>
-          {`${t('SearchScreen.noData')} "${searchText}"`}
+          {`${t('search.noResults')} "${searchText}"`}
         </Text>
       )}
-      <Text style={themedStyles.tryText}>{t('SearchScreen.try')}</Text>
+      <Text style={themedStyles.tryText}>{t('search.suggestionsTitle')}</Text>
       {trySuggestions.map(suggestion => (
         <React.Fragment key={suggestion.id}>
           <View style={themedStyles.marginL16}>

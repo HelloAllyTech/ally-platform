@@ -76,8 +76,8 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
   const [tabIndex, setTabIndex] = useState(0);
 
   const routes = [
-    {key: TABS.INLINE, title: t('ThreadsBottomSheet.tabInline')},
-    {key: TABS.GENERAL, title: t('ThreadsBottomSheet.tabGeneral')},
+    {key: TABS.INLINE, title: t('threadsBottomSheet.tabInline')},
+    {key: TABS.GENERAL, title: t('threadsBottomSheet.tabGeneral')},
   ];
 
   const handleTabChange = useCallback((index: number) => {
@@ -153,7 +153,7 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
   }, []);
 
   const generalPlaceholder = useMemo(
-    () => t('ThreadsBottomSheet.addComment'),
+    () => t('threadsBottomSheet.addComment'),
     [t],
   );
 
@@ -206,7 +206,7 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
                   style={styles.selectedText}
                   numberOfLines={1}
                   ellipsizeMode="tail">
-                  {t('ThreadsBottomSheet.selectedText')} "
+                  {t('threadsBottomSheet.selectedText')} "
                   {getSelectedText(thread) || ''}"
                 </Text>
               </View>
@@ -251,8 +251,8 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
               <View style={styles.moreCommentsContainer}>
                 <Text style={styles.moreCommentsText}>
                   {remainingCount === 1
-                    ? t('ThreadsBottomSheet.moreThreadsOne')
-                    : t('ThreadsBottomSheet.moreThreads', {
+                    ? t('threadsBottomSheet.moreThreadsOne')
+                    : t('threadsBottomSheet.moreThreads', {
                         count: remainingCount,
                       })}
                 </Text>
@@ -328,7 +328,7 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
     return (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyText}>
-          {t('ThreadsBottomSheet.noThreads')}
+          {t('threadsBottomSheet.noThreads')}
         </Text>
       </View>
     );
@@ -417,7 +417,7 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
         <View style={styles.container}>
           <View style={styles.header}>
             <Text style={styles.headerTitle}>
-              {t('ThreadsBottomSheet.title')}
+              {t('threadsBottomSheet.title')}
             </Text>
           </View>
           <TabView
@@ -435,10 +435,10 @@ export const ThreadsBottomSheet: React.FC<ThreadsBottomSheetProps> = ({
         visible={!!generalDeleteCommentId}
         onClose={() => generalControlRef.current.handleCancelDelete()}
         onConfirm={generalControlRef.current.handleConfirmDelete}
-        title={t('ThreadsBottomSheet.deleteConfirmation.title')}
-        description={t('ThreadsBottomSheet.deleteConfirmation.description')}
-        confirmLabel={t('ThreadsBottomSheet.deleteConfirmation.confirm')}
-        cancelLabel={t('ThreadsBottomSheet.deleteConfirmation.cancel')}
+        title={t('threadsBottomSheet.deleteConfirmation.title')}
+        description={t('threadsBottomSheet.deleteConfirmation.description')}
+        confirmLabel={t('threadsBottomSheet.deleteConfirmation.confirm')}
+        cancelLabel={t('threadsBottomSheet.deleteConfirmation.cancel')}
         confirmVariant="destructive"
       />
     </>

@@ -232,6 +232,6 @@ describe('CaseDetailsScreen', () => {
       <CaseDetailsScreen navigation={mockNavigation} route={mockRoute} />,
     );
 
-    expect(getByText('Simulations.case')).toBeTruthy();
+    expect(getByText('simulationPage.failedToLoadCaseDetails')).toBeTruthy();
   });
 });

@@ -80,7 +80,7 @@ export const SimulationTimer: React.FC<SimulationTimerProps> = ({
   return (
     <View style={styles.timerContainer}>
       <Text style={styles.durationText}>
-        {t('SimulationAssistant.sessionDuration')}: {''}
+        {t('simulationPage.sessionDuration')}: {''}
         <Text style={styles.durationValue}>{formatTime(elapsedSeconds)}</Text>
       </Text>
     </View>

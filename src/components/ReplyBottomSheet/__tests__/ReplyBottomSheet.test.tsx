@@ -170,7 +170,7 @@ describe('ReplyBottomSheet', () => {
 
   it('renders header with title', () => {
     const {getByText} = render(<ReplyBottomSheet {...defaultProps} />);
-    expect(getByText('ReplyBottomSheet.title')).toBeTruthy();
+    expect(getByText('replyBottomSheet.title')).toBeTruthy();
   });
 
   it('calls hideReplyBottomSheet when back button is pressed', () => {

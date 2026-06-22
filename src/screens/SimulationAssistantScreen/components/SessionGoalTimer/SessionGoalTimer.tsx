@@ -133,7 +133,7 @@ export const SessionGoalTimer: FC<SessionGoalTimerProps> = ({
       <View style={styles.infoContainer}>
         <View style={styles.leftInfo}>
           <Text style={styles.label} testID="session-goal-timer-label">
-            {t('SimulationTimer.sessionTimer')}
+            {t('simulationPage.sessionTimer')}
           </Text>
           <Text
             style={styles.maxTimeValue}
@@ -143,7 +143,7 @@ export const SessionGoalTimer: FC<SessionGoalTimerProps> = ({
         </View>
 
         <View style={styles.rightInfo}>
-          <Text style={styles.label}>{t('SimulationTimer.timeRemaining')}</Text>
+          <Text style={styles.label}>{t('simulationPage.timeRemaining')}</Text>
           <Text
             testID="session-goal-timer-remaining"
             style={[

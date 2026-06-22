@@ -126,12 +126,7 @@ export const BreathingScreen: React.FC<RootStackScreenProps<'Breathing'>> = ({
             colors={[colors.darkGray, colors.black0]}
             style={StyleSheet.absoluteFillObject}
           />
-          <Text style={styles.heading}>
-            {t('BreathingScreen.header.returnTo')}{' '}
-            <Text style={styles.headingItalic}>
-              {t('BreathingScreen.header.self')}
-            </Text>
-          </Text>
+          <Text style={styles.heading}>{t('stressBuster.returnToSelf')} </Text>
           <View style={styles.content}>
             <BoxBreathingAnimation
               testID="box-breathing-animation"
@@ -152,7 +147,7 @@ export const BreathingScreen: React.FC<RootStackScreenProps<'Breathing'>> = ({
           </View>
 
           <Button
-            label={t('BreathingScreen.viewSessionSummary')}
+            label={t('stressBuster.viewCallSummary')}
             onPress={onPressViewSessionSummary}
             customContainerStyle={styles.viewSummaryButton}
           />

@@ -101,8 +101,8 @@ export const SimulationDetailsCard = ({
                 <TouchableOpacity onPress={toggleDescription}>
                   <Text style={styles.viewMoreText}>
                     {isDescriptionExpanded
-                      ? t('Review.card.viewLess')
-                      : t('Review.card.viewMore')}
+                      ? t('common.viewLess')
+                      : t('common.viewMore')}
                   </Text>
                 </TouchableOpacity>
               )}

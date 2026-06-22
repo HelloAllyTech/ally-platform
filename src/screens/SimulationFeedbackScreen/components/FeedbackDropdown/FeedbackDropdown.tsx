@@ -22,14 +22,14 @@ export const FeedbackDropdown: React.FC<FeedbackDropdownProps> = ({
   const items = [
     {
       icon: <SimulationIcon width={24} height={24} />,
-      text: `${t('SimulationFeedback.title')} ${t('CallSummary.header.subtitle')}`,
+      text: `${t('review.tabs.simulation')} ${t('callSummary.header.subtitle')}`,
       isSelected: showSummary,
       selectedIcon: <TickIcon width={24} height={24} />,
       onPress: () => setShowSummary(true),
     },
     {
       icon: <TranscriptIcon width={24} height={24} />,
-      text: `${t('SimulationFeedback.title')} ${t('SimulationFeedback.transcript')}`,
+      text: `${t('review.tabs.simulation')} ${t('summary.tabs.transcript')}`,
       isSelected: !showSummary,
       selectedIcon: <TickIcon width={24} height={24} />,
       onPress: () => setShowSummary(false),

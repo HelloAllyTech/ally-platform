@@ -75,7 +75,7 @@ export const BadgePopup = () => {
                 </View>
               )}
               <Text style={styles.earnedNewBadge}>
-                {t('Achievements.earnedNewBadge')}
+                {t('achievements.modal.newBadge')}
               </Text>
               <Text style={styles.title}>{currentBadge.name}</Text>
               <Text style={styles.description}>{currentBadge.description}</Text>

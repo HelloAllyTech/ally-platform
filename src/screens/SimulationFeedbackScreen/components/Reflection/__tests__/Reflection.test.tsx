@@ -67,7 +67,7 @@ describe('Reflection', () => {
 
   it('renders without crashing', () => {
     const {getByText} = render(<Reflection {...defaultProps} />);
-    expect(getByText('SimulationFeedback.reflection.sectionTitle')).toBeTruthy();
+    expect(getByText('reflection.sectionTitle')).toBeTruthy();
   });
 
   it('renders prompts with numbered badges', () => {
@@ -84,7 +84,7 @@ describe('Reflection', () => {
     });
 
     const {getByText} = render(<Reflection {...defaultProps} />);
-    expect(getByText('SimulationFeedback.reflection.noPromptsAvailable')).toBeTruthy();
+    expect(getByText('reflection.noPrompts')).toBeTruthy();
   });
 
   it('renders text inputs for each prompt', () => {
@@ -92,7 +92,7 @@ describe('Reflection', () => {
       <Reflection {...defaultProps} />,
     );
     const inputs = getAllByPlaceholderText(
-      'SimulationFeedback.reflection.placeholder',
+      'reflection.writeThoughts',
     );
     expect(inputs).toHaveLength(2);
   });

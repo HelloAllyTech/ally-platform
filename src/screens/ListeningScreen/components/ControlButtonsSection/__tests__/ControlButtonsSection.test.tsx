@@ -30,15 +30,15 @@ describe('ControlButtonsSection', () => {
     const {getByText} = render(<ControlButtonsSection {...defaultProps} />);
 
     // Pause/Resume button label when not paused
-    fireEvent.press(getByText('ListeningScreen.pauseTranscription'));
+    fireEvent.press(getByText('listeningScreen.pauseTranscription'));
     expect(defaultProps.onPauseResumePress).toHaveBeenCalled();
 
     // Focus mode button
-    fireEvent.press(getByText('ListeningScreen.focus'));
+    fireEvent.press(getByText('listeningScreen.focus'));
     expect(defaultProps.onFocusModeButtonPress).toHaveBeenCalled();
 
     // End session button
-    fireEvent.press(getByText('ListeningScreen.endSession'));
+    fireEvent.press(getByText('listeningScreen.endSession'));
     expect(defaultProps.onCallEndPress).toHaveBeenCalled();
   });
 
@@ -46,7 +46,7 @@ describe('ControlButtonsSection', () => {
     const {getByText} = render(
       <ControlButtonsSection {...defaultProps} isCallPaused={true} />,
     );
-    expect(getByText('ListeningScreen.resumeTranscription')).toBeTruthy();
+    expect(getByText('listeningScreen.resumeTranscription')).toBeTruthy();
   });
 
   it('toggle button triggers onToggleMaximized', () => {

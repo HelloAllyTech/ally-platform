@@ -64,10 +64,10 @@ export const AchievementsScreen: React.FC = () => {
   // Memoize tab configuration
   const tabs = useMemo(
     () => [
-      {key: FilterType.ALL, label: t('Achievements.all', 'All')},
+      {key: FilterType.ALL, label: t('achievements.filters.all', 'All')},
       {
         key: FilterType.UNLOCKED,
-        label: t('Achievements.unlocked', 'Unlocked'),
+        label: t('achievements.filters.unlocked', 'Unlocked'),
       },
     ],
     [t],
@@ -110,22 +110,17 @@ export const AchievementsScreen: React.FC = () => {
       <View key={`${categoryGroup.category}-${index}`} style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>
-            {BADGE_CATEGORY_MAP[categoryGroup.category]}
+            {t(
+              `achievements.badgeTypes.${BADGE_CATEGORY_MAP[categoryGroup.category]}`,
+            )}
           </Text>
           <InfoTooltip
             content={
-              <View>
-                <Text style={styles.tooltipText}>
-                  {t(
-                    `BadgeTooltip.${BADGE_CATEGORY_MAP[categoryGroup.category]}.title`,
-                  )}
-                </Text>
-                <Text style={styles.tooltipText}>
-                  {t(
-                    `BadgeTooltip.${BADGE_CATEGORY_MAP[categoryGroup.category]}.description`,
-                  )}
-                </Text>
-              </View>
+              <Text style={styles.tooltipText}>
+                {t(
+                  `achievements.badgeTypes.tooltip.${BADGE_CATEGORY_MAP[categoryGroup.category]}`,
+                )}
+              </Text>
             }
             placement="top"
             isVisible={tooltipCategory === categoryGroup.category}
@@ -150,7 +145,7 @@ export const AchievementsScreen: React.FC = () => {
     () => (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyText}>
-          {t('Achievements.noAchievements', 'No achievements found')}
+          {t('achievements.noAchievements', 'No achievements found')}
         </Text>
       </View>
     ),
@@ -170,7 +165,10 @@ export const AchievementsScreen: React.FC = () => {
       return (
         <View style={styles.centerContainer}>
           <Text style={styles.errorText}>
-            {t('Achievements.error', 'Failed to load achievements')}
+            {t(
+              'achievements.errors.description',
+              'Failed to load achievements',
+            )}
           </Text>
         </View>
       );
@@ -196,18 +194,18 @@ export const AchievementsScreen: React.FC = () => {
           activeOpacity={0.7}>
           <LeftArrowIcon color={colors.black} />
         </TouchableOpacity>
-        <Text style={styles.title}>{t('Achievements.title')}</Text>
+        <Text style={styles.title}>{t('achievements.title')}</Text>
       </View>
 
       {/* Filter Tabs */}
       <View style={styles.filterContainer}>
         <View style={styles.filterRow}>
           <View style={styles.badgesLabelContainer}>
-            <Text style={styles.badgesLabel}>{t('Achievements.badges')}</Text>
+            <Text style={styles.badgesLabel}>{t('achievements.badges')}</Text>
             <InfoTooltip
               content={
                 <Text style={styles.tooltipText}>
-                  {t(`BadgeTooltip.Badge`)}
+                  {t('achievements.badgesTooltip')}
                 </Text>
               }
               placement="top"

@@ -64,7 +64,7 @@ export const ReactionsCount = ({
         </View>
       )}
       <Text style={styles.reactionText}>
-        {pluralize(totalReactions, t('Review.card.reaction'))}
+        {pluralize(totalReactions, t('review.feedCard.reactions'))}
       </Text>
     </TouchableOpacity>
   );

@@ -193,7 +193,7 @@ const CallSummaryDetailsComponent: React.FC<Props> = ({
       return (
         <View key={sectionConfig.key}>
           <SectionWrapper
-            label={sectionConfig.label}
+            label={t(sectionConfig.labelKey)}
             isExpanded={expanded[sectionConfig.key]}
             onToggle={() => toggleSection(sectionConfig.key)}
             icon={<Icon />}
@@ -211,6 +211,7 @@ const CallSummaryDetailsComponent: React.FC<Props> = ({
       );
     },
     [
+      t,
       expanded,
       isEditing,
       handleSubmit,
@@ -245,7 +246,7 @@ const CallSummaryDetailsComponent: React.FC<Props> = ({
             <GoldenShieldIcon />
           </View>
           <Text style={styles.alertText}>
-            {t('CallSummary.aiGeneratedWarning')}
+            {t('callSummary.aiGeneratedWarning')}
           </Text>
         </View>
         <View style={styles.card}>{SECTION_LIST.map(renderSection)}</View>
@@ -253,7 +254,7 @@ const CallSummaryDetailsComponent: React.FC<Props> = ({
       {showSaveButton && (
         <View style={styles.buttonContainer}>
           <Button
-            label={t('save')}
+            label={t('common.save')}
             onPress={onSubmitButtonPress}
             isLoading={isUpdating}
             customContainerStyle={styles.submitButton}

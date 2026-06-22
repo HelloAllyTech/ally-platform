@@ -73,7 +73,7 @@ export const ShareCallLogScreen: React.FC<
     reviewId: shareParams.reviewId,
     isEditNote: shareParams.isEditNote,
     initialNote: shareParams.note,
-    shareTitle: t('SimulationFeedback.shareForReviewTitle'),
+    shareTitle: t('review.details.shareModalHeader'),
     onCreateReview,
     onUpdateStatus,
     onShareSuccess,
@@ -98,12 +98,12 @@ export const ShareCallLogScreen: React.FC<
         description={
           <>
             <SimulationDetailRow
-              label={t('Review.card.dateAndTime')}
+              label={t('review.details.dateAndTime')}
               value={formatDateTime(sessionData.createdAt)}
             />
             {sessionData.duration !== undefined && (
               <SimulationDetailRow
-                label={t('Review.card.duration')}
+                label={t('review.feedCard.duration')}
                 value={sessionData.duration}
               />
             )}

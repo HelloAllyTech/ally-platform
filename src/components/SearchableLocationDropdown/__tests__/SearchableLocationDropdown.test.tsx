@@ -79,7 +79,7 @@ describe('SearchableLocationDropdown', () => {
         setIsOpen={setIsOpen}
       />,
     );
-    expect(getByText('LocationDropdown.startTypingToSearch')).toBeTruthy();
+    expect(getByText('locationDropdown.startTypingToSearch')).toBeTruthy();
     // restore for subsequent tests
     page1Data.data = original.data as any;
     page1Data.total = original.total as any;
@@ -97,8 +97,8 @@ describe('SearchableLocationDropdown', () => {
         setIsOpen={setIsOpen}
       />,
     );
-    fireEvent.changeText(getByPlaceholderText('LocationDropdown.searchPlaceholder'), 'abc');
-    expect(getByText('LocationDropdown.noLocationsFound')).toBeTruthy();
+    fireEvent.changeText(getByPlaceholderText('locationDropdown.searchPlaceholder'), 'abc');
+    expect(getByText('locationDropdown.noLocationsFound')).toBeTruthy();
     mockSearchData = undefined;
   });
 

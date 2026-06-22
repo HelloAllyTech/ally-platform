@@ -25,15 +25,15 @@ export const CallEndConfirmationModal = ({
     description: string,
     actionButtonText: string;
   if (isMicrophoneMode) {
-    titleMain = t('ListeningScreen.end');
-    titleItalic = t('ListeningScreen.session');
-    description = t('ListeningScreen.microphoneModeEndConfirmation');
-    actionButtonText = t('ListeningScreen.endSession');
+    titleMain = t('audioCall.endDialog.titleNormal');
+    titleItalic = t('audioCall.endDialog.titleItalic');
+    description = t('audioCall.endDialog.content');
+    actionButtonText = t('audioCall.endDialog.endSession');
   } else {
-    titleMain = t('ListeningScreen.end');
-    titleItalic = t('ListeningScreen.call');
-    description = t('ListeningScreen.callEndConfirmation');
-    actionButtonText = t('ListeningScreen.endCall');
+    titleMain = t('audioCall.endDialog.titleNormal');
+    titleItalic = t('listeningScreen.call');
+    description = t('audioCall.endDialog.content');
+    actionButtonText = t('listeningScreen.endCall');
   }
 
   const illustration = <EndSessionIcon />;

@@ -37,7 +37,21 @@ export enum APIVersion {
 
 export enum LanguageCode {
   EN = 'en',
+  HI = 'hi',
+  MR = 'mr',
+  TA = 'ta',
+  KN = 'kn',
 }
+
+export const SUPPORTED_LANGUAGES = [
+  LanguageCode.EN,
+  LanguageCode.HI,
+  LanguageCode.MR,
+  LanguageCode.TA,
+  LanguageCode.KN,
+] as const;
+
+export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 
 export const TAG_COLORS = {
   1: {bg: '#FEE1E180', text: '#C62828'},
@@ -304,18 +318,11 @@ export const API_METHODS = {
 export const TERMS_AND_CONDITIONS_URL = 'https://helloally.ai/terms';
 export const PRIVACY_POLICY_URL = 'https://helloally.ai/policy';
 
-export const SIMULATION_START_NOTIFICATION = {
-  TITLE: 'Before you get started',
-  DESCRIPTION:
-    'At times, the bot may be unresponsive, or have unusual lag times. We are always working to improve the experience!',
-  START_SESSION: 'Start Session',
-};
-
 export const SECURITY_CAROUSEL_SLIDES: CarouselItem[] = [
-  {image: carousel1, textKey: 'Carousel.slide1'},
-  {image: carousel2, textKey: 'Carousel.slide2'},
-  {image: carousel3, textKey: 'Carousel.slide3'},
-  {image: carousel4, textKey: 'Carousel.slide4'},
+  {image: carousel1, textKey: 'carousel.slides.noRecording'},
+  {image: carousel2, textKey: 'carousel.slides.noTrainingData'},
+  {image: carousel3, textKey: 'carousel.slides.personalInfoRemoved'},
+  {image: carousel4, textKey: 'carousel.slides.encrypted'},
 ];
 
 export enum CarouselVariant {

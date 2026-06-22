@@ -1,4 +1,5 @@
 import {useState} from 'react';
+import {useTranslation} from 'react-i18next';
 import {
   ActivityIndicator,
   Image,
@@ -11,7 +12,14 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {LeftArrowIcon} from '@/assets/icons';
-import {Button, CustomModal, CustomSwitch} from '@/components';
+import {
+  Button,
+  CustomModal,
+  CustomSwitch,
+  getLabelFromCode,
+  LanguageSelectorSheet,
+} from '@/components';
+import {env} from '@/config/env';
 import {
   useAppNavigation,
   useLeaderboardNotification,
@@ -34,6 +42,11 @@ export const ProfileSettingsScreen: React.FC = () => {
   const {name, email, profileImageUrl} = userData ?? {};
   const [isBottomSheetVisible, setIsBottomSheetVisible] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [isLanguageSheetOpen, setIsLanguageSheetOpen] = useState(false);
+  const {i18n: i18nInstance} = useTranslation();
+  const currentLanguageLabel = getLabelFromCode(
+    i18nInstance.resolvedLanguage ?? i18nInstance.language ?? 'en',
+  );
   const isLearner = userData?.role === UserRole.LEARNER;
 
   const {leaderboardNotifEnabled, handleLeaderboardNotifToggle} =
@@ -103,12 +116,7 @@ export const ProfileSettingsScreen: React.FC = () => {
         <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
           <LeftArrowIcon color={colors.black} />
         </TouchableOpacity>
-        <Text style={styles.title}>
-          {t('ProfileSettings.profile')}{' '}
-          <Text style={styles.titleItalic}>
-            {t('ProfileSettings.settings')}
-          </Text>
-        </Text>
+        <Text style={styles.title}>{t('profile.settings.title')}</Text>
       </View>
 
       <View style={styles.content}>
@@ -132,7 +140,7 @@ export const ProfileSettingsScreen: React.FC = () => {
             )}
           </View>
           <Text style={styles.imageRequirementsText}>
-            {t('ProfileSettings.imageRequirements')}
+            {t('profile.settings.upload_hint')}
           </Text>
           {previewImageUri ? (
             <TouchableOpacity
@@ -140,7 +148,7 @@ export const ProfileSettingsScreen: React.FC = () => {
               onPress={handleChangeImage}
               disabled={isSaving}>
               <Text style={styles.editButtonText}>
-                {t('ProfileSettings.edit')}
+                {t('profile.settings.upload_image')}
               </Text>
             </TouchableOpacity>
           ) : (
@@ -149,7 +157,7 @@ export const ProfileSettingsScreen: React.FC = () => {
               onPress={handleUploadImage}
               disabled={isSaving}>
               <Text style={styles.editButtonText}>
-                {t('ProfileSettings.uploadImage')}
+                {t('profile.settings.upload_image')}
               </Text>
             </TouchableOpacity>
           )}
@@ -157,23 +165,41 @@ export const ProfileSettingsScreen: React.FC = () => {
 
         <View style={styles.fieldsSection}>
           <View style={styles.fieldContainer}>
-            <Text style={styles.fieldLabel}>{t('ProfileSettings.name')}</Text>
+            <Text style={styles.fieldLabel}>{t('profile.settings.name')}</Text>
+
             <View style={styles.fieldValue}>
               <Text style={styles.fieldValueText}>{name || '—'}</Text>
             </View>
           </View>
 
           <View style={styles.fieldContainer}>
-            <Text style={styles.fieldLabel}>{t('ProfileSettings.email')}</Text>
+            <Text style={styles.fieldLabel}>{t('profile.settings.email')}</Text>
             <View style={styles.fieldValue}>
               <Text style={styles.fieldValueText}>{email || '—'}</Text>
             </View>
           </View>
 
+          {env.LANGUAGE_SELECTOR_FLAG && (
+            <View style={styles.fieldContainer}>
+              <Text style={styles.fieldLabel}>
+                {t('profile.settings.language')}
+              </Text>
+              <TouchableOpacity
+                style={styles.fieldValueTouchable}
+                onPress={() => setIsLanguageSheetOpen(true)}
+                activeOpacity={0.7}>
+                <Text style={styles.fieldValueText}>
+                  {currentLanguageLabel}
+                </Text>
+                <Text style={styles.fieldValueChevron}>›</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           {isLearner && (
             <View style={styles.notifToggleContainer}>
               <Text style={styles.fieldLabel}>
-                {t('ProfileSettings.leaderboardNotification')}
+                {t('profile.settings.leaderboardNotification')}
               </Text>
               <CustomSwitch
                 value={leaderboardNotifEnabled}
@@ -187,7 +213,7 @@ export const ProfileSettingsScreen: React.FC = () => {
       {hasUnsavedChanges && (
         <View style={styles.saveButtonContainer}>
           <Button
-            label={t('save')}
+            label={t('common.save')}
             onPress={handleSave}
             isLoading={isSaving}
             customContainerStyle={styles.saveButton}
@@ -203,13 +229,20 @@ export const ProfileSettingsScreen: React.FC = () => {
         hasExistingImage={!!previewImageUri}
       />
 
+      {env.LANGUAGE_SELECTOR_FLAG && (
+        <LanguageSelectorSheet
+          visible={isLanguageSheetOpen}
+          onClose={() => setIsLanguageSheetOpen(false)}
+        />
+      )}
+
       <CustomModal
         visible={showConfirmDialog}
         onClose={handleCancelDiscard}
-        title={t('Common.unsavedChanges')}
-        description={t('Common.unsavedChangesDescription')}
-        primaryButtonText={t('Common.discard')}
-        secondaryButtonText={t('Common.cancel')}
+        title={t('common.unsavedChanges')}
+        description={t('common.unsavedChangesDescription')}
+        primaryButtonText={t('common.discard')}
+        secondaryButtonText={t('common.cancel')}
         onPrimaryPress={handleConfirmDiscard}
         onSecondaryPress={handleCancelDiscard}
         primaryTextColor={colors.brightRed}
@@ -329,10 +362,26 @@ const styles = ScaledSheet.create({
     borderWidth: ms(0.5),
     borderColor: colors.lightGray2,
   },
+  fieldValueTouchable: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: '8@mvs',
+    paddingHorizontal: '8@ms',
+    backgroundColor: colors.lightGray,
+    borderRadius: '4@ms',
+    borderWidth: ms(0.5),
+    borderColor: colors.lightGray2,
+  },
   fieldValueText: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     ...typography.body.medium,
     color: colors.ds.typography.lowEmphasis,
+  },
+  fieldValueChevron: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '18@ms',
+    color: colors.ds.typography.mediumEmphasis,
   },
   saveButtonContainer: {
     paddingHorizontal: '24@ms',

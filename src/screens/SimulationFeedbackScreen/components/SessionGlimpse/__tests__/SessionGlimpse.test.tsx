@@ -22,7 +22,7 @@ describe('SessionGlimpse', () => {
       <SessionGlimpse content="Some content" />,
     );
 
-    expect(getByText('SimulationFeedback.sessionGlimpse')).toBeTruthy();
+    expect(getByText('callFeedback.sessionGlimpse')).toBeTruthy();
   });
 
   it('shows content when expanded (default)', () => {
@@ -38,7 +38,7 @@ describe('SessionGlimpse', () => {
 
     expect(getByText(content)).toBeTruthy();
 
-    fireEvent.press(getByText('SimulationFeedback.sessionGlimpse'));
+    fireEvent.press(getByText('callFeedback.sessionGlimpse'));
 
     expect(queryByText(content)).toBeNull();
   });
@@ -47,10 +47,10 @@ describe('SessionGlimpse', () => {
     const content = 'Toggle content';
     const {getByText, queryByText} = render(<SessionGlimpse content={content} />);
 
-    fireEvent.press(getByText('SimulationFeedback.sessionGlimpse'));
+    fireEvent.press(getByText('callFeedback.sessionGlimpse'));
     expect(queryByText(content)).toBeNull();
 
-    fireEvent.press(getByText('SimulationFeedback.sessionGlimpse'));
+    fireEvent.press(getByText('callFeedback.sessionGlimpse'));
     expect(getByText(content)).toBeTruthy();
   });
 });

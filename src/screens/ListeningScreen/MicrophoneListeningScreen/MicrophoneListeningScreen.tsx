@@ -392,7 +392,7 @@ export const MicrophoneListeningScreen = () => {
           </TouchableOpacity>
         </PrivacyTooltip>
         <Text style={styles.takingNotesText}>
-          {t('ListeningScreen.takingNotes')}
+          {t('listeningScreen.takingNotes')}
         </Text>
       </View>
     );
@@ -415,7 +415,7 @@ export const MicrophoneListeningScreen = () => {
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={colors.white} />
         <Text style={styles.loadingText}>
-          {t('ListeningScreen.connecting')}
+          {t('listeningScreen.connecting')}
         </Text>
       </View>
     );
@@ -454,7 +454,7 @@ export const MicrophoneListeningScreen = () => {
         </View>
         {!isWebMicrophoneMode && (
           <Text style={styles.microphoneModeNote}>
-            {t('ListeningScreen.microphoneModeNote')}
+            {t('listeningScreen.microphoneModeNote')}
           </Text>
         )}
       </View>
@@ -508,8 +508,8 @@ export const MicrophoneListeningScreen = () => {
                 counselor={transcription.senderId === userId}
                 speakerLabel={
                   transcription.senderId === userId
-                    ? t('CallTranscript.you')
-                    : t('CallTranscript.client')
+                    ? t('transcription.youLabel')
+                    : t('transcription.clientLabel')
                 }
               />
             ))

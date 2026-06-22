@@ -69,9 +69,7 @@ export const InteractionsBar = ({
     <View style={styles.container}>
       {onTogglePrivate && (
         <View style={styles.switchContainer}>
-          <Text style={styles.switchLabel}>
-            {t('SimulationFeedback.share')}
-          </Text>
+          <Text style={styles.switchLabel}>{t('learn.scenario.share')}</Text>
           <CustomSwitch
             value={!isPrivate}
             onToggle={onTogglePrivate}

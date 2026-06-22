@@ -18,6 +18,7 @@ import {
   TableEyeIcon,
   TagIcon,
 } from '@/assets/icons';
+import type {TranslationType} from '@/localization/locales/type';
 import {colors} from '@/theme';
 import type {
   FieldDataContext,
@@ -69,8 +70,8 @@ export const formatSessionMode = (value: unknown, t: any) => {
   if (!value) return '-';
   const mode = value.toString().toUpperCase();
   return mode === ScribeSessionMode.DICTATION
-    ? t('CallLogs.dictation')
-    : t('CallLogs.scribe');
+    ? t('calls.mode.dictation')
+    : t('calls.mode.scribe');
 };
 
 export enum ChatSummaryStatus {
@@ -307,6 +308,7 @@ export const SECTION_LIST: SectionItem[] = [
   {
     key: SectionKey.FeaturesAndDemographics,
     label: 'Features & Demographics',
+    labelKey: 'summary.sections.featuresAndDemographics',
     icon: CallDetailsIcon,
     canEdit: true,
     canEnhance: false,
@@ -314,6 +316,7 @@ export const SECTION_LIST: SectionItem[] = [
   {
     key: SectionKey.SessionSummary,
     label: 'Session Summary',
+    labelKey: 'summary.sections.sessionSummary',
     icon: SessionSummaryIcon,
     canEdit: true,
     canEnhance: true,
@@ -321,6 +324,7 @@ export const SECTION_LIST: SectionItem[] = [
   {
     key: SectionKey.Flow,
     label: 'Flow',
+    labelKey: 'summary.sections.flow',
     icon: FlowIcon,
     canEdit: true,
     canEnhance: true,
@@ -328,6 +332,7 @@ export const SECTION_LIST: SectionItem[] = [
   {
     key: SectionKey.KeyConcern,
     label: 'Key Concern',
+    labelKey: 'summary.sections.keyConcerns',
     icon: KeyConcernIcon,
     canEdit: true,
     canEnhance: true,
@@ -335,6 +340,7 @@ export const SECTION_LIST: SectionItem[] = [
   {
     key: SectionKey.ObjectiveObservations,
     label: 'Objective Observations',
+    labelKey: 'summary.sections.objectiveObservations',
     icon: TableEyeIcon,
     canEdit: true,
     canEnhance: true,
@@ -342,6 +348,7 @@ export const SECTION_LIST: SectionItem[] = [
   {
     key: SectionKey.SubjectiveObservations,
     label: 'Subjective Observations',
+    labelKey: 'summary.sections.subjectiveObservations',
     icon: MagnifyEyeIcon,
     canEdit: true,
     canEnhance: true,
@@ -349,6 +356,7 @@ export const SECTION_LIST: SectionItem[] = [
   {
     key: SectionKey.Assessment,
     label: 'Assessment',
+    labelKey: 'summary.sections.assessment',
     icon: AssessmentIcon,
     canEdit: true,
     canEnhance: true,
@@ -356,6 +364,7 @@ export const SECTION_LIST: SectionItem[] = [
   {
     key: SectionKey.DominantFeelings,
     label: 'Dominant Feelings',
+    labelKey: 'summary.sections.dominantFeelings',
     icon: SmileIcon,
     canEdit: true,
     canEnhance: true,
@@ -363,6 +372,7 @@ export const SECTION_LIST: SectionItem[] = [
   {
     key: SectionKey.IssuesWorkedOn,
     label: 'Issues Worked On',
+    labelKey: 'summary.sections.issuesWorkedOn',
     icon: BrightnessAlertIcon,
     canEdit: true,
     canEnhance: true,
@@ -370,6 +380,7 @@ export const SECTION_LIST: SectionItem[] = [
   {
     key: SectionKey.KeyTherapeuticTechniques,
     label: 'Key Therapeutic Techniques',
+    labelKey: 'summary.sections.keyTherapeuticTechniques',
     icon: PrescriptionsIcon,
     canEdit: true,
     canEnhance: true,
@@ -377,6 +388,7 @@ export const SECTION_LIST: SectionItem[] = [
   {
     key: SectionKey.ReferralsProvided,
     label: 'Referrals Provided',
+    labelKey: 'summary.sections.referralsProvided',
     icon: HandShareIcon,
     canEdit: true,
     canEnhance: true,
@@ -384,6 +396,7 @@ export const SECTION_LIST: SectionItem[] = [
   {
     key: SectionKey.HomeworkRecommended,
     label: 'Home work Recommended',
+    labelKey: 'summary.sections.homeworkRecommended',
     icon: NewsStandIcon,
     canEdit: true,
     canEnhance: true,
@@ -391,6 +404,7 @@ export const SECTION_LIST: SectionItem[] = [
   {
     key: SectionKey.PlanForNextCall,
     label: 'Plans for Next Call',
+    labelKey: 'summary.sections.plansForNextCall',
     icon: HeadsetMicIcon,
     canEdit: true,
     canEnhance: true,
@@ -398,6 +412,7 @@ export const SECTION_LIST: SectionItem[] = [
   {
     key: SectionKey.Tags,
     label: 'Tags',
+    labelKey: 'summary.sections.tags',
     icon: TagIcon,
     canEdit: true,
     canEnhance: false,
@@ -405,6 +420,7 @@ export const SECTION_LIST: SectionItem[] = [
   {
     key: SectionKey.Metrics,
     label: 'Metrics',
+    labelKey: 'summary.sections.metrics',
     icon: DatabaseIcon,
     canEdit: false,
     canEnhance: false,
@@ -412,6 +428,7 @@ export const SECTION_LIST: SectionItem[] = [
   {
     key: SectionKey.Intake,
     label: 'Intake',
+    labelKey: 'summary.sections.intake',
     icon: IntakeIcon,
     canEdit: true,
     canEnhance: false,
@@ -419,6 +436,7 @@ export const SECTION_LIST: SectionItem[] = [
   {
     key: SectionKey.OngoingRisks,
     label: 'Risk Assessment',
+    labelKey: 'summary.sections.ongoingRisks',
     icon: OngoingRisksIcon,
     canEdit: true,
     canEnhance: false,
@@ -426,6 +444,7 @@ export const SECTION_LIST: SectionItem[] = [
   {
     key: SectionKey.AdditionalNotes,
     label: 'Additional Notes',
+    labelKey: 'summary.sections.additionalNotes',
     icon: NotesIcon,
     canEdit: false,
     canEnhance: false,
@@ -960,6 +979,97 @@ export const FIELD_LABELS: Record<SummaryFieldKey, string> =
     },
     {} as Record<SummaryFieldKey, string>,
   );
+
+// i18n keys for field labels, resolved via t() at render time.
+// Field keys are data identifiers, so they don't always match the
+// `summary.fields.*` translation key — hence this explicit mapping.
+export const FIELD_LABEL_KEYS: Record<SummaryFieldKey, TranslationType> = {
+  [SUMMARY_FIELDS.CALL_ID]: 'summary.fields.callId',
+  [SUMMARY_FIELDS.CALL_DURATION]: 'summary.fields.callDuration',
+  [SUMMARY_FIELDS.CALL_DATE]: 'summary.fields.callDate',
+  [SUMMARY_FIELDS.CALL_TIME]: 'summary.fields.callTime',
+  [SUMMARY_FIELDS.CALLER_ID]: 'summary.fields.callerId',
+  [SUMMARY_FIELDS.CALLER_TYPE]: 'summary.fields.callerType',
+  [SUMMARY_FIELDS.MODE]: 'summary.fields.mode',
+  [SUMMARY_FIELDS.AGE]: 'summary.fields.age',
+  [SUMMARY_FIELDS.GENDER]: 'summary.fields.gender',
+  [SUMMARY_FIELDS.PROFESSION]: 'summary.fields.profession',
+  [SUMMARY_FIELDS.RELATIONSHIP_STATUS]: 'summary.fields.relationshipStatus',
+  [SUMMARY_FIELDS.LANGUAGES]: 'summary.fields.languages',
+  [SUMMARY_FIELDS.LOCATION]: 'summary.fields.location',
+  [SUMMARY_FIELDS.CONCERN_CODE]: 'summary.fields.concernCode',
+  [SUMMARY_FIELDS.COUNSELLOR]: 'summary.fields.counsellor',
+  [SUMMARY_FIELDS.NEW_CALL_FOLLOW_UP]: 'summary.fields.newCallFollowUp',
+  [SUMMARY_FIELDS.SESSION_SUMMARY]: 'summary.fields.sessionSummary',
+  [SUMMARY_FIELDS.FLOW]: 'summary.fields.flow',
+  [SUMMARY_FIELDS.KEY_CONCERNS]: 'summary.fields.keyConcerns',
+  [SUMMARY_FIELDS.OBJECTIVE_OBSERVATIONS]:
+    'summary.fields.objectiveObservations',
+  [SUMMARY_FIELDS.SUBJECTIVE_OBSERVATIONS]:
+    'summary.fields.subjectiveObservations',
+  [SUMMARY_FIELDS.ASSESSMENT]: 'summary.fields.assessment',
+  [SUMMARY_FIELDS.DOMINANT_FEELINGS]: 'summary.fields.dominantFeelings',
+  [SUMMARY_FIELDS.ISSUES_WORKED_ON]: 'summary.fields.issuesWorkedOn',
+  [SUMMARY_FIELDS.KEY_THERAPEUTIC_TECHNIQUES]:
+    'summary.fields.keyTherapeuticTechniques',
+  [SUMMARY_FIELDS.REFERRALS_PROVIDED]: 'summary.fields.referralsProvided',
+  [SUMMARY_FIELDS.HOMEWORK_RECOMMENDED]: 'summary.fields.homeworkRecommended',
+  [SUMMARY_FIELDS.PLAN_FOR_NEXT_CALL]: 'summary.fields.plansForNextCall',
+  [SUMMARY_FIELDS.TAGS]: 'summary.fields.tags',
+  [SUMMARY_FIELDS.LISTENING_RATIO]: 'summary.fields.listeningRatio',
+  [SUMMARY_FIELDS.REFLECTIVE_QUESTIONS_ASKED]:
+    'summary.fields.reflectiveQuestions',
+  [SUMMARY_FIELDS.EMOTIONAL_LIFT]: 'summary.fields.emotionsLift',
+  [SUMMARY_FIELDS.OPEN_ENDED_QUESTIONS_ASKED]:
+    'summary.fields.openEndedQuestions',
+  [SUMMARY_FIELDS.INTAKE_NOTES]: 'summary.fields.intakeNotes',
+  [SUMMARY_FIELDS.RISK_SELF_HARM]: 'summary.fields.riskSelfHarm',
+  [SUMMARY_FIELDS.RISK_SELF_HARM_NOTES]: 'summary.fields.riskSelfHarmNotes',
+  [SUMMARY_FIELDS.RISK_SUICIDAL_THOUGHTS]:
+    'summary.fields.riskSuicidalThoughts',
+  [SUMMARY_FIELDS.RISK_SUICIDAL_THOUGHTS_NOTES]:
+    'summary.fields.riskSuicidalThoughtsNotes',
+  [SUMMARY_FIELDS.RISK_SUICIDAL_PLAN]: 'summary.fields.riskSuicidalPlan',
+  [SUMMARY_FIELDS.RISK_SUICIDAL_ACTION]: 'summary.fields.riskSuicidalAction',
+  [SUMMARY_FIELDS.RISK_RUNNING_AWAY]: 'summary.fields.riskRunningAway',
+  [SUMMARY_FIELDS.RISK_RUNNING_AWAY_NOTES]:
+    'summary.fields.riskRunningAwayNotes',
+  [SUMMARY_FIELDS.TRAUMA_PHYSICAL_ABUSE]: 'summary.fields.traumaPhysicalAbuse',
+  [SUMMARY_FIELDS.TRAUMA_SEXUAL_ABUSE]: 'summary.fields.traumaSexualAbuse',
+  [SUMMARY_FIELDS.TRAUMA_VERBAL_ABUSE]: 'summary.fields.traumaVerbalAbuse',
+  [SUMMARY_FIELDS.TRAUMA_NEGLECT]: 'summary.fields.traumaNeglect',
+  [SUMMARY_FIELDS.TRAUMA_SEPARATION_FROM_CAREGIVER_PARENT]:
+    'summary.fields.traumaSeparation',
+  [SUMMARY_FIELDS.TRAUMA_WITNESSED_DOMESTIC_VIOLENCE]:
+    'summary.fields.traumaDomesticViolence',
+  [SUMMARY_FIELDS.TRAUMA_NOTES]: 'summary.fields.traumaNotes',
+  [SUMMARY_FIELDS.ASSESSMENT_PSYCHOLOGICAL_DIAGNOSIS]:
+    'summary.fields.assessmentPsychDiagnosis',
+  [SUMMARY_FIELDS.ASSESSMENT_PSYCHOLOGICAL_DIAGNOSIS_NOTES]:
+    'summary.fields.assessmentPsychDiagnosisNotes',
+  [SUMMARY_FIELDS.ASSESSMENT_USE_OF_PSYCHOTROPIC_MEDICATIONS]:
+    'summary.fields.assessmentPsychotropicMeds',
+  [SUMMARY_FIELDS.ASSESSMENT_USE_OF_PSYCHOTROPIC_MEDICATIONS_NOTES]:
+    'summary.fields.assessmentPsychotropicMedsNotes',
+  [SUMMARY_FIELDS.ASSESSMENT_HALLUCINATIONS]:
+    'summary.fields.assessmentHallucinations',
+  [SUMMARY_FIELDS.ASSESSMENT_HALLUCINATIONS_NOTES]:
+    'summary.fields.assessmentHallucinationsNotes',
+  [SUMMARY_FIELDS.ASSESSMENT_AFFECT]: 'summary.fields.assessmentAffect',
+  [SUMMARY_FIELDS.ASSESSMENT_SPEECH]: 'summary.fields.assessmentSpeech',
+  [SUMMARY_FIELDS.ONGOING_RISK_SELF_HARM]: 'summary.fields.ongoingRiskSelfHarm',
+  [SUMMARY_FIELDS.ONGOING_RISK_SELF_HARM_NOTES]:
+    'summary.fields.ongoingRiskSelfHarmNotes',
+  [SUMMARY_FIELDS.ONGOING_RISK_SUICIDAL_THOUGHTS]:
+    'summary.fields.ongoingRiskSuicidalThoughts',
+  [SUMMARY_FIELDS.ONGOING_RISK_SUICIDAL_PLAN]:
+    'summary.fields.ongoingRiskSuicidalPlan',
+  [SUMMARY_FIELDS.ONGOING_RISK_SUICIDAL_ACTION]:
+    'summary.fields.ongoingRiskSuicidalAction',
+  [SUMMARY_FIELDS.ONGOING_RISK_SUICIDAL_THOUGHTS_NOTES]:
+    'summary.fields.ongoingRiskSuicidalThoughtsNotes',
+  [SUMMARY_FIELDS.ADDITIONAL_NOTES]: 'summary.fields.additionalNotes',
+};
 
 export const ALWAYS_VISIBLE_SECTIONS = [SectionKey.AdditionalNotes];
 

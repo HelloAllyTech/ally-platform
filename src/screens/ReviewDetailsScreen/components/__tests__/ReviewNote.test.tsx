@@ -32,7 +32,7 @@ describe('ReviewNote', () => {
     const {getByText} = render(
       <ReviewNote note="Test note" />,
     );
-    expect(getByText('SimulationFeedback.reviewNoteTitle')).toBeTruthy();
+    expect(getByText('review.details.noteLabel')).toBeTruthy();
   });
 
   it('shows edit button when onEditNote provided', () => {

@@ -54,7 +54,7 @@ describe('EventChecklist', () => {
       <EventChecklist scenarioSessionId={scenarioSessionId} />,
     );
 
-    expect(queryByText('SimulationFeedback.checklistHeader')).toBeNull();
+    expect(queryByText('learn.evaluationChecklist')).toBeNull();
   });
 
   it('returns null when data is undefined', () => {
@@ -67,7 +67,7 @@ describe('EventChecklist', () => {
       <EventChecklist scenarioSessionId={scenarioSessionId} />,
     );
 
-    expect(queryByText('SimulationFeedback.checklistHeader')).toBeNull();
+    expect(queryByText('learn.evaluationChecklist')).toBeNull();
   });
 
   it('renders completed items with check icon', () => {
@@ -121,7 +121,7 @@ describe('EventChecklist', () => {
       <EventChecklist scenarioSessionId={scenarioSessionId} />,
     );
 
-    expect(getByText('SimulationFeedback.checklistHeader')).toBeTruthy();
+    expect(getByText('learn.evaluationChecklist')).toBeTruthy();
   });
 
   it('renders mixed completed and incomplete items', () => {

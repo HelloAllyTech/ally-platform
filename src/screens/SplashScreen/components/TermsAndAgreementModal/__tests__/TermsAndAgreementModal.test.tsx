@@ -47,9 +47,9 @@ describe('TermsAndAgreementModal', () => {
       <TermsAndAgreementModal visible={true} onAgree={mockOnAgree} />,
     );
 
-    expect(getByText('TermsAndAgreement.title')).toBeTruthy();
+    expect(getByText('terms.title')).toBeTruthy();
     expect(getByTestId('terms-scroll-view')).toBeTruthy();
-    expect(getByText('TermsAndAgreement.scrollToBottom')).toBeTruthy();
+    expect(getByText('terms.scrollToBottom')).toBeTruthy();
   });
 
   it('renders terms content', () => {
@@ -69,10 +69,10 @@ describe('TermsAndAgreementModal', () => {
 
     fireEvent.press(getByTestId('scroll-to-bottom-button'));
 
-    expect(queryByText('TermsAndAgreement.scrollToBottom')).toBeNull();
+    expect(queryByText('terms.scrollToBottom')).toBeNull();
     // completeDetails text is always rendered in ScrollView, check if it contains the key
-    expect(getByText(/TermsAndAgreement\.completeDetails/)).toBeTruthy();
-    expect(getByText('TermsAndAgreement.iHaveReadAndAgree')).toBeTruthy();
+    expect(getByText(/terms\.footerPrefix/)).toBeTruthy();
+    expect(getByText('terms.agreeLabel')).toBeTruthy();
     expect(getByTestId('mock-primary-button')).toBeTruthy();
   });
 
@@ -152,7 +152,7 @@ describe('TermsAndAgreementModal', () => {
       });
 
       expect(
-        getByText('TermsAndAgreement.iHaveReadAndAgree'),
+        getByText('terms.agreeLabel'),
       ).toBeTruthy();
   });
 });

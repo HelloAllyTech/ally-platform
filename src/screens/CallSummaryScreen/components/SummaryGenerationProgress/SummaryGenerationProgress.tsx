@@ -90,14 +90,12 @@ export const SummaryGenerationProgress = ({
           <View style={[styles.noAudioTagWrapper]}>
             <HexagonCloseIcon />
             <Text style={[styles.generatedText, styles.colorBrickRed]}>
-              {t('CallLogs.noAudioDetected')}
+              {t('calls.status.noAudio')}
             </Text>
           </View>
         )}
         <Image source={summaryFailed} style={styles.marginV40} />
-        <Text style={styles.title}>
-          {t('CallSummaryProgress.summaryGenerationFailed')}
-        </Text>
+        <Text style={styles.title}>{t('summaryLoading.failedTitle')}</Text>
         <View style={styles.separator} />
       </View>
     );
@@ -109,7 +107,7 @@ export const SummaryGenerationProgress = ({
         <View style={styles.generatedRow}>
           <ShieldWithTickIcon />
           <Text style={styles.generatedText}>
-            {t('CallSummaryProgress.transcriptionGeneratedAudioDeleted')}
+            {t('summaryLoading.transcriptionDeleted')}
           </Text>
         </View>
       )}
@@ -134,23 +132,19 @@ export const SummaryGenerationProgress = ({
           </ShinyText>
         </View>
       ) : (
-        <Text style={styles.title}>
-          {t('CallSummaryProgress.generatedSessionSummary')}
-        </Text>
+        <Text style={styles.title}>{t('summaryLoading.generated')}</Text>
       )}
 
       {!hideDescription && (
         <>
           <Text style={styles.subtitle}>
             {isSummaryGenerated
-              ? t(`CallSummaryProgress.generatedSubtitle`)
-              : t(
-                  `CallSummaryProgress.generatingSubtitle${currentChat ? '' : '2'}`,
-                )}
+              ? t(`summaryLoading.generatedDesc`)
+              : t(`summaryLoading.processingDescMain${currentChat ? '' : '2'}`)}
           </Text>
           {!isSummaryGenerated && (
             <Text style={styles.etaText}>
-              {t('CallSummaryProgress.estimatedTime', {time: estimatedTime})}
+              {t('summaryLoading.estimatedTime', {time: estimatedTime})}
             </Text>
           )}
           <View style={styles.separator} />

@@ -208,7 +208,7 @@ export const ConferenceListeningScreen = () => {
           </TouchableOpacity>
         </PrivacyTooltip>
         <Text style={styles.takingNotesText}>
-          {t('ListeningScreen.takingNotes')}
+          {t('listeningScreen.takingNotes')}
         </Text>
       </View>
     );
@@ -219,7 +219,7 @@ export const ConferenceListeningScreen = () => {
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={colors.white} />
         <Text style={styles.loadingText}>
-          {t('ListeningScreen.connecting')}
+          {t('listeningScreen.connecting')}
         </Text>
       </View>
     );

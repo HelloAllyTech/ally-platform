@@ -51,13 +51,13 @@ describe('UpNextSimulationCard', () => {
 
   it('renders the up-next label with order number', () => {
     const {getByText} = render(<UpNextSimulationCard upNext={mockUpNext as any} />);
-    expect(getByText(/SimulationFeedback\.upNext/)).toBeTruthy();
+    expect(getByText(/postSim\.tabs\.upNext/)).toBeTruthy();
     expect(getByText(/2/)).toBeTruthy();
   });
 
   it('renders scenario label', () => {
     const {getByText} = render(<UpNextSimulationCard upNext={mockUpNext as any} />);
-    expect(getByText(/Simulations\.scenario/)).toBeTruthy();
+    expect(getByText(/common\.scenario/)).toBeTruthy();
   });
 
   it('renders cover image when coverImageUrl is provided', () => {

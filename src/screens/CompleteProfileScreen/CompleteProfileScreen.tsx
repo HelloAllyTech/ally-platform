@@ -34,8 +34,8 @@ export const CompleteProfileScreen: React.FC = () => {
     } catch (err) {
       const message = getErrorDetails(err).message;
       Alert.alert(
-        t('CompleteProfile.errorTitle'),
-        message || t('CompleteProfile.errorDescription'),
+        t('completeProfile.errorTitle'),
+        message || t('completeProfile.errorDescription'),
       );
     }
   }, [completeProfile, isNameValid, name, navigation, t]);
@@ -49,18 +49,18 @@ export const CompleteProfileScreen: React.FC = () => {
         enableOnAndroid
         enableAutomaticScroll={!isIOS}
         showsVerticalScrollIndicator={false}>
-        <Text style={styles.headerText}>{t('CompleteProfile.title')}</Text>
-        <Text style={styles.subtitle}>{t('CompleteProfile.subtitle')}</Text>
+        <Text style={styles.headerText}>{t('completeProfile.title')}</Text>
+        <Text style={styles.subtitle}>{t('completeProfile.subtitle')}</Text>
 
         <View style={styles.inputContainer}>
           <Text style={styles.inputLabel}>
-            {t('CompleteProfile.nameLabel')}
+            {t('completeProfile.nameLabel')}
           </Text>
           <TextInput
             style={[styles.input, isNameFocused && styles.inputFocused]}
             value={name}
             onChangeText={setName}
-            placeholder={t('CompleteProfile.namePlaceholder')}
+            placeholder={t('completeProfile.namePlaceholder')}
             placeholderTextColor={colors.mediumGray}
             autoCapitalize="words"
             autoCorrect={false}
@@ -71,7 +71,7 @@ export const CompleteProfileScreen: React.FC = () => {
             editable={!isLoading}
           />
           <Button
-            label={t('CompleteProfile.submit')}
+            label={t('completeProfile.submit')}
             onPress={handleSubmit}
             isDisabled={!isNameValid}
             isLoading={isLoading}

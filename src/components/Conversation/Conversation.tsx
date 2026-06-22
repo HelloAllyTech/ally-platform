@@ -203,9 +203,9 @@ export const Conversation: React.FC<ConversationProps> = ({
   const getSenderName = useCallback(
     (isClient: boolean) => {
       const clientLabel = isScribeReview
-        ? t('CallTranscript.client')
-        : t('CallTranscript.aiClient');
-      const reviewOwnerLabel = reviewOwnerName ?? t('CallTranscript.you');
+        ? t('transcription.clientLabel')
+        : t('transcription.aiClientSuffix');
+      const reviewOwnerLabel = reviewOwnerName ?? t('transcription.youLabel');
       return isClient ? clientLabel : reviewOwnerLabel;
     },
     [reviewOwnerName, t, isScribeReview],

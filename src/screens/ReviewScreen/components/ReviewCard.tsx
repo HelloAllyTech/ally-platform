@@ -133,13 +133,13 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
     <>
       {!!session?.createdAt && (
         <SimulationDetailRow
-          label={t('Review.card.dateAndTime')}
+          label={t('review.details.dateAndTime')}
           value={formatDateTime(session.createdAt)}
         />
       )}
       {session?.duration !== undefined && (
         <SimulationDetailRow
-          label={t('Review.card.duration')}
+          label={t('review.feedCard.duration')}
           value={formatDurationFromSeconds(session.duration)}
         />
       )}
@@ -158,7 +158,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
         style={styles.commentCountContainer}
         onPress={handleCommentPress}>
         <Text style={styles.commentText}>
-          {pluralize(commentsCount, t('Review.card.comment'))}
+          {pluralize(commentsCount, t('review.details.commentLabel'))}
         </Text>
       </TouchableOpacity>
     </View>
@@ -211,7 +211,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({
           onPress={handleReviewItemPress}>
           <ChatAddOnIcon width={16} height={16} />
           <Text style={styles.reviewTranscriptText}>
-            {t('Review.card.reviewTranscript')}
+            {t('review.feedCard.reviewTranscript')}
           </Text>
         </TouchableOpacity>
       )}

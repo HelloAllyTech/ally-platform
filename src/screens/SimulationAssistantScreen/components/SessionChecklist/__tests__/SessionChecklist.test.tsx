@@ -28,7 +28,7 @@ jest.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => {
       // Return hardcoded strings to match component content for testing or just the key
-      if (key === 'SimulationChecklist.sessionChecklist') return 'Session Checklist';
+      if (key === 'SimulationChecklist.sessionChecklist') return 'simulationPage.sessionChecklist';
       if (key === 'SimulationChecklist.progress') return 'Progress';
       if (key === 'SimulationChecklist.completed') return 'completed';
       return key;
@@ -63,7 +63,7 @@ describe('SessionChecklist', () => {
       />,
     );
 
-    expect(getByText('Session Checklist')).toBeTruthy();
+    expect(getByText('simulationPage.sessionChecklist')).toBeTruthy();
     expect(getByText('Step 1')).toBeTruthy();
     expect(getByText('Step 2')).toBeTruthy();
   });
@@ -100,7 +100,7 @@ describe('SessionChecklist', () => {
     // totalCount = 2, followed by 'completed'
     // The component renders: <Text>{totalCount} {t('completed')}</Text>
     // So "2 completed"
-    expect(getByText('2 completed')).toBeTruthy();
+    expect(getByText('2 simulationPage.completed')).toBeTruthy();
   });
 
   it('toggles expansion on press (guided mode)', () => {
@@ -164,7 +164,7 @@ describe('SessionChecklist', () => {
       />,
     );
 
-    expect(getByText('Session Checklist')).toBeTruthy();
+    expect(getByText('simulationPage.sessionChecklist')).toBeTruthy();
     expect(getByText('Step 1')).toBeTruthy();
     expect(getByText('Step 2')).toBeTruthy();
   });
@@ -180,7 +180,7 @@ describe('SessionChecklist', () => {
 
     // Progress line should not render in LIST mode
     expect(queryByText('Progress')).toBeNull();
-    expect(queryByText('2 completed')).toBeNull();
+    expect(queryByText('2 simulationPage.completed')).toBeNull();
 
     // Status circle (tick icon) should not render in LIST mode
     expect(queryAllByTestId('tick-icon').length).toBe(0);

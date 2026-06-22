@@ -20,7 +20,7 @@ jest.mock('@/components', () => ({
 describe('SearchHeader', () => {
   it('renders title and subtitle with translations', () => {
     const {getByText} = render(<SearchHeader isFocused={false} />);
-    expect(getByText('SearchScreen.header.subTitle')).toBeTruthy();
+    expect(getByText('search.headerDescription')).toBeTruthy();
   });
 
   it('updates animation styles when focused', () => {

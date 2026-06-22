@@ -12,6 +12,8 @@ export interface Env {
   NOTIFICATION_SCHEDULE_DAY: number;
   NOTIFICATION_SCHEDULE_HOUR: number;
   NOTIFICATION_SCHEDULE_MINUTE: number;
+  LANGUAGE_SELECTOR_FLAG: boolean;
+  I18N_BASE_URL: string;
 }
 
 function assertEnvVar(value: string | undefined, name: string): string {
@@ -76,4 +78,6 @@ export const env: Env = {
     0, // Default to 0 minutes
     'NOTIFICATION_SCHEDULE_MINUTE',
   ),
+  LANGUAGE_SELECTOR_FLAG: Config.LANGUAGE_SELECTOR_FLAG === 'true',
+  I18N_BASE_URL: Config.I18N_BASE_URL ?? '',
 };

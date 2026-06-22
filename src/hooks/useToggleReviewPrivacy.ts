@@ -26,10 +26,10 @@ export const useToggleReviewPrivacy = (
           reviewId,
           body: {status: newStatus},
         }).unwrap();
-        showToast(t('SimulationFeedback.privacyUpdated'), 'success');
+        showToast(t('simulationPage.privacyUpdated'), 'success');
       } catch (error) {
         console.error('Error updating review status:', error);
-        showToast(t('Errors.updatePrivacy'), 'error');
+        showToast(t('simulationPage.errorUpdatePrivacy'), 'error');
       }
     },
     [reviewId, updateReviewStatus, showToast, t],

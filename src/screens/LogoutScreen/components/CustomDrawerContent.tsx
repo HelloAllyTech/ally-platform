@@ -104,7 +104,7 @@ export const DrawerContent = ({
           <View>
             <View style={styles.creditHeader}>
               <BoltIcon width={16} height={16} />
-              <Text style={styles.creditTitle}>{t('Credits.usage')}</Text>
+              <Text style={styles.creditTitle}>{t('user.creditUsage')}</Text>
             </View>
             <View style={styles.creditInfo}>
               <Text>
@@ -140,13 +140,13 @@ export const DrawerContent = ({
       <View style={styles.menuItemsWrapper}>
         <MenuOption
           icon={<ProfileSettingsIcon width={24} height={24} />}
-          text={t('Drawer.profileSettings')}
+          text={t('profile.settings.title')}
           onPress={handleProfileSettingsPress}
           gap={8}
         />
         <MenuOption
           icon={<LogoutIcon />}
-          text={t('Logout.logout')}
+          text={t('user.logout')}
           onPress={openLogoutModal}
           gap={8}
         />
@@ -154,8 +154,8 @@ export const DrawerContent = ({
 
       <View style={styles.versionContainer}>
         <Text style={styles.versionText}>
-          {t('Common.version')}: {getAppVersion()}{' '}
-          {env.ENVIRONMENT === 'development' && t('Drawer.dev')}
+          {t('common.version')}: {getAppVersion()}{' '}
+          {env.ENVIRONMENT === 'development' && t('drawer.dev')}
         </Text>
       </View>
 

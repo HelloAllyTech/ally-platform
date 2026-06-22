@@ -246,7 +246,7 @@ export const GeneralCommentsList: React.FC<GeneralCommentsListProps> = ({
     return (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyText}>
-          {t('ThreadsBottomSheet.noGeneralComments')}
+          {t('threadsBottomSheet.noGeneralComments')}
         </Text>
       </View>
     );

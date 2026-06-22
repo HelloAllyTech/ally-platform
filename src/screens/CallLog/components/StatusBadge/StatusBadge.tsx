@@ -18,7 +18,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({status}) => {
     return (
       <View style={styles.statusContainer}>
         <HexagonCloseIcon />
-        <Text style={styles.statusText}>{t('CallLogs.noAudioDetected')}</Text>
+        <Text style={styles.statusText}>{t('calls.status.noAudio')}</Text>
       </View>
     );
   }

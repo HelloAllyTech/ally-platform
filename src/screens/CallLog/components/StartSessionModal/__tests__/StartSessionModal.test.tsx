@@ -55,8 +55,8 @@ describe('StartSessionModal', () => {
       />,
     );
 
-    expect(getByText('CallLogs.startScribeMode')).toBeTruthy();
-    expect(queryByText('CallLogs.startDictationMode')).toBeNull();
+    expect(getByText('calls.dialog.startSession.startScribeMode')).toBeTruthy();
+    expect(queryByText('calls.dialog.startSession.startDictationMode')).toBeNull();
   });
 
   // --- Dictation-only tenant ---
@@ -71,8 +71,8 @@ describe('StartSessionModal', () => {
       />,
     );
 
-    expect(getByText('CallLogs.startDictationMode')).toBeTruthy();
-    expect(queryByText('CallLogs.startScribeMode')).toBeNull();
+    expect(getByText('calls.dialog.startSession.startDictationMode')).toBeTruthy();
+    expect(queryByText('calls.dialog.startSession.startScribeMode')).toBeNull();
   });
 
   // --- Both enabled ---
@@ -87,8 +87,8 @@ describe('StartSessionModal', () => {
       />,
     );
 
-    expect(getByText('CallLogs.startScribeMode')).toBeTruthy();
-    expect(getByText('CallLogs.startDictationMode')).toBeTruthy();
+    expect(getByText('calls.dialog.startSession.startScribeMode')).toBeTruthy();
+    expect(getByText('calls.dialog.startSession.startDictationMode')).toBeTruthy();
   });
 
   // --- Scribe flow ---
@@ -105,7 +105,7 @@ describe('StartSessionModal', () => {
       />,
     );
 
-    fireEvent.press(getByText('CallLogs.startScribeMode'));
+    fireEvent.press(getByText('calls.dialog.startSession.startScribeMode'));
     fireEvent.press(getByText('Start Session'));
     expect(onListenLive).toHaveBeenCalledWith('scribe');
     expect(onClose).toHaveBeenCalled();
@@ -125,7 +125,7 @@ describe('StartSessionModal', () => {
       />,
     );
 
-    fireEvent.press(getByText('CallLogs.startDictationMode'));
+    fireEvent.press(getByText('calls.dialog.startSession.startDictationMode'));
     fireEvent.press(getByText('Start Session'));
     expect(onListenLive).toHaveBeenCalledWith('dictation');
     expect(onClose).toHaveBeenCalled();
@@ -142,7 +142,7 @@ describe('StartSessionModal', () => {
       />,
     );
 
-    fireEvent.press(getByText('CallLogs.startScribeMode'));
+    fireEvent.press(getByText('calls.dialog.startSession.startScribeMode'));
     expect(onListenLive).not.toHaveBeenCalled();
   });
 
@@ -157,7 +157,7 @@ describe('StartSessionModal', () => {
       />,
     );
 
-    fireEvent.press(getByText('CallLogs.startScribeMode'));
+    fireEvent.press(getByText('calls.dialog.startSession.startScribeMode'));
     expect(getByTestId('notification-modal')).toBeTruthy();
     expect(onListenLive).not.toHaveBeenCalled();
   });

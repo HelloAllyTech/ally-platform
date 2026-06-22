@@ -218,13 +218,13 @@ export const LeaderboardScreen: React.FC = () => {
     (period: LeaderboardPeriod): string => {
       switch (period) {
         case LeaderboardPeriod.LAST_WEEK:
-          return t('Leaderboard.period.last7Days');
+          return t('community.filters.last7days');
         case LeaderboardPeriod.LAST_MONTH:
-          return t('Leaderboard.period.last28Days');
+          return t('community.filters.last28days');
         case LeaderboardPeriod.LAST_YEAR:
-          return t('Leaderboard.period.last364Days');
+          return t('community.filters.last364days');
         case LeaderboardPeriod.ALL_TIME:
-          return t('Leaderboard.period.allTime');
+          return t('community.filters.allTime');
         default:
           return '';
       }
@@ -269,7 +269,7 @@ export const LeaderboardScreen: React.FC = () => {
         hitSlop={DEFAULT_HIT_SLOP}>
         <BadgeIcon width={20} height={20} />
         <Text style={styles.badgeCount}>
-          {currentUserEntry?.badgeCount || 0} {t('Leaderboard.badges')}
+          {currentUserEntry?.badgeCount || 0} {t('community.table.badges')}
         </Text>
       </TouchableOpacity>
     );
@@ -298,25 +298,19 @@ export const LeaderboardScreen: React.FC = () => {
       <View style={styles.tableHeader}>
         {showRankColumn && (
           <View style={styles.rankColumnHeader}>
-            <Text style={styles.headerText}>
-              {t('Leaderboard.tableHeaders.rank')}
-            </Text>
+            <Text style={styles.headerText}>{t('community.table.rank')}</Text>
           </View>
         )}
         <View style={styles.userColumnHeader}>
-          <Text style={styles.headerText}>
-            {t('Leaderboard.tableHeaders.user')}
-          </Text>
+          <Text style={styles.headerText}>{t('community.table.user')}</Text>
         </View>
         <View style={styles.durationColumnHeader}>
           <Text style={styles.headerText}>
-            {t('Leaderboard.tableHeaders.totalDuration')}
+            {t('community.table.totalDuration')}
           </Text>
         </View>
         <View style={styles.badgesColumnHeader}>
-          <Text style={styles.headerText}>
-            {t('Leaderboard.tableHeaders.badges')}
-          </Text>
+          <Text style={styles.headerText}>{t('community.table.badges')}</Text>
         </View>
       </View>
     );
@@ -333,10 +327,10 @@ export const LeaderboardScreen: React.FC = () => {
     return (
       <View style={styles.emptyStateContainer}>
         <Text style={styles.emptyStateTitle}>
-          {t('Leaderboard.emptyState.title')}
+          {t('community.emptyLeaderboard')}
         </Text>
         <Text style={styles.emptyStateDescription}>
-          {t('Leaderboard.emptyState.description')}
+          {t('community.emptyLeaderBoardDescription')}
         </Text>
       </View>
     );
@@ -345,16 +339,14 @@ export const LeaderboardScreen: React.FC = () => {
   return (
     <View style={[styles.container, {paddingTop: insets.top}]}>
       <TabScreenHeader
-        title={t('Common.community')}
+        title={t('community.title')}
         rightContent={renderBadgesButton()}
         isTooltipRequired
         tooltipContent={
           <View>
+            <Text style={styles.tooltipText}>{t(`community.title`)}</Text>
             <Text style={styles.tooltipText}>
-              {t(`BadgeTooltip.Community.title`)}
-            </Text>
-            <Text style={styles.tooltipText}>
-              {t(`BadgeTooltip.Community.description`)}
+              {t(`achievements.badgeTooltipDescription`)}
             </Text>
           </View>
         }

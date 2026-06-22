@@ -32,8 +32,8 @@ describe('usePermissionAlert', () => {
 
     fireEvent.press(getByTestId('micro'));
     expect(alertSpy).toHaveBeenCalledWith(
-      'Common.permissions.microphoneRequired',
-      'Common.permissions.microphoneMessage',
+      'simulationPage.allowMicrophone',
+      'simulationPage.microphonePrompt',
       expect.any(Array),
     );
 

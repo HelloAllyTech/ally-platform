@@ -10,6 +10,7 @@ import {
   SummaryFieldKey,
   YES_NO_OPTIONS,
 } from '@/constants/summary';
+import {TranslationType} from '@/localization/locales/type';
 import {AgeRange, CallDetails, SummaryDetails} from '@/services/callSummaryApi';
 
 import {FieldType} from './fields';
@@ -76,6 +77,8 @@ export type EditableFieldKey = keyof SummaryFormData;
 export interface SectionItem {
   key: SectionKey;
   label: string;
+  /** i18n key for the section title, resolved via t() at render time. */
+  labelKey: TranslationType;
   icon: React.FC<SvgProps>;
   canEdit: boolean;
   canEnhance: boolean;

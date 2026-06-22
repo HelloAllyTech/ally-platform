@@ -299,12 +299,12 @@ export const SimulationFeedbackScreen: React.FC<
         tags,
       });
       if (response.data) {
-        showToast(t('Success.submitFeedback'), 'success');
+        showToast(t('callFeedback.submit'), 'success');
       } else {
-        showToast(t('Errors.submitFeedback'), 'error');
+        showToast(t('callFeedback.failSubmitFeedback'), 'error');
       }
     } catch (error) {
-      showToast(t('Errors.submitFeedback'), 'error');
+      showToast(t('callFeedback.failSubmitFeedback'), 'error');
       hideFeedbackPopup();
     }
     // When AI feedback is disabled, the rating popup is the only surface, so
@@ -356,7 +356,7 @@ export const SimulationFeedbackScreen: React.FC<
   const renderTryAnotherSimulation = () => {
     return (
       <Button
-        label={t('SimulationFeedback.tryAnother')}
+        label={t('postSim.common.tryAnother')}
         onPress={handleSubmit}
         customContainerStyle={styles.tryAnotherSimulationButton}
       />
@@ -368,18 +368,18 @@ export const SimulationFeedbackScreen: React.FC<
       <View style={styles.titleContainer}>
         <View style={styles.titleTopRow}>
           <Text style={styles.title}>
-            {t('SimulationFeedback.title')}{' '}
+            {t('review.tabs.simulation')}{' '}
             <Text style={styles.titleItalic}>
               {fromLogs
-                ? t('CallSummary.header.subtitle')
-                : t('SimulationFeedback.titleEnded')}
+                ? t('callSummary.header.subtitle')
+                : t('simulationPage.endDialog.titleNormal')}
             </Text>
           </Text>
 
           {feedbackEnabled && !shortSession && (
             <View style={styles.switchContainer}>
               <Text style={styles.switchLabel}>
-                {t('SimulationFeedback.share')}
+                {t('learn.scenario.share')}
               </Text>
               <CustomSwitch
                 value={!!reviewId && !isPrivate}
@@ -584,8 +584,8 @@ export const SimulationFeedbackScreen: React.FC<
         onClose={feedbackEnabled ? hideFeedbackPopup : handleBack}
         onSubmit={submitFeedback}
         showChips={false}
-        placeholder={t('SimulationFeedback.placeholderText')}
-        customTitle={t('SimulationFeedback.questionText')}
+        placeholder={t('callFeedback.placeholderText')}
+        customTitle={t('callFeedback.questionText')}
         initialFeedback={existingFeedback}
       />
     </SafeAreaView>

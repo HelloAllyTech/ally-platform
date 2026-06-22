@@ -40,11 +40,11 @@ describe('NetworkDisconnected', () => {
       />,
     );
 
-    expect(getByText('Common.offline.networkTitle')).toBeTruthy();
-    expect(getByText('Common.offline.networkDescription')).toBeTruthy();
+    expect(getByText('common.offline.networkTitle')).toBeTruthy();
+    expect(getByText('common.offline.networkDescription')).toBeTruthy();
 
-    fireEvent.press(getByText('Common.offline.tryAgain'));
-    fireEvent.press(getByText('Common.offline.goBack'));
+    fireEvent.press(getByText('common.offline.tryAgain'));
+    fireEvent.press(getByText('common.offline.goBack'));
 
     expect(onRetry).toHaveBeenCalled();
     expect(onGoBack).toHaveBeenCalled();

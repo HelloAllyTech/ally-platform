@@ -167,9 +167,7 @@ export const AskAI: React.FC<AskAIProps> = ({
         style={styles.gradientContainer}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerText}>
-            {t('SimulationFeedback.askAIHeader')}
-          </Text>
+          <Text style={styles.headerText}>{t('postSim.tabs.askAi')}</Text>
         </View>
 
         <View style={styles.contentContainer}>
@@ -209,14 +207,14 @@ export const AskAI: React.FC<AskAIProps> = ({
                 {showRetry && (
                   <View style={styles.errorContainer}>
                     <Text style={styles.errorText}>
-                      {error || t('SimulationFeedback.askAIInterrupted')}
+                      {error || t('common.retry')}
                     </Text>
                     <TouchableOpacity
                       style={styles.retryButton}
                       onPress={handleRetry}
                       activeOpacity={0.7}>
                       <Text style={styles.retryButtonText}>
-                        {t('SimulationFeedback.askAIRetry')}
+                        {t('common.retry')}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -231,7 +229,7 @@ export const AskAI: React.FC<AskAIProps> = ({
                     ]}>
                     <TextInput
                       style={styles.input}
-                      placeholder={t('SimulationFeedback.askAIPlaceholder')}
+                      placeholder={t('askAi.inputPlaceholder')}
                       placeholderTextColor={colors.ds.typography.lowEmphasis}
                       value={inputText}
                       onChangeText={setInputText}
@@ -257,7 +255,7 @@ export const AskAI: React.FC<AskAIProps> = ({
                   </View>
                   {isOverLimit && (
                     <Text style={styles.charLimitText}>
-                      {t('SimulationFeedback.askAIMaxMessages', {
+                      {t('askAi.askAIMaxMessages', {
                         maxMessageLength: MAX_MESSAGE_LENGTH,
                       })}
                     </Text>

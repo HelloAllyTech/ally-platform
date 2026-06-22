@@ -14,6 +14,6 @@ jest.mock('@/assets/icons', () => ({
 describe('EmptyTranscript', () => {
   it('renders translated empty text', () => {
     const {getByText} = render(<EmptyTranscript />);
-    expect(getByText('CallTranscript.empty')).toBeTruthy();
+    expect(getByText('transcription.empty')).toBeTruthy();
   });
 });

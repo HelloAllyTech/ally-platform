@@ -83,7 +83,7 @@ export const NudgeSection: React.FC<NudgeSectionProps> = ({
         </ScrollView>
         <View style={styles.feedbackContainer}>
           <Text style={styles.feedbackText}>
-            {t('ListeningScreen.isThisHelpful')}
+            {t('listeningScreen.isThisHelpful')}
           </Text>
           {hasFeedbackPermission && (
             <View style={styles.feedbackButtons}>

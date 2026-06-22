@@ -127,8 +127,8 @@ describe('ProfileImageBottomSheet', () => {
       />,
     );
 
-    expect(getByText('ProfileSettings.profileImage')).toBeTruthy();
-    expect(mockT).toHaveBeenCalledWith('ProfileSettings.profileImage');
+    expect(getByText('profile.settings.profile_image')).toBeTruthy();
+    expect(mockT).toHaveBeenCalledWith('profile.settings.profile_image');
   });
 
   it('shows upload image option when hasExistingImage is false', () => {
@@ -142,9 +142,9 @@ describe('ProfileImageBottomSheet', () => {
       />,
     );
 
-    expect(getByText('ProfileSettings.uploadImage')).toBeTruthy();
+    expect(getByText('profile.settings.upload_image')).toBeTruthy();
     expect(getByTestId('change-image-icon')).toBeTruthy();
-    expect(mockT).toHaveBeenCalledWith('ProfileSettings.uploadImage');
+    expect(mockT).toHaveBeenCalledWith('profile.settings.upload_image');
   });
 
   it('shows change image option when hasExistingImage is true', () => {
@@ -158,9 +158,9 @@ describe('ProfileImageBottomSheet', () => {
       />,
     );
 
-    expect(getByText('ProfileSettings.changeImage')).toBeTruthy();
+    expect(getByText('profile.settings.changeImage')).toBeTruthy();
     expect(getByTestId('change-image-icon')).toBeTruthy();
-    expect(mockT).toHaveBeenCalledWith('ProfileSettings.changeImage');
+    expect(mockT).toHaveBeenCalledWith('profile.settings.changeImage');
   });
 
   it('shows remove image option when hasExistingImage is true', () => {
@@ -174,9 +174,9 @@ describe('ProfileImageBottomSheet', () => {
       />,
     );
 
-    expect(getByText('ProfileSettings.removeImage')).toBeTruthy();
+    expect(getByText('profile.settings.removeImage')).toBeTruthy();
     expect(getAllByTestId('remove-image-icon')[0]).toBeTruthy();
-    expect(mockT).toHaveBeenCalledWith('ProfileSettings.removeImage');
+    expect(mockT).toHaveBeenCalledWith('profile.settings.removeImage');
   });
 
   it('does not show remove image option when hasExistingImage is false', () => {
@@ -190,7 +190,7 @@ describe('ProfileImageBottomSheet', () => {
       />,
     );
 
-    expect(queryByText('ProfileSettings.removeImage')).toBeNull();
+    expect(queryByText('profile.settings.removeImage')).toBeNull();
     expect(queryByTestId('remove-image-icon')).toBeNull();
   });
 
@@ -205,7 +205,7 @@ describe('ProfileImageBottomSheet', () => {
       />,
     );
 
-    const uploadOption = getByText('ProfileSettings.uploadImage');
+    const uploadOption = getByText('profile.settings.upload_image');
     fireEvent.press(uploadOption);
 
     expect(mockOnChangeImage).toHaveBeenCalledTimes(1);
@@ -222,7 +222,7 @@ describe('ProfileImageBottomSheet', () => {
       />,
     );
 
-    const removeOption = getByText('ProfileSettings.removeImage');
+    const removeOption = getByText('profile.settings.removeImage');
     fireEvent.press(removeOption);
 
     expect(mockOnRemoveImage).toHaveBeenCalledTimes(1);

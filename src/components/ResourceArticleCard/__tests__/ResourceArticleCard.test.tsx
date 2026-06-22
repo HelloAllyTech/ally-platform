@@ -41,7 +41,7 @@ describe('ResourceArticleCard', () => {
     );
 
     // Initially collapsed: should show truncated text container with "view more" label
-    const viewMore = getByText('ResourceArticleCard.viewMore');
+    const viewMore = getByText('common.viewMore');
     fireEvent.press(viewMore);
 
     // After expanding, content should still be visible
@@ -51,6 +51,6 @@ describe('ResourceArticleCard', () => {
     fireEvent.press(getByText(content));
 
     // Collapsed again, "view more" should be visible
-    expect(getByText('ResourceArticleCard.viewMore')).toBeTruthy();
+    expect(getByText('common.viewMore')).toBeTruthy();
   });
 });

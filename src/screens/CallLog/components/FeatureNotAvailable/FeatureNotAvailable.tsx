@@ -24,7 +24,7 @@ export const FeatureNotAvailable = ({
 
   return (
     <View style={[styles.clientContainer, containerStyle]}>
-      <Text style={styles.oopsText}>{title || t('CallLogs.oops')}</Text>
+      <Text style={styles.oopsText}>{title || t('audioCall.error.oops')}</Text>
       <View style={styles.messageContainer}>
         <Text style={styles.messageText}>{description}</Text>
       </View>

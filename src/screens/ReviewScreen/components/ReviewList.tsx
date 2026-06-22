@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useRef} from 'react';
+import {useCallback, useEffect, useMemo, useRef} from 'react';
 import {useFocusEffect} from '@react-navigation/native';
 import {ActivityIndicator, FlatList, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
@@ -60,9 +60,18 @@ export const ReviewList: React.FC<ReviewListProps> = ({
 
   useEffect(() => {
     if (error) {
-      showToast(t('Review.fetchError'), 'error');
+      showToast(t('review.error.title'), 'error');
     }
   }, [error, showToast, t]);
+
+  const filterTabs = useMemo(
+    () =>
+      REVIEW_FILTERS.map(filter => ({
+        key: filter.key,
+        label: t(filter.labelKey),
+      })),
+    [t],
+  );
 
   const isScribe = reviewType === 'scribe';
 
@@ -85,7 +94,7 @@ export const ReviewList: React.FC<ReviewListProps> = ({
     <>
       <View style={styles.tabContainer}>
         <TabView
-          tabs={REVIEW_FILTERS}
+          tabs={filterTabs}
           tabWidthMode="content"
           activeTab={selectedFilter}
           onTabChange={setSelectedFilter}
@@ -122,8 +131,8 @@ export const ReviewList: React.FC<ReviewListProps> = ({
         ListEmptyComponent={
           !isLoading && !isFetching && reviews.length === 0 ? (
             <EmptyState
-              title={t('Review.empty.title')}
-              description={t('Review.empty.description')}
+              title={t('review.empty.title')}
+              description={t('review.empty.description')}
               icon={EmptyReviewIcon}
             />
           ) : null

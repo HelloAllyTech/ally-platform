@@ -247,7 +247,7 @@ export const GeneralCommentsSection: React.FC<GeneralCommentsSectionProps> = ({
                 returnKeyType="send"
                 multiline={false}
                 autoFocus
-                placeholder={t('ThreadsBottomSheet.addComment')}
+                placeholder={t('review.details.addCommentPlaceholder')}
                 placeholderTextColor={colors.ds.typography.mediumEmphasis}
               />
               {!!editText.trim() && (
@@ -348,7 +348,7 @@ export const GeneralCommentsSection: React.FC<GeneralCommentsSectionProps> = ({
       return (
         <View style={styles.centeredContainer}>
           <Text style={styles.emptyText}>
-            {t('ThreadsBottomSheet.noGeneralComments')}
+            {t('review.details.noCommentsYet')}
           </Text>
         </View>
       );
@@ -366,7 +366,7 @@ export const GeneralCommentsSection: React.FC<GeneralCommentsSectionProps> = ({
             {isFetching ? (
               <ActivityIndicator size="small" color={colors.ds.theme.primary} />
             ) : (
-              <Text style={styles.loadMoreText}>{t('Common.loadMore')}</Text>
+              <Text style={styles.loadMoreText}>{t('common.loadMore')}</Text>
             )}
           </TouchableOpacity>
         )}
@@ -376,7 +376,7 @@ export const GeneralCommentsSection: React.FC<GeneralCommentsSectionProps> = ({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>{t('ThreadsBottomSheet.title')}</Text>
+      <Text style={styles.title}>{t('review.details.comments')}</Text>
 
       <View style={styles.inputRow}>
         <UserProfileImage
@@ -387,7 +387,7 @@ export const GeneralCommentsSection: React.FC<GeneralCommentsSectionProps> = ({
         <View style={styles.inputContainer}>
           <TextInput
             style={styles.input}
-            placeholder={t('ThreadsBottomSheet.addComment')}
+            placeholder={t('review.details.addCommentPlaceholder')}
             placeholderTextColor={colors.ds.typography.mediumEmphasis}
             value={commentText}
             onChangeText={setCommentText}

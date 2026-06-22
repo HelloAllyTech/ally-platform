@@ -645,12 +645,12 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
         roomStatus === RoomStatus.CONNECTED ||
         roomStatus === RoomStatus.CONNECTING
       ) {
-        return t('SimulationAssistant.waitingForAgent');
+        return t('simulationPage.waitingForAgent');
       }
       if (roomStatus === RoomStatus.DISCONNECTING) {
-        return t('SimulationAssistant.ending');
+        return t('simulationPage.endSession');
       }
-      return t('SimulationAssistant.connectingToSession');
+      return t('simulationPage.connectingToSession');
     };
 
     return (
@@ -660,7 +660,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
         </Text>
         {roomStatus === RoomStatus.CONNECTING && (
           <Text style={styles.loadingDescription}>
-            {t('SimulationAssistant.startingSubtitle')}
+            {t('simulationPage.microphonePrompt')}
           </Text>
         )}
       </View>
@@ -839,9 +839,9 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
 
           <EndingSoonModal
             visible={showEndingSoon && isSimulationInProgress}
-            titleMain={t('SimulationAssistant.session')}
-            titleItalic={t('SimulationAssistant.endingSoon')}
-            description={t('SimulationAssistant.sessionWillEnd')}
+            titleMain={t('simulationPage.warningDialog.titleNormal')}
+            titleItalic={t('simulationPage.warningDialog.titleItalic')}
+            description={t('simulationPage.warningDialog.content')}
             onContinue={() => setShowEndingSoon(false)}
             onEndSession={handleDisconnect}
           />
@@ -849,10 +849,10 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
           <IllustratedModal
             visible={showBackPressConfirmation}
             onClose={() => setShowBackPressConfirmation(false)}
-            description={t('SimulationAssistant.endSimulationConfirmation')}
-            actionButtonText={t('SimulationAssistant.endSimulation')}
-            titleMain={t('ListeningScreen.end')}
-            titleItalic={t('Simulations.simulation')}
+            description={t('simulationPage.endDialog.content')}
+            actionButtonText={t('simulationPage.endSession')}
+            titleMain={t('listeningScreen.end')}
+            titleItalic={t('common.simulation')}
             onActionPress={handleDisconnect}
             actionButtonColor={colors.brightRed}
             illustration={<EndSessionIcon />}

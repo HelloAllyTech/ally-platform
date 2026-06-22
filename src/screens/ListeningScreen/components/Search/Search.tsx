@@ -125,7 +125,7 @@ export const Search = () => {
       <SearchInput
         showSearchResults={showSearchResults}
         onFocus={onFocus}
-        placeholder={t('CallLogs.search.placeholder')}
+        placeholder={t('nav.tabs.search')}
         onBlur={onSearchBlur}
         isFocused={focused}
         searchText={searchText}
@@ -155,7 +155,9 @@ export const Search = () => {
           showsVerticalScrollIndicator={false}>
           <View style={styles.suggestionsContainer}>
             <View style={styles.tryContainer}>
-              <Text style={styles.tryLabel}>{t('SearchScreen.try')}</Text>
+              <Text style={styles.tryLabel}>
+                {t('search.suggestionsTitle')}
+              </Text>
             </View>
             {trySuggestions.map(suggestion => (
               <SearchSuggestion

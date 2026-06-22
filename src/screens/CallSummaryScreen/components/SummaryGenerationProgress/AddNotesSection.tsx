@@ -43,7 +43,7 @@ export const AddNotesSection = ({
   const renderTooltip = () => {
     return (
       <View style={styles.tooltipContainer}>
-        <Text>{t('CallSummary.info.notesAutoSaveInfo')}</Text>
+        <Text>{t('summaryLoading.notesTooltip')}</Text>
       </View>
     );
   };
@@ -59,9 +59,7 @@ export const AddNotesSection = ({
               style={[styles.chevron, isExpanded && styles.chevronExpanded]}
             />
             <PageIcon />
-            <Text style={styles.title}>
-              {t('CallSummaryProgress.addNotes')}
-            </Text>
+            <Text style={styles.title}>{t('summaryLoading.addNotes')}</Text>
           </View>
         </TouchableOpacity>
         <PrivacyTooltip

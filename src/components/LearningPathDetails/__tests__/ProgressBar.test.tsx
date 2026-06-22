@@ -11,7 +11,7 @@ describe('ProgressBar', () => {
   it('renders progress text with translation key', () => {
     const {getByText} = render(<ProgressBar current={2} total={5} />);
 
-    expect(getByText('Simulations.progressCompleted')).toBeTruthy();
+    expect(getByText('simulations.progressCompleted')).toBeTruthy();
   });
 
   it('hides text when isProgressTextVisible=false', () => {
@@ -23,7 +23,7 @@ describe('ProgressBar', () => {
       />,
     );
 
-    expect(queryByText(/Simulations\.progressCompleted/)).toBeNull();
+    expect(queryByText(/simulations\.progressCompleted/)).toBeNull();
   });
 
   it('shows custom progressText when provided', () => {
@@ -69,6 +69,6 @@ describe('ProgressBar', () => {
   it('handles total of 0', () => {
     const {getByText} = render(<ProgressBar current={5} total={0} />);
 
-    expect(getByText('Simulations.progressCompleted')).toBeTruthy();
+    expect(getByText('simulations.progressCompleted')).toBeTruthy();
   });
 });

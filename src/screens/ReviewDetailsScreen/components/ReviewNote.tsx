@@ -17,7 +17,7 @@ export const ReviewNote: React.FC<ReviewNoteProps> = ({note, onEditNote}) => {
       <View style={styles.header}>
         <View style={styles.headerTitle}>
           <Text style={styles.headerTitleText}>
-            {t('SimulationFeedback.reviewNoteTitle')}
+            {t('review.details.noteLabel')}
           </Text>
           {!note && onEditNote && (
             <TouchableOpacity onPress={onEditNote} style={styles.addNoteButton}>

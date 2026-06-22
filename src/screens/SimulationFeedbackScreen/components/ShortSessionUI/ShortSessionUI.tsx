@@ -12,11 +12,9 @@ export const ShortSessionUI: React.FC = () => {
   return (
     <View style={styles.container}>
       <HourGlassIcon />
-      <Text style={styles.title}>
-        {t('SimulationFeedback.shortSession.title')}
-      </Text>
+      <Text style={styles.title}>{t('postSim.shortSession.title')}</Text>
       <Text style={styles.description}>
-        {t('SimulationFeedback.shortSession.description')}
+        {t('postSim.shortSession.description')}
       </Text>
     </View>
   );

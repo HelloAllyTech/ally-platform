@@ -18,9 +18,7 @@ export const RecommendationBox: React.FC<RecommendationBoxProps> = ({
     <View style={styles.wrapper}>
       <View style={styles.container}>
         <View style={styles.content}>
-          <Text style={styles.label}>
-            {t('SimulationFeedback.recommended')}
-          </Text>
+          <Text style={styles.label}>{t('postSim.skills.recommended')}</Text>
           <Text style={styles.recommendationText}>{recommendation}</Text>
         </View>
       </View>

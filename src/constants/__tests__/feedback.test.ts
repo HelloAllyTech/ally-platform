@@ -7,7 +7,7 @@ describe('constants/feedback', () => {
     );
   });
   it('rating text map covers 1-5', () => {
-    expect(RATING_TEXT_MAP[1]).toContain('poor');
-    expect(RATING_TEXT_MAP[5]).toContain('excellent');
+    expect(RATING_TEXT_MAP[1]).toBe('callFeedback.ratings.1');
+    expect(RATING_TEXT_MAP[5]).toBe('callFeedback.ratings.5');
   });
 });

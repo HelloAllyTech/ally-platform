@@ -22,7 +22,7 @@ describe('SearchEmpty', () => {
 
   it('renders try label and suggestions', () => {
     const {getByText} = render(<SearchEmpty {...baseProps} />);
-    expect(getByText('SearchScreen.try')).toBeTruthy();
+    expect(getByText('search.suggestionsTitle')).toBeTruthy();
     expect(getByText('alpha')).toBeTruthy();
     expect(getByText('beta')).toBeTruthy();
   });
@@ -31,7 +31,7 @@ describe('SearchEmpty', () => {
     const {getByText} = render(
       <SearchEmpty {...baseProps} searchText="term" />,
     );
-    expect(getByText('SearchScreen.noData "term"')).toBeTruthy();
+    expect(getByText('search.noResults "term"')).toBeTruthy();
   });
 
   it('calls onPressSuggestion with suggestion text', () => {

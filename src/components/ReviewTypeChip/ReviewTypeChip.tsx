@@ -34,7 +34,7 @@ export const ReviewTypeChip = ({reviewType}: ReviewTypeChipProps) => {
   return (
     <View style={[styles.chip, chipColorsByType[reviewType]]}>
       <Text style={[styles.chipText, chipTextColorsByType[reviewType]]}>
-        {t('Review.card.reviewType', {
+        {t('review.feedCard.reviewType', {
           reviewType: capitalizeFirstLetter(reviewType),
         })}
       </Text>

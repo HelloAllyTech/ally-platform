@@ -67,8 +67,8 @@ describe('SearchScreen', () => {
     const {getByText} = render(<SearchScreen />);
 
     expect(getByText('not-focused')).toBeTruthy();
-    expect(getByText('CallLogs.search.placeholder')).toBeTruthy();
-    expect(getByText('SearchScreen.try')).toBeTruthy();
+    expect(getByText('nav.tabs.search')).toBeTruthy();
+    expect(getByText('search.suggestionsTitle')).toBeTruthy();
   });
 
   it('renders detail view with results list and tabs when showSearchResults=true', () => {
@@ -103,9 +103,9 @@ describe('SearchScreen', () => {
 
     const {getByText, queryByText} = render(<SearchScreen />);
     // Title replaced by mocked header; ensure suggestions header not present
-    expect(queryByText('SearchScreen.try')).toBeNull();
+    expect(queryByText('search.suggestionsTitle')).toBeNull();
     // Search input still exists via placeholder text
-    expect(getByText('CallLogs.search.placeholder')).toBeTruthy();
+    expect(getByText('nav.tabs.search')).toBeTruthy();
   });
 });
 

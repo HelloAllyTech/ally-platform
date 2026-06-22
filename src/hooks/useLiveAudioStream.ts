@@ -62,11 +62,11 @@ export const useLiveAudioStream = ({
               initAudioStream();
             } else {
               showSettingsAlert(
-                'Common.permissions.microphoneRequired',
-                'Common.permissions.microphoneMessage',
+                'simulationPage.allowMicrophone',
+                'simulationPage.microphonePrompt',
                 {
-                  cancelKey: 'Common.cancel',
-                  settingsKey: 'Common.ok',
+                  cancelKey: 'common.cancel',
+                  settingsKey: 'common.ok',
                   onCancel: () => navigation.goBack(),
                   onOpenSettings: () => openSettings(),
                 },

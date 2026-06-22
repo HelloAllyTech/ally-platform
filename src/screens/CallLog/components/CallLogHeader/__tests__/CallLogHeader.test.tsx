@@ -41,12 +41,12 @@ describe('CallLogHeader', () => {
       <CallLogHeader
         search=""
         onSearchChange={() => {}}
-        title="CallLogs.header.title"
-        subtitle="CallLogs.header.subtitle"
+        title="calls.header.title"
+        subtitle="calls.header.subtitle"
       />,
     );
-    expect(getByText('CallLogs.header.title')).toBeTruthy();
-    expect(getByText('CallLogs.header.subtitle')).toBeTruthy();
+    expect(getByText('calls.header.title')).toBeTruthy();
+    expect(getByText('calls.header.subtitle')).toBeTruthy();
   });
 
   it('renders TabScreenHeader component', () => {
@@ -54,7 +54,7 @@ describe('CallLogHeader', () => {
       <CallLogHeader
         search=""
         onSearchChange={() => {}}
-        title="CallLogs.header.title"
+        title="calls.header.title"
       />,
     );
     expect(getByTestId('tab-screen-header')).toBeTruthy();
@@ -79,6 +79,6 @@ describe('CallLogHeader', () => {
       <CallLogHeader search="" onSearchChange={() => {}} />,
     );
     expect(getByTestId('tab-screen-header')).toBeTruthy();
-    expect(queryByText('CallLogs.header.title')).toBeNull();
+    expect(queryByText('calls.header.title')).toBeNull();
   });
 });

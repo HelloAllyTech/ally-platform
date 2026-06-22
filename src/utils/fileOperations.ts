@@ -30,7 +30,7 @@ export const saveFile = async ({
   }
 
   if (!directory) {
-    throw new Error(t('CallSummary.info.directoryPathError'));
+    throw new Error(t('callSummary.info.directoryPathError'));
   }
 
   const filePath = `${directory}/${filename}`;

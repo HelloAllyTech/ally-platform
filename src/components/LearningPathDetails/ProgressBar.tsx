@@ -78,7 +78,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
       {/* Progress text - inline with bar */}
       {isProgressTextVisible && (
         <Text style={[styles.progressText, progressTextStyle]}>
-          {progressText || t('Simulations.progressCompleted', {current, total})}
+          {progressText || t('simulations.progressCompleted', {current, total})}
         </Text>
       )}
     </View>

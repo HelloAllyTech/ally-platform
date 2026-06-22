@@ -33,7 +33,7 @@ describe('ReactionFilterTabs', () => {
 
   it('renders All tab with total count', () => {
     const {getByText} = render(<ReactionFilterTabs {...defaultProps} />);
-    expect(getByText('All 8')).toBeTruthy();
+    expect(getByText('achievements.filters.all 8')).toBeTruthy();
   });
 
   it('renders reaction tabs with counts', () => {
@@ -47,7 +47,7 @@ describe('ReactionFilterTabs', () => {
     const {getByText} = render(
       <ReactionFilterTabs {...defaultProps} onFilterChange={onFilterChange} />,
     );
-    fireEvent.press(getByText('All 8'));
+    fireEvent.press(getByText('achievements.filters.all 8'));
     expect(onFilterChange).toHaveBeenCalledWith(null);
   });
 
@@ -69,7 +69,7 @@ describe('ReactionFilterTabs', () => {
         onFilterChange={jest.fn()}
       />,
     );
-    expect(getByText('All 0')).toBeTruthy();
+    expect(getByText('achievements.filters.all 0')).toBeTruthy();
   });
 
   it('renders with selectedReaction set', () => {

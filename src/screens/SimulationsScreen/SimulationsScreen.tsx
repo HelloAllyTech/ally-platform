@@ -142,7 +142,7 @@ export const SimulationsScreen: React.FC = () => {
     return (
       <SimulationCard
         title={item.title}
-        description={`${total} ${t('CallLogs.simulations')}`}
+        description={`${total} ${t('calls.table.scenario')}`}
         coverImageUrl={item.coverImageUrl}
         onPress={() => handlePathPress(item)}
         rightAccessory={
@@ -176,7 +176,7 @@ export const SimulationsScreen: React.FC = () => {
     return (
       <SimulationCard
         title={item.title}
-        description={`${total} ${t('CallLogs.simulations')}`}
+        description={`${total} ${t('calls.table.scenario')}`}
         coverImageUrl={item.coverImageUrl}
         onPress={() => handleCasePress(item)}
         rightAccessory={
@@ -206,10 +206,10 @@ export const SimulationsScreen: React.FC = () => {
       <View style={styles.empty}>
         <Text style={styles.emptyTitle}>
           {activeTab === SimulationTabs.SIMULATIONS
-            ? t('Simulations.noSimulationsAvailable')
+            ? t('simulationPage.noSimulationsAvailable')
             : activeTab === SimulationTabs.PATHS
-              ? t('Simulations.noPathsAvailable')
-              : t('Simulations.noCasesAvailable')}
+              ? t('simulationPage.noPathsAvailable')
+              : t('simulationPage.noCasesAvailable')}
         </Text>
       </View>
     ),
@@ -238,8 +238,8 @@ export const SimulationsScreen: React.FC = () => {
   const renderHeader = () => {
     return (
       <TabScreenHeader
-        title={t('Simulations.header.title')}
-        subtitle={t('Simulations.header.subtitle')}
+        title={t('common.appName')}
+        subtitle={t('nav.tabs.learn')}
         italicSubtitle
         rightContent={renderCreditsDisplay()}
       />
@@ -266,9 +266,9 @@ export const SimulationsScreen: React.FC = () => {
     return (
       <>
         <Text style={styles.listTitle}>
-          {t('Simulations.chooseYour')}{' '}
+          {t('learn.choose.prefix')}{' '}
           <Text style={styles.pageTitleItalic}>
-            {t(`Simulations.${tabLabel}`)}
+            {t(`simulations.${tabLabel}`)}
           </Text>
         </Text>
         {isSimulationsTab ? (
@@ -338,7 +338,7 @@ export const SimulationsScreen: React.FC = () => {
         <View style={styles.introWrapper}>
           <Text style={styles.introText}>
             <Trans
-              i18nKey="Simulations.learnIntro"
+              i18nKey="simulations.learnIntro"
               components={{
                 blue: <Text style={styles.blueBold} />,
               }}
@@ -350,15 +350,15 @@ export const SimulationsScreen: React.FC = () => {
             tabs={[
               {
                 key: SimulationTabs.SIMULATIONS,
-                label: t('CallLogs.simulations'),
+                label: t('simulations.simulation'),
               },
               {
                 key: SimulationTabs.PATHS,
-                label: t('Simulations.tracks'),
+                label: t('simulations.tracks'),
               },
               {
                 key: SimulationTabs.CASES,
-                label: t('Simulations.cases'),
+                label: t('simulations.cases'),
               },
             ]}
             activeTab={activeTab}

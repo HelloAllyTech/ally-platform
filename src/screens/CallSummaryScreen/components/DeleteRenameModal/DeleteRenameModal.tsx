@@ -26,12 +26,12 @@ export const DeleteRenameModal: React.FC<DeleteRenameModalProps> = ({
       <CustomModal
         visible={activeModal === 'delete'}
         onClose={() => setActiveModal(null)}
-        title={t('CallSummary.customMenu.delete')}
-        primaryButtonText={t('CallSummary.customMenu.delete')}
-        secondaryButtonText={t('CallSummary.info.cancel')}
+        title={t('callSummary.customMenu.delete')}
+        primaryButtonText={t('callSummary.customMenu.delete')}
+        secondaryButtonText={t('callSummary.info.cancel')}
         onPrimaryPress={handleDelete}
         onSecondaryPress={() => setActiveModal(null)}
-        description={t('CallSummary.customMenu.deleteConfirmation')}
+        description={t('callSummary.customMenu.deleteConfirmation')}
         primaryTextColor={colors.brightRed}
       />
     );
@@ -42,9 +42,9 @@ export const DeleteRenameModal: React.FC<DeleteRenameModalProps> = ({
       <CustomModal
         visible={activeModal === 'rename'}
         onClose={() => setActiveModal(null)}
-        title={t('CallSummary.info.rename')}
-        primaryButtonText={t('CallSummary.info.confirm')}
-        secondaryButtonText={t('CallSummary.info.cancel')}
+        title={t('callSummary.info.rename')}
+        primaryButtonText={t('callSummary.info.confirm')}
+        secondaryButtonText={t('callSummary.info.cancel')}
         onPrimaryPress={handleBlur}
         onSecondaryPress={() => setActiveModal(null)}
         showInput

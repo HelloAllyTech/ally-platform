@@ -138,7 +138,7 @@ export const useErrorToast = () => {
       const apiError = error as {data?: {message?: string; error?: string}};
       const hasApiError = apiError?.data?.message || apiError?.data?.error;
 
-      const defaultFallback = t('Common.somethingWentWrong');
+      const defaultFallback = t('postCallSummary.somethingWentWrongRetry');
       const hasSpecificError =
         hasApiError ||
         (errorDetails.message &&

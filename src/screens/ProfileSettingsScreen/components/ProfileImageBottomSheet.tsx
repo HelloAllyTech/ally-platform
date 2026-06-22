@@ -51,14 +51,14 @@ export const ProfileImageBottomSheet: React.FC<
       allowFullExpand={false}
       backgroundColor={colors.white}>
       <View style={styles.container}>
-        <Text style={styles.title}>{t('ProfileSettings.profileImage')}</Text>
+        <Text style={styles.title}>{t('profile.settings.profile_image')}</Text>
         <View style={styles.optionsContainer}>
           <ProfileImageOption
             icon={<ChangeImageIcon width={24} height={24} />}
             text={
               hasExistingImage
-                ? t('ProfileSettings.changeImage')
-                : t('ProfileSettings.uploadImage')
+                ? t('profile.settings.changeImage')
+                : t('profile.settings.upload_image')
             }
             onPress={onChangeImage}
           />
@@ -66,7 +66,7 @@ export const ProfileImageBottomSheet: React.FC<
           {hasExistingImage && (
             <ProfileImageOption
               icon={<RemoveImageIcon width={24} height={24} />}
-              text={t('ProfileSettings.removeImage')}
+              text={t('profile.settings.removeImage')}
               onPress={onRemoveImage}
             />
           )}

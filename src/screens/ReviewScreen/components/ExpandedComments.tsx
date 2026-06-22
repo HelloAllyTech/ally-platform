@@ -73,7 +73,7 @@ export const ExpandedComments: React.FC<ExpandedCommentsProps> = ({
           {!hasComments && (
             <View style={styles.emptyCommentsContainer}>
               <Text style={styles.emptyCommentsText}>
-                {t('Review.card.noComments')}
+                {t('review.details.noCommentsYet')}
               </Text>
             </View>
           )}
@@ -84,12 +84,16 @@ export const ExpandedComments: React.FC<ExpandedCommentsProps> = ({
         <TouchableOpacity
           style={styles.showMoreButton}
           onPress={() => onCommentPress(reviewId)}>
-          <Text style={styles.showMoreText}>{t('Review.card.showMore')}</Text>
+          <Text style={styles.showMoreText}>
+            {t('review.feedCard.showMore')}
+          </Text>
         </TouchableOpacity>
       )}
 
       <TouchableOpacity style={styles.collapseButton} onPress={onCollapsePress}>
-        <Text style={styles.collapseText}>{t('Review.card.collapse')}</Text>
+        <Text style={styles.collapseText}>
+          {t('calls.uploadProgress.collapse')}
+        </Text>
         <View style={styles.chevronUp}>
           <ChevronDown width={16} height={16} color={colors.ds.icon.default} />
         </View>

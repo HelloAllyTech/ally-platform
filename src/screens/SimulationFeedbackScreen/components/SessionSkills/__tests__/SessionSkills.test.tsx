@@ -108,7 +108,7 @@ describe('SessionSkills', () => {
 
     const {getByText} = render(<SessionSkills {...defaultProps} />);
     expect(
-      getByText('SimulationFeedback.sessionSkills.errorLoading'),
+      getByText('callFeedback.sessionSkills.errorLoading'),
     ).toBeTruthy();
   });
 

@@ -23,7 +23,7 @@ export const getSimulationSummaryTabs = (
 ) => {
   const summaryTab = {
     key: SimulationSummaryTabKey.SUMMARY,
-    title: t('SimulationFeedback.tabs.sessionReview'),
+    title: t('postSim.tabs.sessionReview'),
     testID: 'tab-0',
   };
 
@@ -35,22 +35,22 @@ export const getSimulationSummaryTabs = (
     summaryTab,
     {
       key: SimulationSummaryTabKey.ASK_AI,
-      title: t('SimulationFeedback.tabs.askAI'),
+      title: t('postSim.tabs.askAi'),
       testID: 'tab-1',
     },
     {
       key: SimulationSummaryTabKey.TRANSCRIPTION,
-      title: t('SimulationFeedback.tabs.annotatedTranscript'),
+      title: t('postSim.tabs.annotatedTranscript'),
       testID: 'tab-2',
     },
     {
       key: SimulationSummaryTabKey.SKILLS,
-      title: t('SimulationFeedback.tabs.skillsDemonstrated'),
+      title: t('postSim.tabs.skillsDemonstrated'),
       testID: 'tab-3',
     },
     {
       key: SimulationSummaryTabKey.REFLECTION,
-      title: t('SimulationFeedback.tabs.deeperReflection'),
+      title: t('postSim.tabs.deeperReflection'),
       testID: 'tab-4',
     },
   ];
@@ -58,7 +58,7 @@ export const getSimulationSummaryTabs = (
   if (pathId || caseId) {
     tabs.push({
       key: SimulationSummaryTabKey.UP_NEXT,
-      title: t('SimulationFeedback.tabs.upNext'),
+      title: t('postSim.tabs.upNext'),
       testID: 'tab-5',
     });
   }

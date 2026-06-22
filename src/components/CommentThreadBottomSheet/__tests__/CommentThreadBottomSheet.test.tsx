@@ -186,7 +186,7 @@ describe('CommentThreadBottomSheet', () => {
     const {getByText} = render(
       <CommentThreadBottomSheet {...defaultProps} />,
     );
-    expect(getByText('CommentThreadBottomSheet.title')).toBeTruthy();
+    expect(getByText('commentThreadBottomSheet.title')).toBeTruthy();
   });
 
   it('calls hideCommentThreadBottomSheet when back button is pressed', () => {

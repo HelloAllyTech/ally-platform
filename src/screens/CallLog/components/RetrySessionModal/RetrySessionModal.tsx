@@ -101,18 +101,13 @@ export const RetrySessionModal = ({
           <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
             <CloseIcon />
           </TouchableOpacity>
-          <Text style={styles.title}>
-            {t('CallLogs.retrySession.header.title')}
-          </Text>
-          <Text style={styles.subtitle}>
-            {t('CallLogs.retrySession.header.subtitle')}
-          </Text>
+          <Text style={styles.title}>{t('common.maxActiveUsers.title')}</Text>
           <RetrySessionIcon />
           <Text style={styles.description}>
-            {t('CallLogs.retrySession.description')}
+            {t('common.maxActiveUsers.description')}
           </Text>
           <Button
-            label={t('CallLogs.retrySession.button')}
+            label={t('common.retry')}
             onPress={handleRetry}
             customContainerStyle={styles.button}
             isDisabled={retryStatus === 'cooldown' || isRetrying}
@@ -120,8 +115,8 @@ export const RetrySessionModal = ({
           />
           <Text style={styles.autoRetryDescription}>
             {retryStatus === 'cooldown'
-              ? t('CallLogs.retrySession.retryDescription')
-              : t('CallLogs.retrySession.autoRetryDescription')}{' '}
+              ? t('common.maxActiveUsers.manualRetry')
+              : t('common.maxActiveUsers.autoRetry')}{' '}
             {timeleft}
           </Text>
         </View>

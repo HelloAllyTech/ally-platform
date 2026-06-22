@@ -228,7 +228,8 @@ const getUnitLabel = (
   unit: 'day' | 'hour' | 'minute' | 'second',
   t?: (key: string) => string,
 ): string => {
-  const key = `CallSummary.${unit}s`;
+  const key =
+    value === 1 ? `summary.duration.${unit}` : `summary.duration.${unit}s`;
   if (t) return t(key);
   return value === 1 ? unit : `${unit}s`;
 };
@@ -281,7 +282,7 @@ const formatShortDuration = (
   if (minutes > 0) {
     return includeSeconds
       ? `${minutes}:${seconds.toString().padStart(2, '0')} min`
-      : `${minutes} ${t?.('CallSummary.minutes') || 'min'}`;
+      : `${minutes} ${t?.('summary.duration.min') || 'min'}`;
   }
 
   return `${seconds} sec`;

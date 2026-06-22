@@ -41,9 +41,9 @@ export const ReviewComment: React.FC<ReviewCommentProps> = ({
 
   const getRepliesText = () => {
     if (replyCount === 1) {
-      return t('ReviewComment.repliesOne');
+      return t('review.details.replyLabel');
     }
-    return t('ReviewComment.replies', {count: replyCount});
+    return t('review.details.comment_one', {count: replyCount});
   };
 
   const getMenuOptions = (): Array<{label: string; onPress: () => void}> => {
@@ -58,7 +58,7 @@ export const ReviewComment: React.FC<ReviewCommentProps> = ({
       !hidden
     ) {
       options.push({
-        label: t('ReviewComment.edit'),
+        label: t('review.details.edit'),
         onPress: () => onEdit(commentId || '', comment || ''),
       });
     }
@@ -71,7 +71,7 @@ export const ReviewComment: React.FC<ReviewCommentProps> = ({
       !hidden
     ) {
       options.push({
-        label: t('ReviewComment.delete'),
+        label: t('review.details.delete'),
         onPress: () => onDelete?.(commentId || ''),
       });
     }
@@ -79,7 +79,7 @@ export const ReviewComment: React.FC<ReviewCommentProps> = ({
     // Hide - only if user is the review owner
     if (currentUserId && reviewOwnerId && currentUserId === reviewOwnerId) {
       options.push({
-        label: hidden ? t('ReviewComment.unhide') : t('ReviewComment.hide'),
+        label: hidden ? t('review.details.unhide') : t('review.details.hide'),
         onPress: () => onHide?.(commentId || '', !hidden),
       });
     }
@@ -115,9 +115,7 @@ export const ReviewComment: React.FC<ReviewCommentProps> = ({
             {hidden && (
               <View style={styles.hiddenBadge}>
                 <EyeClosedIcon width={ms(16)} height={ms(16)} />
-                <Text style={styles.hiddenBadgeText}>
-                  {t('ReviewComment.hidden')}
-                </Text>
+                <Text style={styles.hiddenBadgeText}>{t('review.hidden')}</Text>
               </View>
             )}
           </View>
@@ -196,7 +194,9 @@ export const ReviewComment: React.FC<ReviewCommentProps> = ({
               onPress={onReplyPress}
               activeOpacity={0.7}
               hitSlop={10}>
-              <Text style={styles.likeText}>{t('ReviewComment.reply')}</Text>
+              <Text style={styles.likeText}>
+                {t('review.details.replyLabel')}
+              </Text>
             </TouchableOpacity>
           )}
 

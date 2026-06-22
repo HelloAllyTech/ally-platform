@@ -49,7 +49,7 @@ export const SimulationControls: React.FC<SimulationControlsProps> = ({
       {
         id: 'mic',
         icon: !isMicEnabled ? <MicOffIcon /> : <MicOnIcon />,
-        label: t(`SimulationAssistant.${!isMicEnabled ? 'unmute' : 'mute'}`),
+        label: t(`simulationPage.${!isMicEnabled ? 'unmute' : 'mute'}`),
         onPress: onMicToggle,
         // Pause is a superset of mute — disable mic toggle while paused.
         disabled: !isSimulationInProgress || isPaused,
@@ -62,7 +62,7 @@ export const SimulationControls: React.FC<SimulationControlsProps> = ({
               icon: (
                 <MicIcon color={isFocusMode ? colors.black : colors.white} />
               ),
-              label: t(`ListeningScreen.${isFocusMode ? 'focused' : 'focus'}`),
+              label: t(`listeningScreen.${isFocusMode ? 'focused' : 'focus'}`),
               onPress: onFocusModeToggle,
               disabled: !isSimulationInProgress || isPaused,
               variant: (isFocusMode ? 'active' : 'default') as
@@ -76,7 +76,7 @@ export const SimulationControls: React.FC<SimulationControlsProps> = ({
             {
               id: 'pause',
               icon: isPaused ? <PlayWhiteIcon /> : <PauseWhiteIcon />,
-              label: t(`SimulationAssistant.${isPaused ? 'resume' : 'pause'}`),
+              label: t(`simulationPage.${isPaused ? 'resume' : 'pause'}`),
               onPress: onPauseToggle,
               disabled: !isSimulationInProgress,
               variant: (isPaused ? 'active' : 'default') as
@@ -88,7 +88,7 @@ export const SimulationControls: React.FC<SimulationControlsProps> = ({
       {
         id: 'end',
         icon: <View style={styles.endButtonIcon} />,
-        label: t('SimulationAssistant.endSession'),
+        label: t('simulationPage.endSession'),
         onPress: onEndSession,
         disabled: !isSimulationInProgress,
         variant: 'destructive',

@@ -137,7 +137,7 @@ describe('ShareCallLogScreen', () => {
     const {getByText} = render(
       <ShareCallLogScreen route={mockRoute} navigation={{} as any} />,
     );
-    expect(getByText('Review.card.dateAndTime')).toBeTruthy();
+    expect(getByText('review.details.dateAndTime')).toBeTruthy();
     expect(getByText('formatted-2026-03-06T10:00:00Z')).toBeTruthy();
   });
 
@@ -145,7 +145,7 @@ describe('ShareCallLogScreen', () => {
     const {getByText} = render(
       <ShareCallLogScreen route={mockRoute} navigation={{} as any} />,
     );
-    expect(getByText('Review.card.duration')).toBeTruthy();
+    expect(getByText('review.feedCard.duration')).toBeTruthy();
     expect(getByText('2:30')).toBeTruthy();
   });
 
@@ -163,7 +163,7 @@ describe('ShareCallLogScreen', () => {
     const {queryByText} = render(
       <ShareCallLogScreen route={routeNoDuration} navigation={{} as any} />,
     );
-    expect(queryByText('Review.card.duration')).toBeNull();
+    expect(queryByText('review.feedCard.duration')).toBeNull();
   });
 
   it('renders simulation details card with scribe reviewType', () => {

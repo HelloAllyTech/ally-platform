@@ -94,7 +94,7 @@ describe('GeneralCommentsSection', () => {
     const {getByText} = render(
       <GeneralCommentsSection {...defaultProps} />,
     );
-    expect(getByText('ThreadsBottomSheet.title')).toBeTruthy();
+    expect(getByText('review.details.comments')).toBeTruthy();
   });
 
   it('shows loading indicator when loading with no comments', () => {
@@ -154,7 +154,7 @@ describe('GeneralCommentsSection', () => {
     const {getByText} = render(
       <GeneralCommentsSection {...defaultProps} />,
     );
-    expect(getByText('ThreadsBottomSheet.noGeneralComments')).toBeTruthy();
+    expect(getByText('review.details.noCommentsYet')).toBeTruthy();
   });
 
   it('renders without crashing', () => {

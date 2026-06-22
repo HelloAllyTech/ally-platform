@@ -84,28 +84,28 @@ describe('SimulationControls', () => {
     const {getByText} = render(
       <SimulationControls {...defaultProps} isMicEnabled={true} />,
     );
-    expect(getByText('SimulationAssistant.mute')).toBeTruthy();
+    expect(getByText('simulationPage.mute')).toBeTruthy();
   });
 
   it('shows unmute label when mic is disabled', () => {
     const {getByText} = render(
       <SimulationControls {...defaultProps} isMicEnabled={false} />,
     );
-    expect(getByText('SimulationAssistant.unmute')).toBeTruthy();
+    expect(getByText('simulationPage.unmute')).toBeTruthy();
   });
 
   it('shows focused label when focus mode is active', () => {
     const {getByText} = render(
       <SimulationControls {...defaultProps} isFocusMode={true} />,
     );
-    expect(getByText('ListeningScreen.focused')).toBeTruthy();
+    expect(getByText('listeningScreen.focused')).toBeTruthy();
   });
 
   it('shows focus label when focus mode is inactive', () => {
     const {getByText} = render(
       <SimulationControls {...defaultProps} isFocusMode={false} />,
     );
-    expect(getByText('ListeningScreen.focus')).toBeTruthy();
+    expect(getByText('listeningScreen.focus')).toBeTruthy();
   });
 
   it('disables buttons when simulation is not in progress', () => {

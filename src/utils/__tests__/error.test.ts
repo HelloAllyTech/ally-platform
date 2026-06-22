@@ -24,7 +24,7 @@ describe('getErrorDetails', () => {
 
   it('returns default message if none present', () => {
     const error = {};
-    expect(getErrorDetails(error).message).toBe('Common.somethingWentWrong');
+    expect(getErrorDetails(error).message).toBe('common.somethingWentWrong');
   });
 });
 

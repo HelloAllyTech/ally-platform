@@ -137,20 +137,20 @@ describe('ThreadsBottomSheet', () => {
     );
 
     expect(queryByTestId('mock-bottom-sheet')).toBeNull();
-    expect(queryByText('ThreadsBottomSheet.title')).toBeNull();
+    expect(queryByText('threadsBottomSheet.title')).toBeNull();
   });
 
   it('renders header title when visible', () => {
     const {getByText} = render(<ThreadsBottomSheet {...defaultProps} />);
 
-    expect(getByText('ThreadsBottomSheet.title')).toBeTruthy();
+    expect(getByText('threadsBottomSheet.title')).toBeTruthy();
   });
 
   it('renders tab labels for inline and general tabs', () => {
     const {getByText} = render(<ThreadsBottomSheet {...defaultProps} />);
 
-    expect(getByText('ThreadsBottomSheet.tabInline')).toBeTruthy();
-    expect(getByText('ThreadsBottomSheet.tabGeneral')).toBeTruthy();
+    expect(getByText('threadsBottomSheet.tabInline')).toBeTruthy();
+    expect(getByText('threadsBottomSheet.tabGeneral')).toBeTruthy();
   });
 
   it('calls onClose when bottom sheet requests close', () => {

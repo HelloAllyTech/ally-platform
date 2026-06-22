@@ -23,7 +23,9 @@ export const CallTranscript = ({chatId}: {chatId: number}) => {
         message={message}
         counselor={counselor}
         speakerLabel={
-          counselor ? t('CallTranscript.you') : t('CallTranscript.client')
+          counselor
+            ? t('transcription.youLabel')
+            : t('transcription.clientLabel')
         }
       />
     );
@@ -31,7 +33,7 @@ export const CallTranscript = ({chatId}: {chatId: number}) => {
 
   const renderEmptyComponent = () => <EmptyTranscript />;
   return (
-    <SummaryCard title={t('CallSummary.header.transcript')}>
+    <SummaryCard title={t('callSummary.header.transcript')}>
       {isDictationMode ? (
         <CallTranscriptItem
           time=""

@@ -45,8 +45,10 @@ export const ReviewScreen: React.FC = () => {
       [ReviewType.SCRIBE]: canViewScribeReviews,
     };
 
-    return REVIEW_TYPE_TABS.filter(tab => permissionMap[tab.key] ?? false);
-  }, [canViewSimulationReviews, canViewScribeReviews]);
+    return REVIEW_TYPE_TABS.filter(tab => permissionMap[tab.key] ?? false).map(
+      tab => ({key: tab.key, title: t(tab.titleKey)}),
+    );
+  }, [canViewSimulationReviews, canViewScribeReviews, t]);
 
   const [activeType, setActiveType] = useState<ReviewType>(
     reviewTypeTabs[0]?.key ?? ReviewType.SIMULATION,
@@ -113,7 +115,7 @@ export const ReviewScreen: React.FC = () => {
         styles.container,
         {paddingTop: insets.top, paddingBottom: insets.bottom},
       ]}>
-      <TabScreenHeader title={t('Review.header.title')} />
+      <TabScreenHeader title={t('review.title')} />
       <View style={styles.contentContainer}>
         {showTypeTabs ? (
           <TabView

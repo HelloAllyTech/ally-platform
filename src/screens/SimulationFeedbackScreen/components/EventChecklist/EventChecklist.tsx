@@ -30,9 +30,7 @@ export const EventChecklist: React.FC<EventChecklistProps> = ({
   return (
     <>
       <View style={styles.headerContainer}>
-        <Text style={styles.title}>
-          {t('SimulationFeedback.checklistHeader')}
-        </Text>
+        <Text style={styles.title}>{t('learn.evaluationChecklist')}</Text>
       </View>
       <View style={styles.itemsContainer}>
         {items.map(item => (

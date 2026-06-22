@@ -58,7 +58,7 @@ export const useShareScreenLogic = ({
         await onUpdateStatus(reviewId, note);
       } else {
         const result = await onCreateReview(note);
-        showToast(t('SimulationFeedback.sharedForReview'), 'success');
+        showToast(t('callFeedback.sharedForReview'), 'success');
         if (onShareSuccess) {
           onShareSuccess(result);
         } else {
@@ -67,13 +67,16 @@ export const useShareScreenLogic = ({
         return;
       }
 
-      showToast(t('SimulationFeedback.sharedForReview'), 'success');
+      showToast(t('callFeedback.sharedForReview'), 'success');
       navigation.goBack();
     } catch (error) {
       console.error('Error sharing for review:', error);
       const serverMessage = (error as {data?: {message?: string}})?.data
         ?.message;
-      showToast(serverMessage || t('Errors.editNoteExpired'), 'error');
+      showToast(
+        serverMessage || t('callFeedback.issues.editNoteExpired'),
+        'error',
+      );
       if (serverMessage) {
         navigation.goBack();
       }
@@ -93,13 +96,16 @@ export const useShareScreenLogic = ({
     if (!reviewId) return;
     try {
       await onUpdateStatus(reviewId, note);
-      showToast(t('Success.editNoteSuccess'), 'success');
+      showToast(t('callFeedback.editNoteSuccess'), 'success');
       navigation.goBack();
     } catch (error) {
       console.error('Error editing note:', error);
       const serverMessage = (error as {data?: {message?: string}})?.data
         ?.message;
-      showToast(serverMessage || t('Errors.editNoteExpired'), 'error');
+      showToast(
+        serverMessage || t('callFeedback.issues.editNoteExpired'),
+        'error',
+      );
       if (serverMessage) {
         navigation.goBack();
       }
@@ -107,10 +113,10 @@ export const useShareScreenLogic = ({
   }, [reviewId, onUpdateStatus, note, navigation, showToast, t]);
 
   const screenTitle = isEditNote
-    ? t('SimulationFeedback.editNoteTitle')
-    : shareTitle || t('SimulationFeedback.shareScreenTitle');
+    ? t('review.details.editNote')
+    : shareTitle || t('simulationPage.shareScreenTitle');
 
-  const buttonLabel = isEditNote ? t('save') : t('SimulationFeedback.share');
+  const buttonLabel = isEditNote ? t('common.save') : t('common.share');
 
   const onSubmit = isEditNote ? handleEditNote : handleShare;
 

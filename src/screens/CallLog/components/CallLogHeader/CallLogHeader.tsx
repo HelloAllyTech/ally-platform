@@ -75,7 +75,7 @@ export const CallLogHeader: React.FC<CallLogHeaderProps> = ({
             options={[
               {
                 leftIcon: <ArchiveIcon width={16} height={16} />,
-                label: t('CallSummary.header.actionsMenu.archive'),
+                label: t('callSummary.header.actionsMenu.archive'),
                 onPress: onArchivePress || (() => {}),
               },
             ]}

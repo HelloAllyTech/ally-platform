@@ -145,12 +145,12 @@ export const CallLogItem = ({
               </>
             )}
             <Text style={styles.duration}>
-              {`${t('CallLogs.duration')}: ${calculateDuration(item.startedAt, item.endedAt)}`}
+              {`${t('common.duration')}: ${calculateDuration(item.startedAt, item.endedAt)}`}
               {item?.score
-                ? ` • ${t('CallLogs.sessionScore')}: ${item?.score}`
+                ? ` • ${t('calls.table.sessionScore')}: ${item?.score}`
                 : ''}
               {item?.details?.callInfo?.mode
-                ? ` • ${t('CallLogs.mode')}: ${formatSessionMode(item.details.callInfo.mode, t)}`
+                ? ` • ${t('calls.table.mode')}: ${formatSessionMode(item.details.callInfo.mode, t)}`
                 : ''}
             </Text>
           </View>
