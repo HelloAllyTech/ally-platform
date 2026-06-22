@@ -83,7 +83,7 @@ export const ReviewTranscriptHeader = ({
           {onTogglePrivate && (
             <View style={styles.shareSwitchContainer}>
               <Text style={styles.shareSwitchLabel}>
-                {t('SimulationFeedback.share')}
+                {t('learn.scenario.share')}
               </Text>
               <CustomSwitch
                 value={!isPrivate}
@@ -116,7 +116,7 @@ export const ReviewTranscriptHeader = ({
           {!!duration &&
             renderSubtitleItem(
               true,
-              t('Review.card.duration'),
+              t('common.duration'),
               formatDurationFromSeconds(duration),
             )}
         </ScrollView>
@@ -125,7 +125,7 @@ export const ReviewTranscriptHeader = ({
         <SimulationDetailsModal
           visible={showSimulationDetailsModal}
           onClose={() => setShowSimulationDetailsModal(false)}
-          title={t('Review.card.simulationDetails')}
+          title={t('simulationPage.simulationDetails')}
           description={htmlToPlainText(sessionDetails.description)}
           coverImageUrl={sessionDetails.coverImageUrl}
           coverVideoUrl={sessionDetails.coverVideoUrl}

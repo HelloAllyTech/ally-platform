@@ -46,9 +46,9 @@ export const Header: React.FC<HeaderProps> = ({
             </TouchableOpacity>
             <View>
               <Text style={styles.expandedSummaryTitle}>
-                {t('CallSummary.header.title')}{' '}
+                {t('callSummary.header.title')}{' '}
                 <Text style={styles.headerSubtitle}>
-                  {t('CallSummary.header.subtitle')}
+                  {t('callSummary.header.subtitle')}
                 </Text>
               </Text>
               <View style={styles.nameContainer}>
@@ -62,7 +62,7 @@ export const Header: React.FC<HeaderProps> = ({
             {showShareSwitch && onShareToggle && (
               <View style={styles.shareSwitchContainer}>
                 <Text style={styles.shareSwitchLabel}>
-                  {t('SimulationFeedback.share')}
+                  {t('learn.scenario.share')}
                 </Text>
                 <CustomSwitch
                   value={isSharedForReview}

@@ -12,8 +12,8 @@ const TestComponent = () => {
   const {t, tVariable} = useTranslate();
   return (
     <>
-      <Text>{t('Common.ok')}</Text>
-      <Text>{tVariable('Common.cancel')}</Text>
+      <Text>{t('common.ok')}</Text>
+      <Text>{tVariable('common.cancel')}</Text>
     </>
   );
 };
@@ -21,8 +21,8 @@ const TestComponent = () => {
 describe('useTranslate', () => {
   it('returns translation functions that pass through keys in tests', () => {
     const {getByText} = render(<TestComponent />);
-    expect(getByText('Common.ok')).toBeTruthy();
-    expect(getByText('Common.cancel')).toBeTruthy();
+    expect(getByText('common.ok')).toBeTruthy();
+    expect(getByText('common.cancel')).toBeTruthy();
   });
 });
 

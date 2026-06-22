@@ -83,7 +83,7 @@ describe('CallSummaryScreen/SectionWrapper', () => {
         isExpanded={true}
         onToggle={() => {}}
         icon={<></>}
-        sectionConfig={{ key: SectionKey.SessionSummary as any, label: 'Section', icon: () => null, canEdit: true, canEnhance: true }}
+        sectionConfig={{ key: SectionKey.SessionSummary as any, label: 'Section', labelKey: 'summary.sections.sessionSummary', icon: () => null, canEdit: true, canEnhance: true }}
         index={0}
         handleSubmit={() => {}}
         isEditing={false}
@@ -101,7 +101,7 @@ describe('CallSummaryScreen/SectionWrapper', () => {
         isExpanded={true}
         onToggle={() => {}}
         icon={<></>}
-        sectionConfig={{ key: SectionKey.SessionSummary as any, label: 'Section', icon: () => null, canEdit: true, canEnhance: true }}
+        sectionConfig={{ key: SectionKey.SessionSummary as any, label: 'Section', labelKey: 'summary.sections.sessionSummary', icon: () => null, canEdit: true, canEnhance: true }}
         index={0}
         handleSubmit={() => {}}
         isEditing={false}
@@ -121,7 +121,7 @@ describe('CallSummaryScreen/SectionWrapper', () => {
         isExpanded={true}
         onToggle={() => {}}
         icon={<></>}
-        sectionConfig={{ key: SectionKey.SessionSummary as any, label: 'Section', icon: () => null, canEdit: true, canEnhance: true }}
+        sectionConfig={{ key: SectionKey.SessionSummary as any, label: 'Section', labelKey: 'summary.sections.sessionSummary', icon: () => null, canEdit: true, canEnhance: true }}
         index={0}
         handleSubmit={() => {}}
         isEditing={false}
@@ -141,7 +141,7 @@ describe('CallSummaryScreen/SectionWrapper', () => {
         isExpanded={true}
         onToggle={() => {}}
         icon={<></>}
-        sectionConfig={{ key: SectionKey.SessionSummary as any, label: 'Section', icon: () => null, canEdit: true, canEnhance: true }}
+        sectionConfig={{ key: SectionKey.SessionSummary as any, label: 'Section', labelKey: 'summary.sections.sessionSummary', icon: () => null, canEdit: true, canEnhance: true }}
         index={0}
         handleSubmit={() => {}}
         isEditing={false}
@@ -161,7 +161,7 @@ describe('CallSummaryScreen/SectionWrapper', () => {
         isExpanded={true}
         onToggle={() => {}}
         icon={<></>}
-        sectionConfig={{ key: SectionKey.SessionSummary as any, label: 'Section', icon: () => null, canEdit: true, canEnhance: true }}
+        sectionConfig={{ key: SectionKey.SessionSummary as any, label: 'Section', labelKey: 'summary.sections.sessionSummary', icon: () => null, canEdit: true, canEnhance: true }}
         index={0}
         handleSubmit={() => {}}
         isEditing={false}
@@ -183,7 +183,7 @@ describe('CallSummaryScreen/SectionWrapper', () => {
         isExpanded={true}
         onToggle={() => {}}
         icon={<></>}
-        sectionConfig={{ key: SectionKey.SessionSummary as any, label: 'Section', icon: () => null, canEdit: true, canEnhance: true }}
+        sectionConfig={{ key: SectionKey.SessionSummary as any, label: 'Section', labelKey: 'summary.sections.sessionSummary', icon: () => null, canEdit: true, canEnhance: true }}
         index={0}
         handleSubmit={handleSubmit}
         isEditing={true}

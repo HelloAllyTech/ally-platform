@@ -95,7 +95,7 @@ export const SimulationSummary: React.FC<SimulationSummaryProps> = ({
   );
 
   return (
-    <SummaryCard title={t('SimulationFeedback.sessionFeedback')}>
+    <SummaryCard title={t('postSim.feedback.sessionFeedback')}>
       {headerContent}
       {isShortSession(data?.details?.callDuration) ? (
         <ShortSessionUI />
@@ -107,11 +107,11 @@ export const SimulationSummary: React.FC<SimulationSummaryProps> = ({
           {!isChecklistMode && !isNoneMode && (
             <>
               <ExpandableFeedbackSection
-                title={t('SimulationFeedback.strengthsAndSkills')}
+                title={t('postSim.skills.strengths')}
                 items={positives}
               />
               <ExpandableFeedbackSection
-                title={t('SimulationFeedback.areasOfGrowth')}
+                title={t('postSim.skills.areasForGrowth')}
                 items={improvements}
               />
             </>
@@ -121,7 +121,7 @@ export const SimulationSummary: React.FC<SimulationSummaryProps> = ({
       <SimulationDetailsModal
         visible={showSimulationDetailsModal}
         onClose={() => setShowSimulationDetailsModal(false)}
-        title={t('Review.card.simulationDetails')}
+        title={t('simulationPage.simulationDetails')}
         description={data?.scenario?.description}
         coverImageUrl={coverImageUrl}
         coverVideoUrl={data?.scenario?.coverVideoUrl || undefined}

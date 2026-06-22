@@ -443,7 +443,7 @@ describe('AchievementsScreen', () => {
 
   it('renders the achievements screen', () => {
     const {getByText} = renderWithSafeArea(<AchievementsScreen />);
-    expect(getByText('Achievements')).toBeTruthy();
+    expect(getByText('achievements.title')).toBeTruthy();
   });
 
   it('renders back button', () => {
@@ -513,12 +513,12 @@ describe('AchievementsScreen', () => {
     const {getByText} = renderWithSafeArea(<AchievementsScreen />);
     
     // Should show category names from mockData
-    expect(getByText('Journey')).toBeTruthy();
-    expect(getByText('Momentum')).toBeTruthy();
+    expect(getByText('achievements.badgeTypes.Journey')).toBeTruthy();
+    expect(getByText('achievements.badgeTypes.Momentum')).toBeTruthy();
   });
 
   it('shows badges label', () => {
     const {getByText} = renderWithSafeArea(<AchievementsScreen />);
-    expect(getByText('Achievements.badges')).toBeTruthy();
+    expect(getByText('achievements.badges')).toBeTruthy();
   });
 });

@@ -41,17 +41,15 @@ describe('CallEndOverlay', () => {
 
   it('renders initial message correctly', () => {
     const {getByText} = render(<CallEndOverlay />);
-    
-    expect(getByText('BreathingScreen.youGaveYour')).toBeTruthy();
-    expect(getByText('BreathingScreen.best')).toBeTruthy();
-    expect(getByText('BreathingScreen.onThatCall')).toBeTruthy();
+
+    expect(getByText(/stressBuster.messages.gaveBest/)).toBeTruthy();
   });
 
   it('transitions to second message after delay', async () => {
     const {getByText, queryByText} = render(<CallEndOverlay />);
 
     // Initial message is visible
-    expect(getByText('BreathingScreen.youGaveYour')).toBeTruthy();
+    expect(getByText(/stressBuster.messages.gaveBest/)).toBeTruthy();
 
     // Advance timers to trigger message change
     act(() => {
@@ -60,10 +58,11 @@ describe('CallEndOverlay', () => {
 
     await waitFor(() => {
       // Initial message should be gone
-      expect(queryByText('BreathingScreen.youGaveYour')).toBeNull();
+      expect(queryByText(/stressBuster.messages.gaveBest/)).toBeNull();
       // Second message should be visible
-      expect(getByText('BreathingScreen.nowTakeAMoment')).toBeTruthy();
-      expect(getByText('BreathingScreen.yourself')).toBeTruthy();
+      expect(
+        getByText(/stressBuster.messages.momentForYourself/),
+      ).toBeTruthy();
     });
   });
 

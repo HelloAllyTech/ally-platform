@@ -110,7 +110,7 @@ describe('saveFile', () => {
         chatId: 123,
         t,
       }),
-    ).rejects.toThrow('CallSummary.info.directoryPathError');
+    ).rejects.toThrow('callSummary.info.directoryPathError');
 
     // Restore the original value
     Object.defineProperty(RNFS, 'DownloadDirectoryPath', {

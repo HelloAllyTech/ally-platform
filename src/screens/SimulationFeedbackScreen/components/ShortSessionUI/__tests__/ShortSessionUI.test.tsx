@@ -25,9 +25,9 @@ describe('ShortSessionUI', () => {
   it('displays title and description text', () => {
     const {getByText} = render(<ShortSessionUI />);
 
-    expect(getByText('SimulationFeedback.shortSession.title')).toBeTruthy();
+    expect(getByText('postSim.shortSession.title')).toBeTruthy();
     expect(
-      getByText('SimulationFeedback.shortSession.description'),
+      getByText('postSim.shortSession.description'),
     ).toBeTruthy();
   });
 

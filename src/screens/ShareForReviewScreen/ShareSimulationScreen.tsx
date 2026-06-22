@@ -78,12 +78,12 @@ export const ShareSimulationScreen: React.FC<
       onEmojiSelected={handleEmojiSelected}>
       <View>
         <SimulationDetailRow
-          label={t('Review.card.dateAndTime')}
+          label={t('review.details.dateAndTime')}
           value={formatDateTime(scenarioData.createdAt)}
         />
         {scenarioData.duration !== undefined && (
           <SimulationDetailRow
-            label={t('Review.card.duration')}
+            label={t('review.feedCard.duration')}
             value={scenarioData.duration}
           />
         )}

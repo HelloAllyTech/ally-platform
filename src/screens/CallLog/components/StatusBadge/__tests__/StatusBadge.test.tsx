@@ -21,7 +21,7 @@ describe('StatusBadge', () => {
     const {getByText} = render(
       <StatusBadge status={(require('@/constants').ChatSummaryStatus as any).NO_AUDIO} />,
     );
-    expect(getByText('CallLogs.noAudioDetected')).toBeTruthy();
+    expect(getByText('calls.status.noAudio')).toBeTruthy();
   });
 
   it('renders configured status label', () => {

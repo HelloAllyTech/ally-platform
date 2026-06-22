@@ -82,7 +82,7 @@ describe('BadgePopup', () => {
     const {getByText, UNSAFE_getByType} = render(<BadgePopup />);
     expect(getByText('First Step')).toBeTruthy();
     expect(getByText('You completed your first simulation')).toBeTruthy();
-    expect(getByText('Achievements.earnedNewBadge')).toBeTruthy();
+    expect(getByText('achievements.modal.newBadge')).toBeTruthy();
 
     const {Modal} = require('react-native');
     const modal = UNSAFE_getByType(Modal);

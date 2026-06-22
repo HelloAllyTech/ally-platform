@@ -156,7 +156,7 @@ export const Reflection: React.FC<ReflectionProps> = ({scenarioSessionId}) => {
   );
 
   return (
-    <SummaryCard title={t('SimulationFeedback.reflection.sectionTitle')}>
+    <SummaryCard title={t('reflection.sectionTitle')}>
       <ScrollView
         ref={scrollViewRef}
         style={styles.scrollView}
@@ -186,7 +186,7 @@ export const Reflection: React.FC<ReflectionProps> = ({scenarioSessionId}) => {
                   inputRefs.current[prompt.id] = ref;
                 }}
                 style={styles.textInput}
-                placeholder={t('SimulationFeedback.reflection.placeholder')}
+                placeholder={t('reflection.writeThoughts')}
                 placeholderTextColor={colors.ds.typography.lowEmphasis}
                 value={prompt.response || ''}
                 onChangeText={value =>
@@ -205,9 +205,7 @@ export const Reflection: React.FC<ReflectionProps> = ({scenarioSessionId}) => {
             </Pressable>
           ))
         ) : (
-          <Text style={styles.emptyText}>
-            {t('SimulationFeedback.reflection.noPromptsAvailable')}
-          </Text>
+          <Text style={styles.emptyText}>{t('reflection.noPrompts')}</Text>
         )}
       </ScrollView>
     </SummaryCard>

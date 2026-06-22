@@ -123,7 +123,7 @@ describe('ReviewTranscriptHeader', () => {
         duration={120}
       />,
     );
-    expect(getByText(/Review.card.duration/)).toBeTruthy();
+    expect(getByText(/common.duration/)).toBeTruthy();
     expect(getByText(/120s/)).toBeTruthy();
   });
 

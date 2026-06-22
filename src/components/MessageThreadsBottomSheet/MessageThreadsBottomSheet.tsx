@@ -70,7 +70,7 @@ export const MessageThreadsBottomSheet: React.FC<
                 style={styles.selectedText}
                 numberOfLines={1}
                 ellipsizeMode="tail">
-                {t('ThreadsBottomSheet.selectedText')} "{thread.selectedText}"
+                {t('threadsBottomSheet.selectedText')} "{thread.selectedText}"
               </Text>
             </View>
           )}
@@ -116,7 +116,7 @@ export const MessageThreadsBottomSheet: React.FC<
               <View style={styles.separatorLine} />
               <View style={styles.moreCommentsContainer}>
                 <Text style={styles.moreCommentsText}>
-                  {t('ThreadsBottomSheet.viewMoreComments')}
+                  {t('threadsBottomSheet.viewMoreComments')}
                 </Text>
                 <ChevronRight
                   width={ms(20)}
@@ -151,7 +151,7 @@ export const MessageThreadsBottomSheet: React.FC<
   const renderHeader = useCallback(() => {
     return (
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>{t('ThreadsBottomSheet.title')}</Text>
+        <Text style={styles.headerTitle}>{t('threadsBottomSheet.title')}</Text>
       </View>
     );
   }, [t]);

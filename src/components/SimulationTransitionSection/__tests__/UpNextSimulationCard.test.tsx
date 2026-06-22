@@ -54,7 +54,7 @@ describe('UpNextSimulationCard', () => {
     );
 
     expect(
-      getByText('SimulationFeedback.upNext - Simulations.simulation 2'),
+      getByText('postSim.tabs.upNext - common.simulation 2'),
     ).toBeTruthy();
   });
 
@@ -63,7 +63,7 @@ describe('UpNextSimulationCard', () => {
       <UpNextSimulationCard upNext={baseUpNext as any} />,
     );
 
-    expect(getByText('Simulations.scenario:')).toBeTruthy();
+    expect(getByText('learn.scenario.scenarioLabel:')).toBeTruthy();
   });
 
   it('renders cover image when coverImageUrl is provided', () => {

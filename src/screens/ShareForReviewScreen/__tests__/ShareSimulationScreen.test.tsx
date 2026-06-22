@@ -129,7 +129,7 @@ describe('ShareSimulationScreen', () => {
     const {getByText} = render(
       <ShareSimulationScreen route={mockRoute} navigation={{} as any} />,
     );
-    expect(getByText('Review.card.dateAndTime')).toBeTruthy();
+    expect(getByText('review.details.dateAndTime')).toBeTruthy();
     expect(getByText('formatted-2026-03-06T10:00:00Z')).toBeTruthy();
   });
 
@@ -137,7 +137,7 @@ describe('ShareSimulationScreen', () => {
     const {getByText} = render(
       <ShareSimulationScreen route={mockRoute} navigation={{} as any} />,
     );
-    expect(getByText('Review.card.duration')).toBeTruthy();
+    expect(getByText('review.feedCard.duration')).toBeTruthy();
     expect(getByText('5:00')).toBeTruthy();
   });
 
@@ -158,6 +158,6 @@ describe('ShareSimulationScreen', () => {
         navigation={{} as any}
       />,
     );
-    expect(queryByText('Review.card.duration')).toBeNull();
+    expect(queryByText('review.feedCard.duration')).toBeNull();
   });
 });

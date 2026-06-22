@@ -282,7 +282,7 @@ describe('SimulationCard', () => {
       <SimulationCard title="Test Simulation" triggerWarnings={warnings} />,
     );
 
-    expect(getByText('Simulations.triggerWarnings')).toBeTruthy();
+    expect(getByText('common.triggerWarnings')).toBeTruthy();
     expect(getByText('Warning 1')).toBeTruthy();
     expect(getByText('Warning 2')).toBeTruthy();
   });
@@ -292,13 +292,13 @@ describe('SimulationCard', () => {
       <SimulationCard title="Test Simulation" triggerWarnings={[]} />,
     );
 
-    expect(queryByText('Simulations.triggerWarnings')).toBeNull();
+    expect(queryByText('common.triggerWarnings')).toBeNull();
   });
 
   it('does not render trigger warnings section when triggerWarnings is undefined', () => {
     const {queryByText} = render(<SimulationCard title="Test Simulation" />);
 
-    expect(queryByText('Simulations.triggerWarnings')).toBeNull();
+    expect(queryByText('common.triggerWarnings')).toBeNull();
   });
 });
 

@@ -59,23 +59,27 @@ export const StartSessionModal: React.FC<StartSessionModalProps> = ({
             <CloseIcon />
           </TouchableOpacity>
           <Text style={styles.title}>
-            {t('CallLogs.start')}{' '}
-            <Text style={styles.titleItalic}>{t('CallLogs.session')}</Text>
+            {t('calls.dialog.startSession.titleNormal')}{' '}
+            <Text style={styles.titleItalic}>
+              {t('calls.dialog.startSession.titleItalic')}
+            </Text>
           </Text>
           <View style={styles.carouselContainer}>
             <SecurityCarousel />
           </View>
           <Text style={styles.description}>
-            {t('CallLogs.startSessionDescription')}
+            {t('calls.dialog.startSession.description1')}
           </Text>
 
           <View style={styles.separator} />
 
           <View style={styles.optionRow}>
             <View style={styles.optionTextBlock}>
-              <Text style={styles.optionTitle}>{t('CallLogs.listenLive')}</Text>
+              <Text style={styles.optionTitle}>
+                {t('calls.dialog.startSession.embedTitle')}
+              </Text>
               <Text style={styles.optionSubtitle}>
-                {t('CallLogs.allyWillHearAudio')}
+                {t('calls.dialog.startSession.embedDesc')}
               </Text>
             </View>
           </View>
@@ -84,7 +88,7 @@ export const StartSessionModal: React.FC<StartSessionModalProps> = ({
 
           {hasMicrophoneChatType && (
             <Button
-              label={t('CallLogs.startScribeMode')}
+              label={t('calls.dialog.startSession.startScribeMode')}
               onPress={() => handleStart('scribe')}
               customContainerStyle={styles.ctaBtn}
             />
@@ -92,7 +96,7 @@ export const StartSessionModal: React.FC<StartSessionModalProps> = ({
 
           {hasDictationChatType && (
             <Button
-              label={t('CallLogs.startDictationMode')}
+              label={t('calls.dialog.startSession.startDictationMode')}
               onPress={() => handleStart('dictation')}
               customContainerStyle={[
                 styles.ctaBtn,
@@ -109,7 +113,9 @@ export const StartSessionModal: React.FC<StartSessionModalProps> = ({
             />
           )}
 
-          <Text style={styles.consent}>{t('CallLogs.consentNotice')}</Text>
+          <Text style={styles.consent}>
+            {t('calls.dialog.startSession.footer')}
+          </Text>
         </View>
       </View>
       <NotificationModal

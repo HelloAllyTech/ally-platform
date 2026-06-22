@@ -13,12 +13,14 @@ import {
   APIVersion,
   AsyncStorageKeys,
 } from '@/constants';
+import i18n from '@/localization/i18n';
 import {handleLogout, storeTokens} from '@/store/slices/userSlice';
 import {store} from '@/store/store';
 import {getItem} from '@/utils/asyncStorage';
 import {logger} from '@/utils/logger';
 
 import {AuthResponse} from './authApi';
+import {LANGUAGE_CODE_ENDPOINTS} from './languageCodeEndpoints';
 
 const V2_ENDPOINTS = [
   API_ROUTES.AUTH.GENERATE_OTP,
@@ -49,6 +51,30 @@ const baseQuery: BaseQueryFn<
       ? `${version}${args}`
       : {...args, url: `${version}${url}`};
 
+  // Inject the active UI language into content endpoints so the backend returns
+  // localized text. Gated by an allowlist (see `languageCodeEndpoints.ts`).
+  // Spreading the caller's params/body last lets a call site override it.
+  // Backend expects a bare ISO code (e.g. `hi`) → `resolvedLanguage`.
+  let injectedArgs = versionedArgs;
+  if (
+    typeof injectedArgs !== 'string' &&
+    LANGUAGE_CODE_ENDPOINTS.has(api.endpoint)
+  ) {
+    const languageCode = i18n.resolvedLanguage ?? i18n.language ?? 'en';
+    const isGet = (injectedArgs.method ?? 'GET').toUpperCase() === 'GET';
+    if (isGet) {
+      injectedArgs = {
+        ...injectedArgs,
+        params: {languageCode, ...injectedArgs.params},
+      };
+    } else {
+      injectedArgs = {
+        ...injectedArgs,
+        body: {languageCode, ...(injectedArgs.body as object)},
+      };
+    }
+  }
+
   const originalBaseQuery = fetchBaseQuery({
     baseUrl: env.API_BASE_URL + '/api/',
     prepareHeaders: async (headers, {endpoint: _endpoint}) => {
@@ -60,7 +86,7 @@ const baseQuery: BaseQueryFn<
     },
   });
 
-  return originalBaseQuery(versionedArgs, api, extraOptions);
+  return originalBaseQuery(injectedArgs, api, extraOptions);
 };
 
 const handleUserLogout = async () => {

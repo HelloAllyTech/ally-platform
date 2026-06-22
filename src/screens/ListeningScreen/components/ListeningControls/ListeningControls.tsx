@@ -62,7 +62,7 @@ export const ListeningControls: React.FC<ListeningControlsProps> = ({
           <PauseIcon width={24} height={24} color={colors.white} />
         ),
         label: t(
-          `ListeningScreen.${isCallPaused ? 'resumeTranscription' : 'pauseTranscription'}`,
+          `listeningScreen.${isCallPaused ? 'resumeTranscription' : 'pauseTranscription'}`,
         ),
         onPress: onPauseResumePress,
         disabled: isPauseResumeDisabled,
@@ -74,7 +74,7 @@ export const ListeningControls: React.FC<ListeningControlsProps> = ({
       buttonList.push({
         id: 'focus',
         icon: <MicIcon color={isFocusMode ? colors.black : colors.white} />,
-        label: t(`ListeningScreen.${isFocusMode ? 'focused' : 'focus'}`),
+        label: t(`listeningScreen.${isFocusMode ? 'focused' : 'focus'}`),
         onPress: onFocusModeButtonPress,
         disabled: false,
         variant: isFocusMode ? 'active' : 'default',
@@ -85,7 +85,7 @@ export const ListeningControls: React.FC<ListeningControlsProps> = ({
       buttonList.push({
         id: 'end',
         icon: <View style={styles.redSquareIcon} />,
-        label: t('ListeningScreen.endSession'),
+        label: t('listeningScreen.endSession'),
         onPress: onCallEndPress,
         disabled: isCallEndDisabled,
         variant: 'destructive',
@@ -111,7 +111,7 @@ export const ListeningControls: React.FC<ListeningControlsProps> = ({
     <View style={styles.tooltipContainer}>
       <View style={styles.tooltip}>
         <Text style={styles.tooltipText}>
-          {t('ListeningScreen.muteTooltip')}
+          {t('listeningScreen.muteTooltip')}
         </Text>
         <TouchableOpacity
           onPress={onDismissMuteTooltip}
@@ -139,7 +139,7 @@ export const ListeningControls: React.FC<ListeningControlsProps> = ({
         <View style={styles.securityContainer}>
           <ShieldIcon width={16} height={16} color={colors.lightGrayD9} />
           <Text style={styles.securityText}>
-            {t('ListeningScreen.dataSafe')}
+            {t('listeningScreen.dataSafe')}
           </Text>
         </View>
       </CollapsibleButtonGroup>

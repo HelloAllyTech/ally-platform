@@ -101,7 +101,7 @@ const NetworkLogsComponent = ({onPress}: {onPress?: () => void}) => {
             onPress && onPress();
             setIsNetworkVIsible(true);
           }}>
-          <Text style={styles.content}>{t('NetworkLogs.logs')}</Text>
+          <Text style={styles.content}>{t('calls.header.subtitle')}</Text>
         </TouchableOpacity>
       </Animated.View>
     </>

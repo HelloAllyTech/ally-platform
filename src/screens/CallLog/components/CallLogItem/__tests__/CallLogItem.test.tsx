@@ -25,8 +25,8 @@ jest.mock('@/constants', () => ({
   formatSessionMode: (value: unknown, t: (k: string) => string) => {
     if (!value) return '-';
     return value.toString().toUpperCase() === 'DICTATION'
-      ? t('CallLogs.dictation')
-      : t('CallLogs.scribe');
+      ? t('calls.mode.dictation')
+      : t('calls.mode.scribe');
   },
 }));
 
@@ -105,7 +105,7 @@ describe('CallLogItem', () => {
       />,
     );
 
-    expect(getByText('CallLogs.duration: 5m')).toBeTruthy();
+    expect(getByText('common.duration: 5m')).toBeTruthy();
     expect(getByText('help')).toBeTruthy();
   });
 
@@ -127,7 +127,7 @@ describe('CallLogItem', () => {
       />,
     );
 
-    expect(getByText(/CallLogs.scribe/)).toBeTruthy();
+    expect(getByText(/calls.mode.scribe/)).toBeTruthy();
   });
 
   it('shows "Mode: Dictation" when expanded and mode is DICTATION', () => {
@@ -148,6 +148,6 @@ describe('CallLogItem', () => {
       />,
     );
 
-    expect(getByText(/CallLogs.dictation/)).toBeTruthy();
+    expect(getByText(/calls.mode.dictation/)).toBeTruthy();
   });
 });

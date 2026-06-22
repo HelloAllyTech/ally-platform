@@ -31,7 +31,7 @@ describe('CallSummaryScreen/DeleteRenameModal', () => {
         setEditedName={() => {}}
       />,
     );
-    expect(getByText('CallSummary.customMenu.delete')).toBeTruthy();
+    expect(getByText('callSummary.customMenu.delete')).toBeTruthy();
   });
 
   it('invokes delete on primary press in delete modal', () => {
@@ -62,7 +62,7 @@ describe('CallSummaryScreen/DeleteRenameModal', () => {
         setEditedName={() => {}}
       />,
     );
-    expect(getByText('CallSummary.info.rename')).toBeTruthy();
+    expect(getByText('callSummary.info.rename')).toBeTruthy();
     fireEvent.press(getByTestId('modal'));
     expect(handleBlur).toHaveBeenCalled();
   });

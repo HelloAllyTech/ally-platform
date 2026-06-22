@@ -77,9 +77,9 @@ export const SimulationDetailsModal: React.FC<SimulationDetailsModalProps> = ({
                 headerTitle
               ) : (
                 <>
-                  {t('Simulations.start')}{' '}
+                  {t('common.start')}{' '}
                   <Text style={styles.headerTitleItalic}>
-                    {t('Simulations.simulation')}
+                    {t('common.simulation')}
                   </Text>
                 </>
               )}
@@ -141,7 +141,7 @@ export const SimulationDetailsModal: React.FC<SimulationDetailsModalProps> = ({
               bounces={false}>
               {order !== undefined && (
                 <Text style={styles.orderLabel}>
-                  {t('Simulations.simulation')} {order}
+                  {t('common.simulation')} {order}
                 </Text>
               )}
               {title && <Text style={styles.title}>{title}</Text>}
@@ -149,7 +149,7 @@ export const SimulationDetailsModal: React.FC<SimulationDetailsModalProps> = ({
               {description && (
                 <>
                   <Text style={styles.scenarioLabel}>
-                    {t('Simulations.scenarioLabel')}
+                    {t('learn.scenario.scenarioLabel')}
                   </Text>
 
                   <Text style={styles.description}>{description}</Text>
@@ -159,7 +159,7 @@ export const SimulationDetailsModal: React.FC<SimulationDetailsModalProps> = ({
               {triggerWarningNames.length > 0 && (
                 <>
                   <Text style={styles.triggerWarningLabel}>
-                    {t('Simulations.triggerWarnings')}:
+                    {t('common.triggerWarnings')}:
                   </Text>
                   <View style={styles.chipsContainer}>
                     {triggerWarningNames.map((warning, index) => (
@@ -177,7 +177,7 @@ export const SimulationDetailsModal: React.FC<SimulationDetailsModalProps> = ({
             <View style={styles.buttonContainer}>
               <View style={styles.ctaWrapper}>
                 <Button
-                  label={`${t('Simulations.start')} ${t('Simulations.simulation')}`}
+                  label={`${t('common.start')} ${t('common.simulation')}`}
                   onPress={onStartSimulation}
                   isLoading={isCreatingRoom}
                   isDisabled={isCreatingRoom}

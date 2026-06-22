@@ -14,7 +14,7 @@ describe('DismissableBanner', () => {
     const onClose = jest.fn();
     const {getByText, UNSAFE_getAllByType} = render(<DismissableBanner onClose={onClose} />);
 
-    expect(getByText('ListeningScreen.scribeStopTakingNotesBanner')).toBeTruthy();
+    expect(getByText('listeningScreen.scribeStopTakingNotesBanner')).toBeTruthy();
     const touchables = UNSAFE_getAllByType(TouchableOpacity);
     // The second TouchableOpacity is the close button
     fireEvent.press(touchables[touchables.length - 1]);

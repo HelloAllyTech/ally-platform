@@ -66,7 +66,7 @@ export const UpNext: React.FC<UpNextProps> = ({
       return (
         <View style={styles.buttonContainer}>
           <Button
-            label={t('Common.finish')}
+            label={t('common.finish')}
             onPress={onFinish}
             customContainerStyle={styles.submitButton}
           />
@@ -79,7 +79,7 @@ export const UpNext: React.FC<UpNextProps> = ({
       <View style={styles.buttonContainer}>
         <View style={styles.pathNavigationContainer}>
           <Button
-            label={t('Common.back')}
+            label={t('common.backToLearn')}
             onPress={onBack}
             variant="secondary"
             customContainerStyle={styles.button}
@@ -87,7 +87,7 @@ export const UpNext: React.FC<UpNextProps> = ({
           {/* Show either Retry or Next, but never both */}
           {!hasUpcoming && canRetryCurrentSession && (
             <Button
-              label={t('CallSummaryProgress.retry')}
+              label={t('common.retry')}
               onPress={retrySimulation}
               customContainerStyle={styles.button}
               isLoading={isStartingSimulation}
@@ -95,7 +95,7 @@ export const UpNext: React.FC<UpNextProps> = ({
           )}
           {isCurrentSessionCompleted && hasUpcoming && (
             <Button
-              label={t('Common.next')}
+              label={t('common.next')}
               onPress={startNextSimulation}
               customContainerStyle={styles.button}
               isLoading={isStartingSimulation}
@@ -111,7 +111,7 @@ export const UpNext: React.FC<UpNextProps> = ({
       style={styles.scrollView}
       contentContainerStyle={styles.scrollContent}
       showsVerticalScrollIndicator={false}>
-      <SummaryCard title={t('SimulationFeedback.tabs.upNext')}>
+      <SummaryCard title={t('postSim.tabs.upNext')}>
         {/* Session Glimpse - only for cases */}
         {caseId && currentSession?.sessionGlimpse && (
           <SessionGlimpse content={currentSession.sessionGlimpse} />
@@ -125,10 +125,8 @@ export const UpNext: React.FC<UpNextProps> = ({
           hasUpcoming={hasUpcoming}
           canRetryCurrentSession={canRetryCurrentSession}
           isCurrentSessionCompleted={isCurrentSessionCompleted}
-          almostThereTitle={t('SimulationFeedback.almostThereTitle')}
-          almostThereDescription={t(
-            'SimulationFeedback.almostThereDescription',
-          )}
+          almostThereTitle={t('callFeedback.almostThereTitle')}
+          almostThereDescription={t('callFeedback.almostThereDescription')}
         />
         {renderButtons()}
       </SummaryCard>

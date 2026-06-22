@@ -24,7 +24,7 @@ export const PrivacyToggle: React.FC<PrivacyToggleProps> = ({
           onPress={() => onToggle(true)}
           activeOpacity={0.9}>
           <Text style={[styles.text, isPrivate && styles.activeText]}>
-            {t('SimulationFeedback.keepItPrivate')}
+            {t('review.privacy.private')}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -32,7 +32,7 @@ export const PrivacyToggle: React.FC<PrivacyToggleProps> = ({
           onPress={() => onToggle(false)}
           activeOpacity={0.9}>
           <Text style={[styles.text, !isPrivate && styles.activeText]}>
-            {t('SimulationFeedback.shareForReview')}
+            {t('postSim.common.shareForReview')}
           </Text>
         </TouchableOpacity>
       </View>

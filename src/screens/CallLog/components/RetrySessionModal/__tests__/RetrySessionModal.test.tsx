@@ -71,10 +71,12 @@ describe('RetrySessionModal', () => {
       />,
     );
 
-    expect(getByText('CallLogs.retrySession.header.title')).toBeTruthy();
-    expect(getByText('CallLogs.retrySession.header.subtitle')).toBeTruthy();
-    expect(getByText('CallLogs.retrySession.description')).toBeTruthy();
-    expect(getByText('CallLogs.retrySession.button')).toBeTruthy();
+    expect(getByText('common.maxActiveUsers.title')).toBeTruthy();
+    expect(
+      getByText(/common.maxActiveUsers.autoRetry/),
+    ).toBeTruthy();
+    expect(getByText('common.maxActiveUsers.description')).toBeTruthy();
+    expect(getByText('common.retry')).toBeTruthy();
   });
 
   it('shows auto-retry description text with countdown', () => {
@@ -87,7 +89,7 @@ describe('RetrySessionModal', () => {
     );
 
     expect(
-      getByText(/CallLogs\.retrySession\.autoRetryDescription/),
+      getByText(/common\.maxActiveUsers\.autoRetry/),
     ).toBeTruthy();
   });
 
@@ -140,7 +142,7 @@ describe('RetrySessionModal', () => {
     });
 
     expect(
-      getByText(/CallLogs\.retrySession\.retryDescription/),
+      getByText(/common\.maxActiveUsers\.manualRetry/),
     ).toBeTruthy();
   });
 

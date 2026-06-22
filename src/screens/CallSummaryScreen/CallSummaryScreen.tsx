@@ -145,7 +145,8 @@ export const CallSummaryScreen: React.FC<
       reviewId: scribeReviewId,
       sessionData: {
         title:
-          callInfo.summaryName || t('Review.card.sharedSimulationForReview'),
+          callInfo.summaryName ||
+          t('review.feedCard.sharedSimulationForReview'),
         createdAt: details.startTime || summaryData.createdAt || '',
         duration: formatDurationFromSeconds(details.callDuration ?? 0),
       },
@@ -254,9 +255,9 @@ export const CallSummaryScreen: React.FC<
   }) => {
     const response = await onAddSummaryFeedback(feedback);
     if (response.data) {
-      showToast(t('Success.submitFeedback'), 'success');
+      showToast(t('callFeedback.submitted'), 'success');
     } else {
-      showToast(t('CallSummary.info.summaryFeedbackSubmittedFailed'), 'error');
+      showToast(t('summaryLoading.summaryFeedbackSubmittedFailed'), 'error');
     }
     setIsFeedbackPopupVisible(false);
     handleGoBack();
@@ -278,10 +279,10 @@ export const CallSummaryScreen: React.FC<
   const summaryActionButtonText = useMemo(
     () =>
       isSummaryAvailable && !canShowSummary
-        ? t('CallSummaryProgress.settingUpSummaryScreen')
+        ? t('summaryLoading.settingUp')
         : hasSummaryFailed
-          ? t('CallSummaryProgress.retry')
-          : t('CallLogs.seeIfItIsReady'),
+          ? t('common.retry')
+          : t('summaryLoading.seeIfReady'),
     [isSummaryAvailable, canShowSummary, hasSummaryFailed, t],
   );
 
@@ -303,7 +304,7 @@ export const CallSummaryScreen: React.FC<
         )}
         {!showSummaryButtonLoader && (
           <Button
-            label={t('CallLogs.willCheckLater')}
+            label={t('summaryLoading.checkLater')}
             onPress={onViewCallLogs}
             customContainerStyle={[
               styles.viewCallLogsButton,
@@ -365,12 +366,12 @@ export const CallSummaryScreen: React.FC<
 
   const tabs = useMemo(() => {
     const result = [
-      {key: SUMMARY_TAB_KEY, title: t('CallSummary.header.subtitle')},
+      {key: SUMMARY_TAB_KEY, title: t('postCallSummary.header.summary')},
     ];
     if (showTranscriptTab) {
       result.push({
         key: TRANSCRIPT_TAB_KEY,
-        title: t('CallSummary.header.transcript'),
+        title: t('summary.tabs.transcript'),
       });
     }
     return result;

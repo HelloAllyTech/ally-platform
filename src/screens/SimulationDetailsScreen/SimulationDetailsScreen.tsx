@@ -84,7 +84,7 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
 
   const linkCopyToClipboard = () => {
     copyToClipboard(`${env.ALLY_WEB_URL}scenario/${scenario.id}`);
-    showToast(t('SimulationAssistant.linkCopiedToClipboard'), 'success');
+    showToast(t('simulationPage.linkCopiedToClipboard'), 'success');
   };
 
   const handleLanguageSelect = (selectedLabel: string) => {
@@ -111,7 +111,9 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
     return (
       <View style={styles.loadingOverlay}>
         <ActivityIndicator size="large" color={colors.white} />
-        <Text style={styles.loadingText}>{t('Simulations.creatingRoom')}</Text>
+        <Text style={styles.loadingText}>
+          {t('simulationPage.creatingRoom')}
+        </Text>
       </View>
     );
   };
@@ -129,7 +131,7 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
               value={selectedLanguage?.label ?? ''}
               options={availableLanguages.map(lang => lang.label)}
               onSelect={handleLanguageSelect}
-              placeholder={t('Simulations.language')}
+              placeholder={t('nav.language.label')}
               isOpen={isLanguageDropdownOpen}
               setIsOpen={setIsLanguageDropdownOpen}
               disabled={isCreatingRoom}
@@ -158,13 +160,15 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
             <ShareIcon />
           </TouchableOpacity>
         </View>
-        <Text style={styles.fieldLabel}>{t('Simulations.scenarioLabel')}</Text>
+        <Text style={styles.fieldLabel}>
+          {t('learn.scenario.scenarioLabel')}
+        </Text>
         <RichText html={scenario.description} style={styles.description} />
 
         {triggerWarnings.length > 0 && (
           <>
             <Text style={styles.fieldLabel}>
-              {t('Simulations.triggerWarnings')}:
+              {t('common.triggerWarnings')}:
             </Text>
             <View style={styles.chipsContainer}>
               {triggerWarnings.map((warning, index) => (
@@ -189,7 +193,7 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
     return (
       <View style={styles.ctaWrapper}>
         <Button
-          label={`${t('Simulations.start')} ${t('Simulations.simulation')}`}
+          label={`${t('common.start')} ${t('common.simulation')}`}
           onPress={startSimulationPress}
           isLoading={isCreatingRoom}
           isDisabled={isStartSimulationDisabled}
@@ -208,10 +212,8 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
             <LeftArrowIcon color={colors.black} />
           </TouchableOpacity>
           <Text style={styles.pageTitle}>
-            {t('Simulations.start')}{' '}
-            <Text style={styles.pageTitleItalic}>
-              {t('Simulations.simulation')}
-            </Text>
+            {t('common.start')}{' '}
+            <Text style={styles.pageTitleItalic}>{t('common.simulation')}</Text>
           </Text>
         </View>
       </>
@@ -239,8 +241,8 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
         <IllustratedModal
           visible={showLowCreditsModal}
           onClose={() => setShowLowCreditsModal(false)}
-          titleMain={t('Credits.lowCreditsTitle')}
-          description={t('Credits.lowCreditsDescription')}
+          titleMain={t('learn.scenario.noCredits.title')}
+          description={t('learn.scenario.noCredits.desc')}
           illustration={<NoCreditsIcon />}
           descriptionStyle={styles.lowCreditsDescription}
         />

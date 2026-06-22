@@ -72,8 +72,8 @@ jest.mock('@/config/env', () => ({
 
 jest.mock('@/constants', () => ({
   REVIEW_TYPE_TABS: [
-    {key: 'simulation', title: 'Simulations'},
-    {key: 'scribe', title: 'Scribe'},
+    {key: 'simulation', titleKey: 'review.tabs.simulation'},
+    {key: 'scribe', titleKey: 'review.tabs.scribe'},
   ],
   ReviewType: {SIMULATION: 'simulation', SCRIBE: 'scribe'},
   USER_PERMISSIONS: {
@@ -111,7 +111,7 @@ describe('ReviewScreen', () => {
   it('renders TabScreenHeader with title', () => {
     const {getByTestId, getByText} = render(<ReviewScreen />);
     expect(getByTestId('tab-screen-header')).toBeTruthy();
-    expect(getByText('Review.header.title')).toBeTruthy();
+    expect(getByText('review.title')).toBeTruthy();
   });
 
   it('renders tab view when user has both permissions', () => {

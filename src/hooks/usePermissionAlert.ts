@@ -23,12 +23,12 @@ export const usePermissionAlert = () => {
     ) => {
       Alert.alert(t(titleKey), t(messageKey), [
         {
-          text: t(options?.cancelKey || 'Common.cancel'),
+          text: t(options?.cancelKey || 'common.cancel'),
           style: 'cancel',
           onPress: options?.onCancel,
         },
         {
-          text: t(options?.settingsKey || 'Common.permissions.openSettings'),
+          text: t(options?.settingsKey || 'common.openSettings'),
           onPress:
             options?.onOpenSettings ||
             (() => {
@@ -42,8 +42,8 @@ export const usePermissionAlert = () => {
 
   const showMicrophoneSettingsAlert = useCallback(() => {
     showSettingsAlert(
-      'Common.permissions.microphoneRequired',
-      'Common.permissions.microphoneMessage',
+      'simulationPage.allowMicrophone',
+      'simulationPage.microphonePrompt',
     );
   }, [showSettingsAlert]);
 

@@ -39,17 +39,17 @@ export const AskAiInitialState = ({
           styles.initialStateItemHeaderText,
           styles.initialStateItemTitle,
         ]}>
-        {t('SimulationFeedback.askAIInitialStateTitle.title')}
+        {t('askAi.initial.titlePrefix')}
         <Text
           style={[
             styles.initialStateItemHeaderText,
             styles.initialStateItemSubtitle,
           ]}>
-          {t('SimulationFeedback.askAIInitialStateTitle.subtitle')}
+          {t('askAi.initial.titleSuffix')}
         </Text>
       </Text>
       <Text style={styles.initialStateItemDescription}>
-        {t('SimulationFeedback.askAIInitialStateDescription')}
+        {t('askAi.initial.subtitle')}
       </Text>
       <FlatList
         data={ASK_AI_EMPTY_STATE_QUESTIONS}

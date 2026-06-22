@@ -19,12 +19,10 @@ export const SummaryUnauthorized: React.FC<SummaryUnauthorizedProps> = ({
   return (
     <View style={styles.container}>
       <Image source={summaryFailed} />
-      <Text style={styles.title}>{t('CallSummaryUnauthorized.title')}</Text>
-      <Text style={styles.subtitle}>
-        {t('CallSummaryUnauthorized.description')}
-      </Text>
+      <Text style={styles.title}>{t('summary.notFoundTitle')}</Text>
+      <Text style={styles.subtitle}>{t('summary.notFoundDesc')}</Text>
       <Button
-        label={t('Common.offline.goBack')}
+        label={t('achievements.backAria')}
         onPress={onGoBack}
         customContainerStyle={styles.button}
       />

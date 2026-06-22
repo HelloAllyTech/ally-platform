@@ -46,7 +46,7 @@ describe('ExpandableFeedbackSection', () => {
 
     expect(queryByText('Item 4')).toBeNull();
 
-    fireEvent.press(getByText('Common.viewMore'));
+    fireEvent.press(getByText('common.viewMore'));
 
     expect(getByText('Item 4')).toBeTruthy();
   });
@@ -57,10 +57,10 @@ describe('ExpandableFeedbackSection', () => {
       <ExpandableFeedbackSection title="Title" items={items} />,
     );
 
-    fireEvent.press(getByText('Common.viewMore'));
+    fireEvent.press(getByText('common.viewMore'));
     expect(getByText('Item 4')).toBeTruthy();
 
-    fireEvent.press(getByText('Common.viewLess'));
+    fireEvent.press(getByText('common.viewLess'));
     expect(queryByText('Item 4')).toBeNull();
   });
 
@@ -69,7 +69,7 @@ describe('ExpandableFeedbackSection', () => {
       <ExpandableFeedbackSection title="Title" items={[]} />,
     );
 
-    expect(getByText('SimulationFeedback.noDataAvailable')).toBeTruthy();
+    expect(getByText('postSim.feedback.noData')).toBeTruthy();
   });
 
   it('respects custom collapsedItemCount', () => {
@@ -94,7 +94,7 @@ describe('ExpandableFeedbackSection', () => {
       <ExpandableFeedbackSection title="Title" items={items} />,
     );
 
-    expect(queryByText('Common.viewMore')).toBeNull();
-    expect(queryByText('Common.viewLess')).toBeNull();
+    expect(queryByText('common.viewMore')).toBeNull();
+    expect(queryByText('common.viewLess')).toBeNull();
   });
 });

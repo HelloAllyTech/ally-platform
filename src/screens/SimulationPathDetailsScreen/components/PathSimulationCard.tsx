@@ -70,7 +70,7 @@ export const PathSimulationCard: React.FC<PathSimulationCardProps> = ({
       <View style={styles.content}>
         <View style={styles.headerRow}>
           <Text style={styles.orderLabel}>
-            {t('Simulations.simulation')} {order}
+            {t('postSim.titlePrefix')} {order}
           </Text>
           {isCompleted && (
             <TickRoundIcon
@@ -81,7 +81,7 @@ export const PathSimulationCard: React.FC<PathSimulationCardProps> = ({
           )}
           {isNext && (
             <View style={styles.nextBadge}>
-              <Text style={styles.nextBadgeText}>{t('Common.next')}</Text>
+              <Text style={styles.nextBadgeText}>{t('common.next')}</Text>
             </View>
           )}
         </View>

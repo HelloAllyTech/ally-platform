@@ -110,7 +110,7 @@ describe('chatElements', () => {
       const {getByText} = render(
         <AIMessageBubble message={message} clientName="Jordan" />,
       );
-      expect(getByText('SimulationFeedback.askAICitationsHeader')).toBeTruthy();
+      expect(getByText('askAi.transcriptReferences')).toBeTruthy();
       expect(getByText('00:01:02')).toBeTruthy();
       expect(getByText(/Citation line A/)).toBeTruthy();
       expect(getByText('00:03:04')).toBeTruthy();
@@ -127,7 +127,7 @@ describe('chatElements', () => {
           youLabel="You"
         />,
       );
-      expect(getByText('SimulationFeedback.askAICitationsHeader')).toBeTruthy();
+      expect(getByText('askAi.transcriptReferences')).toBeTruthy();
       expect(getByText('00:01:02')).toBeTruthy();
       expect(getByText(/Client X:/)).toBeTruthy();
       expect(getByText(/Citation line A/)).toBeTruthy();

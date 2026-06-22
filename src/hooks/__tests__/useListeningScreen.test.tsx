@@ -85,10 +85,10 @@ describe('useListeningScreen', () => {
 
     expect(result.current.tooltipContentList).toHaveLength(4);
     expect(result.current.tooltipContentList).toEqual([
-      'ListeningScreen.dataSafeTooltip.noAudioRecordings',
-      'ListeningScreen.dataSafeTooltip.dataEncrypted',
-      'ListeningScreen.dataSafeTooltip.noTrainingData',
-      'ListeningScreen.dataSafeTooltip.personalInfoRemoved',
+      'audioCall.privacy.noRecording',
+      'audioCall.privacy.encrypted',
+      'audioCall.privacy.noTrainingData',
+      'audioCall.privacy.personalInfoRemoved',
     ]);
   });
 

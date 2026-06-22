@@ -119,7 +119,7 @@ describe('ListeningScreen', () => {
   it('renders connecting view when no chatId', () => {
     mockState = mockBuildFakeState({chat: {currentChat: null}});
     const {getByText} = render(<ListeningScreen route={route} />);
-    expect(getByText('ListeningScreen.connecting')).toBeTruthy();
+    expect(getByText('listeningScreen.connecting')).toBeTruthy();
   });
 
   it('renders main layout when chat is active and not disconnected', () => {

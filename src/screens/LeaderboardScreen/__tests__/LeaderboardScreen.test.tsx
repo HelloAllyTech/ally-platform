@@ -127,23 +127,23 @@ describe('LeaderboardScreen', () => {
 
   it('renders the leaderboard screen', () => {
     const {getByText} = renderWithSafeArea(<LeaderboardScreen />);
-    expect(getByText('Community')).toBeTruthy();
+    expect(getByText('community.title')).toBeTruthy();
   });
 
   it('renders table headers', () => {
     const {getByText} = renderWithSafeArea(<LeaderboardScreen />);
-    expect(getByText('Rank')).toBeTruthy();
-    expect(getByText('User')).toBeTruthy();
-    expect(getByText('Duration')).toBeTruthy();
-    expect(getByText('Badges')).toBeTruthy();
+    expect(getByText('community.table.rank')).toBeTruthy();
+    expect(getByText('community.table.user')).toBeTruthy();
+    expect(getByText('community.table.totalDuration')).toBeTruthy();
+    expect(getByText('community.table.badges')).toBeTruthy();
   });
 
   it('renders period dropdown', () => {
     const {getAllByText} = renderWithSafeArea(<LeaderboardScreen />);
-    expect(getAllByText('Last 7 days').length).toBeGreaterThan(0);
-    expect(getAllByText('Last 28 days').length).toBeGreaterThan(0);
-    expect(getAllByText('Last 364 days').length).toBeGreaterThan(0);
-    expect(getAllByText('All time').length).toBeGreaterThan(0);
+    expect(getAllByText('community.filters.last7days').length).toBeGreaterThan(0);
+    expect(getAllByText('community.filters.last28days').length).toBeGreaterThan(0);
+    expect(getAllByText('community.filters.last364days').length).toBeGreaterThan(0);
+    expect(getAllByText('community.filters.allTime').length).toBeGreaterThan(0);
   });
 
   it('renders leaderboard entries', () => {
@@ -166,7 +166,7 @@ describe('LeaderboardScreen', () => {
 
   it('changes active period when dropdown option is selected', () => {
     const {getAllByText, rerender} = renderWithSafeArea(<LeaderboardScreen />);
-    const monthOptions = getAllByText('Last 28 days');
+    const monthOptions = getAllByText('community.filters.last28days');
     const monthOption = monthOptions[0];
 
     fireEvent.press(monthOption);
@@ -183,7 +183,7 @@ describe('LeaderboardScreen', () => {
     );
 
     // Option should still be visible
-    expect(getAllByText('Last 28 days').length).toBeGreaterThan(0);
+    expect(getAllByText('community.filters.last28days').length).toBeGreaterThan(0);
   });
 
   it('renders rank badges for all entries', () => {

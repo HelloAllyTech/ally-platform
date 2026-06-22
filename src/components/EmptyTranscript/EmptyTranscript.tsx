@@ -11,7 +11,7 @@ export const EmptyTranscript: React.FC = () => {
   return (
     <View style={styles.emptyContainer}>
       <EmptyTranscriptIcon />
-      <Text style={styles.emptyText}>{t('CallTranscript.empty')}</Text>
+      <Text style={styles.emptyText}>{t('transcription.empty')}</Text>
     </View>
   );
 };

@@ -126,7 +126,7 @@ describe('GeneralCommentsList', () => {
     });
 
     const {getByText} = render(<GeneralCommentsList {...defaultProps} />);
-    expect(getByText('ThreadsBottomSheet.noGeneralComments')).toBeTruthy();
+    expect(getByText('threadsBottomSheet.noGeneralComments')).toBeTruthy();
   });
 
   it('shows loading indicator when loading', () => {

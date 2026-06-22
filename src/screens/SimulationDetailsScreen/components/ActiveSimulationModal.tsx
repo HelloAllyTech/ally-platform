@@ -30,7 +30,7 @@ export const ActiveSimulationModal: React.FC<ActiveSimulationModalProps> = ({
       });
       onClose();
       if (!response.error) {
-        showToast(t('Simulations.sessionEndedSuccessfully'), 'success');
+        showToast(t('common.simulationEndedSuccess'), 'success');
       } else {
         showErrorToast(response.error, 'Errors.endSimulation');
       }
@@ -44,18 +44,18 @@ export const ActiveSimulationModal: React.FC<ActiveSimulationModalProps> = ({
   return (
     <IllustratedActionModal
       visible={visible}
-      titleMain={t('Simulations.activeSimulation')}
-      titleItalic={t('Simulations.detected')}
-      description={t('Simulations.activeSimulationDescription')}
+      titleMain={t('learn.scenario.existing.titleNormal')}
+      titleItalic={t('learn.scenario.existing.titleItalic')}
+      description={t('learn.scenario.existing.content')}
       illustration={<RunningSimulationIcon />}
       actions={[
         {
-          label: t('Common.cancel'),
+          label: t('common.cancel'),
           onPress: onClose,
           variant: 'secondary',
         },
         {
-          label: t('SimulationAssistant.endSession'),
+          label: t('simulationPage.endSession'),
           onPress: handleEndSession,
           variant: 'primary',
           isLoading: isEndingSession,

@@ -27,11 +27,11 @@ export const ArchiveActionModal = React.memo(
         visible={visible}
         onClose={onClose}
         onConfirm={onConfirm}
-        title={t(`CallSummary.archiveActionModal.${key}.header.title`)}
-        subtitle={t(`CallSummary.archiveActionModal.${key}.header.subtitle`)}
-        description={t(`CallSummary.archiveActionModal.${key}.description`)}
-        confirmLabel={t(`CallSummary.archiveActionModal.${key}.confirm`)}
-        cancelLabel={t(`CallSummary.archiveActionModal.${key}.cancel`)}
+        title={t(`callSummary.archiveActionModal.${key}.header.title`)}
+        subtitle={t(`callSummary.archiveActionModal.${key}.header.subtitle`)}
+        description={t(`callSummary.archiveActionModal.${key}.description`)}
+        confirmLabel={t(`callSummary.archiveActionModal.${key}.confirm`)}
+        cancelLabel={t(`callSummary.archiveActionModal.${key}.cancel`)}
         confirmVariant={isArchive ? 'destructive' : 'primary'}
       />
     );

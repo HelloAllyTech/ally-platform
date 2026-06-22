@@ -37,15 +37,9 @@ describe('AskAiInitialState', () => {
     const {getByText} = render(
       <AskAiInitialState onQuestionSelection={onQuestionSelection} />,
     );
-    expect(
-      getByText(/SimulationFeedback\.askAIInitialStateTitle\.title/),
-    ).toBeTruthy();
-    expect(
-      getByText(/SimulationFeedback\.askAIInitialStateTitle\.subtitle/),
-    ).toBeTruthy();
-    expect(
-      getByText('SimulationFeedback.askAIInitialStateDescription'),
-    ).toBeTruthy();
+    expect(getByText(/askAi\.initial\.titlePrefix/)).toBeTruthy();
+    expect(getByText(/askAi\.initial\.titleSuffix/)).toBeTruthy();
+    expect(getByText('askAi.initial.subtitle')).toBeTruthy();
   });
 
   it('renders question items from constants', () => {

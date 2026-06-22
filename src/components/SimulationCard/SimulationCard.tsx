@@ -76,7 +76,7 @@ export const SimulationCard: React.FC<SimulationCardProps> = ({
                 <View style={styles.separator} />
                 <View>
                   <Text style={styles.triggerWarningTitle}>
-                    {t('Simulations.triggerWarnings')}
+                    {t('common.triggerWarnings')}
                   </Text>
                   <View style={styles.chipsContainer}>
                     {triggerWarnings.map((warning, index) => (

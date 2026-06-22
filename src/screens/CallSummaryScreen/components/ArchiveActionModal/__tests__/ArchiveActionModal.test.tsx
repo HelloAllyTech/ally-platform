@@ -60,19 +60,19 @@ describe('ArchiveActionModal', () => {
     );
 
     expect(
-      getByText('CallSummary.archiveActionModal.archive.header.title'),
+      getByText('callSummary.archiveActionModal.archive.header.title'),
     ).toBeTruthy();
     expect(
-      getByText('CallSummary.archiveActionModal.archive.header.subtitle'),
+      getByText('callSummary.archiveActionModal.archive.header.subtitle'),
     ).toBeTruthy();
     expect(
-      getByText('CallSummary.archiveActionModal.archive.description'),
+      getByText('callSummary.archiveActionModal.archive.description'),
     ).toBeTruthy();
     expect(
-      getByText('CallSummary.archiveActionModal.archive.confirm'),
+      getByText('callSummary.archiveActionModal.archive.confirm'),
     ).toBeTruthy();
     expect(
-      getByText('CallSummary.archiveActionModal.archive.cancel'),
+      getByText('callSummary.archiveActionModal.archive.cancel'),
     ).toBeTruthy();
   });
 
@@ -87,19 +87,19 @@ describe('ArchiveActionModal', () => {
     );
 
     expect(
-      getByText('CallSummary.archiveActionModal.unarchive.header.title'),
+      getByText('callSummary.archiveActionModal.unarchive.header.title'),
     ).toBeTruthy();
     expect(
-      getByText('CallSummary.archiveActionModal.unarchive.header.subtitle'),
+      getByText('callSummary.archiveActionModal.unarchive.header.subtitle'),
     ).toBeTruthy();
     expect(
-      getByText('CallSummary.archiveActionModal.unarchive.description'),
+      getByText('callSummary.archiveActionModal.unarchive.description'),
     ).toBeTruthy();
     expect(
-      getByText('CallSummary.archiveActionModal.unarchive.confirm'),
+      getByText('callSummary.archiveActionModal.unarchive.confirm'),
     ).toBeTruthy();
     expect(
-      getByText('CallSummary.archiveActionModal.unarchive.cancel'),
+      getByText('callSummary.archiveActionModal.unarchive.cancel'),
     ).toBeTruthy();
   });
 

@@ -46,9 +46,9 @@ describe('useShareScreenLogic', () => {
   it('returns share screen title by default', () => {
     const {result} = renderHook(() => useShareScreenLogic(defaultParams));
     expect(result.current.screenTitle).toBe(
-      'SimulationFeedback.shareScreenTitle',
+      'simulationPage.shareScreenTitle',
     );
-    expect(result.current.buttonLabel).toBe('SimulationFeedback.share');
+    expect(result.current.buttonLabel).toBe('common.share');
   });
 
   it('returns custom share title when provided', () => {
@@ -67,9 +67,9 @@ describe('useShareScreenLogic', () => {
       }),
     );
     expect(result.current.screenTitle).toBe(
-      'SimulationFeedback.editNoteTitle',
+      'review.details.editNote',
     );
-    expect(result.current.buttonLabel).toBe('save');
+    expect(result.current.buttonLabel).toBe('common.save');
   });
 
   it('updates note via setNote', () => {
@@ -117,7 +117,7 @@ describe('useShareScreenLogic', () => {
 
     expect(defaultParams.onCreateReview).toHaveBeenCalledWith('my note');
     expect(mockShowToast).toHaveBeenCalledWith(
-      'SimulationFeedback.sharedForReview',
+      'callFeedback.sharedForReview',
       'success',
     );
     expect(mockGoBack).toHaveBeenCalled();
@@ -155,7 +155,7 @@ describe('useShareScreenLogic', () => {
       'updated note',
     );
     expect(mockShowToast).toHaveBeenCalledWith(
-      'SimulationFeedback.sharedForReview',
+      'callFeedback.sharedForReview',
       'success',
     );
     expect(mockGoBack).toHaveBeenCalled();
@@ -189,7 +189,7 @@ describe('useShareScreenLogic', () => {
     });
 
     expect(mockShowToast).toHaveBeenCalledWith(
-      'Errors.editNoteExpired',
+      'callFeedback.issues.editNoteExpired',
       'error',
     );
     expect(mockGoBack).not.toHaveBeenCalled();
@@ -218,7 +218,7 @@ describe('useShareScreenLogic', () => {
       'edited note',
     );
     expect(mockShowToast).toHaveBeenCalledWith(
-      'Success.editNoteSuccess',
+      'callFeedback.editNoteSuccess',
       'success',
     );
     expect(mockGoBack).toHaveBeenCalled();

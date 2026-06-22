@@ -31,7 +31,7 @@ export const CitationsTable: React.FC<{
   return (
     <View style={styles.citationsContainer}>
       <Text style={styles.citationsHeader}>
-        {t('SimulationFeedback.askAICitationsHeader')}
+        {t('askAi.transcriptReferences')}
       </Text>
       {citations.map(citation => (
         <View key={citation.transcriptId} style={styles.citationRow}>
@@ -56,9 +56,9 @@ export const AIMessageBubble: React.FC<{
 }> = React.memo(({message, clientName}) => {
   const {t} = useTranslate();
   const clientLabel = clientName
-    ? `${clientName} (${t('CallTranscript.aiClient')})`
-    : t('CallTranscript.aiClient');
-  const youLabel = t('CallTranscript.you');
+    ? `${clientName} (${t('transcription.aiClientSuffix')})`
+    : t('transcription.aiClientSuffix');
+  const youLabel = t('transcription.youLabel');
   const showCitations =
     !message.isStreaming && message.citations && message.citations.length > 0;
 

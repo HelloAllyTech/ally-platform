@@ -243,7 +243,7 @@ export const SimulationPathDetailsScreen: React.FC<
         totalScenarios={totalScenarios}
         isCompleted={isPathCompleted}
         startButtonLabel={
-          isPathStarted ? t('Simulations.continue') : t('Simulations.start')
+          isPathStarted ? t('common.continue') : t('common.start')
         }
         onStartPress={handleStartPath}
         isStartDisabled={isStartPathDisabled}
@@ -282,7 +282,7 @@ export const SimulationPathDetailsScreen: React.FC<
         {paddingTop: insets.top, paddingBottom: insets.bottom},
       ]}>
       <LearningPathHeader
-        title={t('Simulations.track')}
+        title={t('learn.choose.track')}
         onBackPress={handleBack}
         credits={
           credits && getCreditsInfo
@@ -304,7 +304,7 @@ export const SimulationPathDetailsScreen: React.FC<
       ) : error || !pathData?.scenarios ? (
         <EmptyState
           icon={DataUnavailableIcon}
-          title={t('Simulations.failedToLoadPathDetails')}
+          title={t('simulationPage.failedToLoadPathDetails')}
         />
       ) : (
         <FlatList
@@ -353,8 +353,8 @@ export const SimulationPathDetailsScreen: React.FC<
         <IllustratedModal
           visible={showLowCreditsModal}
           onClose={() => setShowLowCreditsModal(false)}
-          titleMain={t('Credits.lowCreditsTitle')}
-          description={t('Credits.lowCreditsDescription')}
+          titleMain={t('learn.scenario.noCredits.title')}
+          description={t('learn.scenario.noCredits.desc')}
           illustration={<NoCreditsIcon />}
         />
       )}

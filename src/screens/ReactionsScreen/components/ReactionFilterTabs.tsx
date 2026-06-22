@@ -25,7 +25,7 @@ export const ReactionFilterTabs: React.FC<ReactionFilterTabsProps> = ({
   const tabs = useMemo<TabData[]>(() => {
     const allTab: TabData = {
       reaction: null,
-      label: `${t('Reactions.allFilter')} ${totalCount}`,
+      label: `${t('achievements.filters.all')} ${totalCount}`,
       isSelected: selectedReaction === null,
     };
 

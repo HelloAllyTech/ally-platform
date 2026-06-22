@@ -4,7 +4,7 @@
   "private": true,
   "license": "MIT",
   "scripts": {
-    "android:dev": "react-native run-android --appId com.helloally.app.dev --tasks installDevDebug",
+    "android:dev": "react-native run-android --appId com.helloally.app.dev --tasks installDevDebug --port 8082" ,
     "android:prod": "react-native run-android --appId com.helloally.app --tasks installProdDebug",
     "build:dev": "cd android && ./gradlew assembleDevRelease --stacktrace",
     "build:prod": "cd android && ./gradlew assembleProdRelease --stacktrace",

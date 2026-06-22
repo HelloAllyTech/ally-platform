@@ -37,9 +37,7 @@ export const SessionChecklist: React.FC<SessionChecklistProps> = ({items}) => {
   const renderHeader = (completedItems: number, totalItems: number) => {
     return (
       <View style={styles.headerContainer}>
-        <Text style={styles.title}>
-          {t('SimulationFeedback.checklistHeader')}
-        </Text>
+        <Text style={styles.title}>{t('learn.evaluationChecklist')}</Text>
         <Text style={styles.percentageText}>
           {totalCount > 0 && formatAsPercentage(completedItems / totalItems)}
         </Text>

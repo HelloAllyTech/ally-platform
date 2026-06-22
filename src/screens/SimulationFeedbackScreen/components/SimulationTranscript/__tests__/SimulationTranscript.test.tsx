@@ -72,7 +72,7 @@ describe('SimulationTranscript', () => {
       <SimulationTranscript sessionId="1" startedAt="2024-01-01T00:00:00Z" />,
     );
     expect(
-      getByText('SimulationFeedback.noSessionRecording'),
+      getByText('postSim.noSessionRecording'),
     ).toBeTruthy();
     expect(queryByTestId('simulation-audio-player')).toBeNull();
   });

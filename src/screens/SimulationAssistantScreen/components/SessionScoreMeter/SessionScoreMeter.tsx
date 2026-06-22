@@ -90,9 +90,7 @@ export const SessionScoreMeter: React.FC<SessionScoreMeterProps> = ({
     <View
       style={[styles.container, styleOverrides?.container]}
       accessibilityElementsHidden>
-      <Text style={styles.label}>
-        {t('SimulationAssistant.simulationScore')}
-      </Text>
+      <Text style={styles.label}>{t('simulationPage.simulationScore')}</Text>
 
       <View
         style={[styles.bar, styleOverrides?.bar]}

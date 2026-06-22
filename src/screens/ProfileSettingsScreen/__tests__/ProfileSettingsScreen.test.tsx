@@ -2,7 +2,10 @@ import React from 'react';
 import {fireEvent, render} from '@testing-library/react-native';
 
 jest.mock('react-i18next', () => ({
-  useTranslation: () => ({t: (key: string) => key}),
+  useTranslation: () => ({
+    t: (key: string) => key,
+    i18n: {resolvedLanguage: 'en', language: 'en'},
+  }),
 }));
 
 const mockGoBack = jest.fn();
@@ -76,8 +79,17 @@ jest.mock('@/components', () => {
           <Text>{title}</Text>
         </View>
       ) : null,
+    CustomSwitch: () => <View testID="custom-switch" />,
+    getLabelFromCode: (_code: string) => 'English',
+    LanguageSelectorSheet: () => null,
   };
 });
+
+jest.mock('@/config/env', () => ({
+  __esModule: true,
+  env: {ENVIRONMENT: 'development', LANGUAGE_SELECTOR_FLAG: false},
+}));
+
 
 jest.mock('@/services', () => ({
   useUpdateUserPreferencesMutation: () => [jest.fn(), {isLoading: false}],
@@ -119,10 +131,7 @@ describe('ProfileSettingsScreen', () => {
     const {getByText} = render(<ProfileSettingsScreen />);
 
     expect(
-      getByText(/ProfileSettings\.profile/),
-    ).toBeTruthy();
-    expect(
-      getByText(/ProfileSettings\.settings/),
+      getByText(/profile\.settings\.title/),
     ).toBeTruthy();
   });
 
@@ -135,7 +144,7 @@ describe('ProfileSettingsScreen', () => {
   it('renders upload image button when no image', () => {
     const {getByText} = render(<ProfileSettingsScreen />);
 
-    expect(getByText('ProfileSettings.uploadImage')).toBeTruthy();
+    expect(getByText('profile.settings.upload_image')).toBeTruthy();
   });
 
   it('navigates back on back button press when no unsaved changes', () => {
@@ -148,7 +157,7 @@ describe('ProfileSettingsScreen', () => {
   it('renders field labels', () => {
     const {getByText} = render(<ProfileSettingsScreen />);
 
-    expect(getByText('ProfileSettings.name')).toBeTruthy();
-    expect(getByText('ProfileSettings.email')).toBeTruthy();
+    expect(getByText('profile.settings.name')).toBeTruthy();
+    expect(getByText('profile.settings.email')).toBeTruthy();
   });
 });

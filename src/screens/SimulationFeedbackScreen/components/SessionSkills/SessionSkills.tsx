@@ -147,7 +147,7 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
-        <SummaryCard title={t('SimulationFeedback.sessionSkills.sectionTitle')}>
+        <SummaryCard title={t('callFeedback.sessionSkills.sectionTitle')}>
           <View style={styles.loaderContainer}>
             <ActivityIndicator size="large" color={colors.ds.theme.primary} />
           </View>
@@ -162,10 +162,10 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
-        <SummaryCard title={t('SimulationFeedback.sessionSkills.sectionTitle')}>
+        <SummaryCard title={t('callFeedback.sessionSkills.sectionTitle')}>
           <View style={styles.errorContainer}>
             <Text style={styles.errorText}>
-              {t('SimulationFeedback.sessionSkills.errorLoading')}
+              {t('callFeedback.sessionSkills.errorLoading')}
             </Text>
           </View>
         </SummaryCard>
@@ -178,7 +178,7 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
       style={styles.scrollView}
       contentContainerStyle={styles.scrollContent}
       showsVerticalScrollIndicator={false}>
-      <SummaryCard title={t('SimulationFeedback.sessionSkills.sectionTitle')}>
+      <SummaryCard title={t('callFeedback.sessionSkills.sectionTitle')}>
         <View style={styles.overallScoreContainer}>
           <CircularProgress
             progress={overallScore}
@@ -191,7 +191,7 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
               {`${overallScore}%`}
             </Text>
             <Text style={styles.overallScoreLabel}>
-              {t('SimulationFeedback.sessionSkills.overallScore')}
+              {t('callFeedback.sessionSkills.overallScore')}
             </Text>
           </CircularProgress>
         </View>
@@ -200,7 +200,7 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <Text style={styles.cardHeaderText}>
-                {t('SimulationFeedback.sessionSkills.skillCoverage')}
+                {t('callFeedback.sessionSkills.skillCoverage')}
               </Text>
             </View>
             <View style={styles.cardContent}>
@@ -213,15 +213,15 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Text style={styles.cardHeaderText}>
-              {t('SimulationFeedback.sessionSkills.clientEmotionalMovement')}
+              {t('callFeedback.sessionSkills.clientEmotionalMovement')}
             </Text>
           </View>
           <View style={styles.chartInfoRow}>
             <Text style={styles.chartInfoText}>
-              {t('SimulationFeedback.sessionSkills.chartXAxisLabel')}
+              {t('callFeedback.sessionSkills.chartXAxisLabel')}
             </Text>
             <Text style={styles.chartInfoText}>
-              {t('SimulationFeedback.sessionSkills.chartYAxisLabel')}
+              {t('callFeedback.sessionSkills.chartYAxisLabel')}
             </Text>
           </View>
           <View style={styles.chartWrapper}>
@@ -236,7 +236,7 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
             {!hasEmotionalData && (
               <View style={styles.noDataOverlay}>
                 <Text style={styles.noDataText}>
-                  {t('SimulationFeedback.sessionSkills.noDataFound')}
+                  {t('callFeedback.sessionSkills.noDataFound')}
                 </Text>
               </View>
             )}
@@ -245,11 +245,11 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
         {isChecklistMode && (
           <>
             <ExpandableFeedbackSection
-              title={t('SimulationFeedback.strengthsAndSkills')}
+              title={t('postSim.skills.strengths')}
               items={positives}
             />
             <ExpandableFeedbackSection
-              title={t('SimulationFeedback.areasOfGrowth')}
+              title={t('postSim.skills.areasForGrowth')}
               items={improvements}
             />
           </>

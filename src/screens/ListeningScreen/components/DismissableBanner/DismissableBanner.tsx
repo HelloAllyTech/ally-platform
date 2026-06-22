@@ -21,7 +21,7 @@ export const DismissableBanner: React.FC<ExotelFocusBannerProps> = ({
       <View style={styles.contentWrapper}>
         <BlueWarningIcon width={18} height={16} />
         <Text style={styles.text}>
-          {t('ListeningScreen.scribeStopTakingNotesBanner')}
+          {t('listeningScreen.scribeStopTakingNotesBanner')}
         </Text>
       </View>
       <TouchableOpacity

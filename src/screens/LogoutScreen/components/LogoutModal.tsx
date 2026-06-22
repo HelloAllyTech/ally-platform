@@ -32,13 +32,13 @@ export const LogoutModal = ({
     <IllustratedModal
       visible={isLogoutModalVisible}
       onClose={onPressLogoutCancel}
-      description={t('Logout.logoutConfirmation')}
-      actionButtonText={t('Logout.logoutActionButton')}
+      description={t('nav.logout.content')}
+      actionButtonText={t('nav.logout.button')}
       onActionPress={onPressLogoutConfirm}
       actionButtonColor={colors.brightRed}
       illustration={illustration}
-      titleMain={t('Logout.safeguardTitle')}
-      titleItalic={t('Logout.account')}
+      titleMain={t('nav.logout.title.normal')}
+      titleItalic={t('nav.logout.title.italic')}
     />
   );
 };

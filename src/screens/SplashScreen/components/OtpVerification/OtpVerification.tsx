@@ -153,7 +153,7 @@ export const OtpVerification: React.FC<OtpVerificationProps> = ({
         keyboardShouldPersistTaps="handled">
         <View style={styles.containerWrapper}>
           <Text style={styles.headerText}>
-            {t('SplashScreen.enterTheCodeSentTo')}
+            {t('auth.login.otp.enterCode')}
             {'\n'}
             <Text style={styles.emailText}>{email}</Text>
           </Text>
@@ -175,7 +175,7 @@ export const OtpVerification: React.FC<OtpVerificationProps> = ({
           <View style={styles.expiryContainer}>
             <Text style={styles.expiryText}>
               <Trans
-                i18nKey="SplashScreen.codeExpiryMessage"
+                i18nKey="auth.login.otp.expires"
                 values={{minutes: otpExpiryMinutes}}
                 components={{
                   bold: <Text style={styles.expiryBoldText} />,
@@ -192,7 +192,7 @@ export const OtpVerification: React.FC<OtpVerificationProps> = ({
                   (isResendDisabled || isResending) &&
                     styles.resendButtonDisabled,
                 ]}>
-                {t('SplashScreen.resend')}{' '}
+                {t('auth.login.otp.resend')}{' '}
                 {countdown > 0 ? `(${countdown}s)` : ''}
               </Text>
             </TouchableOpacity>
@@ -201,7 +201,7 @@ export const OtpVerification: React.FC<OtpVerificationProps> = ({
       </KeyboardAwareScrollView>
 
       <Button
-        label={t('SplashScreen.verifyOtp')}
+        label={t('auth.login.otp.verify')}
         onPress={handleSubmit}
         isDisabled={!isOtpComplete || showTermsModal}
         isLoading={isVerifying}

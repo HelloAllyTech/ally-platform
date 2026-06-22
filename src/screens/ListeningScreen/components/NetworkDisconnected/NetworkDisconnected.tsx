@@ -25,26 +25,26 @@ export const NetworkDisconnected: React.FC<NetworkDisconnectedProps> = ({
   const getTitle = () => {
     switch (disconnectedType) {
       case DisconnectedType.SOCKET:
-        return t('Common.offline.socketTitle');
+        return t('common.somethingWentWrong');
       case DisconnectedType.NETWORK:
-        return t('Common.offline.networkTitle');
+        return t('common.offline.networkTitle');
       case DisconnectedType.MICROPHONE_FAILURE:
-        return t('Common.offline.microphoneFailureTitle');
+        return t('common.offline.microphoneFailureTitle');
       default:
-        return t('Common.offline.socketTitle');
+        return t('common.somethingWentWrong');
     }
   };
 
   const getDescription = () => {
     switch (disconnectedType) {
       case DisconnectedType.SOCKET:
-        return t('Common.offline.socketDescription');
+        return t('common.offline.socketDescription');
       case DisconnectedType.NETWORK:
-        return t('Common.offline.networkDescription');
+        return t('common.offline.networkDescription');
       case DisconnectedType.MICROPHONE_FAILURE:
-        return t('Common.offline.microphoneFailureDescription');
+        return t('common.offline.microphoneFailureDescription');
       default:
-        return t('Common.offline.socketDescription');
+        return t('common.offline.socketDescription');
     }
   };
 
@@ -56,14 +56,14 @@ export const NetworkDisconnected: React.FC<NetworkDisconnectedProps> = ({
         <Text style={styles.description}>{getDescription()}</Text>
         {!isOffline && (
           <Button
-            label={t('Common.offline.tryAgain')}
+            label={t('common.offline.tryAgain')}
             onPress={onRetry}
             customContainerStyle={[styles.buttonContainer, styles.bgWhite]}
             customTextStyle={styles.secondaryText}
           />
         )}
         <Button
-          label={t('Common.offline.goBack')}
+          label={t('common.offline.goBack')}
           onPress={onGoBack}
           customContainerStyle={[styles.buttonContainer, styles.bgDarkGray7]}
           customTextStyle={styles.whiteText}

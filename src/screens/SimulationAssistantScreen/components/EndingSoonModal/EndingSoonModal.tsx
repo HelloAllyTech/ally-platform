@@ -32,12 +32,12 @@ export const EndingSoonModal: React.FC<EndingSoonModalProps> = ({
       illustration={<HourGlassIcon />}
       actions={[
         {
-          label: t('SimulationAssistant.endSession'),
+          label: t('simulationPage.endSession'),
           onPress: onEndSession,
           variant: 'secondary',
         },
         {
-          label: t('Simulations.continue'),
+          label: t('common.continue'),
           onPress: onContinue,
           variant: 'primary',
         },

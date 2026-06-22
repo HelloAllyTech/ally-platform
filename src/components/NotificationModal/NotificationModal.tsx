@@ -1,10 +1,10 @@
 import React from 'react';
+import {useTranslation} from 'react-i18next';
 import {Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {CloseIcon} from '@/assets';
 import {Button} from '@/components';
-import {SIMULATION_START_NOTIFICATION} from '@/constants';
 import {colors, fontFamily} from '@/theme';
 
 export interface NotificationModalProps {
@@ -18,7 +18,12 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
   onConfirm,
   onClose,
 }) => {
+  const {t} = useTranslation();
+
   if (!visible) return null;
+
+  const title = t('learn.scenario.preStart.titleNormal');
+  const [firstWord, ...restWords] = title.split(' ');
 
   return (
     <View style={styles.overlay}>
@@ -33,20 +38,16 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
           </TouchableOpacity>
         )}
         <Text style={styles.title}>
-          <Text style={styles.titleMain}>
-            {SIMULATION_START_NOTIFICATION.TITLE.split(' ')[0]}{' '}
-          </Text>
-          <Text style={styles.titleItalic}>
-            {SIMULATION_START_NOTIFICATION.TITLE.split(' ').slice(1).join(' ')}
-          </Text>
+          <Text style={styles.titleMain}>{firstWord} </Text>
+          <Text style={styles.titleItalic}>{restWords.join(' ')}</Text>
         </Text>
 
         <Text style={styles.description}>
-          {SIMULATION_START_NOTIFICATION.DESCRIPTION}
+          {t('learn.scenario.preStart.content')}
         </Text>
 
         <Button
-          label={SIMULATION_START_NOTIFICATION.START_SESSION}
+          label={t('learn.scenario.preStart.button')}
           onPress={onConfirm}
           customContainerStyle={styles.actionButton}
           customTextStyle={styles.actionButtonText}

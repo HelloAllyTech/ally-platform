@@ -116,10 +116,10 @@ describe('SimulationDetailsCard', () => {
       nativeEvent: {lines: threeLines},
     });
 
-    const viewMore = getByText('Review.card.viewMore');
+    const viewMore = getByText('common.viewMore');
     expect(viewMore).toBeTruthy();
     fireEvent.press(viewMore);
-    expect(getByText('Review.card.viewLess')).toBeTruthy();
+    expect(getByText('common.viewLess')).toBeTruthy();
   });
 
   it('applies titleNumberOfLines to title', () => {

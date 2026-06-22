@@ -84,7 +84,7 @@ export const TermsAndAgreementModal: React.FC<TermsAndAgreementModalProps> = ({
       <View style={styles.container}>
         <SafeAreaView style={styles.safeArea}>
           <View style={styles.contentContainer}>
-            <Text style={styles.title}>{t('TermsAndAgreement.title')}</Text>
+            <Text style={styles.title}>{t('terms.title')}</Text>
 
             <ScrollView
               ref={scrollViewRef}
@@ -130,13 +130,11 @@ export const TermsAndAgreementModal: React.FC<TermsAndAgreementModalProps> = ({
               ))}
               <View style={styles.completeDetailsContainer}>
                 <Text style={styles.completeDetailsText}>
-                  {t('TermsAndAgreement.completeDetails')}{' '}
+                  {t('terms.footerPrefix')}{' '}
                   <Text
                     style={styles.linkText}
                     onPress={() => handleLinkPress(TERMS_AND_CONDITIONS_URL)}>
-                    {t(
-                      'TermsAndAgreement.privacyPolicyAndUserLicenseAgreement',
-                    )}
+                    {t('terms.footerLinkText')}
                   </Text>
                   .
                 </Text>
@@ -152,7 +150,7 @@ export const TermsAndAgreementModal: React.FC<TermsAndAgreementModalProps> = ({
                     onPress={scrollToBottom}
                     testID="scroll-to-bottom-button">
                     <Text style={styles.scrollToBottomText}>
-                      {t('TermsAndAgreement.scrollToBottom')}
+                      {t('terms.scrollToBottom')}
                     </Text>
                   </TouchableOpacity>
                 </>
@@ -169,12 +167,12 @@ export const TermsAndAgreementModal: React.FC<TermsAndAgreementModalProps> = ({
                       onPress={() => setIsAgreed(!isAgreed)}
                     />
                     <Text style={styles.checkboxLabel}>
-                      {t('TermsAndAgreement.iHaveReadAndAgree')}
+                      {t('terms.agreeLabel')}
                     </Text>
                   </TouchableOpacity>
 
                   <Button
-                    label={t('TermsAndAgreement.agree')}
+                    label={t('terms.agreeButton')}
                     onPress={onAgree}
                     isDisabled={!isAgreed}
                     customContainerStyle={styles.agreeButton}

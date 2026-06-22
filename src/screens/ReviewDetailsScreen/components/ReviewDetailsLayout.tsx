@@ -278,10 +278,10 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
         visible={!!generalDeleteState}
         onClose={generalDeleteState?.onClose ?? (() => {})}
         onConfirm={generalDeleteState?.onConfirm ?? (() => {})}
-        title={t('ThreadsBottomSheet.deleteConfirmation.title')}
-        description={t('ThreadsBottomSheet.deleteConfirmation.description')}
-        confirmLabel={t('ThreadsBottomSheet.deleteConfirmation.confirm')}
-        cancelLabel={t('ThreadsBottomSheet.deleteConfirmation.cancel')}
+        title={t('threadsBottomSheet.deleteConfirmation.title')}
+        description={t('threadsBottomSheet.deleteConfirmation.description')}
+        confirmLabel={t('threadsBottomSheet.deleteConfirmation.confirm')}
+        cancelLabel={t('threadsBottomSheet.deleteConfirmation.cancel')}
         confirmVariant="destructive"
       />
     </SafeAreaView>

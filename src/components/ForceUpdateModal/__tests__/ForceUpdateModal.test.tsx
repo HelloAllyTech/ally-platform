@@ -27,12 +27,12 @@ jest.mock('@/utils', () => ({
 describe('ForceUpdateModal', () => {
   it('does not render when not visible', () => {
     const {queryByText} = render(<ForceUpdateModal visible={false} />);
-    expect(queryByText('ForceUpdate.description')).toBeNull();
+    expect(queryByText('forceUpdate.description')).toBeNull();
   });
 
   it('renders and triggers openAppStore on button press', () => {
     const {getByText} = render(<ForceUpdateModal visible />);
-    fireEvent.press(getByText('ForceUpdate.updateButton'));
+    fireEvent.press(getByText('forceUpdate.updateButton'));
     const {openAppStore} = require('@/utils');
     expect(openAppStore).toHaveBeenCalled();
   });

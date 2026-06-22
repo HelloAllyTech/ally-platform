@@ -63,7 +63,7 @@ describe('ReactionsScreen', () => {
 
   it('renders header with title and back button', () => {
     const {getByText} = render(<ReactionsScreen {...defaultProps} />);
-    expect(getByText('Reactions.title')).toBeTruthy();
+    expect(getByText('review.reactionsModal.title')).toBeTruthy();
   });
 
   it('calls goBack when back button is pressed', () => {
@@ -93,7 +93,7 @@ describe('ReactionsScreen', () => {
 
   it('shows empty state when not loading and no reactions', () => {
     const {getByText} = render(<ReactionsScreen {...defaultProps} />);
-    expect(getByText('Reactions.noReactionsYet')).toBeTruthy();
+    expect(getByText('review.reactionsModal.noReactionsYet')).toBeTruthy();
   });
 
   it('does not render FlatList when reviewId is missing', () => {

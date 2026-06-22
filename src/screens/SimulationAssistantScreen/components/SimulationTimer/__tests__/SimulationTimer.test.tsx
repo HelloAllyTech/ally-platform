@@ -31,7 +31,7 @@ describe('SimulationTimer', () => {
     );
 
     // Initially 00:00
-    getByText(/SimulationAssistant\.sessionDuration/);
+    getByText(/simulationPage\.sessionDuration/);
     getByText('00:00');
 
     // Advance 3 seconds and system time

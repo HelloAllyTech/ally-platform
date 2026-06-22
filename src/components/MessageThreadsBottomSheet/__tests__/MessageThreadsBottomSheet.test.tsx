@@ -110,7 +110,7 @@ describe('MessageThreadsBottomSheet', () => {
     const {getByText} = render(
       <MessageThreadsBottomSheet {...defaultProps} />,
     );
-    expect(getByText('ThreadsBottomSheet.title')).toBeTruthy();
+    expect(getByText('threadsBottomSheet.title')).toBeTruthy();
   });
 
   it('renders empty state when threads is empty', () => {

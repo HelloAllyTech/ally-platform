@@ -33,8 +33,13 @@ jest.mock('@/components', () => ({
 jest.mock('@/constants', () => ({
   ALWAYS_VISIBLE_SECTIONS: ['always'] as string[],
   SECTION_LIST: [
-    {key: 'always', label: 'Always', icon: () => null},
-    {key: 'conditional', label: 'Conditional', icon: () => null},
+    {key: 'always', label: 'Always', labelKey: 'Always', icon: () => null},
+    {
+      key: 'conditional',
+      label: 'Conditional',
+      labelKey: 'Conditional',
+      icon: () => null,
+    },
   ],
   summaryFields: [
     {key: 'field1', label: 'F1', sectionKey: 'conditional'},
@@ -95,7 +100,7 @@ describe('CallSummaryDetails', () => {
     expect(getByText('Conditional')).toBeTruthy();
 
     await act(async () => {
-      fireEvent.press(getByText('save'));
+      fireEvent.press(getByText('common.save'));
     });
     expect(onSubmit).toHaveBeenCalledWith(true);
   });

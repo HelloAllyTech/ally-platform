@@ -63,7 +63,7 @@ describe('useToggleReviewPrivacy', () => {
       body: {status: 'IN_REVIEW'},
     });
     expect(mockShowToast).toHaveBeenCalledWith(
-      'SimulationFeedback.privacyUpdated',
+      'simulationPage.privacyUpdated',
       'success',
     );
   });
@@ -96,7 +96,7 @@ describe('useToggleReviewPrivacy', () => {
     });
 
     expect(mockShowToast).toHaveBeenCalledWith(
-      'Errors.updatePrivacy',
+      'simulationPage.errorUpdatePrivacy',
       'error',
     );
     consoleSpy.mockRestore();

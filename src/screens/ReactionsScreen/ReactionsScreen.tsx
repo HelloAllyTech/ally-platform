@@ -85,7 +85,9 @@ const ReactionsContent: React.FC<{reviewId: string | number}> = ({
 
     return (
       <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>{t('Reactions.noReactionsYet')}</Text>
+        <Text style={styles.emptyText}>
+          {t('review.reactionsModal.noReactionsYet')}
+        </Text>
       </View>
     );
   }, [isLoading, isFetching, t]);
@@ -111,7 +113,7 @@ const ReactionsContent: React.FC<{reviewId: string | number}> = ({
           <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
             <LeftArrowIcon color={colors.black} />
           </TouchableOpacity>
-          <Text style={styles.title}>{t('Reactions.title')}</Text>
+          <Text style={styles.title}>{t('review.reactionsModal.title')}</Text>
         </View>
         <ReactionFilterTabs
           summary={summary}

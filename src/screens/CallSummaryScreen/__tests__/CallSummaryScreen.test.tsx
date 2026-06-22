@@ -273,7 +273,7 @@ describe('CallSummaryScreen', () => {
         navigation={{} as any}
       />,
     );
-    expect(getByText('CallSummaryProgress.settingUpSummaryScreen')).toBeTruthy();
+    expect(getByText('summaryLoading.settingUp')).toBeTruthy();
   });
 
   it('shows retry label when summary has failed', () => {
@@ -300,6 +300,6 @@ describe('CallSummaryScreen', () => {
         navigation={{} as any}
       />,
     );
-    expect(getByText('CallSummaryProgress.retry')).toBeTruthy();
+    expect(getByText('common.retry')).toBeTruthy();
   });
 });

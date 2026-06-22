@@ -83,9 +83,9 @@ export const useCallSummaryActions = ({
           summaryName: newName,
         }).unwrap();
         setSummaryName(newName);
-        showToast(t('CallSummary.info.summaryNameUpdateSuccess'), 'success');
+        showToast(t('callSummary.info.summaryNameUpdateSuccess'), 'success');
       } catch (error) {
-        showErrorToast(error, 'CallSummary.info.summaryNameUpdateFailed');
+        showErrorToast(error, 'callSummary.info.summaryNameUpdateFailed');
       }
     }
   };
@@ -100,7 +100,7 @@ export const useCallSummaryActions = ({
 
       const response = await exportCallSummary(chatId).unwrap();
       if (typeof response !== 'string') {
-        throw new Error(t('CallSummary.info.invalidResponseFormat'));
+        throw new Error(t('callSummary.info.invalidResponseFormat'));
       }
 
       const filePath = await saveFile({
@@ -108,12 +108,12 @@ export const useCallSummaryActions = ({
         chatId,
         t,
       });
-      logger.info(t('CallSummary.info.fileSavedSuccess', {path: filePath}));
+      logger.info(t('callSummary.info.fileSavedSuccess', {path: filePath}));
 
-      showToast(t('CallSummary.info.fileExportedSuccess'), 'success');
+      showToast(t('callSummary.info.fileExportedSuccess'), 'success');
       setIsMenuVisible(false);
     } catch (error) {
-      showErrorToast(error, 'CallSummary.info.fileExportFailed');
+      showErrorToast(error, 'callSummary.info.fileExportFailed');
     }
   };
 
@@ -123,7 +123,7 @@ export const useCallSummaryActions = ({
       await archiveCallLog({callLogId: chatId, archive}).unwrap();
       showToast(
         t(
-          `CallSummary.archiveActionModal.${archive ? 'archive' : 'unarchive'}.success`,
+          `callSummary.archiveActionModal.${archive ? 'archive' : 'unarchive'}.success`,
         ),
         'success',
       );
@@ -133,7 +133,7 @@ export const useCallSummaryActions = ({
       showErrorToast(
         error,
         t(
-          `CallSummary.archiveActionModal.${archive ? 'archive' : 'unarchive'}.failed`,
+          `callSummary.archiveActionModal.${archive ? 'archive' : 'unarchive'}.failed`,
         ),
       );
     } finally {
@@ -149,20 +149,20 @@ export const useCallSummaryActions = ({
           chatId,
           data: {summary: {}},
         });
-        showToast(t('CallSummary.info.summaryDeletedSuccess'), 'success');
+        showToast(t('callSummary.info.summaryDeletedSuccess'), 'success');
         setIsMenuVisible(false);
         if (response.data) {
           setTimeout(() => {
             navigation.goBack();
           }, 2000);
         } else {
-          showToast(t('CallSummary.info.summaryDeleteFailed'));
+          showToast(t('callSummary.info.summaryDeleteFailed'));
         }
       } catch (err) {
         const errorMessage =
           err instanceof Error
             ? err.message
-            : t('CallSummary.info.summaryDeleteFailed');
+            : t('callSummary.info.summaryDeleteFailed');
         logger.error(errorMessage);
         showToast(errorMessage);
       }
@@ -183,12 +183,12 @@ export const useCallSummaryActions = ({
   const onUpdateSummary = useCallback(
     (isSuccess: boolean) => {
       if (isSuccess) {
-        showToast(t('CallSummary.info.summaryUpdatedSuccess'), 'success');
+        showToast(t('callSummary.info.summaryUpdatedSuccess'), 'success');
         setTimeout(() => {
           handleGoBack();
         }, 2000);
       } else {
-        showToast(t('CallSummary.info.summaryUpdateFailed'));
+        showToast(t('callSummary.info.summaryUpdateFailed'));
       }
     },
     [showToast, t, handleGoBack],

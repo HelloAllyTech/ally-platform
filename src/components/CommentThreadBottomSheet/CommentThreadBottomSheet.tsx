@@ -196,7 +196,7 @@ export const CommentThreadBottomSheet: React.FC<
     ],
   );
 
-  const headerTitle = useMemo(() => t('CommentThreadBottomSheet.title'), [t]);
+  const headerTitle = useMemo(() => t('commentThreadBottomSheet.title'), [t]);
 
   const renderFooter = useCallback(() => {
     if (!isFetching) return null;
@@ -219,7 +219,7 @@ export const CommentThreadBottomSheet: React.FC<
     return (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyText}>
-          {t('CommentThreadBottomSheet.noComments')}
+          {t('commentThreadBottomSheet.noComments')}
         </Text>
       </View>
     );
@@ -247,7 +247,7 @@ export const CommentThreadBottomSheet: React.FC<
   ]);
 
   const placeholderText = useMemo(
-    () => t('CommentThreadBottomSheet.addComment'),
+    () => t('commentThreadBottomSheet.addComment'),
     [t],
   );
 
@@ -315,12 +315,12 @@ export const CommentThreadBottomSheet: React.FC<
         visible={!!deleteCommentId}
         onClose={handleCancelDelete}
         onConfirm={handleConfirmDelete}
-        title={t('CommentThreadBottomSheet.deleteConfirmation.title')}
+        title={t('commentThreadBottomSheet.deleteConfirmation.title')}
         description={t(
-          'CommentThreadBottomSheet.deleteConfirmation.description',
+          'commentThreadBottomSheet.deleteConfirmation.description',
         )}
-        confirmLabel={t('CommentThreadBottomSheet.deleteConfirmation.confirm')}
-        cancelLabel={t('CommentThreadBottomSheet.deleteConfirmation.cancel')}
+        confirmLabel={t('commentThreadBottomSheet.deleteConfirmation.confirm')}
+        cancelLabel={t('commentThreadBottomSheet.deleteConfirmation.cancel')}
         confirmVariant="destructive"
       />
     </>

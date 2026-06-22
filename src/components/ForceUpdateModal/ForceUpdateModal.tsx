@@ -20,17 +20,17 @@ export const ForceUpdateModal: React.FC<ForceUpdateModalProps> = ({
     <View style={styles.overlay}>
       <View style={styles.modalContainer}>
         <Text style={styles.title}>
-          {t('ForceUpdate.title')}
-          <Text style={styles.titleBold}>{t('ForceUpdate.titleBold')}</Text>
+          {t('forceUpdate.title')}
+          <Text style={styles.titleBold}>{t('forceUpdate.titleBold')}</Text>
         </Text>
         <View style={styles.iconContainer}>
           <ForceUpdateAlertIcon width={125} height={125} />
         </View>
 
-        <Text style={styles.description}>{t('ForceUpdate.description')}</Text>
+        <Text style={styles.description}>{t('forceUpdate.description')}</Text>
 
         <Button
-          label={t('ForceUpdate.updateButton')}
+          label={t('forceUpdate.updateButton')}
           onPress={openAppStore}
           customContainerStyle={styles.updateButton}
           customTextStyle={styles.updateButtonText}

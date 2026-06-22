@@ -144,7 +144,7 @@ describe('MicrophoneListeningScreen', () => {
 
   it('shows loading state when chatData is null', () => {
     const {getByText} = render(<MicrophoneListeningScreen />);
-    expect(getByText('ListeningScreen.connecting')).toBeTruthy();
+    expect(getByText('listeningScreen.connecting')).toBeTruthy();
   });
 
   it('shows disconnected view when disconnectedType is set', () => {

@@ -76,9 +76,7 @@ export const ResourceArticleCard: React.FC<ResourceArticleCardProps> = ({
               style={themedStyles.moreButton}
               onPress={toggleExpand}
               activeOpacity={0.7}>
-              <Text style={themedStyles.moreText}>
-                {t('ResourceArticleCard.viewMore')}
-              </Text>
+              <Text style={themedStyles.moreText}>{t('common.viewMore')}</Text>
               <DownArrowIcon
                 color={colorTheme === 'dark' ? colors.white2 : colors.black}
                 width={24}

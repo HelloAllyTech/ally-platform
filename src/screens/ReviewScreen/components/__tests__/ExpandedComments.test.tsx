@@ -64,7 +64,7 @@ describe('ExpandedComments', () => {
         generalCommentsData={generalCommentsData}
       />,
     );
-    expect(getByText('Review.card.noComments')).toBeTruthy();
+    expect(getByText('review.details.noCommentsYet')).toBeTruthy();
   });
 
   it('renders comments when generalCommentsData has comments', () => {
@@ -136,7 +136,7 @@ describe('ExpandedComments', () => {
     const {getByText} = render(
       <ExpandedComments {...defaultProps} onCollapsePress={onCollapsePress} />,
     );
-    fireEvent.press(getByText('Review.card.collapse'));
+    fireEvent.press(getByText('calls.uploadProgress.collapse'));
     expect(onCollapsePress).toHaveBeenCalledTimes(1);
   });
 });

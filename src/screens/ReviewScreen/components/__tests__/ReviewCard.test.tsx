@@ -150,15 +150,15 @@ describe('ReviewCard', () => {
 
   it('renders detail rows', () => {
     const {getByText} = render(<ReviewCard {...defaultProps} />);
-    expect(getByText('Review.card.dateAndTime')).toBeTruthy();
+    expect(getByText('review.details.dateAndTime')).toBeTruthy();
     expect(getByText('date-2024-01-01T12:00:00Z')).toBeTruthy();
-    expect(getByText('Review.card.duration')).toBeTruthy();
+    expect(getByText('review.feedCard.duration')).toBeTruthy();
     expect(getByText('90s')).toBeTruthy();
   });
 
   it('renders review transcript button', () => {
     const {getByText} = render(<ReviewCard {...defaultProps} />);
-    expect(getByText('Review.card.reviewTranscript')).toBeTruthy();
+    expect(getByText('review.feedCard.reviewTranscript')).toBeTruthy();
   });
 
   it('calls onReviewPress when review transcript is pressed', () => {
@@ -166,14 +166,14 @@ describe('ReviewCard', () => {
     const {getByText} = render(
       <ReviewCard {...defaultProps} onReviewPress={onReviewPress} />,
     );
-    fireEvent.press(getByText('Review.card.reviewTranscript'));
+    fireEvent.press(getByText('review.feedCard.reviewTranscript'));
     expect(onReviewPress).toHaveBeenCalledWith('review-1');
   });
 
   it('renders reactions and comments count', () => {
     const {getByTestId, getByText} = render(<ReviewCard {...defaultProps} />);
     expect(getByTestId('reactions-count')).toBeTruthy();
-    expect(getByText('2 Review.card.comments')).toBeTruthy();
+    expect(getByText('2 review.details.commentLabels')).toBeTruthy();
   });
 
   it('expands on press when generalCommentsData has items', () => {
@@ -181,7 +181,7 @@ describe('ReviewCard', () => {
     const {getByText, getByTestId} = render(
       <ReviewCard {...defaultProps} commentsCount={2} />,
     );
-    fireEvent.press(getByText('2 Review.card.comments'));
+    fireEvent.press(getByText('2 review.details.commentLabels'));
     expect(getByTestId('expanded-comments')).toBeTruthy();
     mockGeneralCommentsData = undefined;
   });

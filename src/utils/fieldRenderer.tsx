@@ -4,7 +4,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {CustomDropdown, SearchableLocationDropdown} from '@/components';
 import commonStyles from '@/components/styles';
-import {SummaryFieldKey} from '@/constants/summary';
+import {FIELD_LABEL_KEYS, SummaryFieldKey} from '@/constants/summary';
 import {colors} from '@/theme';
 import {FieldDataContext, FieldType, SummaryField} from '@/types';
 
@@ -84,17 +84,19 @@ export function renderField(
     canEdit = true,
   } = extraProps;
 
+  // Prefer the localized label; fall back to the hardcoded English label
+  // when no translator is provided (e.g. some test contexts).
+  const label = t ? t(FIELD_LABEL_KEYS[field.key]) : field.label;
+
   switch (field.type) {
     case FieldType.Text:
-      return (
-        <FieldRow key={field.key} label={field.label} value={displayValue} />
-      );
+      return <FieldRow key={field.key} label={label} value={displayValue} />;
 
     case FieldType.InlineTextInput:
       return (
         <FieldRow
           key={field.key}
-          label={field.label}
+          label={label}
           value={displayValue}
           renderEdit={
             isEditing && field.isEditable
@@ -123,7 +125,7 @@ export function renderField(
         <EditableField
           key={field.key}
           fieldKey={field.key}
-          label={field.label}
+          label={label}
           value={
             typeof value === 'string' ? value : value ? String(value) : null
           }
@@ -139,7 +141,7 @@ export function renderField(
       return (
         <FieldRow
           key={field.key}
-          label={field.label}
+          label={label}
           value={displayValue}
           renderEdit={
             isEditing
@@ -166,7 +168,7 @@ export function renderField(
       return (
         <FieldRow
           key={field.key}
-          label={field.label}
+          label={label}
           value={displayValue}
           renderEdit={
             isEditing
@@ -189,9 +191,7 @@ export function renderField(
 
     default:
       // Fallback to text display
-      return (
-        <FieldRow key={field.key} label={field.label} value={displayValue} />
-      );
+      return <FieldRow key={field.key} label={label} value={displayValue} />;
   }
 }
 

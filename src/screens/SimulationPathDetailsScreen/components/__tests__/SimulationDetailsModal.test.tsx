@@ -91,7 +91,7 @@ describe('SimulationDetailsModal', () => {
   it('renders order label', () => {
     const {getByText} = render(<SimulationDetailsModal {...defaultProps} />);
 
-    expect(getByText('Simulations.simulation 1')).toBeTruthy();
+    expect(getByText('common.simulation 1')).toBeTruthy();
   });
 
   it('renders start button when onStartSimulation is provided', () => {

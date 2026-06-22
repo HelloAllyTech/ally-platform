@@ -7,12 +7,8 @@ jest.mock('@/assets', () => ({
   CloseIcon: 'CloseIcon',
 }));
 
-jest.mock('@/constants', () => ({
-  SIMULATION_START_NOTIFICATION: {
-    TITLE: 'Before you get started',
-    DESCRIPTION: 'At times, the bot may be unresponsive.',
-    START_SESSION: 'Start Session',
-  },
+jest.mock('react-i18next', () => ({
+  useTranslation: () => ({t: (key: string) => key}),
 }));
 
 jest.mock('@/components', () => {
@@ -39,10 +35,9 @@ describe('NotificationModal', () => {
       <NotificationModal visible onConfirm={jest.fn()} />,
     );
 
-    expect(getByText(/Before/)).toBeTruthy();
-    expect(getByText(/you get started/)).toBeTruthy();
-    expect(getByText(/bot may be unresponsive/)).toBeTruthy();
-    expect(getByText('Start Session')).toBeTruthy();
+    expect(getByText('learn.scenario.preStart.titleNormal')).toBeTruthy();
+    expect(getByText('learn.scenario.preStart.content')).toBeTruthy();
+    expect(getByText('learn.scenario.preStart.button')).toBeTruthy();
   });
 
   it('calls onConfirm when Start Session button is pressed', () => {

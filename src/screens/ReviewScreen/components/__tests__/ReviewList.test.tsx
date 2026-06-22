@@ -86,8 +86,8 @@ jest.mock('@/assets', () => {
 
 jest.mock('@/constants', () => ({
   REVIEW_FILTERS: [
-    {key: 'all', label: 'All'},
-    {key: 'mine', label: 'Mine'},
+    {key: 'all', labelKey: 'review.filter.all'},
+    {key: 'mine', labelKey: 'review.filter.mine'},
   ],
   SCREEN_NAMES: {
     REVIEW_DETAILS: 'ReviewDetails',
@@ -292,6 +292,6 @@ describe('ReviewList', () => {
         canViewReview
       />,
     );
-    expect(mockShowToast).toHaveBeenCalledWith('Review.fetchError', 'error');
+    expect(mockShowToast).toHaveBeenCalledWith('review.error.title', 'error');
   });
 });

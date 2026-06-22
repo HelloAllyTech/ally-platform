@@ -219,7 +219,7 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
     ],
   );
 
-  const headerTitle = useMemo(() => t('ReplyBottomSheet.title'), [t]);
+  const headerTitle = useMemo(() => t('replyBottomSheet.title'), [t]);
 
   const renderOriginalComment = useCallback(() => {
     if (!originalComment) return null;
@@ -317,7 +317,7 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
     return <View style={styles.emptyContainer} />;
   }, [isLoading]);
 
-  const placeholderText = useMemo(() => t('ReplyBottomSheet.addReply'), [t]);
+  const placeholderText = useMemo(() => t('replyBottomSheet.addReply'), [t]);
 
   const renderFooterComponent = useStableFooterRenderer({
     text: replyText,
@@ -384,10 +384,10 @@ export const ReplyBottomSheet: React.FC<ReplyBottomSheetProps> = ({
         visible={!!deleteReplyId}
         onClose={handleCancelDelete}
         onConfirm={handleConfirmDelete}
-        title={t('ReplyBottomSheet.deleteConfirmation.title')}
-        description={t('ReplyBottomSheet.deleteConfirmation.description')}
-        confirmLabel={t('ReplyBottomSheet.deleteConfirmation.confirm')}
-        cancelLabel={t('ReplyBottomSheet.deleteConfirmation.cancel')}
+        title={t('replyBottomSheet.deleteConfirmation.title')}
+        description={t('replyBottomSheet.deleteConfirmation.description')}
+        confirmLabel={t('replyBottomSheet.deleteConfirmation.confirm')}
+        cancelLabel={t('replyBottomSheet.deleteConfirmation.cancel')}
         confirmVariant="destructive"
       />
     </>

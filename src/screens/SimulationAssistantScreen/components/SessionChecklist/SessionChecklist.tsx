@@ -99,14 +99,14 @@ export const SessionChecklist: FC<SessionChecklistProps> = ({
         </View>
         <View style={styles.headerTextContainer}>
           <Text style={styles.headerTitle}>
-            {t('SimulationChecklist.sessionChecklist')}
+            {t('simulationPage.sessionChecklist')}
           </Text>
           {mode !== ChecklistType.LIST && (
             <Text style={styles.headerSubtitle}>
-              {t('SimulationChecklist.progress')}:{' '}
+              {t('simulationPage.progress')}:{' '}
               <Text style={styles.progressCompleted}>{completedCount}</Text> of{' '}
               <Text style={styles.progressTotal}>
-                {totalCount} {t('SimulationChecklist.completed')}
+                {totalCount} {t('simulationPage.completed')}
               </Text>
             </Text>
           )}

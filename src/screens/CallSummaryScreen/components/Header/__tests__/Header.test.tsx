@@ -60,8 +60,8 @@ describe('Header', () => {
 
   it('renders title and subtitle', () => {
     const {getByText} = render(<Header {...baseProps} />);
-    expect(getByText(/CallSummary\.header\.title/)).toBeTruthy();
-    expect(getByText(/CallSummary\.header\.subtitle/)).toBeTruthy();
+    expect(getByText(/callSummary\.header\.title/)).toBeTruthy();
+    expect(getByText(/callSummary\.header\.subtitle/)).toBeTruthy();
   });
 
   it('renders summary name with # prefix', () => {
@@ -99,7 +99,7 @@ describe('Header', () => {
       />,
     );
 
-    expect(getByText('SimulationFeedback.share')).toBeTruthy();
+    expect(getByText('learn.scenario.share')).toBeTruthy();
     expect(getByTestId('custom-switch')).toBeTruthy();
   });
 

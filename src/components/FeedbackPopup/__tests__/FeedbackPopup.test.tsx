@@ -38,7 +38,7 @@ describe('FeedbackPopup', () => {
     fireEvent.press(getByTestId('fp-stars'));
 
     // Press submit button
-    fireEvent.press(getByText('FeedbackPopup.submitButton'));
+    fireEvent.press(getByText('callFeedback.submit'));
 
     expect(onSubmit).toHaveBeenCalledWith({rating: 4, issues: [], comment: '', tags: []});
     expect(onClose).toHaveBeenCalled();

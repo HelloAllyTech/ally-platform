@@ -6,7 +6,7 @@ import {ReviewTypeChip} from '../ReviewTypeChip';
 jest.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, options?: {reviewType?: string}) =>
-      key === 'Review.card.reviewType' && options?.reviewType
+      key === 'review.feedCard.reviewType' && options?.reviewType
         ? options.reviewType
         : key,
   }),

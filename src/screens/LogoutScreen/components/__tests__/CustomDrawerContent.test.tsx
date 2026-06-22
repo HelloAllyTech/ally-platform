@@ -39,7 +39,7 @@ jest.mock('@/services/authApi', () => ({
 // Mock child components to avoid rendering complexity
 jest.mock('@/components', () => {
   const React = require('react');
-  const {View, Text} = require('react-native');
+  const {View} = require('react-native');
   return {
     __esModule: true,
     UserProfileImage: () => <View testID="profile-icon" />,
@@ -224,16 +224,16 @@ describe('CustomDrawerContent', () => {
 
     // logout button
     expect(getByTestId('logout-icon')).toBeTruthy();
-    expect(getByText('Logout.logout')).toBeTruthy();
+    expect(getByText('user.logout')).toBeTruthy();
 
     // profile settings menu item
     expect(getByTestId('profile-settings-icon')).toBeTruthy();
-    expect(getByText('Drawer.profileSettings')).toBeTruthy();
+    expect(getByText('profile.settings.title')).toBeTruthy();
 
     // version
-    expect(getByText(/Common.version/)).toBeTruthy();
+    expect(getByText(/common.version/)).toBeTruthy();
     expect(getByText(/1.2.3/)).toBeTruthy();
-    expect(getByText(/Drawer.dev/)).toBeTruthy();
+    expect(getByText(/drawer.dev/)).toBeTruthy();
   });
 
   it('invokes openLogoutModal when logout is pressed', () => {
@@ -242,7 +242,7 @@ describe('CustomDrawerContent', () => {
       <DrawerContent {...mockDrawerProps} openLogoutModal={openLogoutModal} />,
     );
 
-    fireEvent.press(getByText('Logout.logout'));
+    fireEvent.press(getByText('user.logout'));
     expect(openLogoutModal).toHaveBeenCalled();
   });
 

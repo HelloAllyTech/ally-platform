@@ -65,7 +65,7 @@ export const SummaryModals: React.FC<SummaryModalsProps> = ({
 
   const customMenuOptions: CustomMenuModalOption[] = [
     {
-      label: t('CallSummary.info.rename'),
+      label: t('callSummary.info.rename'),
       iconRight: <EditIcon width={16} height={16} />,
       onPress: () => {
         setActiveModal('rename');
@@ -75,22 +75,22 @@ export const SummaryModals: React.FC<SummaryModalsProps> = ({
     ...(showExportOption
       ? [
           {
-            label: t('CallSummary.customMenu.export'),
+            label: t('callSummary.customMenu.export'),
             iconRight: <ExportIcon width={16} height={16} />,
             onPress: handleExport,
           },
         ]
       : []),
     {
-      label: t('CallSummary.customMenu.dataPolicy'),
+      label: t('callSummary.customMenu.dataPolicy'),
       iconRight: <ContractIcon width={16} height={16} />,
       onPress: () => Linking.openURL(PRIVACY_POLICY_URL),
     },
     {
       label:
         actionType === 'archive'
-          ? t(`CallSummary.customMenu.archive`)
-          : t(`CallSummary.customMenu.unarchive`),
+          ? t(`callSummary.customMenu.archive`)
+          : t(`callSummary.customMenu.unarchive`),
       iconRight:
         actionType === 'archive' ? (
           <ArchiveIcon width={16} height={16} />
@@ -116,7 +116,7 @@ export const SummaryModals: React.FC<SummaryModalsProps> = ({
         options={customMenuOptions}
       />
       <FeedbackPopup
-        note={t('FeedbackPopup.instructionText')}
+        note={t('callFeedback.rateSubtitle')}
         visible={isSummaryFeedbackPopup}
         onClose={hideSummaryFeedbackPopup}
         onSubmit={onSubmitSummaryFeedback}

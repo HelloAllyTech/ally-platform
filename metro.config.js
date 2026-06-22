@@ -11,6 +11,9 @@ const tslibEsm = path.resolve(__dirname, 'node_modules/tslib/tslib.es6.js');
  * @type {import('@react-native/metro-config').MetroConfig}
  */
 const config = {
+  server: {
+    port: 8082,
+  },
   transformer: {
     babelTransformerPath: require.resolve('react-native-svg-transformer'),
   },

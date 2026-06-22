@@ -49,26 +49,15 @@ export const CallEndOverlay = () => {
               {/* Line 1: text + pill */}
               <View style={styles.inlineRow}>
                 <Text style={styles.text}>
-                  {t('BreathingScreen.youGaveYour')}{' '}
-                </Text>
-                <Text style={[styles.text, styles.pill]}>
-                  {t('BreathingScreen.best')}
+                  {t('stressBuster.messages.gaveBest')}{' '}
                 </Text>
               </View>
-              {/* Line 2 */}
-              <Text style={styles.text}>{t('BreathingScreen.onThatCall')}</Text>
             </View>
           ) : (
             <View style={styles.lineWrap}>
               <Text style={styles.text}>
-                {t('BreathingScreen.nowTakeAMoment')}
+                {t('stressBuster.messages.momentForYourself')}
               </Text>
-              <View style={styles.inlineRow}>
-                <Text style={styles.text}>{t('BreathingScreen.for')} </Text>
-                <Text style={[styles.text, styles.pill]}>
-                  {t('BreathingScreen.yourself')}
-                </Text>
-              </View>
             </View>
           )}
         </Animated.View>

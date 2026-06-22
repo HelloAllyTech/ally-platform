@@ -78,7 +78,7 @@ describe('UpNext', () => {
     const {getByLabelText} = render(
       <UpNext {...defaultProps} pathId="path-1" />,
     );
-    expect(getByLabelText('Common.finish')).toBeTruthy();
+    expect(getByLabelText('common.finish')).toBeTruthy();
   });
 
   it('shows Back button when event completed but flow not completed', () => {
@@ -98,7 +98,7 @@ describe('UpNext', () => {
     const {getByLabelText} = render(
       <UpNext {...defaultProps} pathId="path-1" />,
     );
-    expect(getByLabelText('Common.back')).toBeTruthy();
+    expect(getByLabelText('common.backToLearn')).toBeTruthy();
   });
 
   it('returns no buttons when no pathId/caseId', () => {

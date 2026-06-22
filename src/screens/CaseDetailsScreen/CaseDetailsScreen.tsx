@@ -231,9 +231,7 @@ export const CaseDetailsScreen: React.FC<
         completedScenarios={data.completedScenarios}
         totalScenarios={totalScenarios}
         isCompleted={isCompleted}
-        startButtonLabel={
-          isStarted ? t('Simulations.continue') : t('Simulations.start')
-        }
+        startButtonLabel={isStarted ? t('common.continue') : t('common.start')}
         onStartPress={handleStart}
         isStartDisabled={isStartDisabled}
         isCreatingSession={isCreatingSession}
@@ -270,7 +268,7 @@ export const CaseDetailsScreen: React.FC<
         {paddingTop: insets.top, paddingBottom: insets.bottom},
       ]}>
       <LearningPathHeader
-        title={t('Simulations.case')}
+        title={t('learn.choose.case')}
         onBackPress={handleBack}
         credits={
           credits && getCreditsInfo
@@ -292,7 +290,7 @@ export const CaseDetailsScreen: React.FC<
       ) : error || !data?.scenarios ? (
         <EmptyState
           icon={DataUnavailableIcon}
-          title={t('Simulations.failedToLoadCaseDetails')}
+          title={t('simulationPage.failedToLoadCaseDetails')}
         />
       ) : (
         <FlatList
@@ -339,8 +337,8 @@ export const CaseDetailsScreen: React.FC<
         <IllustratedModal
           visible={showLowCreditsModal}
           onClose={() => setShowLowCreditsModal(false)}
-          titleMain={t('Credits.lowCreditsTitle')}
-          description={t('Credits.lowCreditsDescription')}
+          titleMain={t('learn.scenario.noCredits.title')}
+          description={t('learn.scenario.noCredits.desc')}
           illustration={<NoCreditsIcon />}
         />
       )}

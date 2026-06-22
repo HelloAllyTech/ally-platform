@@ -45,7 +45,7 @@ export const SearchableLocationDropdown: React.FC<
     disabled = false,
     isOpen,
     setIsOpen,
-    placeholder = t('LocationDropdown.placeholder'),
+    placeholder = t('locationDropdown.placeholder'),
     modalTranslateX,
   } = props;
   const [searchQuery, setSearchQuery] = useState('');
@@ -188,8 +188,8 @@ export const SearchableLocationDropdown: React.FC<
     <View style={styles.loadingContainer}>
       <Text style={styles.loadingText}>
         {searchQuery.length > 0
-          ? t('LocationDropdown.searching')
-          : t('LocationDropdown.loadingPlaces')}
+          ? t('locationDropdown.searching')
+          : t('locationDropdown.loadingPlaces')}
       </Text>
     </View>
   );
@@ -213,7 +213,7 @@ export const SearchableLocationDropdown: React.FC<
       {isLoadingInitial && currentPage > 1 && (
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>
-            {t('LocationDropdown.loadingPlaces')}
+            {t('locationDropdown.loadingPlaces')}
           </Text>
         </View>
       )}
@@ -223,7 +223,7 @@ export const SearchableLocationDropdown: React.FC<
   const renderNoResults = () => (
     <View style={styles.noResultsContainer}>
       <Text style={styles.noResultsText}>
-        {t('LocationDropdown.noLocationsFound')}
+        {t('locationDropdown.noLocationsFound')}
       </Text>
     </View>
   );
@@ -231,7 +231,7 @@ export const SearchableLocationDropdown: React.FC<
   const renderInstructions = () => (
     <View style={styles.instructionContainer}>
       <Text style={styles.instructionText}>
-        {t('LocationDropdown.startTypingToSearch')}
+        {t('locationDropdown.startTypingToSearch')}
       </Text>
     </View>
   );
@@ -337,7 +337,7 @@ export const SearchableLocationDropdown: React.FC<
                     style={styles.searchInput}
                     value={searchQuery}
                     onChangeText={setSearchQuery}
-                    placeholder={t('LocationDropdown.searchPlaceholder')}
+                    placeholder={t('locationDropdown.searchPlaceholder')}
                     placeholderTextColor={colors.lightGray3}
                     autoFocus
                   />

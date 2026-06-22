@@ -25,7 +25,7 @@ jest.useFakeTimers();
 describe('NetworkLogs', () => {
   it('opens modal on press', () => {
     const {getByText} = render(<NetworkLogs />);
-    fireEvent.press(getByText('NetworkLogs.logs'));
-    expect(getByText('NetworkLogs.logs')).toBeTruthy();
+    fireEvent.press(getByText('calls.header.subtitle'));
+    expect(getByText('calls.header.subtitle')).toBeTruthy();
   });
 });

@@ -22,14 +22,14 @@ export const SuspendedAccountScreen: React.FC = () => {
     <SafeAreaView style={styles.container}>
       <EmptyState
         icon={SuspendedAccountIcon}
-        title={t('SuspendedAccount.title')}
-        description={t('SuspendedAccount.description')}
+        title={t('suspended.title')}
+        description={
+          t('suspended.description.line1') + t('suspended.description.line2')
+        }
       />
       <View style={styles.buttonContainer}>
         <TouchableOpacity style={styles.button} onPress={handleGoToLogin}>
-          <Text style={styles.buttonText}>
-            {t('SuspendedAccount.goToLogin')}
-          </Text>
+          <Text style={styles.buttonText}>{t('suspended.goToLogin')}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

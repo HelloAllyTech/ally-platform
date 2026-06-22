@@ -62,7 +62,7 @@ describe('ReactionsCount', () => {
 
   it('renders total reactions text', () => {
     const {getByText} = render(<ReactionsCount {...defaultProps} />);
-    expect(getByText('8 reactions')).toBeTruthy();
+    expect(getByText('8 review.feedCard.reactionss')).toBeTruthy();
   });
 
   it('renders singular when totalReactions is 1', () => {
@@ -73,12 +73,12 @@ describe('ReactionsCount', () => {
         totalReactions={1}
       />,
     );
-    expect(getByText('1 reaction')).toBeTruthy();
+    expect(getByText('1 review.feedCard.reactions')).toBeTruthy();
   });
 
   it('calls navigate to REACTIONS screen when pressed', () => {
     const {getByText} = render(<ReactionsCount {...defaultProps} />);
-    fireEvent.press(getByText('8 reactions'));
+    fireEvent.press(getByText('8 review.feedCard.reactionss'));
     expect(mockNavigate).toHaveBeenCalledWith('Reactions', {
       reviewId: 'review-123',
     });
@@ -92,13 +92,13 @@ describe('ReactionsCount', () => {
         totalReactions={0}
       />,
     );
-    expect(getByText('0 reactions')).toBeTruthy();
+    expect(getByText('0 review.feedCard.reactionss')).toBeTruthy();
   });
 
   it('uses default totalReactions of 0 when not provided', () => {
     const {getByText} = render(
       <ReactionsCount reviewId="r1" reactions={{}} totalReactions={0} />,
     );
-    expect(getByText('0 reactions')).toBeTruthy();
+    expect(getByText('0 review.feedCard.reactionss')).toBeTruthy();
   });
 });

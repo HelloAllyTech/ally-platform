@@ -76,10 +76,10 @@ export const playNotificationSound = async (soundFile: number) => {
 };
 
 export const BADGE_CATEGORY_MAP: Record<BadgeCategory, string> = {
-  [BadgeCategory.SIMULATION_MINUTES]: 'Journey',
-  [BadgeCategory.ACTIVE_DAY_STREAK]: 'Momentum',
-  [BadgeCategory.COMMENTS_REACTIONS_GIVEN]: 'Contribution',
-  [BadgeCategory.COMMENTS_REACTIONS_RECEIVED]: 'Resonance',
+  [BadgeCategory.SIMULATION_MINUTES]: 'journey',
+  [BadgeCategory.ACTIVE_DAY_STREAK]: 'momentum',
+  [BadgeCategory.COMMENTS_REACTIONS_GIVEN]: 'contribution',
+  [BadgeCategory.COMMENTS_REACTIONS_RECEIVED]: 'resonance',
 };
 
 /**

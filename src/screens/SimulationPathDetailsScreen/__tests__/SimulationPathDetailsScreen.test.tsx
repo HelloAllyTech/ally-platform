@@ -33,11 +33,11 @@ jest.mock('@/hooks', () => ({
         return 'Role-play';
       }
       const translations: Record<string, string> = {
-        'Simulations.trackWay': 'Track way',
-        'Simulations.start': 'Start',
-        'Simulations.continue': 'Continue',
-        'Common.next': 'Next',
-        'Simulations.failedToLoadPathDetails': 'Failed to load path details',
+        'learn.choose.track': 'Track way',
+        'common.start': 'Start',
+        'common.continue': 'Continue',
+        'common.next': 'Next',
+        'simulationPage.failedToLoadPathDetails': 'Failed to load path details',
         'Errors.startSimulation': 'Failed to start simulation',
       };
       return translations[key] || key;

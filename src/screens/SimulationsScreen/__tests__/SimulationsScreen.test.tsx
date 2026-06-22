@@ -6,6 +6,16 @@ import {SimulationsScreen} from '../SimulationsScreen';
 import {ScenarioStatus, SCREEN_NAMES} from '../../../constants';
 import type {Scenario} from '../../../types';
 
+// Keep t() returning keys so assertions match (same pattern as sibling tests).
+// Required now that api.ts pulls in @/localization/i18n, which would otherwise
+// initialize i18next and make t() resolve to real translations.
+jest.mock('react-i18next', () => ({
+  useTranslation: () => ({t: (key: string) => key}),
+  Trans: ({i18nKey, children}: {i18nKey?: string; children?: React.ReactNode}) =>
+    children ?? i18nKey ?? null,
+  initReactI18next: {type: '3rdParty', init: jest.fn()},
+}));
+
 jest.mock('@notifee/react-native', () => ({
   __esModule: true,
   default: {
@@ -201,7 +211,7 @@ describe('SimulationsScreen', () => {
 
     const {getByText} = renderWithSafeArea(<SimulationsScreen />);
     await waitFor(() =>
-      expect(getByText('Simulations.noSimulationsAvailable')).toBeTruthy(),
+      expect(getByText('simulationPage.noSimulationsAvailable')).toBeTruthy(),
     );
   });
 

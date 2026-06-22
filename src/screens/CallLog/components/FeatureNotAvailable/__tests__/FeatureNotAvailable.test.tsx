@@ -14,7 +14,7 @@ describe('FeatureNotAvailable', () => {
     const {getByText} = render(
       <FeatureNotAvailable description="desc" />,
     );
-    expect(getByText('CallLogs.oops')).toBeTruthy();
+    expect(getByText('audioCall.error.oops')).toBeTruthy();
     expect(getByText('desc')).toBeTruthy();
   });
 

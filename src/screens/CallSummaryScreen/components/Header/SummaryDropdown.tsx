@@ -22,14 +22,14 @@ export const SummaryDropdown: React.FC<SummaryDropdownProps> = ({
   const items = [
     {
       icon: <CallIcon width={24} height={24} />,
-      text: t('CallSummary.header.callSummary'),
+      text: t('callSummary.header.callSummary'),
       isSelected: showSummary,
       selectedIcon: <TickIcon width={24} height={24} />,
       onPress: () => setShowSummary(true),
     },
     {
       icon: <TranscriptIcon width={24} height={24} />,
-      text: t('CallSummary.header.callTranscript'),
+      text: t('callSummary.header.callTranscript'),
       isSelected: !showSummary,
       selectedIcon: <TickIcon width={24} height={24} />,
       onPress: () => setShowSummary(false),

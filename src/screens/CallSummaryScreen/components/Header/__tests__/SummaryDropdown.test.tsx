@@ -31,7 +31,7 @@ describe('CallSummaryScreen/SummaryDropdown', () => {
         setShowSummary={() => {}}
       />,
     );
-    expect(getByText('CallSummary.header.callSummary')).toBeTruthy();
+    expect(getByText('callSummary.header.callSummary')).toBeTruthy();
   });
 });
 

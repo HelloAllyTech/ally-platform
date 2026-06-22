@@ -94,7 +94,7 @@ describe('UserAnalyticsScreen variants', () => {
     mockState.isLoading = false;
     mockState.error = {} as any;
     const {getByText} = render(<UserAnalyticsScreen />);
-    expect(getByText('Analytics.failedToLoadAnalytics')).toBeTruthy();
+    expect(getByText('analytics.empty.description')).toBeTruthy();
   });
 
   it('shows TabView for both types and renders WebViews after URLs resolve', async () => {

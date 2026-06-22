@@ -86,20 +86,20 @@ describe('EmailLogin', () => {
     const invalid = 'a@';
     const input = UNSAFE_getAllByType(TextInput)[0];
     fireEvent.changeText(input, invalid);
-    fireEvent.press(getByText('Common.next'));
+    fireEvent.press(getByText('common.next'));
     // No crash; button was disabled (onPress no-op)
 
     // Enter valid email and expect button to be actionable
     fireEvent.changeText(input, 'user@example.com');
-    fireEvent.press(getByText('Common.next'));
+    fireEvent.press(getByText('common.next'));
   });
 
   it('opens T&C and Privacy links', () => {
     const {getByText} = render(
       <EmailLogin onOtpGenerationSuccess={jest.fn()} onLoginSuccess={jest.fn()} />,
     );
-    fireEvent.press(getByText('SplashScreen.termsAndConditions'));
-    fireEvent.press(getByText('SplashScreen.privacyPolicy'));
+    fireEvent.press(getByText('auth.login.terms'));
+    fireEvent.press(getByText('auth.login.privacy'));
     expect(Linking.openURL).toHaveBeenCalledTimes(2);
   });
 
@@ -114,7 +114,7 @@ describe('EmailLogin', () => {
     const {getByText} = render(
       <EmailLogin onOtpGenerationSuccess={jest.fn()} onLoginSuccess={jest.fn()} />,
     );
-    expect(getByText('Common.or')).toBeTruthy();
+    expect(getByText('common.or')).toBeTruthy();
   });
 
   it('calls Google Sign-In handler when button is pressed', () => {

@@ -82,7 +82,7 @@ describe('SimulationSummary', () => {
       <SimulationSummary data={baseData as any} />,
     );
     expect(getByText('Scenario Title')).toBeTruthy();
-    expect(getByText('SimulationFeedback.sessionFeedback')).toBeTruthy();
+    expect(getByText('postSim.feedback.sessionFeedback')).toBeTruthy();
     expect(getByText('ID: test-id-123')).toBeTruthy();
     expect(getByText(/Min/)).toBeTruthy();
   });

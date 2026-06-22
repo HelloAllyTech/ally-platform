@@ -27,8 +27,7 @@ export const UpNextSimulationCard: React.FC<UpNextSimulationCardProps> = ({
         )}
         <View style={styles.headerTextContainer}>
           <Text style={styles.upNextLabel}>
-            {t('SimulationFeedback.upNext')} - {t('Simulations.simulation')}{' '}
-            {upNext.order}
+            {t('postSim.tabs.upNext')} - {t('common.simulation')} {upNext.order}
           </Text>
           <Text style={styles.title} numberOfLines={2}>
             {upNext.title}
@@ -36,7 +35,9 @@ export const UpNextSimulationCard: React.FC<UpNextSimulationCardProps> = ({
         </View>
       </View>
       <View style={styles.content}>
-        <Text style={styles.scenarioLabel}>{t('Simulations.scenario')}:</Text>
+        <Text style={styles.scenarioLabel}>
+          {t('learn.scenario.scenarioLabel')}:
+        </Text>
         <Text style={styles.description}>{upNext.description}</Text>
       </View>
     </View>

@@ -508,8 +508,8 @@ export const CallLogScreen: React.FC = () => {
           isFetching={isFetchingRealLogs || isFetchingSimulationLogs}
         />
         <FeatureNotAvailable
-          description={t('CallLogs.appCurrentlyForCounsellors')}
-          ctaText={t('CallLogs.learnMore')}
+          description={t('calls.appCurrentlyForCounsellors')}
+          ctaText={t('calls.learnMore')}
           onCtaPress={handleLearnMorePress}
           containerStyle={styles.featureNotAvailable}
         />
@@ -522,12 +522,10 @@ export const CallLogScreen: React.FC = () => {
       <CallLogHeader
         title={
           isViewingArchivedRealLogs
-            ? t('CallLogs.archives.header.title')
-            : t('CallLogs.header.title')
+            ? t('calls.menu.archives')
+            : t('calls.header.title')
         }
-        subtitle={
-          !isViewingArchivedRealLogs ? t('CallLogs.header.subtitle') : ''
-        }
+        subtitle={!isViewingArchivedRealLogs ? t('calls.header.subtitle') : ''}
         search={search}
         onSearchChange={setSearch}
         onRefresh={handleRefresh}
@@ -547,8 +545,8 @@ export const CallLogScreen: React.FC = () => {
           <View style={styles.tabMargin}>
             <TabView
               tabs={[
-                {key: LogType.REAL, label: t('CallLogs.realCallLogs')},
-                {key: LogType.SIMULATION, label: t('Simulations.simulation')},
+                {key: LogType.REAL, label: t('analytics.types.callLogs')},
+                {key: LogType.SIMULATION, label: t('analytics.types.rolePlay')},
               ]}
               activeTab={activeTab}
               onTabChange={setActiveTab}
@@ -562,13 +560,13 @@ export const CallLogScreen: React.FC = () => {
           icon={NoCallLogsIcon}
           title={
             activeTab === LogType.REAL
-              ? t('CallLogs.noCallLogs')
-              : t('CallLogs.noSimulationLogs')
+              ? t('calls.fallback.callEmptyTitle')
+              : t('calls.fallback.simEmptyTitle')
           }
           description={
             activeTab === LogType.REAL
-              ? t('CallLogs.noCallLogsDescription')
-              : t('CallLogs.noSimulationLogsDescription')
+              ? t('audioCall.fallback.noActiveCallDesc')
+              : t('audioCall.fallback.noActiveCallDesc')
           }
           containerStyle={styles.emptyStateContainer}
         />

@@ -148,14 +148,14 @@ export const FeedbackPopup: React.FC<FeedbackPopupProps> = ({
       <>
         {showTitle && (
           <Text style={styles.suggestionPrompt}>
-            {t('FeedbackPopup.suggestionPrompt')}
+            {t('callFeedback.moreSuggestions')}
           </Text>
         )}
         <TextInput
           style={[styles.textArea, customTextAreaStyle]}
           value={suggestion}
           onChangeText={setSuggestion}
-          placeholder={placeholder || t('FeedbackPopup.suggestionPlaceholder')}
+          placeholder={placeholder || t('callFeedback.suggestionPlaceholder')}
           placeholderTextColor={colors.ds.typography.lowEmphasis}
           multiline
           numberOfLines={4}
@@ -199,7 +199,7 @@ export const FeedbackPopup: React.FC<FeedbackPopupProps> = ({
             <TouchableWithoutFeedback>
               <View style={[styles.container, customContainerStyle]}>
                 <Text style={[styles.title, customTitleStyle]}>
-                  {customTitle || t('FeedbackPopup.title')}
+                  {customTitle || t('callFeedback.rateTitle')}
                 </Text>
                 <StarRating
                   rating={rating}
@@ -239,7 +239,7 @@ export const FeedbackPopup: React.FC<FeedbackPopupProps> = ({
                       options={issueOptions}
                       selectedValues={selectedIssues}
                       onSelectionChange={handleIssueSelectionChange}
-                      title={t('FeedbackPopup.issueSelectionTitle')}
+                      title={t('callFeedback.selectIssues')}
                       testID={`${testID}-issue-chips`}
                     />
                     <View style={styles.separator} />
@@ -258,7 +258,7 @@ export const FeedbackPopup: React.FC<FeedbackPopupProps> = ({
                   <Text style={styles.instructionText}>{note}</Text>
                 )}
                 <Button
-                  label={t('FeedbackPopup.submitButton')}
+                  label={t('callFeedback.submit')}
                   onPress={handleSubmit}
                   customContainerStyle={customButtonStyle}
                   isDisabled={rating < 1}

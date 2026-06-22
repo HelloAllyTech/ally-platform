@@ -94,7 +94,7 @@ export const ControlButtonsSection: React.FC<ControlButtonsSectionProps> = ({
                     isCallPaused && {color: colors.darkGray5},
                   ]}>
                   {t(
-                    `ListeningScreen.${isCallPaused ? 'resumeTranscription' : 'pauseTranscription'}`,
+                    `listeningScreen.${isCallPaused ? 'resumeTranscription' : 'pauseTranscription'}`,
                   )}
                 </Text>
               </TouchableOpacity>
@@ -116,7 +116,7 @@ export const ControlButtonsSection: React.FC<ControlButtonsSectionProps> = ({
                     styles.buttonText,
                     isFocusMode && {color: colors.darkGray5},
                   ]}>
-                  {t(`ListeningScreen.${isFocusMode ? 'focused' : 'focus'}`)}
+                  {t(`listeningScreen.${isFocusMode ? 'focused' : 'focus'}`)}
                 </Text>
               </TouchableOpacity>
             )}
@@ -131,7 +131,7 @@ export const ControlButtonsSection: React.FC<ControlButtonsSectionProps> = ({
                 hitSlop={DEFAULT_HIT_SLOP}>
                 <View style={styles.redSquareIcon} />
                 <Text style={styles.buttonText}>
-                  {t('ListeningScreen.endSession')}
+                  {t('listeningScreen.endSession')}
                 </Text>
               </TouchableOpacity>
             )}
@@ -139,7 +139,7 @@ export const ControlButtonsSection: React.FC<ControlButtonsSectionProps> = ({
           <View style={styles.securityContainer}>
             <ShieldIcon width={16} height={16} color={colors.lightGrayD9} />
             <Text style={styles.securityText}>
-              {t('ListeningScreen.dataSafe')}
+              {t('listeningScreen.dataSafe')}
             </Text>
           </View>
         </>
