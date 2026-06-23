@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
+import {useTranslate} from '@/hooks/useTranslate';
 import {colors, fontFamily, typography} from '@/theme';
 import type {MessagePart} from '@/types/reviews';
 
@@ -162,6 +163,7 @@ export const IosCommentableText: React.FC<IosCommentableTextProps> = ({
   onShowAddCommentMenu,
   onHideAddCommentMenu,
 }) => {
+  const {t} = useTranslate();
   const containerRef = useRef<View>(null);
   const selectionRef = useRef<Sel>({start: 0, end: 0});
   const ignoreNextSelectionEvent = useRef(false);
@@ -268,8 +270,8 @@ export const IosCommentableText: React.FC<IosCommentableTextProps> = ({
     setShowMenu(false);
     onHideAddCommentMenu?.(messageId);
 
-    const t = setTimeout(() => setForcedSelection(null), 0);
-    return () => clearTimeout(t);
+    const timeoutId = setTimeout(() => setForcedSelection(null), 0);
+    return () => clearTimeout(timeoutId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displayText, prefixLength]);
 
@@ -529,7 +531,9 @@ export const IosCommentableText: React.FC<IosCommentableTextProps> = ({
                     style={styles.menuItem}
                     onPress={handleAddComment}
                     activeOpacity={0.7}>
-                    <Text style={styles.menuItemText}>Add comment</Text>
+                    <Text style={styles.menuItemText}>
+                      {t('common.addComment')}
+                    </Text>
                   </TouchableOpacity>
                 </View>
               </TouchableWithoutFeedback>

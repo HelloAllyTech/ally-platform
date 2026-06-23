@@ -24,6 +24,7 @@ import {
   SKILL_COLORS,
 } from '@/constants';
 import {useTranslate} from '@/hooks';
+import type {TranslationType} from '@/localization/locales/type';
 import {useGetSimulationSkillsQuery} from '@/services/simulationSummaryApi';
 import {colors, fontFamily, radius, typography} from '@/theme';
 import {ExperienceMode, SimulationSummaryData, SkillCoverage} from '@/types';
@@ -32,6 +33,24 @@ import {calculateAverageForObjectArray, formatSecondsToMMSS} from '@/utils';
 import {getImprovementsWithRecommendations} from '../../utils/simulationSummary';
 import {ExpandableFeedbackSection} from '../ExpandableFeedbackSection';
 import {SummaryCard} from '../SummaryCard';
+
+// Skill categories arrive from the backend as canonical English names (also
+// used as identifiers/colors), so only the DISPLAY label is translated via a
+// fixed i18n map, falling back to the raw category when it isn't a known skill.
+// Mirrors ally-web's SkillsTab SKILL_LABEL_I18N.
+const SKILL_LABEL_I18N: Record<string, TranslationType> = {
+  'Listening Engagement': 'postSim.skills.categories.listeningEngagement',
+  'Emotional Attunement': 'postSim.skills.categories.emotionalAttunement',
+  'Supportive Engagement': 'postSim.skills.categories.supportiveEngagement',
+};
+
+const getSkillLabel = (
+  t: (key: TranslationType, vars?: {[key: string]: unknown}) => string,
+  category: string,
+): string => {
+  const key = SKILL_LABEL_I18N[category];
+  return key ? t(key, {defaultValue: category}) : category;
+};
 
 export interface SessionSkillsProps {
   scenarioSessionId: string;
@@ -112,7 +131,9 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
         </View>
         <View style={styles.skillItem}>
           <View style={styles.skillLabelRow}>
-            <Text style={styles.skillName}>{skill.category}</Text>
+            <Text style={styles.skillName}>
+              {getSkillLabel(t, skill.category)}
+            </Text>
             <Text style={styles.skillPercentage}>{skill.percentage}%</Text>
           </View>
           <ProgressBar

@@ -1,3 +1,24 @@
+jest.mock('react-i18next', () => {
+  const en = require('@/localization/locales/en.json');
+  const resolve = (key, vars = {}) => {
+    const val = String(key)
+      .split('.')
+      .reduce((o, p) => (o == null ? undefined : o[p]), en);
+    let s = typeof val === 'string' ? val : key;
+    Object.keys(vars || {}).forEach(k => {
+      s = s.split('{{' + k + '}}').join(String(vars[k]));
+    });
+    return s;
+  };
+  return {
+    ...jest.requireActual('react-i18next'),
+    useTranslation: () => ({
+      t: resolve,
+      i18n: {language: 'en', changeLanguage: jest.fn()},
+    }),
+  };
+});
+
 import React from 'react';
 import {render, fireEvent} from '@testing-library/react-native';
 
@@ -13,10 +34,6 @@ jest.mock('@/components', () => ({
   PrivacyTooltip: ({children}: any) => <>{children}</>,
 }));
 
-jest.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (k: string) => k }),
-}));
-
 describe('CallSummaryScreen/AddNotesSection', () => {
   it('toggles expansion and updates text', () => {
     const onNoteChange = jest.fn();
@@ -24,7 +41,7 @@ describe('CallSummaryScreen/AddNotesSection', () => {
       <AddNotesSection savedNotes="hello" onNoteChange={onNoteChange} />,
     );
 
-    fireEvent.press(getByText('summaryLoading.addNotes'));
+    fireEvent.press(getByText('Add Notes (optional)'));
     const input = getByPlaceholderText('Enter note');
     fireEvent.changeText(input, 'updated');
     expect(onNoteChange).toHaveBeenCalledWith('updated');

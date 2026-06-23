@@ -73,13 +73,13 @@ export const EmailLogin: React.FC<EmailLoginProps> = ({
     (err: FetchBaseQueryError | SerializedError) => {
       const message = getErrorDetails(err).message;
       Alert.alert(
-        'Failed to Send OTP',
+        t('auth.login.errors.sendOtpFailed'),
         message === 'Network Error'
-          ? 'Please check your internet connection and try again.'
-          : message || 'Unknown error',
+          ? t('common.checkInternet')
+          : message || t('common.unknownError'),
       );
     },
-    [],
+    [t],
   );
 
   // Handle OTP success

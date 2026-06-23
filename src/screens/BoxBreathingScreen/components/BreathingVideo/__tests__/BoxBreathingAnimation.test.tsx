@@ -1,3 +1,18 @@
+jest.mock('@/hooks/useTranslate', () => {
+  const en = require('@/localization/locales/en.json');
+  const resolve = (key, vars = {}) => {
+    const val = String(key)
+      .split('.')
+      .reduce((o, p) => (o == null ? undefined : o[p]), en);
+    let s = typeof val === 'string' ? val : key;
+    Object.keys(vars || {}).forEach(k => {
+      s = s.split('{{' + k + '}}').join(String(vars[k]));
+    });
+    return s;
+  };
+  return {useTranslate: () => ({t: resolve, tVariable: resolve})};
+});
+
 import React from 'react';
 import {act, render, waitFor} from '@testing-library/react-native';
 import {Animated, Platform} from 'react-native';
@@ -129,7 +144,7 @@ describe('BoxBreathingAnimation', () => {
     // Initial phase change
     expect(onPhaseChange).toHaveBeenCalledWith(expect.objectContaining({
       name: 'one',
-      label: 'Hold',
+      label: 'boxBreathing.phaseHold',
     }));
 
     // Advance to next phase
@@ -139,7 +154,7 @@ describe('BoxBreathingAnimation', () => {
 
     expect(onPhaseChange).toHaveBeenCalledWith(expect.objectContaining({
       name: 'two',
-      label: 'Inhale',
+      label: 'boxBreathing.phaseInhale',
     }));
   });
 

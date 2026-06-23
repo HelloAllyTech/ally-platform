@@ -80,7 +80,7 @@ export const SessionGoalTimer: FC<SessionGoalTimerProps> = ({
   // Format remaining time text
   const remainingMinutes = Math.floor(remainingTime / 60);
   const remainingSeconds = remainingTime % 60;
-  const remainingMinutesText = `${remainingMinutes} min ${remainingSeconds} sec`;
+  const remainingMinutesText = `${remainingMinutes} ${t('simulationPage.min')} ${remainingSeconds} ${t('simulationPage.sec')}`;
 
   // Calculate progress percentage (0 to 100)
   const progressPercentage =

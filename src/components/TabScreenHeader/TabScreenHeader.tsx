@@ -56,7 +56,7 @@ export const TabScreenHeader: React.FC<TabScreenHeaderProps> = ({
           <TouchableOpacity
             style={styles.hamburgerButton}
             onPress={handleOpenDrawer}
-            accessibilityLabel="Open menu">
+            accessibilityLabel={t('accessibility.openMenu')}>
             <DrawerMenuIcon />
           </TouchableOpacity>
         )}

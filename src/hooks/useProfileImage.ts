@@ -89,7 +89,7 @@ export const useProfileImage = ({
             const error = new Error(
               'Image size must be less than 2MB. Please select a smaller image.',
             );
-            showErrorToast(error, 'Errors.uploadProfileImage');
+            showErrorToast(error, 'errors.uploadProfileImage');
             onError?.(error);
             return;
           }
@@ -101,7 +101,7 @@ export const useProfileImage = ({
             const error = new Error(
               'Image must be square (1:1 aspect ratio). Please select a square image.',
             );
-            showErrorToast(error, 'Errors.uploadProfileImage');
+            showErrorToast(error, 'errors.uploadProfileImage');
             onError?.(error);
             return;
           }
@@ -199,7 +199,7 @@ export const useProfileImage = ({
       const errorObj =
         error instanceof Error ? error : new Error(String(error));
       logger.error(`Error saving profile image: ${errorObj}`);
-      showErrorToast(errorObj, 'Errors.uploadProfileImage');
+      showErrorToast(errorObj, 'errors.uploadProfileImage');
       onError?.(errorObj);
     } finally {
       setIsSaving(false);

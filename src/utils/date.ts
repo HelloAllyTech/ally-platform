@@ -1,13 +1,39 @@
+import i18next from 'i18next';
+
 import {MONTH_NAMES_FULL, MONTH_NAMES_SHORT} from '@/constants';
+
+/**
+ * Returns the localized month name for the active UI language, falling back to
+ * the English constants if the translated array is unavailable.
+ * Digits are intentionally left in Latin numerals (matching Web) — only the
+ * month name is localized.
+ */
+const getMonthName = (
+  monthIndex: number,
+  variant: 'short' | 'full',
+): string => {
+  const fallback = variant === 'short' ? MONTH_NAMES_SHORT : MONTH_NAMES_FULL;
+  try {
+    const arr = i18next.t(`months.${variant}`, {
+      returnObjects: true,
+    }) as unknown;
+    if (Array.isArray(arr) && typeof arr[monthIndex] === 'string') {
+      return arr[monthIndex] as string;
+    }
+  } catch {
+    // i18n not ready — fall back to the static English month names
+  }
+  return fallback[monthIndex];
+};
 
 /**
  * Formats a date string into a short month and day representation.
  * @param dateString - ISO date string
- * @returns Formatted date in "MMM DD" (e.g., "May 09")
+ * @returns Formatted date in "MMM DD" (e.g., "May 09" / "मई 09")
  */
 export const formatDate = (dateString: string) => {
   const date = new Date(dateString);
-  const month = MONTH_NAMES_SHORT[date.getMonth()];
+  const month = getMonthName(date.getMonth(), 'short');
   const day = date.getDate().toString().padStart(2, '0');
   return `${month} ${day}`;
 };
@@ -18,7 +44,15 @@ export const formatDate = (dateString: string) => {
  * @returns Formatted time in "h:mm AM/PM" (e.g., "1:05 PM")
  */
 export const formatTime = (dateString: string) => {
-  const date = new Date(dateString);
+  return formatClockTime(new Date(dateString));
+};
+
+/**
+ * Formats a Date into "h:mm AM/PM". AM/PM is kept as the conventional
+ * abbreviation (widely used as-is across the supported locales).
+ * @private
+ */
+const formatClockTime = (date: Date): string => {
   let hours = date.getHours();
   const minutes = date.getMinutes().toString().padStart(2, '0');
   const ampm = hours >= 12 ? 'PM' : 'AM';
@@ -69,12 +103,14 @@ export const formatTimeHHmm = (date: string | Date): string => {
 export const formatDateWithOrdinal = (dateString: string | Date): string => {
   const date = new Date(dateString);
 
-  // Get day with ordinal suffix
   const day = date.getDate();
-  const ordinalSuffix = getOrdinalSuffix(date.getDate());
+  // Ordinal suffixes (st/nd/rd/th) only apply to English; other locales use the
+  // plain day number.
+  const isEnglish = (i18next.language ?? 'en').toLowerCase().startsWith('en');
+  const ordinalSuffix = isEnglish ? getOrdinalSuffix(day) : '';
 
-  // Get full month name
-  const month = MONTH_NAMES_FULL[date.getMonth()];
+  // Get localized full month name
+  const month = getMonthName(date.getMonth(), 'full');
 
   // Get full year
   const year = date.getFullYear();
@@ -173,16 +209,10 @@ export const pluralize = (value: number, unit: string) =>
 // formatDateTime(new Date()) // returns current date and time
 export const formatDateTime = (dateString: string): string => {
   const date = new Date(dateString);
-  return date
-    .toLocaleDateString('en-US', {
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    })
-    .replace(' at ', ' ');
+  const month = getMonthName(date.getMonth(), 'full');
+  const day = date.getDate();
+  const year = date.getFullYear();
+  return `${month} ${day}, ${year} ${formatClockTime(date)}`;
 };
 
 /**
@@ -193,30 +223,41 @@ export const formatDateTime = (dateString: string): string => {
  * formatRelativeTime("2025-02-18T11:05:00Z") // returns "1 year ago"
  * formatRelativeTime("2024-01-01T09:30:00Z") // returns "1 year ago"
  */
+const RELATIVE_TIME_PREFIX = 'review.feedCard.relativeTime';
+
+/** Localized relative-time unit using the i18next plural keys. */
+const rt = (unit: keyof typeof SECONDS_IN, count: number): string =>
+  i18next.t(`${RELATIVE_TIME_PREFIX}.${unit}`, {count}) as string;
+
 export const formatRelativeTime = (dateString: string): string => {
   const diffSeconds = Math.floor(
     (Date.now() - new Date(dateString).getTime()) / 1000,
   );
 
-  if (diffSeconds < 1) return 'Just now';
+  const justNow = i18next.t(`${RELATIVE_TIME_PREFIX}.justNow`) as string;
+  if (diffSeconds < 1) return justNow;
 
   const years = Math.floor(diffSeconds / SECONDS_IN.year);
 
-  if (years >= 2) return pluralize(years, 'year');
+  if (years >= 2) return rt('year', years);
 
   if (years === 1) {
     const months = Math.floor(
       (diffSeconds % SECONDS_IN.year) / SECONDS_IN.month,
     );
-    return months === 0 ? '1 year' : `1 year ${pluralize(months, 'month')}`;
+    return months === 0
+      ? rt('year', 1)
+      : (i18next.t(`${RELATIVE_TIME_PREFIX}.yearMonth`, {
+          months: rt('month', months),
+        }) as string);
   }
 
   for (const [unit, seconds] of TIME_THRESHOLDS) {
     const value = Math.floor(diffSeconds / seconds);
-    if (value >= 1) return pluralize(value, unit);
+    if (value >= 1) return rt(unit, value);
   }
 
-  return 'Just now';
+  return justNow;
 };
 
 /**

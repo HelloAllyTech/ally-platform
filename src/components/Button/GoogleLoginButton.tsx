@@ -3,6 +3,7 @@ import {ActivityIndicator, Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {GoogleIcon} from '@/assets';
+import {useTranslate} from '@/hooks/useTranslate';
 import {colors, fontFamily, radius, typography} from '@/theme';
 
 import type {ButtonProps} from './types';
@@ -12,12 +13,14 @@ interface GoogleLoginButtonProps extends Omit<ButtonProps, 'label'> {
 }
 
 export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
-  label = 'Continue with Google',
+  label,
   isDisabled,
   isLoading,
   onPress,
   ...rest
 }) => {
+  const {t} = useTranslate();
+  const buttonLabel = label ?? t('auth.login.google.button');
   return (
     <TouchableOpacity
       activeOpacity={0.8}
@@ -37,7 +40,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
       ) : (
         <View style={styles.contentContainer}>
           <GoogleIcon />
-          <Text style={styles.buttonText}>{label}</Text>
+          <Text style={styles.buttonText}>{buttonLabel}</Text>
         </View>
       )}
     </TouchableOpacity>

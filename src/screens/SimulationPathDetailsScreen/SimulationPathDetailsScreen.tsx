@@ -186,7 +186,7 @@ export const SimulationPathDetailsScreen: React.FC<
           fromLogs: true,
         });
       } else {
-        showToast('Failed to load simulation details', 'error');
+        showToast(t('simulationPage.failedToLoadPathDetails'), 'error');
       }
     } catch (err) {
       showToast(getErrorDetails(err)?.message, 'error');

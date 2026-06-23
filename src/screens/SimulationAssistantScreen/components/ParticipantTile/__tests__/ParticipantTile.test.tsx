@@ -48,6 +48,23 @@ jest.mock('livekit-client', () => ({
   Track: {Source: {Microphone: 'microphone'}},
 }));
 
+jest.mock('@/hooks/useTranslate', () => {
+  const labels: Record<string, string> = {
+    'simulationPage.turnIndicator.speaking': 'Speaking...',
+    'simulationPage.turnIndicator.listening': 'Listening...',
+    'simulationPage.turnIndicator.yourTurnToSpeak': 'Your turn to speak',
+    'simulationPage.turnIndicator.yourTurnToListen': 'Your turn to listen',
+    'simulationPage.turnIndicator.thinking': 'Thinking...',
+    'simulationPage.turnIndicator.paused': 'Paused',
+  };
+  return {
+    useTranslate: () => ({
+      t: (key: string) => labels[key] ?? key,
+      tVariable: (key: string) => key,
+    }),
+  };
+});
+
 import {TurnState} from '@/types';
 
 import {ParticipantTile} from '../ParticipantTile';

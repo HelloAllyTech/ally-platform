@@ -4,6 +4,7 @@ import {ReviewTranscriptHeader} from '@/components';
 import {SCREEN_NAMES, USER_PERMISSIONS} from '@/constants';
 import {ReviewApiProvider, scribeApiHooks} from '@/contexts/ReviewApiContext';
 import {useAppNavigation, useUser} from '@/hooks';
+import {useTranslate} from '@/hooks/useTranslate';
 import {RootStackScreenProps} from '@/navigation';
 import {
   useAddScribeReviewCommentMutation,
@@ -23,6 +24,7 @@ type Props = RootStackScreenProps<'ScribeReviewDetails'>;
 
 export const ScribeReviewDetailsScreen: React.FC<Props> = ({route}) => {
   const {reviewId} = route.params || {};
+  const {t} = useTranslate();
   const navigation = useAppNavigation();
   const {userData} = useUser();
 
@@ -121,7 +123,9 @@ export const ScribeReviewDetailsScreen: React.FC<Props> = ({route}) => {
               reviewType="scribe"
               title={
                 reviewData.summaryName ||
-                `CALL-${reviewData.scribeSession?.id || ''}`
+                t('review.details.callTitle', {
+                  id: reviewData.scribeSession?.id || '',
+                })
               }
               user={reviewData.createdBy}
               createdAt={reviewData.scribeSession?.createdAt}

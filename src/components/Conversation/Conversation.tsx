@@ -154,7 +154,7 @@ export const Conversation: React.FC<ConversationProps> = ({
 
   const renderEmptyComponent = () => (
     <View style={styles.centered}>
-      <Text>No messages found.</Text>
+      <Text>{t('conversation.noMessages')}</Text>
     </View>
   );
 
@@ -425,7 +425,9 @@ export const Conversation: React.FC<ConversationProps> = ({
               style={styles.iosMenuItem}
               onPress={handleFloatingMenuAddComment}
               activeOpacity={0.7}>
-              <Text style={styles.iosMenuItemText}>Add comment</Text>
+              <Text style={styles.iosMenuItemText}>
+                {t('common.addComment')}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>

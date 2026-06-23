@@ -181,7 +181,7 @@ export const CaseDetailsScreen: React.FC<
           fromLogs: true,
         });
       } else {
-        showToast('Failed to load simulation details', 'error');
+        showToast(t('simulationPage.failedToLoadCaseDetails'), 'error');
       }
     } catch (err) {
       showToast(getErrorDetails(err)?.message, 'error');

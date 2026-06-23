@@ -111,7 +111,8 @@ export const ReviewTranscriptHeader = ({
                   })}
             />
           </View>
-          {!!user?.name && renderSubtitleItem(false, `By ${user?.name}`)}
+          {!!user?.name &&
+            renderSubtitleItem(false, t('review.byAuthor', {name: user?.name}))}
           {!!createdAt && renderSubtitleItem(true, formatDateTime(createdAt))}
           {!!duration &&
             renderSubtitleItem(

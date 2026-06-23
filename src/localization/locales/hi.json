@@ -161,7 +161,8 @@
       "errors": {
         "generateOtp": "ओटीपी जनरेट करने में विफल। कृपया पुनः प्रयास करें।",
         "verifyOtp": "ओटीपी सत्यापित करने में विफल। कृपया पुनः प्रयास करें।",
-        "agreeTerms": "नियम एवं शर्तों से सहमत होने में विफल"
+        "agreeTerms": "नियम एवं शर्तों से सहमत होने में विफल",
+        "sendOtpFailed": "OTP भेजने में विफल"
       }
     }
   },
@@ -177,7 +178,10 @@
   "boxBreathing": {
     "inhale": "अब सांस अंदर लें",
     "hold": "सांस रोकें",
-    "exhale": "सांस छोड़ें"
+    "exhale": "सांस छोड़ें",
+    "phaseHold": "रोकें",
+    "phaseInhale": "साँस लें",
+    "phaseExhale": "साँस छोड़ें"
   },
   "callFeedback": {
     "rateTitle": "AI-जनित सारांश को रेट करें?",
@@ -454,7 +458,46 @@
     "discard": "छोड़ दें",
     "openSettings": "सेटिंग्स खोलें",
     "version": "संस्करण",
-    "finish": "समाप्त करें"
+    "finish": "समाप्त करें",
+    "addComment": "टिप्पणी जोड़ें",
+    "submit": "सबमिट करें",
+    "done": "पूर्ण",
+    "yes": "हां",
+    "no": "नहीं",
+    "select": "चुनें",
+    "unableToOpenLink": "लिंक खोलने में असमर्थ",
+    "checkInternet": "कृपया अपना इंटरनेट कनेक्शन जांचें और पुनः प्रयास करें।",
+    "unknownError": "अज्ञात त्रुटि"
+  },
+  "months": {
+    "short": [
+      "जन",
+      "फ़र",
+      "मार्च",
+      "अप्रैल",
+      "मई",
+      "जून",
+      "जुल",
+      "अग",
+      "सित",
+      "अक्टू",
+      "नव",
+      "दिस"
+    ],
+    "full": [
+      "जनवरी",
+      "फ़रवरी",
+      "मार्च",
+      "अप्रैल",
+      "मई",
+      "जून",
+      "जुलाई",
+      "अगस्त",
+      "सितंबर",
+      "अक्टूबर",
+      "नवंबर",
+      "दिसंबर"
+    ]
   },
   "community": {
     "title": "समुदाय",
@@ -628,7 +671,12 @@
       "timeline": "सत्र टाइमलाइन",
       "strengths": "ताकत और प्रदर्शित कौशल",
       "areasForGrowth": "विकास के क्षेत्र",
-      "recommended": "अनुशंसित"
+      "recommended": "अनुशंसित",
+      "categories": {
+        "listeningEngagement": "श्रवण सहभागिता",
+        "emotionalAttunement": "भावनात्मक तालमेल",
+        "supportiveEngagement": "सहायक सहभागिता"
+      }
     },
     "tabs": {
       "annotatedTranscript": "एनोटेट ट्रांसक्रिप्ट",
@@ -652,7 +700,44 @@
           "2": "वास्तव में नहीं",
           "3": "शायद",
           "4": "हाँ",
-          "5": "बिल्कुल"
+          "5": "बिल्कुल",
+          "tags": {
+            "1": [
+              "खराब",
+              "सहायक नहीं",
+              "बहुत बुरा",
+              "निराशाजनक",
+              "अनुपयोगी"
+            ],
+            "2": [
+              "औसत से कम",
+              "कमज़ोर",
+              "असंतोषजनक",
+              "अपर्याप्त",
+              "सुधार की ज़रूरत"
+            ],
+            "3": [
+              "तटस्थ",
+              "ठीक है",
+              "औसत",
+              "मध्यम",
+              "स्वीकार्य"
+            ],
+            "4": [
+              "अच्छा",
+              "सहायक",
+              "संतोषजनक",
+              "प्रभावी",
+              "उपयोगी"
+            ],
+            "5": [
+              "उत्कृष्ट",
+              "अद्भुत",
+              "बहुत उपयोगी",
+              "शानदार",
+              "अत्यंत प्रभावी"
+            ]
+          }
         }
       }
     },
@@ -775,7 +860,8 @@
       "commentUpdateFailed": "टिप्पणी अपडेट करने में विफल",
       "replyUpdateFailed": "उत्तर अपडेट करने में विफल",
       "replyCreatedSuccessfully": "उत्तर सफलतापूर्वक बनाया गया",
-      "replyCreateFailed": "उत्तर बनाने में विफल"
+      "replyCreateFailed": "उत्तर बनाने में विफल",
+      "callTitle": "CALL-{{id}}"
     },
     "reactionsModal": {
       "title": "प्रतिक्रियाएं",
@@ -823,7 +909,9 @@
     "tabs": {
       "scribe": "स्क्राइब",
       "simulation": "सिमुलेशन"
-    }
+    },
+    "byAuthor": "{{name}} द्वारा",
+    "addNotePlaceholder": "एक नोट जोड़ें..."
   },
   "search": {
     "placeholder": "मार्गदर्शन चाहिए? यहां खोजें..",
@@ -852,6 +940,8 @@
     "mute": "म्यूट करें",
     "simulationDetails": "सिमुलेशन विवरण",
     "unmute": "अनम्यूट करें",
+    "pause": "रोकें",
+    "resume": "फिर से शुरू करें",
     "focus": "फोकस",
     "focused": "फोकस्ड",
     "endSession": "सत्र समाप्त करें",
@@ -889,7 +979,8 @@
       "listening": "सुन रहा है...",
       "yourTurnToSpeak": "बोलने की आपकी बारी",
       "yourTurnToListen": "सुनने की आपकी बारी",
-      "thinking": "सोच रहा है..."
+      "thinking": "सोच रहा है...",
+      "paused": "रुका हुआ"
     },
     "warningDialog": {
       "titleNormal": "सत्र",
@@ -1286,7 +1377,11 @@
         "success": "सत्र सफलतापूर्वक संग्रह से निकाला गया",
         "failed": "सत्र को संग्रह से निकालने में विफल"
       }
-    }
+    },
+    "notesLabel": "नोट्स",
+    "notesPlaceholder": "अगली कॉल के लिए नोट्स लें (यदि कोई हो)",
+    "addConcern": "एक चिंता जोड़ें",
+    "enterNote": "नोट दर्ज करें"
   },
   "locationDropdown": {
     "placeholder": "स्थान चुनें",
@@ -1295,6 +1390,9 @@
     "loadingPlaces": "स्थान लोड हो रहे हैं...",
     "noLocationsFound": "कोई स्थान नहीं मिला",
     "startTypingToSearch": "स्थान खोजने के लिए टाइप करना शुरू करें"
+  },
+  "networkLogs": {
+    "logs": "लॉग्स"
   },
   "simulations": {
     "header": {
@@ -1320,7 +1418,7 @@
     "noSimulationsAvailable": "कोई सिमुलेशन उपलब्ध नहीं है",
     "noPathsAvailable": "कोई पथ उपलब्ध नहीं है",
     "noCasesAvailable": "कोई केस उपलब्ध नहीं है",
-    "failedToLoadPathDetails": "पथ विवरण लोड करने में विफल",
+    "failedToLoadTrackDetails": "ट्रैक विवरण लोड करने में विफल",
     "failedToLoadCaseDetails": "केस विवरण लोड करने में विफल",
     "connecting": "कनेक्ट हो रहा है...",
     "disconnecting": "डिस्कनेक्ट हो रहा है...",
@@ -1334,6 +1432,7 @@
     "detected": "मिला",
     "activeSimulationDescription": "आपका एक सिमुलेशन चल रहा है। नया शुरू करने के लिए मौजूदा सत्र को समाप्त करें।",
     "progressCompleted": "{{total}} में से {{current}} पूरे हुए",
+    "failedToLoadPathDetails": "पथ विवरण लोड करने में विफल",
     "noActiveSimulation": "कोई सक्रिय सिमुलेशन नहीं मिला",
     "sessionEndedSuccessfully": "सत्र सफलतापूर्वक समाप्त हुआ",
     "triggerWarnings": "ट्रिगर चेतावनियाँ",
@@ -1361,6 +1460,20 @@
       "cancel": "रद्द करें"
     }
   },
+  "errors": {
+    "startSimulation": "सिमुलेशन शुरू करने में विफल",
+    "navigateAssistant": "सिमुलेशन असिस्टेंट खोलने में विफल",
+    "attachListeners": "रूम लिसनर्स जोड़ने में विफल",
+    "connect": "रूम से कनेक्ट करने में विफल",
+    "toggleMic": "माइक्रोफ़ोन टॉगल करने में विफल",
+    "pauseControl": "सत्र तक नहीं पहुँच सके — कृपया पुनः प्रयास करें",
+    "uploadProfileImage": "प्रोफ़ाइल छवि अपलोड करने में विफल",
+    "removeProfileImage": "प्रोफ़ाइल छवि हटाने में विफल",
+    "audioSession": "ऑडियो सत्र कॉन्फ़िगर करने में विफल",
+    "reflectionPromptSaveFailed": "रिफ्लेक्शन प्रॉम्प्ट सहेजने में विफल",
+    "endSimulation": "सिमुलेशन समाप्त करने में विफल",
+    "permission": "माइक्रोफ़ोन अनुमति आवश्यक है"
+  },
   "threadsBottomSheet": {
     "title": "टिप्पणियाँ",
     "tabInline": "इनलाइन",
@@ -1378,5 +1491,20 @@
       "confirm": "हटाएं",
       "cancel": "रद्द करें"
     }
+  },
+  "commentInput": {
+    "placeholder": "एक संदेश लिखें..."
+  },
+  "conversation": {
+    "noMessages": "कोई संदेश नहीं मिला।"
+  },
+  "messageThreadsBottomSheet": {
+    "noThreads": "इस संदेश के लिए कोई थ्रेड नहीं मिला"
+  },
+  "languageSelector": {
+    "title": "ऐप भाषा"
+  },
+  "accessibility": {
+    "openMenu": "मेन्यू खोलें"
   }
 }

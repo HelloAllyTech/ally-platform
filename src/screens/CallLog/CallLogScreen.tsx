@@ -445,7 +445,7 @@ export const CallLogScreen: React.FC = () => {
       await Linking.openURL(env.ALLY_WEB_URL);
     } catch (error) {
       logger.error(`Error opening learn more URL: ${error}`);
-      Alert.alert('Error', 'Unable to open the link');
+      Alert.alert(t('common.error'), t('common.unableToOpenLink'));
     }
   };
 

@@ -1,13 +1,22 @@
+jest.mock('@/hooks', () => {
+  const en = require('@/localization/locales/en.json');
+  const resolve = (key, vars = {}) => {
+    const val = String(key)
+      .split('.')
+      .reduce((o, p) => (o == null ? undefined : o[p]), en);
+    let s = typeof val === 'string' ? val : key;
+    Object.keys(vars || {}).forEach(k => {
+      s = s.split('{{' + k + '}}').join(String(vars[k]));
+    });
+    return s;
+  };
+  return {useTranslate: () => ({t: resolve, tVariable: resolve})};
+});
+
 import React from 'react';
 import {fireEvent, render} from '@testing-library/react-native';
 
 import {ReviewTranscriptHeader} from '../../ReviewTranscriptDetails/ReviewTranscriptHeader';
-
-jest.mock('@/hooks', () => ({
-  useTranslate: () => ({
-    t: (key: string) => key,
-  }),
-}));
 
 jest.mock('@/assets', () => {
   const React = require('react');
@@ -123,7 +132,7 @@ describe('ReviewTranscriptHeader', () => {
         duration={120}
       />,
     );
-    expect(getByText(/common.duration/)).toBeTruthy();
+    expect(getByText(/Duration/)).toBeTruthy();
     expect(getByText(/120s/)).toBeTruthy();
   });
 

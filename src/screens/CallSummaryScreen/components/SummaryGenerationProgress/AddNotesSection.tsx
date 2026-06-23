@@ -82,7 +82,7 @@ export const AddNotesSection = ({
               style={styles.input}
               value={note}
               onChangeText={text => handleNoteChange(text)}
-              placeholder="Enter note"
+              placeholder={t('callSummary.enterNote')}
               multiline
               numberOfLines={6}
               placeholderTextColor={colors.lightGray3}

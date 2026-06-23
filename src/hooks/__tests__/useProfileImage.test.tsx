@@ -563,7 +563,7 @@ describe('useProfileImage', () => {
       await waitFor(() => {
         expect(mockShowErrorToast).toHaveBeenCalledWith(
           expect.any(Error),
-          'Errors.uploadProfileImage',
+          'errors.uploadProfileImage',
         );
       });
 
@@ -610,7 +610,7 @@ describe('useProfileImage', () => {
       await waitFor(() => {
         expect(mockShowErrorToast).toHaveBeenCalledWith(
           expect.any(Error),
-          'Errors.uploadProfileImage',
+          'errors.uploadProfileImage',
         );
       });
 

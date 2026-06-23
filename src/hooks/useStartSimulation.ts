@@ -137,7 +137,7 @@ export const useStartSimulation = (): UseStartSimulationReturn => {
         if (result !== RESULTS.GRANTED) {
           showErrorToast(
             new Error(t('simulationPage.microphonePrompt')),
-            'Errors.permission',
+            'errors.permission',
           );
           return;
         }
@@ -156,7 +156,7 @@ export const useStartSimulation = (): UseStartSimulationReturn => {
           setActiveSimulationId(err.data?.entityId || null);
           setShowActiveSimulationModal(true);
         } else {
-          showErrorToast(error, 'Errors.startSimulation');
+          showErrorToast(error, 'errors.startSimulation');
         }
       }
     } finally {
@@ -192,7 +192,7 @@ export const useStartSimulation = (): UseStartSimulationReturn => {
       } else {
         setShowRetryModal(false);
         retryParamsRef.current = null;
-        showErrorToast(error, 'Errors.startSimulation');
+        showErrorToast(error, 'errors.startSimulation');
       }
       return false;
     }

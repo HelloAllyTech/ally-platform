@@ -10,6 +10,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {LeftArrowIcon} from '@/assets/icons';
 import {BottomSheet} from '@/components/BottomSheet';
+import {useTranslate} from '@/hooks/useTranslate';
 import {colors, fontFamily, radius, typography} from '@/theme';
 
 export interface CommentInputProps {
@@ -33,6 +34,7 @@ export const CommentInput: React.FC<CommentInputProps> = ({
   isSendButtonDisabled = false,
   isLoading = false,
 }) => {
+  const {t} = useTranslate();
   useEffect(() => {
     if (visible) {
       // Small delay to ensure bottom sheet is fully open
@@ -70,7 +72,7 @@ export const CommentInput: React.FC<CommentInputProps> = ({
           <BottomSheetTextInput
             style={styles.input}
             value={comment}
-            placeholder="Type a message..."
+            placeholder={t('commentInput.placeholder')}
             placeholderTextColor={colors.ds.typography.mediumEmphasis}
             onChangeText={onChangeText}
             onFocus={onFocus}

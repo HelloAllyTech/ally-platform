@@ -11,6 +11,7 @@ import {ScaledSheet} from 'react-native-size-matters';
 
 import {BottomSheet} from '@/components/BottomSheet';
 import {AsyncStorageKeys} from '@/constants';
+import {useTranslate} from '@/hooks/useTranslate';
 import i18n from '@/localization/i18n';
 import {api} from '@/services/api';
 import {store} from '@/store/store';
@@ -40,6 +41,7 @@ export const LanguageSelectorSheet: React.FC<LanguageSelectorSheetProps> = ({
   visible,
   onClose,
 }) => {
+  const {t} = useTranslate();
   const currentCode = i18n.resolvedLanguage ?? i18n.language ?? 'en';
 
   const handleSelect = useCallback(
@@ -69,7 +71,7 @@ export const LanguageSelectorSheet: React.FC<LanguageSelectorSheetProps> = ({
       allowFullExpand={false}
       backgroundColor={colors.white}>
       <View style={styles.container}>
-        <Text style={styles.title}>App Language</Text>
+        <Text style={styles.title}>{t('languageSelector.title')}</Text>
         <FlatList
           data={LANGUAGE_OPTIONS}
           keyExtractor={item => item.code}

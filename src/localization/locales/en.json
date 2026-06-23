@@ -4,7 +4,7 @@
     "badges": "Badges",
     "viewAll": "View all",
     "viewAllBadges": "View all badges",
-    "badgeTooltipDescription" : "This view reflects overall activity in the selected time period, including practice time, badges earned, and community participation. If a comment or reaction is removed by you or a reviewer, the leaderboard updates accordingly.",
+    "badgeTooltipDescription": "This view reflects overall activity in the selected time period, including practice time, badges earned, and community participation. If a comment or reaction is removed by you or a reviewer, the leaderboard updates accordingly.",
     "emptyHome": "You don't have any badges yet",
     "badgesCount": "{{count}} Badges",
     "badgesTooltip": "Badges are earned based on your activity across simulations and community participation. Some badges may be removed if qualifying actions are undone.",
@@ -161,7 +161,8 @@
       "errors": {
         "generateOtp": "Failed to generate OTP. Please try again.",
         "verifyOtp": "Failed to verify OTP. Please try again.",
-        "agreeTerms": "Failed to agree to terms and conditions"
+        "agreeTerms": "Failed to agree to terms and conditions",
+        "sendOtpFailed": "Failed to Send OTP"
       }
     }
   },
@@ -177,7 +178,10 @@
   "boxBreathing": {
     "inhale": "Inhale now",
     "hold": "Hold breathe",
-    "exhale": "Exhale"
+    "exhale": "Exhale",
+    "phaseHold": "Hold",
+    "phaseInhale": "Inhale",
+    "phaseExhale": "Exhale"
   },
   "callFeedback": {
     "rateTitle": "Rate the AI-generated summary?",
@@ -454,7 +458,46 @@
     "discard": "Discard",
     "openSettings": "Open Settings",
     "version": "Version",
-    "finish": "Finish"
+    "finish": "Finish",
+    "addComment": "Add comment",
+    "submit": "Submit",
+    "done": "Done",
+    "yes": "Yes",
+    "no": "No",
+    "select": "Select",
+    "unableToOpenLink": "Unable to open the link",
+    "checkInternet": "Please check your internet connection and try again.",
+    "unknownError": "Unknown error"
+  },
+  "months": {
+    "short": [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec"
+    ],
+    "full": [
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December"
+    ]
   },
   "community": {
     "title": "Community",
@@ -628,7 +671,12 @@
       "timeline": "Session Timeline",
       "strengths": "Strengths & skills demonstrated",
       "areasForGrowth": "Areas for growth",
-      "recommended": "RECOMMENDED"
+      "recommended": "RECOMMENDED",
+      "categories": {
+        "listeningEngagement": "Listening Engagement",
+        "emotionalAttunement": "Emotional Attunement",
+        "supportiveEngagement": "Supportive Engagement"
+      }
     },
     "tabs": {
       "annotatedTranscript": "Annotated Transcript",
@@ -652,7 +700,44 @@
           "2": "Not really",
           "3": "Maybe",
           "4": "Yes",
-          "5": "Absolutely"
+          "5": "Absolutely",
+          "tags": {
+            "1": [
+              "Poor",
+              "Not helpful",
+              "Very bad",
+              "Disappointing",
+              "Unhelpful"
+            ],
+            "2": [
+              "Below average",
+              "Lacking",
+              "Unsatisfying",
+              "Weak",
+              "Needs improvement"
+            ],
+            "3": [
+              "Neutral",
+              "Okay",
+              "Average",
+              "Moderate",
+              "Acceptable"
+            ],
+            "4": [
+              "Good",
+              "Helpful",
+              "Satisfying",
+              "Effective",
+              "Worthwhile"
+            ],
+            "5": [
+              "Excellent",
+              "Amazing",
+              "Highly useful",
+              "Outstanding",
+              "Very effective"
+            ]
+          }
         }
       }
     },
@@ -775,7 +860,8 @@
       "commentUpdateFailed": "Failed to update comment",
       "replyUpdateFailed": "Failed to update reply",
       "replyCreatedSuccessfully": "Reply created successfully",
-      "replyCreateFailed": "Failed to create reply"
+      "replyCreateFailed": "Failed to create reply",
+      "callTitle": "CALL-{{id}}"
     },
     "reactionsModal": {
       "title": "Reactions",
@@ -823,7 +909,9 @@
     "tabs": {
       "scribe": "Scribe",
       "simulation": "Simulation"
-    }
+    },
+    "byAuthor": "By {{name}}",
+    "addNotePlaceholder": "Add a note..."
   },
   "search": {
     "placeholder": "Need guidance? Search here..",
@@ -891,7 +979,8 @@
       "listening": "Listening...",
       "yourTurnToSpeak": "Your turn to speak",
       "yourTurnToListen": "Your turn to listen",
-      "thinking": "Thinking..."
+      "thinking": "Thinking...",
+      "paused": "Paused"
     },
     "warningDialog": {
       "titleNormal": "Session",
@@ -950,7 +1039,7 @@
       "issuesWorkedOn": "Issues Worked On",
       "keyTherapeuticTechniques": "Key Therapeutic Techniques",
       "referralsProvided": "Referrals Provided",
-      "homeworkRecommended": "Home work Recommended",
+      "homeworkRecommended": "Homework Recommended",
       "plansForNextCall": "Plans for Next Call",
       "tags": "Tags",
       "metrics": "Metrics",
@@ -1288,7 +1377,11 @@
         "success": "Session unarchived successfully",
         "failed": "Failed to unarchive session"
       }
-    }
+    },
+    "notesLabel": "Notes",
+    "notesPlaceholder": "Take notes for the next call (if any)",
+    "addConcern": "Add a concern",
+    "enterNote": "Enter note"
   },
   "locationDropdown": {
     "placeholder": "Select location",
@@ -1375,7 +1468,11 @@
     "toggleMic": "Failed to toggle microphone",
     "pauseControl": "Couldn't reach the session — please try again",
     "uploadProfileImage": "Failed to upload profile image",
-    "removeProfileImage": "Failed to remove profile image"
+    "removeProfileImage": "Failed to remove profile image",
+    "audioSession": "Failed to configure audio session",
+    "reflectionPromptSaveFailed": "Failed to save reflection prompt",
+    "endSimulation": "Failed to end simulation",
+    "permission": "Microphone permission required"
   },
   "threadsBottomSheet": {
     "title": "Comments",
@@ -1394,5 +1491,20 @@
       "confirm": "Delete",
       "cancel": "Cancel"
     }
+  },
+  "commentInput": {
+    "placeholder": "Type a message..."
+  },
+  "conversation": {
+    "noMessages": "No messages found."
+  },
+  "messageThreadsBottomSheet": {
+    "noThreads": "No threads found for this message"
+  },
+  "languageSelector": {
+    "title": "App Language"
+  },
+  "accessibility": {
+    "openMenu": "Open menu"
   }
 }
