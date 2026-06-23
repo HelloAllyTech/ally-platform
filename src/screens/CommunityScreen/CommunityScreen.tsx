@@ -3,11 +3,13 @@ import {useFocusEffect} from '@react-navigation/native';
 import {Linking, Text, View} from 'react-native';
 
 import {useAppNavigation, useTabBackToHomeHandler} from '@/hooks';
+import {useTranslate} from '@/hooks/useTranslate';
 
 const url = 'https://community.helloally.ai/';
 
 export const CommunityScreen: React.FC = () => {
   useTabBackToHomeHandler();
+  const {t} = useTranslate();
   const navigation = useAppNavigation();
   useFocusEffect(
     useCallback(() => {
@@ -20,7 +22,7 @@ export const CommunityScreen: React.FC = () => {
 
   return (
     <View>
-      <Text>Community</Text>
+      <Text>{t('community.title')}</Text>
     </View>
   );
 };

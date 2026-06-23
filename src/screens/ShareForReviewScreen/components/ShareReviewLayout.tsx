@@ -5,6 +5,7 @@ import EmojiKeyboard, {type EmojiType} from 'rn-emoji-keyboard';
 
 import {AddReactionIcon, CloseIcon} from '@/assets';
 import {Button, LineTextInput} from '@/components';
+import {useTranslate} from '@/hooks/useTranslate';
 import {colors, fontFamily, typography} from '@/theme';
 
 interface ShareReviewLayoutProps {
@@ -36,6 +37,7 @@ export const ShareReviewLayout = ({
   onEmojiSelected,
   children,
 }: ShareReviewLayoutProps) => {
+  const {t} = useTranslate();
   const insets = useSafeAreaInsets();
 
   return (
@@ -52,7 +54,7 @@ export const ShareReviewLayout = ({
         <Text style={styles.screenHeaderTitle}>{screenTitle}</Text>
       </View>
       <LineTextInput
-        placeholder="Add a note..."
+        placeholder={t('review.addNotePlaceholder')}
         value={note}
         onChangeText={onChangeNote}
         maxLength={maxNoteLength}

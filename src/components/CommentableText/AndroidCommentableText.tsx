@@ -8,6 +8,8 @@ import {
   ViewStyle,
 } from 'react-native';
 
+import {useTranslate} from '@/hooks/useTranslate';
+
 // ─── Types ────────────────────────────────────────────────────────
 
 export interface SelectionChangeEvent {
@@ -77,7 +79,7 @@ const NativeAndroidCommentableTextInput =
  */
 export const AndroidCommentableText: React.FC<AndroidCommentableTextProps> = ({
   messageId,
-  menuOptions = ['Add comment'],
+  menuOptions,
   onSelectionChange,
   onSingleTap,
   clearSelectionSignal,
@@ -85,6 +87,8 @@ export const AndroidCommentableText: React.FC<AndroidCommentableTextProps> = ({
   children,
   style,
 }) => {
+  const {t} = useTranslate();
+  const resolvedMenuOptions = menuOptions ?? [t('common.addComment')];
   const handleSelectionChange = useCallback(
     (event: NativeSyntheticEvent<SelectionChangeEvent>) => {
       onSelectionChange?.(event.nativeEvent);
@@ -106,7 +110,7 @@ export const AndroidCommentableText: React.FC<AndroidCommentableTextProps> = ({
   return (
     <NativeAndroidCommentableTextInput
       messageId={messageId}
-      menuOptions={menuOptions}
+      menuOptions={resolvedMenuOptions}
       clearSelectionSignal={clearSelectionSignal}
       prefixLength={prefixLength}
       onSelectionChange={handleSelectionChange}

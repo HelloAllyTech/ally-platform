@@ -38,7 +38,7 @@ jest.mock('@/hooks', () => ({
         'common.continue': 'Continue',
         'common.next': 'Next',
         'simulationPage.failedToLoadPathDetails': 'Failed to load path details',
-        'Errors.startSimulation': 'Failed to start simulation',
+        'errors.startSimulation': 'Failed to start simulation',
       };
       return translations[key] || key;
     },

@@ -130,10 +130,9 @@ export const FeedbackPopup: React.FC<FeedbackPopupProps> = ({
 
   const ratingTagOptions = useMemo(() => {
     if (rating <= 0) return [];
-    const result = t(
-      `SimulationFeedback.feedback.dialog.rating.tags.${rating}`,
-      {returnObjects: true},
-    );
+    const result = t(`postSim.feedback.dialog.rating.tags.${rating}`, {
+      returnObjects: true,
+    });
     return Array.isArray(result) ? result : [];
   }, [rating, t]);
 

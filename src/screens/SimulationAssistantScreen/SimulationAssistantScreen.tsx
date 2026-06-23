@@ -311,7 +311,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
         setIsMicEnabled(true);
         // await ensureCorrectAudioOutput();
       } catch (error) {
-        showErrorToast(error, 'Errors.attachListeners');
+        showErrorToast(error, 'errors.attachListeners');
       }
     };
 
@@ -505,7 +505,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
         },
       });
     } catch (error) {
-      showErrorToast(error, 'Errors.audioSession');
+      showErrorToast(error, 'errors.audioSession');
     }
   };
 
@@ -514,7 +514,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
       await configureAudioSession();
       await room.connect(liveKitServerUrl, accessToken);
     } catch (error) {
-      showErrorToast(error, 'Errors.connect');
+      showErrorToast(error, 'errors.connect');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken, liveKitServerUrl]);
@@ -546,7 +546,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
       await room.localParticipant.setMicrophoneEnabled(next);
       setIsMicEnabled(next);
     } catch (error) {
-      showErrorToast(error, 'Errors.toggleMic');
+      showErrorToast(error, 'errors.toggleMic');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMicEnabled]);
@@ -572,7 +572,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
           {reliable: true},
         );
       } catch (error) {
-        showErrorToast(error, 'Errors.toggleMic');
+        showErrorToast(error, 'errors.toggleMic');
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -588,7 +588,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     const timer = setTimeout(() => {
       pendingControlRef.current = null;
       revert();
-      showErrorToast(undefined, 'Errors.pauseControl');
+      showErrorToast(undefined, 'errors.pauseControl');
     }, CONTROL_ACK_TIMEOUT_MS);
     pendingControlRef.current = {timer, revert};
     // eslint-disable-next-line react-hooks/exhaustive-deps

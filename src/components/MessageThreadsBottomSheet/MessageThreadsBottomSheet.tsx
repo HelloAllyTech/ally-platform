@@ -143,10 +143,12 @@ export const MessageThreadsBottomSheet: React.FC<
 
     return (
       <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>No threads found for this message</Text>
+        <Text style={styles.emptyText}>
+          {t('messageThreadsBottomSheet.noThreads')}
+        </Text>
       </View>
     );
-  }, [isLoading]);
+  }, [isLoading, t]);
 
   const renderHeader = useCallback(() => {
     return (

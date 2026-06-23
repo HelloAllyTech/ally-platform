@@ -32,10 +32,10 @@ export const ActiveSimulationModal: React.FC<ActiveSimulationModalProps> = ({
       if (!response.error) {
         showToast(t('common.simulationEndedSuccess'), 'success');
       } else {
-        showErrorToast(response.error, 'Errors.endSimulation');
+        showErrorToast(response.error, 'errors.endSimulation');
       }
     } catch (error) {
-      showErrorToast(error, 'Errors.endSimulation');
+      showErrorToast(error, 'errors.endSimulation');
     } finally {
       setIsEndingSession(false);
     }

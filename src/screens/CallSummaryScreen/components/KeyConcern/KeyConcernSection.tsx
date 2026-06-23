@@ -2,6 +2,7 @@ import React, {useEffect, useState} from 'react';
 import {TextInput, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
+import {useTranslate} from '@/hooks/useTranslate';
 import {colors, fontFamily} from '@/theme';
 
 interface KeyConcernSectionProps {
@@ -11,6 +12,7 @@ interface KeyConcernSectionProps {
 export const KeyConcernSection: React.FC<KeyConcernSectionProps> = ({
   concerns,
 }) => {
+  const {t} = useTranslate();
   const [concernsText, setConcernsText] = useState(concerns);
 
   useEffect(() => {
@@ -23,7 +25,7 @@ export const KeyConcernSection: React.FC<KeyConcernSectionProps> = ({
         style={styles.editableText}
         value={concernsText}
         onChangeText={setConcernsText}
-        placeholder="Add a concern"
+        placeholder={t('callSummary.addConcern')}
         numberOfLines={10}
         multiline
       />

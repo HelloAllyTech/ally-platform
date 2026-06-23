@@ -1,12 +1,23 @@
+jest.mock('@/hooks', () => {
+  const en = require('@/localization/locales/en.json');
+  const resolve = (key, vars = {}) => {
+    const val = String(key)
+      .split('.')
+      .reduce((o, p) => (o == null ? undefined : o[p]), en);
+    let s = typeof val === 'string' ? val : key;
+    Object.keys(vars || {}).forEach(k => {
+      s = s.split('{{' + k + '}}').join(String(vars[k]));
+    });
+    return s;
+  };
+  return {useTranslate: () => ({t: resolve, tVariable: resolve})};
+});
+
 import React from 'react';
 import {render} from '@testing-library/react-native';
 
 import {MessageThreadsBottomSheet} from '../MessageThreadsBottomSheet';
 import type {MessageThread} from '@/types/reviews';
-
-jest.mock('@/hooks', () => ({
-  useTranslate: () => ({t: (key: string) => key}),
-}));
 
 jest.mock('@/utils/date', () => ({
   formatRelativeTime: (d: string) => `relative-${d}`,
@@ -110,7 +121,7 @@ describe('MessageThreadsBottomSheet', () => {
     const {getByText} = render(
       <MessageThreadsBottomSheet {...defaultProps} />,
     );
-    expect(getByText('threadsBottomSheet.title')).toBeTruthy();
+    expect(getByText('Comments')).toBeTruthy();
   });
 
   it('renders empty state when threads is empty', () => {

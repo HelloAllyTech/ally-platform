@@ -1,12 +1,23 @@
+jest.mock('@/hooks', () => {
+  const en = require('@/localization/locales/en.json');
+  const resolve = (key, vars = {}) => {
+    const val = String(key)
+      .split('.')
+      .reduce((o, p) => (o == null ? undefined : o[p]), en);
+    let s = typeof val === 'string' ? val : key;
+    Object.keys(vars || {}).forEach(k => {
+      s = s.split('{{' + k + '}}').join(String(vars[k]));
+    });
+    return s;
+  };
+  return {useTranslate: () => ({t: resolve, tVariable: resolve})};
+});
+
 import React from 'react';
 import {fireEvent, render} from '@testing-library/react-native';
 
 import {Conversation} from '../Conversation';
 import type {MessageData} from '@/types/reviews';
-
-jest.mock('@/hooks', () => ({
-  useTranslate: () => ({t: (key: string) => key}),
-}));
 
 jest.mock('@/components/CommentableText', () => {
   const React = require('react');

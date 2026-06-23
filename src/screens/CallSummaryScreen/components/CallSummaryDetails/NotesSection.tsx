@@ -2,6 +2,7 @@ import React from 'react';
 import {Text, TextInput, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
+import {useTranslate} from '@/hooks/useTranslate';
 import {colors, fontFamily} from '@/theme';
 
 interface NotesSectionProps {
@@ -15,13 +16,14 @@ export const NotesSection: React.FC<NotesSectionProps> = ({
   onNotesChange,
   onSubmit,
 }) => {
+  const {t} = useTranslate();
   return (
     <View style={styles.container}>
       <View style={styles.notesBox}>
-        <Text style={styles.notesLabel}>Notes</Text>
+        <Text style={styles.notesLabel}>{t('callSummary.notesLabel')}</Text>
         <TextInput
           style={styles.notesInput}
-          placeholder="Take notes for the next call (if any)"
+          placeholder={t('callSummary.notesPlaceholder')}
           placeholderTextColor={colors.mediumGray}
           value={notes}
           onChangeText={onNotesChange}
@@ -29,7 +31,7 @@ export const NotesSection: React.FC<NotesSectionProps> = ({
         />
       </View>
       <TouchableOpacity style={styles.submitButton} onPress={onSubmit}>
-        <Text style={styles.submitButtonText}>Submit</Text>
+        <Text style={styles.submitButtonText}>{t('common.submit')}</Text>
       </TouchableOpacity>
     </View>
   );

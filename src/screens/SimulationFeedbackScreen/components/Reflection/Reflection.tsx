@@ -127,7 +127,7 @@ export const Reflection: React.FC<ReflectionProps> = ({scenarioSessionId}) => {
           body: {promptId, response},
         }).unwrap();
       } catch (error) {
-        showErrorToast(error, 'Errors.reflectionPromptSaveFailed');
+        showErrorToast(error, 'errors.reflectionPromptSaveFailed');
       }
     },
     [scenarioSessionId, updateReflectionPrompt, showErrorToast],

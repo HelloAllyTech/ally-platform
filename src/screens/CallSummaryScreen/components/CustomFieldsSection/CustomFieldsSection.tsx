@@ -3,6 +3,7 @@ import {Modal, Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {CustomDropdown} from '@/components';
+import {useTranslate} from '@/hooks/useTranslate';
 import {colors, fontFamily, typography} from '@/theme';
 
 import {
@@ -51,6 +52,7 @@ const MultiSelectModal: React.FC<MultiSelectModalProps> = ({
   onDone,
   onClose,
 }) => {
+  const {t} = useTranslate();
   const [localSelected, setLocalSelected] = useState<string[]>(selected);
 
   const toggle = (option: string) => {
@@ -88,7 +90,7 @@ const MultiSelectModal: React.FC<MultiSelectModalProps> = ({
               onDone(localSelected);
               onClose();
             }}>
-            <Text style={styles.doneButtonText}>Done</Text>
+            <Text style={styles.doneButtonText}>{t('common.done')}</Text>
           </TouchableOpacity>
         </TouchableOpacity>
       </TouchableOpacity>
@@ -105,6 +107,7 @@ export const CustomFieldsSection: React.FC<CustomFieldsSectionProps> = ({
   isAdmin = false,
   isCounsellorForCall = false,
 }) => {
+  const {t} = useTranslate();
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [multiSelectOpen, setMultiSelectOpen] = useState<string | null>(null);
 
@@ -189,7 +192,7 @@ export const CustomFieldsSection: React.FC<CustomFieldsSectionProps> = ({
                             setIsOpen={open =>
                               setOpenDropdown(open ? def.id : null)
                             }
-                            placeholder="Select"
+                            placeholder={t('common.select')}
                             modalTranslateX="-50%"
                           />
                         </View>
@@ -201,12 +204,14 @@ export const CustomFieldsSection: React.FC<CustomFieldsSectionProps> = ({
           }
 
           case CustomFieldType.BOOLEAN: {
-            const boolOptions = ['Yes', 'No'];
+            const yesLabel = t('common.yes');
+            const noLabel = t('common.no');
+            const boolOptions = [yesLabel, noLabel];
             const boolDisplay =
               value === 'true'
-                ? 'Yes'
+                ? yesLabel
                 : value === 'false'
-                  ? 'No'
+                  ? noLabel
                   : (value ?? '-');
             return (
               <FieldRow
@@ -223,7 +228,7 @@ export const CustomFieldsSection: React.FC<CustomFieldsSectionProps> = ({
                             onSelect={v => {
                               onValueChange(
                                 def.id,
-                                v === 'Yes' ? 'true' : 'false',
+                                v === yesLabel ? 'true' : 'false',
                               );
                               setOpenDropdown(null);
                             }}
@@ -231,7 +236,7 @@ export const CustomFieldsSection: React.FC<CustomFieldsSectionProps> = ({
                             setIsOpen={open =>
                               setOpenDropdown(open ? def.id : null)
                             }
-                            placeholder="Select"
+                            placeholder={t('common.select')}
                             modalTranslateX="-50%"
                           />
                         </View>

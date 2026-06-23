@@ -5,6 +5,8 @@ import SoundPlayer from 'react-native-sound-player';
 
 import {sounds} from '@/assets';
 import {SCREEN_WIDTH} from '@/constants/general';
+import {useTranslate} from '@/hooks/useTranslate';
+import type {TranslationType} from '@/localization/locales/type';
 import {colors} from '@/theme';
 
 import {FlowerPetal} from './FlowerPetal';
@@ -12,7 +14,7 @@ import {FlowerPetal} from './FlowerPetal';
 export interface Phase {
   time: number;
   name: string;
-  label: string;
+  label: TranslationType;
   dotSize: number;
   position: {
     top: number;
@@ -41,7 +43,7 @@ const phases: Phase[] = [
   {
     time: 4,
     name: 'one',
-    label: 'Hold',
+    label: 'boxBreathing.phaseHold',
     dotSize: 14,
     position: {top: 0, left: 0},
     flowerPos: {top: 0.2, left: 0.5},
@@ -49,7 +51,7 @@ const phases: Phase[] = [
   {
     time: 1,
     name: 'two',
-    label: 'Inhale',
+    label: 'boxBreathing.phaseInhale',
     dotSize: 14,
     position: {top: 0, left: 1},
     flowerPos: {top: 0.2, left: 0.5},
@@ -57,7 +59,7 @@ const phases: Phase[] = [
   {
     time: 2,
     name: 'three',
-    label: 'Hold',
+    label: 'boxBreathing.phaseHold',
     dotSize: 14,
     position: {top: 1, left: 1},
     flowerPos: {top: 0.2, left: 0.5},
@@ -65,7 +67,7 @@ const phases: Phase[] = [
   {
     time: 3,
     name: 'four',
-    label: 'Exhale',
+    label: 'boxBreathing.phaseExhale',
     dotSize: 14,
     position: {top: 1, left: 0},
     flowerPos: {top: 0.2, left: 0.5},
@@ -78,6 +80,7 @@ export const BoxBreathingAnimation = ({
   onPhaseChange,
   animationDuration = 4000,
 }: BoxBreathingAnimationProps) => {
+  const {t} = useTranslate();
   const [phaseIndex, setPhaseIndex] = useState(0);
   // Use animated value directly for bloom instead of setState-per-frame
   const [isPlayerReady, setIsPlayerReady] = useState(false);
@@ -256,7 +259,7 @@ export const BoxBreathingAnimation = ({
 
         {/* Flower in center */}
         <View style={styles.flowerContainer}>
-          <Text style={styles.flowerText}>{phases[phaseIndex].label}</Text>
+          <Text style={styles.flowerText}>{t(phases[phaseIndex].label)}</Text>
 
           <FlowerPetal
             bloomProgress={bloomProgress}
