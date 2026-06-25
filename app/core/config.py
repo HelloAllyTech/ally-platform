@@ -327,6 +327,25 @@ class Settings(BaseSettings):
             "A/B behaviorsMs / responseLatencyMs and confirm scoring unchanged."
         ),
     )
+    EVENTS_OFF_GATE: bool = Field(
+        default=False,
+        description=(
+            "Latency lever: when events fire, send only the reply-shaping ones "
+            "(branching + guardrail + termination) to Core on the voice-to-voice "
+            "critical path and fire-and-forget the NON-branching ones (pure "
+            "scoring/feedback rows) off it. orchestrate_events makes no LLM "
+            "calls, so this sheds the non-branching SQS round-trip; scoring and "
+            "termination still run on the FULL event set on the gate, so "
+            "reply-state selection, next-turn cascade baseline and the final "
+            "score are unchanged. The single registry/cascade pass runs once (we "
+            "partition its OUTPUT, never re-call it). No-op in report mode. "
+            "Generalizes ORCHESTRATION_ASYNC_SQS, partitioned by branching "
+            "status, and takes precedence over it when both are set. In-flight "
+            "off-gate sends are drained in the shutdown handler so the last "
+            "turn's rows are not dropped. Default False; A/B orchestrationMs / "
+            "responseLatencyMs."
+        ),
+    )
     BATCH_EVENT_CLASSIFIERS: bool = Field(
         default=False,
         description=(

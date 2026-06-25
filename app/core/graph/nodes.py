@@ -339,11 +339,13 @@ async def _orchestrate_and_split_events(
     """Orchestrate events and split them by type."""
     detected_event_ids = {event.event_id for event in new_events}
 
-    # Wrap event orchestration in asyncio.wait_for. The orchestrator runs
-    # its own LLM calls (branching resolution, feedback generation) which can
-    # hang if upstream providers are slow. On timeout we return empty results
-    # so the agent can still produce a response. See ORCHESTRATION_TIMEOUT in
-    # app/core/config.py.
+    # Wrap event orchestration in asyncio.wait_for so a slow upstream cannot park
+    # the turn. NOTE: orchestrate_events makes NO LLM calls — it updates the event
+    # registry, commits scores, sends events to Core (SQS), and handles
+    # termination; branching-instruction LLM resolution happens later in
+    # resolve_branching_instruction. The on-gate cost here is the SQS round-trip +
+    # ScoreKeeper lock. On timeout we return empty results so the agent can still
+    # produce a response. See ORCHESTRATION_TIMEOUT in app/core/config.py.
     _orch_start = datetime.now(timezone.utc)
     logger.info(
         "[orchestrate_events] orchestration_start timeout=%ss events=%d",
