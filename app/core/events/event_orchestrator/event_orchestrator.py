@@ -575,7 +575,35 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
         # UI events are handled via branching_and_feedback_data in generate_response
         # In report mode, skip SQS entirely -- results are delivered via webhook
         if not self.is_report_mode:
-            if settings.ORCHESTRATION_ASYNC_SQS:
+            if settings.EVENTS_OFF_GATE:
+                # Latency lever: only branching + guardrail + termination events
+                # shape the reply. Send those to Core on the gate (awaited) and
+                # fire-and-forget the NON-branching ones off the voice-to-voice
+                # critical path. Branching status is config-time
+                # (branching_instruction is not None); termination is forced into
+                # the gating slice so its deferred-to-shutdown handling stays on
+                # the synchronous path. This only defers the non-branching SQS
+                # send — score commit + termination below still run on the FULL
+                # set on the gate. We partition the OUTPUT events_to_process here;
+                # the registry/cascade pass already ran once above. Takes
+                # precedence over ORCHESTRATION_ASYNC_SQS. See EVENTS_OFF_GATE.
+                gate_events = [
+                    e
+                    for e in events_to_process
+                    if e.branching_instruction is not None
+                    or e.event_id in self.termination_event_ids
+                ]
+                gate_ids = {e.event_id for e in gate_events}
+                offgate_events = [
+                    e for e in events_to_process if e.event_id not in gate_ids
+                ]
+                await self._send_events_to_core(gate_events, room)
+                if offgate_events:
+                    self._spawn_background(
+                        self._send_events_to_core(offgate_events, room),
+                        label="send_events_to_core_offgate",
+                    )
+            elif settings.ORCHESTRATION_ASYNC_SQS:
                 # Latency lever: the SQS round-trip is on the fan-in critical
                 # path before generate_response, but the spoken reply does not
                 # depend on it. Fire it off so orchestrate_events can return the
@@ -587,10 +615,13 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
             else:
                 await self._send_events_to_core(events_to_process, room)
 
-        # Commit event scores to ScoreKeeper
+        # Commit event scores to ScoreKeeper. Always the FULL event set, even
+        # under EVENTS_OFF_GATE — keeps reply-state selection, the next-turn
+        # cascade baseline, and the authoritative final score correct.
         await self._update_event_score(events_to_process)
 
-        # Handle termination events after sending events (even if room is None)
+        # Handle termination events after sending events (even if room is None).
+        # Full set, single synchronous path — one-shot termination guards intact.
         await self._handle_termination_events(events_to_process)
 
         return (

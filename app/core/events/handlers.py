@@ -460,6 +460,33 @@ def create_shutdown_handler(
         if event_orchestrator.deferred_termination_event:
             await send_deferred_termination_event(room_name, event_orchestrator)
 
+        # Drain in-flight off-gate background sends (EVENTS_OFF_GATE /
+        # ORCHESTRATION_ASYNC_SQS) before finalizing, so the last turn's
+        # non-branching backend rows are not dropped on shutdown. The
+        # orchestrator keeps its OWN _background_tasks set, separate from the
+        # worker's cleanup_background_tasks (which cancels), so it must be drained
+        # explicitly here. Drain (do NOT cancel) under a short timeout so finalize
+        # still proceeds promptly.
+        pending_sends = [
+            t for t in list(event_orchestrator._background_tasks) if not t.done()
+        ]
+        if pending_sends:
+            logger.info(
+                "Draining %d in-flight orchestrator background task(s) before "
+                "finalize",
+                len(pending_sends),
+            )
+            try:
+                await asyncio.wait_for(
+                    asyncio.gather(*pending_sends, return_exceptions=True),
+                    timeout=3.0,
+                )
+            except asyncio.TimeoutError:
+                logger.warning(
+                    "Orchestrator background drain timed out after 3s; "
+                    "proceeding to finalize"
+                )
+
         # Finalize session (send final score and cleanup)
         if not final_score_sent_ref():
             try:
