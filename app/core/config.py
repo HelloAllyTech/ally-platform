@@ -309,18 +309,22 @@ class Settings(BaseSettings):
         ),
     )
     BEHAVIORS_OFF_GATE: bool = Field(
-        default=False,
+        default=True,
         description=(
             "Latency lever: run detect_behaviors in PARALLEL with the response "
             "instead of gating generate_response on it. Behaviors only drive "
             "scoring + UI feedback (not the reply text), so they join at "
             "send_event_feedback like event feedback already does — removing "
             "the ~1.3s behavior branch from the voice-to-voice critical path. "
-            "Trade-off: the reply selects its main-agent state from a score "
-            "that excludes THIS turn's behavior delta (events still count); "
-            "cosmetic and the same race class already tolerated for RAG state. "
-            "Behavior scores/feedback still accumulate every turn. Default "
-            "False; flip in dev, confirm scoring + feedback unchanged, then A/B."
+            "Branching that DOES shape the reply travels as events through "
+            "process_events, whose edge to the sync node is unconditional — it "
+            "always gates the response regardless of this flag — so de-gating "
+            "behaviors never drops branching. Trade-off: the reply selects its "
+            "main-agent state from a score that excludes THIS turn's behavior "
+            "delta (events still count); cosmetic and the same race class "
+            "already tolerated for RAG state. Behavior scores/feedback still "
+            "accumulate every turn. Default True; set False to restore gating. "
+            "A/B behaviorsMs / responseLatencyMs and confirm scoring unchanged."
         ),
     )
     BATCH_EVENT_CLASSIFIERS: bool = Field(
