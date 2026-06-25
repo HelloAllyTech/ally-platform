@@ -238,6 +238,10 @@ class AgentWorker:
         # consecutive turns (random.choice has no memory). Kept short and capped
         # below the clip count so there's always a candidate to pick.
         self._recent_filler_phrases: list[str] = []
+        # Delay-gated playback: a filler only plays if the reply is still pending
+        # after FILLER_MIN_DELAY_MS, so fast turns get no (unnatural) filler.
+        self._filler_delay_task: Optional[asyncio.Task] = None
+        self._agent_thinking: bool = False
 
         # ========== Termination Handling (for entrypoint context) ==========
         # Use asyncio.Event to signal termination from graph context
@@ -945,37 +949,103 @@ class AgentWorker:
             self._bg_audio = None
 
     def _on_filler_agent_state(self, ev) -> None:
-        """Play a filler clip while the agent is "thinking" and record the
-        spoken phrase in the transcript; stop it once the agent moves on.
+        """Decide whether to play a filler when the agent starts "thinking".
+
+        Rather than firing on every turn (which sounds unnatural), we defer:
+        only if the reply is STILL pending after FILLER_MIN_DELAY_MS do we play a
+        filler — fast replies leave no gap to mask. Leaving "thinking" cancels a
+        pending wait and stops any filler already playing.
 
         Best-effort: never raises into the session.
         """
         try:
-            # Prefer fresh LLM-generated fillers; fall back to the static set.
-            clips = self._dynamic_filler_clips or self._filler_clips
-            if self._bg_audio is None or not clips:
+            if self._bg_audio is None:
                 return
             if getattr(ev, "new_state", None) == "thinking":
-                # Already playing this turn — don't stack.
+                self._agent_thinking = True
+                # Don't stack: a filler or a pending wait is already in flight.
                 if self._filler_handle is not None and not self._filler_handle.done():
                     return
-                from livekit.agents import AudioConfig
-
+                if (
+                    self._filler_delay_task is not None
+                    and not self._filler_delay_task.done()
+                ):
+                    return
                 created_at = getattr(ev, "created_at", None)
-                phrase, path = self._pick_filler_clip(clips)
-                self._filler_handle = self._bg_audio.play(AudioConfig(path))
-                self._emit_filler_transcript(phrase, created_at)
-                # response_latency_ms is measured to first audio — the filler
-                # became audible now (before the real reply), so report it.
-                if created_at is not None:
-                    turn_metrics.note_filler_started(self.ctx.room.name, created_at)
-                logger.info("[FILLER] playing %r (recorded in transcript)", phrase)
-            elif self._filler_handle is not None and not self._filler_handle.done():
-                # Agent left "thinking" (e.g. started speaking) — stop the filler.
-                self._filler_handle.stop()
-                self._filler_handle = None
+                self._filler_delay_task = asyncio.create_task(
+                    self._delayed_filler_play(created_at)
+                )
+                self._background_tasks.add(self._filler_delay_task)
+                self._filler_delay_task.add_done_callback(
+                    self._background_tasks.discard
+                )
+            else:
+                # Reply is ready / turn moved on.
+                self._agent_thinking = False
+                if (
+                    self._filler_delay_task is not None
+                    and not self._filler_delay_task.done()
+                ):
+                    self._filler_delay_task.cancel()
+                if self._filler_handle is not None and not self._filler_handle.done():
+                    self._filler_handle.stop()
+                    self._filler_handle = None
         except Exception as e:  # noqa: BLE001 - filler must never break a session
             logger.warning("[FILLER] agent-state handler error: %s", e)
+
+    async def _delayed_filler_play(self, created_at) -> None:
+        """Play a filler only if the reply is still pending after a short wait.
+
+        Waits a randomized delay in [FILLER_MIN_DELAY_MS, FILLER_MAX_DELAY_MS],
+        then bails if the agent already left "thinking" (reply ready → no gap to
+        mask). Even when there is a gap, plays only FILLER_PLAY_PROBABILITY of
+        the time so fillers aren't used on every turn. Best-effort; cancelled
+        when the agent stops thinking.
+        """
+        try:
+            import random as _random
+
+            lo = float(getattr(settings, "FILLER_MIN_DELAY_MS", 300.0))
+            hi = float(getattr(settings, "FILLER_MAX_DELAY_MS", 600.0))
+            if hi < lo:
+                lo, hi = hi, lo
+            delay_s = max(0.0, _random.uniform(lo, hi) / 1000.0)
+            await asyncio.sleep(delay_s)
+
+            # Reply became ready within the delay — no awkward gap, no filler.
+            if not self._agent_thinking or self._bg_audio is None:
+                return
+            if self._filler_handle is not None and not self._filler_handle.done():
+                return
+            clips = self._dynamic_filler_clips or self._filler_clips
+            if not clips:
+                return
+
+            # There's a real pause — but don't fill on every one. Roll the dice.
+            probability = float(getattr(settings, "FILLER_PLAY_PROBABILITY", 0.6))
+            if _random.random() > probability:
+                logger.info("[FILLER] skipped this turn (probability gate)")
+                return
+
+            from livekit.agents import AudioConfig
+
+            phrase, path = self._pick_filler_clip(clips)
+            self._filler_handle = self._bg_audio.play(AudioConfig(path))
+            # The filler becomes audible now (after the wait); report that time
+            # as first-audio for response_latency_ms and the transcript.
+            play_ts = (created_at + delay_s) if created_at is not None else None
+            self._emit_filler_transcript(phrase, play_ts)
+            if play_ts is not None:
+                turn_metrics.note_filler_started(self.ctx.room.name, play_ts)
+            logger.info(
+                "[FILLER] playing %r after %.0fms wait (reply still pending)",
+                phrase,
+                delay_s * 1000,
+            )
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:  # noqa: BLE001 - filler must never break a session
+            logger.warning("[FILLER] delayed play error: %s", e)
 
     def _pick_filler_clip(self, clips: list) -> tuple:
         """Pick a filler clip, avoiding phrases played on recent turns.

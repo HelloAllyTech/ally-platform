@@ -225,6 +225,34 @@ class Settings(BaseSettings):
         default=5,
         description="How many predictive filler phrases to generate per refresh.",
     )
+    # Only consider a filler if the reply is still pending after a short delay —
+    # fast replies leave no awkward gap, so they get no filler. The delay is
+    # randomized per turn between MIN and MAX (ms) so it doesn't feel mechanical.
+    FILLER_MIN_DELAY_MS: float = Field(
+        default=300.0,
+        description=(
+            "Lower bound (ms) of the randomized wait after the learner stops "
+            "before a filler may play; skipped entirely if the reply is ready "
+            "first. Set MIN=MAX=0 to consider a filler immediately."
+        ),
+    )
+    FILLER_MAX_DELAY_MS: float = Field(
+        default=600.0,
+        description=(
+            "Upper bound (ms) of the randomized filler wait. A value is picked "
+            "uniformly in [FILLER_MIN_DELAY_MS, FILLER_MAX_DELAY_MS] each turn."
+        ),
+    )
+    # Even when there IS a pause, only play a filler this fraction of the time so
+    # the agent doesn't fill on every slow turn (more natural). 1.0 = always when
+    # there's a gap; 0.0 = never.
+    FILLER_PLAY_PROBABILITY: float = Field(
+        default=0.6,
+        description=(
+            "Probability (0-1) of playing a filler on a turn that has a real "
+            "pause. Adds natural variation so fillers aren't used every time."
+        ),
+    )
 
     LLM_TEMPERATURE: str = Field(...)
 
