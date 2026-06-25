@@ -105,14 +105,17 @@ class Settings(BaseSettings):
     # full LLM response. The LiveKit LLMAdapter already streams (stream_mode=
     # "messages"); the only missing piece is enabling streaming on the chat
     # model. When True, TTS starts on the first tokens of generate_response —
-    # the single biggest voice-to-voice latency lever. Default False (no change);
-    # flip in dev to verify no double-speak, then A/B in prod.
+    # the single biggest voice-to-voice latency lever. Default True, paired with
+    # PROSDY_FORCE_SKIP: the streamed tokens (including inline ElevenLabs v3 audio
+    # tags emitted by generate_response itself) go straight to TTS, with no second
+    # prosody LLM call to rewrite the reply. Set False to fall back to waiting for
+    # the full reply.
     STREAM_RESPONSE: bool = Field(
-        default=False,
+        default=True,
         description=(
             "Enable token streaming of generate_response to TTS (sets "
             "streaming=True on the response chat model). Cuts time-to-first-audio "
-            "from full-generation to first-token. Verify in dev before prod."
+            "from full-generation to first-token."
         ),
     )
 
@@ -363,14 +366,16 @@ class Settings(BaseSettings):
     # Speech prosody skip thresholds (reduce latency when under pressure)
     # When skipped, TTS keeps last params instead of running prosody LLM call
     PROSDY_FORCE_SKIP: bool = Field(
-        default=False,
+        default=True,
         description=(
-            "Latency kill-switch: when True, prosody is skipped unconditionally "
-            "so the (streamed) generate_response reply goes straight to TTS "
-            "instead of waiting on the prosody LLM call. Trades voice "
-            "expressiveness for the lowest voice-to-voice latency. Default False "
-            "(no change); flip to True in prod to A/B against the prosodyMs / "
-            "responseLatencyMs metrics."
+            "Latency kill-switch: when True, the apply_voice_expressions prosody "
+            "LLM call is skipped unconditionally so the (streamed) "
+            "generate_response reply goes straight to TTS. Default True, paired "
+            "with STREAM_RESPONSE: ElevenLabs v3 audio tags are now produced "
+            "INLINE by generate_response (the persona prompt carries the tag "
+            "instructions), so skipping the second rewrite call no longer loses "
+            "tags. TTS keeps the session-default voice params. Set False to "
+            "restore the per-turn prosody rewrite (and lose streaming's gains)."
         ),
     )
     PROSDY_SKIP_ENABLED: bool = Field(

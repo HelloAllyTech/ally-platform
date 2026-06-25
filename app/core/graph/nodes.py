@@ -53,6 +53,7 @@ from app.core.scenario.base import (
 from app.core.scoring.score_keeper import ScoreKeeper
 from app.core.time_utils import TimingContext, time_operation
 from app.llms import create_llm_client
+from app.prompts.resolver import load_template
 
 
 def _resolve_current_state(
@@ -979,6 +980,48 @@ async def generate_response(
         cast(Scenario, config["configurable"].get("scenario")) if config else None
     )
 
+    # ElevenLabs v3 supports inline audio tags ([pause], [sighs], [empathetic],
+    # ...). When the scenario's TTS provider supports them, fold the tag guidance
+    # into the persona prompt so the agent emits tags inline as it generates —
+    # letting tokens stream straight to TTS (STREAM_RESPONSE) instead of waiting
+    # on a second prosody LLM call to rewrite the reply (skipped via
+    # PROSDY_FORCE_SKIP). The guidance TEXT is resolved from prompt management
+    # (code `ally_ai_learn_system_audio_tag_guidance`, local fallback
+    # `app/prompts/system/audio_tag_guidance.txt`): dashboard override wins, else
+    # the local .txt. Stays None for v2 ElevenLabs and every non-tag provider,
+    # leaving the prompt unchanged.
+    tts_client = (
+        config["configurable"].get("tts_client")
+        if config and "configurable" in config
+        else None
+    )
+    audio_tag_instructions = None
+    if tts_client is not None:
+        try:
+            if tts_client.supports_text_enhancement():
+                audio_tag_instructions = (
+                    load_template(
+                        "system/audio_tag_guidance",
+                        scenario.prompt_data if scenario is not None else None,
+                    )
+                    or None
+                )
+                if not audio_tag_instructions:
+                    # Provider supports tags but guidance resolved empty (missing
+                    # local .txt / empty dashboard override). Don't fail the turn,
+                    # but warn — v3 would otherwise speak tag-less with no signal
+                    # (the prosody fallback that used to add tags is force-skipped).
+                    logger.warning(
+                        "[generate_response] audio tag guidance empty for "
+                        "tag-capable provider; emitting reply without inline tags"
+                    )
+        except Exception:
+            logger.exception(
+                "[generate_response] failed to resolve audio tag guidance; "
+                "emitting reply without inline tags"
+            )
+            audio_tag_instructions = None
+
     # Get language code
     language_code = DEFAULT_LANGUAGE_CODE
     if scenario and scenario.language_config:
@@ -1019,6 +1062,7 @@ async def generate_response(
             current_state=current_state,
             retrieved_context=state.retrieved_context,
             current_score=turn_score,
+            audio_tag_instructions=audio_tag_instructions,
         )
 
         room_name = ""
@@ -1643,13 +1687,16 @@ async def apply_voice_expressions(
             return {}
 
         # Skip runtime prosody when under pressure (keeps last params, reduces latency)
-        # IMPORTANT: Do NOT skip when provider supports text enhancement
-        # (SSML/audio tags). Skipping would send plain text instead of enhanced
-        # text, losing pauses and rate variations (faster, less natural speech).
+        # NOTE: the conditional has_text_enhancement branch below preserves tags
+        # only on the legacy (non-force-skip) path. By default PROSDY_FORCE_SKIP
+        # is True and short-circuits everything here: ElevenLabs v3 audio tags are
+        # now produced INLINE by generate_response (the persona prompt carries the
+        # tag instructions), so the second rewrite call is unnecessary and the
+        # streamed reply — tags included — goes straight to TTS.
         response_len = len(response_text)
         skip_prosody = False
         skip_reason = ""
-        has_text_enhancement = bool(tts_client.get_text_enhancement_instructions())
+        has_text_enhancement = tts_client.supports_text_enhancement()
         # Per-simulation override: if scenario has prosody disabled, skip
         # unconditionally (takes precedence over PROSDY_SKIP_ENABLED and
         # text-enhancement providers).

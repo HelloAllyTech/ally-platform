@@ -61,59 +61,11 @@ class ElevenLabsTTSClient(BaseTTSClient):
         },
     }
 
-    # Define text enhancement metadata for audio tags (v3 models only)
-    # Audio tags are supported in Eleven v3 (Alpha) model, not in v2 models
-    TEXT_ENHANCEMENT_METADATA = {
-        "instructions": """
-ElevenLabs v3 (Alpha) supports audio tags for expressive speech control.
-These tags are placed inline in square brackets.
-
-Supported audio tag categories:
-- Emotions: [curious], [crying], [mischievously], [excited], [sad], [happy],
-  [angry], [surprised], [calm], [empathetic]
-- Delivery/pace: [whispers], [shouts], [rushed], [slow], [normal]
-- Human reactions: [laughs], [sighs], [clears throat], [gasps]
-- Pauses: [pause], [short pause], [long pause]
-
-IMPORTANT NOTES:
-- Audio tags are ONLY supported in v3 models
-  (e.g., "eleven_v3", "eleven_multilingual_v3")
-- v2 models (e.g., "eleven_turbo_v2_5", "eleven_multilingual_v2")
-  do NOT support audio tags
-- Tags should be placed at the beginning of sentences/phrases for best effect
-- Some tags may be spoken aloud instead of interpreted
-  (v3 is in alpha/research preview)
-- Pause durations are approximate and may vary
-
-THERAPY SESSION SPECIFIC RULES:
-1. "Vulnerable Pause": Add [long pause] or [pause] before/after vulnerable
-   admissions or difficult revelations. Example: "[long pause] I've never told
-   anyone this before [pause] but..."
-2. "Anxious Rush": Use [rushed] at the start of sentences when character is
-   anxious or overwhelmed. Example: "[rushed] I just can't seem to catch my
-   breath [pause] everything feels so overwhelming."
-3. "Heavy Sigh": Add [sighs] or [clears throat] before heavy emotional moments
-   or when processing difficult information. Example: "[sighs] I've been
-   carrying this for so long [pause] I don't even know where to start."
-4. "Processing Break": Add [pause] or [long pause] when character is
-   processing difficult emotions or trauma. Example: "That memory [pause] it's
-   still so vivid [long pause] I can feel it in my body."
-
-GENERAL USAGE:
-1. Place emotion/delivery tags at the start of sentences or phrases
-2. Use pause tags between phrases for natural rhythm
-3. Combine tags naturally: "[surprised] Really? [pause] I didn't expect that."
-4. Avoid overusing tags - use them for emphasis and natural expression
-5. For therapy sessions, prioritize vulnerable pauses and processing breaks
-   to create space for emotional processing
-
-Examples:
-- "[empathetic] I understand how you're feeling. [pause] That must be really difficult."
-- "[sighs] I've been thinking about this a lot [long pause] and I realize..."
-- "[rushed] I just can't stop worrying [pause] it's like my mind won't shut off."
-- "[calm] Let's take a deep breath. [short pause] Everything will be okay."
-        """,
-    }
+    # Inline audio tags (v3 models only). The instruction TEXT lives in prompt
+    # management — prompt code `ally_ai_learn_system_audio_tag_guidance`, local
+    # fallback `app/prompts/system/audio_tag_guidance.txt` — so superadmins can
+    # edit it. This client only advertises the capability via
+    # supports_text_enhancement(); callers resolve the text from prompt management.
 
     def __init__(
         self,
@@ -268,20 +220,17 @@ Examples:
                 self._tts_instance = base
         return self._tts_instance
 
-    def get_text_enhancement_instructions(self) -> Optional[str]:
+    def supports_text_enhancement(self) -> bool:
         """
-        Get text enhancement instructions for audio tags.
+        Whether inline audio tags are supported (ElevenLabs v3 models only).
 
-        Audio tags are only supported in v3 models. Returns None for v2 models.
+        Capability flag only — the tag instruction text lives in prompt
+        management (see the class comment above).
 
         Returns:
-            Instructions string if v3 model, None otherwise
+            True for v3 models, False for v2/turbo/flash.
         """
-        if self._supports_audio_tags:
-            metadata = getattr(self.__class__, "TEXT_ENHANCEMENT_METADATA", None)
-            if isinstance(metadata, dict):
-                return metadata.get("instructions")
-        return None
+        return self._supports_audio_tags
 
     def _apply_parameters_dict(self, params_dict: Dict[str, Any]) -> None:
         """

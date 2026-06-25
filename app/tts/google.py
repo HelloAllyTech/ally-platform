@@ -81,9 +81,10 @@ class GoogleTTSClient(BaseTTSClient):
         },
     }
 
-    # No TEXT_ENHANCEMENT_METADATA: Google TTS with streaming (default) does not
-    # support SSML. Tags would be spoken aloud. Prosody is applied via
-    # update_options() (speaking_rate) and PARAMETER_METADATA only.
+    # Google TTS with streaming (default) does not support SSML / inline tags —
+    # they would be spoken aloud — so it inherits supports_text_enhancement() ->
+    # False from BaseTTSClient. Prosody is applied via update_options()
+    # (speaking_rate) and PARAMETER_METADATA only.
 
     @staticmethod
     def _resolve_plugin_model_name(
@@ -355,8 +356,8 @@ class GoogleTTSClient(BaseTTSClient):
                     unsupported_params.append(param_name)
                     logger.warning(
                         f"[Google TTS] Parameter '{param_name}' is not supported "
-                        f"via update_options(). Use SSML prosody tags in text "
-                        f"input instead. See TEXT_ENHANCEMENT_METADATA for details."
+                        f"via update_options(); it would require SSML prosody tags "
+                        f"in the text input, which Google streaming does not support."
                     )
 
             # Apply only supported parameters

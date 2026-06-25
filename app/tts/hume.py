@@ -60,17 +60,11 @@ class HumeTTSClient(BaseTTSClient):
         },
     }
 
-    # Define text enhancement metadata as separate class constant
-    # Uncomment and customize if Hume supports text enhancement tags
-    # (e.g., audio tags, SSML)
-    # TEXT_ENHANCEMENT_METADATA = {
-    #     "instructions": """
-    #     - Expression tags: [surprised], [excited], [empathetic], [calm]
-    #       - place at start of sentences/phrases
-    #     - Break tags: <break time="1.5s" /> - use for natural pauses
-    #     Example: "[surprised] Really? <break time="1s" /> I didn't expect that."
-    #     """
-    # }
+    # Hume does not support inline text enhancement (audio tags / SSML), so it
+    # inherits supports_text_enhancement() -> False from BaseTTSClient. To enable
+    # it later: override supports_text_enhancement() to return True and add the
+    # tag guidance to prompt management as `ally_ai_learn_system_audio_tag_guidance`
+    # (or a Hume-specific prompt code), the same way ElevenLabs v3 does.
 
     def __init__(
         self,

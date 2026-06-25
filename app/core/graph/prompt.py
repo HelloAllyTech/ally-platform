@@ -551,6 +551,39 @@ def _build_behavior_prompt(
     return SystemMessage(content=(behavior_prompt or "").strip())
 
 
+# Header framing the provider audio-tag instructions for INLINE generation.
+# The instruction text is resolved from prompt management (prompt code
+# `ally_ai_learn_system_audio_tag_guidance`) by generate_response and passed in;
+# this header reframes it so the persona emits the tags as part of its own reply.
+# That lets generate_response tokens (tags included) stream straight to TTS,
+# removing the second prosody LLM call from the critical path.
+_AUDIO_TAG_GUIDANCE_HEADER = (
+    "\n\n## Voice expression — audio tags\n"
+    "Embed the audio tags below INLINE in your spoken replies to convey emotion "
+    "and pacing. They are part of how you speak — include them directly in your "
+    "dialogue, naturally and sparingly. Never list, describe, or explain the "
+    "tags; only use them inline.\n\n"
+)
+
+
+def _append_audio_tag_guidance(
+    message: SystemMessage, audio_tag_instructions: Optional[str]
+) -> SystemMessage:
+    """Append provider audio-tag guidance to the persona prompt for inline use.
+
+    Only takes effect when the scenario's TTS provider exposes tag instructions
+    (ElevenLabs v3); for v2 ElevenLabs and every other provider
+    `audio_tag_instructions` is None and the message is returned unchanged.
+    Appended AFTER templating so the tag examples (square brackets, not braces)
+    never reach the prompt formatter.
+    """
+    instructions = (audio_tag_instructions or "").strip()
+    if not instructions:
+        return message
+    combined = f"{message.content}{_AUDIO_TAG_GUIDANCE_HEADER}{instructions}"
+    return SystemMessage(content=combined.strip())
+
+
 def generate_system_message(
     prompt_data: PromptData,
     next_instruction: Optional[str] = None,
@@ -559,6 +592,7 @@ def generate_system_message(
     current_state: Optional[SimulationStateInstruction] = None,
     retrieved_context: Optional[str] = None,
     current_score: Optional[int] = None,
+    audio_tag_instructions: Optional[str] = None,
 ) -> SystemMessage:
     """
     Generates a SystemMessage prompt for an AI roleplay assistant
@@ -567,6 +601,10 @@ def generate_system_message(
     `current_score` is required only when the selected main-agent prompt
     has `hasStates: true`; the score selects the active simulation state.
     Branching mode ignores it.
+
+    `audio_tag_instructions`, when provided (ElevenLabs v3 only), is appended
+    so the persona emits voice audio tags inline as it generates — see
+    `_append_audio_tag_guidance`.
     """
     if next_instruction:
         msg = _build_branching_prompt(
@@ -577,7 +615,7 @@ def generate_system_message(
             LOG_PREFIX,
             language_code or "None",
         )
-        return msg
+        return _append_audio_tag_guidance(msg, audio_tag_instructions)
 
     if behavior_instructions is not None:
         if not behavior_instructions:
@@ -597,7 +635,7 @@ def generate_system_message(
             LOG_PREFIX,
             language_code or "None",
         )
-        return msg
+        return _append_audio_tag_guidance(msg, audio_tag_instructions)
 
     logger.warning(
         "No behavior_instructions provided, "
@@ -616,7 +654,7 @@ def generate_system_message(
         LOG_PREFIX,
         language_code or "None",
     )
-    return msg
+    return _append_audio_tag_guidance(msg, audio_tag_instructions)
 
 
 def generate_prompt_content(
