@@ -182,6 +182,9 @@ class ExpressionType(str, Enum):
 # Core service endpoint paths
 AUTH_VERIFY_ENDPOINT: Final[str] = "/api/v1/authorization/permissions/validate"
 SCENARIO_REPORT_WEBHOOK_ENDPOINT: Final[str] = "/api/v1/learn/scenarios/reports/webhook"
+# Goal-based actor evaluation result is PATCHed to
+# {base}{ACTOR_EVALUATION_WEBHOOK_ENDPOINT}/{scenario_session_id}/evaluation
+ACTOR_EVALUATION_WEBHOOK_ENDPOINT: Final[str] = "/api/v1/learn/scenario-session"
 
 # Worker configuration constants
 DEFAULT_VAD_ACTIVATION_THRESHOLD: Final[float] = 0.7
