@@ -201,29 +201,20 @@ class BaseTTSClient(ABC):
 
         return validated
 
-    def get_text_enhancement_instructions(self) -> Optional[str]:
+    def supports_text_enhancement(self) -> bool:
         """
-        Get text enhancement instructions from metadata if provider supports it.
+        Whether this provider supports inline text enhancement (audio tags / SSML).
 
-        Looks for TEXT_ENHANCEMENT_METADATA class constant. Providers can
-        define this constant with provider-specific instructions
-        (e.g., SSML tags, audio tags, etc.).
-
-        Expected structure:
-        TEXT_ENHANCEMENT_METADATA = {
-            "instructions": "Provider-specific tag rules and examples..."
-        }
+        This is a capability flag only — the actual instruction text now lives in
+        prompt management (prompt code ``ally_ai_learn_system_audio_tag_guidance``,
+        local fallback ``app/prompts/system/audio_tag_guidance.txt``) so it can be
+        edited by superadmins. Callers gate on this flag, then resolve the text via
+        ``app.prompts.resolver.load_template("system/audio_tag_guidance", ...)``.
 
         Returns:
-            String with text enhancement rules/instructions, or None if
-            not supported
+            True if the provider can interpret inline audio tags, else False.
         """
-        # Look for TEXT_ENHANCEMENT_METADATA class constant
-        if hasattr(self.__class__, "TEXT_ENHANCEMENT_METADATA"):
-            metadata = getattr(self.__class__, "TEXT_ENHANCEMENT_METADATA")
-            if isinstance(metadata, dict):
-                return metadata.get("instructions")
-        return None
+        return False
 
     def get_defaults_for_learn_service(self) -> dict:
         """

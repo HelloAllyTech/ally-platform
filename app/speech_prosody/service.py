@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional
 from app.core.logger import get_logger
 from app.core.scenario.base import Scenario
 from app.llms import BaseLLMClient
+from app.prompts.resolver import load_template
 from app.speech_prosody.constants import (
     DEFAULT_CONVERSATION_HISTORY_LIMIT,
     MAX_TURN_DELTA_PERCENT,
@@ -293,8 +294,15 @@ class SpeechProsodyService:
             )
             return None
 
-        # Get text enhancement instructions if supported
-        enhancement_instructions = self.tts_client.get_text_enhancement_instructions()
+        # Get text enhancement instructions if supported. The TEXT lives in
+        # prompt management (code `ally_ai_learn_system_audio_tag_guidance`, local
+        # fallback `app/prompts/system/audio_tag_guidance.txt`); resolve it from
+        # prompt management — dashboard override wins, else the local .txt.
+        enhancement_instructions = None
+        if self.tts_client.supports_text_enhancement():
+            enhancement_instructions = (
+                load_template("system/audio_tag_guidance", backend_prompts) or None
+            )
 
         # Determine which current parameters to use
         # If explicitly passed, use that (None = use self._current_params, {} = fresh)

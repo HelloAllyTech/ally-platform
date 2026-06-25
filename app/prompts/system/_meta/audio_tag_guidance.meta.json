@@ -1,0 +1,8 @@
+{
+    "name": "Audio Tag Guidance",
+    "kind": "prompt",
+    "promptType": "audio_tag_guidance",
+    "hasStates": false,
+    "description": "Inline ElevenLabs v3 audio-tag guidance ([pause], [sighs], [empathetic], ...). Appended to the persona prompt by generate_response so tag-capable (v3) voices emit voice tags inline while streaming. No template variables.",
+    "availableVariables": []
+}
