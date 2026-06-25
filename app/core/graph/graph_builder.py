@@ -7,7 +7,9 @@ from app.core.graph.nodes import (
     clear_events_and_detected_data,
     detect_behaviors,
     generate_response,
+    process_deferred_events,
     process_events,
+    process_gating_events,
     resolve_branching_instruction,
     retrieve_knowledge,
     send_event_feedback,
@@ -123,7 +125,20 @@ def build_simulation_graph() -> StateGraph[SimulationState]:
     """
     # Build the main graph
     graph = StateGraph(SimulationState)
-    graph.add_node("process_events", process_events)
+    # EVENTS_OFF_GATE_DEFER_DETECTION splits event handling into a gating node
+    # (detects only reply-shaping events; gates the reply) and a deferred node
+    # (detects + scores + sends the rest, off the critical path). The flag-OFF
+    # path keeps the single process_events node — today's topology exactly.
+    events_node = (
+        "process_gating_events"
+        if settings.EVENTS_OFF_GATE_DEFER_DETECTION
+        else "process_events"
+    )
+    if settings.EVENTS_OFF_GATE_DEFER_DETECTION:
+        graph.add_node("process_gating_events", process_gating_events)
+        graph.add_node("process_deferred_events", process_deferred_events)
+    else:
+        graph.add_node("process_events", process_events)
 
     # Build the resolve_branching_instruction subgraph and add it as a node
     # This prevents its LLM outputs (for resolving branching tags) from being streamed
@@ -152,15 +167,25 @@ def build_simulation_graph() -> StateGraph[SimulationState]:
     # for contexts that don't need UI feedback (e.g. report generation).
     graph.add_node("send_event_feedback", send_event_feedback)
 
-    # START splits into three parallel paths
+    # START splits into parallel paths
     graph.add_edge(START, "detect_behaviors")
-    graph.add_edge(START, "process_events")
+    graph.add_edge(START, events_node)
     graph.add_edge(START, "retrieve_knowledge")
 
-    # process_events and retrieve_knowledge always gate the response (the reply
+    # The event node and retrieve_knowledge always gate the response (the reply
     # consumes branching instructions + retrieved_context).
-    graph.add_edge("process_events", "sync_events_and_behaviors_node")
+    graph.add_edge(events_node, "sync_events_and_behaviors_node")
     graph.add_edge("retrieve_knowledge", "sync_events_and_behaviors_node")
+
+    if settings.EVENTS_OFF_GATE_DEFER_DETECTION:
+        # Deferred (non-reply-shaping) event detection runs downstream of the gate
+        # node — so the single registry/cascade pass has completed and there is no
+        # concurrent registry mutation — but in PARALLEL with the spoken reply,
+        # joining only at send_event_feedback (the UI branch). The reply
+        # (generate_response → apply_voice_expressions) never waits on it. See
+        # EVENTS_OFF_GATE_DEFER_DETECTION.
+        graph.add_edge("process_gating_events", "process_deferred_events")
+        graph.add_edge("process_deferred_events", "send_event_feedback")
 
     if settings.BEHAVIORS_OFF_GATE:
         # Behaviors only drive scoring + UI feedback (not the reply text), so

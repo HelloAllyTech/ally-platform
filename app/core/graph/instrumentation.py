@@ -31,6 +31,10 @@ _NODE_METRIC_FIELDS = {
     # The three parallel fan-out branches — their node times let dashboards
     # answer "which branch held up the sync?" (the fan-in bottleneck).
     "process_events": "process_events_ms",
+    # Under EVENTS_OFF_GATE_DEFER_DETECTION the gating node replaces process_events
+    # on the critical path, so it carries the same on-gate breakdown metric.
+    # (process_deferred_events runs off-gate and is intentionally not mapped here.)
+    "process_gating_events": "process_events_ms",
     "detect_behaviors": "behaviors_ms",
 }
 
