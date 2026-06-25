@@ -156,6 +156,16 @@ class PromptData(BaseModel):
             "back to allowed filler words (see app/core/livekit/fillers.py)."
         ),
     )
+    history_trim_enabled: bool = Field(
+        default=False,
+        description=(
+            "Per-simulation toggle (Studio: historyTrimEnabled) to trim the "
+            "dialogue history sent to the main LLM to the last few exchanges, "
+            "bounding input tokens / latency as the conversation grows. Default "
+            "False (opt-in). The system prompt is never trimmed. See "
+            "settings.HISTORY_TRIM_* and app/core/graph/nodes.py."
+        ),
+    )
     selected_main_prompt_code: Optional[str] = Field(
         default=None,
         description=(
@@ -561,6 +571,9 @@ class Scenario(BaseModel):
                     else bool(prompt_data_dict.get("enableProsody"))
                 ),
                 "filler_enabled": bool(prompt_data_dict.get("fillerEnabled") or False),
+                "history_trim_enabled": bool(
+                    prompt_data_dict.get("historyTrimEnabled") or False
+                ),
                 "selected_main_prompt_code": prompt_data_dict.get(
                     "selectedMainPromptCode"
                 ),

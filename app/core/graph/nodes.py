@@ -950,6 +950,30 @@ async def detect_behaviors(
     return {"behavior_feedback_data": behavior_feedback}
 
 
+def _trim_history_to_last_dialogues(messages: list, max_dialogues: int) -> list:
+    """Keep only the last ``max_dialogues`` learner turns (and everything after
+    the earliest kept turn) of the dialogue history.
+
+    A "dialogue" is anchored on a HumanMessage (a learner turn). We slice from
+    the ``max_dialogues``-th-last HumanMessage so the window always starts on a
+    learner turn and includes its reply(ies). Older messages are dropped — the
+    persona/scenario/RAG context is NOT here (it's in the system prompt), so
+    nothing essential is lost; this only shortens the prompt to cut latency.
+
+    Returns ``messages`` unchanged when trimming is disabled (max_dialogues<=0)
+    or the conversation hasn't exceeded the window yet.
+    """
+    if max_dialogues <= 0:
+        return messages
+    human_indices = [
+        i for i, m in enumerate(messages) if isinstance(m, HumanMessage)
+    ]
+    if len(human_indices) <= max_dialogues:
+        return messages
+    start = human_indices[-max_dialogues]
+    return messages[start:]
+
+
 @instrumented_node("generate_response")
 async def generate_response(
     state: SimulationState, config: Optional[RunnableConfig] = None
@@ -1098,11 +1122,37 @@ async def generate_response(
             logger.warning(f"LLM config failed for {language_code}, using default: {e}")
             llm_client = create_llm_client(language_code=DEFAULT_LANGUAGE_CODE)
 
-    # Prepare the messages for the LLM call without mutating the state
+    # Prepare the messages for the LLM call without mutating the state. When the
+    # scenario opts in (Studio "Trim History" toggle) and the global kill-switch
+    # is on, send only the last N exchanges to bound input tokens / latency. The
+    # system prompt carries the persona/scenario/RAG context, so trimming only
+    # drops the literal wording of older turns.
+    history = state.messages
+    scenario_trim_on = bool(
+        getattr(getattr(scenario, "prompt_data", None), "history_trim_enabled", False)
+    )
+    if (
+        settings.HISTORY_TRIM_ENABLED
+        and scenario_trim_on
+        and settings.HISTORY_TRIM_DIALOGUES > 0
+    ):
+        trimmed = _trim_history_to_last_dialogues(
+            history, settings.HISTORY_TRIM_DIALOGUES
+        )
+        if len(trimmed) != len(history):
+            logger.info(
+                "[generate_response] history trimmed %d -> %d messages "
+                "(last %d dialogues)",
+                len(history),
+                len(trimmed),
+                settings.HISTORY_TRIM_DIALOGUES,
+            )
+        history = trimmed
+
     messages_to_send = []
     if system_message is not None:
         messages_to_send.append(system_message)
-    messages_to_send.extend(state.messages)
+    messages_to_send.extend(history)
 
     # Get LLM instance
     llm_instance = llm_client.llm_instance

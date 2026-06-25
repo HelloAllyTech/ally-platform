@@ -254,6 +254,28 @@ class Settings(BaseSettings):
         ),
     )
 
+    # ---- Conversation-history trimming (prompt shortening) ----
+    # Per-scenario opt-in via prompt_data.history_trim_enabled (Studio toggle
+    # "Trim History", default off). When on, only the last HISTORY_TRIM_DIALOGUES
+    # exchanges are sent to the main LLM, bounding input tokens / latency as the
+    # conversation grows. The system prompt (persona/scenario/RAG) is unaffected.
+    # This setting is the GLOBAL kill-switch.
+    HISTORY_TRIM_ENABLED: bool = Field(
+        default=True,
+        description=(
+            "Global kill-switch for conversation-history trimming. When False, "
+            "no trimming happens even if a scenario enables it. Per-scenario "
+            "opt-in is prompt_data.history_trim_enabled (Studio toggle)."
+        ),
+    )
+    HISTORY_TRIM_DIALOGUES: int = Field(
+        default=5,
+        description=(
+            "How many recent learner turns (and their replies) to keep verbatim "
+            "once the conversation grows beyond that. <=0 disables trimming."
+        ),
+    )
+
     LLM_TEMPERATURE: str = Field(...)
 
     GOOGLE_APPLICATION_CREDENTIALS: Optional[str] = Field(
