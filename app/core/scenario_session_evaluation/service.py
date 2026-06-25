@@ -1,0 +1,81 @@
+"""
+Orchestration for goal-based actor evaluation of a real session: run the LLM
+judge, then PATCH the result to ally-be's session-evaluation webhook.
+
+Mirrors the scenario-report service's fire-and-forget + webhook pattern, but
+evaluates an EXISTING transcript supplied by ally-be (no conversation is
+generated here).
+"""
+
+import httpx
+
+from app.core.config import settings
+from app.core.constants import ACTOR_EVALUATION_WEBHOOK_ENDPOINT
+from app.core.logger import get_logger
+from app.core.scenario_session_evaluation.evaluator import evaluate_actor_goals
+from app.core.scenario_session_evaluation.schemas import (
+    ActorEvaluationRequest,
+    ActorEvaluationWebhookPayload,
+)
+
+logger = get_logger(__name__)
+
+
+async def _send_webhook(
+    scenario_session_id: str, payload: ActorEvaluationWebhookPayload
+) -> None:
+    """PATCH the evaluation result to the core backend (best-effort)."""
+    url = (
+        f"{settings.CORE_SERVICE_BASE_URL}"
+        f"{ACTOR_EVALUATION_WEBHOOK_ENDPOINT}"
+        f"/{scenario_session_id}/evaluation"
+    )
+    logger.info(
+        "Sending actor-evaluation webhook to %s (status=%s)", url, payload.status
+    )
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.patch(
+                url,
+                json=payload.model_dump(),
+                headers={
+                    "Content-Type": "application/json",
+                    "x-api-key": settings.CORE_SERVICE_API_KEY,
+                },
+            )
+            resp.raise_for_status()
+            logger.info(
+                "Actor-evaluation webhook delivered (status=%d)", resp.status_code
+            )
+    except httpx.HTTPStatusError as e:
+        logger.error(
+            "Actor-evaluation webhook failed HTTP %d for session=%s: %s",
+            e.response.status_code,
+            scenario_session_id,
+            e.response.text,
+        )
+    except Exception:
+        logger.exception(
+            "Unexpected error sending actor-evaluation webhook for session=%s",
+            scenario_session_id,
+        )
+
+
+async def run_actor_evaluation(request: ActorEvaluationRequest) -> None:
+    """Evaluate the actor against the goals and webhook the result back."""
+    try:
+        result = await evaluate_actor_goals(request.transcript, request.goals)
+        payload = ActorEvaluationWebhookPayload(
+            status="COMPLETED",
+            metrics=result["metrics"],
+            report_markdown=result["report_markdown"],
+        )
+    except Exception as e:  # noqa: BLE001 — report the failure to ally-be
+        logger.exception(
+            "Actor evaluation failed for session=%s", request.scenario_session_id
+        )
+        payload = ActorEvaluationWebhookPayload(
+            status="FAILED", error_message=str(e)
+        )
+
+    await _send_webhook(request.scenario_session_id, payload)
