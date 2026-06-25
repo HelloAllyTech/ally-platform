@@ -396,6 +396,27 @@ class Settings(BaseSettings):
             "responseLatencyMs."
         ),
     )
+    EVENTS_OFF_GATE_DEFER_DETECTION: bool = Field(
+        default=False,
+        description=(
+            "Latency lever (Phase 3): run DETECTION of non-reply-shaping events "
+            "off the voice-to-voice critical path. The reply gates only on "
+            "detecting branching + guardrail + termination events, plus any event "
+            "referenced by a combination expression (deferring a combination "
+            "input could make the combination permanently miss). Everything else "
+            "(independent non-branching leaf classifiers) is detected, scored and "
+            "sent in a parallel node that joins at send_event_feedback — the LLM "
+            "no longer waits on those classifier calls. Splits the graph into "
+            "process_gating_events (gates) + process_deferred_events (off-gate). "
+            "TRADE-OFF: deferred events' scores land off-gate, so in scenarios "
+            "using score-based events or score-windowed combinations a branching "
+            "outcome can lag ONE turn (same class as BEHAVIORS_OFF_GATE). The "
+            "single registry/cascade pass still runs once on the gate; the "
+            "deferred path marks + scores + sends only its own events without "
+            "re-running combinations/cascade. No-op in report mode. Default "
+            "False; A/B and validate scoring before enabling."
+        ),
+    )
     BATCH_EVENT_CLASSIFIERS: bool = Field(
         default=False,
         description=(

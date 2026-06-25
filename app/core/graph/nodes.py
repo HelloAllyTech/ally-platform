@@ -483,13 +483,17 @@ async def _publish_done_thinking(room) -> None:
         logger.warning(f"Failed to publish done_thinking state: {e}")
 
 
-@instrumented_node("process_events")
-async def process_events(
-    state: SimulationState, config: Optional[RunnableConfig] = None
+async def _process_events_impl(
+    state: SimulationState,
+    config: Optional[RunnableConfig],
+    permitted_events: list,
 ) -> dict:
-    """
-    Process events, optimizing detection based on Time, Score, and Cooldown windows.
-    Collects branching_and_feedback_data for later processing.
+    """Shared event-processing pass over ``permitted_events``.
+
+    Backs both process_events (all events) and process_gating_events (the gating
+    subset, for EVENTS_OFF_GATE_DEFER_DETECTION). Kept as a plain helper (not a
+    graph node) so callers can pass an event subset without routing kwargs
+    through the instrumentation decorator.
 
     NOTE: orchestrate_events processes ALL events in registry where happened=True,
     not just the ones we pass. This means we cannot safely call it multiple times
@@ -535,10 +539,10 @@ async def process_events(
                 _prepare_event_context(state, config)
             )
 
-        # 2. Detect events in parallel
+        # 2. Detect events in parallel (over the given permitted subset)
         with timing.operation("Event detection"):
             detected_events, new_events = await _detect_events(
-                state.permitted_events,
+                permitted_events,
                 chat_messages,
                 elapsed_time,
                 live_score,
@@ -547,11 +551,9 @@ async def process_events(
 
         # 3. Orchestrate and split events
         # (all events together to avoid duplicate processing)
-        # CRITICAL: orchestrate_events has side effects:
-        # - Sends events to Core (SQS) via _send_events_to_core
-        # - Updates live_score via _update_live_score
-        # - Handles termination callbacks via _handle_termination_events
-        # All of these happen inside orchestrate_events, so they're preserved.
+        # NOTE: orchestrate_events makes NO LLM calls — it updates the event
+        # registry, commits scores, sends events to Core (SQS), and handles
+        # termination. The on-gate cost is the SQS round-trip + ScoreKeeper lock.
         additional_score = 0
         branching_and_feedback_data = []
         non_branching_feedback_data = []
@@ -588,6 +590,95 @@ async def process_events(
         timing.log_summary()
 
         return result
+
+
+@instrumented_node("process_events")
+async def process_events(
+    state: SimulationState, config: Optional[RunnableConfig] = None
+) -> dict:
+    """
+    Process events, optimizing detection based on Time, Score, and Cooldown windows.
+    Collects branching_and_feedback_data for later processing. Detects over the
+    full permitted-events set (the default graph topology).
+    """
+    return await _process_events_impl(state, config, state.permitted_events)
+
+
+@instrumented_node("process_gating_events")
+async def process_gating_events(
+    state: SimulationState, config: Optional[RunnableConfig] = None
+) -> dict:
+    """Gate-path event processing for EVENTS_OFF_GATE_DEFER_DETECTION.
+
+    Runs the full pass (detection + the single registry/cascade/combination pass
+    + scoring + termination) but over ONLY the gating subset: branching,
+    guardrail, termination, and combination-referenced events. The reply gates on
+    this node; the remaining independent non-branching events are detected off the
+    gate in process_deferred_events.
+    """
+    orchestrator = (
+        config["configurable"].get("event_orchestrator")
+        if config and "configurable" in config
+        else None
+    )
+    deferrable = (
+        orchestrator.deferrable_detection_event_ids
+        if orchestrator is not None
+        else set()
+    )
+    gate_permitted = [e for e in state.permitted_events if e.event_id not in deferrable]
+    return await _process_events_impl(state, config, gate_permitted)
+
+
+@instrumented_node("process_deferred_events")
+async def process_deferred_events(
+    state: SimulationState, config: Optional[RunnableConfig] = None
+) -> dict:
+    """Off-gate detection + processing for non-reply-shaping events.
+
+    Runs in parallel with the spoken reply (downstream of process_gating_events,
+    joining at send_event_feedback). Detects ONLY the deferrable leaf events and
+    scores/sends them via orchestrator.orchestrate_deferred_events — without
+    re-running the registry/cascade/combination pass. The LLM never waits on
+    these classifier calls. See EVENTS_OFF_GATE_DEFER_DETECTION.
+    """
+    # Pause gate (mirror process_events): do nothing while paused.
+    if config and "configurable" in config:
+        _clock = config["configurable"].get("session_clock")
+        if _clock is not None and _clock.is_paused:
+            return {}
+
+    orchestrator = (
+        config["configurable"].get("event_orchestrator")
+        if config and "configurable" in config
+        else None
+    )
+    if orchestrator is None:
+        return {}
+
+    deferrable = orchestrator.deferrable_detection_event_ids
+    if not deferrable:
+        return {}
+
+    deferred_permitted = [e for e in state.permitted_events if e.event_id in deferrable]
+    if not deferred_permitted:
+        return {}
+
+    chat_messages, elapsed_time, live_score, orchestrator, room = (
+        _prepare_event_context(state, config)
+    )
+
+    _, new_events = await _detect_events(
+        deferred_permitted, chat_messages, elapsed_time, live_score, orchestrator
+    )
+    detected_ids = {e.event_id for e in new_events}
+    if not detected_ids:
+        return {}
+
+    feedback = await orchestrator.orchestrate_deferred_events(detected_ids, room)
+    if feedback:
+        return {"non_branching_feedback_data": feedback}
+    return {}
 
 
 @instrumented_node("resolve_branching_instruction")

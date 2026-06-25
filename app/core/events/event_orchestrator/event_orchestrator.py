@@ -108,6 +108,18 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
             for event in self.events
             if event.detection_type == DetectionType.SCORE
         ]
+        # ---- EVENTS_OFF_GATE_DEFER_DETECTION partition (config-time) ----
+        self.deferrable_detection_event_ids: Set[str] = (
+            self._compute_deferrable_detection_event_ids(
+                self.events, self.termination_event_ids
+            )
+        )
+        if self.deferrable_detection_event_ids:
+            logger.debug(
+                "EVENTS_OFF_GATE_DEFER_DETECTION: %d deferrable leaf event(s): %s",
+                len(self.deferrable_detection_event_ids),
+                sorted(self.deferrable_detection_event_ids),
+            )
         self.agent_joined_at = datetime.now(timezone.utc)
         # Track deferred termination events that should be sent only after
         # shutdown. This prevents the backend from closing the room before
@@ -629,6 +641,160 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
             additional_score,
             branching_and_feedback_data,
         )
+
+    @staticmethod
+    def _compute_deferrable_detection_event_ids(
+        events: List[BaseEvent], termination_event_ids: Set[str]
+    ) -> Set[str]:
+        """Config-time partition: leaf events whose DETECTION may be deferred.
+
+        Deferrable = classifier/similarity leaves that are NOT branching, NOT
+        termination, and NOT referenced by any combination expression.
+        Combination-referenced leaves MUST gate: deferring a combination input
+        could make the combination permanently miss (its inputs would never be
+        ``happened`` in the same turn), not merely lag a turn. Branching/guardrail
+        (guardrails carry a branching instruction) and termination always shape
+        the reply, so they gate too.
+        """
+        combination_referenced_ids: Set[str] = set()
+        for e in events:
+            if e.detection_type == DetectionType.COMBINATION:
+                expr = getattr(getattr(e, "data", None), "expression", None)
+                if expr is not None:
+                    combination_referenced_ids |= extract_event_ids_from_expression(
+                        expr
+                    )
+        deferrable_types = {
+            DetectionType.BINARY_CLASSIFIER,
+            DetectionType.SENTENCE_SIMILARITY,
+            DetectionType.SEMANTIC_SIMILARITY,
+            DetectionType.HELPER_INTERRUPTED,
+            DetectionType.HELPER_PARAPHRASED,
+        }
+        return {
+            e.event_id
+            for e in events
+            if e.branching_instruction is None
+            and e.event_id not in termination_event_ids
+            and e.event_id not in combination_referenced_ids
+            and e.detection_type in deferrable_types
+        }
+
+    def _mark_deferred_leaf_detections(self, detected_event_ids: Set[str]) -> None:
+        """Mark detected deferred leaf events ``happened`` (occurrence-interval aware).
+
+        Mirrors the per-event marking in ``update()`` (the detected_event_ids
+        loop) but does NOT evaluate combination expressions or run cascade scoring
+        — deferred events are referenced by no combination, so combinations and
+        cascade were already evaluated correctly on the gate. Used only by
+        ``orchestrate_deferred_events`` (EVENTS_OFF_GATE_DEFER_DETECTION).
+        """
+        for event_id in detected_event_ids:
+            mapped_event = self._event_map.get(event_id)
+            interval = (
+                int(mapped_event.detection_config.occurrence_interval)
+                if (
+                    mapped_event
+                    and mapped_event.detection_config
+                    and mapped_event.detection_config.occurrence_interval is not None
+                )
+                else None
+            )
+            if interval is not None:
+                if event_id not in self.event_registry:
+                    self.set_event_state(event_id, False)
+                self.event_registry[event_id].detection_count += 1
+                current_count = self.event_registry[event_id].detection_count
+                if current_count % interval == 0:
+                    self.set_event_state(event_id, True)
+                else:
+                    self.event_registry[event_id].happened = False
+            else:
+                self.set_event_state(event_id, True)
+
+    def _filter_deferred_events_to_send(
+        self, successful_events: List[BaseEvent], detected_event_ids: Set[str]
+    ) -> List[BaseEvent]:
+        """Filter deferred happened events for sending (trigger_multiple + dedup).
+
+        Mirrors the trigger_events / trigger_multiple / _sent_events filtering in
+        ``_update_registry_and_collect_event_data``, minus termination handling
+        (deferred events are never termination events by construction).
+        """
+        events_to_process: List[BaseEvent] = []
+        for event in successful_events:
+            if (
+                self.trigger_events is not None
+                and event.event_id not in self.trigger_events
+            ):
+                continue
+            event_data = self.event_registry.get(event.event_id)
+            if event_data is None:
+                continue
+            trigger_multiple = event_data.trigger_multiple
+            if trigger_multiple is None:
+                trigger_multiple = event.detection_type in (
+                    DetectionType.SENTENCE_SIMILARITY,
+                    DetectionType.SEMANTIC_SIMILARITY,
+                    DetectionType.BINARY_CLASSIFIER,
+                    DetectionType.HELPER_INTERRUPTED,
+                    DetectionType.HELPER_PARAPHRASED,
+                    DetectionType.GUARDRAIL,
+                )
+            if trigger_multiple and event.event_id in detected_event_ids:
+                events_to_process.append(event)
+                self._sent_events.add(event.event_id)
+            elif event.event_id not in self._sent_events:
+                events_to_process.append(event)
+                self._sent_events.add(event.event_id)
+        return events_to_process
+
+    async def orchestrate_deferred_events(
+        self,
+        detected_event_ids: Set[str],
+        room: Optional[rtc.Room] = None,
+    ) -> List["BranchingAndFeedbackData"]:
+        """Off-gate processing for deferred (non-reply-shaping) events.
+
+        Marks the detected deferred leaf events, filters them for sending, sends
+        them to Core, and commits their scores — WITHOUT re-running combination
+        evaluation, cascade scoring, or get_happened_events (those ran once on the
+        gate). Safe because deferred events are non-branching, non-termination,
+        and referenced by no combination (see ``deferrable_detection_event_ids``),
+        so they cannot change the on-gate registry/cascade/combination result.
+
+        Returns the collected (non-branching) feedback data for graph state.
+        Used only by EVENTS_OFF_GATE_DEFER_DETECTION.
+        """
+        if not detected_event_ids:
+            return []
+
+        # Mark detected deferred leaves happened (no combination/cascade eval).
+        self._mark_deferred_leaf_detections(detected_event_ids)
+
+        happened_deferred: List[BaseEvent] = []
+        for eid in detected_event_ids:
+            entry = self.event_registry.get(eid)
+            mapped = self._event_map.get(eid)
+            if entry is not None and entry.happened and mapped is not None:
+                happened_deferred.append(mapped)
+
+        events_to_process = self._filter_deferred_events_to_send(
+            happened_deferred, set(detected_event_ids)
+        )
+
+        feedback = self._collect_branching_and_feedback_data(events_to_process)
+
+        # Send to Core off the gate (skipped in report mode, like the main pass).
+        if not self.is_report_mode:
+            await self._send_events_to_core(events_to_process, room)
+
+        # Commit deferred scores. Off the gate by construction, so this turn's
+        # reply may not see them (the accepted EVENTS_OFF_GATE_DEFER_DETECTION
+        # race); they still land before finalize via the shutdown drain.
+        await self._update_event_score(events_to_process)
+
+        return feedback
 
     def get_event_state(self, event_id: str) -> bool:
         """
