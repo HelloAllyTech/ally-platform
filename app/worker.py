@@ -920,8 +920,13 @@ class AgentWorker:
                 synthesize_comfort_clip,
             )
 
-            if not is_comfort_audio_enabled():
-                logger.info("[COMFORT] disabled (COMFORT_AUDIO_ENABLED=False)")
+            if not is_comfort_audio_enabled(self.scenario):
+                _pd = getattr(self.scenario, "prompt_data", None)
+                logger.info(
+                    "[COMFORT] disabled (global_enabled=%s comfort_audio_enabled=%s)",
+                    getattr(settings, "COMFORT_AUDIO_ENABLED", None),
+                    getattr(_pd, "comfort_audio_enabled", None),
+                )
                 return None
 
             path = synthesize_comfort_clip()
@@ -1242,9 +1247,10 @@ class AgentWorker:
                 is_backchannel_enabled,
             )
 
-            if not is_backchannel_enabled():
+            if not is_backchannel_enabled(self.scenario):
                 logger.info(
-                    "[BACKCHANNEL] disabled (BACKCHANNEL_GLOBALLY_ENABLED=False)"
+                    "[BACKCHANNEL] disabled (global kill-switch off or "
+                    "per-simulation continuous_backchanneling off)"
                 )
                 return False
 

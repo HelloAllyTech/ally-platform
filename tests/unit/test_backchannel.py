@@ -9,17 +9,35 @@ from app.core.livekit import backchannel
 
 
 class TestIsBackchannelEnabled:
-    """Gate driven by the single global flag."""
+    """Gated by the global kill-switch AND the per-simulation toggle."""
+
+    @staticmethod
+    def _scenario(continuous_backchanneling):
+        return SimpleNamespace(
+            prompt_data=SimpleNamespace(
+                continuous_backchanneling=continuous_backchanneling
+            )
+        )
 
     @pytest.mark.unit
-    def test_enabled_by_default(self, monkeypatch):
+    def test_enabled_when_global_and_per_sim_on(self, monkeypatch):
         monkeypatch.setattr(backchannel.settings, "BACKCHANNEL_GLOBALLY_ENABLED", True)
-        assert backchannel.is_backchannel_enabled() is True
+        assert backchannel.is_backchannel_enabled(self._scenario(True)) is True
 
     @pytest.mark.unit
-    def test_disabled_when_flag_off(self, monkeypatch):
+    def test_disabled_by_default_per_sim_off(self, monkeypatch):
+        monkeypatch.setattr(backchannel.settings, "BACKCHANNEL_GLOBALLY_ENABLED", True)
+        assert backchannel.is_backchannel_enabled(self._scenario(False)) is False
+
+    @pytest.mark.unit
+    def test_disabled_when_global_flag_off(self, monkeypatch):
         monkeypatch.setattr(backchannel.settings, "BACKCHANNEL_GLOBALLY_ENABLED", False)
-        assert backchannel.is_backchannel_enabled() is False
+        assert backchannel.is_backchannel_enabled(self._scenario(True)) is False
+
+    @pytest.mark.unit
+    def test_disabled_when_prompt_data_missing(self, monkeypatch):
+        monkeypatch.setattr(backchannel.settings, "BACKCHANNEL_GLOBALLY_ENABLED", True)
+        assert backchannel.is_backchannel_enabled(SimpleNamespace()) is False
 
 
 def _make_scenario(language_code="hi-IN", language_label="Hindi"):

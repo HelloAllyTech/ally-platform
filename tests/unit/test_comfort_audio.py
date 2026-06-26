@@ -2,24 +2,49 @@
 
 import os
 import wave
+from types import SimpleNamespace
 
 import pytest
 
 from app.core.livekit import comfort_audio
 
 
+def _scenario(comfort_audio_enabled):
+    """A minimal scenario stub exposing prompt_data.comfort_audio_enabled."""
+    return SimpleNamespace(
+        prompt_data=SimpleNamespace(comfort_audio_enabled=comfort_audio_enabled)
+    )
+
+
 class TestIsComfortAudioEnabled:
-    """Gate driven by the single global flag."""
+    """Two gates: the global kill-switch AND the per-simulation opt-in."""
 
     @pytest.mark.unit
-    def test_enabled_by_default(self, monkeypatch):
+    def test_enabled_when_both_on(self, monkeypatch):
         monkeypatch.setattr(comfort_audio.settings, "COMFORT_AUDIO_ENABLED", True)
-        assert comfort_audio.is_comfort_audio_enabled() is True
+        assert comfort_audio.is_comfort_audio_enabled(_scenario(True)) is True
 
     @pytest.mark.unit
-    def test_disabled_when_flag_off(self, monkeypatch):
+    def test_disabled_by_default_when_scenario_opt_out(self, monkeypatch):
+        """Global on but the per-sim opt-in is off (the default) → no tone."""
+        monkeypatch.setattr(comfort_audio.settings, "COMFORT_AUDIO_ENABLED", True)
+        assert comfort_audio.is_comfort_audio_enabled(_scenario(False)) is False
+
+    @pytest.mark.unit
+    def test_disabled_when_global_off(self, monkeypatch):
+        """Global kill-switch wins even when the per-sim toggle is on."""
         monkeypatch.setattr(comfort_audio.settings, "COMFORT_AUDIO_ENABLED", False)
-        assert comfort_audio.is_comfort_audio_enabled() is False
+        assert comfort_audio.is_comfort_audio_enabled(_scenario(True)) is False
+
+    @pytest.mark.unit
+    def test_disabled_when_no_scenario(self, monkeypatch):
+        monkeypatch.setattr(comfort_audio.settings, "COMFORT_AUDIO_ENABLED", True)
+        assert comfort_audio.is_comfort_audio_enabled(None) is False
+
+    @pytest.mark.unit
+    def test_disabled_when_no_prompt_data(self, monkeypatch):
+        monkeypatch.setattr(comfort_audio.settings, "COMFORT_AUDIO_ENABLED", True)
+        assert comfort_audio.is_comfort_audio_enabled(SimpleNamespace()) is False
 
 
 class TestSynthesizeComfortClip:

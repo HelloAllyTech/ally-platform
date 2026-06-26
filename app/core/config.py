@@ -259,14 +259,20 @@ class Settings(BaseSettings):
     # background-audio track for the whole session, so the dead-silent gap before
     # a reply never sounds "muted"/"disconnected" (telephony comfort noise). Like
     # the filler this does NOT change the measured response_latency_ms — it only
-    # masks the perceived gap. This is a GLOBAL flag (default on) with an off
-    # switch; there is no per-scenario opt-in (it's a baseline comfort).
+    # masks the perceived gap. This GLOBAL flag (default on) is a kill-switch
+    # that GATES a per-simulation opt-in (PromptData.comfort_audio_enabled,
+    # Studio: comfortAudioEnabled, default off): both must be on for the tone to
+    # play, so comfort audio is off for every scenario unless an author enables
+    # it. Set this False to force it off everywhere regardless of the per-sim
+    # toggle.
     COMFORT_AUDIO_ENABLED: bool = Field(
         default=True,
         description=(
-            "Global flag for the comfort-audio room tone. When True (default) a "
-            "faint ambient tone loops on the background-audio track so the line "
-            "never sounds dead between turns. Set False to disable everywhere."
+            "Global kill-switch for the comfort-audio room tone. Default True: "
+            "the tone plays for a session only when this is on AND that "
+            "simulation has comfortAudioEnabled set (per-sim opt-in, default "
+            "off). Set False to disable everywhere regardless of the per-sim "
+            "toggle."
         ),
     )
     COMFORT_AUDIO_VOLUME: float = Field(
