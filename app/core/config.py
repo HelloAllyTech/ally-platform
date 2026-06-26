@@ -277,6 +277,73 @@ class Settings(BaseSettings):
         ),
     )
 
+    # ---- Continuous back-channeling (listener affirmations) ----
+    # Naturalness lever: while the LEARNER is still speaking on a long turn, emit
+    # brief listener affirmations ("mm-hmm", a soft "yeah") on the background
+    # track — the human "I'm listening, go on" signal, distinct from the
+    # post-turn thinking-filler. Driven off the user-speaking state and kept
+    # sparse (long-utterance gate + randomized gap + probability) so it never
+    # interrupts. Language-correct phrases are LLM-generated once at session
+    # start from the editable filler/backchannel prompt. GLOBAL flag (default on)
+    # with an off switch; no per-scenario opt-in (a baseline listening signal).
+    BACKCHANNEL_GLOBALLY_ENABLED: bool = Field(
+        default=True,
+        description=(
+            "Global kill-switch for continuous back-channeling during the "
+            "learner's turn. When True (default) brief 'mm-hmm'-style "
+            "affirmations play sparsely on the background track while the "
+            "learner speaks. Set False to disable everywhere."
+        ),
+    )
+    BACKCHANNEL_COUNT: int = Field(
+        default=6,
+        description=(
+            "How many short back-channel phrases to generate at session start "
+            "(the loop picks among them, avoiding back-to-back repeats)."
+        ),
+    )
+    # Long-utterance gate: only back-channel once the learner has held the floor
+    # this long. Short turns get nothing (a 'mm-hmm' over a one-liner is noise).
+    BACKCHANNEL_MIN_UTTERANCE_MS: float = Field(
+        default=4000.0,
+        description=(
+            "How long (ms) the learner must speak continuously before any "
+            "back-channel may play. If they stop first, none plays."
+        ),
+    )
+    # Spacing between consecutive back-channels, randomized per emission so the
+    # rhythm doesn't feel mechanical. Kept wide to stay sparse.
+    BACKCHANNEL_MIN_GAP_MS: float = Field(
+        default=3500.0,
+        description=(
+            "Lower bound (ms) of the randomized wait between back-channels while "
+            "the learner keeps speaking."
+        ),
+    )
+    BACKCHANNEL_MAX_GAP_MS: float = Field(
+        default=7000.0,
+        description=(
+            "Upper bound (ms) of the randomized back-channel gap. A value is "
+            "picked uniformly in [BACKCHANNEL_MIN_GAP_MS, BACKCHANNEL_MAX_GAP_MS]."
+        ),
+    )
+    # Even when a back-channel is due, only emit this fraction of the time so the
+    # signal stays sparse and natural. 1.0 = every gap; 0.0 = never.
+    BACKCHANNEL_PLAY_PROBABILITY: float = Field(
+        default=0.5,
+        description=(
+            "Probability (0-1) of emitting a back-channel when one is due. "
+            "Lower keeps it sparser so it never feels like an interruption."
+        ),
+    )
+    BACKCHANNEL_VOLUME: float = Field(
+        default=0.6,
+        description=(
+            "Playback volume (0-1) of back-channel affirmations. Kept below full "
+            "so they sit softly under the learner's voice as a listening signal."
+        ),
+    )
+
     # ---- Conversation-history trimming (prompt shortening) ----
     # Per-scenario opt-in via prompt_data.history_trim_enabled (Studio toggle
     # "Trim History", default off). When on, only the last HISTORY_TRIM_DIALOGUES
