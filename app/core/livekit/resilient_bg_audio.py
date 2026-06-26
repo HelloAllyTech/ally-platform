@@ -9,19 +9,23 @@ Comfort audio, the thinking-filler and the back-channel all ride ONE LiveKit
         async for frame in self._audio_mixer:
             await self._audio_source.capture_frame(frame)
 
-so a SINGLE transient ``capture_frame`` error (e.g. surfaced around a LiveKit
-reconnect) propagates out, ``@log_exceptions`` re-raises, the pump coroutine
-terminates — and nothing ever restarts it. ``_on_reconnected`` only republishes
-the track from the same source; it never re-arms the mixer task or the ambient
-sound. The result is the reported bug: comfort audio (plus filler + back-channel)
-goes permanently silent partway through a session while the agent's own voice —
-on a SEPARATE ``AgentSession`` track — keeps working.
+so a transient ``capture_frame`` error (e.g. surfaced around a LiveKit reconnect)
+propagates out, ``@log_exceptions`` re-raises, the pump coroutine terminates —
+and nothing ever restarts it (``_on_reconnected`` only republishes the track
+from the same source). That would silence comfort + filler + back-channel for
+the rest of the session while the agent's own voice — on a SEPARATE
+``AgentSession`` track — keeps working.
 
 This subclass overrides only the pump so a per-frame capture error is logged and
 SKIPPED instead of killing the session-long loop. The happy path is unchanged
-(every frame is still captured); we only refuse to let one bad frame end the
-track. The ``async for`` over the mixer still ends normally on
-``aclose()``/``StopAsyncIteration``, so shutdown is unaffected.
+(every frame is still captured); the ``async for`` over the mixer still ends
+normally on ``aclose()``/``StopAsyncIteration``, so shutdown is unaffected.
+
+NOTE: this is defense-in-depth for the capture_frame failure mode, which is
+distinct from the "comfort stops the first time a filler plays" bug — that one
+is caused by the mixer timing-out and DROPPING the file-backed ambient stream,
+and is fixed by feeding an in-memory ambient loop instead (see
+``comfort_audio.comfort_ambient_source``). This guard does not address that path.
 """
 
 from __future__ import annotations
