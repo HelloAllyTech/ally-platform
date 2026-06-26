@@ -121,6 +121,7 @@ export const API_ROUTES = {
     CALL_DETAILS: (chatId: number) => `/chats/${chatId}/call-details`,
     EXPORT_SUMMARY: (chatId: number) => `/chats/${chatId}/export-summary`,
     CALL_INFO: (chatId: number) => `/chats/${chatId}/call-info`,
+    RETRY_SUMMARY: (chatId: number) => `/chats/${chatId}/retry-summary`,
     SUMMARY_FEEDBACK: (chatId: number) => `/chats/${chatId}/summary-feedback`,
     ENHANCE: '/chats/enhance',
     CALL_LOGS: '/chats/call-logs',

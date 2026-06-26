@@ -261,6 +261,17 @@ export const callSummaryApi = api.injectEndpoints({
         },
       }),
     }),
+    // Regenerate the summary for a session whose transcript was saved but whose
+    // summary failed (mirrors the web "Retry summary" action). The backend also
+    // re-transcribes from the stored audio when no transcript exists.
+    retrySummary: builder.mutation<{success: boolean; message: string}, number>(
+      {
+        query: chatId => ({
+          url: API_ROUTES.CHATS.RETRY_SUMMARY(chatId),
+          method: API_METHODS.POST,
+        }),
+      },
+    ),
   }),
 });
 
@@ -272,4 +283,5 @@ export const {
   useEnhanceCallSummaryMutation,
   useGetTagsMutation,
   useAddSummaryFeedbackMutation,
+  useRetrySummaryMutation,
 } = callSummaryApi;

@@ -1190,6 +1190,8 @@
     "notesTooltip": "Your notes are saved automatically and will appear under “Additional Notes” after the summary is created.",
     "notesPlaceholder": "write down your thoughts",
     "summaryFeedbackSubmittedFailed": "Failed to submit summary feedback",
+    "retryStarted": "Regenerating summary…",
+    "retryFailed": "Couldn't retry the summary. Please try again.",
     "processing": {
       "generatingTranscription": "Generating transcription",
       "deletingAudio": "Deleting audio",

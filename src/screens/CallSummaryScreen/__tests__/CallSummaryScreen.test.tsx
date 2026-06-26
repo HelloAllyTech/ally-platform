@@ -84,6 +84,10 @@ jest.mock('@/services', () => ({
   useLazyGetScribeThreadsQuery: () => [jest.fn(), {data: undefined}],
 }));
 
+jest.mock('@/services/callSummaryApi', () => ({
+  useRetrySummaryMutation: () => [jest.fn(), {isLoading: false}],
+}));
+
 jest.mock('@/services/scribeReactionsApi', () => ({
   useLazyGetScribeReactionsCountQuery: () => [jest.fn(), {data: undefined}],
 }));
