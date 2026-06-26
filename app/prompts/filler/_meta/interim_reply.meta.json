@@ -1,0 +1,5 @@
+{
+    "name": "Interim Reply Prompt",
+    "kind": "prompt",
+    "description": "System prompt for the predictive interim reply. While the learner is still speaking on a long turn, a fast model uses the partial transcript to draft one short, non-committal holding reply that the character speaks the instant the learner stops — masking the real reply's latency, then cut when the real reply begins. Editable under System Skills. Variables: {scenario_context}, {language_label}, {language_code}."
+}
