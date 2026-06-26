@@ -182,6 +182,21 @@ class PromptData(BaseModel):
             "See app/core/livekit/backchannel.py."
         ),
     )
+    interim_reply_enabled: bool = Field(
+        default=False,
+        description=(
+            "Per-simulation toggle (Studio: interimReplyEnabled) for the "
+            "predictive interim reply — while the learner is still speaking on a "
+            "long turn, a fast dedicated model generates a short, non-committal "
+            "holding reply from the partial transcript; it is pre-synthesized and "
+            "played at the VAD endpoint to mask the real reply's latency, then cut "
+            "when the real reply begins. Unlike the filler, the interim IS recorded "
+            "as a CLIENT transcript line; the real reply is generated independently. "
+            "Default False (opt-in). Gated by settings.INTERIM_REPLY_GLOBALLY_ENABLED "
+            "(a global kill-switch): both must be on. See "
+            "app/core/livekit/interim_reply.py."
+        ),
+    )
     history_trim_enabled: bool = Field(
         default=False,
         description=(
@@ -602,6 +617,9 @@ class Scenario(BaseModel):
                 ),
                 "continuous_backchanneling": bool(
                     prompt_data_dict.get("continuousBackchanneling") or False
+                ),
+                "interim_reply_enabled": bool(
+                    prompt_data_dict.get("interimReplyEnabled") or False
                 ),
                 "history_trim_enabled": bool(
                     prompt_data_dict.get("historyTrimEnabled") or False

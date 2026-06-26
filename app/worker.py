@@ -264,6 +264,34 @@ class AgentWorker:
         # (kept separate from the filler's list — different phrase pools).
         self._recent_backchannel_phrases: list[str] = []
 
+        # Predictive interim reply: while the learner is still speaking on a long
+        # turn, a fast DEDICATED model (separate from the main reply LLM) turns
+        # the partial transcript into a short, non-committal holding reply; it is
+        # pre-synthesized and played on the SAME background track at the VAD
+        # endpoint (after the thinking-filler) to mask the real reply's latency,
+        # then cut the instant the real reply speaks. The real reply is generated
+        # independently and never sees the interim. See
+        # app/core/livekit/interim_reply.py.
+        self._interim_enabled: bool = False
+        self._interim_llm_client = None
+        # Per-turn state machine: idle -> generating -> ready -> playing -> done.
+        self._interim_state: str = "idle"
+        self._interim_armed: bool = False  # generation kicked off this turn
+        # Partial transcript accumulation for the current learner turn (finalized
+        # STT segments + the latest in-progress interim segment).
+        self._interim_final_segments: list[str] = []
+        self._interim_current_interim: str = ""
+        self._interim_partial_text: str = ""
+        # Monotonic timestamp of when the learner started this turn — drives the
+        # "spoken >= TRIGGER_MS" gate, independent of any event clock base.
+        self._user_turn_start_monotonic: Optional[float] = None
+        self._interim_gen_task: Optional[asyncio.Task] = None
+        self._interim_play_task: Optional[asyncio.Task] = None
+        self._interim_clip: Optional[tuple[str, str]] = None  # (text, wav_path)
+        self._interim_handle = None
+        # All interim WAVs synthesized this session, deleted on shutdown.
+        self._interim_clip_paths: list[str] = []
+
         # ========== Termination Handling (for entrypoint context) ==========
         # Use asyncio.Event to signal termination from graph context
         # to entrypoint context
@@ -572,6 +600,13 @@ class AgentWorker:
             if self._backchannel_task is not None and not self._backchannel_task.done():
                 self._backchannel_task.cancel()
             self._backchannel_task = None
+            # Stop interim-reply generation/playback so neither runs after teardown.
+            if self._interim_gen_task is not None and not self._interim_gen_task.done():
+                self._interim_gen_task.cancel()
+            self._interim_gen_task = None
+            if self._interim_play_task is not None and not self._interim_play_task.done():
+                self._interim_play_task.cancel()
+            self._interim_play_task = None
             # Tear down the background-audio track (comfort tone + filler +
             # back-channel) and delete its temp clips.
             if self._bg_audio is not None:
@@ -600,6 +635,14 @@ class AgentWorker:
                 except Exception:  # noqa: BLE001
                     pass
                 self._backchannel_clips = []
+            if self._interim_clip_paths:
+                try:
+                    from app.core.livekit.filler_audio import cleanup_clips
+
+                    cleanup_clips(self._interim_clip_paths)
+                except Exception:  # noqa: BLE001
+                    pass
+                self._interim_clip_paths = []
             if self._comfort_clip_path is not None:
                 try:
                     from app.core.livekit.comfort_audio import cleanup_clip
@@ -708,6 +751,11 @@ class AgentWorker:
         # includes the whole paused wall-clock — a garbage outlier in the
         # latency analytics. (Counter preserved so turn_index stays unique.)
         turn_metrics.discard_inflight(self.ctx.room.name)
+
+        # Abandon any in-flight interim reply: a clip generated before the pause
+        # would be stale across the paused wall-clock gap. It re-arms naturally
+        # on the next learner turn after resume.
+        self._interim_reset_turn()
 
         # Enforce the max continuous pause (auto-end).
         self._arm_pause_cap_timer()
@@ -1015,8 +1063,21 @@ class AgentWorker:
             # long turn (see _on_backchannel_user_state). Global flag, default on.
             backchannel_on = await self._resolve_backchannel_clips()
 
+            # ---- Predictive interim reply ----
+            # Resolved before the player gate so an interim-only session still
+            # publishes the background track. Handlers are registered after the
+            # player starts (below).
+            from app.core.livekit.interim_reply import is_interim_reply_enabled
+
+            self._interim_enabled = is_interim_reply_enabled(self.scenario)
+
             # Nothing to play on any layer — don't publish a track.
-            if comfort_source is None and not filler_on and not backchannel_on:
+            if (
+                comfort_source is None
+                and not filler_on
+                and not backchannel_on
+                and not self._interim_enabled
+            ):
                 return
 
             from app.core.livekit.resilient_bg_audio import (
@@ -1054,6 +1115,12 @@ class AgentWorker:
                     "[BACKCHANNEL] enabled (%d clip(s)) — driven off user-speaking",
                     len(self._backchannel_clips),
                 )
+
+            # Interim reply: build the dedicated fast LLM client and register its
+            # handlers. Independent of the filler gate (it has its own), so wire
+            # it before the filler-only early return below.
+            if self._interim_enabled:
+                self._setup_interim_reply()
 
             if not filler_on:
                 # No thinking-filler: the comfort tone needs no per-turn driver,
@@ -1398,6 +1465,363 @@ class AgentWorker:
             pass
         except Exception as e:  # noqa: BLE001 - back-channel must never break a session
             logger.warning("[BACKCHANNEL] loop error: %s", e)
+
+    # ================================================================
+    # Predictive interim reply (latency mask)
+    # ================================================================
+
+    def _setup_interim_reply(self) -> None:
+        """Build the dedicated fast LLM client and register interim handlers.
+
+        Best-effort: on any failure the interim feature is disabled for the
+        session and the rest of the background audio is unaffected. Called from
+        _setup_background_audio after the player starts, only when interim is
+        enabled for this session.
+        """
+        try:
+            from app.llms.factory import create_llm_client
+
+            language_code = (
+                getattr(
+                    getattr(self.scenario, "language_config", None),
+                    "language_code",
+                    None,
+                )
+                or "en-US"
+            )
+            self._interim_llm_client = create_llm_client(
+                llm_config={
+                    "provider": getattr(
+                        settings, "INTERIM_REPLY_MODEL_PROVIDER", "openai"
+                    ),
+                    "config": {
+                        "model": getattr(settings, "INTERIM_REPLY_MODEL", "gpt-4o-mini")
+                    },
+                },
+                language_code=language_code,
+            )
+        except Exception as e:  # noqa: BLE001 - interim must never break a session
+            logger.warning("[INTERIM] fast-model client setup failed; disabling: %s", e)
+            self._interim_enabled = False
+            self._interim_llm_client = None
+            return
+
+        # Track the learner's turn (arm clock + reset) and read partial transcripts.
+        self.session.on("user_state_changed")(self._on_interim_user_state)
+        self.session.on("user_input_transcribed")(self._on_user_input_transcribed)
+        # Drive playback on the agent's thinking->speaking transitions.
+        self.session.on("agent_state_changed")(self._on_interim_agent_state)
+        logger.info(
+            "[INTERIM] enabled (model=%s, trigger=%.0fms, min_words=%d)",
+            getattr(settings, "INTERIM_REPLY_MODEL", "?"),
+            float(getattr(settings, "INTERIM_REPLY_TRIGGER_MS", 6000.0)),
+            int(getattr(settings, "INTERIM_REPLY_MIN_WORDS", 8)),
+        )
+
+    def _on_interim_user_state(self, ev) -> None:
+        """Reset interim state and (re)start the turn clock when the learner speaks.
+
+        Leaving "speaking" needs no action here — playback is driven off the
+        agent's "thinking" state. A fresh "speaking" (new turn OR a resume after
+        a false endpoint) drops any prior interim and restarts the gate clock so
+        a quick resume can't instantly re-trigger. Best-effort; never raises.
+        """
+        try:
+            if not self._interim_enabled:
+                return
+            if getattr(ev, "new_state", None) == "speaking":
+                import time
+
+                self._interim_reset_turn()
+                self._user_speaking = True
+                self._user_turn_start_monotonic = time.monotonic()
+            else:
+                self._user_speaking = False
+        except Exception as e:  # noqa: BLE001 - interim must never break a session
+            logger.warning("[INTERIM] user-state handler error: %s", e)
+
+    def _on_user_input_transcribed(self, ev) -> None:
+        """Accumulate the learner's partial transcript and arm generation once.
+
+        Fires repeatedly while the learner speaks (interim, is_final=False) and
+        once per finalized segment (is_final=True). When the learner has spoken
+        >= INTERIM_REPLY_TRIGGER_MS and the partial has >= INTERIM_REPLY_MIN_WORDS,
+        snapshot it and kick off generation a single time. Best-effort.
+        """
+        try:
+            if not self._interim_enabled:
+                return
+            text = (getattr(ev, "transcript", "") or "").strip()
+            is_final = bool(getattr(ev, "is_final", False))
+            if is_final:
+                if text:
+                    self._interim_final_segments.append(text)
+                self._interim_current_interim = ""
+            else:
+                self._interim_current_interim = text
+            partial = " ".join(
+                [*self._interim_final_segments, self._interim_current_interim]
+            ).strip()
+            self._interim_partial_text = partial
+
+            # Arm once per turn, only while the learner is still speaking (on an
+            # interim event — never a final at the endpoint, which would start a
+            # generation too late to ever be used), after both gates pass.
+            if is_final or self._interim_armed or self._interim_state != "idle":
+                return
+            if self._bg_audio is None or self._user_turn_start_monotonic is None:
+                return
+
+            import time
+
+            trigger_s = (
+                float(getattr(settings, "INTERIM_REPLY_TRIGGER_MS", 6000.0)) / 1000.0
+            )
+            elapsed = time.monotonic() - self._user_turn_start_monotonic
+            if elapsed < trigger_s:
+                return
+            if len(partial.split()) < int(
+                getattr(settings, "INTERIM_REPLY_MIN_WORDS", 8)
+            ):
+                return
+
+            self._interim_armed = True
+            self._interim_state = "generating"
+            logger.info(
+                "[INTERIM] armed at %.1fs (%d words) — generating",
+                elapsed,
+                len(partial.split()),
+            )
+            self._interim_gen_task = asyncio.create_task(
+                self._interim_generate(partial)
+            )
+            self._background_tasks.add(self._interim_gen_task)
+            self._interim_gen_task.add_done_callback(self._background_tasks.discard)
+        except Exception as e:  # noqa: BLE001 - interim must never break a session
+            logger.warning("[INTERIM] transcribed handler error: %s", e)
+
+    async def _interim_generate(self, partial_text: str) -> None:
+        """Generate the interim text (fast model) and synthesize it to audio.
+
+        On success stores a ready clip (state -> "ready"); on any failure/timeout
+        leaves no interim for the turn (state -> "idle"). Best-effort.
+        """
+        try:
+            from app.core.livekit.filler_audio import (
+                cleanup_clips,
+                synthesize_filler_clips,
+            )
+            from app.core.livekit.interim_reply import generate_interim_reply
+
+            messages = self._read_conversation_history()
+            reply = await generate_interim_reply(
+                self._interim_llm_client, self.scenario, messages, partial_text
+            )
+            if not reply:
+                if self._interim_state == "generating":
+                    self._interim_state = "idle"
+                return
+
+            tts_timeout_s = (
+                float(getattr(settings, "INTERIM_REPLY_TTS_TIMEOUT_MS", 2500.0))
+                / 1000.0
+            )
+            clips = await asyncio.wait_for(
+                synthesize_filler_clips(self.tts_client, [reply]),
+                timeout=tts_timeout_s,
+            )
+            if not clips:
+                if self._interim_state == "generating":
+                    self._interim_state = "idle"
+                return
+
+            # The turn may have ended/reset while we synthesized — only commit if
+            # still generating for this turn; otherwise discard the fresh clip.
+            if self._interim_state != "generating":
+                cleanup_clips([p for _, p in clips])
+                return
+
+            self._interim_clip = clips[0]
+            self._interim_clip_paths.append(clips[0][1])
+            self._interim_state = "ready"
+            logger.info("[INTERIM] ready: %r", clips[0][0])
+        except asyncio.CancelledError:
+            if self._interim_state == "generating":
+                self._interim_state = "idle"
+            raise
+        except asyncio.TimeoutError:
+            logger.info("[INTERIM] TTS synth timed out; no interim this turn")
+            if self._interim_state == "generating":
+                self._interim_state = "idle"
+        except Exception as e:  # noqa: BLE001 - interim must never break a session
+            logger.warning("[INTERIM] generate error: %s", e)
+            if self._interim_state == "generating":
+                self._interim_state = "idle"
+
+    def _on_interim_agent_state(self, ev) -> None:
+        """Drive interim playback off the agent's state.
+
+        Entering "thinking" (real reply being generated) starts the play task,
+        which plays the ready interim after the filler. Any other transition
+        (notably "speaking" = real reply TTS begins) cuts the interim so two
+        voices never overlap across the two tracks. Best-effort.
+        """
+        try:
+            if not self._interim_enabled or self._bg_audio is None:
+                return
+            if getattr(ev, "new_state", None) == "thinking":
+                if self._interim_state in ("ready", "generating") and (
+                    self._interim_play_task is None or self._interim_play_task.done()
+                ):
+                    thinking_ts = getattr(ev, "created_at", None)
+                    self._interim_play_task = asyncio.create_task(
+                        self._interim_play_after_filler(thinking_ts)
+                    )
+                    self._background_tasks.add(self._interim_play_task)
+                    self._interim_play_task.add_done_callback(
+                        self._background_tasks.discard
+                    )
+            else:
+                self._interim_cutover()
+        except Exception as e:  # noqa: BLE001 - interim must never break a session
+            logger.warning("[INTERIM] agent-state handler error: %s", e)
+
+    async def _interim_play_after_filler(self, thinking_ts) -> None:
+        """Play the ready interim on the background track, chained after the filler.
+
+        Waits out the thinking-filler's decision/playback so the two never
+        overlap on the single track, waits (bounded) for the clip to be ready if
+        generation is still finishing, then plays it — unless the real reply has
+        started, the learner resumed, or generation failed. Best-effort;
+        cancelled at cutover.
+        """
+        try:
+            import time
+
+            from livekit.agents import AudioConfig
+
+            start_wait = time.monotonic()
+            # Let the filler's randomized delayed-play decision resolve first.
+            filler_max_s = (
+                float(getattr(settings, "FILLER_MAX_DELAY_MS", 600.0)) / 1000.0
+            )
+            await asyncio.sleep(max(0.0, filler_max_s) + 0.05)
+
+            # Wait for the clip to be ready (generation may finish just after the
+            # endpoint) AND any thinking-filler to finish. Bounded backstop; the
+            # cutover cancels this task the instant the real reply speaks.
+            llm_to = float(getattr(settings, "INTERIM_REPLY_LLM_TIMEOUT_MS", 1500.0))
+            tts_to = float(getattr(settings, "INTERIM_REPLY_TTS_TIMEOUT_MS", 2500.0))
+            cap = time.monotonic() + (llm_to + tts_to) / 1000.0 + 1.0
+            while True:
+                if self._interim_state in ("playing", "done", "idle"):
+                    return
+                if self._bg_audio is None or self._user_speaking:
+                    return
+                filler_playing = (
+                    self._filler_handle is not None
+                    and not self._filler_handle.done()
+                )
+                if self._interim_state == "ready" and not filler_playing:
+                    break
+                if time.monotonic() > cap:
+                    return
+                await asyncio.sleep(0.05)
+
+            clip = self._interim_clip
+            if clip is None:
+                return
+            text, path = clip
+            volume = float(getattr(settings, "INTERIM_REPLY_VOLUME", 0.9))
+            self._interim_handle = self._bg_audio.play(
+                AudioConfig(path, volume=volume)
+            )
+            self._interim_state = "playing"
+
+            waited = time.monotonic() - start_wait
+            play_ts = (thinking_ts + waited) if thinking_ts is not None else None
+            # Record the interim as a real CLIENT turn, and credit it as
+            # first-audio for response_latency_ms (earliest wins, so a filler that
+            # played before keeps priority).
+            self._emit_interim_transcript(text, play_ts)
+            if play_ts is not None:
+                turn_metrics.note_filler_started(self.ctx.room.name, play_ts)
+            logger.info("[INTERIM] playing %r", text)
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:  # noqa: BLE001 - interim must never break a session
+            logger.warning("[INTERIM] play error: %s", e)
+
+    def _interim_cutover(self) -> None:
+        """Cut the interim the instant the real reply takes over (or turn ends)."""
+        if self._interim_play_task is not None and not self._interim_play_task.done():
+            self._interim_play_task.cancel()
+        self._interim_play_task = None
+        if self._interim_handle is not None and not self._interim_handle.done():
+            self._interim_handle.stop()
+        self._interim_handle = None
+        if self._interim_gen_task is not None and not self._interim_gen_task.done():
+            self._interim_gen_task.cancel()
+        self._interim_gen_task = None
+        if self._interim_state != "idle":
+            self._interim_state = "done"
+
+    def _interim_reset_turn(self) -> None:
+        """Drop all per-turn interim state (new turn, pause, or barge-in)."""
+        if self._interim_play_task is not None and not self._interim_play_task.done():
+            self._interim_play_task.cancel()
+        self._interim_play_task = None
+        if self._interim_gen_task is not None and not self._interim_gen_task.done():
+            self._interim_gen_task.cancel()
+        self._interim_gen_task = None
+        if self._interim_handle is not None and not self._interim_handle.done():
+            self._interim_handle.stop()
+        self._interim_handle = None
+        # The clip's temp WAV is cleaned at shutdown via _interim_clip_paths.
+        self._interim_clip = None
+        self._interim_armed = False
+        self._interim_final_segments = []
+        self._interim_current_interim = ""
+        self._interim_partial_text = ""
+        self._interim_state = "idle"
+
+    def _emit_interim_transcript(self, text: str, created_at) -> None:
+        """Record the interim reply as a CLIENT transcript line (a real agent turn).
+
+        Unlike the thinking-filler (also a CLIENT line, but a discardable hedge
+        excluded from the transcript record convention), the interim is a genuine
+        — if non-committal — utterance the learner heard, so it is recorded. The
+        real reply follows as its own CLIENT line. Fire-and-forget; never raises.
+        """
+        try:
+            from app.core.events.base import ChatMessage
+            from app.core.events.handlers import (
+                calculate_start_time,
+                send_event_to_queue,
+            )
+            from app.core.events.schemas import CoreEventMessageType
+
+            start_time = (
+                calculate_start_time(created_at, self.joined_iso)
+                if created_at
+                else None
+            )
+            chat_message = ChatMessage(
+                role="CLIENT",
+                content=text,
+                start_time=start_time,
+                end_time=start_time,
+            )
+            core_event = CoreEventMessageType.create(
+                room_id=self.ctx.room.name, chat_message=chat_message
+            )
+            task = asyncio.create_task(
+                send_event_to_queue(core_event.model_dump_json())
+            )
+            self._background_tasks.add(task)
+            task.add_done_callback(self._background_tasks.discard)
+        except Exception as e:  # noqa: BLE001 - interim must never break a turn
+            logger.warning("[INTERIM] failed to emit interim transcript: %s", e)
 
     def _read_conversation_history(self) -> list:
         """Snapshot the live conversation messages for this room.
