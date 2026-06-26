@@ -156,6 +156,32 @@ class PromptData(BaseModel):
             "back to allowed filler words (see app/core/livekit/fillers.py)."
         ),
     )
+    comfort_audio_enabled: bool = Field(
+        default=False,
+        description=(
+            "Per-simulation toggle (Studio: comfortAudioEnabled) for comfort "
+            "audio — a faint, constant room tone looped on the shared "
+            "background-audio track so the line never sounds dead/'muted' "
+            "between turns (telephony comfort noise). Does NOT change the "
+            "measured response_latency_ms — it only masks the perceived gap. "
+            "Default False (opt-in) so existing scenarios are unchanged. Gated "
+            "by settings.COMFORT_AUDIO_ENABLED (a global kill-switch): both "
+            "must be on for the tone to play. See "
+            "app/core/livekit/comfort_audio.py."
+        ),
+    )
+    continuous_backchanneling: bool = Field(
+        default=False,
+        description=(
+            "Per-simulation toggle (Studio: continuousBackchanneling) for "
+            "continuous back-channeling — brief 'mm-hmm'-style listener "
+            "affirmations played sparsely while the learner is still speaking "
+            "on a long turn. Default False (opt-in) so existing scenarios are "
+            "unchanged. Gated by settings.BACKCHANNEL_GLOBALLY_ENABLED (a "
+            "global kill-switch): both must be on for back-channels to play. "
+            "See app/core/livekit/backchannel.py."
+        ),
+    )
     history_trim_enabled: bool = Field(
         default=False,
         description=(
@@ -571,6 +597,12 @@ class Scenario(BaseModel):
                     else bool(prompt_data_dict.get("enableProsody"))
                 ),
                 "filler_enabled": bool(prompt_data_dict.get("fillerEnabled") or False),
+                "comfort_audio_enabled": bool(
+                    prompt_data_dict.get("comfortAudioEnabled") or False
+                ),
+                "continuous_backchanneling": bool(
+                    prompt_data_dict.get("continuousBackchanneling") or False
+                ),
                 "history_trim_enabled": bool(
                     prompt_data_dict.get("historyTrimEnabled") or False
                 ),

@@ -12,8 +12,11 @@ loops under everything for the whole session.
 This does NOT reduce the measured ``response_latency_ms`` — it only masks the
 *perceived* gap so the line never sounds dead.
 
-Controlled by a single global flag (``settings.COMFORT_AUDIO_ENABLED``, default
-on) with an off switch; ``settings.COMFORT_AUDIO_VOLUME`` tunes how faint it is.
+Two gates, both required: ``settings.COMFORT_AUDIO_ENABLED`` is the global
+kill-switch (default on) and the per-simulation ``comfort_audio_enabled`` toggle
+(Studio: comfortAudioEnabled, default off) is the opt-in — so the tone is off
+for every scenario unless an author turns it on. ``settings.COMFORT_AUDIO_VOLUME``
+tunes how faint it is.
 
 Everything here is best-effort: any failure yields no comfort audio and the
 session continues normally — it must never break the agent.
@@ -34,14 +37,21 @@ from app.core.logger import get_logger
 logger = get_logger(__name__)
 
 
-def is_comfort_audio_enabled() -> bool:
+def is_comfort_audio_enabled(scenario=None) -> bool:
     """Whether the comfort-audio room tone is on for this session.
 
-    A single global flag (default on). Unlike the thinking-filler there is no
-    per-scenario opt-in: a faint room tone is a baseline comfort the whole
-    platform gets unless ops turns it off.
+    Two gates, both required (same shape as the thinking-filler):
+    ``settings.COMFORT_AUDIO_ENABLED`` is the global kill-switch (default on),
+    and ``prompt_data.comfort_audio_enabled`` is the per-simulation opt-in
+    (default off, set in Studio). The tone plays only when both are true, so
+    comfort audio is off for every scenario unless an author turns it on.
     """
-    return bool(getattr(settings, "COMFORT_AUDIO_ENABLED", True))
+    if not getattr(settings, "COMFORT_AUDIO_ENABLED", True):
+        return False
+    prompt_data = getattr(scenario, "prompt_data", None)
+    if prompt_data is None:
+        return False
+    return bool(getattr(prompt_data, "comfort_audio_enabled", False))
 
 
 def synthesize_comfort_clip(

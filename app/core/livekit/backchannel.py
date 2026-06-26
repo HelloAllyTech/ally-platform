@@ -21,9 +21,10 @@ prompt forces the right language / native script so this works across languages
 (the Indic TTS spells Latin text out letter-by-letter, so "Mm" must arrive as the
 language's own back-channel, not transliterated).
 
-Controlled by a single global flag (``settings.BACKCHANNEL_GLOBALLY_ENABLED``,
-default on) with an off switch — a baseline naturalness lever, kept sparse so it
-never interrupts.
+Controlled by the global kill-switch (``settings.BACKCHANNEL_GLOBALLY_ENABLED``,
+default on) AND a per-simulation toggle (``prompt_data.continuous_backchanneling``,
+Studio: continuousBackchanneling, default off — opt-in). Both must be on; kept
+sparse so it never interrupts.
 
 Everything here is best-effort: any failure yields no phrases and the session
 continues with no back-channel — it must never break the agent.
@@ -43,14 +44,21 @@ from app.prompts.resolver import load_and_format
 logger = get_logger(__name__)
 
 
-def is_backchannel_enabled() -> bool:
+def is_backchannel_enabled(scenario) -> bool:
     """Whether continuous back-channeling is on for this session.
 
-    A single global flag (default on). Unlike the thinking-filler there is no
-    per-scenario opt-in: a sparse listening signal is a baseline naturalness
-    lever the whole platform gets unless ops turns it off.
+    Gated by the global kill-switch (``settings.BACKCHANNEL_GLOBALLY_ENABLED``,
+    default on) AND the per-simulation ``continuous_backchanneling`` toggle
+    (Studio: continuousBackchanneling, default off). Both must be on — the
+    global flag lets ops disable back-channeling everywhere regardless of the
+    per-scenario opt-in.
     """
-    return bool(getattr(settings, "BACKCHANNEL_GLOBALLY_ENABLED", True))
+    if not getattr(settings, "BACKCHANNEL_GLOBALLY_ENABLED", True):
+        return False
+    prompt_data = getattr(scenario, "prompt_data", None)
+    if prompt_data is None:
+        return False
+    return bool(getattr(prompt_data, "continuous_backchanneling", False))
 
 
 class _BackchannelPhrases(BaseModel):
