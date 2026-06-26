@@ -249,6 +249,21 @@ class AgentWorker:
         # shutdown alongside the filler clips.
         self._comfort_clip_path: Optional[str] = None
 
+        # Continuous back-channeling: brief listener affirmations ("mm-hmm",
+        # soft "yeah") played on the SAME background track WHILE the learner is
+        # still speaking on a long turn — a human "I'm listening" signal,
+        # distinct from the post-turn thinking-filler. Driven off the
+        # user-speaking state (see _on_backchannel_user_state / _backchannel_loop)
+        # and kept sparse so it never interrupts. Clips are generated once at
+        # session start in the scenario's language; deleted on shutdown.
+        self._backchannel_clips: list[tuple[str, str]] = []  # (phrase, wav_path)
+        self._backchannel_task: Optional[asyncio.Task] = None
+        self._backchannel_handle = None
+        self._user_speaking: bool = False
+        # Recent back-channel phrases, so consecutive emissions don't repeat
+        # (kept separate from the filler's list — different phrase pools).
+        self._recent_backchannel_phrases: list[str] = []
+
         # ========== Termination Handling (for entrypoint context) ==========
         # Use asyncio.Event to signal termination from graph context
         # to entrypoint context
@@ -553,8 +568,12 @@ class AgentWorker:
             # cleanup_background_tasks in the wrapped shutdown handler).
             if self._predictor_task is not None and not self._predictor_task.done():
                 self._predictor_task.cancel()
-            # Tear down the background-audio track (comfort tone + filler) and
-            # delete its temp clips.
+            # Stop the back-channel loop so it can't emit after teardown.
+            if self._backchannel_task is not None and not self._backchannel_task.done():
+                self._backchannel_task.cancel()
+            self._backchannel_task = None
+            # Tear down the background-audio track (comfort tone + filler +
+            # back-channel) and delete its temp clips.
             if self._bg_audio is not None:
                 try:
                     await self._bg_audio.aclose()
@@ -573,6 +592,14 @@ class AgentWorker:
                     pass
                 self._filler_clips = []
                 self._dynamic_filler_clips = []
+            if self._backchannel_clips:
+                try:
+                    from app.core.livekit.filler_audio import cleanup_clips
+
+                    cleanup_clips([path for _, path in self._backchannel_clips])
+                except Exception:  # noqa: BLE001
+                    pass
+                self._backchannel_clips = []
             if self._comfort_clip_path is not None:
                 try:
                     from app.core.livekit.comfort_audio import cleanup_clip
@@ -912,19 +939,21 @@ class AgentWorker:
             return None
 
     async def _setup_background_audio(self) -> None:
-        """Start the shared background-audio track (comfort tone + thinking filler).
+        """Start the shared background-audio track (comfort + filler + back-channel).
 
-        Both perceived-latency levers ride one LiveKit BackgroundAudioPlayer (its
-        own published track, so neither can race or preempt the agent's real
-        reply, unlike session.say() on the shared speech channel):
+        All three naturalness levers ride one LiveKit BackgroundAudioPlayer (its
+        own published track, so none can race or preempt the agent's real reply,
+        unlike session.say() on the shared speech channel):
 
         - Comfort audio: a faint room tone set as the player's ``ambient_sound``,
           looped for the whole session so the line never sounds dead/muted.
         - Thinking filler: scenario/predictive phrases we play ourselves on the
           agent's "thinking" state (see _on_filler_agent_state) so we know which
           phrase plays and can record it in the transcript.
+        - Back-channel: brief listener affirmations played while the LEARNER is
+          still speaking on a long turn (see _on_backchannel_user_state).
 
-        The player is created when EITHER layer is on. Fully best-effort: any
+        The player is created when ANY layer is on. Fully best-effort: any
         failure leaves the session running without background audio.
         """
         try:
@@ -971,8 +1000,13 @@ class AgentWorker:
                     getattr(_pd, "filler_enabled", None),
                 )
 
-            # Nothing to play on either layer — don't publish a track.
-            if comfort_source is None and not filler_on:
+            # ---- Continuous back-channeling (listener affirmations) ----
+            # Brief "mm-hmm"/"yeah" clips played WHILE the learner speaks on a
+            # long turn (see _on_backchannel_user_state). Global flag, default on.
+            backchannel_on = await self._resolve_backchannel_clips()
+
+            # Nothing to play on any layer — don't publish a track.
+            if comfort_source is None and not filler_on and not backchannel_on:
                 return
 
             from livekit.agents import BackgroundAudioPlayer
@@ -989,14 +1023,25 @@ class AgentWorker:
             await self._bg_audio.start(room=self.ctx.room)
             logger.info(
                 "[BG_AUDIO] BackgroundAudioPlayer started "
-                "(comfort=%s static_clips=%d predictive=%s)",
+                "(comfort=%s static_clips=%d predictive=%s backchannel=%s)",
                 comfort_source is not None,
                 len(self._filler_clips),
                 predictive_on,
+                backchannel_on,
             )
 
+            # Back-channeling rides the user-speaking state, independent of the
+            # thinking-filler — register it before any filler-only early return.
+            if backchannel_on:
+                self.session.on("user_state_changed")(self._on_backchannel_user_state)
+                logger.info(
+                    "[BACKCHANNEL] enabled (%d clip(s)) — driven off user-speaking",
+                    len(self._backchannel_clips),
+                )
+
             if not filler_on:
-                # Comfort-only session: the ambient tone needs no per-turn driver.
+                # No thinking-filler: the comfort tone needs no per-turn driver,
+                # and back-channeling (if on) is driven by its own handler above.
                 return
 
             self.session.on("agent_state_changed")(self._on_filler_agent_state)
@@ -1115,8 +1160,8 @@ class AgentWorker:
         except Exception as e:  # noqa: BLE001 - filler must never break a session
             logger.warning("[FILLER] delayed play error: %s", e)
 
-    def _pick_filler_clip(self, clips: list) -> tuple:
-        """Pick a filler clip, avoiding phrases played on recent turns.
+    def _pick_filler_clip(self, clips: list, recent: Optional[list] = None) -> tuple:
+        """Pick a clip, avoiding phrases played recently.
 
         random.choice alone can land on the same phrase back-to-back, which
         sounds like the agent is stuck. We exclude recently spoken phrases when
@@ -1124,18 +1169,24 @@ class AgentWorker:
         count so there's always a candidate). With a single clip it necessarily
         repeats. Phrase text is the key, so this also suppresses repeats across
         predictive regenerations.
+
+        ``recent`` is the list to read/update in place (defaults to the
+        thinking-filler's; the back-channel loop passes its own so the two
+        phrase pools don't cross-contaminate).
         """
         import random as _random
 
-        recent = set(self._recent_filler_phrases)
-        candidates = [c for c in clips if c[0] not in recent] or clips
+        recent_list = recent if recent is not None else self._recent_filler_phrases
+        recent_set = set(recent_list)
+        candidates = [c for c in clips if c[0] not in recent_set] or clips
         choice = _random.choice(candidates)
 
         # Remember up to (clip_count - 1) recent phrases, max 3, so the exclusion
-        # can never empty the candidate pool.
+        # can never empty the candidate pool. Mutate in place so the caller's
+        # list (an instance attribute) stays updated.
         max_remember = max(1, min(len(clips) - 1, 3))
-        self._recent_filler_phrases.append(choice[0])
-        self._recent_filler_phrases = self._recent_filler_phrases[-max_remember:]
+        recent_list.append(choice[0])
+        recent_list[:] = recent_list[-max_remember:]
         return choice
 
     def _emit_filler_transcript(self, phrase: str, created_at) -> None:
@@ -1170,6 +1221,166 @@ class AgentWorker:
             task.add_done_callback(self._background_tasks.discard)
         except Exception as e:  # noqa: BLE001 - filler must never break a turn
             logger.warning("[FILLER] failed to emit filler transcript: %s", e)
+
+    # ================================================================
+    # Continuous back-channeling (listener affirmations)
+    # ================================================================
+
+    async def _resolve_backchannel_clips(self) -> bool:
+        """Generate + synthesize the back-channel clips for this session.
+
+        Best-effort: when back-channeling is globally enabled, asks the LLM for
+        short listener affirmations in the scenario's language (editable
+        ``filler/backchannel`` prompt) and synthesizes them to temp WAVs on
+        ``self._backchannel_clips``. Returns True only if at least one clip is
+        ready (the caller uses this to decide whether to publish the track and
+        register the handler). Never raises.
+        """
+        try:
+            from app.core.livekit.backchannel import (
+                generate_backchannel_phrases,
+                is_backchannel_enabled,
+            )
+
+            if not is_backchannel_enabled():
+                logger.info(
+                    "[BACKCHANNEL] disabled (BACKCHANNEL_GLOBALLY_ENABLED=False)"
+                )
+                return False
+
+            count = int(getattr(settings, "BACKCHANNEL_COUNT", 6))
+            phrases = await generate_backchannel_phrases(
+                self.llm_client, self.scenario, count
+            )
+            if not phrases:
+                logger.info("[BACKCHANNEL] no phrases generated — no back-channel")
+                return False
+
+            from app.core.livekit.filler_audio import synthesize_filler_clips
+
+            self._backchannel_clips = await synthesize_filler_clips(
+                self.tts_client, phrases
+            )
+            logger.info(
+                "[BACKCHANNEL] synthesized %d clip(s) from %d phrase(s)",
+                len(self._backchannel_clips),
+                len(phrases),
+            )
+            return bool(self._backchannel_clips)
+        except Exception as e:  # noqa: BLE001 - must never break a session
+            logger.warning("[BACKCHANNEL] setup failed (continuing without): %s", e)
+            self._backchannel_clips = []
+            return False
+
+    def _on_backchannel_user_state(self, ev) -> None:
+        """Start/stop the back-channel loop on the user-speaking state.
+
+        The loop lives only while the learner holds the floor: entering
+        "speaking" starts it (if not already running); leaving "speaking" cancels
+        it and stops any clip still playing, so a back-channel can never spill
+        past the learner's turn into the agent's reply.
+
+        Best-effort: never raises into the session.
+        """
+        try:
+            if self._bg_audio is None or not self._backchannel_clips:
+                return
+            if getattr(ev, "new_state", None) == "speaking":
+                self._user_speaking = True
+                if self._backchannel_task is None or self._backchannel_task.done():
+                    self._backchannel_task = asyncio.create_task(
+                        self._backchannel_loop()
+                    )
+                    self._background_tasks.add(self._backchannel_task)
+                    self._backchannel_task.add_done_callback(
+                        self._background_tasks.discard
+                    )
+            else:
+                # Learner stopped holding the floor — stop emitting immediately.
+                self._user_speaking = False
+                if (
+                    self._backchannel_task is not None
+                    and not self._backchannel_task.done()
+                ):
+                    self._backchannel_task.cancel()
+                self._backchannel_task = None
+                if (
+                    self._backchannel_handle is not None
+                    and not self._backchannel_handle.done()
+                ):
+                    self._backchannel_handle.stop()
+                self._backchannel_handle = None
+        except Exception as e:  # noqa: BLE001 - back-channel must never break a session
+            logger.warning("[BACKCHANNEL] user-state handler error: %s", e)
+
+    async def _backchannel_loop(self) -> None:
+        """Emit sparse listener affirmations while the learner keeps speaking.
+
+        Heuristic, driven off the user-speaking state:
+          1. Long-utterance gate — wait BACKCHANNEL_MIN_UTTERANCE_MS before the
+             first affirmation. Short turns get nothing (a "mm-hmm" over a
+             one-liner is just noise). If the learner stops first, the
+             state-change handler cancels this task during the wait.
+          2. Then loop while still speaking: wait a randomized gap in
+             [MIN_GAP_MS, MAX_GAP_MS] (the half-second-plus lull between
+             affirmations), and emit ONE clip behind a probability gate. The
+             randomized spacing + probability keep it sparse, so it reads as a
+             human listening signal rather than an interruption.
+
+        Every clip plays on the background track at a soft volume, so it can
+        never preempt the agent's real reply. Best-effort; cancelled when the
+        learner stops speaking.
+        """
+        try:
+            import random as _random
+
+            from livekit.agents import AudioConfig
+
+            min_utterance_s = (
+                float(getattr(settings, "BACKCHANNEL_MIN_UTTERANCE_MS", 4000.0))
+                / 1000.0
+            )
+            # Long-utterance gate. Cancelled mid-wait if the learner stops.
+            await asyncio.sleep(max(0.0, min_utterance_s))
+
+            volume = float(getattr(settings, "BACKCHANNEL_VOLUME", 0.6))
+            probability = float(getattr(settings, "BACKCHANNEL_PLAY_PROBABILITY", 0.5))
+
+            while self._user_speaking and self._bg_audio is not None:
+                lo = float(getattr(settings, "BACKCHANNEL_MIN_GAP_MS", 3500.0))
+                hi = float(getattr(settings, "BACKCHANNEL_MAX_GAP_MS", 7000.0))
+                if hi < lo:
+                    lo, hi = hi, lo
+                gap_s = max(0.0, _random.uniform(lo, hi) / 1000.0)
+                await asyncio.sleep(gap_s)
+
+                # Learner may have stopped during the gap.
+                if not self._user_speaking or self._bg_audio is None:
+                    break
+                # Keep it sparse: don't emit on every gap.
+                if _random.random() > probability:
+                    continue
+                # Don't stack over an affirmation still playing.
+                if (
+                    self._backchannel_handle is not None
+                    and not self._backchannel_handle.done()
+                ):
+                    continue
+                if not self._backchannel_clips:
+                    break
+
+                phrase, path = self._pick_filler_clip(
+                    self._backchannel_clips,
+                    recent=self._recent_backchannel_phrases,
+                )
+                self._backchannel_handle = self._bg_audio.play(
+                    AudioConfig(path, volume=volume)
+                )
+                logger.info("[BACKCHANNEL] emitted %r while learner speaking", phrase)
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:  # noqa: BLE001 - back-channel must never break a session
+            logger.warning("[BACKCHANNEL] loop error: %s", e)
 
     def _read_conversation_history(self) -> list:
         """Snapshot the live conversation messages for this room.
