@@ -1014,17 +1014,23 @@ class AgentWorker:
             if comfort_source is None and not filler_on and not backchannel_on:
                 return
 
-            from livekit.agents import BackgroundAudioPlayer
+            from app.core.livekit.resilient_bg_audio import (
+                ResilientBackgroundAudioPlayer,
+            )
 
             # ambient_sound auto-loops for the whole session (comfort tone). No
             # thinking_sound: we drive filler playback on "thinking" ourselves so
             # we know which phrase is spoken (the auto thinking_sound picks a clip
             # at random and doesn't expose which) — required to record it in the
             # transcript. Still its own published track, so it can't race the reply.
+            # ResilientBackgroundAudioPlayer (not the stock player) so a transient
+            # capture_frame error can't permanently silence the shared track.
             if comfort_source is not None:
-                self._bg_audio = BackgroundAudioPlayer(ambient_sound=comfort_source)
+                self._bg_audio = ResilientBackgroundAudioPlayer(
+                    ambient_sound=comfort_source
+                )
             else:
-                self._bg_audio = BackgroundAudioPlayer()
+                self._bg_audio = ResilientBackgroundAudioPlayer()
             await self._bg_audio.start(room=self.ctx.room)
             logger.info(
                 "[BG_AUDIO] BackgroundAudioPlayer started "

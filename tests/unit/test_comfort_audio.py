@@ -65,6 +65,17 @@ class TestSynthesizeComfortClip:
             comfort_audio.cleanup_clip(path)
 
     @pytest.mark.unit
+    def test_default_sample_rate_matches_mixer(self):
+        """Default rate must be 48 kHz to match the BackgroundAudioPlayer mixer/
+        source; a mismatch makes the room tone resample to the wrong character."""
+        path = comfort_audio.synthesize_comfort_clip(duration_s=0.1)
+        try:
+            with wave.open(path, "rb") as wav:
+                assert wav.getframerate() == 48000
+        finally:
+            comfort_audio.cleanup_clip(path)
+
+    @pytest.mark.unit
     def test_normalized_to_expected_peak(self):
         """Filtered noise is normalized to a predictable source peak so the
         playback volume control is meaningful (the low-pass would otherwise

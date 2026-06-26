@@ -56,9 +56,14 @@ def is_comfort_audio_enabled(scenario=None) -> bool:
 
 def synthesize_comfort_clip(
     duration_s: float = 2.0,
-    sample_rate: int = 24000,
+    sample_rate: int = 48000,
 ) -> Optional[str]:
     """Generate a short, seamless-looping comfort-noise WAV; return its path.
+
+    Synthesized at 48 kHz to match the ``BackgroundAudioPlayer``'s mixer/source
+    rate (``rtc.AudioMixer(48000, ...)`` / ``rtc.AudioSource(48000, ...)``). A
+    lower rate is resampled up by the library and reads at the wrong character,
+    so keep this aligned with the mixer.
 
     The clip is white noise run through a one-pole low-pass filter so it reads as
     soft "air"/room tone rather than hiss, then normalized to a fixed target peak
