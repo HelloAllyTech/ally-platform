@@ -1,0 +1,5 @@
+{
+    "name": "Simulated User (V2V Test) Prompt",
+    "kind": "prompt",
+    "description": "System prompt for the synthetic-user agent used in superadmin V2V test sessions: an AI that plays the counselor/learner side of a roleplay and drives the real client agent end to end, so sessions can be tested without a human. Editable under System Skills. Variables: {scenario_context}, {language_label}, {language_code}, {max_exchanges}."
+}

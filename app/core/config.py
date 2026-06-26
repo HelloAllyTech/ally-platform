@@ -38,6 +38,31 @@ class Settings(BaseSettings):
     LIVEKIT_URL: str = Field(...)
     AGENT_NAME: str = Field(default="Agent", description="Agent name for LiveKit")
 
+    # ---- Simulated-user agent (superadmin V2V test sessions) ----
+    # A second agent that plays the counselor/learner side over real voice to
+    # drive the client agent end-to-end without a human tester. Registered under
+    # its own agent name so Core can dispatch it into the same room; uses cheap
+    # STT/TTS/LLM since audio quality is irrelevant for a test harness.
+    SIMULATED_USER_AGENT_NAME: str = Field(
+        default="SimulatedUser",
+        description="LiveKit agent name the simulated-user worker registers as.",
+    )
+    SIMULATED_USER_LLM_MODEL: str = Field(
+        default="gpt-4o-mini",
+        description="Cheap OpenAI model the simulated-user agent uses for replies.",
+    )
+    SIMULATED_USER_TTS_MODEL: str = Field(
+        default="aura-2-thalia-en",
+        description="Cheap Deepgram TTS voice/model for the simulated-user agent.",
+    )
+    SIMULATED_USER_OPENING_GRACE_SECONDS: float = Field(
+        default=10.0,
+        description=(
+            "If the client agent hasn't spoken within this many seconds, the "
+            "simulated user opens the conversation itself (deadlock guard)."
+        ),
+    )
+
     OPENAI_API_KEY: str = Field(...)
     OPENAI_MODEL: str = Field(
         default="gpt-4o-mini", description="OpenAI model to use for LLM responses"
