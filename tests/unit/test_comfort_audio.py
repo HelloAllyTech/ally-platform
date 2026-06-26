@@ -116,6 +116,37 @@ class TestSynthesizeComfortClip:
         assert comfort_audio.synthesize_comfort_clip(duration_s=0.1) is None
 
 
+class TestComfortAmbientSource:
+    """The in-memory looping ambient iterator fed to BackgroundAudioPlayer."""
+
+    @pytest.mark.unit
+    def test_infinite_inmemory_loop_of_48k_frames(self):
+        """Yields 48 kHz mono frames and loops forever (never exhausts), so the
+        shared mixer can't time it out and drop the comfort stream mid-session."""
+        import asyncio
+
+        src = comfort_audio.comfort_ambient_source(
+            duration_s=0.2, sample_rate=48000, frame_samples=4800
+        )
+        assert src is not None
+
+        async def take(n):
+            out = []
+            async for frame in src:
+                out.append(frame)
+                if len(out) >= n:
+                    break
+            return out
+
+        # 0.2s @ 48k / 4800 = 2 base frames; pulling 5 proves it loops (infinite).
+        frames = asyncio.run(take(5))
+        assert len(frames) == 5
+        for frame in frames:
+            assert frame.sample_rate == 48000
+            assert frame.num_channels == 1
+            assert frame.samples_per_channel == 4800
+
+
 class TestCleanupClip:
     @pytest.mark.unit
     def test_removes_file(self):

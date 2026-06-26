@@ -908,16 +908,20 @@ class AgentWorker:
     def _resolve_comfort_audio(self):
         """Build the comfort-audio ambient source, or None when disabled.
 
-        Returns a LiveKit ``AudioConfig`` wrapping a freshly-synthesized faint
-        room-tone clip (looped by the BackgroundAudioPlayer as its ambient
-        sound), or ``None`` when comfort audio is off or synthesis fails. Stashes
-        the temp WAV path on ``self._comfort_clip_path`` for cleanup. Best-effort:
-        never raises.
+        Returns a LiveKit ``AudioConfig`` wrapping an INFINITE in-memory room-tone
+        iterator (played as the BackgroundAudioPlayer ambient sound), or ``None``
+        when comfort audio is off or synthesis fails. In-memory (not a temp WAV)
+        on purpose: a file-backed ambient re-opens/decodes the clip every loop,
+        and if that stalls past the mixer's per-stream timeout (e.g. while a
+        thinking-filler is also decoding) the mixer cancels + closes the ambient
+        generator and drops it for good — comfort would then stop the first time
+        a filler plays. An in-memory loop yields instantly and can't be dropped.
+        Best-effort: never raises.
         """
         try:
             from app.core.livekit.comfort_audio import (
+                comfort_ambient_source,
                 is_comfort_audio_enabled,
-                synthesize_comfort_clip,
             )
 
             if not is_comfort_audio_enabled(self.scenario):
@@ -929,16 +933,17 @@ class AgentWorker:
                 )
                 return None
 
-            path = synthesize_comfort_clip()
-            if not path:
+            source = comfort_ambient_source()
+            if source is None:
                 return None
-            self._comfort_clip_path = path
 
             from livekit.agents import AudioConfig
 
             volume = float(getattr(settings, "COMFORT_AUDIO_VOLUME", 0.15))
-            logger.info("[COMFORT] room tone enabled (volume=%.2f)", volume)
-            return AudioConfig(path, volume=volume)
+            logger.info(
+                "[COMFORT] room tone enabled (volume=%.2f, in-memory loop)", volume
+            )
+            return AudioConfig(source, volume=volume)
         except Exception as e:  # noqa: BLE001 - must never break a session
             logger.warning("[COMFORT] setup failed (continuing without): %s", e)
             return None
