@@ -243,6 +243,12 @@ class AgentWorker:
         self._filler_delay_task: Optional[asyncio.Task] = None
         self._agent_thinking: bool = False
 
+        # Comfort audio: a faint room tone played as the ambient sound on the
+        # SAME BackgroundAudioPlayer track, looping for the whole session so the
+        # line never sounds dead/muted between turns. Its temp WAV is deleted on
+        # shutdown alongside the filler clips.
+        self._comfort_clip_path: Optional[str] = None
+
         # ========== Termination Handling (for entrypoint context) ==========
         # Use asyncio.Event to signal termination from graph context
         # to entrypoint context
@@ -547,7 +553,8 @@ class AgentWorker:
             # cleanup_background_tasks in the wrapped shutdown handler).
             if self._predictor_task is not None and not self._predictor_task.done():
                 self._predictor_task.cancel()
-            # Tear down the thinking-filler track + delete its temp clips.
+            # Tear down the background-audio track (comfort tone + filler) and
+            # delete its temp clips.
             if self._bg_audio is not None:
                 try:
                     await self._bg_audio.aclose()
@@ -566,6 +573,14 @@ class AgentWorker:
                     pass
                 self._filler_clips = []
                 self._dynamic_filler_clips = []
+            if self._comfort_clip_path is not None:
+                try:
+                    from app.core.livekit.comfort_audio import cleanup_clip
+
+                    cleanup_clip(self._comfort_clip_path)
+                except Exception:  # noqa: BLE001
+                    pass
+                self._comfort_clip_path = None
             await original_shutdown_handler()
 
         shutdown_handler = shutdown_with_cleanup
@@ -863,17 +878,54 @@ class AgentWorker:
         finally:
             self._prosody_task = None
 
-    async def _setup_thinking_filler(self) -> None:
-        """Start the thinking-filler on a separate audio track.
+    def _resolve_comfort_audio(self):
+        """Build the comfort-audio ambient source, or None when disabled.
 
-        The filler plays via LiveKit's BackgroundAudioPlayer (its own published
-        track), so it can NEVER race or preempt the agent's real reply — unlike
-        a session.say() on the shared speech channel. We synthesize the
-        scenario's per-language filler dialogues to audio once, then drive
-        playback ourselves on the agent's "thinking" state (see
-        _on_filler_agent_state) so we know which phrase plays and can record it
-        in the transcript. Fully best-effort: any failure leaves the session
-        running with no filler.
+        Returns a LiveKit ``AudioConfig`` wrapping a freshly-synthesized faint
+        room-tone clip (looped by the BackgroundAudioPlayer as its ambient
+        sound), or ``None`` when comfort audio is off or synthesis fails. Stashes
+        the temp WAV path on ``self._comfort_clip_path`` for cleanup. Best-effort:
+        never raises.
+        """
+        try:
+            from app.core.livekit.comfort_audio import (
+                is_comfort_audio_enabled,
+                synthesize_comfort_clip,
+            )
+
+            if not is_comfort_audio_enabled():
+                logger.info("[COMFORT] disabled (COMFORT_AUDIO_ENABLED=False)")
+                return None
+
+            path = synthesize_comfort_clip()
+            if not path:
+                return None
+            self._comfort_clip_path = path
+
+            from livekit.agents import AudioConfig
+
+            volume = float(getattr(settings, "COMFORT_AUDIO_VOLUME", 0.15))
+            logger.info("[COMFORT] room tone enabled (volume=%.2f)", volume)
+            return AudioConfig(path, volume=volume)
+        except Exception as e:  # noqa: BLE001 - must never break a session
+            logger.warning("[COMFORT] setup failed (continuing without): %s", e)
+            return None
+
+    async def _setup_background_audio(self) -> None:
+        """Start the shared background-audio track (comfort tone + thinking filler).
+
+        Both perceived-latency levers ride one LiveKit BackgroundAudioPlayer (its
+        own published track, so neither can race or preempt the agent's real
+        reply, unlike session.say() on the shared speech channel):
+
+        - Comfort audio: a faint room tone set as the player's ``ambient_sound``,
+          looped for the whole session so the line never sounds dead/muted.
+        - Thinking filler: scenario/predictive phrases we play ourselves on the
+          agent's "thinking" state (see _on_filler_agent_state) so we know which
+          phrase plays and can record it in the transcript.
+
+        The player is created when EITHER layer is on. Fully best-effort: any
+        failure leaves the session running without background audio.
         """
         try:
             from app.core.livekit.fillers import (
@@ -881,10 +933,36 @@ class AgentWorker:
                 resolve_filler_phrases,
             )
 
+            # ---- Comfort audio (ambient room tone) ----
+            comfort_source = self._resolve_comfort_audio()
+
+            # ---- Thinking filler ----
             # Gate: the filler feature must be on for this session. Static
             # phrases may be empty (a scenario can rely purely on predictive
             # fillers), so we check the feature flag separately from the phrases.
-            if not is_filler_enabled(self.scenario):
+            predictive_on = bool(getattr(settings, "PREDICTIVE_FILLER_ENABLED", False))
+            filler_on = False
+            if is_filler_enabled(self.scenario):
+                from app.core.livekit.filler_audio import synthesize_filler_clips
+
+                phrases = resolve_filler_phrases(self.scenario)
+                if phrases:
+                    logger.info("[FILLER] resolved %d static phrase(s)", len(phrases))
+                    self._filler_clips = await synthesize_filler_clips(
+                        self.tts_client, phrases
+                    )
+                    logger.info(
+                        "[FILLER] synthesized %d static clip(s)",
+                        len(self._filler_clips),
+                    )
+                # The filler can play if it has static clips now or will get
+                # predictive ones; otherwise there's nothing it could ever play.
+                filler_on = bool(self._filler_clips) or predictive_on
+                if not filler_on:
+                    logger.info(
+                        "[FILLER] no static phrases and predictive disabled — no filler"
+                    )
+            else:
                 _pd = getattr(self.scenario, "prompt_data", None)
                 logger.info(
                     "[FILLER] not enabled for this session "
@@ -892,44 +970,36 @@ class AgentWorker:
                     getattr(settings, "FILLER_GLOBALLY_ENABLED", None),
                     getattr(_pd, "filler_enabled", None),
                 )
-                return
 
-            from app.core.livekit.filler_audio import synthesize_filler_clips
-
-            phrases = resolve_filler_phrases(self.scenario)
-            if phrases:
-                logger.info("[FILLER] resolved %d static phrase(s)", len(phrases))
-                self._filler_clips = await synthesize_filler_clips(
-                    self.tts_client, phrases
-                )
-                logger.info(
-                    "[FILLER] synthesized %d static clip(s)", len(self._filler_clips)
-                )
-
-            predictive_on = bool(getattr(settings, "PREDICTIVE_FILLER_ENABLED", False))
-            if not self._filler_clips and not predictive_on:
-                # No static phrases configured and predictive disabled: there is
-                # nothing this session could ever play.
-                logger.info(
-                    "[FILLER] no static phrases and predictive disabled — no filler"
-                )
+            # Nothing to play on either layer — don't publish a track.
+            if comfort_source is None and not filler_on:
                 return
 
             from livekit.agents import BackgroundAudioPlayer
 
-            # No thinking_sound: we drive playback on "thinking" ourselves so we
-            # know which phrase is spoken (BackgroundAudioPlayer's auto
-            # thinking_sound picks a clip at random and doesn't expose which) —
-            # required to record the filler in the transcript. Still its own
-            # published track, so it can't race or preempt the reply.
-            self._bg_audio = BackgroundAudioPlayer()
+            # ambient_sound auto-loops for the whole session (comfort tone). No
+            # thinking_sound: we drive filler playback on "thinking" ourselves so
+            # we know which phrase is spoken (the auto thinking_sound picks a clip
+            # at random and doesn't expose which) — required to record it in the
+            # transcript. Still its own published track, so it can't race the reply.
+            if comfort_source is not None:
+                self._bg_audio = BackgroundAudioPlayer(ambient_sound=comfort_source)
+            else:
+                self._bg_audio = BackgroundAudioPlayer()
             await self._bg_audio.start(room=self.ctx.room)
-            self.session.on("agent_state_changed")(self._on_filler_agent_state)
             logger.info(
-                "[FILLER] BackgroundAudioPlayer started (static_clips=%d predictive=%s)",
+                "[BG_AUDIO] BackgroundAudioPlayer started "
+                "(comfort=%s static_clips=%d predictive=%s)",
+                comfort_source is not None,
                 len(self._filler_clips),
                 predictive_on,
             )
+
+            if not filler_on:
+                # Comfort-only session: the ambient tone needs no per-turn driver.
+                return
+
+            self.session.on("agent_state_changed")(self._on_filler_agent_state)
 
             # Start the background predictive-filler job (best-effort). It reads
             # the live conversation every interval and refreshes
@@ -942,10 +1012,8 @@ class AgentWorker:
                 self._background_tasks.add(self._predictor_task)
                 self._predictor_task.add_done_callback(self._background_tasks.discard)
                 logger.info("[FILLER] predictive filler loop started")
-        except Exception as e:  # noqa: BLE001 - filler must never break a session
-            logger.warning(
-                "[FILLER] thinking-filler setup failed (continuing without): %s", e
-            )
+        except Exception as e:  # noqa: BLE001 - must never break a session
+            logger.warning("[BG_AUDIO] setup failed (continuing without): %s", e)
             self._bg_audio = None
 
     def _on_filler_agent_state(self, ev) -> None:
@@ -1236,9 +1304,9 @@ class AgentWorker:
         # Collect background prosody task before first speech synthesis call
         await self._await_prosody()
 
-        # Set up the thinking-filler on its own audio track (best-effort; never
-        # blocks or breaks the session).
-        await self._setup_thinking_filler()
+        # Set up the shared background-audio track — comfort room tone and the
+        # thinking-filler (best-effort; never blocks or breaks the session).
+        await self._setup_background_audio()
 
         if should_say_opening_statement(
             scenario=self.scenario,

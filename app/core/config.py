@@ -254,6 +254,29 @@ class Settings(BaseSettings):
         ),
     )
 
+    # ---- Comfort audio (ambient room tone) ----
+    # Perceived-latency lever: play a faint, constant room tone on the shared
+    # background-audio track for the whole session, so the dead-silent gap before
+    # a reply never sounds "muted"/"disconnected" (telephony comfort noise). Like
+    # the filler this does NOT change the measured response_latency_ms — it only
+    # masks the perceived gap. This is a GLOBAL flag (default on) with an off
+    # switch; there is no per-scenario opt-in (it's a baseline comfort).
+    COMFORT_AUDIO_ENABLED: bool = Field(
+        default=True,
+        description=(
+            "Global flag for the comfort-audio room tone. When True (default) a "
+            "faint ambient tone loops on the background-audio track so the line "
+            "never sounds dead between turns. Set False to disable everywhere."
+        ),
+    )
+    COMFORT_AUDIO_VOLUME: float = Field(
+        default=0.15,
+        description=(
+            "Playback volume (0-1) of the comfort-audio room tone. Kept low so "
+            "it sits under speech as barely-there 'air', not audible noise."
+        ),
+    )
+
     # ---- Conversation-history trimming (prompt shortening) ----
     # Per-scenario opt-in via prompt_data.history_trim_enabled (Studio toggle
     # "Trim History", default off). When on, only the last HISTORY_TRIM_DIALOGUES
