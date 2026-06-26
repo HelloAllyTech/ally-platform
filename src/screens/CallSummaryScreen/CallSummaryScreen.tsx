@@ -26,6 +26,7 @@ import {
 } from '@/hooks';
 import {useHideReviewDetails} from '@/hooks/useHideReviewDetails';
 import {RootStackScreenProps} from '@/navigation';
+import {useRetrySummaryMutation} from '@/services/callSummaryApi';
 import {useLazyGetScribeReactionsCountQuery} from '@/services/scribeReactionsApi';
 import {useUpdateScribeReviewStatusMutation} from '@/services/scribeReviewsApi';
 import {useLazyGetScribeThreadsQuery} from '@/services/scribeReviewThreadsApi';
@@ -127,6 +128,26 @@ export const CallSummaryScreen: React.FC<
   });
 
   const {showToast} = useToast();
+
+  const [retrySummary, {isLoading: isRetrying}] = useRetrySummaryMutation();
+
+  // Failed-summary retry: regenerate the summary from the saved transcript (the
+  // backend re-transcribes from stored audio when no transcript exists), then
+  // refresh so the regenerated summary — or the still-failed state — is shown.
+  const handleRetrySummary = useCallback(async () => {
+    if (!chatId) return;
+    try {
+      const res = await retrySummary(chatId).unwrap();
+      if (!res?.success) {
+        showToast(res?.message || t('summaryLoading.retryFailed'), 'error');
+      } else {
+        showToast(t('summaryLoading.retryStarted'), 'success');
+      }
+    } catch {
+      showToast(t('summaryLoading.retryFailed'), 'error');
+    }
+    handleRefresh();
+  }, [chatId, retrySummary, showToast, t, handleRefresh]);
 
   const scribeReviewId = summaryData?.reviewId ?? undefined;
   const isSharedForReview =
@@ -274,7 +295,10 @@ export const CallSummaryScreen: React.FC<
   );
 
   const showSummaryButtonLoader =
-    (isSummaryAvailable && !canShowSummary) || isLoading || refreshing;
+    (isSummaryAvailable && !canShowSummary) ||
+    isLoading ||
+    refreshing ||
+    isRetrying;
 
   const summaryActionButtonText = useMemo(
     () =>
@@ -291,7 +315,7 @@ export const CallSummaryScreen: React.FC<
       <View style={styles.summaryButtonsContainer}>
         {summaryStatus !== ChatSummaryStatus.NO_AUDIO && (
           <TouchableOpacity
-            onPress={handleRefresh}
+            onPress={hasSummaryFailed ? handleRetrySummary : handleRefresh}
             style={[styles.seeIfReadyButton, styles.marginB8]}
             disabled={showSummaryButtonLoader}>
             {showSummaryButtonLoader && (
