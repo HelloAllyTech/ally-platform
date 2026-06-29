@@ -307,6 +307,123 @@ class TestLLMFactory:
             create_llm_client(llm_config=llm_config, language_code="en-IN")
 
 
+class TestLLMFactoryTemperatureOverride:
+    """Roleplay-level temperature override (promptData.temperature)."""
+
+    @pytest.mark.unit
+    @patch("app.llms.factory.OpenAILLMClient")
+    def test_override_injected_when_no_config(self, mock_llm_class):
+        """Override lands in config even when no llm_config is provided."""
+        mock_llm_class.from_config.return_value = Mock()
+
+        create_llm_client(language_code="en-IN", temperature=0.2)
+
+        mock_llm_class.from_config.assert_called_once_with(
+            config={"model": "gpt-4o-mini", "temperature": 0.2},
+            language_code="en-IN",
+        )
+
+    @pytest.mark.unit
+    @patch("app.llms.factory.OpenAILLMClient")
+    def test_override_wins_over_llm_config_temperature(self, mock_llm_class):
+        """Roleplay override takes precedence over llm.config.temperature."""
+        mock_llm_class.from_config.return_value = Mock()
+
+        llm_config = {
+            "provider": "openai",
+            "config": {"model": "gpt-4", "temperature": 0.7},
+        }
+        create_llm_client(llm_config=llm_config, language_code="en-IN", temperature=0.3)
+
+        mock_llm_class.from_config.assert_called_once_with(
+            config={"model": "gpt-4", "temperature": 0.3},
+            language_code="en-IN",
+        )
+
+    @pytest.mark.unit
+    @patch("app.llms.factory.OpenAILLMClient")
+    def test_no_override_leaves_config_temperature_untouched(self, mock_llm_class):
+        """temperature=None leaves the existing config temperature in place."""
+        mock_llm_class.from_config.return_value = Mock()
+
+        llm_config = {
+            "provider": "openai",
+            "config": {"model": "gpt-4", "temperature": 0.7},
+        }
+        create_llm_client(
+            llm_config=llm_config, language_code="en-IN", temperature=None
+        )
+
+        mock_llm_class.from_config.assert_called_once_with(
+            config={"model": "gpt-4", "temperature": 0.7},
+            language_code="en-IN",
+        )
+
+    @pytest.mark.unit
+    @patch("app.llms.factory.GeminiLLMClient")
+    def test_override_applies_to_gemini(self, mock_gemini_class):
+        """Override is provider-agnostic — also applied for Gemini."""
+        mock_gemini_class.from_config.return_value = Mock()
+
+        llm_config = {
+            "provider": "gemini",
+            "config": {"model": "gemini-pro", "temperature": 0.9},
+        }
+        create_llm_client(
+            llm_config=llm_config, language_code="en-IN", temperature=0.25
+        )
+
+        mock_gemini_class.from_config.assert_called_once_with(
+            config={"model": "gemini-pro", "temperature": 0.25},
+            language_code="en-IN",
+        )
+
+    @pytest.mark.unit
+    @patch("app.llms.factory.OpenAILLMClient")
+    def test_override_zero_is_respected(self, mock_llm_class):
+        """temperature=0.0 is a real override, not treated as 'unset'."""
+        mock_llm_class.from_config.return_value = Mock()
+
+        create_llm_client(language_code="en-IN", temperature=0.0)
+
+        mock_llm_class.from_config.assert_called_once_with(
+            config={"model": "gpt-4o-mini", "temperature": 0.0},
+            language_code="en-IN",
+        )
+
+
+class TestConfigureLLMClientTemperature:
+    """configure_llm_client forwards promptData.temperature to the factory."""
+
+    def _make_scenario(self, temperature):
+        """Minimal stub exposing only what configure_llm_client reads."""
+        scenario = Mock()
+        scenario.language_config.llm_config = None
+        scenario.language_config.language_code = "en-IN"
+        scenario.prompt_data.temperature = temperature
+        return scenario
+
+    @pytest.mark.unit
+    @patch("app.core.agent.factory.create_llm_client")
+    def test_forwards_roleplay_temperature(self, mock_create):
+        from app.core.agent.factory import configure_llm_client
+
+        mock_create.return_value = Mock()
+        configure_llm_client(self._make_scenario(0.2))
+
+        assert mock_create.call_args.kwargs["temperature"] == 0.2
+
+    @pytest.mark.unit
+    @patch("app.core.agent.factory.create_llm_client")
+    def test_forwards_none_when_unset(self, mock_create):
+        from app.core.agent.factory import configure_llm_client
+
+        mock_create.return_value = Mock()
+        configure_llm_client(self._make_scenario(None))
+
+        assert mock_create.call_args.kwargs["temperature"] is None
+
+
 class TestOpenAILLMClientBaseUrl:
     """Test cases for OpenAILLMClient base_url support."""
 

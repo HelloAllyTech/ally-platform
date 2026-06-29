@@ -3,7 +3,7 @@ from datetime import timezone
 from enum import Enum
 from typing import Any, Dict, List, Mapping, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.core.branching_instructions.base import BranchingInstruction
 from app.core.config import settings
@@ -88,6 +88,49 @@ class PromptData(BaseModel):
         "When set, the simulation is shaped to help the counselor practice and "
         "learn this specific competency.",
     )
+    temperature: Optional[float] = Field(
+        default=None,
+        description=(
+            "Roleplay-level sampling temperature for the main response LLM "
+            "(Studio: temperature). When set, it overrides the provider-level "
+            "`llm.config.temperature` and the global LLM_TEMPERATURE default for "
+            "this simulation only. Lower values (e.g. 0.2-0.4) keep the persona "
+            "tightly consistent with the brief; higher values add variety. "
+            "Valid range 0.0-2.0; out-of-range values are clamped and a warning "
+            "is logged. None falls back to the existing temperature resolution."
+        ),
+    )
+
+    @field_validator("temperature", mode="before")
+    @classmethod
+    def _validate_temperature(cls, v: Any) -> Optional[float]:
+        """Coerce and clamp the roleplay temperature without ever crashing parse.
+
+        Bad/unparseable values become None (fall back to provider/global default)
+        rather than nulling out the whole PromptData. Out-of-range values clamp to
+        [0.0, 2.0] (the range both OpenAI and Gemini accept) with a warning so the
+        misconfiguration is visible in logs.
+        """
+        if v is None or v == "":
+            return None
+        try:
+            temperature = float(v)
+        except (TypeError, ValueError):
+            logger.warning(
+                "Ignoring invalid promptData.temperature=%r (not a number); "
+                "falling back to provider/global temperature",
+                v,
+            )
+            return None
+        clamped = min(2.0, max(0.0, temperature))
+        if clamped != temperature:
+            logger.warning(
+                "Clamping promptData.temperature %s -> %s (valid range 0.0-2.0)",
+                temperature,
+                clamped,
+            )
+        return clamped
+
     language_dialogue_samples: Optional[List] = Field(
         default=None,
         description=(
@@ -592,6 +635,7 @@ class Scenario(BaseModel):
                 "previous_memory": prompt_data_dict.get("previousMemory", None),
                 "prompts": prompt_data_dict.get("prompts"),
                 "competency": prompt_data_dict.get("competency", None),
+                "temperature": prompt_data_dict.get("temperature"),
                 "language_dialogue_samples": prompt_data_dict.get(
                     "languageDialogueSamples"
                 )

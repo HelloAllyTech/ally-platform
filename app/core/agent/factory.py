@@ -196,6 +196,11 @@ def configure_llm_client(scenario: Scenario) -> BaseLLMClient:
         else DEFAULT_LANGUAGE_CODE
     )
 
+    # Roleplay-level temperature override (promptData.temperature). When set, it
+    # takes precedence over llm.config.temperature and the global default; lets a
+    # persona that needs tight consistency run cooler than the platform default.
+    roleplay_temperature = getattr(scenario.prompt_data, "temperature", None)
+
     # Log LLM config for debugging
     if llm_config_from_metadata:
         logger.info(
@@ -206,17 +211,26 @@ def configure_llm_client(scenario: Scenario) -> BaseLLMClient:
     else:
         logger.info("No LLM config in scenario metadata, using defaults")
 
+    if roleplay_temperature is not None:
+        logger.info(
+            "Applying roleplay-level temperature override: %s", roleplay_temperature
+        )
+
     try:
         llm_client = create_llm_client(
             llm_config=llm_config_from_metadata,
             language_code=language_code,
+            temperature=roleplay_temperature,
         )
         logger.info(f"Successfully created LLM client: {type(llm_client).__name__}")
         return llm_client
     except Exception as e:
         logger.warning(f"LLM config failed, using default: {e}")
         logger.info("Falling back to default LLM configuration")
-        return create_llm_client(language_code=language_code)
+        return create_llm_client(
+            language_code=language_code,
+            temperature=roleplay_temperature,
+        )
 
 
 # ====================================================================

@@ -453,6 +453,21 @@ LLM_TEMPERATURE=0.7  # Optional, defaults to 0.7
 
 If not specified in metadata, the system uses the default OpenAI configuration from environment settings (model and temperature from `OPENAI_API_KEY` and `LLM_TEMPERATURE`).
 
+**Roleplay-level temperature override:**
+
+Temperature can also be set per-scenario at the roleplay level via `promptData.temperature`. When present, it overrides both `llm.config.temperature` and the global `LLM_TEMPERATURE` for that simulation's conversation responses. Lower values keep the persona tightly consistent with the brief; higher values add variety. Values are clamped to `0.0`–`2.0`.
+
+```json
+{
+  "promptData": {
+    "name": "Client Name",
+    "temperature": 0.3
+  }
+}
+```
+
+Resolution order (highest priority first): `promptData.temperature` → `llm.config.temperature` → `LLM_TEMPERATURE` (default `0.7`).
+
 **Open-Source Models (Ollama / vLLM):**
 
 For local development or dev server testing, you can use open-source models (Llama, Mistral, etc.) via Ollama or vLLM. Both expose OpenAI-compatible APIs.

@@ -266,6 +266,61 @@ class TestPromptData:
 
     @pytest.mark.unit
     @pytest.mark.parametrize(
+        "temperature_input,expected_temperature",
+        [
+            (0.2, 0.2),
+            (0, 0.0),
+            ("0.4", 0.4),  # numeric string coerced
+            (None, None),  # absent -> None (falls back to provider/global)
+            (2.5, 2.0),  # above range -> clamped
+            (-0.5, 0.0),  # below range -> clamped
+            ("hot", None),  # unparseable -> None, never crashes parse
+        ],
+    )
+    def test_prompt_data_temperature_mapping(
+        self, temperature_input, expected_temperature
+    ):
+        """Scenario._build_prompt_data maps `temperature` onto PromptData and the
+        validator coerces/clamps it to [0.0, 2.0]. Bad values degrade to None so
+        the whole PromptData is never nulled out over a misconfigured field."""
+        prompt_data = {
+            "name": "Temperature Test",
+            "age": "30",
+            "gender": "female",
+            "currentLocation": "Chennai",
+            "context": "Session",
+            "lifeHistory": "Background.",
+            "openingStatements": ["Hi"],
+        }
+        if temperature_input is not None:
+            prompt_data["temperature"] = temperature_input
+
+        result = Scenario._build_prompt_data({"promptData": prompt_data})
+
+        assert result is not None
+        assert result.temperature == expected_temperature
+
+    @pytest.mark.unit
+    def test_prompt_data_temperature_defaults_to_none(self):
+        """Absent `temperature` leaves PromptData.temperature None."""
+        result = Scenario._build_prompt_data(
+            {
+                "promptData": {
+                    "name": "No Temp",
+                    "age": "30",
+                    "gender": "male",
+                    "currentLocation": "Chennai",
+                    "context": "Session",
+                    "openingStatements": ["Hi"],
+                }
+            }
+        )
+
+        assert result is not None
+        assert result.temperature is None
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize(
         "age_input,expected_age",
         [(25, "25"), ("30", "30"), (35.5, "35.5"), ("forty", "forty")],  # String input
     )
