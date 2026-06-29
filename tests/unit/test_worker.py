@@ -141,14 +141,21 @@ class TestWorker:
         created = {}
 
         class DummyAgentSession:
-            def __init__(self, stt, tts, vad, turn_detection):
+            def __init__(self, stt, tts, vad, turn_detection, **kwargs):
                 self.stt = stt
                 self.tts = tts
                 self.vad = vad
                 self.turn_detection = turn_detection
+                self.endpointing_kwargs = kwargs
                 created["session"] = True
 
         monkeypatch.setattr(worker, "AgentSession", DummyAgentSession)
+        # Pin the plain-VAD path so this test deterministically asserts the
+        # STT/TTS/VAD wiring (the semantic-EOU branch is covered separately in
+        # the _resolve_turn_detection tests below).
+        monkeypatch.setattr(
+            worker.settings, "SEMANTIC_TURN_DETECTION_ENABLED", False, raising=False
+        )
 
         class MockCtx:
             def __init__(self):
@@ -168,6 +175,66 @@ class TestWorker:
         assert worker_instance.session.tts == "TTS"
         assert worker_instance.session.vad == "VAD"
         assert worker_instance.session.turn_detection == "vad"
+        assert worker_instance.session.endpointing_kwargs == {}
+
+    # -------------------- _resolve_turn_detection --------------------
+    def _bare_worker(self):
+        ctx = types.SimpleNamespace(room=types.SimpleNamespace(name="room-1"))
+        return worker.AgentWorker(ctx)
+
+    def test_resolve_turn_detection_no_vad_returns_none(self):
+        td, kwargs = self._bare_worker()._resolve_turn_detection(None)
+        assert td is None
+        assert kwargs == {}
+
+    def test_resolve_turn_detection_flag_off_uses_vad(self, monkeypatch):
+        monkeypatch.setattr(
+            worker.settings, "SEMANTIC_TURN_DETECTION_ENABLED", False, raising=False
+        )
+        td, kwargs = self._bare_worker()._resolve_turn_detection("VAD")
+        assert td == "vad"
+        assert kwargs == {}
+
+    def test_resolve_turn_detection_semantic_builds_model(self, monkeypatch):
+        import livekit.plugins.turn_detector.multilingual as ml
+
+        class FakeMultilingualModel:
+            def __init__(self):
+                pass
+
+        monkeypatch.setattr(ml, "MultilingualModel", FakeMultilingualModel)
+        monkeypatch.setattr(
+            worker.settings, "SEMANTIC_TURN_DETECTION_ENABLED", True, raising=False
+        )
+        monkeypatch.setattr(
+            worker.settings, "TURN_MIN_ENDPOINTING_DELAY", 0.4, raising=False
+        )
+        monkeypatch.setattr(
+            worker.settings, "TURN_MAX_ENDPOINTING_DELAY", 4.0, raising=False
+        )
+
+        td, kwargs = self._bare_worker()._resolve_turn_detection("VAD")
+        assert isinstance(td, FakeMultilingualModel)
+        assert kwargs == {
+            "min_endpointing_delay": 0.4,
+            "max_endpointing_delay": 4.0,
+        }
+
+    def test_resolve_turn_detection_falls_back_when_model_unavailable(
+        self, monkeypatch
+    ):
+        import livekit.plugins.turn_detector.multilingual as ml
+
+        def _boom():
+            raise RuntimeError("weights not downloaded")
+
+        monkeypatch.setattr(ml, "MultilingualModel", _boom)
+        monkeypatch.setattr(
+            worker.settings, "SEMANTIC_TURN_DETECTION_ENABLED", True, raising=False
+        )
+        td, kwargs = self._bare_worker()._resolve_turn_detection("VAD")
+        assert td == "vad"
+        assert kwargs == {}
 
     # -------------------- entrypoint --------------------
     class DummyRoom:
@@ -368,7 +435,7 @@ class TestWorker:
         # Mock AgentSession to return our dummy session
         dummy_session = self.DummySession()
         monkeypatch.setattr(
-            worker, "AgentSession", lambda stt, tts, vad, turn_detection: dummy_session
+            worker, "AgentSession", lambda stt, tts, vad, turn_detection, **kwargs: dummy_session
         )
 
         # Conversation handler factory (just return passthrough fn)
@@ -565,7 +632,7 @@ class TestWorker:
 
         dummy_session = self.DummySession()
         monkeypatch.setattr(
-            worker, "AgentSession", lambda stt, tts, vad, turn_detection: dummy_session
+            worker, "AgentSession", lambda stt, tts, vad, turn_detection, **kwargs: dummy_session
         )
         monkeypatch.setattr(worker, "Agent", self.DummyAgent)
         monkeypatch.setattr(agent_graph, "update_state", lambda *a, **k: None)
@@ -934,7 +1001,7 @@ class TestWorker:
 
         dummy_session = self.DummySession()
         monkeypatch.setattr(
-            worker, "AgentSession", lambda stt, tts, vad, turn_detection: dummy_session
+            worker, "AgentSession", lambda stt, tts, vad, turn_detection, **kwargs: dummy_session
         )
         monkeypatch.setattr(worker, "Agent", self.DummyAgent)
         monkeypatch.setattr(agent_graph, "update_state", lambda *a, **k: None)
@@ -1056,7 +1123,7 @@ class TestWorker:
 
         dummy_session = self.DummySession()
         monkeypatch.setattr(
-            worker, "AgentSession", lambda stt, tts, vad, turn_detection: dummy_session
+            worker, "AgentSession", lambda stt, tts, vad, turn_detection, **kwargs: dummy_session
         )
         monkeypatch.setattr(worker, "Agent", self.DummyAgent)
         monkeypatch.setattr(agent_graph, "update_state", lambda *a, **k: None)
@@ -1192,7 +1259,7 @@ class TestWorker:
 
         dummy_session = self.DummySession()
         monkeypatch.setattr(
-            worker, "AgentSession", lambda stt, tts, vad, turn_detection: dummy_session
+            worker, "AgentSession", lambda stt, tts, vad, turn_detection, **kwargs: dummy_session
         )
         monkeypatch.setattr(worker, "Agent", self.DummyAgent)
         monkeypatch.setattr(agent_graph, "update_state", lambda *a, **k: None)
@@ -1387,7 +1454,7 @@ class TestWorker:
 
         dummy_session = MockSessionWithSay()
         monkeypatch.setattr(
-            worker, "AgentSession", lambda stt, tts, vad, turn_detection: dummy_session
+            worker, "AgentSession", lambda stt, tts, vad, turn_detection, **kwargs: dummy_session
         )
         monkeypatch.setattr(worker, "Agent", self.DummyAgent)
         monkeypatch.setattr(agent_graph, "update_state", lambda *a, **k: None)
@@ -1594,7 +1661,7 @@ class TestWorker:
 
         dummy_session = self.DummySession()
         monkeypatch.setattr(
-            worker, "AgentSession", lambda stt, tts, vad, turn_detection: dummy_session
+            worker, "AgentSession", lambda stt, tts, vad, turn_detection, **kwargs: dummy_session
         )
         monkeypatch.setattr(worker, "Agent", self.DummyAgent)
         monkeypatch.setattr(agent_graph, "update_state", lambda *a, **k: None)
