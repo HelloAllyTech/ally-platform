@@ -457,6 +457,41 @@ class Settings(BaseSettings):
         ),
     )
 
+    # ---- Semantic turn detection (end-of-utterance model) ----
+    # Latency lever for the FRONT of the turn (eou_delay_ms): instead of a fixed
+    # VAD silence timeout, the LiveKit multilingual EOU model reads the running
+    # transcript and modulates the endpointing delay between MIN and MAX —
+    # collapsing toward MIN when the utterance looks grammatically complete (fast
+    # reply) and extending toward MAX when the learner is likely mid-thought
+    # (fewer barge-ins). The model still rides ON TOP of VAD (never replaces it).
+    # IMPORTANT — language coverage: the multilingual model only supports a fixed
+    # set (of ours: English and Hindi). For any other language (Tamil, Telugu,
+    # etc.) LiveKit transparently falls back to the plain VAD endpointing, i.e.
+    # exactly the prior behaviour — no regression, no benefit. This GLOBAL flag is
+    # the kill-switch; set False to force the plain VAD timeout everywhere.
+    SEMANTIC_TURN_DETECTION_ENABLED: bool = Field(
+        default=True,
+        description=(
+            "Global kill-switch for semantic (EOU-model) turn detection. When "
+            "False, the session uses the plain VAD silence timeout (prior "
+            "behaviour). Unsupported languages fall back to VAD regardless."
+        ),
+    )
+    TURN_MIN_ENDPOINTING_DELAY: float = Field(
+        default=0.5,
+        description=(
+            "Minimum endpointing delay (s) — the fast path used when the EOU "
+            "model is confident the learner finished. LiveKit default 0.5."
+        ),
+    )
+    TURN_MAX_ENDPOINTING_DELAY: float = Field(
+        default=3.0,
+        description=(
+            "Maximum endpointing delay (s) — the ceiling the agent waits when the "
+            "learner is likely mid-thought. LiveKit default 3.0."
+        ),
+    )
+
     # ---- Conversation-history trimming (prompt shortening) ----
     # Per-scenario opt-in via prompt_data.history_trim_enabled (Studio toggle
     # "Trim History", default off). When on, only the last HISTORY_TRIM_DIALOGUES

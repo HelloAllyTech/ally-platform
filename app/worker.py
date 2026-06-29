@@ -433,12 +433,66 @@ class AgentWorker:
         stt_instance = self.stt_client.stt_instance
         tts_instance = self.tts_client.tts_instance
 
+        # Semantic EOU (multilingual) layered on VAD when enabled, else the plain
+        # VAD silence timeout (prior behaviour). See _resolve_turn_detection for
+        # the language-coverage + graceful-fallback details.
+        turn_detection, endpointing_kwargs = self._resolve_turn_detection(vad)
+
         self.session = AgentSession(
             stt=stt_instance,
             tts=tts_instance,
             vad=vad,
-            turn_detection="vad" if vad else None,
+            turn_detection=turn_detection,
+            **endpointing_kwargs,
         )
+
+    def _resolve_turn_detection(self, vad) -> tuple[object, dict]:
+        """Pick the turn-detection strategy + endpointing bounds for this session.
+
+        Default (SEMANTIC_TURN_DETECTION_ENABLED, on): the LiveKit multilingual
+        end-of-utterance model layered ON TOP of VAD. It reads the running
+        transcript and modulates the endpointing delay between
+        TURN_MIN/MAX_ENDPOINTING_DELAY — collapsing toward MIN when the utterance
+        looks grammatically complete (fast reply) and extending toward MAX when
+        the learner is likely mid-thought (fewer barge-ins). The win surfaces in
+        the eou_delay_ms metric.
+
+        Language coverage: the multilingual model only supports a fixed set (of
+        ours: English and Hindi). For any other language (Tamil, Telugu, etc.)
+        LiveKit transparently uses the plain VAD endpointing instead — exactly
+        the prior behaviour, so there is no regression for unsupported languages.
+
+        Fully defensive: with no VAD, or the flag off, or the model unavailable
+        (e.g. weights weren't baked into the image), we fall back to the plain
+        "vad" timeout so a session never fails to start over turn detection.
+        Returns ``(turn_detection, endpointing_kwargs)``.
+        """
+        if not vad:
+            return None, {}
+        if not getattr(settings, "SEMANTIC_TURN_DETECTION_ENABLED", True):
+            return "vad", {}
+        try:
+            from livekit.plugins.turn_detector.multilingual import MultilingualModel
+
+            min_delay = float(getattr(settings, "TURN_MIN_ENDPOINTING_DELAY", 0.5))
+            max_delay = float(getattr(settings, "TURN_MAX_ENDPOINTING_DELAY", 3.0))
+            detector = MultilingualModel()
+            logger.info(
+                "[TURN] semantic EOU enabled (multilingual; min=%.2fs max=%.2fs); "
+                "VAD fallback for unsupported languages",
+                min_delay,
+                max_delay,
+            )
+            return detector, {
+                "min_endpointing_delay": min_delay,
+                "max_endpointing_delay": max_delay,
+            }
+        except Exception as e:  # noqa: BLE001 - never fail a session over turn detection
+            logger.warning(
+                "[TURN] semantic EOU unavailable (%s); falling back to VAD timeout",
+                e,
+            )
+            return "vad", {}
 
     def _setup_event_orchestrator(self, score_keeper=None):
         """Initialize event orchestrator with callbacks."""
