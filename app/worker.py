@@ -373,10 +373,20 @@ class AgentWorker:
         # Configure LLM client
         self.llm_client = configure_llm_client(self.scenario)
 
-        # Speech prosody is deprecated: the session-start baseline voice tuning
-        # and the per-turn rewrite were removed. ElevenLabs v3 expressiveness is
-        # now produced inline by generate_response, so there is no baseline
-        # prosody task to fire here.
+        # Fire prosody generation as a background task so configure() returns
+        # immediately and the agent can join the room while prosody is generating.
+        # _await_prosody() in start() will collect the result before first speech.
+
+        from app.speech_prosody.service import SpeechProsodyService
+
+        self._prosody_service = SpeechProsodyService(self.tts_client)
+        self._prosody_task: Optional[asyncio.Task] = asyncio.create_task(
+            self._prosody_service.generate_and_set_defaults(
+                scenario=self.scenario,
+                llm_client=self.llm_client,
+            )
+        )
+        logger.info("[AgentWorker] Phase 1: Prosody generation started in background.")
 
         logger.info("[AgentWorker] Configuration phase complete")
 
@@ -984,6 +994,28 @@ class AgentWorker:
             limit,
         )
         self.ctx.shutdown("max_duration_exceeded")
+
+    async def _await_prosody(self) -> None:
+        """Collect the background prosody task and apply defaults to the TTS client."""
+        task = getattr(self, "_prosody_task", None)
+        if task is None:
+            return
+        try:
+            await asyncio.wait_for(task, timeout=1.5)
+            defaults = self._prosody_service.get_default_parameters()
+            self.tts_client._default_params = defaults.copy()
+            logger.info("[AgentWorker] Prosody configuration applied.")
+        except asyncio.TimeoutError:
+            logger.warning(
+                "[AgentWorker] Prosody generation timed out after 1.5s, "
+                "using safe defaults."
+            )
+        except Exception as e:
+            logger.error(
+                f"[AgentWorker] Prosody generation failed: {e}. Using safe defaults."
+            )
+        finally:
+            self._prosody_task = None
 
     def _resolve_comfort_audio(self):
         """Build the comfort-audio ambient source, or None when disabled.
@@ -1985,6 +2017,9 @@ class AgentWorker:
         # Initialize event orchestrator (only after session is connected)
         await self.event_orchestrator.initialize()
 
+        # Collect background prosody task before first speech synthesis call
+        await self._await_prosody()
+
         # Set up the shared background-audio track — comfort room tone and the
         # thinking-filler (best-effort; never blocks or breaks the session).
         await self._setup_background_audio()
@@ -2091,9 +2126,39 @@ class AgentWorker:
                 # Don't shutdown - this is a configuration error that should be fixed
                 return
 
-            # Speech prosody is deprecated — the termination message plays with the
-            # TTS provider's configured voice (no per-message prosody rewrite).
-            termination_text_to_say = self._termination_message
+            # Step 1: Generate new prosody parameters for termination message
+            # Termination is a significant moment - pass current parameters for context
+            # so LLM can make informed decisions about the transition.
+            # Skip the prosody pass when the simulation has prosody disabled —
+            # the termination message will play with the TTS provider's defaults.
+            prosody_enabled = getattr(self.scenario.prompt_data, "enable_prosody", True)
+            if prosody_enabled:
+                from app.speech_prosody.service import (
+                    SpeechProsodyService,
+                    generate_and_apply_prosody_for_message,
+                )
+
+                # Get current parameters for context (LLM will decide on transition)
+                prosody_service = SpeechProsodyService(self.tts_client)
+                current_params = prosody_service.get_current_parameters()
+
+                # Generate parameters for termination message
+                # Pass current parameters so LLM can make context-aware decisions
+                # about the transition (dramatic shift vs subtle change)
+                termination_text_to_say = await generate_and_apply_prosody_for_message(
+                    tts_client=self.tts_client,
+                    message_text=self._termination_message,
+                    llm_client=self.llm_client,
+                    scenario=self.scenario,
+                    conversation_history=None,  # No history for termination
+                    conversation_history_limit=0,
+                    current_parameters=current_params,
+                )
+            else:
+                termination_text_to_say = None
+
+            if not termination_text_to_say:
+                termination_text_to_say = self._termination_message
 
             # Step 2: Interrupt any current speech to prevent other utterances
             # from playing

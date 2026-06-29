@@ -46,17 +46,15 @@ def build_resolve_branching_subgraph() -> CompiledStateGraph[SimulationState]:
 
 def build_voice_expressions_subgraph() -> CompiledStateGraph[SimulationState]:
     """
-    Build the terminal reply-path subgraph.
+    Build a subgraph for applying voice expressions.
 
-    NOTE: this used to run the per-turn speech-prosody pass. Prosody is
-    deprecated — ElevenLabs v3 audio tags are now produced INLINE by
-    generate_response — so ``apply_voice_expressions`` is a thin node that only
-    publishes the ``done_thinking`` signal. The subgraph wrapper is retained for
-    topology stability (it also harmlessly keeps any node output off the streamed
-    path).
+    This subgraph is isolated from the main graph's streaming output.
+    When subgraphs=False (default in LLMAdapter), the LLM outputs from
+    this subgraph will NOT be streamed to TTS/UI, preventing the parameters
+    dict from appearing in the agent's response.
 
     Returns:
-        Compiled subgraph wrapping apply_voice_expressions
+        Compiled subgraph that applies voice expressions
 
     Raises:
         ImportError: If apply_voice_expressions cannot be imported
@@ -111,18 +109,16 @@ def build_simulation_graph() -> StateGraph[SimulationState]:
     3. resolve_branching_instruction: Resolves branching instructions with LLM calls
        (as subgraph)
     4. generate_response: Generates LLM response based on detected events
-    5. apply_voice_expressions: terminal reply-path node that publishes the
-       done_thinking signal. Speech prosody is deprecated/removed, so it no
-       longer rewrites the reply or applies voice parameters (as subgraph).
+    5. apply_voice_expressions: Applies voice expression parameters and text enhancement
+       (as subgraph)
     6. send_event_feedback: Sends event and behavior feedback to the UI and clears
        transient state. Separated from generate_response so the core nodes can be
        reused by the report graph without UI concerns.
 
-    Note: resolve_branching_instruction and retrieve_knowledge are subgraphs to
-    prevent their LLM outputs from being streamed. With subgraphs=False (default
-    in LLMAdapter), only root graph outputs are streamed. apply_voice_expressions
-    is also wrapped as a subgraph for topology consistency (it emits no LLM
-    output now).
+    Note: resolve_branching_instruction, retrieve_knowledge, and
+    apply_voice_expressions are subgraphs to prevent their LLM outputs from
+    being streamed. With subgraphs=False (default in LLMAdapter), only root
+    graph outputs are streamed.
 
     This is a workaround for LiveKit issue #2836:
     https://github.com/livekit/agents/issues/2836
@@ -204,9 +200,9 @@ def build_simulation_graph() -> StateGraph[SimulationState]:
     graph.add_edge("resolve_branching_instruction", "generate_response")
     graph.add_edge("resolve_branching_instruction", "send_event_feedback")
 
-    # Build the apply_voice_expressions subgraph and add it as a node.
-    # It is now only the done_thinking terminal node (prosody removed); the
-    # subgraph wrapper is kept for topology stability.
+    # Build the apply_voice_expressions subgraph and add it as a node
+    # This prevents its LLM outputs (for voice expression parameters) from being
+    # streamed
     voice_expressions_subgraph = build_voice_expressions_subgraph()
     graph.add_node("apply_voice_expressions", voice_expressions_subgraph)
 
