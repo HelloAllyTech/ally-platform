@@ -266,6 +266,44 @@ class TestPromptData:
 
     @pytest.mark.unit
     @pytest.mark.parametrize(
+        "field_camel,field_snake",
+        [
+            ("enablePerformativeText", "enable_performative_text"),
+            ("enableBreakTags", "enable_break_tags"),
+        ],
+    )
+    @pytest.mark.parametrize(
+        "value_input,expected",
+        [
+            (True, True),
+            (False, False),
+            (None, False),  # default OFF when the key is absent
+        ],
+    )
+    def test_prompt_data_expression_flag_mapping(
+        self, field_camel, field_snake, value_input, expected
+    ):
+        """enablePerformativeText / enableBreakTags map onto PromptData
+        (camelCase → snake_case) and default to False (off) when absent."""
+        prompt_data = {
+            "name": "Expression Toggle Test",
+            "age": "30",
+            "gender": "female",
+            "currentLocation": "Chennai",
+            "context": "Session",
+            "lifeHistory": "Background.",
+            "openingStatements": ["Hi"],
+        }
+        if value_input is not None:
+            prompt_data[field_camel] = value_input
+
+        result = Scenario._build_prompt_data({"promptData": prompt_data})
+
+        assert result is not None
+        assert getattr(result, field_snake) is expected
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize(
         "temperature_input,expected_temperature",
         [
             (0.2, 0.2),

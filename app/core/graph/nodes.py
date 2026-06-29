@@ -1063,6 +1063,59 @@ def _trim_history_to_last_dialogues(messages: list, max_dialogues: int) -> list:
     return messages[start:]
 
 
+def _resolve_voice_expression_guidance(
+    tts_client: Any, prompt_data: Any
+) -> tuple[Optional[str], Optional[str]]:
+    """Resolve inline voice-expression guidance to fold into the persona prompt.
+
+    Returns ``(audio_tag_instructions, text_expressivity_instructions)``; at most
+    one is non-None. All text resolves from prompt management (dashboard override
+    winning over the local ``app/prompts/system/*.txt``):
+
+    * ElevenLabs v3 (``supports_text_enhancement()``): inline audio tags, ALWAYS
+      on (``system/audio_tag_guidance``).
+    * any other provider: per-simulation opt-in (default off) performative-text
+      (``enable_performative_text``) and/or ``<break>`` (``enable_break_tags``)
+      guidance. Break guidance is gated ALSO on ``supports_break_tags()`` so an
+      unrecognized ``<break/>`` is never spoken aloud on a non-parsing provider —
+      the reply now reaches TTS unmodified.
+    """
+    if tts_client is None:
+        return None, None
+    try:
+        if tts_client.supports_text_enhancement():
+            audio_tag_instructions = (
+                load_template("system/audio_tag_guidance", prompt_data) or None
+            )
+            if not audio_tag_instructions:
+                # Provider supports tags but guidance resolved empty (missing
+                # local .txt / empty dashboard override). Don't fail the turn,
+                # but warn — v3 would otherwise speak tag-less with no signal.
+                logger.warning(
+                    "[generate_response] audio tag guidance empty for "
+                    "tag-capable provider; emitting reply without inline tags"
+                )
+            return audio_tag_instructions, None
+
+        parts = []
+        if getattr(prompt_data, "enable_performative_text", False):
+            parts.append(
+                load_template("system/text_expressivity_guidance", prompt_data)
+            )
+        if getattr(prompt_data, "enable_break_tags", False) and (
+            tts_client.supports_break_tags()
+        ):
+            parts.append(load_template("system/break_tag_guidance", prompt_data))
+        text_expressivity_instructions = "\n\n".join(p for p in parts if p) or None
+        return None, text_expressivity_instructions
+    except Exception:
+        logger.exception(
+            "[generate_response] failed to resolve voice expression guidance; "
+            "emitting reply without it"
+        )
+        return None, None
+
+
 @instrumented_node("generate_response")
 async def generate_response(
     state: SimulationState, config: Optional[RunnableConfig] = None
@@ -1095,47 +1148,20 @@ async def generate_response(
         cast(Scenario, config["configurable"].get("scenario")) if config else None
     )
 
-    # ElevenLabs v3 supports inline audio tags ([pause], [sighs], [empathetic],
-    # ...). When the scenario's TTS provider supports them, fold the tag guidance
-    # into the persona prompt so the agent emits tags inline as it generates —
-    # letting tokens stream straight to TTS (STREAM_RESPONSE) instead of waiting
-    # on a second prosody LLM call to rewrite the reply (skipped via
-    # PROSDY_FORCE_SKIP). The guidance TEXT is resolved from prompt management
-    # (code `ally_ai_learn_system_audio_tag_guidance`, local fallback
-    # `app/prompts/system/audio_tag_guidance.txt`): dashboard override wins, else
-    # the local .txt. Stays None for v2 ElevenLabs and every non-tag provider,
-    # leaving the prompt unchanged.
+    # Fold inline voice-expression guidance into the persona prompt (see
+    # _resolve_voice_expression_guidance): ElevenLabs v3 → audio tags (always
+    # on); other providers → opt-in performative-text / <break> guidance. It
+    # streams straight to TTS with no second LLM call.
     tts_client = (
         config["configurable"].get("tts_client")
         if config and "configurable" in config
         else None
     )
-    audio_tag_instructions = None
-    if tts_client is not None:
-        try:
-            if tts_client.supports_text_enhancement():
-                audio_tag_instructions = (
-                    load_template(
-                        "system/audio_tag_guidance",
-                        scenario.prompt_data if scenario is not None else None,
-                    )
-                    or None
-                )
-                if not audio_tag_instructions:
-                    # Provider supports tags but guidance resolved empty (missing
-                    # local .txt / empty dashboard override). Don't fail the turn,
-                    # but warn — v3 would otherwise speak tag-less with no signal
-                    # (the prosody fallback that used to add tags is force-skipped).
-                    logger.warning(
-                        "[generate_response] audio tag guidance empty for "
-                        "tag-capable provider; emitting reply without inline tags"
-                    )
-        except Exception:
-            logger.exception(
-                "[generate_response] failed to resolve audio tag guidance; "
-                "emitting reply without inline tags"
-            )
-            audio_tag_instructions = None
+    audio_tag_instructions, text_expressivity_instructions = (
+        _resolve_voice_expression_guidance(
+            tts_client, scenario.prompt_data if scenario is not None else None
+        )
+    )
 
     # Get language code
     language_code = DEFAULT_LANGUAGE_CODE
@@ -1178,6 +1204,7 @@ async def generate_response(
             retrieved_context=state.retrieved_context,
             current_score=turn_score,
             audio_tag_instructions=audio_tag_instructions,
+            text_expressivity_instructions=text_expressivity_instructions,
         )
 
         room_name = ""
