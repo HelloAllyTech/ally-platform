@@ -180,11 +180,10 @@ class Settings(BaseSettings):
     PROSODY_GENERATION_TIMEOUT: float = Field(
         default=3.0,
         description=(
-            "Upper limit in seconds for prosody / voice-expression LLM call in "
-            "apply_voice_expressions. On timeout, the original text is used. "
-            "Prosody is on the serial critical path before first audio, so this "
-            "is kept tight (was 15s): a slow prosody call falls back to raw text "
-            "quickly instead of blocking the turn. Measured by prosodyMs."
+            "DEPRECATED / inert — speech prosody is no longer wired into the "
+            "pipeline (v3 audio tags are produced inline by generate_response). "
+            "Formerly the upper limit in seconds for the prosody LLM call in "
+            "apply_voice_expressions. Retained for a later hard removal."
         ),
     )
     ORCHESTRATION_TIMEOUT: float = Field(
@@ -695,48 +694,33 @@ class Settings(BaseSettings):
         ),
     )
 
-    # Speech prosody skip thresholds (reduce latency when under pressure)
-    # When skipped, TTS keeps last params instead of running prosody LLM call
+    # DEPRECATED / inert — speech prosody has been removed from the pipeline.
+    # ElevenLabs v3 expressiveness is produced inline by generate_response, so the
+    # per-turn prosody node no longer runs and these flags no longer gate anything.
+    # Retained (not deleted) for a later hard removal; do not rely on them.
     PROSDY_FORCE_SKIP: bool = Field(
         default=True,
         description=(
-            "Latency kill-switch: when True, the apply_voice_expressions prosody "
-            "LLM call is skipped unconditionally so the (streamed) "
-            "generate_response reply goes straight to TTS. Default True, paired "
-            "with STREAM_RESPONSE: ElevenLabs v3 audio tags are now produced "
-            "INLINE by generate_response (the persona prompt carries the tag "
-            "instructions), so skipping the second rewrite call no longer loses "
-            "tags. TTS keeps the session-default voice params. Set False to "
-            "restore the per-turn prosody rewrite (and lose streaming's gains)."
+            "DEPRECATED / inert. Formerly the latency kill-switch that skipped "
+            "the apply_voice_expressions prosody LLM call. Prosody is now "
+            "removed from the pipeline entirely, so this flag has no effect."
         ),
     )
     PROSDY_SKIP_ENABLED: bool = Field(
         default=True,
-        description=(
-            "Enable skip-when-under-pressure logic. "
-            "When False, always run prosody (no skip)."
-        ),
+        description="DEPRECATED / inert — prosody removed from the pipeline.",
     )
     PROSDY_SKIP_MIN_RESPONSE_LENGTH: int = Field(
         default=50,
-        description=(
-            "Skip prosody when response is shorter than this (chars). "
-            "Short responses have low prosody impact."
-        ),
+        description="DEPRECATED / inert — prosody removed from the pipeline.",
     )
     PROSDY_SKIP_MAX_RESPONSE_LENGTH: int = Field(
         default=0,
-        description=(
-            "Skip prosody when response is longer than this (chars). "
-            "0 = disabled. Avoids compounding latency on long responses."
-        ),
+        description="DEPRECATED / inert — prosody removed from the pipeline.",
     )
     PROSDY_SKIP_WHEN_EVENTS_DETECTED: bool = Field(
         default=True,
-        description=(
-            "Skip prosody when events detected this turn. "
-            "Prioritizes responsiveness over voice expression."
-        ),
+        description="DEPRECATED / inert — prosody removed from the pipeline.",
     )
 
 

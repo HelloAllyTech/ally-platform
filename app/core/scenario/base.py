@@ -180,11 +180,11 @@ class PromptData(BaseModel):
     enable_prosody: bool = Field(
         default=True,
         description=(
-            "Per-simulation toggle for speech prosody generation. "
-            "When False, the runtime prosody node is skipped and the TTS "
-            "client keeps its current/default parameters; no SSML/audio-tag "
-            "enhancement is applied either. Default True for backwards "
-            "compatibility with existing scenarios."
+            "DEPRECATED / inert — speech prosody has been removed from the "
+            "pipeline, so this per-simulation toggle no longer has any effect. "
+            "Retained (and still parsed from `enableProsody`) for backwards "
+            "compatibility with stored scenarios; will be removed in a later "
+            "release."
         ),
     )
     filler_enabled: bool = Field(
