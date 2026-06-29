@@ -187,26 +187,6 @@ class PromptData(BaseModel):
             "release."
         ),
     )
-    enable_performative_text: bool = Field(
-        default=False,
-        description=(
-            "Per-simulation opt-in (default OFF) for performative-text voice "
-            "expression on non-ElevenLabs-v3 voices. When True, generate_response "
-            "folds plain-text delivery guidance (punctuation, pacing, "
-            "disfluencies — no markup) into the persona prompt so the streamed "
-            "reply reads more expressively. No effect on v3 (audio tags) or when "
-            "off. Parsed from `enablePerformativeText`."
-        ),
-    )
-    enable_break_tags: bool = Field(
-        default=False,
-        description=(
-            "Per-simulation opt-in (default OFF) for inline `<break time=.../>` "
-            "tags. Only takes effect on providers that parse break tags "
-            "(ElevenLabs non-v3); ignored elsewhere so the token is never spoken "
-            "aloud. Parsed from `enableBreakTags`."
-        ),
-    )
     filler_enabled: bool = Field(
         default=False,
         description=(
@@ -674,12 +654,6 @@ class Scenario(BaseModel):
                     True
                     if prompt_data_dict.get("enableProsody") is None
                     else bool(prompt_data_dict.get("enableProsody"))
-                ),
-                "enable_performative_text": bool(
-                    prompt_data_dict.get("enablePerformativeText") or False
-                ),
-                "enable_break_tags": bool(
-                    prompt_data_dict.get("enableBreakTags") or False
                 ),
                 "filler_enabled": bool(prompt_data_dict.get("fillerEnabled") or False),
                 "comfort_audio_enabled": bool(

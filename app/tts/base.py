@@ -216,20 +216,6 @@ class BaseTTSClient(ABC):
         """
         return False
 
-    def supports_break_tags(self) -> bool:
-        """
-        Whether this provider interprets inline ``<break time="..."/>`` tags.
-
-        Capability flag only; gates the optional per-simulation break-tag guidance
-        (prompt code ``ally_ai_learn_system_break_tag_guidance``). Must stay False
-        for any provider that would SPEAK an unrecognized ``<break/>`` token aloud
-        — the reply text now reaches TTS unmodified (no SSML sanitizer on the path).
-
-        Returns:
-            True if the provider honors inline break tags, else False.
-        """
-        return False
-
     def get_defaults_for_learn_service(self) -> dict:
         """
         Get default parameter values for learn service.

@@ -1,9 +1,0 @@
-You may also insert literal pause markers using the break tag, which this voice
-interprets as a real silence (it is NOT spoken aloud):
-
-  <break time="0.5s" />   up to   <break time="1.5s" />
-
-Use them sparingly, only where a deliberate beat helps — before a vulnerable
-admission, after a heavy statement, or to let a thought settle. Keep durations
-between 0.3s and 1.5s. Use at most one or two per reply, and never place
-anything other than the exact <break time="..." /> token inside angle brackets.
