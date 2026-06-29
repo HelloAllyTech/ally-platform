@@ -51,6 +51,16 @@ from app.llms import BaseLLMClient
 from app.stt import BaseSTTClient
 from app.tts import BaseTTSClient
 
+# Register the multilingual EOU inference runner at MODULE IMPORT (not lazily per
+# job): livekit-agents only creates + warms its inference-executor process when
+# _InferenceRunner.registered_runners is non-empty at Worker.__init__ time, and the
+# runner registers as an import side effect of this module. Without this top-level
+# import the executor is never created, EOU inference returns "no inference executor"
+# at the first turn, and turn detection silently falls back to VAD (feature inert).
+# Gated on the kill-switch so a disabled feature spawns no inference process.
+if settings.SEMANTIC_TURN_DETECTION_ENABLED:
+    from livekit.plugins.turn_detector import multilingual as _eou_multilingual  # noqa: F401
+
 logger = get_logger(__name__)
 setup_logging(
     settings.LIVEKIT_LOG_LEVEL,
