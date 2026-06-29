@@ -1,0 +1,8 @@
+{
+    "name": "Break Tag Guidance",
+    "kind": "prompt",
+    "promptType": "break_tag_guidance",
+    "hasStates": false,
+    "description": "Inline <break time=.../> guidance for ElevenLabs (non-v3) voices. Appended to the persona prompt by generate_response when the scenario opts in (enableBreakTags) and the provider parses break tags. No template variables.",
+    "availableVariables": []
+}

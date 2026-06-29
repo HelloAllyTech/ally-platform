@@ -1,0 +1,8 @@
+{
+    "name": "Text Expressivity Guidance",
+    "kind": "prompt",
+    "promptType": "text_expressivity_guidance",
+    "hasStates": false,
+    "description": "Performative-text voice expression for non-v3 voices (punctuation, pacing, disfluencies — no markup). Appended to the persona prompt by generate_response when the scenario opts in (enablePerformativeText). No template variables.",
+    "availableVariables": []
+}

@@ -232,6 +232,15 @@ class ElevenLabsTTSClient(BaseTTSClient):
         """
         return self._supports_audio_tags
 
+    def supports_break_tags(self) -> bool:
+        """
+        ElevenLabs interprets inline ``<break time="..."/>`` tags on all models.
+
+        v3 voices are routed through the audio-tag path (checked first), so in
+        practice this break-tag guidance is used only for v2/turbo/flash.
+        """
+        return True
+
     def _apply_parameters_dict(self, params_dict: Dict[str, Any]) -> None:
         """
         Apply validated parameters dict to ElevenLabs TTS instance.

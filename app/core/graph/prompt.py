@@ -584,6 +584,39 @@ def _append_audio_tag_guidance(
     return SystemMessage(content=combined.strip())
 
 
+# Header framing performative-text / break-tag guidance for non-v3 providers.
+# The instruction text is resolved from prompt management (codes
+# `ally_ai_learn_system_text_expressivity_guidance` and
+# `ally_ai_learn_system_break_tag_guidance`) by generate_response when the
+# scenario opts in, and reframed here so the persona performs it inline.
+_TEXT_EXPRESSIVITY_GUIDANCE_HEADER = (
+    "\n\n## Voice expression — performative delivery\n"
+    "Convey emotion and pacing through the WORDS and PUNCTUATION of your reply "
+    "itself — naturally and sparingly. Apply the guidance below inline as part "
+    "of how you speak; never describe or explain it, only perform it.\n\n"
+)
+
+
+def _append_text_expressivity_guidance(
+    message: SystemMessage, text_expressivity_instructions: Optional[str]
+) -> SystemMessage:
+    """Append performative-text / break-tag guidance to the persona prompt.
+
+    Used for non-ElevenLabs-v3 providers when the scenario opts in
+    (`enable_performative_text` / `enable_break_tags`); `text_expressivity_
+    instructions` is None for v3 and when both flags are off, leaving the
+    message unchanged. Appended AFTER templating so any literal punctuation or
+    `<break>` examples never reach the prompt formatter.
+    """
+    instructions = (text_expressivity_instructions or "").strip()
+    if not instructions:
+        return message
+    combined = (
+        f"{message.content}{_TEXT_EXPRESSIVITY_GUIDANCE_HEADER}{instructions}"
+    )
+    return SystemMessage(content=combined.strip())
+
+
 def generate_system_message(
     prompt_data: PromptData,
     next_instruction: Optional[str] = None,
@@ -593,6 +626,7 @@ def generate_system_message(
     retrieved_context: Optional[str] = None,
     current_score: Optional[int] = None,
     audio_tag_instructions: Optional[str] = None,
+    text_expressivity_instructions: Optional[str] = None,
 ) -> SystemMessage:
     """
     Generates a SystemMessage prompt for an AI roleplay assistant
@@ -605,6 +639,11 @@ def generate_system_message(
     `audio_tag_instructions`, when provided (ElevenLabs v3 only), is appended
     so the persona emits voice audio tags inline as it generates — see
     `_append_audio_tag_guidance`.
+
+    `text_expressivity_instructions`, when provided (non-v3 providers that opted
+    into performative-text and/or break-tag guidance), is appended after the
+    audio-tag guidance — see `_append_text_expressivity_guidance`. In practice
+    exactly one of the two is non-None.
     """
     if next_instruction:
         msg = _build_branching_prompt(
@@ -615,7 +654,10 @@ def generate_system_message(
             LOG_PREFIX,
             language_code or "None",
         )
-        return _append_audio_tag_guidance(msg, audio_tag_instructions)
+        msg = _append_audio_tag_guidance(msg, audio_tag_instructions)
+        return _append_text_expressivity_guidance(
+            msg, text_expressivity_instructions
+        )
 
     if behavior_instructions is not None:
         if not behavior_instructions:
@@ -635,7 +677,10 @@ def generate_system_message(
             LOG_PREFIX,
             language_code or "None",
         )
-        return _append_audio_tag_guidance(msg, audio_tag_instructions)
+        msg = _append_audio_tag_guidance(msg, audio_tag_instructions)
+        return _append_text_expressivity_guidance(
+            msg, text_expressivity_instructions
+        )
 
     logger.warning(
         "No behavior_instructions provided, "
