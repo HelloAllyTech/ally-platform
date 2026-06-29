@@ -236,6 +236,16 @@ class TestWorker:
         assert td == "vad"
         assert kwargs == {}
 
+    def test_eou_runner_registered_at_import(self):
+        # Importing app.worker must register the multilingual EOU inference runner
+        # so the worker creates + warms its inference executor at bootstrap. Without
+        # it the executor is never built and turn detection silently degrades to VAD.
+        from livekit.agents.inference_runner import _InferenceRunner
+
+        assert (
+            "lk_end_of_utterance_multilingual" in _InferenceRunner.registered_runners
+        )
+
     # -------------------- entrypoint --------------------
     class DummyRoom:
         """Mock room object with event listener support"""
