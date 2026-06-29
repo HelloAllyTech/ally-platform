@@ -148,17 +148,49 @@ async def _maybe_open(session: AgentSession, state: Dict[str, Any]) -> None:
 
 
 async def _end_session(ctx: JobContext, session: AgentSession) -> None:
-    """Let the closing line play out, then disconnect to end the test session."""
+    """Let the closing line play out, then end the V2V test session.
+
+    Deletes the LiveKit room so the backend's room_finished webhook fires,
+    which calls endScenarioSession and generates the transcript + summary.
+    Simply calling ctx.shutdown() only disconnects this agent; the client
+    agent remains in the room and the room_finished webhook never fires,
+    so no transcript or summary is ever produced.
+    """
     try:
-        # Give the final (goodbye) utterance time to finish before leaving.
+        # Give the final (goodbye) utterance time to finish before tearing down.
         await asyncio.sleep(8.0)
     except asyncio.CancelledError:
         return
-    finally:
+
+    room_name = ctx.room.name
+    try:
+        from livekit import api as lk_api
+
+        lk = lk_api.LiveKitAPI(
+            url=settings.LIVEKIT_URL,
+            api_key=settings.LIVEKIT_API_KEY,
+            api_secret=settings.LIVEKIT_API_SECRET,
+        )
+        try:
+            await lk.room.delete_room(lk_api.DeleteRoomRequest(room=room_name))
+            logger.info(
+                "[SIM_USER] deleted room=%s — room_finished webhook will "
+                "trigger endScenarioSession and generate transcript+summary",
+                room_name,
+            )
+        finally:
+            await lk.aclose()
+    except Exception as e:  # noqa: BLE001
+        logger.warning(
+            "[SIM_USER] room deletion failed for room=%s: %s — "
+            "falling back to ctx.shutdown()",
+            room_name,
+            e,
+        )
         try:
             ctx.shutdown(reason="simulated_user_session_complete")
-        except Exception as e:  # noqa: BLE001
-            logger.warning("[SIM_USER] shutdown error: %s", e)
+        except Exception as e2:  # noqa: BLE001
+            logger.warning("[SIM_USER] shutdown error: %s", e2)
 
 
 if __name__ == "__main__":
