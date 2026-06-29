@@ -3,7 +3,8 @@ Tests for AGENT_STATE lifecycle in the turn-taking indicator feature.
 
 Signal contract:
   thinking      → published at START of process_events (wraps full pipeline)
-  done_thinking → published at END of apply_voice_expressions (via finally block)
+  done_thinking → published by apply_voice_expressions (now a thin terminal node;
+                  prosody was removed, so publishing this signal is all it does)
 
 Scope:
   These signals wrap the main reply path:
@@ -197,14 +198,16 @@ class TestApplyVoiceExpressionsDoneThinkingSignal:
         assert payload == {"type": "AGENT_STATE", "state": "done_thinking"}
 
     @pytest.mark.asyncio
-    async def test_done_thinking_fires_on_early_return(self):
+    async def test_done_thinking_fires_without_tts_or_llm(self):
         """
-        done_thinking must still fire via finally even if the node returns early.
+        done_thinking must fire even when no tts_client/llm_client is configured;
+        the node no longer touches them (prosody removed).
         """
         room = _make_room()
-        # Providing room but NOT providing tts_client/llm_client forces early return
-        config = {"configurable": {"room": room}} 
-        
+        # Providing room but NOT providing tts_client/llm_client — the node
+        # ignores them entirely now and simply publishes done_thinking.
+        config = {"configurable": {"room": room}}
+
         await apply_voice_expressions(_make_state(), config=config)
         
         assert room.local_participant.publish_data.called
@@ -216,11 +219,12 @@ class TestApplyVoiceExpressionsDoneThinkingSignal:
     @pytest.mark.asyncio
     async def test_done_thinking_publish_failure_does_not_crash_node(self):
         """
-        If publish_data raises an error during the 'finally' block, node completes.
+        If publish_data raises, _publish_done_thinking swallows it and the node
+        still returns normally.
         """
         room = _make_room()
         room.local_participant.publish_data.side_effect = RuntimeError("Network error")
-        
+
         config = {"configurable": {"room": room}}
         # result should be returned normally even if the background publish fails
         result = await apply_voice_expressions(_make_state(), config=config)
@@ -232,3 +236,21 @@ class TestApplyVoiceExpressionsDoneThinkingSignal:
         config = {"configurable": {"scenario": _make_scenario()}}
         result = await apply_voice_expressions(_make_state(), config=config)
         assert result is not None
+
+    @pytest.mark.asyncio
+    async def test_no_prosody_work_done(self):
+        """
+        Prosody is deprecated: the node must NOT call into the TTS client
+        (no parameter generation / text enhancement) and must return an empty
+        dict so the agent's reply text is left unchanged.
+        """
+        room = _make_room()
+        tts_client = MagicMock()
+        config = {"configurable": {"room": room, "tts_client": tts_client}}
+
+        result = await apply_voice_expressions(_make_state(), config=config)
+
+        assert result == {}
+        tts_client.get_parameter_metadata.assert_not_called()
+        tts_client.supports_text_enhancement.assert_not_called()
+        tts_client._apply_parameters_dict.assert_not_called()
