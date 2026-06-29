@@ -1056,9 +1056,7 @@ def _trim_history_to_last_dialogues(messages: list, max_dialogues: int) -> list:
     """
     if max_dialogues <= 0:
         return messages
-    human_indices = [
-        i for i, m in enumerate(messages) if isinstance(m, HumanMessage)
-    ]
+    human_indices = [i for i, m in enumerate(messages) if isinstance(m, HumanMessage)]
     if len(human_indices) <= max_dialogues:
         return messages
     start = human_indices[-max_dialogues]
@@ -1205,13 +1203,24 @@ async def generate_response(
         if scenario and scenario.language_config:
             llm_config_from_metadata = scenario.language_config.llm_config
 
+        # Honor the roleplay-level temperature override on this fallback path too,
+        # so a dynamically-created client matches configure_llm_client's behavior.
+        roleplay_temperature = (
+            getattr(scenario.prompt_data, "temperature", None) if scenario else None
+        )
+
         try:
             llm_client = create_llm_client(
-                llm_config=llm_config_from_metadata, language_code=language_code
+                llm_config=llm_config_from_metadata,
+                language_code=language_code,
+                temperature=roleplay_temperature,
             )
         except Exception as e:
             logger.warning(f"LLM config failed for {language_code}, using default: {e}")
-            llm_client = create_llm_client(language_code=DEFAULT_LANGUAGE_CODE)
+            llm_client = create_llm_client(
+                language_code=DEFAULT_LANGUAGE_CODE,
+                temperature=roleplay_temperature,
+            )
 
     # Prepare the messages for the LLM call without mutating the state. When the
     # scenario opts in (Studio "Trim History" toggle) and the global kill-switch

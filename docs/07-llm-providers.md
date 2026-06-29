@@ -79,7 +79,7 @@ LOCAL_LLM_MODEL=your-model-name
 
 **File:** `app/llms/factory.py`
 
-`create_llm_client(llm_config, language_code)` creates a client:
+`create_llm_client(llm_config, language_code, temperature=None)` creates a client:
 
 1. If `llm_config` is `None`, returns default `OpenAILLMClient` with `gpt-4o-mini`
 2. Reads `provider` from config (defaults to `openai`)
@@ -88,6 +88,23 @@ LOCAL_LLM_MODEL=your-model-name
    - Flat: `{"provider": "openai", "model": "gpt-4o"}`
 4. Routes to the appropriate client class
 5. For Ollama/vLLM: injects `base_url` and optionally `LOCAL_LLM_MODEL`
+6. When `temperature` is passed (the roleplay-level override), it is injected into
+   the config and wins over any temperature in `llm_config`
+
+### Temperature precedence
+
+Temperature is resolved highest-priority-first:
+
+1. **Roleplay level** — `promptData.temperature` (per-simulation). Set on the
+   scenario's persona/roleplay config; `configure_llm_client` reads it and forwards
+   it to `create_llm_client(..., temperature=...)`. Validated and clamped to
+   `[0.0, 2.0]` by `PromptData` (bad values degrade to "unset"). Use a lower value
+   (e.g. `0.2`-`0.4`) for personas that must stay tightly consistent with the brief.
+2. **Provider level** — `llm.config.temperature` in scenario metadata.
+3. **Global default** — `settings.LLM_TEMPERATURE` (env `LLM_TEMPERATURE`, default `0.7`).
+
+Only the conversation-response LLM honors the roleplay override; the branching,
+classifier, and summary roles are unaffected.
 
 ### Routing Table
 

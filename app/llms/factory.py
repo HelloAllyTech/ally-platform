@@ -15,6 +15,7 @@ logger = get_logger(__name__)
 def create_llm_client(
     llm_config: Optional[Dict[str, Any]] = None,
     language_code: str = DEFAULT_LANGUAGE_CODE,
+    temperature: Optional[float] = None,
 ) -> BaseLLMClient:
     """
     Create LLM client instance from configuration.
@@ -26,6 +27,10 @@ def create_llm_client(
             Also supports backward compatibility with flat structure:
             {"provider": "openai", "model": "gpt-4o-mini"}
         language_code: BCP 47 language code (e.g., "en-IN", "hi-IN")
+        temperature: Optional roleplay-level temperature override. When provided
+            (i.e. set on the scenario's promptData), it takes precedence over any
+            temperature in ``llm_config`` and over the global LLM_TEMPERATURE
+            default. None leaves the existing provider/global resolution intact.
 
     Returns:
         LLM client instance
@@ -61,6 +66,14 @@ def create_llm_client(
             # Ensure model has a default if missing (not for local providers)
             if "model" not in config_dict and not is_local_provider:
                 config_dict["model"] = DEFAULT_LLM_CONFIG["model"]
+
+    # Roleplay-level override: when the scenario's promptData specifies a
+    # temperature, it wins over any temperature carried in llm_config and over
+    # the per-provider fallback to settings.LLM_TEMPERATURE. Applied here (after
+    # config_dict is finalized for every provider branch) so it lands in the
+    # single dict that from_config reads.
+    if temperature is not None:
+        config_dict["temperature"] = temperature
 
     # Map provider to class and instantiate using from_config
     provider = provider.lower()

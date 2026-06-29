@@ -312,7 +312,9 @@ class TestGenerateResponse:
     async def test_generate_response_handles_llm_fallback(self, monkeypatch):
         call_count = {"primary": 0, "fallback": 0}
 
-        def fake_create_llm_client(llm_config=None, language_code=None):
+        def fake_create_llm_client(
+            llm_config=None, language_code=None, temperature=None
+        ):
             if language_code == "unsupported-lang":
                 call_count["primary"] += 1
                 raise ValueError("Unsupported language")
@@ -394,7 +396,9 @@ class TestGenerateResponse:
 
     @pytest.mark.asyncio
     async def test_generate_response_without_scenario(self, monkeypatch):
-        def fake_create_llm_client(llm_config=None, language_code=None):
+        def fake_create_llm_client(
+            llm_config=None, language_code=None, temperature=None
+        ):
             return FakeLLMClient(content="response without scenario")
 
         monkeypatch.setattr(
