@@ -46,11 +46,11 @@ Providers optionally define two class constants:
 - **`PARAMETER_METADATA`** -- dict describing available voice parameters (speed, pitch, etc.) with types, ranges, and defaults
 - **`TEXT_ENHANCEMENT_METADATA`** -- dict with `instructions` key describing provider-specific text markup (SSML, audio tags, etc.)
 
-If a provider defines neither, the `apply_voice_expressions` graph node skips processing for that provider.
+`TEXT_ENHANCEMENT_METADATA` (via `supports_text_enhancement()`) drives inline audio-tag generation for v3 ElevenLabs voices in `generate_response`. `PARAMETER_METADATA` is retained on the clients but is no longer actively consumed — the voice-parameter generation pipeline has been removed.
 
 ## Supported Providers
 
-| Provider | Class | Enum | Prosody Parameters | Text Enhancement |
+| Provider | Class | Enum | Voice Parameters | Text Enhancement |
 |----------|-------|------|-------------------|-----------------|
 | Deepgram | `DeepgramTTSClient` | `TTSProvider.DEEPGRAM` | No | No |
 | ElevenLabs | `ElevenLabsTTSClient` | `TTSProvider.ELEVENLABS` | Yes (speed, stability, similarity_boost, style) | Yes (SSML-like tags) |
@@ -60,15 +60,15 @@ If a provider defines neither, the `apply_voice_expressions` graph node skips pr
 
 ### Provider Details
 
-**Deepgram** -- Default TTS provider. Low latency, no prosody parameters. Uses `model` for voice selection. Falls back to gender-based default voices.
+**Deepgram** -- Default TTS provider. Low latency, no voice parameters. Uses `model` for voice selection. Falls back to gender-based default voices.
 
 **ElevenLabs** -- High-quality voices with expressive parameters. Supports voice ID-based selection, speed control, and SSML-like text enhancement for emphasis and pauses.
 
 **Sarvam** -- Specialized for Indian languages. Uses `speaker` for voice selection.
 
-**Google Cloud** -- Uses `voice_name` and `gender` for voice selection. Supports voice cloning via `voice_cloning_key`. Prosody via parameters only (no SSML) when streaming is enabled.
+**Google Cloud** -- Uses `voice_name` and `gender` for voice selection. Supports voice cloning via `voice_cloning_key`. Voice parameters only (no SSML) when streaming is enabled.
 
-**Hume** -- Emotion-aware TTS. Uses `voice_id` with optional `voice_provider` (HUME_AI for pre-existing, CUSTOM_VOICE for custom). Supports `instant_mode` for lower latency. Prosody parameters include a text `description` of desired emotional expression.
+**Hume** -- Emotion-aware TTS. Uses `voice_id` with optional `voice_provider` (HUME_AI for pre-existing, CUSTOM_VOICE for custom). Supports `instant_mode` for lower latency. Voice parameters include a text `description` of desired emotional expression.
 
 ## Factory
 

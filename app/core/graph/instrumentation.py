@@ -24,7 +24,7 @@ from app.core.metrics import turn_metrics
 
 # Graph nodes whose successful elapsed time maps directly onto a turn-metrics
 # field. Recorded from node_exit below so the breakdown is captured in one place
-# (these stages have no dedicated inner timer like llm/orchestration/prosody do).
+# (these stages have no dedicated inner timer like llm/orchestration do).
 _NODE_METRIC_FIELDS = {
     "resolve_branching_instruction": "branching_ms",
     "retrieve_knowledge": "knowledge_retrieval_ms",

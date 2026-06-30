@@ -196,12 +196,10 @@ ally-learn-core/
 │   ├── prompts/                         # Prompt templates
 │   │   ├── manager.py                  # Template loading
 │   │   ├── resolver.py                  # Backend override resolution
-│   │   ├── system/                     # System prompts
-│   │   └── prosody/                    # Prosody prompts
+│   │   └── system/                     # System prompts
 │   ├── tts/                             # TTS provider implementations
 │   ├── stt/                             # STT provider implementations
 │   ├── llms/                            # LLM provider implementations
-│   ├── speech_prosody/                  # Voice expression parameters
 │   ├── main.py                          # FastAPI application
 │   ├── middleware.py                    # Request logging and CORS
 │   └── worker.py                        # LiveKit agent worker
@@ -232,7 +230,6 @@ ally-learn-core/
      - **Sync**: Convergence point for all three parallel paths
      - **Branching Resolution**: Resolves branching instructions (LLM tags, dynamic variables)
      - **Response + UI Feedback** (parallel): LLM generates client response; event and behavior scores/feedback are sent to frontend
-     - **Voice Expressions**: Applies prosody parameters and text enhancement
    - Client response → TTS → Audio → Played to user
 
 3. **Event System**

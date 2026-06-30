@@ -67,7 +67,6 @@ class TurnMetricsData(BaseModel):
     # App-stage timings (graph nodes)
     orchestration_ms: Optional[int] = None
     llm_response_ms: Optional[int] = None
-    prosody_ms: Optional[int] = None
     branching_ms: Optional[int] = None
     knowledge_retrieval_ms: Optional[int] = None
     # Parallel fan-out branch totals (for fan-in bottleneck analysis)
@@ -88,7 +87,6 @@ class TurnMetricsData(BaseModel):
     env: Optional[str] = None
     response_chars: Optional[int] = None
     events_detected: Optional[int] = None
-    prosody_skipped: Optional[bool] = None
     llm_timed_out: Optional[bool] = None
     interrupted: Optional[bool] = None
     metadata: Optional[dict] = None

@@ -220,11 +220,9 @@ class BaseTTSClient(ABC):
         """
         Get default parameter values for learn service.
 
-        Note: This method is kept for backward compatibility. When voice expressions
-        are enabled, defaults are managed by SpeechProsodyService. This method returns
-        the cached value that was synced from the service, or an empty dict if not set.
+        Returns the cached default parameters set on this client, or an empty
+        dict if none have been set.
         """
-        # Return cached value if available (synced from SpeechProsodyService)
         if hasattr(self, "_default_params"):
             return self._default_params.copy()
         return {}

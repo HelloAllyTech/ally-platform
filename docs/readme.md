@@ -49,7 +49,6 @@
 | 05 | [TTS Providers](05-tts-providers.md) | BaseTTSClient, 5 providers, factory |
 | 06 | [STT Providers](06-stt-providers.md) | BaseSTTClient, 3 providers, factory |
 | 07 | [LLM Providers](07-llm-providers.md) | BaseLLMClient, 4 providers, open-source support |
-| 08 | [Speech Prosody](08-speech-prosody.md) | Voice expression parameters and text enhancement |
 | 09 | [Scenario Engine](09-scenario-engine.md) | Pydantic models, metadata parsing pipeline |
 | 10 | [Branching Instructions](10-branching-instructions.md) | Variable substitution, dynamic resolution |
 | 11 | [Queue Messaging](11-queue-messaging.md) | AWS SQS event delivery, LocalStack |

@@ -1,5 +1,0 @@
-{
-  "name": "Prosody Parameters Only",
-  "kind": "prompt",
-  "description": "Analyzes response text and returns only prosody parameters (no text enhancement). Uses current parameters as baseline with 1–2% natural variation or 3–5% for marked events."
-}

@@ -64,12 +64,12 @@ def test_negative_latency_is_clamped():
 
 def test_none_values_and_unknown_keys_ignored():
     tm.note_user_speech_end("room-1", 100.0)
-    tm.record("room-1", llm_response_ms=None, bogus_field=123, prosody_ms=40)
+    tm.record("room-1", llm_response_ms=None, bogus_field=123, branching_ms=40)
     rec = tm.finalize("room-1", 100.4)
 
     assert "llm_response_ms" not in rec  # None dropped
     assert "bogus_field" not in rec  # unknown dropped
-    assert rec["prosody_ms"] == 40
+    assert rec["branching_ms"] == 40
 
 
 def test_finalize_pops_turn_so_next_starts_fresh():

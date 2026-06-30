@@ -85,7 +85,7 @@ Termination can be triggered by any event type that can fire:
 2. **Defer to Core** — Event is sent to SQS with `autoTerminationStatus: true` (deferred so agent can speak first)
 3. **Select termination** — If multiple termination events fire, the one with highest magnitude `score` is chosen
 4. **Callback** — `_handle_termination_events()` invokes the termination callback
-5. **Entrypoint** — Worker's entrypoint receives signal, generates prosody for termination message, plays audio, then calls `ctx.shutdown()`
+5. **Entrypoint** — Worker's entrypoint receives signal, plays the termination audio, then calls `ctx.shutdown()`
 6. **Backend** — Core receives the deferred event and closes the room
 
 The termination message is played in the **entrypoint context** (not the graph context) to ensure reliable audio playback.

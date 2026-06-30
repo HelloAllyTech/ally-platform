@@ -233,39 +233,6 @@ class TestPromptData:
 
     @pytest.mark.unit
     @pytest.mark.parametrize(
-        "enable_prosody_input,expected_enable_prosody",
-        [
-            (True, True),
-            (False, False),
-            (None, True),
-        ],
-    )
-    def test_prompt_data_enable_prosody_mapping(
-        self, enable_prosody_input, expected_enable_prosody
-    ):
-        """Scenario._build_prompt_data maps backend `enableProsody` (camelCase)
-        onto PromptData.enable_prosody (snake_case). Missing/None values default
-        to True for backwards compatibility with existing scenarios that have
-        no enableProsody key in their metadata."""
-        prompt_data = {
-            "name": "Prosody Toggle Test",
-            "age": "30",
-            "gender": "female",
-            "currentLocation": "Chennai",
-            "context": "Session",
-            "lifeHistory": "Background.",
-            "openingStatements": ["Hi"],
-        }
-        if enable_prosody_input is not None:
-            prompt_data["enableProsody"] = enable_prosody_input
-
-        result = Scenario._build_prompt_data({"promptData": prompt_data})
-
-        assert result is not None
-        assert result.enable_prosody is expected_enable_prosody
-
-    @pytest.mark.unit
-    @pytest.mark.parametrize(
         "temperature_input,expected_temperature",
         [
             (0.2, 0.2),

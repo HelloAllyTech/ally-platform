@@ -3,11 +3,11 @@ Tests for AGENT_STATE lifecycle in the turn-taking indicator feature.
 
 Signal contract:
   thinking      → published at START of process_events (wraps full pipeline)
-  done_thinking → published at END of apply_voice_expressions (via finally block)
+  done_thinking → published by the publish_done_thinking terminal node
 
 Scope:
   These signals wrap the main reply path:
-  process_events → ... → generate_response → apply_voice_expressions
+  process_events → ... → generate_response → publish_done_thinking
 """
 
 import json
@@ -18,7 +18,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 from app.core.graph.nodes import (
     process_events,
     generate_response,
-    apply_voice_expressions,
+    publish_done_thinking,
 )
 from app.core.graph.state import SimulationState
 
@@ -167,14 +167,14 @@ class TestGenerateResponseNoSignals:
 
 
 # ---------------------------------------------------------------------------
-# apply_voice_expressions — done_thinking signal
+# publish_done_thinking — done_thinking signal
 # ---------------------------------------------------------------------------
 class TestApplyVoiceExpressionsDoneThinkingSignal:
 
     @pytest.mark.asyncio
     async def test_done_thinking_published_after_voice_chain(self):
         """
-        done_thinking must be sent at the end of apply_voice_expressions.
+        done_thinking must be published by the publish_done_thinking node.
         """
         room = _make_room()
         state = SimulationState(
@@ -188,7 +188,7 @@ class TestApplyVoiceExpressionsDoneThinkingSignal:
 
         config = {"configurable": {"room": room, "scenario": _make_scenario()}}
 
-        await apply_voice_expressions(state, config=config)
+        await publish_done_thinking(state, config=config)
 
         # Verify the last call made to publish_data was done_thinking
         assert room.local_participant.publish_data.called
@@ -197,15 +197,15 @@ class TestApplyVoiceExpressionsDoneThinkingSignal:
         assert payload == {"type": "AGENT_STATE", "state": "done_thinking"}
 
     @pytest.mark.asyncio
-    async def test_done_thinking_fires_on_early_return(self):
+    async def test_done_thinking_fires_with_minimal_config(self):
         """
-        done_thinking must still fire via finally even if the node returns early.
+        done_thinking fires whenever a room is present, regardless of other config.
         """
         room = _make_room()
-        # Providing room but NOT providing tts_client/llm_client forces early return
-        config = {"configurable": {"room": room}} 
+        # Only a room in config — no tts_client/llm_client needed by this node
+        config = {"configurable": {"room": room}}
         
-        await apply_voice_expressions(_make_state(), config=config)
+        await publish_done_thinking(_make_state(), config=config)
         
         assert room.local_participant.publish_data.called
         # Access positional arguments of the last call safely
@@ -216,19 +216,19 @@ class TestApplyVoiceExpressionsDoneThinkingSignal:
     @pytest.mark.asyncio
     async def test_done_thinking_publish_failure_does_not_crash_node(self):
         """
-        If publish_data raises an error during the 'finally' block, node completes.
+        If publish_data raises an error, the node still completes.
         """
         room = _make_room()
         room.local_participant.publish_data.side_effect = RuntimeError("Network error")
         
         config = {"configurable": {"room": room}}
         # result should be returned normally even if the background publish fails
-        result = await apply_voice_expressions(_make_state(), config=config)
+        result = await publish_done_thinking(_make_state(), config=config)
         assert result is not None
 
     @pytest.mark.asyncio
     async def test_done_thinking_no_room_does_not_crash(self):
         """No room in config does not cause a crash."""
         config = {"configurable": {"scenario": _make_scenario()}}
-        result = await apply_voice_expressions(_make_state(), config=config)
+        result = await publish_done_thinking(_make_state(), config=config)
         assert result is not None
