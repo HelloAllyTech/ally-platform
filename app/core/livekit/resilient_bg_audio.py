@@ -53,3 +53,24 @@ class ResilientBackgroundAudioPlayer(BackgroundAudioPlayer):
                     "[BG_AUDIO] capture_frame failed, continuing: %s", e
                 )
                 continue
+
+    def flush(self) -> None:
+        """Drop any audio already buffered in the source so a stopped clip is
+        cut immediately.
+
+        ``PlayHandle.stop()`` only halts the *feeder* that pushes new frames into
+        the mixer; frames already captured into the shared ``AudioSource`` keep
+        playing out (~``queue_size_ms``, ~1s by default). On its own that lets a
+        cut filler/interim bleed over the agent's real reply — which rides a
+        SEPARATE ``AgentSession`` ``AudioSource``, so the two voices overlap.
+        Clearing the source queue here cuts the buffered tail at once. The mixer
+        pump keeps running (the whole point of this subclass), so the looping
+        comfort tone refills on the next pull — an imperceptible blip in a noise
+        bed. Best-effort; never raises into a turn.
+        """
+        try:
+            src = getattr(self, "_audio_source", None)
+            if src is not None and hasattr(src, "clear_queue"):
+                src.clear_queue()
+        except Exception as e:  # noqa: BLE001 - must never break the bg track
+            logger.warning("[BG_AUDIO] flush failed: %s", e)
