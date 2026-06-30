@@ -376,6 +376,26 @@ class TestCutover:
         w._on_interim_agent_state(types.SimpleNamespace(new_state="speaking"))
 
         handle.stop.assert_called_once()
+        # stop() alone leaves a buffered tail on the shared bg track that would
+        # bleed over the real reply — the cutover must flush the source queue too.
+        w._bg_audio.flush.assert_called_once()
+        assert w._interim_handle is None
+        assert w._interim_state == "done"
+
+    @pytest.mark.unit
+    async def test_no_flush_when_interim_already_finished(self, monkeypatch):
+        """A naturally-finished interim leaves nothing to cut — don't churn the
+        shared bg queue (and the comfort tone) for nothing."""
+        w = _interim_worker(monkeypatch)
+        handle = MagicMock()
+        handle.done.return_value = True  # interim already played out
+        w._interim_handle = handle
+        w._interim_state = "playing"
+
+        w._on_interim_agent_state(types.SimpleNamespace(new_state="speaking"))
+
+        handle.stop.assert_not_called()
+        w._bg_audio.flush.assert_not_called()
         assert w._interim_handle is None
         assert w._interim_state == "done"
 
@@ -504,6 +524,9 @@ class TestResetTurn:
         w._interim_reset_turn()
 
         handle.stop.assert_called_once()
+        # Same as cutover: a live handle must also flush the buffered tail so a
+        # barge-in/new turn doesn't leave the interim playing over what follows.
+        w._bg_audio.flush.assert_called_once()
         assert w._interim_handle is None
         assert w._interim_state == "idle"
         assert w._interim_armed is False
@@ -511,3 +534,30 @@ class TestResetTurn:
         assert w._interim_current_interim == ""
         assert w._interim_partial_text == ""
         assert w._interim_clip is None
+
+
+class TestFillerCutover:
+    """The thinking-filler shares the bug class: stop() leaves a buffered tail."""
+
+    @pytest.mark.unit
+    async def test_leaving_thinking_flushes_filler_tail(self, monkeypatch):
+        w = _interim_worker(monkeypatch)
+        handle = MagicMock()
+        handle.done.return_value = False
+        w._filler_handle = handle
+
+        # Agent left "thinking" (real reply is starting) — cut the filler.
+        w._on_filler_agent_state(types.SimpleNamespace(new_state="speaking"))
+
+        handle.stop.assert_called_once()
+        w._bg_audio.flush.assert_called_once()
+        assert w._filler_handle is None
+
+    @pytest.mark.unit
+    async def test_no_flush_when_no_filler_playing(self, monkeypatch):
+        w = _interim_worker(monkeypatch)
+        w._filler_handle = None
+
+        w._on_filler_agent_state(types.SimpleNamespace(new_state="speaking"))
+
+        w._bg_audio.flush.assert_not_called()

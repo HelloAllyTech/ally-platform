@@ -1212,6 +1212,10 @@ class AgentWorker:
                     self._filler_delay_task.cancel()
                 if self._filler_handle is not None and not self._filler_handle.done():
                     self._filler_handle.stop()
+                    # Flush the source queue too: stop() halts the feeder but the
+                    # filler's already-buffered tail would otherwise bleed over
+                    # the real reply (separate track). See bg_audio.flush().
+                    self._bg_audio.flush()
                     self._filler_handle = None
         except Exception as e:  # noqa: BLE001 - filler must never break a session
             logger.warning("[FILLER] agent-state handler error: %s", e)
@@ -1786,6 +1790,9 @@ class AgentWorker:
         self._interim_play_task = None
         if self._interim_handle is not None and not self._interim_handle.done():
             self._interim_handle.stop()
+            # stop() only halts the feeder; flush the buffered tail so the
+            # interim can't keep playing over the real reply on the agent track.
+            self._bg_audio.flush()
         self._interim_handle = None
         if self._interim_gen_task is not None and not self._interim_gen_task.done():
             self._interim_gen_task.cancel()
@@ -1803,6 +1810,8 @@ class AgentWorker:
         self._interim_gen_task = None
         if self._interim_handle is not None and not self._interim_handle.done():
             self._interim_handle.stop()
+            # Drop the buffered tail too (see _interim_cutover / bg_audio.flush).
+            self._bg_audio.flush()
         self._interim_handle = None
         # The clip's temp WAV is cleaned at shutdown via _interim_clip_paths.
         self._interim_clip = None
