@@ -2,7 +2,7 @@
 
 A turn's *total* latency (user stops speaking → agent starts speaking) is
 observed in the session event handlers, while its *component* timings
-(orchestration, LLM, prosody, …) are recorded inside the graph nodes, and
+(orchestration, LLM, …) are recorded inside the graph nodes, and
 *framework* timings (EOU delay, LLM TTFT, TTS TTFB) arrive via LiveKit's
 MetricsCollectedEvent — three different call sites on the same event loop.
 
@@ -41,7 +41,6 @@ _RECORD_FIELDS = {
     "tts_ttfb_ms",
     "orchestration_ms",
     "llm_response_ms",
-    "prosody_ms",
     "branching_ms",
     "knowledge_retrieval_ms",
     "process_events_ms",
@@ -55,7 +54,6 @@ _RECORD_FIELDS = {
     "max_tokens",
     "response_chars",
     "events_detected",
-    "prosody_skipped",
     "llm_timed_out",
     "interrupted",
     "metadata",

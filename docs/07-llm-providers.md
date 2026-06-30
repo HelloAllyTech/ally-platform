@@ -129,7 +129,6 @@ The system uses LLMs in several roles, each potentially with a different provide
 | Conversation response | `scenario.language_config.llm_config` | `gpt-4o-mini` |
 | Branching resolution | `scenario.language_config.branching_llm_config` | `gpt-4o-mini` |
 | Binary classifier | hardcoded | OpenAI |
-| Prosody generation | same as conversation | same as conversation |
 | Chat summary | `branching_llm_config` | `gpt-4o-mini` |
 
 ---

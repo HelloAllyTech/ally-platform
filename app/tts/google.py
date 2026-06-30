@@ -83,7 +83,7 @@ class GoogleTTSClient(BaseTTSClient):
 
     # Google TTS with streaming (default) does not support SSML / inline tags —
     # they would be spoken aloud — so it inherits supports_text_enhancement() ->
-    # False from BaseTTSClient. Prosody is applied via update_options()
+    # False from BaseTTSClient. Voice parameters are applied via update_options()
     # (speaking_rate) and PARAMETER_METADATA only.
 
     @staticmethod

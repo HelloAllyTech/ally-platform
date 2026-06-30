@@ -1,9 +1,9 @@
 """
 Test cases for graph builder subgraph isolation and structure.
 
-These tests ensure that branching instruction resolution, behavior detection,
-and voice expressions are properly isolated in subgraphs to prevent
-LLM output streaming issues.
+These tests ensure that branching instruction resolution and knowledge
+retrieval are properly isolated in subgraphs to prevent LLM output
+streaming issues.
 """
 
 from langgraph.graph import StateGraph
@@ -12,7 +12,6 @@ from langgraph.graph.state import CompiledStateGraph
 from app.core.graph.graph_builder import (
     build_resolve_branching_subgraph,
     build_simulation_graph,
-    build_voice_expressions_subgraph,
 )
 
 
@@ -22,13 +21,6 @@ class TestSubgraphStructure:
     def test_resolve_branching_subgraph_structure(self):
         """Test that resolve_branching_instruction subgraph is properly structured."""
         subgraph = build_resolve_branching_subgraph()
-
-        assert isinstance(subgraph, CompiledStateGraph)
-        assert subgraph is not None
-
-    def test_voice_expressions_subgraph_structure(self):
-        """Test that voice_expressions subgraph is properly structured."""
-        subgraph = build_voice_expressions_subgraph()
 
         assert isinstance(subgraph, CompiledStateGraph)
         assert subgraph is not None
@@ -44,7 +36,7 @@ class TestSubgraphStructure:
             "resolve_branching_instruction",
             "generate_response",
             "detect_behaviors",
-            "apply_voice_expressions",
+            "publish_done_thinking",
             "send_event_feedback",
         ]
 
@@ -58,13 +50,13 @@ class TestSubgraphStructure:
         # Verify edges exist for the expected flow
         # process_events -> resolve_branching_instruction
         # resolve_branching_instruction -> [generate_response, detect_behaviors]
-        # [generate_response, detect_behaviors] -> apply_voice_expressions
+        # generate_response -> publish_done_thinking -> END
 
         assert "process_events" in graph.nodes
         assert "resolve_branching_instruction" in graph.nodes
         assert "generate_response" in graph.nodes
         assert "detect_behaviors" in graph.nodes
-        assert "apply_voice_expressions" in graph.nodes
+        assert "publish_done_thinking" in graph.nodes
         assert "send_event_feedback" in graph.nodes
 
 
@@ -75,12 +67,9 @@ class TestSubgraphIsolation:
         """Test that subgraphs are compiled (not raw StateGraph) when added to main."""
         # This ensures subgraphs=False in LLMAdapter will prevent their streaming
         resolve_subgraph = build_resolve_branching_subgraph()
-        voice_subgraph = build_voice_expressions_subgraph()
 
-        # All should be CompiledStateGraph, not StateGraph
+        # Should be CompiledStateGraph, not StateGraph
         assert isinstance(resolve_subgraph, CompiledStateGraph)
-        assert isinstance(voice_subgraph, CompiledStateGraph)
 
-        # They should NOT be StateGraph instances
+        # It should NOT be a StateGraph instance
         assert not isinstance(resolve_subgraph, StateGraph)
-        assert not isinstance(voice_subgraph, StateGraph)

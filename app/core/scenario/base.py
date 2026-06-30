@@ -78,8 +78,8 @@ class PromptData(BaseModel):
     prompts: Optional[Dict[str, Any]] = Field(
         default=None,
         description="Editable prompt templates from backend (promptData.prompts). "
-        "Keys: ally_ai_learn_system_base_role_instruction, ally_ai_learn_prosody_*, "
-        "etc. Values may be raw strings or objects with prompt metadata like "
+        "Keys: ally_ai_learn_system_base_role_instruction, etc. Values may be "
+        "raw strings or objects with prompt metadata like "
         "{prompt: str, availableVariables: string[]}.",
     )
     competency: Optional[str] = Field(
@@ -175,21 +175,6 @@ class PromptData(BaseModel):
             'Format: [{"key": "topic name", "description": "detailed info"}, ...]. '
             "The system uses an LLM to identify relevant keys per utterance "
             "and injects the corresponding descriptions into the prompt."
-        ),
-    )
-    enable_prosody: bool = Field(
-        default=True,
-        description=(
-            "Per-simulation toggle for speech prosody generation. "
-            "When False, the runtime prosody node is skipped and the TTS "
-            "client keeps its current/default parameters; no SSML/audio-tag "
-            "enhancement is applied either. Default True for backwards "
-            "compatibility with existing scenarios."
-            "DEPRECATED / inert — speech prosody has been removed from the "
-            "pipeline, so this per-simulation toggle no longer has any effect. "
-            "Retained (and still parsed from `enableProsody`) for backwards "
-            "compatibility with stored scenarios; will be removed in a later "
-            "release."
         ),
     )
     filler_enabled: bool = Field(
@@ -655,11 +640,6 @@ class Scenario(BaseModel):
                 )
                 or prompt_data_dict.get("language_characteristics"),
                 "knowledge_sources": prompt_data_dict.get("knowledgeSources"),
-                "enable_prosody": (
-                    True
-                    if prompt_data_dict.get("enableProsody") is None
-                    else bool(prompt_data_dict.get("enableProsody"))
-                ),
                 "filler_enabled": bool(prompt_data_dict.get("fillerEnabled") or False),
                 "comfort_audio_enabled": bool(
                     prompt_data_dict.get("comfortAudioEnabled") or False

@@ -1,5 +1,0 @@
-{
-  "name": "Prosody Baseline Generation",
-  "kind": "prompt",
-  "description": "Establishes physiological baseline and arousal-valence mapping for the character's voice from scenario info and opening statements. Used to set initial pitch, pace, and stability."
-}

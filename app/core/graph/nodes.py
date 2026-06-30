@@ -483,6 +483,23 @@ async def _publish_done_thinking(room) -> None:
         logger.warning(f"Failed to publish done_thinking state: {e}")
 
 
+@instrumented_node("publish_done_thinking")
+async def publish_done_thinking(
+    state: SimulationState, config: Optional[RunnableConfig] = None
+) -> Dict:
+    """Terminal node on the agent reply path: publish the done_thinking signal
+    once the spoken reply has finished generating.
+
+    Makes no LLM calls, so it needs no subgraph isolation and nothing streams
+    to TTS/UI from here.
+    """
+    room = None
+    if config and "configurable" in config:
+        room = config["configurable"].get("room")
+    await _publish_done_thinking(room)
+    return {}
+
+
 async def _process_events_impl(
     state: SimulationState,
     config: Optional[RunnableConfig],
@@ -1098,9 +1115,8 @@ async def generate_response(
     # ElevenLabs v3 supports inline audio tags ([pause], [sighs], [empathetic],
     # ...). When the scenario's TTS provider supports them, fold the tag guidance
     # into the persona prompt so the agent emits tags inline as it generates —
-    # letting tokens stream straight to TTS (STREAM_RESPONSE) instead of waiting
-    # on a second prosody LLM call to rewrite the reply (skipped via
-    # PROSDY_FORCE_SKIP). The guidance TEXT is resolved from prompt management
+    # letting tokens stream straight to TTS (STREAM_RESPONSE). The guidance TEXT
+    # is resolved from prompt management
     # (code `ally_ai_learn_system_audio_tag_guidance`, local fallback
     # `app/prompts/system/audio_tag_guidance.txt`): dashboard override wins, else
     # the local .txt. Stays None for v2 ElevenLabs and every non-tag provider,
@@ -1124,8 +1140,7 @@ async def generate_response(
                 if not audio_tag_instructions:
                     # Provider supports tags but guidance resolved empty (missing
                     # local .txt / empty dashboard override). Don't fail the turn,
-                    # but warn — v3 would otherwise speak tag-less with no signal
-                    # (the prosody fallback that used to add tags is force-skipped).
+                    # but warn — v3 would otherwise speak tag-less with no signal.
                     logger.warning(
                         "[generate_response] audio tag guidance empty for "
                         "tag-capable provider; emitting reply without inline tags"
@@ -1417,7 +1432,7 @@ async def send_event_feedback(
     Send all feedback (events + behaviors) to UI after LLM response generation.
 
     This node is placed at the end of the agent graph (after
-    apply_voice_expressions) and is NOT used by the report graph.
+    generate_response) and is NOT used by the report graph.
 
     It:
     1. Merges feedback from branching and non-branching events:
@@ -1752,279 +1767,3 @@ async def clear_events_and_detected_data(
         "behavior_feedback_data": None,
         "retrieved_context": None,
     }
-
-
-@instrumented_node("apply_voice_expressions")
-async def apply_voice_expressions(
-    state: SimulationState, config: Optional[RunnableConfig] = None
-) -> Dict:
-    """
-    Generate and apply voice expressions based on the generated response.
-
-    Uses a unified LLM call to:
-    1. Generate voice expression parameters (speed, tone, etc.) and apply them
-    2. Generate enhanced text with provider-specific tags (if supported)
-    3. Update message content with enhanced text
-
-    This unified approach reduces latency and cost by combining both operations
-    into a single LLM invocation, while ensuring consistency between parameters
-    and text enhancement.
-
-    Args:
-        state: Current simulation state
-        config: Runnable config with TTS client and LLM client
-
-    Returns:
-        Updated simulation state with enhanced message content if text was enhanced
-    """
-
-    # Get room upfront — done_thinking fires here regardless of voice path taken
-    room = None
-    if config and "configurable" in config:
-        room = config["configurable"].get("room")
-
-    # Baseline so the prosody metric is populated even when this node
-    # early-returns (provider without prosody params, empty response, etc.).
-    # The complete/timeout/skip paths below overwrite this with the real value.
-    turn_metrics.record(get_room_id(), prosody_ms=0)
-
-    try:
-        # Get TTS client, LLM client, and scenario from config
-        tts_client = None
-        llm_client = None
-        scenario = None
-        if config and "configurable" in config:
-            tts_client = config["configurable"].get("tts_client")
-            llm_client = config["configurable"].get("llm_client")
-            scenario = (
-                cast(Scenario, config["configurable"].get("scenario"))
-                if config
-                else None
-            )
-
-        if not tts_client or not llm_client:
-            logger.debug(
-                "No TTS client or LLM client available, "
-                "skipping voice expression application"
-            )
-            return {}
-
-        # Early return if provider doesn't support voice expression parameters
-        # This avoids unnecessary processing for providers like Deepgram
-        parameter_metadata = tts_client.get_parameter_metadata()
-        if not parameter_metadata:
-            logger.debug(
-                "Provider does not support voice expression parameters, "
-                "skipping voice expression node"
-            )
-            return {}
-
-        # Get the last message (the generated response)
-        if not state.messages:
-            return {}
-
-        last_message = state.messages[-1]
-        response_text = None
-
-        if hasattr(last_message, "content"):
-            response_text = last_message.content
-        elif isinstance(last_message, str):
-            response_text = last_message
-
-        if not response_text:
-            logger.debug(
-                "[apply_voice_expressions] No response text found, "
-                "skipping voice expression application"
-            )
-            return {}
-
-        # Skip runtime prosody when under pressure (keeps last params, reduces latency)
-        # NOTE: the conditional has_text_enhancement branch below preserves tags
-        # only on the legacy (non-force-skip) path. By default PROSDY_FORCE_SKIP
-        # is True and short-circuits everything here: ElevenLabs v3 audio tags are
-        # now produced INLINE by generate_response (the persona prompt carries the
-        # tag instructions), so the second rewrite call is unnecessary and the
-        # streamed reply — tags included — goes straight to TTS.
-        response_len = len(response_text)
-        skip_prosody = False
-        skip_reason = ""
-        has_text_enhancement = tts_client.supports_text_enhancement()
-        # Per-simulation override: if scenario has prosody disabled, skip
-        # unconditionally (takes precedence over PROSDY_SKIP_ENABLED and
-        # text-enhancement providers).
-        prompt_data = getattr(scenario, "prompt_data", None)
-        if settings.PROSDY_FORCE_SKIP:
-            skip_prosody = True
-            skip_reason = "PROSDY_FORCE_SKIP enabled (latency kill-switch)"
-        elif prompt_data is not None and not getattr(
-            prompt_data, "enable_prosody", True
-        ):
-            skip_prosody = True
-            skip_reason = "prosody disabled for simulation"
-        elif not settings.PROSDY_SKIP_ENABLED:
-            pass  # Skip logic disabled, always run prosody
-        elif has_text_enhancement:
-            pass  # Provider needs enhanced text; skip would cause faster speech
-        elif response_len < settings.PROSDY_SKIP_MIN_RESPONSE_LENGTH:
-            skip_prosody = True
-            min_len = settings.PROSDY_SKIP_MIN_RESPONSE_LENGTH
-            skip_reason = f"response too short ({response_len} < {min_len} chars)"
-        elif (
-            settings.PROSDY_SKIP_MAX_RESPONSE_LENGTH > 0
-            and response_len > settings.PROSDY_SKIP_MAX_RESPONSE_LENGTH
-        ):
-            skip_prosody = True
-            max_len = settings.PROSDY_SKIP_MAX_RESPONSE_LENGTH
-            skip_reason = f"response too long ({response_len} > {max_len} chars)"
-        elif settings.PROSDY_SKIP_WHEN_EVENTS_DETECTED and state.new_events:
-            skip_prosody = True
-            skip_reason = f"events detected this turn ({len(state.new_events)} events)"
-
-        if skip_prosody:
-            logger.debug(
-                "[apply_voice_expressions] Skipped prosody (%s)",
-                skip_reason,
-            )
-            turn_metrics.record(get_room_id(), prosody_skipped=True, prosody_ms=0)
-            # Re-apply current params to TTS (persists; no LLM call, no enhanced text)
-            if hasattr(tts_client, "_current_params") and tts_client._current_params:
-                tts_client._apply_parameters_dict(tts_client._current_params.copy())
-            return {}
-
-        # Extract conversation history (last N messages, excluding the current response)
-        conversation_history = []
-        if state.messages:
-            # Get last N messages (excluding the current response which is the last one)
-            messages_for_history = (
-                state.messages[:-1] if len(state.messages) > 1 else []
-            )
-            for msg in messages_for_history[-10:]:  # Last 10 messages
-                role = "user"
-                content = ""
-
-                # Determine role based on message type
-                if isinstance(msg, AIMessage):
-                    role = "assistant"
-                elif isinstance(msg, HumanMessage):
-                    role = "user"
-                elif hasattr(msg, "type"):
-                    # Fallback to type attribute
-                    if msg.type == "ai":
-                        role = "assistant"
-                    elif msg.type == "human":
-                        role = "user"
-                elif hasattr(msg, "__class__"):
-                    # Fallback to class name
-                    class_name = msg.__class__.__name__
-                    if "AI" in class_name or "Assistant" in class_name:
-                        role = "assistant"
-                    elif "Human" in class_name or "User" in class_name:
-                        role = "user"
-
-                # Extract content
-                if hasattr(msg, "content"):
-                    content = msg.content
-                elif isinstance(msg, str):
-                    content = msg
-
-                if content:
-                    conversation_history.append({"role": role, "content": content})
-
-        # Note: response_text comes from the agent's LLM response in
-        # generate_response node. It should not contain parameters dict —
-        # parameters are generated separately.
-
-        # Generate and apply voice expressions (parameters + enhanced text)
-        # in single LLM call
-        # This method:
-        # 1. Generates parameters (speed, description, etc.)
-        #    → applies via update_options() to TTS
-        # 2. Returns enhanced text (if supported) or original text (if not supported)
-        # CRITICAL: Parameters go ONLY to update_options(), never to message content
-        from app.speech_prosody.service import generate_and_apply_prosody_for_message
-
-        # Get current parameters from TTS client for context
-        current_parameters = None
-        if hasattr(tts_client, "_current_params") and tts_client._current_params:
-            current_parameters = tts_client._current_params.copy()
-
-        # Wrap prosody generation in asyncio.wait_for so a hanging upstream
-        # prosody LLM call cannot block done_thinking from firing. On timeout
-        # we fall back to the original (un-enhanced) text. See
-        # PROSODY_GENERATION_TIMEOUT in app/core/config.py.
-        _prosody_start = datetime.now(timezone.utc)
-        logger.info(
-            "[apply_voice_expressions] prosody_call_start timeout=%ss text_chars=%d",
-            settings.PROSODY_GENERATION_TIMEOUT,
-            len(response_text or ""),
-        )
-        try:
-            enhanced_text = await asyncio.wait_for(
-                generate_and_apply_prosody_for_message(
-                    tts_client=tts_client,
-                    message_text=response_text,
-                    llm_client=llm_client,
-                    scenario=scenario,
-                    conversation_history=conversation_history,
-                    current_parameters=current_parameters,
-                ),
-                timeout=settings.PROSODY_GENERATION_TIMEOUT,
-            )
-            _prosody_latency = (
-                datetime.now(timezone.utc) - _prosody_start
-            ).total_seconds()
-            logger.info(
-                "[apply_voice_expressions] prosody_call_complete latency_s=%.2f "
-                "enhanced=%s",
-                _prosody_latency,
-                enhanced_text is not None,
-            )
-            turn_metrics.record(
-                get_room_id(),
-                prosody_ms=int(_prosody_latency * 1000),
-                prosody_skipped=False,
-            )
-        except asyncio.TimeoutError:
-            _prosody_latency = (
-                datetime.now(timezone.utc) - _prosody_start
-            ).total_seconds()
-            logger.error(
-                "[apply_voice_expressions] prosody_call_timeout latency_s=%.2f "
-                "timeout=%ss — falling back to original text",
-                _prosody_latency,
-                settings.PROSODY_GENERATION_TIMEOUT,
-            )
-            turn_metrics.record(get_room_id(), prosody_ms=int(_prosody_latency * 1000))
-            enhanced_text = None
-        except Exception as e:
-            _prosody_latency = (
-                datetime.now(timezone.utc) - _prosody_start
-            ).total_seconds()
-            logger.exception(
-                "[apply_voice_expressions] prosody_call_failed latency_s=%.2f "
-                "error=%s — falling back to original text",
-                _prosody_latency,
-                str(e),
-            )
-            enhanced_text = None
-
-        if enhanced_text is not None:
-            # Text was enhanced (provider supports text enhancement)
-            # Preserve the message ID to ensure it's replaced in state history,
-            # not appended, which would cause duplicate speech/history bloat.
-            message_id = getattr(last_message, "id", None)
-            enhanced_message = AIMessage(content=enhanced_text, id=message_id)
-
-            # Return only the fields that need updating
-            return {
-                "messages": [enhanced_message],
-            }
-
-        # Text was not enhanced (provider doesn't support text enhancement, like Hume)
-        # Parameters have already been applied via update_options() in
-        # generate_and_apply_voice_expressions()
-        # Message content remains unchanged
-        return {}
-
-    finally:
-        await _publish_done_thinking(room)

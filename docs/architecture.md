@@ -25,13 +25,12 @@ flowchart TB
             N2[resolve_branching_instruction]
             N3A[generate_response]
             N3B[detect_behaviors]
-            N4[apply_voice_expressions]
+            N4[publish_done_thinking]
             N5[send_event_feedback]
             N1 --> N2
             N2 --> N3A
             N2 --> N3B
             N3A --> N4
-            N4 --> N5
             N3B --> N5
         end
 
@@ -60,8 +59,6 @@ flowchart TB
             PM[PromptManager]
             RESOLVER[Template Resolver]
         end
-
-        PROSODY[SpeechProsodyService]
     end
 
     LK <-->|WebRTC audio| WORKER
@@ -77,7 +74,6 @@ flowchart TB
     WORKER --> STT_F
     STT_F --> STT_API
     WORKER --> SCEN
-    Graph --> PROSODY
 ```
 
 ## Component Inventory
@@ -96,7 +92,6 @@ flowchart TB
 | Scenario Engine | `app/core/scenario/base.py` | Parse metadata into `Scenario` objects |
 | Agent Factory | `app/core/agent/factory.py` | Parse metadata, configure clients, create agent |
 | Branching System | `app/core/branching_instructions/` | Variable substitution in instructions |
-| Speech Prosody | `app/speech_prosody/` | Voice expression parameter generation |
 | Prompts System | `app/prompts/` | Template loading, backend override resolution |
 | Scenario Report | `app/core/scenario_report/` | N-turn text simulation, webhook delivery |
 | ScoreKeeper | `app/core/scoring/score_keeper.py` | Behavior instruction score tracking |
@@ -121,9 +116,9 @@ The event factory (`app/core/events/factory.py`) follows a similar pattern: `bui
 
 ## Design Decisions
 
-### Why subgraphs for resolve_branching_instruction and apply_voice_expressions?
+### Why subgraphs for resolve_branching_instruction and retrieve_knowledge?
 
-LangGraph's `LLMAdapter` (used by LiveKit) streams all LLM outputs from every node in a graph. The `resolve_branching_instruction` and `apply_voice_expressions` nodes make internal LLM calls that should not be streamed to the user. By wrapping these nodes in subgraphs and using `subgraphs=False` (default in LLMAdapter), their outputs are isolated from the main streaming pipeline.
+LangGraph's `LLMAdapter` (used by LiveKit) streams all LLM outputs from every node in a graph. The `resolve_branching_instruction` and `retrieve_knowledge` nodes make internal LLM calls that should not be streamed to the user. By wrapping these nodes in subgraphs and using `subgraphs=False` (default in LLMAdapter), their outputs are isolated from the main streaming pipeline.
 
 This is a workaround for [LiveKit agents issue #2836](https://github.com/livekit/agents/issues/2836).
 

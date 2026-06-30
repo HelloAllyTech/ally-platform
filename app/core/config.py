@@ -105,11 +105,10 @@ class Settings(BaseSettings):
     # full LLM response. The LiveKit LLMAdapter already streams (stream_mode=
     # "messages"); the only missing piece is enabling streaming on the chat
     # model. When True, TTS starts on the first tokens of generate_response —
-    # the single biggest voice-to-voice latency lever. Default True, paired with
-    # PROSDY_FORCE_SKIP: the streamed tokens (including inline ElevenLabs v3 audio
-    # tags emitted by generate_response itself) go straight to TTS, with no second
-    # prosody LLM call to rewrite the reply. Set False to fall back to waiting for
-    # the full reply.
+    # the single biggest voice-to-voice latency lever. Default True: the streamed
+    # tokens (including inline ElevenLabs v3 audio tags emitted by generate_response
+    # itself) go straight to TTS. Set False to fall back to waiting for the full
+    # reply.
     STREAM_RESPONSE: bool = Field(
         default=True,
         description=(
@@ -151,16 +150,6 @@ class Settings(BaseSettings):
         description="Seconds past the scenario time limit before the agent "
         "authoritatively ends the session (lets the client countdown reach "
         "zero first).",
-    )
-    PROSODY_GENERATION_TIMEOUT: float = Field(
-        default=3.0,
-        description=(
-            "Upper limit in seconds for prosody / voice-expression LLM call in "
-            "apply_voice_expressions. On timeout, the original text is used. "
-            "Prosody is on the serial critical path before first audio, so this "
-            "is kept tight (was 15s): a slow prosody call falls back to raw text "
-            "quickly instead of blocking the turn. Measured by prosodyMs."
-        ),
     )
     ORCHESTRATION_TIMEOUT: float = Field(
         default=20.0,
@@ -667,50 +656,6 @@ class Settings(BaseSettings):
             "Maximum number of scenario reports that can run concurrently. "
             "Prevents memory spikes from too many simultaneous long-running tasks. "
             "Requests beyond this limit will queue until a slot opens."
-        ),
-    )
-
-    # Speech prosody skip thresholds (reduce latency when under pressure)
-    # When skipped, TTS keeps last params instead of running prosody LLM call
-    PROSDY_FORCE_SKIP: bool = Field(
-        default=True,
-        description=(
-            "Latency kill-switch: when True, the apply_voice_expressions prosody "
-            "LLM call is skipped unconditionally so the (streamed) "
-            "generate_response reply goes straight to TTS. Default True, paired "
-            "with STREAM_RESPONSE: ElevenLabs v3 audio tags are now produced "
-            "INLINE by generate_response (the persona prompt carries the tag "
-            "instructions), so skipping the second rewrite call no longer loses "
-            "tags. TTS keeps the session-default voice params. Set False to "
-            "restore the per-turn prosody rewrite (and lose streaming's gains)."
-        ),
-    )
-    PROSDY_SKIP_ENABLED: bool = Field(
-        default=True,
-        description=(
-            "Enable skip-when-under-pressure logic. "
-            "When False, always run prosody (no skip)."
-        ),
-    )
-    PROSDY_SKIP_MIN_RESPONSE_LENGTH: int = Field(
-        default=50,
-        description=(
-            "Skip prosody when response is shorter than this (chars). "
-            "Short responses have low prosody impact."
-        ),
-    )
-    PROSDY_SKIP_MAX_RESPONSE_LENGTH: int = Field(
-        default=0,
-        description=(
-            "Skip prosody when response is longer than this (chars). "
-            "0 = disabled. Avoids compounding latency on long responses."
-        ),
-    )
-    PROSDY_SKIP_WHEN_EVENTS_DETECTED: bool = Field(
-        default=True,
-        description=(
-            "Skip prosody when events detected this turn. "
-            "Prioritizes responsiveness over voice expression."
         ),
     )
 

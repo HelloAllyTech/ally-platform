@@ -21,7 +21,7 @@ sequenceDiagram
     LK->>EP: New job
     EP->>W: AgentWorker(ctx)
     EP->>W: configure()
-    Note over W: Parse metadata<br/>Create STT/TTS/LLM clients<br/>Generate default prosody<br/>Initialize graph state
+    Note over W: Parse metadata<br/>Create STT/TTS/LLM clients<br/>Initialize graph state
     EP->>W: initialize()
     Note over W: Create AgentSession<br/>Setup EventOrchestrator<br/>Create Agent with LLMAdapter<br/>Register callbacks
     EP->>W: start()
@@ -38,8 +38,7 @@ sequenceDiagram
 3. **Create STT client** -- via `configure_stt_client()` using scenario voice/language config
 4. **Create TTS client** -- via `configure_tts_client()` using scenario voice config
 5. **Create LLM client** -- via `configure_llm_client()` using scenario language config
-6. **Generate default prosody** -- `SpeechProsodyService.generate_and_set_defaults()` uses the LLM to generate default voice expression parameters based on the persona
-7. **Initialize graph state** -- `initialize_agent_state()` sets up the LangGraph thread
+6. **Initialize graph state** -- `initialize_agent_state()` sets up the LangGraph thread
 
 After this phase, `worker.scenario`, `worker.tts_client`, `worker.stt_client`, `worker.llm_client`, and `worker.embedding_client` are all populated.
 
@@ -96,7 +95,7 @@ sequenceDiagram
     Note over Worker: Set _termination_message<br/>Set _termination_event
     Worker->>EP: _termination_event.set()
     EP->>EP: _handle_termination_in_entrypoint_context()
-    Note over EP: Generate prosody for termination msg<br/>Interrupt current speech<br/>Play termination audio<br/>ctx.shutdown()
+    Note over EP: Interrupt current speech<br/>Play termination audio<br/>ctx.shutdown()
 ```
 
 The termination message is played in the **entrypoint context** (not the graph context) to ensure reliable audio playback. The graph context signals the entrypoint via `asyncio.Event`.

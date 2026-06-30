@@ -24,7 +24,7 @@ app/prompts/<subdir>/<name>.txt  →  load_template() / load_and_format()
                                          ↓
                             (optional) template.format(**kwargs)
                                          ↓
-                            Final prompt string used by graph/report/prosody
+                            Final prompt string used by graph/report
 ```
 
 ---
@@ -33,7 +33,7 @@ app/prompts/<subdir>/<name>.txt  →  load_template() / load_and_format()
 
 | Function | Use when | Returns |
 |----------|----------|---------|
-| `load_template(prompt_code, backend_prompts=None)` | Caller will format manually (e.g. `build_prosody_prompt`) | Raw template string, or `""` |
+| `load_template(prompt_code, backend_prompts=None)` | Caller will format the template manually | Raw template string, or `""` |
 | `load_and_format(prompt_code, backend_prompts=None, **kwargs)` | You have all format kwargs ready (e.g. `language_code`, `custom_prompt`) | Formatted string, or `""` |
 
 **Variable format.** Templates use Python `str.format()` placeholders: `{var_name}`. Example: `{language_code}`, `{custom_prompt}`, `{persona_context}`.
@@ -47,10 +47,6 @@ app/prompts/
 ├── system/                 # System prompts for simulation
 │   ├── base_role_instruction.txt
 │   └── multilingual_instructions.txt
-├── prosody/                # Prosody generation prompts
-│   ├── default_generation_prompt.txt
-│   ├── unified_prompt_with_enhancement.txt
-│   └── parameters_only_prompt.txt
 └── counselor/
     └── report_generation_prompt.txt
 ```
@@ -63,9 +59,6 @@ Prompt codes use `ally_ai_learn_` prefix: `subdir/filename.txt` → `ally_ai_lea
 |-------------|----------------|---------|
 | `ally_ai_learn_system_base_role_instruction` | `system/base_role_instruction` | System prompt |
 | `ally_ai_learn_system_multilingual_instructions` | `system/multilingual_instructions` | Language samples for non-English |
-| `ally_ai_learn_prosody_default_generation_prompt` | `prosody/default_generation_prompt` | Prosody default params |
-| `ally_ai_learn_prosody_unified_prompt_with_enhancement` | `prosody/unified_prompt_with_enhancement` | Prosody runtime (params + text) |
-| `ally_ai_learn_prosody_parameters_only_prompt` | `prosody/parameters_only_prompt` | Prosody runtime (params only) |
 | `ally_ai_learn_counselor_report_generation_prompt` | `counselor/report_generation_prompt` | Report generation |
 
 ## Language Instruction (Non-English)
@@ -102,5 +95,4 @@ poetry run python scripts/sync_prompts.py --dry-run
 - `app/prompts/resolver.py` -- `load_template()`, `load_and_format()`, `resolve_template()`, path-based lookup
 - `app/core/graph/prompt.py` -- `generate_system_message()`, `_get_language_block()`, `_get_language_sample_block()`
 - `app/core/scenario_report/service.py` -- `_build_counselor_prompt()` uses `load_and_format()`
-- `app/speech_prosody/generator.py` -- Uses `load_template()` and `load_and_format()` for prosody prompts
 - `scripts/sync_prompts.py` -- Sync prompts to ally-be

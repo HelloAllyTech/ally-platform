@@ -464,7 +464,7 @@ def _build_behavior_prompt(
         # silently ignores unused kwargs. Future variants can reference any of
         # these as {placeholder} in their prompt text. These attributes are
         # populated on PromptData by app/core/scenario/base.py and otherwise
-        # feed prosody / evaluator / worker subsystems.
+        # feed evaluator / worker subsystems.
         opening_statements=_coerce_block_value(
             getattr(prompt_data, "opening_statements", None)
         ),
@@ -556,7 +556,7 @@ def _build_behavior_prompt(
 # `ally_ai_learn_system_audio_tag_guidance`) by generate_response and passed in;
 # this header reframes it so the persona emits the tags as part of its own reply.
 # That lets generate_response tokens (tags included) stream straight to TTS,
-# removing the second prosody LLM call from the critical path.
+# keeping the reply on a single streamed LLM call (no second rewrite pass).
 _AUDIO_TAG_GUIDANCE_HEADER = (
     "\n\n## Voice expression — audio tags\n"
     "Embed the audio tags below INLINE in your spoken replies to convey emotion "
