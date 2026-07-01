@@ -47,20 +47,35 @@ jest.mock('@/components', () => {
         ))}
       </View>
     ),
+    CustomDropdown: ({value, options, onSelect}: any) => (
+      <View testID="sort-dropdown">
+        <Text>{value}</Text>
+        {options?.map((opt: string) => (
+          <TouchableOpacity
+            key={opt}
+            testID={`sort-option-${opt}`}
+            onPress={() => onSelect(opt)}>
+            <Text>{opt}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    ),
     useToast: () => ({showToast: mockShowToast}),
   };
 });
 
 const mockRefresh = jest.fn();
 const mockLoadMore = jest.fn();
-const mockSetFilter = jest.fn();
+const mockSetReadFilter = jest.fn();
+const mockSetSort = jest.fn();
 
 let mockReviewsData: any[] = [];
 let mockIsLoading = false;
 let mockIsFetching = false;
 let mockError: any = null;
 let mockHasMore = false;
-let mockSelectedFilter = 'all';
+let mockSelectedReadFilter = 'ALL';
+let mockSelectedSort = 'LATEST';
 
 jest.mock('@/hooks/useReviews', () => ({
   useReviews: () => ({
@@ -69,10 +84,12 @@ jest.mock('@/hooks/useReviews', () => ({
     isFetching: mockIsFetching,
     error: mockError,
     hasMore: mockHasMore,
-    selectedFilter: mockSelectedFilter,
+    selectedReadFilter: mockSelectedReadFilter,
+    selectedSort: mockSelectedSort,
     loadMore: mockLoadMore,
     refresh: mockRefresh,
-    setSelectedFilter: mockSetFilter,
+    setSelectedReadFilter: mockSetReadFilter,
+    setSelectedSort: mockSetSort,
   }),
 }));
 
@@ -85,9 +102,15 @@ jest.mock('@/assets', () => {
 });
 
 jest.mock('@/constants', () => ({
-  REVIEW_FILTERS: [
-    {key: 'all', labelKey: 'review.filter.all'},
-    {key: 'mine', labelKey: 'review.filter.mine'},
+  READ_FILTER_OPTIONS: [
+    {key: 'ALL', labelKey: 'review.filter.all'},
+    {key: 'READ', labelKey: 'review.filter.read'},
+    {key: 'UNREAD', labelKey: 'review.filter.unread'},
+  ],
+  SORT_OPTIONS: [
+    {key: 'LATEST', labelKey: 'review.sort.latest'},
+    {key: 'MOST_VIEWED', labelKey: 'review.sort.mostViewed'},
+    {key: 'MOST_COMMENTED', labelKey: 'review.sort.mostCommented'},
   ],
   SCREEN_NAMES: {
     REVIEW_DETAILS: 'ReviewDetails',
@@ -138,10 +161,11 @@ describe('ReviewList', () => {
     mockIsFetching = false;
     mockError = null;
     mockHasMore = false;
-    mockSelectedFilter = 'all';
+    mockSelectedReadFilter = 'ALL';
+    mockSelectedSort = 'LATEST';
   });
 
-  it('renders tab filters', () => {
+  it('renders read filter tabs', () => {
     const {getByTestId} = render(
       <ReviewList
         reviewType="simulation"
@@ -150,6 +174,32 @@ describe('ReviewList', () => {
       />,
     );
     expect(getByTestId('tab-view')).toBeTruthy();
+    expect(getByTestId('filter-ALL')).toBeTruthy();
+    expect(getByTestId('filter-READ')).toBeTruthy();
+    expect(getByTestId('filter-UNREAD')).toBeTruthy();
+  });
+
+  it('renders sort dropdown', () => {
+    const {getByTestId} = render(
+      <ReviewList
+        reviewType="simulation"
+        useLazyQuery={mockUseLazyQuery}
+        canViewReview
+      />,
+    );
+    expect(getByTestId('sort-dropdown')).toBeTruthy();
+  });
+
+  it('calls setSelectedReadFilter when filter tab is pressed', () => {
+    const {getByTestId} = render(
+      <ReviewList
+        reviewType="simulation"
+        useLazyQuery={mockUseLazyQuery}
+        canViewReview
+      />,
+    );
+    fireEvent.press(getByTestId('filter-UNREAD'));
+    expect(mockSetReadFilter).toHaveBeenCalledWith('UNREAD');
   });
 
   it('renders empty state when no reviews and not loading', () => {

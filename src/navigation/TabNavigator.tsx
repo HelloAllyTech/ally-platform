@@ -5,7 +5,7 @@ import {
 } from '@react-navigation/bottom-tabs';
 import {TouchableOpacity, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {ScaledSheet} from 'react-native-size-matters';
+import {ms, ScaledSheet} from 'react-native-size-matters';
 import {useSelector} from 'react-redux';
 
 import {SCREEN_NAMES} from '@/constants';
@@ -15,6 +15,8 @@ import {
   TAB_CONFIG,
   TabConfig,
 } from '@/constants/tabs';
+import {useGetUnreadSimulationReviewCountQuery} from '@/services/reviewsApi';
+import {useGetUnreadScribeReviewCountQuery} from '@/services/scribeReviewsApi';
 import {AppRootState} from '@/store/store';
 import {colors} from '@/theme';
 
@@ -35,9 +37,24 @@ const CustomTabBar = (props: CustomTabBarProps) => {
   const insets = useSafeAreaInsets();
   const {visibleTabs} = props;
 
+  const {data: simUnread} = useGetUnreadSimulationReviewCountQuery();
+  const {data: scribeUnread} = useGetUnreadScribeReviewCountQuery();
+  const hasUnreadReviews =
+    (simUnread?.count ?? 0) + (scribeUnread?.count ?? 0) > 0;
+
   const renderTabBarIcon = (routeName: string, focused: boolean) => {
     const tab = visibleTabs.find(t => t.name === routeName);
-    return tab ? (focused ? tab.focusedIcon : tab.unfocusedIcon) : null;
+    if (!tab) return null;
+    const icon = focused ? tab.focusedIcon : tab.unfocusedIcon;
+    if (routeName === SCREEN_NAMES.REVIEW && hasUnreadReviews) {
+      return (
+        <View>
+          {icon}
+          <View style={styles.unreadBadge} />
+        </View>
+      );
+    }
+    return icon;
   };
 
   return (
@@ -145,6 +162,15 @@ const styles = ScaledSheet.create({
   },
   smallTabBar: {
     marginHorizontal: '80@ms',
+  },
+  unreadBadge: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: ms(8),
+    height: ms(8),
+    borderRadius: ms(4),
+    backgroundColor: colors.ds.theme.primary,
   },
   tabItem: {
     flex: 1,

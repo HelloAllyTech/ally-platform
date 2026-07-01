@@ -42,6 +42,7 @@ jest.mock('@/services/scribeReviewsApi', () => ({
   }),
   useAddScribeReviewCommentMutation: () => [jest.fn(), {isLoading: false}],
   useUpdateScribeReviewStatusMutation: () => [jest.fn(), {isLoading: false}],
+  useMarkScribeReviewAsReadMutation: () => [jest.fn()],
 }));
 
 jest.mock('@/contexts/ReviewApiContext', () => {

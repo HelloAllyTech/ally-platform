@@ -245,6 +245,9 @@ export const API_ROUTES = {
       `/scenario-session-reviews/general-comments/${commentId}`,
     GENERAL_COMMENT_VISIBILITY: (commentId: string) =>
       `/scenario-session-reviews/general-comments/${commentId}/visibility`,
+    MARK_READ: (reviewId: string) =>
+      `/scenario-session-reviews/${reviewId}/mark-read`,
+    UNREAD_COUNT: '/scenario-session-reviews/unread-count',
   },
   // Scribe session reviews
   SCRIBE_REVIEWS: {
@@ -287,6 +290,9 @@ export const API_ROUTES = {
       `/scribe-session-reviews/general-comments/${commentId}`,
     GENERAL_COMMENT_VISIBILITY: (commentId: string) =>
       `/scribe-session-reviews/general-comments/${commentId}/visibility`,
+    MARK_READ: (reviewId: string) =>
+      `/scribe-session-reviews/${reviewId}/mark-read`,
+    UNREAD_COUNT: '/scribe-session-reviews/unread-count',
   },
   BADGES: {
     GET_BADGES: `/badges/me`,

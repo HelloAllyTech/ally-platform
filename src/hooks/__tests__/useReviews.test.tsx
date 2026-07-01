@@ -29,12 +29,13 @@ describe('useReviews', () => {
     });
   });
 
-  it('fetches reviews on mount', async () => {
+  it('fetches reviews on mount with default readFilter and sortBy', async () => {
     renderHook(() => useReviews(mockUseLazyQuery));
 
     await waitFor(() => {
       expect(mockGetReviews).toHaveBeenCalledWith({
-        sortBy: 'ALL',
+        sortBy: 'LATEST',
+        readFilter: 'ALL',
         limit: 10,
         offset: 0,
       });
@@ -146,7 +147,7 @@ describe('useReviews', () => {
     });
   });
 
-  it('resets and refetches when filter changes', async () => {
+  it('resets and refetches when readFilter changes', async () => {
     mockGetReviews.mockResolvedValue({
       data: {data: makeReviewItems(5), count: 5},
     });
@@ -158,12 +159,34 @@ describe('useReviews', () => {
     });
 
     act(() => {
-      result.current.setSelectedFilter('LATEST' as any);
+      result.current.setSelectedReadFilter('READ' as any);
     });
 
     await waitFor(() => {
       expect(mockGetReviews).toHaveBeenLastCalledWith(
-        expect.objectContaining({sortBy: 'LATEST', offset: 0}),
+        expect.objectContaining({readFilter: 'READ', offset: 0}),
+      );
+    });
+  });
+
+  it('resets and refetches when sort changes', async () => {
+    mockGetReviews.mockResolvedValue({
+      data: {data: makeReviewItems(5), count: 5},
+    });
+
+    const {result} = renderHook(() => useReviews(mockUseLazyQuery));
+
+    await waitFor(() => {
+      expect(result.current.reviews).toHaveLength(5);
+    });
+
+    act(() => {
+      result.current.setSelectedSort('MOST_VIEWED' as any);
+    });
+
+    await waitFor(() => {
+      expect(mockGetReviews).toHaveBeenLastCalledWith(
+        expect.objectContaining({sortBy: 'MOST_VIEWED', offset: 0}),
       );
     });
   });
