@@ -12,10 +12,43 @@ from app.llms.openai import OpenAILLMClient
 logger = get_logger(__name__)
 
 
+def infer_provider_from_model(model: Optional[str]) -> Optional[str]:
+    """Infer the LLM provider from a model name.
+
+    Prompt/skill rows store only a model string (no provider), and the voice
+    runtime supports OpenAI + Gemini. Map by well-known prefixes so a
+    prompt-level model override also selects the right client class. Returns
+    None when the prefix is unrecognized (caller keeps the existing provider).
+    """
+    if not model:
+        return None
+    name = model.strip().lower()
+    if name.startswith(("gemini", "google")):
+        return LLMProvider.GEMINI
+    if name.startswith(("gpt", "o1", "o3", "o4", "chatgpt", "text-", "davinci")):
+        return LLMProvider.OPENAI
+    return None
+
+
+def model_supports_temperature(model: Optional[str]) -> bool:
+    """Whether a model accepts a custom ``temperature``.
+
+    OpenAI reasoning models (o-series, gpt-5 family) only allow the default and
+    return a 400 for any other value. Return False for those so callers can drop
+    the override instead of failing the call. Unknown/None models default True.
+    """
+    if not model:
+        return True
+    name = model.strip().lower()
+    return not name.startswith(("o1", "o3", "o4", "gpt-5"))
+
+
 def create_llm_client(
     llm_config: Optional[Dict[str, Any]] = None,
     language_code: str = DEFAULT_LANGUAGE_CODE,
     temperature: Optional[float] = None,
+    model: Optional[str] = None,
+    provider_override: Optional[str] = None,
 ) -> BaseLLMClient:
     """
     Create LLM client instance from configuration.
@@ -74,6 +107,35 @@ def create_llm_client(
     # single dict that from_config reads.
     if temperature is not None:
         config_dict["temperature"] = temperature
+
+    # Prompt-level model override: when a prompt/skill specifies a model, it
+    # wins over the model carried in llm_config and the code default. The
+    # provider is re-derived from the model name (prompts store only a model
+    # string), so the correct client class is built. An unrecognized model
+    # keeps the existing provider.
+    if model:
+        config_dict["model"] = model
+
+    # Provider resolution: an explicit prompt-level provider wins; otherwise
+    # infer from an overriding model name (legacy heuristic, kept as fallback).
+    if provider_override:
+        provider = provider_override
+    elif model:
+        inferred_provider = infer_provider_from_model(model)
+        if inferred_provider:
+            provider = inferred_provider
+
+    # Some models (OpenAI reasoning: o-series, gpt-5) reject a custom temperature
+    # and 400 on any non-default value. Drop it so an override on such a model
+    # degrades to the model's default instead of breaking the call.
+    if "temperature" in config_dict and not model_supports_temperature(
+        config_dict.get("model")
+    ):
+        logger.info(
+            "Model %s does not support a custom temperature; omitting it.",
+            config_dict.get("model"),
+        )
+        config_dict.pop("temperature", None)
 
     # Map provider to class and instantiate using from_config
     provider = provider.lower()

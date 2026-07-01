@@ -5,8 +5,42 @@ from unittest.mock import Mock, patch
 import pytest
 
 from app.llms.base import BaseLLMClient
-from app.llms.factory import create_llm_client
+from app.llms.factory import create_llm_client, model_supports_temperature
 from app.llms.openai import OpenAILLMClient
+
+
+class TestModelSupportsTemperature:
+    """OpenAI reasoning models reject a custom temperature."""
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize(
+        "model,expected",
+        [
+            ("gpt-4o", True),
+            ("gpt-4o-mini", True),
+            ("gpt-4.1", True),
+            ("gemini-2.5-pro", True),
+            ("gpt-5", False),
+            ("gpt-5-mini", False),
+            ("o1", False),
+            ("o3-mini", False),
+            ("o4-mini", False),
+            (None, True),
+        ],
+    )
+    def test_supports(self, model, expected):
+        assert model_supports_temperature(model) is expected
+
+    @pytest.mark.unit
+    @patch("app.llms.factory.OpenAILLMClient")
+    def test_temperature_dropped_for_reasoning_model(self, mock_llm_class):
+        """A custom temperature is omitted (not 400'd) for a no-temp model."""
+        mock_llm_class.from_config.return_value = Mock()
+        create_llm_client(language_code="en-IN", model="gpt-5", temperature=0.3)
+        mock_llm_class.from_config.assert_called_once_with(
+            config={"model": "gpt-5"},
+            language_code="en-IN",
+        )
 
 
 class TestBaseLLMClient:

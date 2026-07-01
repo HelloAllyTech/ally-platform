@@ -176,12 +176,139 @@ def configure_tts_client(scenario: Scenario) -> BaseTTSClient:
             raise ValueError("Cannot create TTS: gender is required for fallback")
 
 
+# Prompt code for the main response agent. A scenario may select a variant via
+# prompt_data.selected_main_prompt_code; otherwise this default is used to look
+# up a prompt-level model/temperature override.
+DEFAULT_MAIN_AGENT_PROMPT_CODE = "ally_ai_learn_system_main_agent_prompt"
+
+
+def _clamp_prompt_temperature(value: Any) -> Optional[float]:
+    """Coerce a prompt-level temperature to a float in [0, 2]; None on invalid.
+
+    Mirrors PromptData's own validator so a bad value sent on a prompt entry
+    falls back to the provider/global default instead of breaking the call.
+    """
+    if value is None or value == "":
+        return None
+    try:
+        temp = float(value)
+    except (TypeError, ValueError):
+        logger.warning("Ignoring invalid prompt-level temperature=%r", value)
+        return None
+    return min(2.0, max(0.0, temp))
+
+
+def get_prompt_llm_overrides(
+    prompt_data: Any, prompt_code: Optional[str]
+) -> tuple[Optional[str], Optional[str], Optional[float]]:
+    """Return (provider, model, temperature) overrides for a prompt code, read
+    from ``prompt_data.prompts[prompt_code]`` (shipped by ally-be). Returns
+    ``(None, None, None)`` when the prompt has no entry or no overrides set.
+    `provider` is explicit (no model-name inference) when ally-be sets it.
+    """
+    if not prompt_code or prompt_data is None:
+        return (None, None, None)
+    prompts = getattr(prompt_data, "prompts", None) or {}
+    entry = prompts.get(prompt_code)
+    if not isinstance(entry, dict):
+        return (None, None, None)
+    provider = entry.get("provider") or None
+    model = entry.get("model") or None
+    temperature = _clamp_prompt_temperature(entry.get("temperature"))
+    return (provider, model, temperature)
+
+
+def build_llm_client_for_prompt(
+    scenario: Scenario,
+    prompt_code: Optional[str],
+    *,
+    base_llm_config: Optional[Dict[str, Any]] = None,
+    language_code: str = DEFAULT_LANGUAGE_CODE,
+    simulation_temperature: Optional[float] = None,
+) -> BaseLLMClient:
+    """Build an LLM client for a prompt/skill, applying the precedence chain:
+
+        code default → language ``base_llm_config`` → prompt-level → simulation
+
+    - model/provider: a prompt-level model wins over the base/code model (no
+      simulation model exists). The provider is the explicit prompt provider
+      when set, else re-derived from the model name in ``create_llm_client``.
+    - temperature: the simulation override wins when provided (main agent
+      only); otherwise the prompt-level value; otherwise the base/code default
+      resolved inside ``create_llm_client``.
+    """
+    prompt_data = getattr(scenario, "prompt_data", None)
+    provider, model, prompt_temperature = get_prompt_llm_overrides(
+        prompt_data, prompt_code
+    )
+    effective_temperature = (
+        simulation_temperature
+        if simulation_temperature is not None
+        else prompt_temperature
+    )
+    if model or effective_temperature is not None:
+        logger.info(
+            "[LLM] prompt=%s applying overrides provider=%s model=%s temperature=%s",
+            prompt_code,
+            provider,
+            model,
+            effective_temperature,
+        )
+    return create_llm_client(
+        llm_config=base_llm_config,
+        language_code=language_code,
+        temperature=effective_temperature,
+        model=model,
+        provider_override=provider,
+    )
+
+
+def resolve_call_site_llm_client(
+    scenario: Scenario,
+    prompt_code: Optional[str],
+    *,
+    default_client: BaseLLMClient,
+    base_llm_config: Optional[Dict[str, Any]] = None,
+    language_code: str = DEFAULT_LANGUAGE_CODE,
+) -> BaseLLMClient:
+    """Return a per-prompt LLM client for an auxiliary call site.
+
+    When the prompt/skill at ``prompt_code`` carries a model or temperature
+    override, build a dedicated client honoring it; otherwise return the shared
+    ``default_client`` unchanged (no extra client built, no behaviour change).
+    This lets every call site honor a prompt-level override while keeping the
+    common no-override path identical to today.
+    """
+    provider, model, temperature = get_prompt_llm_overrides(
+        getattr(scenario, "prompt_data", None), prompt_code
+    )
+    if provider is None and model is None and temperature is None:
+        return default_client
+    try:
+        return build_llm_client_for_prompt(
+            scenario,
+            prompt_code,
+            base_llm_config=base_llm_config,
+            language_code=language_code,
+        )
+    except Exception as e:  # never break a call site over an override
+        logger.warning(
+            "[LLM] prompt=%s override failed (%s); using default client",
+            prompt_code,
+            e,
+        )
+        return default_client
+
+
 def configure_llm_client(scenario: Scenario) -> BaseLLMClient:
     """
-    Configure LLM client from scenario metadata with fallback.
+    Configure the main roleplay-agent LLM client from scenario metadata.
+
+    Precedence: code default → per-language llm_config → main-agent prompt
+    (model + temperature) → simulation-level temperature override.
 
     Args:
-        scenario: Scenario instance containing language config
+        scenario: Scenario instance containing language config + prompt_data
 
     Returns:
         Configured LLM client instance
@@ -196,12 +323,16 @@ def configure_llm_client(scenario: Scenario) -> BaseLLMClient:
         else DEFAULT_LANGUAGE_CODE
     )
 
-    # Roleplay-level temperature override (promptData.temperature). When set, it
-    # takes precedence over llm.config.temperature and the global default; lets a
-    # persona that needs tight consistency run cooler than the platform default.
+    # Simulation-level temperature (promptData.temperature) — main agent only.
     roleplay_temperature = getattr(scenario.prompt_data, "temperature", None)
 
-    # Log LLM config for debugging
+    # The main-agent prompt (or its selected variant) may carry its own
+    # model/temperature default, which sits below the simulation override.
+    main_prompt_code = (
+        getattr(scenario.prompt_data, "selected_main_prompt_code", None)
+        or DEFAULT_MAIN_AGENT_PROMPT_CODE
+    )
+
     if llm_config_from_metadata:
         logger.info(
             f"Using LLM config from scenario metadata: "
@@ -211,22 +342,24 @@ def configure_llm_client(scenario: Scenario) -> BaseLLMClient:
     else:
         logger.info("No LLM config in scenario metadata, using defaults")
 
-    if roleplay_temperature is not None:
-        logger.info(
-            "Applying roleplay-level temperature override: %s", roleplay_temperature
-        )
-
     try:
-        llm_client = create_llm_client(
-            llm_config=llm_config_from_metadata,
+        llm_client = build_llm_client_for_prompt(
+            scenario,
+            main_prompt_code,
+            base_llm_config=llm_config_from_metadata,
             language_code=language_code,
-            temperature=roleplay_temperature,
+            simulation_temperature=roleplay_temperature,
         )
         logger.info(f"Successfully created LLM client: {type(llm_client).__name__}")
         return llm_client
     except Exception as e:
         logger.warning(f"LLM config failed, using default: {e}")
         logger.info("Falling back to default LLM configuration")
+        # Deliberately DROP the prompt-level model override on fallback: if an
+        # unrunnable model (e.g. a provider with no API key, or a model the key
+        # can't access) is what failed, retrying with it would fail again and
+        # break the session. Keep only the safe code default + simulation
+        # temperature so the roleplay degrades gracefully instead of dying.
         return create_llm_client(
             language_code=language_code,
             temperature=roleplay_temperature,

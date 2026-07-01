@@ -781,6 +781,33 @@ async def resolve_branching_instruction(
                                 "llm_client"
                             )
 
+                        # Prompt-level override for the branching skill: when the
+                        # branching prompt sets a model/temperature, build a
+                        # dedicated client honoring it. No override → unchanged
+                        # (the existing branching_llm_config / main-client path).
+                        if scenario is not None:
+                            from app.core.agent.factory import (
+                                build_llm_client_for_prompt,
+                                get_prompt_llm_overrides,
+                            )
+
+                            _b_code = "ally_ai_learn_system_branching_agent_prompt"
+                            _b_provider, _b_model, _b_temp = get_prompt_llm_overrides(
+                                getattr(scenario, "prompt_data", None), _b_code
+                            )
+                            if (
+                                _b_provider is not None
+                                or _b_model is not None
+                                or _b_temp is not None
+                            ):
+                                branching_llm_client = build_llm_client_for_prompt(
+                                    scenario,
+                                    _b_code,
+                                    base_llm_config=llm_config_for_branching,
+                                    language_code=language_code,
+                                )
+                                llm_config_for_branching = None
+
                     # Lazily resolve llm_response tags if present (BLOCKING operation).
                     # Wrapped in asyncio.wait_for so a hanging upstream LLM cannot
                     # park this node indefinitely (would manifest as the user being
