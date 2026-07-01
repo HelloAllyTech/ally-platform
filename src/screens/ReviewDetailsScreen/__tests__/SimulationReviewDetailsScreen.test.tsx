@@ -46,6 +46,7 @@ jest.mock('@/services/reviewsApi', () => ({
     refetch: jest.fn(),
   }),
   useAddReviewCommentMutation: () => [jest.fn(), {isLoading: false}],
+  useMarkSimulationReviewAsReadMutation: () => [jest.fn()],
 }));
 
 jest.mock('@/contexts/ReviewApiContext', () => {

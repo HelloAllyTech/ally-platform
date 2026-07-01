@@ -182,6 +182,7 @@ export const api = createApi({
     'ReviewThreads',
     'GeneralComments',
     'ReflectionPrompts',
+    'UnreadReviewCount',
   ],
   endpoints: () => ({}),
 });

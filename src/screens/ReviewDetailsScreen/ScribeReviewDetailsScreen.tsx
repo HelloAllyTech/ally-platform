@@ -1,4 +1,4 @@
-import React, {useCallback, useMemo} from 'react';
+import React, {useCallback, useEffect, useMemo} from 'react';
 
 import {ReviewTranscriptHeader} from '@/components';
 import {SCREEN_NAMES, USER_PERMISSIONS} from '@/constants';
@@ -10,6 +10,7 @@ import {
   useAddScribeReviewCommentMutation,
   useGetScribeReviewByIdQuery,
   useLazyGetScribeMessagesQuery,
+  useMarkScribeReviewAsReadMutation,
   useUpdateScribeReviewStatusMutation,
 } from '@/services/scribeReviewsApi';
 import {useAppSelector} from '@/store/hooks';
@@ -45,6 +46,15 @@ export const ScribeReviewDetailsScreen: React.FC<Props> = ({route}) => {
     );
   const [addReviewComment, {isLoading: isAddingComment}] =
     useAddScribeReviewCommentMutation();
+
+  const [markScribeReviewAsRead] = useMarkScribeReviewAsReadMutation();
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      markScribeReviewAsRead({reviewId});
+    }, 10000);
+    return () => clearTimeout(timer);
+  }, [reviewId, markScribeReviewAsRead]);
 
   const isPrivate = reviewData?.reviewStatus === ReviewStatus.HIDDEN;
 

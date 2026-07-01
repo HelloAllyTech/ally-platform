@@ -7,6 +7,33 @@ export enum ReviewFilter {
   UNDISCOVERED = 'UNDISCOVERED',
 }
 
+export enum ReadFilter {
+  ALL = 'ALL',
+  READ = 'READ',
+  UNREAD = 'UNREAD',
+}
+
+export enum SortBy {
+  LATEST = 'LATEST',
+  MOST_VIEWED = 'MOST_VIEWED',
+  MOST_COMMENTED = 'MOST_COMMENTED',
+}
+
+export const READ_FILTER_OPTIONS: {
+  key: ReadFilter;
+  labelKey: TranslationType;
+}[] = [
+  {key: ReadFilter.ALL, labelKey: 'review.filter.all'},
+  {key: ReadFilter.READ, labelKey: 'review.filter.read'},
+  {key: ReadFilter.UNREAD, labelKey: 'review.filter.unread'},
+];
+
+export const SORT_OPTIONS: {key: SortBy; labelKey: TranslationType}[] = [
+  {key: SortBy.LATEST, labelKey: 'review.sort.latest'},
+  {key: SortBy.MOST_VIEWED, labelKey: 'review.sort.mostViewed'},
+  {key: SortBy.MOST_COMMENTED, labelKey: 'review.sort.mostCommented'},
+];
+
 export const REVIEW_FILTERS: {key: ReviewFilter; labelKey: TranslationType}[] =
   [
     {

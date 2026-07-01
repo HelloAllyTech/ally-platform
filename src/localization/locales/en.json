@@ -793,7 +793,14 @@
       "all": "All",
       "latest": "Latest",
       "mostReviewed": "Most reviewed",
-      "undiscovered": "Undiscovered"
+      "undiscovered": "Undiscovered",
+      "read": "Read",
+      "unread": "Unread"
+    },
+    "sort": {
+      "latest": "Latest",
+      "mostViewed": "Most viewed",
+      "mostCommented": "Most commented"
     },
     "empty": {
       "title": "No shared sessions yet",

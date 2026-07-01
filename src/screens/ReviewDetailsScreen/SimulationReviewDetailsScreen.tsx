@@ -1,4 +1,4 @@
-import React, {useCallback, useMemo} from 'react';
+import React, {useCallback, useEffect, useMemo} from 'react';
 
 import {ReviewTranscriptHeader} from '@/components';
 import {SCREEN_NAMES, USER_PERMISSIONS} from '@/constants';
@@ -12,6 +12,7 @@ import {
   useAddReviewCommentMutation,
   useGetReviewByIdQuery,
   useLazyGetMessagesQuery,
+  useMarkSimulationReviewAsReadMutation,
 } from '@/services/reviewsApi';
 import {useAppSelector} from '@/store/hooks';
 import {ReviewStatus} from '@/types';
@@ -51,6 +52,15 @@ export const SimulationReviewDetailsScreen: React.FC<Props> = ({route}) => {
 
   const [addReviewComment, {isLoading: isAddingComment}] =
     useAddReviewCommentMutation();
+
+  const [markSimulationReviewAsRead] = useMarkSimulationReviewAsReadMutation();
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      markSimulationReviewAsRead({reviewId});
+    }, 10000);
+    return () => clearTimeout(timer);
+  }, [reviewId, markSimulationReviewAsRead]);
 
   const api: ReviewApiAdapter = useMemo(
     () => ({

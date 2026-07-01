@@ -1,11 +1,11 @@
-import {useCallback, useEffect, useMemo, useRef} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useFocusEffect} from '@react-navigation/native';
 import {ActivityIndicator, FlatList, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {EmptyReviewIcon} from '@/assets';
-import {EmptyState, TabView, useToast} from '@/components';
-import {REVIEW_FILTERS, SCREEN_NAMES} from '@/constants';
+import {CustomDropdown, EmptyState, TabView, useToast} from '@/components';
+import {READ_FILTER_OPTIONS, SCREEN_NAMES, SORT_OPTIONS} from '@/constants';
 import {ReviewType} from '@/contexts/ReviewApiContext';
 import {useAppNavigation, useTranslate} from '@/hooks';
 import {useReviews} from '@/hooks/useReviews';
@@ -35,6 +35,7 @@ export const ReviewList: React.FC<ReviewListProps> = ({
   const {showToast} = useToast();
   const navigation = useAppNavigation();
   const isFirstFocus = useRef(true);
+  const [isSortOpen, setIsSortOpen] = useState(false);
 
   const {
     reviews,
@@ -42,10 +43,12 @@ export const ReviewList: React.FC<ReviewListProps> = ({
     isFetching,
     error,
     hasMore,
-    selectedFilter,
+    selectedReadFilter,
+    selectedSort,
     loadMore,
     refresh,
-    setSelectedFilter,
+    setSelectedReadFilter,
+    setSelectedSort,
   } = useReviews(useLazyQuery);
 
   useFocusEffect(
@@ -64,13 +67,27 @@ export const ReviewList: React.FC<ReviewListProps> = ({
     }
   }, [error, showToast, t]);
 
-  const filterTabs = useMemo(
+  const readFilterTabs = useMemo(
     () =>
-      REVIEW_FILTERS.map(filter => ({
+      READ_FILTER_OPTIONS.map(filter => ({
         key: filter.key,
         label: t(filter.labelKey),
       })),
     [t],
+  );
+
+  const sortOptionLabels = useMemo(
+    () => SORT_OPTIONS.map(o => t(o.labelKey)),
+    [t],
+  );
+
+  const selectedSortLabel = useMemo(
+    () =>
+      t(
+        SORT_OPTIONS.find(o => o.key === selectedSort)?.labelKey ??
+          SORT_OPTIONS[0].labelKey,
+      ),
+    [selectedSort, t],
   );
 
   const isScribe = reviewType === 'scribe';
@@ -90,15 +107,38 @@ export const ReviewList: React.FC<ReviewListProps> = ({
     [navigation, screenName],
   );
 
+  const handleSortSelect = useCallback(
+    (label: string) => {
+      const option = SORT_OPTIONS.find(o => t(o.labelKey) === label);
+      if (option) {
+        setSelectedSort(option.key);
+      }
+      setIsSortOpen(false);
+    },
+    [setSelectedSort, t],
+  );
+
   return (
     <>
-      <View style={styles.tabContainer}>
-        <TabView
-          tabs={filterTabs}
-          tabWidthMode="content"
-          activeTab={selectedFilter}
-          onTabChange={setSelectedFilter}
-        />
+      <View style={styles.controlsContainer}>
+        <View style={styles.tabContainer}>
+          <TabView
+            tabs={readFilterTabs}
+            tabWidthMode="content"
+            activeTab={selectedReadFilter}
+            onTabChange={setSelectedReadFilter}
+          />
+        </View>
+        <View style={styles.sortContainer}>
+          <CustomDropdown
+            value={selectedSortLabel}
+            options={sortOptionLabels}
+            onSelect={handleSortSelect}
+            isOpen={isSortOpen}
+            setIsOpen={setIsSortOpen}
+            alignModalRight
+          />
+        </View>
       </View>
 
       <FlatList
@@ -151,9 +191,18 @@ export const ReviewList: React.FC<ReviewListProps> = ({
 };
 
 const styles = ScaledSheet.create({
-  tabContainer: {
+  controlsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginTop: '16@ms',
     paddingHorizontal: '16@s',
+  },
+  tabContainer: {
+    flex: 1,
+  },
+  sortContainer: {
+    marginLeft: '8@s',
   },
   list: {
     paddingHorizontal: '16@s',

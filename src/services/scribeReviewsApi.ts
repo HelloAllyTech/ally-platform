@@ -20,13 +20,29 @@ export const scribeReviewsApi = api.injectEndpoints({
   endpoints: builder => ({
     getScribeReviews: builder.query<
       ReviewsResponse | null,
-      {sortBy: string; limit: number; offset: number}
+      {sortBy: string; readFilter?: string; limit: number; offset: number}
     >({
-      query: ({sortBy, limit, offset}) => ({
+      query: ({sortBy, readFilter, limit, offset}) => ({
         url: API_ROUTES.SCRIBE_REVIEWS.REVIEWS,
         method: API_METHODS.GET,
-        params: {sortBy, limit, offset, order: SortOrder.DESC},
+        params: {sortBy, readFilter, limit, offset, order: SortOrder.DESC},
       }),
+    }),
+    markScribeReviewAsRead: builder.mutation<
+      {success: boolean},
+      {reviewId: string}
+    >({
+      query: ({reviewId}) => ({
+        url: API_ROUTES.SCRIBE_REVIEWS.MARK_READ(reviewId),
+        method: API_METHODS.PATCH,
+      }),
+    }),
+    getUnreadScribeReviewCount: builder.query<{count: number}, void>({
+      query: () => ({
+        url: API_ROUTES.SCRIBE_REVIEWS.UNREAD_COUNT,
+        method: API_METHODS.GET,
+      }),
+      providesTags: ['UnreadReviewCount'],
     }),
     createScribeReview: builder.mutation<
       CreateScribeReviewResponse,
@@ -171,4 +187,6 @@ export const {
   useDeleteScribeCommentMutation,
   useLazyGetScribeGeneralReviewCommentsQuery,
   useGetScribeGeneralReviewCommentsQuery,
+  useMarkScribeReviewAsReadMutation,
+  useGetUnreadScribeReviewCountQuery,
 } = scribeReviewsApi;

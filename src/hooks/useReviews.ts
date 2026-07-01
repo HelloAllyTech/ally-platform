@@ -1,6 +1,6 @@
 import {useCallback, useEffect, useState} from 'react';
 
-import {ReviewFilter} from '@/constants';
+import {ReadFilter, SortBy} from '@/constants';
 import {useLazyGetReviewsQuery} from '@/services/reviewsApi';
 import {ReviewItem} from '@/types/reviews';
 
@@ -12,15 +12,18 @@ export const useReviews = (useLazyQuery: LazyReviewsQuery) => {
   const [offset, setOffset] = useState<number>(0);
   const [hasMore, setHasMore] = useState(true);
   const [reviews, setReviews] = useState<ReviewItem[]>([]);
-  const [selectedFilter, setSelectedFilter] = useState<ReviewFilter>(
-    ReviewFilter.ALL,
+  const [selectedReadFilter, setSelectedReadFilter] = useState<ReadFilter>(
+    ReadFilter.ALL,
   );
+  const [selectedSort, setSelectedSort] = useState<SortBy>(SortBy.LATEST);
   const [getReviews, {isLoading, isFetching, error}] = useLazyQuery();
+
   const fetchReviews = useCallback(
     async (currentOffset: number, reset: boolean = false) => {
       try {
         const response = await getReviews({
-          sortBy: selectedFilter,
+          sortBy: selectedSort,
+          readFilter: selectedReadFilter,
           limit: LIMIT,
           offset: currentOffset,
         });
@@ -47,17 +50,17 @@ export const useReviews = (useLazyQuery: LazyReviewsQuery) => {
         console.error('Error fetching reviews:', err);
       }
     },
-    [getReviews, selectedFilter],
+    [getReviews, selectedReadFilter, selectedSort],
   );
 
-  // Reset and fetch when filter changes
+  // Reset and fetch when filter or sort changes
   useEffect(() => {
     setOffset(0);
     setReviews([]);
     setHasMore(true);
     fetchReviews(0, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedFilter]);
+  }, [selectedReadFilter, selectedSort]);
 
   // Load more reviews (for infinite scroll)
   const loadMore = useCallback(() => {
@@ -82,10 +85,12 @@ export const useReviews = (useLazyQuery: LazyReviewsQuery) => {
     isFetching,
     error,
     hasMore,
-    selectedFilter,
+    selectedReadFilter,
+    selectedSort,
     fetchReviews,
     loadMore,
     refresh,
-    setSelectedFilter,
+    setSelectedReadFilter,
+    setSelectedSort,
   };
 };

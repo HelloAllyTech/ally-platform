@@ -793,7 +793,14 @@
       "all": "सभी",
       "latest": "नवीनतम",
       "mostReviewed": "सबसे अधिक समीक्षा की गई",
-      "undiscovered": "अन्वेषित"
+      "undiscovered": "अन्वेषित",
+      "read": "पढ़ा हुआ",
+      "unread": "अपठित"
+    },
+    "sort": {
+      "latest": "नवीनतम",
+      "mostViewed": "सर्वाधिक देखा गया",
+      "mostCommented": "सर्वाधिक टिप्पणी"
     },
     "empty": {
       "title": "अभी तक कोई साझा सत्र नहीं",
