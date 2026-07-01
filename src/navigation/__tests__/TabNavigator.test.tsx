@@ -96,6 +96,14 @@ jest.mock('../../utils/common', () => ({
   ...jest.requireActual('../../utils/common'),
 }));
 
+jest.mock('@/services/reviewsApi', () => ({
+  useGetUnreadSimulationReviewCountQuery: () => ({data: {count: 0}}),
+}));
+
+jest.mock('@/services/scribeReviewsApi', () => ({
+  useGetUnreadScribeReviewCountQuery: () => ({data: {count: 0}}),
+}));
+
 // Mock API to prevent store issues
 jest.mock('@/services/api', () => ({
   api: {
