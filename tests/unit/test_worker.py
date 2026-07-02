@@ -236,6 +236,24 @@ class TestWorker:
         assert td == "vad"
         assert kwargs == {}
 
+    def test_resolve_turn_detection_records_eou_build_timing(self, monkeypatch):
+        # The per-job MultilingualModel() build is timed so [START_TIMING] can
+        # confirm it stays cheap (it's a handle to the boot-loaded executor).
+        import livekit.plugins.turn_detector.multilingual as ml
+
+        class FakeMultilingualModel:
+            def __init__(self):
+                pass
+
+        monkeypatch.setattr(ml, "MultilingualModel", FakeMultilingualModel)
+        monkeypatch.setattr(
+            worker.settings, "SEMANTIC_TURN_DETECTION_ENABLED", True, raising=False
+        )
+        w = self._bare_worker()
+        td, kwargs = w._resolve_turn_detection("VAD")
+        assert isinstance(td, FakeMultilingualModel)
+        assert "eou_load_ms" in w._timing
+
     def test_eou_runner_registered_at_import(self):
         # Importing app.worker must register the multilingual EOU inference runner
         # so the worker creates + warms its inference executor at bootstrap. Without
@@ -688,6 +706,53 @@ class TestWorker:
         worker.prewarm(proc)
 
         assert proc.userdata["vad"] == "VAD_THRESHOLD_0.7"
+
+    def test_prewarm_sets_bvc(self, monkeypatch):
+        # prewarm also builds the BVC filter per process (the EOU model can't be
+        # prewarmed — it needs the job context — so it's built per-job instead).
+        class DummyVAD:
+            @staticmethod
+            def load(activation_threshold):
+                return "VAD"
+
+        monkeypatch.setattr(worker.silero, "VAD", DummyVAD)
+        monkeypatch.setattr(worker.noise_cancellation, "BVC", lambda: "BVC")
+
+        class DummyProc:
+            def __init__(self):
+                self.userdata = {}
+
+        proc = DummyProc()
+        worker.prewarm(proc)
+
+        assert proc.userdata["vad"] == "VAD"
+        assert proc.userdata["bvc"] == "BVC"
+        assert "eou" not in proc.userdata  # EOU is never prewarmed
+
+    def test_prewarm_degrades_when_bvc_fails(self, monkeypatch):
+        # If BVC construction raises during prewarm, prewarm must not raise; VAD
+        # still loads and session.start falls back to constructing BVC inline
+        # (the "bvc" key is simply absent).
+        class DummyVAD:
+            @staticmethod
+            def load(activation_threshold):
+                return "VAD"
+
+        def _boom(*a, **k):
+            raise RuntimeError("no event loop")
+
+        monkeypatch.setattr(worker.silero, "VAD", DummyVAD)
+        monkeypatch.setattr(worker.noise_cancellation, "BVC", _boom)
+
+        class DummyProc:
+            def __init__(self):
+                self.userdata = {}
+
+        proc = DummyProc()
+        worker.prewarm(proc)  # must not raise
+
+        assert proc.userdata["vad"] == "VAD"
+        assert "bvc" not in proc.userdata
 
     # -------------------- _arm_orphan_deadline --------------------
     @pytest.mark.asyncio
@@ -1637,3 +1702,293 @@ class TestParseMaxTimeSeconds:
 
     def test_invalid_returns_none(self):
         assert worker._parse_max_time_seconds("abc") is None
+
+
+class _RecordingSession:
+    """Minimal AgentSession stand-in that records .on() handler registrations."""
+
+    def __init__(self):
+        self.handlers = {}
+
+    def on(self, event_name):
+        def decorator(fn):
+            self.handlers[event_name] = fn
+            return fn
+
+        return decorator
+
+
+class TestBackgroundAudioDeferral:
+    """The opening statement must not wait on filler/back-channel synthesis.
+
+    _setup_background_audio() now only resolves the (in-memory) comfort tone and
+    publishes the player synchronously, then spawns _setup_deferred_naturalness()
+    as a background task for the LLM call + TTS synthesis + handler wiring.
+    """
+
+    def _bg_worker(self):
+        ctx = types.SimpleNamespace(
+            room=types.SimpleNamespace(name="room-1"),
+            proc=types.SimpleNamespace(userdata={}),
+        )
+        w = worker.AgentWorker(ctx)
+        w.scenario = types.SimpleNamespace(prompt_data=types.SimpleNamespace())
+        w.tts_client = types.SimpleNamespace(tts_instance="TTS")
+        w.session = _RecordingSession()
+        return w
+
+    @pytest.mark.asyncio
+    async def test_setup_background_audio_defers_synthesis(self, monkeypatch):
+        w = self._bg_worker()
+        # No comfort tone; both naturalness layers "possible" via pure flags.
+        monkeypatch.setattr(w, "_resolve_comfort_audio", lambda: None)
+        monkeypatch.setattr(
+            "app.core.livekit.fillers.is_filler_enabled", lambda s: True
+        )
+        monkeypatch.setattr(
+            "app.core.livekit.backchannel.is_backchannel_enabled", lambda s: True
+        )
+        monkeypatch.setattr(
+            "app.core.livekit.interim_reply.is_interim_reply_enabled", lambda s: False
+        )
+
+        started = {}
+
+        class FakePlayer:
+            def __init__(self, ambient_sound=None):
+                started["ambient"] = ambient_sound
+
+            async def start(self, room):
+                started["room"] = room
+
+        monkeypatch.setattr(
+            "app.core.livekit.resilient_bg_audio.ResilientBackgroundAudioPlayer",
+            FakePlayer,
+        )
+
+        # The expensive per-layer work must be scheduled as a task, NOT awaited
+        # inline — replace it with an AsyncMock and confirm it runs afterwards.
+        deferred = AsyncMock()
+        monkeypatch.setattr(w, "_setup_deferred_naturalness", deferred)
+
+        await w._setup_background_audio()
+
+        # Player published synchronously; deferred synthesis not yet run.
+        assert isinstance(w._bg_audio, FakePlayer)
+        assert started["room"] is w.ctx.room
+        deferred.assert_not_awaited()
+
+        # Let the scheduled background task run.
+        await asyncio.sleep(0)
+        deferred.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_setup_background_audio_skips_track_when_nothing_possible(
+        self, monkeypatch
+    ):
+        w = self._bg_worker()
+        monkeypatch.setattr(w, "_resolve_comfort_audio", lambda: None)
+        monkeypatch.setattr(
+            "app.core.livekit.fillers.is_filler_enabled", lambda s: False
+        )
+        monkeypatch.setattr(
+            "app.core.livekit.backchannel.is_backchannel_enabled", lambda s: False
+        )
+        monkeypatch.setattr(
+            "app.core.livekit.interim_reply.is_interim_reply_enabled", lambda s: False
+        )
+        deferred = AsyncMock()
+        monkeypatch.setattr(w, "_setup_deferred_naturalness", deferred)
+
+        await w._setup_background_audio()
+        await asyncio.sleep(0)
+
+        assert w._bg_audio is None
+        deferred.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_deferred_naturalness_failure_leaves_session_running(
+        self, monkeypatch
+    ):
+        w = self._bg_worker()
+        w._bg_audio = Mock()  # player already published by the sync part
+        monkeypatch.setattr(
+            "app.core.livekit.fillers.is_filler_enabled", lambda s: True
+        )
+        monkeypatch.setattr(
+            "app.core.livekit.fillers.resolve_filler_phrases", lambda s: ["um"]
+        )
+
+        def _boom(*a, **k):
+            raise RuntimeError("tts down")
+
+        monkeypatch.setattr(
+            "app.core.livekit.filler_audio.synthesize_filler_clips", _boom
+        )
+
+        # Must swallow the failure — never raises into the session.
+        assert await w._setup_deferred_naturalness() is None
+        # Player untouched; session still usable.
+        assert w._bg_audio is not None
+
+    @pytest.mark.asyncio
+    async def test_deferred_naturalness_registers_handlers(self, monkeypatch):
+        w = self._bg_worker()
+        w._bg_audio = Mock()
+        w._interim_enabled = False
+        monkeypatch.setattr(worker.settings, "PREDICTIVE_FILLER_ENABLED", False)
+        monkeypatch.setattr(
+            "app.core.livekit.fillers.is_filler_enabled", lambda s: True
+        )
+        monkeypatch.setattr(
+            "app.core.livekit.fillers.resolve_filler_phrases", lambda s: ["um"]
+        )
+        monkeypatch.setattr(
+            "app.core.livekit.filler_audio.synthesize_filler_clips",
+            AsyncMock(return_value=[("um", "/tmp/um.wav")]),
+        )
+        # Back-channel resolves to True (its own synthesis is exercised elsewhere).
+        monkeypatch.setattr(
+            w, "_resolve_backchannel_clips", AsyncMock(return_value=True)
+        )
+
+        await w._setup_deferred_naturalness()
+
+        # Filler drives off agent "thinking"; back-channel off user "speaking".
+        assert "agent_state_changed" in w.session.handlers
+        assert "user_state_changed" in w.session.handlers
+        assert w._filler_clips == [("um", "/tmp/um.wav")]
+
+
+class TestStartUsesPrewarmedBVC:
+    @pytest.mark.asyncio
+    async def test_start_uses_prewarmed_bvc(self, monkeypatch):
+        prewarmed_bvc = object()
+        captured = {}
+
+        class DummyRIO:
+            def __init__(self, **kwargs):
+                captured["noise_cancellation"] = kwargs.get("noise_cancellation")
+
+        class DummySession:
+            async def start(self, room, agent, room_input_options):
+                self.started = True
+
+        monkeypatch.setattr(worker, "RoomInputOptions", DummyRIO)
+        # If the prewarmed instance were ignored, this fallback marker would show.
+        monkeypatch.setattr(worker.noise_cancellation, "BVC", lambda: "FRESH_BVC")
+        monkeypatch.setattr(
+            worker, "setup_interruption_detection", lambda session: None
+        )
+        monkeypatch.setattr(
+            worker,
+            "should_say_opening_statement",
+            lambda scenario, event_orchestrator: False,
+        )
+        monkeypatch.setattr(
+            worker,
+            "should_auto_start_conversation",
+            lambda scenario, event_orchestrator: False,
+        )
+
+        async def _connect():
+            return None
+
+        ctx = types.SimpleNamespace(
+            room=types.SimpleNamespace(name="room-1"),
+            proc=types.SimpleNamespace(userdata={"bvc": prewarmed_bvc}),
+            connect=_connect,
+        )
+
+        w = worker.AgentWorker(ctx)
+        w.session = DummySession()
+        w.agent = object()
+        w.scenario = types.SimpleNamespace(
+            prompt_data=types.SimpleNamespace(opening_statements=[])
+        )
+        w.event_orchestrator = types.SimpleNamespace(initialize=AsyncMock())
+        monkeypatch.setattr(w, "_arm_orphan_deadline", AsyncMock())
+        monkeypatch.setattr(w, "_arm_max_duration_enforcer", AsyncMock())
+        monkeypatch.setattr(w, "_setup_background_audio", AsyncMock())
+
+        await w.start()
+
+        assert captured["noise_cancellation"] is prewarmed_bvc
+
+
+class TestEmitStartMetrics:
+    """The per-session start-latency ("time to first word") emit to Core."""
+
+    def _worker(self):
+        ctx = types.SimpleNamespace(
+            room=types.SimpleNamespace(name="room-1"),
+            proc=types.SimpleNamespace(userdata={}),
+        )
+        w = worker.AgentWorker(ctx)
+        w.scenario = types.SimpleNamespace(
+            language_config=types.SimpleNamespace(language_code="en-IN")
+        )
+        return w
+
+    @pytest.mark.asyncio
+    async def test_emits_total_and_segments(self, monkeypatch):
+        import json
+
+        sent = {}
+        emit = AsyncMock()
+        monkeypatch.setattr(event_handler, "send_event_to_queue", emit)
+
+        w = self._worker()
+        w._timing = {
+            "configure_ms": 100.4,
+            "initialize_ms": 200.6,
+            "connect_ms": 300.0,
+            "prep_ms": 50.0,
+            "opening_ms": 1200.0,
+        }
+
+        w._emit_start_metrics()
+        await asyncio.sleep(0)  # let the fire-and-forget task run
+
+        emit.assert_awaited_once()
+        payload = json.loads(emit.await_args.args[0])
+        assert payload["message_type"] == "start_metrics"
+        assert payload["room_id"] == "room-1"
+        sm = payload["data"]["start_metrics"]
+        # Total = sum of the four segments (rounded), NOT including opening playout.
+        assert sm["start_latency_ms"] == 100 + 201 + 300 + 50
+        assert sm["configure_ms"] == 100
+        assert sm["initialize_ms"] == 201
+        assert sm["connect_ms"] == 300
+        assert sm["prep_ms"] == 50
+        assert sm["opening_playout_ms"] == 1200
+        assert sm["language"] == "en-IN"
+        sent["ok"] = True
+        assert sent["ok"]
+
+    @pytest.mark.asyncio
+    async def test_no_emit_when_no_timing(self, monkeypatch):
+        emit = AsyncMock()
+        monkeypatch.setattr(event_handler, "send_event_to_queue", emit)
+
+        w = self._worker()
+        w._timing = {}  # start() bailed before any segment was measured
+
+        w._emit_start_metrics()
+        await asyncio.sleep(0)
+
+        emit.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_never_raises_on_emit_failure(self, monkeypatch):
+        def _boom(*a, **k):
+            raise RuntimeError("queue down")
+
+        monkeypatch.setattr(event_handler, "send_event_to_queue", _boom)
+
+        w = self._worker()
+        w._timing = {"configure_ms": 10.0, "connect_ms": 20.0}
+
+        # Must swallow the failure — a metrics emit can never break a session.
+        w._emit_start_metrics()
+        await asyncio.sleep(0)
