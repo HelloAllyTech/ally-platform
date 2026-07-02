@@ -21,6 +21,7 @@ class CoreMessageType(str, Enum):
     EVENT = "event"
     BEHAVIOR_INSTRUCTION = "behavior_instruction"
     TURN_METRICS = "turn_metrics"
+    START_METRICS = "start_metrics"
     LLM_USAGE = "llm_usage"
 
 
@@ -89,6 +90,29 @@ class TurnMetricsData(BaseModel):
     events_detected: Optional[int] = None
     llm_timed_out: Optional[bool] = None
     interrupted: Optional[bool] = None
+    metadata: Optional[dict] = None
+
+
+class StartMetricsData(BaseModel):
+    """Simulation START latency shipped to Core for the start-latency chart.
+
+    ``start_latency_ms`` is the headline "time to first word" (agent job start
+    -> the agent begins its opening dialogue); the segment fields break it down
+    so the chart can stack WHERE the startup time goes. All *_ms fields are
+    integer milliseconds. Emitted once per session (see
+    AgentWorker._emit_start_metrics).
+    """
+
+    start_latency_ms: int
+    configure_ms: Optional[int] = None
+    initialize_ms: Optional[int] = None
+    connect_ms: Optional[int] = None
+    prep_ms: Optional[int] = None
+    # Opening-statement TTS playout duration (informational; not in the total).
+    opening_playout_ms: Optional[int] = None
+    scenario_id: Optional[int] = None
+    language: Optional[str] = None
+    env: Optional[str] = None
     metadata: Optional[dict] = None
 
 
@@ -196,6 +220,9 @@ class CoreEventMessageTypeData(BaseModel):
     turn_metrics: Optional[TurnMetricsData] = Field(
         default=None, description="Per-turn latency metrics"
     )
+    start_metrics: Optional[StartMetricsData] = Field(
+        default=None, description="Per-session simulation start latency"
+    )
     llm_usage: Optional[LLMUsageData] = Field(
         default=None, description="Per-LLM-call token usage"
     )
@@ -261,6 +288,20 @@ class CoreEventMessageType(BaseModel):
         return cls(
             message_type=CoreMessageType.TURN_METRICS,
             data=CoreEventMessageTypeData(turn_metrics=turn_metrics),
+            room_id=room_id,
+            timestamp=int(time.time()),
+        )
+
+    @classmethod
+    def create_start_metrics(
+        cls,
+        room_id: str,
+        start_metrics: StartMetricsData,
+    ) -> "CoreEventMessageType":
+        """Create a per-session simulation start-latency message for Core."""
+        return cls(
+            message_type=CoreMessageType.START_METRICS,
+            data=CoreEventMessageTypeData(start_metrics=start_metrics),
             room_id=room_id,
             timestamp=int(time.time()),
         )

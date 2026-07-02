@@ -232,6 +232,12 @@ class AgentWorker:
         self.final_score_sent = False
         self._background_tasks: Set[asyncio.Task] = set()
 
+        # Startup-latency instrumentation: per-segment elapsed times (ms) filled
+        # in during configure/initialize/start and emitted as one [START_TIMING]
+        # line by the entrypoint, so we can see which segment dominates the delay
+        # before the agent speaks its opening line. Log-only; never gates logic.
+        self._timing: dict[str, float] = {}
+
         # Thinking-filler (plays on a separate audio track via
         # BackgroundAudioPlayer, so it can't race/preempt the real reply). We
         # drive playback ourselves on the agent's "thinking" state so we know
@@ -471,7 +477,15 @@ class AgentWorker:
 
             min_delay = float(getattr(settings, "TURN_MIN_ENDPOINTING_DELAY", 0.5))
             max_delay = float(getattr(settings, "TURN_MAX_ENDPOINTING_DELAY", 3.0))
+            # The EOU model weights are loaded once per WORKER by the inference
+            # executor (registered at module import — see the top-of-file note),
+            # so this per-job construction is a lightweight handle to that
+            # executor, NOT a weight load. It also requires the job context, so
+            # it cannot be prewarmed. Timed here so [START_TIMING] can confirm it
+            # stays cheap (if it ever isn't, revisit).
+            _eou_t0 = time.monotonic()
             detector = MultilingualModel()
+            self._timing["eou_load_ms"] = (time.monotonic() - _eou_t0) * 1000
             logger.info(
                 "[TURN] semantic EOU enabled (multilingual; min=%.2fs max=%.2fs); "
                 "VAD fallback for unsupported languages",
@@ -1024,7 +1038,7 @@ class AgentWorker:
             return None
 
     async def _setup_background_audio(self) -> None:
-        """Start the shared background-audio track (comfort + filler + back-channel).
+        """Publish the shared background-audio track (comfort + filler + back-channel).
 
         All three naturalness levers ride one LiveKit BackgroundAudioPlayer (its
         own published track, so none can race or preempt the agent's real reply,
@@ -1038,71 +1052,39 @@ class AgentWorker:
         - Back-channel: brief listener affirmations played while the LEARNER is
           still speaking on a long turn (see _on_backchannel_user_state).
 
-        The player is created when ANY layer is on. Fully best-effort: any
+        LATENCY: this runs on the session-start critical path, BEFORE the opening
+        statement, so it only does cheap work here — resolve the in-memory comfort
+        tone, decide (via pure flag checks, no LLM/TTS) whether any layer could
+        play, and publish the track. The expensive per-layer synthesis (the
+        back-channel LLM call + all filler/back-channel TTS) is moved off the
+        opening path into _setup_deferred_naturalness(), spawned as a background
+        task — those clips aren't needed until later turns (the filler is
+        delay-gated; the back-channel needs BACKCHANNEL_MIN_UTTERANCE_MS into a
+        learner turn), so synthesizing them here would only delay the opening.
+
+        The player is created when ANY layer COULD play. Fully best-effort: any
         failure leaves the session running without background audio.
         """
         try:
-            from app.core.livekit.fillers import (
-                is_filler_enabled,
-                resolve_filler_phrases,
-            )
-
-            # ---- Comfort audio (ambient room tone) ----
-            comfort_source = self._resolve_comfort_audio()
-
-            # ---- Thinking filler ----
-            # Gate: the filler feature must be on for this session. Static
-            # phrases may be empty (a scenario can rely purely on predictive
-            # fillers), so we check the feature flag separately from the phrases.
-            predictive_on = bool(getattr(settings, "PREDICTIVE_FILLER_ENABLED", False))
-            filler_on = False
-            if is_filler_enabled(self.scenario):
-                from app.core.livekit.filler_audio import synthesize_filler_clips
-
-                phrases = resolve_filler_phrases(self.scenario)
-                if phrases:
-                    logger.info("[FILLER] resolved %d static phrase(s)", len(phrases))
-                    self._filler_clips = await synthesize_filler_clips(
-                        self.tts_client, phrases
-                    )
-                    logger.info(
-                        "[FILLER] synthesized %d static clip(s)",
-                        len(self._filler_clips),
-                    )
-                # The filler can play if it has static clips now or will get
-                # predictive ones; otherwise there's nothing it could ever play.
-                filler_on = bool(self._filler_clips) or predictive_on
-                if not filler_on:
-                    logger.info(
-                        "[FILLER] no static phrases and predictive disabled — no filler"
-                    )
-            else:
-                _pd = getattr(self.scenario, "prompt_data", None)
-                logger.info(
-                    "[FILLER] not enabled for this session "
-                    "(global_enabled=%s filler_enabled=%s) — no filler",
-                    getattr(settings, "FILLER_GLOBALLY_ENABLED", None),
-                    getattr(_pd, "filler_enabled", None),
-                )
-
-            # ---- Continuous back-channeling (listener affirmations) ----
-            # Brief "mm-hmm"/"yeah" clips played WHILE the learner speaks on a
-            # long turn (see _on_backchannel_user_state). Global flag, default on.
-            backchannel_on = await self._resolve_backchannel_clips()
-
-            # ---- Predictive interim reply ----
-            # Resolved before the player gate so an interim-only session still
-            # publishes the background track. Handlers are registered after the
-            # player starts (below).
+            from app.core.livekit.backchannel import is_backchannel_enabled
+            from app.core.livekit.fillers import is_filler_enabled
             from app.core.livekit.interim_reply import is_interim_reply_enabled
 
+            # ---- Comfort audio (ambient room tone) ---- cheap, in-memory PCM.
+            comfort_source = self._resolve_comfort_audio()
+
+            # Pure flag checks (no LLM/TTS): decide whether each layer COULD play,
+            # so we can publish the track now and defer the actual synthesis.
+            predictive_on = bool(getattr(settings, "PREDICTIVE_FILLER_ENABLED", False))
+            filler_possible = is_filler_enabled(self.scenario)
+            backchannel_possible = is_backchannel_enabled(self.scenario)
             self._interim_enabled = is_interim_reply_enabled(self.scenario)
 
             # Nothing to play on any layer — don't publish a track.
             if (
                 comfort_source is None
-                and not filler_on
-                and not backchannel_on
+                and not filler_possible
+                and not backchannel_possible
                 and not self._interim_enabled
             ):
                 return
@@ -1127,15 +1109,79 @@ class AgentWorker:
             await self._bg_audio.start(room=self.ctx.room)
             logger.info(
                 "[BG_AUDIO] BackgroundAudioPlayer started "
-                "(comfort=%s static_clips=%d predictive=%s backchannel=%s)",
+                "(comfort=%s filler_possible=%s predictive=%s "
+                "backchannel_possible=%s interim=%s)",
                 comfort_source is not None,
-                len(self._filler_clips),
+                filler_possible,
                 predictive_on,
-                backchannel_on,
+                backchannel_possible,
+                self._interim_enabled,
+            )
+        except Exception as e:  # noqa: BLE001 - must never break a session
+            logger.warning("[BG_AUDIO] setup failed (continuing without): %s", e)
+            self._bg_audio = None
+            return
+
+        # Defer the expensive per-layer work (back-channel LLM call + filler/
+        # back-channel TTS synthesis + interim client build + handler wiring) off
+        # the opening-statement critical path. Tracked so it's cancelled on
+        # shutdown. Best-effort inside the task — never awaited here.
+        deferred_task = asyncio.create_task(self._setup_deferred_naturalness())
+        self._background_tasks.add(deferred_task)
+        deferred_task.add_done_callback(self._background_tasks.discard)
+
+    async def _setup_deferred_naturalness(self) -> None:
+        """Synthesize the filler/back-channel clips and wire their handlers.
+
+        Split out of _setup_background_audio and run as a background task so the
+        back-channel LLM call and the TTS syntheses never delay the opening
+        statement. The BackgroundAudioPlayer track is already published by the
+        caller; this only fills in the per-layer clips and registers the handlers
+        that drive them. Every playback handler guards on ``self._bg_audio`` /
+        empty clip lists, so if the first learner turn begins before this
+        finishes the only effect is no filler/back-channel on that turn (both are
+        delay-gated well past the opening window anyway). Best-effort: any failure
+        leaves the session running with whatever layers did resolve; never raises.
+        """
+        if self._bg_audio is None:
+            return
+        try:
+            from app.core.livekit.fillers import (
+                is_filler_enabled,
+                resolve_filler_phrases,
             )
 
-            # Back-channeling rides the user-speaking state, independent of the
-            # thinking-filler — register it before any filler-only early return.
+            predictive_on = bool(getattr(settings, "PREDICTIVE_FILLER_ENABLED", False))
+
+            # ---- Thinking filler (static clips) ----
+            # Static phrases may be empty (a scenario can rely purely on
+            # predictive fillers), so the feature flag is checked separately.
+            filler_on = False
+            if is_filler_enabled(self.scenario):
+                from app.core.livekit.filler_audio import synthesize_filler_clips
+
+                phrases = resolve_filler_phrases(self.scenario)
+                if phrases:
+                    logger.info("[FILLER] resolved %d static phrase(s)", len(phrases))
+                    self._filler_clips = await synthesize_filler_clips(
+                        self.tts_client, phrases
+                    )
+                    logger.info(
+                        "[FILLER] synthesized %d static clip(s)",
+                        len(self._filler_clips),
+                    )
+                # The filler can play if it has static clips now or will get
+                # predictive ones; otherwise there's nothing it could ever play.
+                filler_on = bool(self._filler_clips) or predictive_on
+                if not filler_on:
+                    logger.info(
+                        "[FILLER] no static phrases and predictive disabled — no filler"
+                    )
+
+            # ---- Continuous back-channeling (listener affirmations) ----
+            # Brief "mm-hmm"/"yeah" clips played WHILE the learner speaks on a
+            # long turn (see _on_backchannel_user_state). Global flag, default on.
+            backchannel_on = await self._resolve_backchannel_clips()
             if backchannel_on:
                 self.session.on("user_state_changed")(self._on_backchannel_user_state)
                 logger.info(
@@ -1143,9 +1189,9 @@ class AgentWorker:
                     len(self._backchannel_clips),
                 )
 
-            # Interim reply: build the dedicated fast LLM client and register its
-            # handlers. Independent of the filler gate (it has its own), so wire
-            # it before the filler-only early return below.
+            # ---- Predictive interim reply ----
+            # Build the dedicated fast LLM client and register its handlers.
+            # Independent of the filler gate (it has its own).
             if self._interim_enabled:
                 self._setup_interim_reply()
 
@@ -1168,8 +1214,11 @@ class AgentWorker:
                 self._predictor_task.add_done_callback(self._background_tasks.discard)
                 logger.info("[FILLER] predictive filler loop started")
         except Exception as e:  # noqa: BLE001 - must never break a session
-            logger.warning("[BG_AUDIO] setup failed (continuing without): %s", e)
-            self._bg_audio = None
+            logger.warning(
+                "[BG_AUDIO] deferred naturalness setup failed (continuing "
+                "without): %s",
+                e,
+            )
 
     def _on_filler_agent_state(self, ev) -> None:
         """Decide whether to play a filler when the agent starts "thinking".
@@ -1952,19 +2001,26 @@ class AgentWorker:
 
         # Start session and connect
         try:
+            _connect_t0 = time.monotonic()
             logger.info("[AgentWorker] Phase 3: Connecting to room...")
+            # Prefer a process-prewarmed BVC instance (prewarm() builds one per
+            # process into proc.userdata) so its noise-cancellation model isn't
+            # constructed on the per-job critical path; fall back to a fresh one.
+            userdata = getattr(getattr(self.ctx, "proc", None), "userdata", {}) or {}
+            bvc = userdata.get("bvc") or noise_cancellation.BVC()
             await self.session.start(
                 # ... (rest of the args identical)
                 room=self.ctx.room,
                 agent=self.agent,
                 room_input_options=RoomInputOptions(
-                    noise_cancellation=noise_cancellation.BVC(),
+                    noise_cancellation=bvc,
                 ),
             )
 
             # Connect to room with timeout
             logger.info("[AgentWorker] Phase 3: Joining room...")
             await self.ctx.connect()
+            self._timing["connect_ms"] = (time.monotonic() - _connect_t0) * 1000
             logger.info("[AgentWorker] Phase 3: Started and joined room.")
 
             # Arm orphan deadline: if no human joins within 30s the agent was
@@ -1983,6 +2039,11 @@ class AgentWorker:
             logger.info(f"[AgentWorker] Phase 3: Failed to start/join room: {e}")
             raise
 
+        # Post-connect prep before the agent can speak (interruption detection +
+        # event orchestrator + background-audio track). Timed as one segment for
+        # the start-latency breakdown.
+        _prep_t0 = time.monotonic()
+
         # Setup interruption detection
         setup_interruption_detection(self.session)
 
@@ -1992,6 +2053,8 @@ class AgentWorker:
         # Set up the shared background-audio track — comfort room tone and the
         # thinking-filler (best-effort; never blocks or breaks the session).
         await self._setup_background_audio()
+
+        self._timing["prep_ms"] = (time.monotonic() - _prep_t0) * 1000
 
         if should_say_opening_statement(
             scenario=self.scenario,
@@ -2008,9 +2071,11 @@ class AgentWorker:
             # "AgentSession is closing, cannot use say()". That must not crash
             # the job — the session is ending anyway.
             try:
+                _open_t0 = time.monotonic()
                 handler = self.session.say(statement)
                 logger.info("[AgentWorker] Waiting for opening statement playout...")
                 await handler.wait_for_playout()
+                self._timing["opening_ms"] = (time.monotonic() - _open_t0) * 1000
                 logger.info("[AgentWorker] Opening statement playout complete.")
             except Exception as e:
                 logger.warning(
@@ -2038,6 +2103,82 @@ class AgentWorker:
                     f"[AgentWorker] Auto-start generate_reply() failed; agent "
                     f"will respond once the user speaks: {e}"
                 )
+
+        # Ship the start-latency ("time to first word") metric to Core for the
+        # analytics chart. Best-effort and fire-and-forget — never block/break
+        # the session on a metrics emit.
+        self._emit_start_metrics()
+
+    def _emit_start_metrics(self) -> None:
+        """Ship this session's start-latency breakdown to Core (best-effort).
+
+        The headline metric is the total time-to-first-word (agent job start ->
+        the agent begins its opening dialogue) = configure + initialize + connect
+        + prep, computed from ``self._timing`` (see the [START_TIMING] log). The
+        segment fields let the chart stack where the startup time went. Emitted
+        once per session; a missing timing segment simply drops that field.
+        Fire-and-forget so the (sync) call never blocks on the network.
+        """
+        try:
+            from app.core.events.handlers import send_event_to_queue
+            from app.core.events.schemas import (
+                CoreEventMessageType,
+                StartMetricsData,
+            )
+
+            t = self._timing
+
+            def _ms(key: str):
+                v = t.get(key)
+                return int(round(v)) if v is not None else None
+
+            configure = _ms("configure_ms")
+            initialize = _ms("initialize_ms")
+            connect = _ms("connect_ms")
+            prep = _ms("prep_ms")
+            segments = [s for s in (configure, initialize, connect, prep) if s]
+            if not segments:
+                # No usable timing captured (e.g. start() bailed early) — nothing
+                # meaningful to report.
+                return
+            total = sum(segments)
+
+            language = getattr(
+                getattr(self.scenario, "language_config", None),
+                "language_code",
+                None,
+            )
+
+            data = StartMetricsData(
+                start_latency_ms=total,
+                configure_ms=configure,
+                initialize_ms=initialize,
+                connect_ms=connect,
+                prep_ms=prep,
+                opening_playout_ms=_ms("opening_ms"),
+                language=language,
+                env=settings.ENV.value,
+            )
+            message = CoreEventMessageType.create_start_metrics(
+                self.ctx.room.name, data
+            )
+            logger.info(
+                "[START_METRICS] total=%dms configure=%s initialize=%s "
+                "connect=%s prep=%s room=%s",
+                total,
+                configure,
+                initialize,
+                connect,
+                prep,
+                self.ctx.room.name,
+            )
+            task = asyncio.create_task(
+                send_event_to_queue(message.model_dump_json())
+            )
+            self._background_tasks.add(task)
+            task.add_done_callback(self._background_tasks.discard)
+        except Exception:  # noqa: BLE001 - metrics must never break a session
+            logger.exception("[START_METRICS] emit failed")
 
     async def shutdown(self):
         """
@@ -2159,12 +2300,36 @@ async def entrypoint(ctx: agents.JobContext):
 
     worker = AgentWorker(ctx)
     logger.info(f"[AgentWorker] Starting job {ctx.job.id}...")
+    _seg_t0 = time.monotonic()
     await worker.configure()  # Phase 1: Configure clients
+    worker._timing["configure_ms"] = (time.monotonic() - _seg_t0) * 1000
     logger.info(f"[AgentWorker] Job {ctx.job.id} configured.")
+    _seg_t0 = time.monotonic()
     await worker.initialize()  # Phase 2: Create session, agent, orchestrator
+    worker._timing["initialize_ms"] = (time.monotonic() - _seg_t0) * 1000
     logger.info(f"[AgentWorker] Job {ctx.job.id} initialized.")
+    _seg_t0 = time.monotonic()
     await worker.start()  # Phase 3: Connect and start
+    worker._timing["start_ms"] = (time.monotonic() - _seg_t0) * 1000
     logger.info(f"[AgentWorker] Job {ctx.job.id} started.")
+
+    # One-line breakdown of the pre-opening critical path so we can see which
+    # segment dominates the delay before the agent speaks. Log-only, guarded so
+    # a formatting slip can never affect the job.
+    try:
+        _t = worker._timing
+        logger.info(
+            "[START_TIMING] configure=%.0fms initialize=%.0fms eou_load=%.0fms "
+            "start=%.0fms connect=%.0fms opening=%.0fms",
+            _t.get("configure_ms", 0.0),
+            _t.get("initialize_ms", 0.0),
+            _t.get("eou_load_ms", 0.0),
+            _t.get("start_ms", 0.0),
+            _t.get("connect_ms", 0.0),
+            _t.get("opening_ms", 0.0),
+        )
+    except Exception:  # noqa: BLE001 - timing log must never affect the job
+        pass
 
     # Start background task to handle termination in entrypoint context
     # This allows termination audio to play reliably (runs in main async context)
@@ -2257,10 +2422,32 @@ async def entrypoint(ctx: agents.JobContext):
 
 def prewarm(proc: JobProcess):
     logger.info("!!! PREWARM CALLED !!!")
-    """Prewarm VAD model for faster startup."""
+    """Prewarm per-process objects so they aren't built on the per-job path.
+
+    Each is stored in ``proc.userdata`` and reused by the (single) job running on
+    this process (see ``_create_session`` for VAD and ``session.start`` for BVC).
+
+    Note: the semantic-EOU model is intentionally NOT prewarmed here — its
+    weights load once per worker in the inference executor (registered at module
+    import), and its per-job ``MultilingualModel()`` handle requires the job
+    context so it cannot be constructed in prewarm.
+
+    The BVC prewarm is wrapped in its own try/except: if it can't be constructed
+    here we log and skip it, and ``session.start`` falls back to building it
+    inline — a pure best-effort speedup with zero regression when it fails.
+    """
     proc.userdata["vad"] = silero.VAD.load(
         activation_threshold=DEFAULT_VAD_ACTIVATION_THRESHOLD
     )
+
+    # Noise-cancellation (BVC) filter used by the room input options.
+    try:
+        proc.userdata["bvc"] = noise_cancellation.BVC()
+        logger.info("[PREWARM] noise-cancellation (BVC) prewarmed")
+    except Exception as e:  # noqa: BLE001 - best-effort; falls back per-job
+        logger.warning(
+            "[PREWARM] BVC prewarm skipped (will build per-job): %s", e
+        )
 
 
 if __name__ == "__main__":

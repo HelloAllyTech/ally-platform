@@ -13,72 +13,84 @@ session continues without a filler — it must never break the agent.
 
 from __future__ import annotations
 
+import asyncio
 import os
 import tempfile
 import wave
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 from app.core.logger import get_logger
 
 logger = get_logger(__name__)
 
 
+async def _synthesize_one(tts, phrase: str) -> Optional[Tuple[str, str]]:
+    """Synthesize a single phrase to a temp WAV; return ``(phrase, path)`` or None.
+
+    Best-effort: returns ``None`` for an empty phrase, no synthesized audio, or
+    any failure — never raises. The caller filters out ``None`` so one bad
+    phrase can't break the whole set (a filler must never break a session).
+    """
+    if not phrase or not phrase.strip():
+        return None
+    try:
+        frames: list[bytes] = []
+        sample_rate = 24000
+        num_channels = 1
+        stream = tts.synthesize(phrase)
+        try:
+            async for ev in stream:
+                frame = getattr(ev, "frame", None)
+                if frame is None:
+                    continue
+                frames.append(bytes(frame.data))
+                sample_rate = frame.sample_rate
+                num_channels = frame.num_channels
+        finally:
+            aclose = getattr(stream, "aclose", None)
+            if aclose is not None:
+                try:
+                    await aclose()
+                except Exception:  # noqa: BLE001
+                    pass
+
+        if not frames:
+            logger.warning("[FILLER] no audio synthesized for %r", phrase)
+            return None
+
+        fd, path = tempfile.mkstemp(prefix="filler_", suffix=".wav")
+        os.close(fd)
+        with wave.open(path, "wb") as wav:
+            wav.setnchannels(num_channels)
+            wav.setsampwidth(2)  # TTS frames are int16 PCM
+            wav.setframerate(sample_rate)
+            wav.writeframes(b"".join(frames))
+        logger.info("[FILLER] synthesized clip phrase=%r -> %s", phrase, path)
+        return (phrase, path)
+    except Exception as e:  # noqa: BLE001 - filler must never break a session
+        logger.warning("[FILLER] failed to synthesize %r: %s", phrase, e)
+        return None
+
+
 async def synthesize_filler_clips(
     tts_client, phrases: List[str]
 ) -> List[Tuple[str, str]]:
-    """Synthesize each phrase to a temp WAV file.
+    """Synthesize each phrase to a temp WAV file, concurrently.
 
     Returns a list of ``(phrase, wav_path)`` pairs so the caller knows which
     phrase each clip says — needed to record the spoken filler in the transcript.
     Uses the session's configured TTS so the filler matches the agent voice.
-    Per-phrase failures are skipped (logged), never raised.
+    Phrases are synthesized in parallel (``asyncio.gather``); per-phrase failures
+    are skipped (logged), never raised, and input ordering is preserved.
     """
-    clips: List[Tuple[str, str]] = []
     tts = getattr(tts_client, "tts_instance", None)
     if tts is None or not phrases:
-        return clips
+        return []
 
-    for phrase in phrases:
-        if not phrase or not phrase.strip():
-            continue
-        try:
-            frames: list[bytes] = []
-            sample_rate = 24000
-            num_channels = 1
-            stream = tts.synthesize(phrase)
-            try:
-                async for ev in stream:
-                    frame = getattr(ev, "frame", None)
-                    if frame is None:
-                        continue
-                    frames.append(bytes(frame.data))
-                    sample_rate = frame.sample_rate
-                    num_channels = frame.num_channels
-            finally:
-                aclose = getattr(stream, "aclose", None)
-                if aclose is not None:
-                    try:
-                        await aclose()
-                    except Exception:  # noqa: BLE001
-                        pass
-
-            if not frames:
-                logger.warning("[FILLER] no audio synthesized for %r", phrase)
-                continue
-
-            fd, path = tempfile.mkstemp(prefix="filler_", suffix=".wav")
-            os.close(fd)
-            with wave.open(path, "wb") as wav:
-                wav.setnchannels(num_channels)
-                wav.setsampwidth(2)  # TTS frames are int16 PCM
-                wav.setframerate(sample_rate)
-                wav.writeframes(b"".join(frames))
-            clips.append((phrase, path))
-            logger.info("[FILLER] synthesized clip phrase=%r -> %s", phrase, path)
-        except Exception as e:  # noqa: BLE001 - filler must never break a session
-            logger.warning("[FILLER] failed to synthesize %r: %s", phrase, e)
-
-    return clips
+    results = await asyncio.gather(
+        *[_synthesize_one(tts, phrase) for phrase in phrases]
+    )
+    return [clip for clip in results if clip is not None]
 
 
 def cleanup_clips(paths: List[str]) -> None:
