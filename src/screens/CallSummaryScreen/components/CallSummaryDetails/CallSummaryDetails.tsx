@@ -59,6 +59,12 @@ const CallSummaryDetailsComponent: React.FC<Props> = ({
   const [customLocalValues, setCustomLocalValues] = useState<
     Record<string, string | null>
   >({});
+  // Fields the user has actually edited in this visit. Saving must only ever
+  // send these — diffing customLocalValues against the live customFieldValues
+  // query instead would re-include any field whose server value drifted for a
+  // reason unrelated to this user (another editor, a background AI fill) and
+  // silently write the stale locally-seeded value back over it.
+  const [dirtyFieldIds, setDirtyFieldIds] = useState<Set<string>>(new Set());
   const seededChatIdRef = useRef<number | null>(null);
 
   // Seed local edit state once per chat. Re-seeding on every customFieldValues
@@ -71,6 +77,7 @@ const CallSummaryDetailsComponent: React.FC<Props> = ({
         initial[f.fieldDefinitionId] = f.value ?? null;
       });
       setCustomLocalValues(initial);
+      setDirtyFieldIds(new Set());
       seededChatIdRef.current = chatId ?? null;
     }
   }, [customFieldValues, chatId]);
@@ -78,34 +85,36 @@ const CallSummaryDetailsComponent: React.FC<Props> = ({
   const handleCustomFieldChange = useCallback(
     (fieldDefinitionId: string, value: string | null) => {
       setCustomLocalValues(prev => ({...prev, [fieldDefinitionId]: value}));
+      setDirtyFieldIds(prev => new Set(prev).add(fieldDefinitionId));
     },
     [],
   );
 
   const handleCustomFieldSave = useCallback(
     async (sectionKey: string) => {
-      if (!chatId || !customFieldDefs || !customFieldValues) return;
+      if (!chatId || !customFieldDefs) return;
       const sectionDefIds = new Set(
         customFieldDefs.filter(d => d.sectionKey === sectionKey).map(d => d.id),
       );
-      const changed = customFieldValues
-        .filter(
-          f =>
-            sectionDefIds.has(f.fieldDefinitionId) &&
-            customLocalValues[f.fieldDefinitionId] !== (f.value ?? null),
-        )
-        .map(f => ({
-          fieldDefinitionId: f.fieldDefinitionId,
-          value: customLocalValues[f.fieldDefinitionId] ?? undefined,
+      const changed = Array.from(dirtyFieldIds)
+        .filter(id => sectionDefIds.has(id))
+        .map(fieldDefinitionId => ({
+          fieldDefinitionId,
+          value: customLocalValues[fieldDefinitionId] ?? undefined,
         }));
       if (changed.length > 0) {
         await upsertCustomFieldValues({chatId, values: changed});
+        setDirtyFieldIds(prev => {
+          const next = new Set(prev);
+          changed.forEach(c => next.delete(c.fieldDefinitionId));
+          return next;
+        });
       }
     },
     [
       chatId,
       customFieldDefs,
-      customFieldValues,
+      dirtyFieldIds,
       customLocalValues,
       upsertCustomFieldValues,
     ],

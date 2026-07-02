@@ -3,15 +3,45 @@ import {act, fireEvent, render} from '@testing-library/react-native';
 
 import {CallSummaryDetails} from '../CallSummaryDetails';
 
-// Simplify SectionWrapper to a tappable element invoking onToggle
+// Simplify SectionWrapper to a tappable element invoking onToggle, plus a
+// plain text input + save button per custom field definition in this section
+// (needed to drive the custom-field edit/save regression test below).
 jest.mock('../../SectionWrapper/SectionWrapper', () => ({
-  SectionWrapper: ({label, onToggle}: any) => {
+  SectionWrapper: ({
+    label,
+    onToggle,
+    sectionConfig,
+    customFieldDefs,
+    customFieldLocalValues,
+    onCustomFieldChange,
+    onCustomFieldSave,
+  }: any) => {
     const React = require('react');
-    const {Text, TouchableOpacity} = require('react-native');
+    const {Text, TouchableOpacity, TextInput} = require('react-native');
+    const defsForSection = (customFieldDefs ?? []).filter(
+      (d: any) => d.sectionKey === sectionConfig?.key,
+    );
     return (
-      <TouchableOpacity onPress={onToggle}>
-        <Text>{label}</Text>
-      </TouchableOpacity>
+      <>
+        <TouchableOpacity onPress={onToggle}>
+          <Text>{label}</Text>
+        </TouchableOpacity>
+        {defsForSection.map((d: any) => (
+          <TextInput
+            key={d.id}
+            testID={`field-${d.id}`}
+            value={customFieldLocalValues?.[d.id] ?? ''}
+            onChangeText={(v: string) => onCustomFieldChange?.(d.id, v)}
+          />
+        ))}
+        {sectionConfig && (
+          <TouchableOpacity
+            testID={`save-${sectionConfig.key}`}
+            onPress={() => onCustomFieldSave?.(sectionConfig.key)}>
+            <Text>{`save-${sectionConfig.key}`}</Text>
+          </TouchableOpacity>
+        )}
+      </>
     );
   },
 }));
@@ -56,12 +86,21 @@ jest.mock('@/store/hooks', () => ({
   useAppSelector: (sel: any) => sel({}),
 }));
 
-// Mock custom fields API to avoid RTK store initialization in test env
+// Mock custom fields API to avoid RTK store initialization in test env.
+// Exposed as mutable jest.fn()s so individual tests can reconfigure return
+// values (e.g. to simulate a background refetch changing customFieldValues).
+const mockGetCustomFieldDefinitions = jest.fn<any, any[]>(() => ({data: undefined}));
+const mockGetCustomFieldValues = jest.fn<any, any[]>(() => ({data: undefined}));
+const mockUpsertCustomFieldValues = jest.fn<any, any[]>(() =>
+  Promise.resolve({data: {success: true}}),
+);
+const mockGetCustomFieldsEnabled = jest.fn<any, any[]>(() => ({data: false}));
 jest.mock('@/services/customFieldsApi', () => ({
-  useGetCustomFieldDefinitionsQuery: () => ({data: undefined}),
-  useGetCustomFieldValuesQuery: () => ({data: undefined}),
-  useUpsertCustomFieldValuesMutation: () => [jest.fn()],
-  useGetCustomFieldsEnabledQuery: () => ({data: false}),
+  useGetCustomFieldDefinitionsQuery: (...args: any[]) =>
+    mockGetCustomFieldDefinitions(...args),
+  useGetCustomFieldValuesQuery: (...args: any[]) => mockGetCustomFieldValues(...args),
+  useUpsertCustomFieldValuesMutation: () => [mockUpsertCustomFieldValues],
+  useGetCustomFieldsEnabledQuery: (...args: any[]) => mockGetCustomFieldsEnabled(...args),
 }));
 
 // Translate
@@ -103,5 +142,67 @@ describe('CallSummaryDetails', () => {
       fireEvent.press(getByText('common.save'));
     });
     expect(onSubmit).toHaveBeenCalledWith(true);
+  });
+});
+
+describe('CallSummaryDetails — custom field save does not revert fields the user did not touch', () => {
+  const CF_A = {
+    id: 'cf-a',
+    name: 'Session No',
+    sectionKey: 'conditional',
+    fieldType: 'NUMBER',
+    editPermission: 'BOTH',
+  };
+  const CF_B = {
+    id: 'cf-b',
+    name: 'Topic',
+    sectionKey: 'conditional',
+    fieldType: 'TEXT',
+    editPermission: 'BOTH',
+  };
+
+  beforeEach(() => {
+    mockGetCustomFieldsEnabled.mockReturnValue({data: true});
+    mockGetCustomFieldDefinitions.mockReturnValue({data: [CF_A, CF_B]});
+    mockUpsertCustomFieldValues.mockClear();
+    mockUpsertCustomFieldValues.mockReturnValue(Promise.resolve({data: {success: true}}));
+  });
+
+  it('only submits the field the user edited, even if another field drifted in the background', async () => {
+    mockGetCustomFieldValues.mockReturnValue({
+      data: [
+        {fieldDefinitionId: 'cf-a', value: '5'},
+        {fieldDefinitionId: 'cf-b', value: 'Anxiety'},
+      ],
+    });
+
+    const {getByTestId, rerender} = render(
+      <CallSummaryDetails isLoading={false} onSubmit={jest.fn()} showSaveButton chatId={1} />,
+    );
+
+    // User edits Topic (cf-b) only — Session No (cf-a) is never touched.
+    fireEvent.changeText(getByTestId('field-cf-b'), 'Depression');
+
+    // Simulate a background refetch (another editor, or an AI-fill pass)
+    // surfacing a changed Session No that this screen never asked for.
+    mockGetCustomFieldValues.mockReturnValue({
+      data: [
+        {fieldDefinitionId: 'cf-a', value: '6'},
+        {fieldDefinitionId: 'cf-b', value: 'Anxiety'},
+      ],
+    });
+    rerender(
+      <CallSummaryDetails isLoading={false} onSubmit={jest.fn()} showSaveButton chatId={1} />,
+    );
+
+    await act(async () => {
+      fireEvent.press(getByTestId('save-conditional'));
+    });
+
+    expect(mockUpsertCustomFieldValues).toHaveBeenCalledTimes(1);
+    expect(mockUpsertCustomFieldValues).toHaveBeenCalledWith({
+      chatId: 1,
+      values: [{fieldDefinitionId: 'cf-b', value: 'Depression'}],
+    });
   });
 });
