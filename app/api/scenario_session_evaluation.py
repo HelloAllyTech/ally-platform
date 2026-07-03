@@ -24,10 +24,10 @@ router = APIRouter(
 @router.post(
     "/actor-evaluation",
     response_model=ActorEvaluationResponse,
-    summary="Evaluate a real session's roleplay actor against optimisation goals",
+    summary="Evaluate a real session's roleplay actor against agent test cases",
     description=(
-        "Accepts a real session's transcript plus the configured optimisation "
-        "goals and starts an asynchronous LLM-judge evaluation of the ACTOR "
+        "Accepts a real session's transcript plus the configured agent test "
+        "cases and starts an asynchronous LLM-judge evaluation of the ACTOR "
         "agent. Returns immediately; per-goal scores + feedback are delivered "
         "to ally-be via the session-evaluation webhook."
     ),

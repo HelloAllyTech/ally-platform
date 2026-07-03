@@ -1,6 +1,6 @@
 """
 LLM-as-a-judge evaluation of the roleplay ACTOR agent for a REAL session,
-scored against the superadmin-configured optimisation goals.
+scored against the superadmin-configured agent test cases.
 
 Unlike the scenario-report evaluator (whose 6 metrics are fixed in a prompt
 template), the goals here are dynamic — supplied per request by ally-be — so
@@ -40,10 +40,10 @@ def build_actor_goal_system_prompt(goals: List[ActorEvaluationGoal]) -> str:
         "[assistant] are the ROLEPLAY ACTOR you are evaluating. Turns labelled "
         "[user] are the trainee — do NOT score the trainee.\n\n"
         "Evaluate ONLY the actor's performance against each of the following "
-        "superadmin-configured optimisation goals. For each goal, assign an "
+        "superadmin-configured agent test cases. For each goal, assign an "
         "integer score from 0 to 100 for how well the actor achieved that goal "
         "across the whole conversation (0 = not at all, 100 = exemplary).\n\n"
-        f"Optimisation goals:\n{goals_block}\n\n"
+        f"Agent test cases:\n{goals_block}\n\n"
         "Scoring guidance: 50-59 below average, 60-69 average, 70-79 good, "
         "80-89 very good, 90-100 exceptional.\n\n"
         "Respond ONLY as JSON with two keys:\n"
@@ -62,7 +62,7 @@ def _build_user_message(transcript: List[ActorEvaluationTurn]) -> str:
     return (
         f"## Conversation Transcript\n{transcript_text}\n\n"
         "Evaluate the ACTOR ([assistant]) agent's performance against the "
-        "optimisation goals."
+        "agent test cases."
     )
 
 
