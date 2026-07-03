@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 
 class ActorEvaluationGoal(BaseModel):
-    """One superadmin-configured optimisation goal the actor is scored against."""
+    """One superadmin-configured agent test case the actor is scored against."""
 
     id: str
     title: str
