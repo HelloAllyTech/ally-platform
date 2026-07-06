@@ -1,0 +1,1 @@
+Evaluate the latest exchange and return your JSON verdict for the turn index given below. The runtime state and the recent conversation window follow. Remember: judge only the trainee's LATEST message for behavior observations; use the whole window for context.
