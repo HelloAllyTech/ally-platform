@@ -37,7 +37,7 @@ class TestInferProviderFromModel:
             ("gpt-4o", "openai"),
             ("gpt-4o-mini", "openai"),
             ("o3-mini", "openai"),
-            ("gemini-2.0-flash", "gemini"),
+            ("gemini-2.5-flash", "gemini"),
             ("google/gemini-pro", "gemini"),  # 'google' prefix maps to Gemini
             ("claude-opus-4-7", None),  # Anthropic unsupported by the voice runtime
             (None, None),
@@ -92,10 +92,10 @@ class TestBuildLlmClientForPrompt:
     @pytest.mark.unit
     @patch("app.core.agent.factory.create_llm_client")
     def test_forwards_prompt_overrides(self, mock_create):
-        sc = _scenario(prompts={"p": {"model": "gemini-2.0-flash", "temperature": 0.4}})
+        sc = _scenario(prompts={"p": {"model": "gemini-2.5-flash", "temperature": 0.4}})
         build_llm_client_for_prompt(sc, "p", base_llm_config={"provider": "openai"})
         kwargs = mock_create.call_args.kwargs
-        assert kwargs["model"] == "gemini-2.0-flash"
+        assert kwargs["model"] == "gemini-2.5-flash"
         assert kwargs["temperature"] == 0.4
 
     @pytest.mark.unit
