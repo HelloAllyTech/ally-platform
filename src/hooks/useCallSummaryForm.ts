@@ -1,6 +1,7 @@
 import {useCallback, useEffect, useRef} from 'react';
 
 import {
+  ChatSummaryStatus,
   SectionKey,
   SUMMARY_FIELDS,
   SummaryFieldKey,
@@ -11,6 +12,7 @@ import {
   transformSummaryToFormData,
 } from '@/screens/CallSummaryScreen/utils/formDataTransformer';
 import {
+  SummaryDetails,
   useGetTagsMutation,
   useUpdateCallSummaryMutation,
 } from '@/services/callSummaryApi';
@@ -36,17 +38,22 @@ export const useCallSummaryForm = () => {
     useUpdateCallSummaryMutation();
   const [getTags] = useGetTagsMutation();
 
+  // A manual scribe note has summaryStatus SUCCESS but no AI summary yet; its
+  // form must still be seeded (with empty values) so the fields are editable.
+  const isManualNote =
+    summaryData?.summaryStatus === ChatSummaryStatus.SUCCESS && !summary;
+
   useEffect(() => {
-    if (summary) {
+    if (summary || isManualNote) {
       const transformedData = transformSummaryToFormData(
-        summary,
+        summary ?? ({} as SummaryDetails),
         summaryData?.details?.callInfo,
       );
       dispatch(setFormData(transformedData));
       // Store the original form data for comparison
       originalFormDataRef.current = transformedData;
     }
-  }, [dispatch, summary, summaryData?.details?.callInfo]);
+  }, [dispatch, summary, isManualNote, summaryData?.details?.callInfo]);
 
   const handleFieldChange =
     (field: SummaryFieldKey) => (value: string | null) => {

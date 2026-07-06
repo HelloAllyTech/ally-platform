@@ -117,6 +117,9 @@ export const API_ROUTES = {
     BY_ID: (chatId: number) => `/chats/${chatId}`,
     END: (chatId: number) => `/chats/${chatId}/end`,
     NOTES: (chatId: number) => `/chats/${chatId}/notes`,
+    NOTE: '/chats/note',
+    GENERATE_NOTE_FROM_AUDIO: '/chats/note/generate-from-audio',
+    SAVE_NOTE_TRANSCRIPT: (chatId: number) => `/chats/${chatId}/transcript`,
     MESSAGES: (chatId: number) => `/chats/${chatId}/messages`,
     CALL_DETAILS: (chatId: number) => `/chats/${chatId}/call-details`,
     EXPORT_SUMMARY: (chatId: number) => `/chats/${chatId}/export-summary`,
@@ -150,6 +153,7 @@ export const API_ROUTES = {
     NUDGE_STATUS: '/settings/nudge-status',
     CHAT_TYPES: '/settings/chat-types',
     CUSTOM_FIELDS_ENABLED: '/settings/custom-fields-enabled',
+    SCRIBE_NOTE_CREATION_ENABLED: '/settings/scribe-note-creation-enabled',
   },
   CUSTOM_FIELDS: {
     DEFINITIONS: '/custom-fields/definitions',

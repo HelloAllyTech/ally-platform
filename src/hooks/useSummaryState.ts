@@ -1,5 +1,6 @@
-import {useCallback, useEffect, useState} from 'react';
+import {useCallback, useEffect, useRef, useState} from 'react';
 
+import {ChatSummaryStatus} from '@/constants';
 import {useLazyGetCallSummaryQuery} from '@/services/callSummaryApi';
 import {useUpdateNotesMutation} from '@/services/chatApi';
 import {useAppDispatch} from '@/store/hooks';
@@ -50,6 +51,20 @@ export const useSummaryState = (
       setIsTranscriptAvailable(true);
     }
   }, [summaryData?.details?.transcript]);
+
+  // A manual scribe note is created as an already-ended DICTATION chat with
+  // summaryStatus SUCCESS but no AI summary — the counsellor fills the fields
+  // by hand (or via voice dictation). Latched for the screen's lifetime so the
+  // note keeps its manual-note behaviour (no AI-feedback prompts) even after
+  // the first save makes a summary object exist.
+  const isManualNoteRef = useRef(false);
+  if (
+    summaryData?.summaryStatus === ChatSummaryStatus.SUCCESS &&
+    !summaryData?.details?.summary
+  ) {
+    isManualNoteRef.current = true;
+  }
+  const isManualNote = isManualNoteRef.current;
 
   // After the summary becomes available, keep showing loader for 3 seconds,
   // then reveal the summary content automatically.
@@ -110,5 +125,6 @@ export const useSummaryState = (
     setIsEndReached,
     summaryStatus: summaryData?.summaryStatus,
     isTranscriptAvailable,
+    isManualNote,
   };
 };

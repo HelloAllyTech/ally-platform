@@ -13,6 +13,10 @@ interface StartSessionModalProps {
   onListenLive: (mode: 'scribe' | 'dictation') => void;
   hasMicrophoneChatType?: boolean;
   hasDictationChatType?: boolean;
+  /** Tenant toggle + counsellor permission gate (see useScribeNoteCreationEnabled). */
+  showCreateNote?: boolean;
+  onCreateNote?: () => void;
+  isCreatingNote?: boolean;
 }
 
 export const StartSessionModal: React.FC<StartSessionModalProps> = ({
@@ -21,6 +25,9 @@ export const StartSessionModal: React.FC<StartSessionModalProps> = ({
   onListenLive,
   hasMicrophoneChatType,
   hasDictationChatType,
+  showCreateNote,
+  onCreateNote,
+  isCreatingNote,
 }) => {
   const {t} = useTranslate();
   const [showNotification, setShowNotification] = useState(false);
@@ -110,6 +117,31 @@ export const StartSessionModal: React.FC<StartSessionModalProps> = ({
                   : {},
               ]}
               customTextStyle={hasMicrophoneChatType ? {color: '#007AFF'} : {}}
+            />
+          )}
+
+          {showCreateNote && (
+            <Button
+              testID="start-session-create-note"
+              label={t('calls.createNote.button')}
+              onPress={() => onCreateNote?.()}
+              isLoading={isCreatingNote}
+              customContainerStyle={[
+                styles.ctaBtn,
+                hasMicrophoneChatType || hasDictationChatType
+                  ? {
+                      backgroundColor: 'white',
+                      borderWidth: 1,
+                      borderColor: '#007AFF',
+                      marginTop: 10,
+                    }
+                  : {},
+              ]}
+              customTextStyle={
+                hasMicrophoneChatType || hasDictationChatType
+                  ? {color: '#007AFF'}
+                  : {}
+              }
             />
           )}
 

@@ -368,7 +368,33 @@
       }
     },
     "appCurrentlyForCounsellors": "This app is currently for counsellors and learners only.",
-    "learnMore": "Learn more"
+    "learnMore": "Learn more",
+    "createNote": {
+      "button": "+ Create Note",
+      "error": "Couldn't create the note. Please try again.",
+      "voice": {
+        "record": "Record a note",
+        "listening": "Listening…",
+        "paused": "Paused",
+        "pause": "Pause",
+        "resume": "Resume",
+        "stop": "Stop",
+        "ready": "Recording ready",
+        "generate": "Generate notes",
+        "generating": "Generating notes…",
+        "discard": "Discard",
+        "micDenied": "Microphone access was denied. Enable it in your settings to record.",
+        "noSpeech": "We couldn't hear any speech. Please try recording again.",
+        "generateError": "Couldn't generate notes from the recording. Please try again.",
+        "generated": "Notes generated from your recording",
+        "nothingExtracted": "We transcribed the audio but couldn't fill any fields from it.",
+        "processing": {
+          "transcribing": "Transcribing your recording…",
+          "extracting": "Extracting note details…",
+          "populating": "Filling in the fields…"
+        }
+      }
+    }
   },
   "carousel": {
     "slides": {

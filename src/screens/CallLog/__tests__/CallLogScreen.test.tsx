@@ -58,6 +58,7 @@ jest.mock('@/hooks', () => ({
   usePermissionAlert: () => ({ showMicrophoneSettingsAlert: jest.fn() }),
   useTranslate: () => ({ t: (k: string) => k }),
   useUser: () => ({ userData: undefined, checkAuth: jest.fn() }),
+  useScribeNoteCreationEnabled: () => ({ data: false }),
 }));
 
 import React from 'react';
@@ -85,6 +86,7 @@ jest.mock('@/components', () => {
     CallLogSkeleton: () => null,
     EmptyState: ({title}: {title: string}) => React.createElement(Text, {}, title),
     TabView: () => null,
+    useToast: () => ({ showToast: jest.fn() }),
   };
 });
 
@@ -111,6 +113,9 @@ jest.mock('@/services/callsApi', () => ({
 }));
 jest.mock('@/services/simulationsApi', () => ({
   useLazyGetSimulationLogsQuery: () => [jest.fn().mockResolvedValue({ data: { data: [] } }), { isFetching: false }],
+}));
+jest.mock('@/services/scribeNoteApi', () => ({
+  useCreateNoteMutation: () => [jest.fn(), { isLoading: false }],
 }));
 jest.mock('@/services/settingsApi', () => ({
   useLazyGetVisibleChatTypesQuery: () => [jest.fn(), { data: ['MIC'] }],

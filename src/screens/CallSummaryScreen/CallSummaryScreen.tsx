@@ -51,6 +51,7 @@ import {
   SummaryGenerationProgress,
   SummaryModals,
   SummaryUnauthorized,
+  VoiceNoteSection,
 } from './components';
 import {styles} from './styles';
 
@@ -92,7 +93,12 @@ export const CallSummaryScreen: React.FC<
     handleNoteChange,
     summaryStatus,
     isTranscriptAvailable,
+    isManualNote,
   } = useSummaryState(chatId, callId);
+
+  // Bumped after voice dictation writes custom-field values server-side, to
+  // remount CallSummaryDetails so it re-seeds from the fresh values.
+  const [voiceApplyVersion, setVoiceApplyVersion] = useState(0);
 
   const hasFeedbackAlready = Boolean(
     summaryData?.details?.callInfo?.isSummaryFeedbackAdded,
@@ -231,7 +237,8 @@ export const CallSummaryScreen: React.FC<
 
   const onBackNavigation = () => {
     const summaryGenerated = isSummaryAvailable && canShowSummary;
-    if (!summaryGenerated) {
+    // Manual notes have no AI-generated summary to rate — never prompt.
+    if (!summaryGenerated || isManualNote) {
       handleGoBack();
       return;
     }
@@ -252,7 +259,7 @@ export const CallSummaryScreen: React.FC<
   };
 
   const onSaveButtonPress = () => {
-    if (!hasFeedbackAlready && hasEditFeedbackPermission) {
+    if (!hasFeedbackAlready && hasEditFeedbackPermission && !isManualNote) {
       setIsFeedbackPopupVisible(true);
     }
   };
@@ -347,16 +354,25 @@ export const CallSummaryScreen: React.FC<
       return <SummaryUnauthorized onGoBack={handleGoBack} />;
     }
 
-    if (isSummaryAvailable && canShowSummary) {
+    if ((isSummaryAvailable || isManualNote) && canShowSummary) {
       const shouldShowSaveButton =
         (!callId || hasChanges) && !isFeedbackPopupVisible;
       return (
-        <CallSummaryDetails
-          isLoading={isLoading}
-          onSubmit={onSaveButtonPress}
-          showSaveButton={shouldShowSaveButton}
-          chatId={chatId}
-        />
+        <View style={styles.summaryTabContainer}>
+          {isManualNote && (
+            <VoiceNoteSection
+              chatId={chatId}
+              onCustomValuesApplied={() => setVoiceApplyVersion(v => v + 1)}
+            />
+          )}
+          <CallSummaryDetails
+            key={voiceApplyVersion}
+            isLoading={isLoading}
+            onSubmit={onSaveButtonPress}
+            showSaveButton={shouldShowSaveButton}
+            chatId={chatId}
+          />
+        </View>
       );
     }
 
@@ -428,6 +444,8 @@ export const CallSummaryScreen: React.FC<
       summaryData,
       showSummaryButtonLoader,
       summaryActionButtonText,
+      isManualNote,
+      voiceApplyVersion,
     ],
   );
 
