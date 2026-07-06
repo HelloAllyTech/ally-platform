@@ -20,7 +20,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {NoCallLogsIcon, TranscribeIcon} from '@/assets/icons';
-import {CallLogSkeleton, EmptyState, TabView} from '@/components';
+import {CallLogSkeleton, EmptyState, TabView, useToast} from '@/components';
 import {env} from '@/config/env';
 import {
   CHAT_TYPES,
@@ -36,11 +36,13 @@ import {
   useCounselorChat,
   useHardwareBackPressHandler,
   usePermissionAlert,
+  useScribeNoteCreationEnabled,
   useTranslate,
   useUser,
 } from '@/hooks';
 import {getFirstVisibleTab} from '@/navigation/TabNavigator';
 import {useLazyGetCallLogsQuery} from '@/services/callsApi';
+import {useCreateNoteMutation} from '@/services/scribeNoteApi';
 import {useLazyGetVisibleChatTypesQuery} from '@/services/settingsApi';
 import {useLazyGetSimulationLogsQuery} from '@/services/simulationsApi';
 import {useAppSelector} from '@/store/hooks';
@@ -156,6 +158,13 @@ export const CallLogScreen: React.FC = () => {
       ),
     [enabledChatTypes],
   );
+
+  // Manual scribe notes: counsellor permission + per-tenant toggle (the hook
+  // skips the request for non-counsellors, so data stays undefined for them).
+  const {data: scribeNoteCreationEnabled} = useScribeNoteCreationEnabled();
+  const canCreateNote =
+    Boolean(permissions?.includes(USER_PERMISSIONS.COUNSELOR_ACCESS)) &&
+    Boolean(scribeNoteCreationEnabled);
 
   const availableLogTypes = useMemo(() => {
     const logTypes: LogType[] = [];
@@ -449,6 +458,25 @@ export const CallLogScreen: React.FC = () => {
     }
   };
 
+  const {showToast} = useToast();
+  const [createNote, {isLoading: isCreatingNote}] = useCreateNoteMutation();
+
+  // Creates an empty manual note and opens it in the summary screen, where the
+  // counsellor fills the fields (typed or via voice dictation).
+  const handleCreateNote = async () => {
+    try {
+      const {chatId} = await createNote().unwrap();
+      setShowStartSession(false);
+      stackNavigation.navigate(SCREEN_NAMES.CALL_SUMMARY, {
+        callId: chatId,
+        fromLogs: true,
+      });
+    } catch (error) {
+      logger.error(`Create note failed: ${error}`);
+      showToast(t('calls.createNote.error'), 'error');
+    }
+  };
+
   const handleVoiceRecording = async (
     mode: 'scribe' | 'dictation' = 'scribe',
   ) => {
@@ -591,15 +619,17 @@ export const CallLogScreen: React.FC = () => {
           />
         </View>
       )}
-      {canStartCall && !currentChat?.chatId && (
+      {(canStartCall || canCreateNote) && !currentChat?.chatId && (
         <TouchableOpacity
           style={[
             styles.fab,
             {bottom: insets.bottom + ms(100)},
-            !(hasMicrophoneChatType || hasDictationChatType) &&
+            !(hasMicrophoneChatType || hasDictationChatType || canCreateNote) &&
               styles.bgAshGray,
           ]}
-          disabled={!(hasMicrophoneChatType || hasDictationChatType)}
+          disabled={
+            !(hasMicrophoneChatType || hasDictationChatType || canCreateNote)
+          }
           activeOpacity={0.9}
           onPress={() => setShowStartSession(true)}>
           <TranscribeIcon />
@@ -611,6 +641,9 @@ export const CallLogScreen: React.FC = () => {
         onListenLive={handleVoiceRecording}
         hasMicrophoneChatType={hasMicrophoneChatType}
         hasDictationChatType={hasDictationChatType}
+        showCreateNote={canCreateNote}
+        onCreateNote={handleCreateNote}
+        isCreatingNote={isCreatingNote}
       />
     </View>
   );

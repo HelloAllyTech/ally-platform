@@ -161,4 +161,44 @@ describe('StartSessionModal', () => {
     expect(getByTestId('notification-modal')).toBeTruthy();
     expect(onListenLive).not.toHaveBeenCalled();
   });
+
+  // --- Create Note (per-tenant toggle + counsellor permission, resolved by the parent) ---
+  it('shows the Create Note button only when showCreateNote is true', () => {
+    const {getByText, rerender, queryByText} = render(
+      <StartSessionModal
+        visible
+        onClose={jest.fn()}
+        onListenLive={jest.fn()}
+        showCreateNote
+      />,
+    );
+    expect(getByText('calls.createNote.button')).toBeTruthy();
+
+    rerender(
+      <StartSessionModal
+        visible
+        onClose={jest.fn()}
+        onListenLive={jest.fn()}
+        showCreateNote={false}
+      />,
+    );
+    expect(queryByText('calls.createNote.button')).toBeNull();
+  });
+
+  it('fires onCreateNote immediately (no consent modal — nothing is recorded)', () => {
+    const onCreateNote = jest.fn();
+    const {getByText, queryByTestId} = render(
+      <StartSessionModal
+        visible
+        onClose={jest.fn()}
+        onListenLive={jest.fn()}
+        showCreateNote
+        onCreateNote={onCreateNote}
+      />,
+    );
+
+    fireEvent.press(getByText('calls.createNote.button'));
+    expect(onCreateNote).toHaveBeenCalled();
+    expect(queryByTestId('notification-modal')).toBeNull();
+  });
 });

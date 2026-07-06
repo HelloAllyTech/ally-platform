@@ -16,3 +16,4 @@ export {
 export {SummaryModals} from './SummaryModals';
 export {SummaryUnauthorized} from './SummaryUnauthorized';
 export {ArchiveActionModal} from './ArchiveActionModal';
+export {VoiceNotePanel, VoiceNoteSection} from './VoiceNotePanel';

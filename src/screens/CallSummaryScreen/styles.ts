@@ -37,6 +37,9 @@ export const styles = ScaledSheet.create({
   scrollView: {
     flex: 1,
   },
+  summaryTabContainer: {
+    flex: 1,
+  },
   card: {
     backgroundColor: colors.white,
     marginTop: 0,

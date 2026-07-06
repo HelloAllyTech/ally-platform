@@ -48,6 +48,7 @@ jest.mock('@/screens/CallSummaryScreen/utils/formDataTransformer', () => ({
 
 jest.mock('@/constants/summary', () => ({
   SUMMARY_FIELDS: {TAGS: 'tags'},
+  ChatSummaryStatus: {SUCCESS: 'SUCCESS'},
   summaryFields: [
     {key: 'notes', sectionKey: 'demo', isEditable: true},
     {key: 'tags', sectionKey: 'demo', isEditable: true},

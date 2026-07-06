@@ -40,3 +40,5 @@ export * from './useStableFooterRenderer';
 export * from './useToggleReviewPrivacy';
 export * from './useShareScreenLogic';
 export * from './useHideReviewDetails';
+export * from './useScribeNoteCreationEnabled';
+export * from './useVoiceNoteRecorder';

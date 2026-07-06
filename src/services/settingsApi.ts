@@ -21,6 +21,9 @@ export const settingsApi = api.injectEndpoints({
       getVisibleChatTypes: builder.query<CHAT_TYPES[], void>({
         query: () => API_ROUTES.SETTINGS.CHAT_TYPES,
       }),
+      getScribeNoteCreationEnabled: builder.query<boolean, void>({
+        query: () => API_ROUTES.SETTINGS.SCRIBE_NOTE_CREATION_ENABLED,
+      }),
     };
   },
 });
@@ -30,4 +33,5 @@ export const {
   useLazyGetSummaryFieldsQuery,
   useGetNudgeStatusQuery,
   useLazyGetVisibleChatTypesQuery,
+  useGetScribeNoteCreationEnabledQuery,
 } = settingsApi;

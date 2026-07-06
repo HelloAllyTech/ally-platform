@@ -53,6 +53,9 @@ export enum USER_PERMISSIONS {
 
   // === CUSTOM FIELDS ===
   MANAGE_CUSTOM_FIELD_DEFINITIONS = 'manage:custom-field:definitions',
+
+  // === COUNSELLOR ===
+  COUNSELOR_ACCESS = 'counselor:access',
 }
 
 export const MICROPHONE_PERMISSION =
