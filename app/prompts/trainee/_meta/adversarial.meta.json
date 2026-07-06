@@ -1,0 +1,8 @@
+{
+    "name": "Roleplay v2 Trainee — Adversarial Profile",
+    "kind": "prompt",
+    "promptType": "roleplay_v2_trainee",
+    "hasStates": false,
+    "description": "Red-team profile: direct secret extraction, roleplay-breaking, prompt-injection attempts, contradiction traps. Used to verify locked secrets and persona hold under attack.",
+    "availableVariables": []
+}

@@ -34,3 +34,13 @@ format:
 
 .PHONY: fix
 fix: format
+
+# Roleplay Studio v2 voice worker (registers as AGENT_NAME_V2; v1 untouched)
+.PHONY: run-worker-v2
+run-worker-v2:
+	@poetry run python -m app.worker_v2 start
+
+# v2 worker in LiveKit console/dev mode (local testing without a dispatcher)
+.PHONY: run-worker-v2-dev
+run-worker-v2-dev:
+	@poetry run python -m app.worker_v2 dev

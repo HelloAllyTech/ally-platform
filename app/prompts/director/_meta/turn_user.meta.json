@@ -1,0 +1,8 @@
+{
+    "name": "Roleplay v2 Director — Turn User Message",
+    "kind": "prompt",
+    "promptType": "roleplay_v2_director",
+    "hasStates": false,
+    "description": "Static header of the per-turn Director user message. The runtime appends the turn index, serialized runtime state, and the rolling conversation window manually (load_template + assembly; no format placeholders so transcript braces can never break rendering).",
+    "availableVariables": []
+}

@@ -659,5 +659,81 @@ class Settings(BaseSettings):
         ),
     )
 
+    # ---- Roleplay Studio v2 (spec-driven runtime; app/roleplay_v2) ----
+    ROLEPLAY_V2_ENABLED: bool = Field(
+        default=True,
+        description=(
+            "Kill-switch for the v2 runtime. When False, worker_v2 refuses "
+            "jobs at the entrypoint. Never affects the v1 worker."
+        ),
+    )
+    AGENT_NAME_V2: str = Field(
+        default="AgentV2",
+        description=(
+            "LiveKit agent name the v2 worker registers under. Distinct from "
+            "AGENT_NAME so ally-be dispatches engine='roleplay_v2' rooms to "
+            "the v2 worker pool and everything else to v1."
+        ),
+    )
+    ACTOR_DEFAULT_MODEL: str = Field(
+        default="gpt-4o-mini",
+        description=(
+            "Default model for the v2 Actor when the spec has no actorModel."
+        ),
+    )
+    DIRECTOR_PROVIDER: str = Field(
+        default="openai",
+        description=(
+            "Default provider for the v2 Director LLM when the spec has no "
+            "directorModel (needs json_mode structured-output support)."
+        ),
+    )
+    DIRECTOR_MODEL: str = Field(
+        default="gpt-4o-mini",
+        description=(
+            "Default model for the v2 Director when the spec has no "
+            "directorModel."
+        ),
+    )
+    DIRECTOR_TIMEOUT_S: float = Field(
+        default=8.0,
+        description=(
+            "Hard timeout (seconds) for one Director verdict. The Director "
+            "runs OFF the voice critical path, so on timeout the turn simply "
+            "goes undirected (a recorded miss) — it never delays the actor."
+        ),
+    )
+    DIRECTOR_GRACE_MS: float = Field(
+        default=0.0,
+        description=(
+            "Optional wait (ms) before the actor compiles its turn card, "
+            "giving a near-done Director verdict a chance to land and reduce "
+            "direction staleness. 0 (default) = never wait; keep small "
+            "(<300ms) — it adds directly to voice latency."
+        ),
+    )
+    REHEARSAL_CONCURRENCY_LIMIT: int = Field(
+        default=2,
+        description=(
+            "Maximum number of v2 rehearsals running concurrently. Each "
+            "rehearsal is 3 profile runs × N turns × 3 LLM calls per turn, "
+            "so this bounds cost and memory; excess requests queue."
+        ),
+    )
+    REHEARSAL_JUDGE_MODEL: str = Field(
+        default="gpt-4o-mini",
+        description=(
+            "Default judge model for rehearsals (config.judge_model in the "
+            "request overrides per-run)."
+        ),
+    )
+    REHEARSAL_TURNS_DEFAULT: int = Field(
+        default=12,
+        description=(
+            "Default trainee turns per rehearsal profile when the request "
+            "omits config.turns_per_profile."
+        ),
+    )
+
 
 settings = Settings()

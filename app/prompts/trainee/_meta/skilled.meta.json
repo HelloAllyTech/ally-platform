@@ -1,0 +1,10 @@
+{
+    "name": "Roleplay v2 Trainee — Skilled Profile",
+    "kind": "prompt",
+    "promptType": "roleplay_v2_trainee",
+    "hasStates": false,
+    "description": "Textbook-skilled counselor profile for rehearsals: deliberately demonstrates every helpful rubric behavior (injected as {helpful_behaviors}) so rubric coverage and state progression can be measured.",
+    "availableVariables": [
+        "helpful_behaviors"
+    ]
+}
