@@ -34,8 +34,11 @@ ELEVEN_API_KEY=<YOUR_ELEVEN_LABS_API_KEY>
 HUME_API_KEY=<YOUR_HUME_API_KEY>
 
 # Google Gemini LLM (optional - for using Gemini as conversation LLM provider)
-# Option 1: Google API key (from https://aistudio.google.com)
-# GOOGLE_API_KEY=<YOUR_GOOGLE_API_KEY>
+# Option 1 (recommended, no gcloud needed): plain API key from
+# https://aistudio.google.com. Any of these names works (aliases):
+# GEMINI_API_KEY / GOOGLE_API_KEY / GOOGLE_GENERATIVE_AI_API_KEY. When set, the
+# Gemini client uses API-key auth and does NOT require gcloud/ADC or a project.
+# GEMINI_API_KEY=<YOUR_GEMINI_API_KEY>
 # Option 2: Application Default Credentials (run: gcloud auth application-default login)
 # GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
 

@@ -4,7 +4,7 @@ Configuration settings for the application.
 
 from typing import Optional
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.core.constants import Environment
@@ -63,9 +63,19 @@ class Settings(BaseSettings):
 
     GOOGLE_API_KEY: Optional[str] = Field(
         default=None,
+        # Accept the common key names so a plain API key works without gcloud /
+        # ADC: GOOGLE_API_KEY (native), GEMINI_API_KEY (used by ally-be/ally-ai),
+        # and GOOGLE_GENERATIVE_AI_API_KEY (Vercel/LangChain convention). When
+        # set, the Gemini client uses API-key auth (Generative Language API) and
+        # does NOT require GOOGLE_APPLICATION_CREDENTIALS / a GCP project.
+        validation_alias=AliasChoices(
+            "GOOGLE_API_KEY",
+            "GEMINI_API_KEY",
+            "GOOGLE_GENERATIVE_AI_API_KEY",
+        ),
         description=(
-            "Google API key for Gemini LLM "
-            "(can also use GOOGLE_APPLICATION_CREDENTIALS)"
+            "API key for Gemini LLM (API-key auth, no gcloud/ADC needed). "
+            "Falls back to GOOGLE_APPLICATION_CREDENTIALS / ADC when unset."
         ),
     )
 

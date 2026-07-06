@@ -721,3 +721,19 @@ class TestLLMAbstractionIntegration:
         # Test hi-IN
         client2 = create_llm_client(language_code="hi-IN")
         assert client2.llm_instance == mock_llm_instance
+
+
+class TestGeminiApiKeyAliases:
+    """The Gemini API key must be settable via any common env-var name, so a
+    plain API key works without gcloud / ADC."""
+
+    def test_google_api_key_accepts_common_aliases(self):
+        from app.core.config import Settings
+
+        alias = Settings.model_fields["GOOGLE_API_KEY"].validation_alias
+        names = set(getattr(alias, "choices", []) or [])
+        assert {
+            "GOOGLE_API_KEY",
+            "GEMINI_API_KEY",
+            "GOOGLE_GENERATIVE_AI_API_KEY",
+        }.issubset(names)
