@@ -1,0 +1,14 @@
+{
+    "name": "Roleplay v2 Actor — Turn Card",
+    "kind": "prompt",
+    "promptType": "roleplay_v2_actor",
+    "hasStates": false,
+    "description": "Layers L3-L6 of the v2 actor prompt, recompiled every turn: current state card, disclosure ledger (locked items render topic + deflection ONLY, never content), retrieved persona-bible chunks, and the active stage direction.",
+    "availableVariables": [
+        "state_name",
+        "state_section",
+        "ledger_section",
+        "chunks_section",
+        "stage_direction"
+    ]
+}

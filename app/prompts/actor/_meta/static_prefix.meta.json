@@ -1,0 +1,17 @@
+{
+    "name": "Roleplay v2 Actor — Static Prefix",
+    "kind": "prompt",
+    "promptType": "roleplay_v2_actor",
+    "hasStates": false,
+    "description": "Layers L1 (identity core) + L2 (scenario context) of the v2 actor prompt. Compiled ONCE per session and byte-stable across turns so provider prompt caching can hit; per-turn material lives in the turn card.",
+    "availableVariables": [
+        "title",
+        "identity_core",
+        "scenario_context",
+        "competency",
+        "language_code",
+        "language_label",
+        "linguistic_samples",
+        "allowed_fillers"
+    ]
+}
