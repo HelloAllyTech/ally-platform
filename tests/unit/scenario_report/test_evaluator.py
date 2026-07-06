@@ -260,6 +260,79 @@ class TestEvaluateTranscript:
         assert "# Evaluation Report" in result["report_markdown"]
 
     @pytest.mark.asyncio
+    @patch("app.core.scenario_report.evaluator.resolve_template")
+    @patch("app.core.scenario_report.evaluator._build_evaluator_llm")
+    async def test_honors_per_prompt_openai_model_and_temperature(
+        self, mock_build, mock_resolve
+    ):
+        """The selected evaluator prompt's OpenAI model + temperature apply."""
+        mock_resolve.return_value = "Judge the transcript."
+        mock_llm = AsyncMock()
+        mock_llm.ainvoke.return_value = EvaluationResult(
+            metrics={"x": 50}, report_markdown="r"
+        )
+        mock_client = MagicMock()
+        mock_client.with_structured_output.return_value = mock_llm
+        mock_build.return_value = mock_client
+
+        pd = _make_prompt_data(
+            prompts={
+                "eval_judge": {
+                    "prompt": "Judge the transcript.",
+                    "provider": "openai",
+                    "model": "gpt-4.1",
+                    "temperature": 0.2,
+                }
+            }
+        )
+
+        await evaluate_transcript(
+            transcripts=[_make_transcript("Hi", "CLIENT")],
+            prompt_data=pd,
+            counselor_prompt="x",
+            selected_prompt_code="eval_judge",
+        )
+
+        mock_build.assert_called_once_with("gpt-4.1", 0.2)
+
+    @pytest.mark.asyncio
+    @patch("app.core.scenario_report.evaluator.resolve_template")
+    @patch("app.core.scenario_report.evaluator._build_evaluator_llm")
+    async def test_ignores_non_openai_model_but_keeps_temperature(
+        self, mock_build, mock_resolve
+    ):
+        """A non-OpenAI evaluator model is ignored (json_mode judge is OpenAI);
+        the temperature override still applies."""
+        mock_resolve.return_value = "Judge the transcript."
+        mock_llm = AsyncMock()
+        mock_llm.ainvoke.return_value = EvaluationResult(
+            metrics={"x": 50}, report_markdown="r"
+        )
+        mock_client = MagicMock()
+        mock_client.with_structured_output.return_value = mock_llm
+        mock_build.return_value = mock_client
+
+        pd = _make_prompt_data(
+            prompts={
+                "eval_judge": {
+                    "prompt": "Judge the transcript.",
+                    "provider": "gemini",
+                    "model": "gemini-2.0-flash",
+                    "temperature": 0.4,
+                }
+            }
+        )
+
+        await evaluate_transcript(
+            transcripts=[_make_transcript("Hi", "CLIENT")],
+            prompt_data=pd,
+            counselor_prompt="x",
+            selected_prompt_code="eval_judge",
+        )
+
+        mock_build.assert_called_once_with(None, 0.4)
+
+    @pytest.mark.asyncio
     @patch("app.core.scenario_report.evaluator._build_evaluator_llm")
     async def test_dynamic_metrics_passed_through(self, mock_create_llm):
         """Any metric keys returned by the LLM are preserved without code changes."""

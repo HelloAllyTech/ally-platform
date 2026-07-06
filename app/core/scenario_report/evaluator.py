@@ -39,8 +39,15 @@ _EVALUATOR_TIMEOUT_S = 120
 _EVALUATOR_TEMPERATURE = 0
 
 
-def _build_evaluator_llm():
+def _build_evaluator_llm(
+    model: Optional[str] = None, temperature: Optional[float] = None
+):
     """Return a ChatOpenAI instance tuned for transcript evaluation.
+
+    `model`/`temperature` come from the selected evaluator prompt's per-prompt
+    config (Prompt Management) when set, else fall back to the pinned judge
+    defaults. The judge runs on OpenAI (json_mode structured output), so only an
+    OpenAI model override is applied here (see ``evaluate_transcript``).
 
     Built per-call rather than at module import so any settings change
     (e.g. test fixtures swapping the API key) takes effect without
@@ -48,8 +55,8 @@ def _build_evaluator_llm():
     session in the report-gen worker between runs.
     """
     return ChatOpenAI(
-        model=_EVALUATOR_MODEL,
-        temperature=_EVALUATOR_TEMPERATURE,
+        model=model or _EVALUATOR_MODEL,
+        temperature=temperature if temperature is not None else _EVALUATOR_TEMPERATURE,
         api_key=settings.OPENAI_API_KEY,
         timeout=_EVALUATOR_TIMEOUT_S,
         max_retries=1,
@@ -163,7 +170,35 @@ async def evaluate_transcript(
         return {"metrics": {}, "report_markdown": ""}
 
     try:
-        llm = _build_evaluator_llm().with_structured_output(
+        # Honor the selected evaluator prompt's per-prompt model/temperature
+        # (set in Prompt Management). The judge uses OpenAI json_mode structured
+        # output, so a non-OpenAI model override is ignored (default judge model
+        # kept); the temperature override still applies.
+        eval_model: Optional[str] = None
+        eval_temperature: Optional[float] = None
+        if selected_prompt_code:
+            from app.core.agent.factory import get_prompt_llm_overrides
+            from app.llms.factory import infer_provider_from_model
+
+            provider, model, temperature = get_prompt_llm_overrides(
+                prompt_data, selected_prompt_code
+            )
+            eval_temperature = temperature
+            resolved_provider = provider or (
+                infer_provider_from_model(model) if model else None
+            )
+            if model and resolved_provider == "openai":
+                eval_model = model
+            elif model:
+                logger.info(
+                    "Evaluator prompt %s requests non-OpenAI model %r; the judge "
+                    "runs on OpenAI, keeping the default model (temperature "
+                    "override still applies).",
+                    selected_prompt_code,
+                    model,
+                )
+
+        llm = _build_evaluator_llm(eval_model, eval_temperature).with_structured_output(
             EvaluationResult, method="json_mode"
         )
         user_message = _build_evaluation_prompt(
