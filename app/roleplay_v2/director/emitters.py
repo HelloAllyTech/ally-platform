@@ -201,7 +201,7 @@ class DirectorEmitter:
         (the DirectorService enforces this — content strings never reach the
         client).
         """
-        self._publish_data_channel({"type": "director_turn", **payload})
+        self._publish_data_channel({"type": "director.turn", **payload})
 
     # ------------------------------------------------------------------
     # LLM usage + lifecycle

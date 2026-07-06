@@ -540,19 +540,24 @@ class DirectorService:
                 event_id=direction_event_id,
             )
 
-        # One data-channel packet per turn. Unlocks carry secret TOPIC only —
+        # One data-channel packet per turn, in the frozen client contract shape
+        # (ally-web DirectorObserverPanel). Unlocks carry secret TOPIC only —
         # NEVER content (the client must not receive what the actor may not
         # have said yet).
         self.emitter.publish_turn_result(
             {
-                "turn_index": turn_index,
-                "state_id": next_state_id or snapshot.current_state_id,
-                "transitioned": bool(next_state_id),
-                "cumulative_score": cumulative_score,
-                "scores": scores,
+                "turn": turn_index,
+                "behaviors": [
+                    {"id": ob.behavior_id, "observed": ob.observed}
+                    for ob in verdict.behavior_observations
+                ],
+                "state": {
+                    "from": snapshot.current_state_id,
+                    "to": next_state_id or snapshot.current_state_id,
+                },
                 "unlocks": [
                     {
-                        "secret_id": secret_id,
+                        "id": secret_id,
                         "topic": (
                             self.spec.get_secret(secret_id).topic
                             if self.spec.get_secret(secret_id)
@@ -561,9 +566,14 @@ class DirectorService:
                     }
                     for secret_id, _ in unlocks
                 ],
-                "stage_direction": stage_direction,
-                "trainee_feedback": verdict.trainee_feedback,
-                "confidence": verdict.confidence,
+                "events": (
+                    [direction_event_id]
+                    if direction_kind == "engineered_event" and direction_event_id
+                    else []
+                ),
+                "score": cumulative_score,
+                "feedback": verdict.trainee_feedback,
+                "stale": False,
             }
         )
 
