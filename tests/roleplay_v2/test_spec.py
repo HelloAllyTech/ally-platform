@@ -53,8 +53,7 @@ class TestSampleSpec:
 class TestValidators:
     def _minimal_states(self, n):
         return [
-            {"id": f"s{i}", "name": f"State {i}", "transitions": []}
-            for i in range(n)
+            {"id": f"s{i}", "name": f"State {i}", "transitions": []} for i in range(n)
         ]
 
     def test_too_few_states_rejected(self):

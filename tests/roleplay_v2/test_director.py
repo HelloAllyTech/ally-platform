@@ -2,18 +2,13 @@
 
 import asyncio
 
-import pytest
-
 from app.roleplay_v2.director.emitters import DirectorEmitter
 from app.roleplay_v2.director.schemas import (
     BehaviorObservation,
     DirectorVerdict,
     GuardEvaluation,
 )
-from app.roleplay_v2.director.service import (
-    DirectorService,
-    truncate_stage_direction,
-)
+from app.roleplay_v2.director.service import DirectorService, truncate_stage_direction
 
 
 class FakeDirectorLLM:
@@ -80,9 +75,7 @@ def make_service(sample_spec, state_store, verdicts, timeout_s=5.0, delay_s=0.0)
 
 
 class TestPromptAssembly:
-    def test_system_prompt_has_full_ledger_and_machine(
-        self, sample_spec, state_store
-    ):
+    def test_system_prompt_has_full_ledger_and_machine(self, sample_spec, state_store):
         service, _, _ = make_service(sample_spec, state_store, [])
         prompt = service._system_prompt
         # The Director (referee) sees secret contents AND unlock conditions.
@@ -112,9 +105,7 @@ class TestScoreComputation:
         assert len(score_msgs) == 1
         scores = {s["behavior_id"]: s["score"] for s in score_msgs[0]["scores"]}
         assert scores == {"beh-validation": 2, "beh-judgment": -3}
-        rationales = {
-            s["behavior_id"]: s["rationale"] for s in score_msgs[0]["scores"]
-        }
+        rationales = {s["behavior_id"]: s["rationale"] for s in score_msgs[0]["scores"]}
         assert rationales["beh-validation"] == "quote-beh-validation"
 
     async def test_unknown_behavior_ignored(self, sample_spec, state_store):
@@ -314,17 +305,13 @@ class TestTimeoutAndFailure:
 
         llm = ExplodingLLM()
         emitter = DirectorEmitter("room-test", room=None, enable_sqs=False)
-        service = DirectorService(
-            sample_spec, state_store, llm, emitter, timeout_s=1.0
-        )
+        service = DirectorService(sample_spec, state_store, llm, emitter, timeout_s=1.0)
         await state_store.begin_turn()
         assert await service.run_turn(1, "hi", "hello") is None
         snap = await state_store.snapshot()
         assert snap.director_misses == 1
 
-    async def test_on_turn_committed_is_fire_and_forget(
-        self, sample_spec, state_store
-    ):
+    async def test_on_turn_committed_is_fire_and_forget(self, sample_spec, state_store):
         verdict = make_verdict(observed=["beh-validation"])
         service, _, _ = make_service(sample_spec, state_store, [verdict])
         await state_store.begin_turn()
@@ -337,8 +324,7 @@ class TestTimeoutAndFailure:
 class TestStageDirection:
     def test_truncate_first_sentence(self):
         assert (
-            truncate_stage_direction("Soften now. Then push harder.")
-            == "Soften now."
+            truncate_stage_direction("Soften now. Then push harder.") == "Soften now."
         )
 
     def test_truncate_200_chars(self):

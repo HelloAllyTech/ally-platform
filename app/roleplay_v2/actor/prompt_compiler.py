@@ -107,9 +107,7 @@ def _render_state_section(state: SpecState) -> str:
     return "\n".join(line for line in lines if line is not None)
 
 
-def _render_ledger_section(
-    spec: ScenarioSpec, snapshot: RuntimeSessionState
-) -> str:
+def _render_ledger_section(spec: ScenarioSpec, snapshot: RuntimeSessionState) -> str:
     """Render L4. LOCKED items: topic + deflection ONLY — content NEVER."""
     if not spec.disclosure_ledger.secrets:
         return "(nothing is being withheld in this scenario)"

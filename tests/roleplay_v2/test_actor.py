@@ -8,7 +8,6 @@ from app.roleplay_v2.actor.prompt_compiler import (
     compile_turn_card,
 )
 from app.roleplay_v2.actor.retrieval.persona_bible import select_chunks
-from app.roleplay_v2.spec.runtime_state import LEDGER_UNLOCKED
 
 
 class FakeChatModel:
@@ -160,9 +159,7 @@ class TestActorEngine:
         assert sent[0].content == engine.static_prefix
         assert "Disclosure ledger" in sent[-1].content
 
-    async def test_static_prefix_identical_across_turns(
-        self, sample_spec, state_store
-    ):
+    async def test_static_prefix_identical_across_turns(self, sample_spec, state_store):
         engine = ActorEngine(sample_spec, state_store, FakeChatModel())
         first = (await engine.prepare([HumanMessage(content="a")])).messages[0].content
         await state_store.begin_turn()
@@ -174,9 +171,7 @@ class TestActorEngine:
 
 
 class TestActorGraph:
-    async def test_graph_advances_turn_and_calls_hook(
-        self, sample_spec, state_store
-    ):
+    async def test_graph_advances_turn_and_calls_hook(self, sample_spec, state_store):
         from app.roleplay_v2.actor.graph import build_actor_graph
 
         llm = FakeChatModel(replies=["I'm managing."])

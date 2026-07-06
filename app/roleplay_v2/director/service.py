@@ -135,9 +135,7 @@ class DirectorService:
             # The Director (unlike the Actor) sees the FULL ledger — secret
             # contents AND unlock conditions — it is the referee, not the
             # character, and its output schema never echoes content.
-            "disclosureLedger": self.spec.disclosure_ledger.model_dump(
-                by_alias=True
-            ),
+            "disclosureLedger": self.spec.disclosure_ledger.model_dump(by_alias=True),
             "engineeredEvents": [
                 e.model_dump(by_alias=True)
                 for e in self.spec.engineered_events
@@ -397,9 +395,7 @@ class DirectorService:
                 continue  # time events are code-owned, never LLM-proposed
             if event.once and event_id in snapshot.fired_events:
                 continue
-            if event.trigger == "behavior" and not (
-                set(event.behavior_ids) & observed
-            ):
+            if event.trigger == "behavior" and not (set(event.behavior_ids) & observed):
                 continue
             if (
                 event.trigger == "score"

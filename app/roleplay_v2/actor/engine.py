@@ -23,10 +23,7 @@ from app.roleplay_v2.actor.retrieval.persona_bible import (
     select_chunks,
 )
 from app.roleplay_v2.spec.models import ScenarioSpec
-from app.roleplay_v2.spec.runtime_state import (
-    RuntimeSessionState,
-    RuntimeStateStore,
-)
+from app.roleplay_v2.spec.runtime_state import RuntimeSessionState, RuntimeStateStore
 
 logger = get_logger(__name__)
 

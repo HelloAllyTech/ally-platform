@@ -4,10 +4,9 @@ import copy
 
 import pytest
 
-from scenario_spec_sample import SCENARIO_SPEC_SAMPLE
-
 from app.roleplay_v2.spec.models import RoleplaySpecEnvelope, ScenarioSpec
 from app.roleplay_v2.spec.runtime_state import RuntimeStateStore
+from scenario_spec_sample import SCENARIO_SPEC_SAMPLE
 
 
 @pytest.fixture

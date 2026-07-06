@@ -35,9 +35,7 @@ _WORD_RE = re.compile(r"[\w']+", re.UNICODE)
 def _keywords(text: Optional[str]) -> set[str]:
     if not text:
         return set()
-    return {
-        w.lower() for w in _WORD_RE.findall(text) if len(w) >= _MIN_KEYWORD_LEN
-    }
+    return {w.lower() for w in _WORD_RE.findall(text) if len(w) >= _MIN_KEYWORD_LEN}
 
 
 def _topic_tokens(chunk: PersonaChunk) -> set[str]:
@@ -67,9 +65,7 @@ def select_chunks(
     if not chunks:
         return []
 
-    nominated = {
-        t.strip().lower() for t in (retrieve_topics or []) if t and t.strip()
-    }
+    nominated = {t.strip().lower() for t in (retrieve_topics or []) if t and t.strip()}
     keywords = _keywords(last_user_text)
 
     director_hits: List[tuple[int, PersonaChunk]] = []

@@ -83,7 +83,14 @@ SCENARIO_SPEC_SAMPLE = {
                 },
                 {
                     "id": "chunk-health",
-                    "topics": ["sleep", "health", "eating", "body", "tired", "exhausted"],
+                    "topics": [
+                        "sleep",
+                        "health",
+                        "eating",
+                        "body",
+                        "tired",
+                        "exhausted",
+                    ],
                     "content": (
                         "Maya wakes at 3 a.m. most nights with her heart "
                         "racing and answers email until dawn because 'at least "
@@ -220,7 +227,9 @@ SCENARIO_SPEC_SAMPLE = {
                 {
                     "id": "state-opening",
                     "name": "Opening",
-                    "emotionalRegister": "quieter, more honest, emotion close to the surface",
+                    "emotionalRegister": (
+                        "quieter, more honest, emotion close to the surface"
+                    ),
                     "disclosurePosture": (
                         "Speak plainly about exhaustion and fear. Unlocked "
                         "secrets may now surface if the counselor makes room."
@@ -498,8 +507,7 @@ SCENARIO_SPEC_SAMPLE = {
                     "examples": [
                         "What would it say about you, in your own eyes, if "
                         "you did rest?",
-                        "Who is Maya when she isn't the one holding "
-                        "everything up?",
+                        "Who is Maya when she isn't the one holding " "everything up?",
                     ],
                 },
                 {

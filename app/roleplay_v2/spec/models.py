@@ -256,13 +256,9 @@ class EngineeredEvent(SpecBase):
         if self.trigger == "time" and self.at_seconds is None:
             raise ValueError(f"time-trigger event {self.id!r} requires atSeconds")
         if self.trigger == "behavior" and not self.behavior_ids:
-            raise ValueError(
-                f"behavior-trigger event {self.id!r} requires behaviorIds"
-            )
+            raise ValueError(f"behavior-trigger event {self.id!r} requires behaviorIds")
         if self.trigger == "score" and self.score_threshold is None:
-            raise ValueError(
-                f"score-trigger event {self.id!r} requires scoreThreshold"
-            )
+            raise ValueError(f"score-trigger event {self.id!r} requires scoreThreshold")
         return self
 
 

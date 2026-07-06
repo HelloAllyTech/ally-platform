@@ -24,7 +24,6 @@ import time
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
 
 from app.core.logger import get_logger
-from app.core.queue.utils import send_message_to_queue
 
 if TYPE_CHECKING:  # pragma: no cover
     from livekit import rtc
@@ -82,6 +81,11 @@ class DirectorEmitter:
         self.trace.append({"type": message_type, **data})
         if not self._enable_sqs:
             return
+        # Deferred import: app.core.queue.utils pulls in the v1 graph package
+        # at module import; importing it lazily keeps roleplay_v2 (and the
+        # FastAPI router) free of that import-order cycle.
+        from app.core.queue.utils import send_message_to_queue
+
         self._track(send_message_to_queue(json.dumps(envelope)))
 
     def _publish_data_channel(self, payload: Dict[str, Any]) -> None:
@@ -127,9 +131,7 @@ class DirectorEmitter:
             },
         )
 
-    def emit_rubric_score(
-        self, turn_index: int, scores: List[Dict[str, Any]]
-    ) -> None:
+    def emit_rubric_score(self, turn_index: int, scores: List[Dict[str, Any]]) -> None:
         """scores: [{behavior_id, score, rationale}]."""
         self._send_sqs(
             MSG_RUBRIC_SCORE,
