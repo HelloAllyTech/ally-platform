@@ -1,0 +1,55 @@
+"""Spec contract models, runtime state, and metadata parsing for roleplay v2."""
+
+from app.roleplay_v2.spec.models import (
+    DisclosureLedger,
+    EngineeredEvent,
+    ModelSpec,
+    Persona,
+    PersonaChunk,
+    RoleplaySpecEnvelope,
+    Rubric,
+    RubricBehavior,
+    ScenarioSpec,
+    Secret,
+    SpecFetch,
+    SpecLanguage,
+    SpecSessionInfo,
+    SpecState,
+    SpecVoice,
+    StateMachine,
+    StateTransition,
+)
+from app.roleplay_v2.spec.parse import parse_spec_metadata
+from app.roleplay_v2.spec.runtime_state import (
+    LEDGER_LOCKED,
+    LEDGER_REVEALED,
+    LEDGER_UNLOCKED,
+    RuntimeSessionState,
+    RuntimeStateStore,
+)
+
+__all__ = [
+    "DisclosureLedger",
+    "EngineeredEvent",
+    "LEDGER_LOCKED",
+    "LEDGER_REVEALED",
+    "LEDGER_UNLOCKED",
+    "ModelSpec",
+    "Persona",
+    "PersonaChunk",
+    "RoleplaySpecEnvelope",
+    "Rubric",
+    "RubricBehavior",
+    "RuntimeSessionState",
+    "RuntimeStateStore",
+    "ScenarioSpec",
+    "Secret",
+    "SpecFetch",
+    "SpecLanguage",
+    "SpecSessionInfo",
+    "SpecState",
+    "SpecVoice",
+    "StateMachine",
+    "StateTransition",
+    "parse_spec_metadata",
+]
