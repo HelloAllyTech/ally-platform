@@ -25,6 +25,7 @@ from langchain_core.messages import AnyMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph, add_messages
 
+from app.core.config import settings
 from app.core.logger import get_logger
 from app.roleplay_v2 import telemetry
 from app.roleplay_v2.actor.engine import ActorEngine
@@ -86,6 +87,18 @@ def build_actor_graph(engine: ActorEngine):
             snapshot = await engine.state_store.begin_turn()
         else:
             snapshot = await engine.state_store.snapshot()
+
+        # Optional grace window: give a near-done Director verdict (for the
+        # PREVIOUS turn) a beat to land before compiling the turn card —
+        # trades a little voice latency for fresher direction. Off by
+        # default (DIRECTOR_GRACE_MS=0). The advanced turn counters are
+        # preserved; only Director-owned fields are re-read.
+        grace_ms = float(getattr(settings, "DIRECTOR_GRACE_MS", 0.0))
+        if is_trainee_turn and grace_ms > 0:
+            await asyncio.sleep(grace_ms / 1000.0)
+            fresh = await engine.state_store.snapshot()
+            fresh.turn_index = snapshot.turn_index
+            snapshot = fresh
 
         telemetry.reset_turn_fields(room_id)
         prepared = await engine.prepare(history, snapshot=snapshot)

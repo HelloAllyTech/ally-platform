@@ -42,3 +42,26 @@ services:
       # Linux: host.docker.internal may not exist; this adds it
       - 'host.docker.internal:host-gateway'
     restart: on-failure
+
+  # Roleplay Studio v2 voice worker. Runs alongside the v1 app container
+  # (which keeps serving the API + v1 worker via start.sh) and registers
+  # under AGENT_NAME_V2 so ally-be can dispatch engine='roleplay_v2' rooms
+  # to it. Same image, same env; only the command differs.
+  worker-v2:
+    build:
+      context: .
+      dockerfile: dockerfile
+    container_name: ally-ai-learn-worker-v2
+    env_file:
+      - .env
+    environment:
+      AWS_ENDPOINT_URL: http://host.docker.internal:4566
+      CORE_SERVICE_BASE_URL: http://host.docker.internal:8001
+      SQS_MESSAGE_EVENT_QUEUE_NAME: http://host.docker.internal:4566/000000000000/sqs-learn-message-and-event-queue
+    command: ["poetry", "run", "python", "-m", "app.worker_v2", "start"]
+    volumes:
+      - .:/app
+      - ~/.config/gcloud:/root/.config/gcloud:ro
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    restart: on-failure
