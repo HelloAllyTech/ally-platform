@@ -253,3 +253,4 @@ credentials.json
 *.key
 private_key*
 public_key*
+.claude/

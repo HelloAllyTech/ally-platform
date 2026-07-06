@@ -53,7 +53,11 @@ class TestGetPromptLlmOverrides:
     def test_reads_provider_model_and_temperature(self):
         sc = _scenario(
             prompts={
-                "p": {"provider": "gemini", "model": "gemini-2.5-pro", "temperature": 0.3}
+                "p": {
+                    "provider": "gemini",
+                    "model": "gemini-2.5-pro",
+                    "temperature": 0.3,
+                }
             }
         )
         assert get_prompt_llm_overrides(sc.prompt_data, "p") == (
@@ -116,7 +120,9 @@ class TestConfigureLlmClientPrecedence:
     @patch("app.core.agent.factory.create_llm_client")
     def test_main_agent_prompt_override_applied(self, mock_create):
         sc = _scenario(
-            prompts={DEFAULT_MAIN_AGENT_PROMPT_CODE: {"model": "gpt-4o", "temperature": 0.2}}
+            prompts={
+                DEFAULT_MAIN_AGENT_PROMPT_CODE: {"model": "gpt-4o", "temperature": 0.2}
+            }
         )
         configure_llm_client(sc)
         kwargs = mock_create.call_args.kwargs
@@ -127,7 +133,9 @@ class TestConfigureLlmClientPrecedence:
     @patch("app.core.agent.factory.create_llm_client")
     def test_simulation_temperature_overrides_prompt(self, mock_create):
         sc = _scenario(
-            prompts={DEFAULT_MAIN_AGENT_PROMPT_CODE: {"model": "gpt-4o", "temperature": 0.2}},
+            prompts={
+                DEFAULT_MAIN_AGENT_PROMPT_CODE: {"model": "gpt-4o", "temperature": 0.2}
+            },
             sim_temperature=0.95,
         )
         configure_llm_client(sc)
