@@ -10,7 +10,7 @@ jest.mock('@/services/api', () => ({api: {injectEndpoints: () => ({})}}));
 jest.mock('@/components', () => ({useToast: () => ({showToast: jest.fn()})}));
 jest.mock('@/hooks', () => ({
   useTranslate: () => ({t: (k: string) => k}),
-  useUser: () => ({userData: undefined}),
+  useScribeVoiceNoteEnabled: () => ({data: false}),
   useVoiceNoteRecorder: () => ({}),
 }));
 jest.mock('@/services/callSummaryApi', () => ({

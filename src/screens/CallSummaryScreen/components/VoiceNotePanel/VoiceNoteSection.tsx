@@ -10,7 +10,11 @@ import {
   summaryFields,
   USER_PERMISSIONS,
 } from '@/constants';
-import {useTranslate, useUser, useVoiceNoteRecorder} from '@/hooks';
+import {
+  useScribeVoiceNoteEnabled,
+  useTranslate,
+  useVoiceNoteRecorder,
+} from '@/hooks';
 import {transformFormDataForSubmission} from '@/screens/CallSummaryScreen/utils/formDataTransformer';
 import {
   Tag,
@@ -52,15 +56,6 @@ interface VoiceNoteSectionProps {
    */
   onCustomValuesApplied: () => void;
 }
-
-// TEMPORARY: while the voice-dictation feature is in limited rollout, the mic
-// is shown only to these users (lower-cased for a case-insensitive match).
-// Kept in sync with the web CreateNoteDrawer allowlist; remove — or replace
-// with a per-tenant Preference toggle — once GA.
-const VOICE_NOTE_EMAIL_ALLOWLIST = [
-  'learner@example.com',
-  'sandeep.malhotra+internal@helloally.ai',
-];
 
 const mapBuiltinType = (type: FieldType): VoiceNoteFieldType => {
   if (type === FieldType.Dropdown || type === FieldType.SearchableDropdown) {
@@ -155,7 +150,6 @@ export const VoiceNoteSection: React.FC<VoiceNoteSectionProps> = ({
   const {t} = useTranslate();
   const {showToast} = useToast();
   const dispatch = useAppDispatch();
-  const {userData} = useUser();
   const permissions = useAppSelector(state => state.user.permissions);
   const visibleFields = useAppSelector(selectSummaryVisibleFields);
   const formData = useAppSelector(selectFormData);
@@ -167,17 +161,19 @@ export const VoiceNoteSection: React.FC<VoiceNoteSectionProps> = ({
   const isAdmin = Boolean(
     permissions?.includes(USER_PERMISSIONS.MANAGE_CUSTOM_FIELD_DEFINITIONS),
   );
-  const isAllowlisted = Boolean(
-    userData?.email &&
-      VOICE_NOTE_EMAIL_ALLOWLIST.includes(userData.email.trim().toLowerCase()),
-  );
+
+  // Voice is offered only when the tenant has enabled it (super-admin /
+  // org-admin toggle, default OFF). The hook skips its request for
+  // non-counsellors, matching the web CreateNoteDrawer gate.
+  const {data: voiceNoteEnabled} = useScribeVoiceNoteEnabled();
+  const isVoiceEnabled = Boolean(voiceNoteEnabled);
 
   const {data: customFieldsEnabled} = useGetCustomFieldsEnabledQuery(
     undefined,
-    {skip: !isAllowlisted},
+    {skip: !isVoiceEnabled},
   );
   const {data: customFieldDefs} = useGetCustomFieldDefinitionsQuery(undefined, {
-    skip: !isAllowlisted || customFieldsEnabled === false,
+    skip: !isVoiceEnabled || customFieldsEnabled === false,
   });
 
   const [generateNoteFromAudio] = useGenerateNoteFromAudioMutation();
@@ -274,7 +270,7 @@ export const VoiceNoteSection: React.FC<VoiceNoteSectionProps> = ({
   }, [recorderError, resetRecorder, showToast, t]);
 
   const canUseVoice =
-    isAllowlisted && isCounsellor && Boolean(chatId) && voiceFields.length > 0;
+    isVoiceEnabled && isCounsellor && Boolean(chatId) && voiceFields.length > 0;
 
   if (!canUseVoice) return null;
 
