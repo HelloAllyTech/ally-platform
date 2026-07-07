@@ -14,6 +14,17 @@ interface UseSocketConnectionOptions {
   onDisconnect?: (reason?: string) => void;
   onConnectionError?: (error?: Error) => void;
   enabled?: boolean;
+  /**
+   * Whether to tear down the socket when the app is backgrounded. Default true
+   * (correct for chat/list screens). Set FALSE for live mic recording: a
+   * counselor's screen locking or a notification briefly backgrounding the app
+   * must NOT drop the recording socket — doing so fires 'disconnect', surfaces
+   * "something went wrong", and abandons the session. Kept connected, socket.io
+   * buffers frames across a transient background and flushes on resume.
+   * (Surviving a long-locked screen additionally needs native background-audio;
+   * this only stops the app from cutting the socket itself.)
+   */
+  disconnectOnBackground?: boolean;
 }
 
 /**
@@ -58,6 +69,7 @@ export const useSocketConnection = ({
   onDisconnect,
   onConnectionError,
   enabled = true,
+  disconnectOnBackground = true,
 }: UseSocketConnectionOptions) => {
   const appState = useRef(AppState.currentState);
 
@@ -89,8 +101,12 @@ export const useSocketConnection = ({
               appState.current === 'active' &&
               nextAppState.match(/inactive|background/)
             ) {
-              // App has gone to background
-              disconnect();
+              // App has gone to background. For most screens we drop the socket
+              // to save resources; for live recording we keep it so a screen
+              // lock / brief app switch doesn't kill the session.
+              if (disconnectOnBackground) {
+                disconnect();
+              }
             }
             appState.current = nextAppState;
           },
@@ -100,7 +116,7 @@ export const useSocketConnection = ({
           subscription.remove();
         };
       }
-    }, [connect, disconnect, userId, enabled]),
+    }, [connect, disconnect, userId, enabled, disconnectOnBackground]),
   );
 
   return {
