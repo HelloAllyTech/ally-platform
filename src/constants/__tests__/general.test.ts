@@ -42,7 +42,7 @@ describe('constants/general', () => {
     expect(API_ROUTES.LEARN.ROOMS).toContain('/rooms');
     expect(API_METHODS.POST).toBe('POST');
     expect(TERMS_AND_CONDITIONS_URL).toContain('terms');
-    expect(PRIVACY_POLICY_URL).toContain('policy');
+    expect(PRIVACY_POLICY_URL).toContain('privacy');
   });
 
   it('carousel configs', () => {

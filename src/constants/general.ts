@@ -327,8 +327,8 @@ export const API_METHODS = {
   PUT: 'PUT',
 } as const;
 
-export const TERMS_AND_CONDITIONS_URL = 'https://helloally.ai/terms';
-export const PRIVACY_POLICY_URL = 'https://helloally.ai/policy';
+export const TERMS_AND_CONDITIONS_URL = 'https://app.helloally.ai/terms';
+export const PRIVACY_POLICY_URL = 'https://app.helloally.ai/privacy';
 
 export const SECURITY_CAROUSEL_SLIDES: CarouselItem[] = [
   {image: carousel1, textKey: 'carousel.slides.noRecording'},
