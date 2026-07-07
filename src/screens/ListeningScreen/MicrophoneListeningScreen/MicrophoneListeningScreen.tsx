@@ -281,6 +281,13 @@ export const MicrophoneListeningScreen = () => {
     eventCallbacks: socketEventCallbacks,
     onDisconnect: onDisconnectSocket,
     onConnectionError: onConnectionError,
+    // A live recording must survive the app being briefly backgrounded (screen
+    // lock, a notification, a quick app switch). Tearing the socket down here is
+    // what turned those everyday interruptions into "something went wrong" +
+    // a lost/partial session. Keep it connected; socket.io buffers across the
+    // blip. (A long-locked screen still needs native background-audio — tracked
+    // separately.)
+    disconnectOnBackground: false,
   });
 
   const handleAudioData = useCallback(
