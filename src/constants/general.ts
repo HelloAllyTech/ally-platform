@@ -154,6 +154,7 @@ export const API_ROUTES = {
     CHAT_TYPES: '/settings/chat-types',
     CUSTOM_FIELDS_ENABLED: '/settings/custom-fields-enabled',
     SCRIBE_NOTE_CREATION_ENABLED: '/settings/scribe-note-creation-enabled',
+    SCRIBE_VOICE_NOTE_ENABLED: '/settings/scribe-voice-note-enabled',
   },
   CUSTOM_FIELDS: {
     DEFINITIONS: '/custom-fields/definitions',

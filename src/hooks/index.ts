@@ -42,3 +42,4 @@ export * from './useShareScreenLogic';
 export * from './useHideReviewDetails';
 export * from './useScribeNoteCreationEnabled';
 export * from './useVoiceNoteRecorder';
+export * from './useScribeVoiceNoteEnabled';
