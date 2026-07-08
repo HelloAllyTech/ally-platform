@@ -29,7 +29,11 @@ from pydantic import BaseModel, Field, field_validator
 
 from app.core.logger import get_logger
 from app.prompts.resolver import load_template
-from app.roleplay_v2.rehearsal.schemas import TranscriptTurn
+from app.roleplay_v2.rehearsal.schemas import (
+    RehearsalTestCase,
+    TestVerdict,
+    TranscriptTurn,
+)
 from app.roleplay_v2.spec.models import ScenarioSpec
 
 logger = get_logger(__name__)
@@ -74,6 +78,17 @@ class RehearsalSessionJudgement(BaseModel):
             "difficulty_calibration": self.difficulty_calibration,
             "rubric_coverage": self.rubric_coverage,
         }
+
+
+class TestCaseEvaluation(BaseModel):
+    """Structured evaluator output for one agent test case (json_mode target)."""
+
+    __test__ = False  # name matches pytest's Test* pattern; not a test class
+
+    condition_recreated: bool = False
+    verdict: TestVerdict = "INCONCLUSIVE"
+    evidence: str = ""
+    reasoning: str = ""
 
 
 # ---------------------------------------------------------------------------
@@ -168,6 +183,8 @@ def _build_judge_user_message(
     profile: str,
     transcript: Sequence[TranscriptTurn],
     director_trace: Sequence[Dict[str, Any]],
+    *,
+    include_closing: bool = True,
 ) -> str:
     # Interleave Director decisions after each turn they belong to.
     by_turn: Dict[int, List[Dict[str, Any]]] = {}
@@ -194,8 +211,9 @@ def _build_judge_user_message(
         lines.append(
             f"SESSION SUMMARY: {json.dumps(summaries[-1], ensure_ascii=False)}"
         )
-    lines.append("")
-    lines.append("Score this run and return the JSON verdict.")
+    if include_closing:
+        lines.append("")
+        lines.append("Score this run and return the JSON verdict.")
     return "\n".join(lines)
 
 
@@ -280,3 +298,87 @@ async def judge_session(
             judgement.rubric_coverage = deterministic_coverage
 
     return judgement
+
+
+async def evaluate_test_case(
+    spec: ScenarioSpec,
+    test_case: RehearsalTestCase,
+    transcript: Sequence[TranscriptTurn],
+    director_trace: Sequence[Dict[str, Any]],
+    judge_llm: Any,
+    *,
+    prompt_data: Any = None,
+) -> TestCaseEvaluation:
+    """LLM-evaluate one agent test case, then apply deterministic coercions.
+
+    Judges the RUNTIME (actor + director), not the trainee — the trainee was
+    a scripted CONDITION_DRIVEN profile tasked with provoking the condition.
+    A condition that never materialised deterministically forces INCONCLUSIVE
+    regardless of the LLM's claimed verdict.
+    """
+    base = (load_template("judge/test_case", prompt_data) or "").strip()
+    spec_json = json.dumps(
+        spec.model_dump(by_alias=True, exclude={"ui"}),
+        indent=2,
+        ensure_ascii=False,
+    )
+    system_prompt = (
+        f"{base}\n\n## Scenario specification (JSON, including locked secrets)\n"
+        f"{spec_json}"
+    )
+    transcript_block = _build_judge_user_message(
+        "CONDITION_DRIVEN", transcript, director_trace, include_closing=False
+    )
+    user_message = "\n".join(
+        [
+            f"TEST CASE: {test_case.title}",
+            "",
+            "CONDITION (the situation the scripted trainee was tasked to " "recreate):",
+            test_case.condition,
+            "",
+            "TEST (the assertion to check once the condition occurred):",
+            test_case.test,
+            "",
+            transcript_block,
+            "",
+            "Apply the two-step protocol and return the JSON verdict for "
+            "this test case.",
+        ]
+    )
+
+    evaluation: Optional[TestCaseEvaluation] = None
+    try:
+        structured = judge_llm.with_structured_output(
+            TestCaseEvaluation, method="json_mode"
+        )
+        result = await structured.ainvoke(
+            [
+                SystemMessage(content=system_prompt),
+                HumanMessage(content=user_message),
+            ]
+        )
+        if isinstance(result, TestCaseEvaluation):
+            evaluation = result
+        elif isinstance(result, dict):
+            evaluation = result.get("parsed") or TestCaseEvaluation.model_validate(
+                result
+            )
+    except Exception:
+        logger.exception(
+            "[roleplay_v2] test-case evaluator failed for test case %s",
+            test_case.id,
+        )
+    if evaluation is None:
+        evaluation = TestCaseEvaluation(reasoning="evaluator unavailable")
+
+    # ---- Deterministic coercion: no condition → no verdict ----
+    if not evaluation.condition_recreated and evaluation.verdict != "INCONCLUSIVE":
+        logger.info(
+            "[roleplay_v2] judge override: test case %s verdict %s → INCONCLUSIVE "
+            "(condition_recreated=false)",
+            test_case.id,
+            evaluation.verdict,
+        )
+        evaluation.verdict = "INCONCLUSIVE"
+
+    return evaluation

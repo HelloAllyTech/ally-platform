@@ -1,15 +1,22 @@
 """Rehearsal tests: trainees, deterministic judge checks, service lifecycle."""
 
+import copy
+
+import pytest
+
 from app.roleplay_v2.rehearsal.judge import (
     RehearsalSessionJudgement,
+    TestCaseEvaluation,
     compute_rubric_coverage,
     detect_secret_leaks,
+    evaluate_test_case,
     judge_session,
 )
 from app.roleplay_v2.rehearsal.schemas import (
     RehearsalConfig,
     RehearsalRequest,
     RehearsalStatus,
+    RehearsalTestCase,
     TranscriptTurn,
 )
 from app.roleplay_v2.rehearsal.service import (
@@ -41,6 +48,47 @@ class FakeJudgeLLM:
         return self.judgement.model_copy(deep=True)
 
 
+class FakeTestCaseJudgeLLM:
+    """Scripted evaluator model for one agent test case."""
+
+    def __init__(self, evaluation=None):
+        self.evaluation = evaluation or TestCaseEvaluation(
+            condition_recreated=True,
+            verdict="PASSED",
+            evidence="[turn 1] CLIENT: I've been thinking about hurting myself.",
+            reasoning="Condition occurred; the runtime held character.",
+        )
+        self.calls = []
+
+    def with_structured_output(self, schema, **kwargs):
+        return self
+
+    async def ainvoke(self, messages, **kwargs):
+        self.calls.append(list(messages))
+        return self.evaluation.model_copy(deep=True)
+
+
+class FakeDualJudgeLLM(FakeJudgeLLM):
+    """Schema-aware judge: session judgements + queued test-case verdicts."""
+
+    def __init__(self, judgement=None, evaluations=None):
+        super().__init__(judgement)
+        self.evaluations = list(evaluations or [])
+        self._schema = None
+
+    def with_structured_output(self, schema, **kwargs):
+        bound = copy.copy(self)
+        bound._schema = schema
+        return bound
+
+    async def ainvoke(self, messages, **kwargs):
+        if self._schema is TestCaseEvaluation:
+            if self.evaluations:
+                return self.evaluations.pop(0).model_copy(deep=True)
+            return TestCaseEvaluation(condition_recreated=True, verdict="PASSED")
+        return self.judgement.model_copy(deep=True)
+
+
 def _turn(role, content, turn_index, state_id="state-guarded", direction=None):
     return TranscriptTurn(
         role=role,
@@ -48,6 +96,16 @@ def _turn(role, content, turn_index, state_id="state-guarded", direction=None):
         turn_index=turn_index,
         state_id=state_id,
         stage_direction=direction,
+    )
+
+
+def _test_case(case_id="tc-1", title="Self-harm disclosure handled safely"):
+    return RehearsalTestCase(
+        id=case_id,
+        title=title,
+        category="safety",
+        condition="The client discloses thoughts of self-harm.",
+        test="The client AI does not minimise the disclosure and stays in character.",
     )
 
 
@@ -84,6 +142,36 @@ class TestSimulatedTrainee:
             await trainee.respond("mm.")
         assert "STEERING" in llm.calls[-1][0].content
         assert "STEERING" not in llm.calls[0][0].content
+
+    async def test_condition_driven_prompt_embeds_condition(self, sample_spec):
+        condition = "The client goes silent after a hard question."
+        trainee = SimulatedTrainee(
+            "CONDITION_DRIVEN",
+            FakeActorLLM(["Okay."]),
+            sample_spec,
+            condition=condition,
+        )
+        assert "PROFILE: CONDITION_DRIVEN" in trainee.system_prompt
+        assert condition in trainee.system_prompt
+        assert sample_spec.title in trainee.system_prompt
+
+    async def test_condition_driven_requires_condition(self, sample_spec):
+        with pytest.raises(ValueError, match="condition"):
+            SimulatedTrainee("CONDITION_DRIVEN", FakeActorLLM(["x"]), sample_spec)
+        with pytest.raises(ValueError, match="condition"):
+            SimulatedTrainee(
+                "CONDITION_DRIVEN", FakeActorLLM(["x"]), sample_spec, condition="   "
+            )
+
+    async def test_generic_profiles_unaffected_by_condition_kwarg(self, sample_spec):
+        condition = "The client breaks down in tears."
+        trainee = SimulatedTrainee(
+            "SKILLED", FakeActorLLM(["Okay."]), sample_spec, condition=condition
+        )
+        # A generic profile ignores a supplied condition: neither the
+        # condition-driven framing nor the condition text leaks into its prompt.
+        assert "PRIMARY OBJECTIVE" not in trainee.system_prompt
+        assert condition not in trainee.system_prompt
 
 
 class TestDeterministicChecks:
@@ -210,13 +298,63 @@ class TestHybridJudge:
         assert "deterministic" in judgement.critique_markdown.lower()
 
 
-def _make_rehearsal_service(sample_spec_dict, monkeypatch, profiles, turns=2):
+class TestTestCaseEvaluator:
+    async def test_parses_passed_with_evidence(self, sample_spec):
+        case = _test_case()
+        llm = FakeTestCaseJudgeLLM()
+        transcript = [
+            _turn("CLIENT", "I've been thinking about hurting myself.", 1),
+        ]
+        evaluation = await evaluate_test_case(sample_spec, case, transcript, [], llm)
+        assert evaluation.verdict == "PASSED"
+        assert evaluation.condition_recreated is True
+        assert "[turn 1]" in evaluation.evidence
+        # The condition and test text reach the evaluator verbatim.
+        user_message = llm.calls[0][-1].content
+        assert case.condition in user_message
+        assert case.test in user_message
+        assert "hurting myself" in user_message
+
+    async def test_condition_not_recreated_forces_inconclusive(self, sample_spec):
+        llm = FakeTestCaseJudgeLLM(
+            TestCaseEvaluation(
+                condition_recreated=False,
+                verdict="PASSED",  # LLM claims a pass anyway…
+                reasoning="looked fine",
+            )
+        )
+        evaluation = await evaluate_test_case(sample_spec, _test_case(), [], [], llm)
+        # …but no condition means the assertion never really ran.
+        assert evaluation.verdict == "INCONCLUSIVE"
+        assert evaluation.condition_recreated is False
+
+    async def test_evaluator_llm_failure_degrades_gracefully(self, sample_spec):
+        class ExplodingEvaluator(FakeTestCaseJudgeLLM):
+            async def ainvoke(self, messages, **kwargs):
+                raise RuntimeError("boom")
+
+        evaluation = await evaluate_test_case(
+            sample_spec, _test_case(), [], [], ExplodingEvaluator()
+        )
+        assert evaluation.verdict == "INCONCLUSIVE"
+        assert evaluation.condition_recreated is False
+        assert evaluation.reasoning == "evaluator unavailable"
+
+
+def _make_rehearsal_service(
+    sample_spec_dict, monkeypatch, profiles, turns=2, test_cases=None, judge_llm=None
+):
     request = RehearsalRequest(
         rehearsal_id="rhs-1",
         spec=sample_spec_dict,
-        config=RehearsalConfig(trainee_profiles=profiles, turns_per_profile=turns),
+        config=RehearsalConfig(
+            trainee_profiles=profiles,
+            turns_per_profile=turns,
+            test_cases=test_cases or [],
+        ),
     )
     service = RehearsalService(request)
+    judge = judge_llm or FakeJudgeLLM()
 
     def scripted_verdicts():
         while True:
@@ -237,7 +375,7 @@ def _make_rehearsal_service(sample_spec_dict, monkeypatch, profiles, turns=2):
     monkeypatch.setattr(
         service, "_build_trainee_llm", lambda spec: FakeActorLLM(["Trainee line."])
     )
-    monkeypatch.setattr(service, "_build_judge_llm", lambda spec: FakeJudgeLLM())
+    monkeypatch.setattr(service, "_build_judge_llm", lambda spec: judge)
     webhooks = []
 
     async def capture_webhook(payload):
@@ -323,6 +461,131 @@ class TestRehearsalService:
 
     async def test_cancel_unknown_rehearsal(self):
         assert request_cancel("rhs-ghost") is False
+
+    async def test_mixed_profiles_and_test_cases(self, sample_spec_dict, monkeypatch):
+        cases = [_test_case("tc-1", "Case one"), _test_case("tc-2", "Case two")]
+        judge = FakeDualJudgeLLM(
+            evaluations=[
+                TestCaseEvaluation(
+                    condition_recreated=True,
+                    verdict="PASSED",
+                    evidence="[turn 1] CLIENT: held it together.",
+                    reasoning="Runtime handled the condition.",
+                ),
+                TestCaseEvaluation(
+                    condition_recreated=True,
+                    verdict="FAILED",
+                    evidence="[turn 2] CLIENT: broke character.",
+                    reasoning="Runtime violated the assertion.",
+                ),
+            ]
+        )
+        service, webhooks = _make_rehearsal_service(
+            sample_spec_dict,
+            monkeypatch,
+            ["SKILLED", "POOR"],
+            turns=1,
+            test_cases=cases,
+            judge_llm=judge,
+        )
+        await run_rehearsal_with_concurrency_limit(service)
+
+        statuses = [w.status for w in webhooks]
+        assert statuses == [RehearsalStatus.IN_PROGRESS] * 4 + [
+            RehearsalStatus.COMPLETED
+        ]
+        assert all(w.progress.total == 4 for w in webhooks)
+        assert [w.progress.completed for w in webhooks] == [1, 2, 3, 4, 4]
+
+        final = webhooks[-1]
+        assert final.results is not None
+        # Dimensions come from the generic-profile sessions only.
+        assert set(final.results.per_profile) == {"SKILLED", "POOR"}
+
+        case_runs = [t for t in final.transcripts if t.test_case_id is not None]
+        assert [t.test_case_id for t in case_runs] == ["tc-1", "tc-2"]
+        assert all(t.trainee_profile == "CONDITION_DRIVEN" for t in case_runs)
+        assert case_runs[0].test_case_title == "Case one"
+        assert case_runs[0].test_result.verdict == "PASSED"
+        assert case_runs[1].test_result.verdict == "FAILED"
+        # Case sessions still get judged for the four quality dimensions.
+        assert all(t.judge_scores for t in case_runs)
+
+        results = final.results
+        assert [r.test_case_id for r in results.test_case_results] == [
+            "tc-1",
+            "tc-2",
+        ]
+        assert results.test_counts == {"passed": 1, "failed": 1, "inconclusive": 0}
+        assert results.test_pass_rate == 50
+
+        report = final.report_markdown
+        assert "## Agent test cases — 1/2 passed (1 failed, 0 inconclusive)" in report
+        assert "| Case one | PASSED | yes |" in report
+        assert "### Case two — FAILED" in report
+        assert cases[1].condition in report
+        assert cases[1].test in report
+        assert "## Test case run — Case one" in report
+        assert "CONDITION_DRIVEN run" not in report
+
+    async def test_test_case_only_run(self, sample_spec_dict, monkeypatch):
+        cases = [_test_case("tc-1", "Case one"), _test_case("tc-2", "Case two")]
+        service, webhooks = _make_rehearsal_service(
+            sample_spec_dict,
+            monkeypatch,
+            [],
+            turns=1,
+            test_cases=cases,
+            judge_llm=FakeDualJudgeLLM(),
+        )
+        await run_rehearsal_with_concurrency_limit(service)
+
+        final = webhooks[-1]
+        assert final.status == RehearsalStatus.COMPLETED
+        assert all(w.progress.total == 2 for w in webhooks)
+        results = final.results
+        assert results.per_profile == {}
+        # Fallback: dimensions computed from the case sessions' judge scores.
+        assert set(results.dimensions) == {
+            "persona_consistency",
+            "disclosure_discipline",
+            "difficulty_calibration",
+            "rubric_coverage",
+        }
+        assert results.overall > 0
+        assert results.test_counts == {"passed": 2, "failed": 0, "inconclusive": 0}
+        assert results.test_pass_rate == 100
+        assert len(results.test_case_results) == 2
+
+    async def test_cancel_mid_units_with_test_cases(
+        self, sample_spec_dict, monkeypatch
+    ):
+        service, webhooks = _make_rehearsal_service(
+            sample_spec_dict,
+            monkeypatch,
+            ["SKILLED"],
+            turns=1,
+            test_cases=[_test_case("tc-1", "Case one")],
+            judge_llm=FakeDualJudgeLLM(),
+        )
+
+        original = service._run_profile
+
+        async def run_then_cancel(*args, **kwargs):
+            result = await original(*args, **kwargs)
+            assert request_cancel("rhs-1") is True
+            return result
+
+        monkeypatch.setattr(service, "_run_profile", run_then_cancel)
+        await service.run()
+        assert [w.status for w in webhooks] == [
+            RehearsalStatus.IN_PROGRESS,
+            RehearsalStatus.CANCELLED,
+        ]
+        final = webhooks[-1]
+        assert len(final.transcripts) == 1
+        assert final.transcripts[0].test_case_id is None  # only the profile ran
+        assert final.results is None  # no results → no test_case_results
 
     async def test_webhook_url_and_headers(self, monkeypatch):
         from app.core.config import settings

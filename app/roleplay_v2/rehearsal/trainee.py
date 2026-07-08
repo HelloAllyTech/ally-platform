@@ -12,7 +12,7 @@ when the trainee starts looping.
 
 from __future__ import annotations
 
-from typing import Any, List
+from typing import Any, List, Optional
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
@@ -27,6 +27,7 @@ PROFILE_TEMPLATES = {
     "SKILLED": "trainee/skilled",
     "POOR": "trainee/poor",
     "ADVERSARIAL": "trainee/adversarial",
+    "CONDITION_DRIVEN": "trainee/condition_driven",
 }
 
 _REPETITION_JACCARD_THRESHOLD = 0.5
@@ -56,6 +57,7 @@ class SimulatedTrainee:
         spec: ScenarioSpec,
         *,
         prompt_data: Any = None,
+        condition: Optional[str] = None,
     ) -> None:
         profile = profile.upper()
         if profile not in PROFILE_TEMPLATES:
@@ -63,6 +65,8 @@ class SimulatedTrainee:
                 f"Unknown trainee profile {profile!r}; "
                 f"expected one of {sorted(PROFILE_TEMPLATES)}"
             )
+        if profile == "CONDITION_DRIVEN" and not (condition or "").strip():
+            raise ValueError("CONDITION_DRIVEN trainee requires a non-empty condition")
         self.profile = profile
         self._llm = llm
 
@@ -80,6 +84,7 @@ class SimulatedTrainee:
             PROFILE_TEMPLATES[profile],
             prompt_data=prompt_data,
             helpful_behaviors=_format_helpful_behaviors(spec),
+            condition=condition or "",
         ).strip()
         self._system_prompt = f"{base}\n\n{profile_prompt}"
         self._steering = (
