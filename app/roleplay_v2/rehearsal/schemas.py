@@ -11,12 +11,33 @@ TraineeProfile = Literal["SKILLED", "POOR", "ADVERSARIAL"]
 
 DEFAULT_PROFILES: List[str] = ["SKILLED", "POOR", "ADVERSARIAL"]
 
+TestVerdict = Literal["PASSED", "FAILED", "INCONCLUSIVE"]
+
 
 class RehearsalStatus(str, Enum):
     IN_PROGRESS = "IN_PROGRESS"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
     CANCELLED = "CANCELLED"
+
+
+class RehearsalTestCase(BaseModel):
+    """Launch-time snapshot of one agent test case (self-describing, no DB)."""
+
+    id: str
+    title: str
+    category: Optional[str] = None
+    condition: str
+    test: str
+
+
+class TestCaseResult(BaseModel):
+    test_case_id: str
+    title: str
+    verdict: TestVerdict
+    condition_recreated: bool
+    evidence: str = ""
+    reasoning: str = ""
 
 
 class RehearsalConfig(BaseModel):
@@ -28,10 +49,14 @@ class RehearsalConfig(BaseModel):
         description="Trainee turns per profile run; None → "
         "settings.REHEARSAL_TURNS_DEFAULT (12).",
     )
-    language_id: Optional[str] = None
+    language_id: Optional[int] = None
     judge_model: Optional[str] = Field(
         default=None,
         description="Judge model id override; None → settings.REHEARSAL_JUDGE_MODEL.",
+    )
+    test_cases: List[RehearsalTestCase] = Field(
+        default_factory=list,
+        description="Agent test-case snapshots to rehearse, one session each.",
     )
 
 
@@ -66,12 +91,18 @@ class ProfileTranscript(BaseModel):
     judge_scores: Dict[str, int] = Field(default_factory=dict)
     judge_notes: str = ""
     director_trace: List[Dict[str, Any]] = Field(default_factory=list)
+    test_case_id: Optional[str] = None
+    test_case_title: Optional[str] = None
+    test_result: Optional[TestCaseResult] = None
 
 
 class RehearsalResults(BaseModel):
     overall: int = 0
     dimensions: Dict[str, int] = Field(default_factory=dict)
     per_profile: Dict[str, Dict[str, int]] = Field(default_factory=dict)
+    test_case_results: List[TestCaseResult] = Field(default_factory=list)
+    test_counts: Dict[str, int] = Field(default_factory=dict)
+    test_pass_rate: Optional[int] = None
 
 
 class RehearsalWebhookPayload(BaseModel):
