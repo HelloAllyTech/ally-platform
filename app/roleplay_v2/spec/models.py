@@ -362,6 +362,13 @@ class ScenarioSpec(SpecBase):
     language: Optional[SpecLanguage] = None
     opening_statement: Optional[str] = None
     difficulty: Optional[str] = None
+    # Voice-naturalness / latency-masking runtime toggles (mirror Roleplay Studio
+    # 1 metadata flags). camelCase aliases (fillerEnabled, ...) accepted via the
+    # SpecBase to_camel alias generator. Honored by the naturalness controller.
+    filler_enabled: bool = False
+    comfort_audio_enabled: bool = False
+    continuous_backchanneling: bool = False
+    interim_reply_enabled: bool = True
     actor_model: Optional[ModelSpec] = None
     director_model: Optional[ModelSpec] = None
     # `ui` is authoring-only; accepted and ignored so the runtime never breaks

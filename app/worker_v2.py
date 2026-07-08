@@ -89,6 +89,12 @@ class AgentWorkerV2:
         self.actor_engine: Optional[ActorEngine] = None
         self.session_clock: Optional[SessionClock] = None
 
+        # Voice-naturalness levers (comfort audio / thinking filler / continuous
+        # back-channeling / interim reply). The scenario shim is a duck-typed
+        # object the shared controller reads flags + persona context off.
+        self._naturalness = None
+        self._naturalness_scenario = None
+
         self._background_tasks: Set[asyncio.Task] = set()
         self._room_disconnected_event: Optional[asyncio.Event] = None
         self._summary_sent = False
@@ -175,6 +181,36 @@ class AgentWorkerV2:
         )
         self.director_llm_client = create_llm_client(
             llm_config=director_config, language_code=language_code
+        )
+
+        # Duck-typed scenario for the naturalness controller: the gating +
+        # phrase-generation helpers read .prompt_data (flags + persona context),
+        # .language_config and .voice — mirror the v1 Scenario shape so the
+        # shared controller works unchanged. camelCase spec keys were already
+        # normalized to snake_case flags on ScenarioSpec.
+        persona = self.spec.persona
+        naturalness_prompt_data = SimpleNamespace(
+            filler_enabled=self.spec.filler_enabled,
+            comfort_audio_enabled=self.spec.comfort_audio_enabled,
+            continuous_backchanneling=self.spec.continuous_backchanneling,
+            interim_reply_enabled=self.spec.interim_reply_enabled,
+            gender=None,
+            # No Studio-authored static filler phrases for v2 — thinking filler
+            # relies on predictive fillers (needs history + PREDICTIVE_FILLER_ENABLED).
+            allowed_fillers=None,
+            language_label=language_code,
+            # Persona grounding for back-channel / interim / predictive phrase gen.
+            title=self.spec.title,
+            name=None,
+            profession=None,
+            description=self.spec.difficulty or None,
+            context=getattr(persona, "scenario_context", None),
+            role_instructions=getattr(persona, "identity_core", None),
+        )
+        self._naturalness_scenario = SimpleNamespace(
+            prompt_data=naturalness_prompt_data,
+            language_config=language_config,
+            voice=voice,
         )
 
         self.joined_iso = datetime.now(timezone.utc).isoformat()
@@ -356,6 +392,44 @@ class AgentWorkerV2:
             pass
         return "unknown", "unknown"
 
+    def _read_naturalness_history(self) -> list:
+        """Recent-turns snapshot for predictive fillers / interim context.
+
+        The v2 actor graph runs with NO checkpointer (the LLMAdapter passes the
+        full chat context each turn), so — unlike v1 — there is no graph state to
+        read. Best-effort convert the AgentSession's chat history to LangChain
+        messages; return [] on any mismatch. Interim reply degrades gracefully
+        without history (it still uses the partial transcript + persona context);
+        only predictive-filler refresh needs it.
+        """
+        try:
+            from langchain_core.messages import AIMessage, HumanMessage
+
+            hist = getattr(self.session, "history", None)
+            items = getattr(hist, "items", None) if hist is not None else None
+            if not items:
+                return []
+            messages: list = []
+            for item in items:
+                if getattr(item, "type", "message") != "message":
+                    continue
+                role = getattr(item, "role", None)
+                content = getattr(item, "text_content", None)
+                if content is None:
+                    content = getattr(item, "content", None)
+                if isinstance(content, (list, tuple)):
+                    content = " ".join(str(c) for c in content if c)
+                if not content or not str(content).strip():
+                    continue
+                if role == "user":
+                    messages.append(HumanMessage(content=str(content)))
+                elif role == "assistant":
+                    messages.append(AIMessage(content=str(content)))
+            return messages
+        except Exception as e:  # noqa: BLE001 - best-effort; history is optional
+            logger.debug("[AgentWorkerV2] read history failed: %s", e)
+            return []
+
     # ------------------------------------------------------------------
     # Phase 3 — start
     # ------------------------------------------------------------------
@@ -384,6 +458,28 @@ class AgentWorkerV2:
 
         # Code-owned time-triggered engineered events (pause-aware clock).
         self.director.start_time_events()
+
+        # Voice-naturalness track (comfort tone + thinking filler + back-channel
+        # + interim reply). Publishes the shared background-audio track now and
+        # defers synthesis off the opening path — mirrors v1. Best-effort: never
+        # blocks or breaks the session.
+        try:
+            from app.core.livekit.naturalness import NaturalnessController
+
+            self._naturalness = NaturalnessController(
+                room=self.ctx.room,
+                session=self.session,
+                tts_client=self.tts_client,
+                llm_client=self.actor_llm_client,
+                scenario=self._naturalness_scenario,
+                joined_iso=self.joined_iso,
+                background_tasks=self._background_tasks,
+                read_history=self._read_naturalness_history,
+            )
+            await self._naturalness.start()
+        except Exception as e:  # noqa: BLE001 - naturalness must never break start
+            logger.warning("[AgentWorkerV2] naturalness setup failed: %s", e)
+            self._naturalness = None
 
         # Opening: the spec's scripted statement wins; otherwise let the
         # actor graph open the conversation.
@@ -459,6 +555,11 @@ class AgentWorkerV2:
             self._cleanup_conversation_handler()
         except Exception:  # noqa: BLE001
             pass
+        if self._naturalness is not None:
+            try:
+                await self._naturalness.aclose()
+            except Exception:  # noqa: BLE001 - never block room teardown
+                logger.debug("[AgentWorkerV2] naturalness teardown failed", exc_info=True)
         try:
             if self.director is not None:
                 await self.director.flush()
