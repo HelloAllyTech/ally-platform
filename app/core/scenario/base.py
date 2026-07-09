@@ -203,6 +203,24 @@ class PromptData(BaseModel):
             "app/core/livekit/comfort_audio.py."
         ),
     )
+    comfort_audio_url: Optional[str] = Field(
+        default=None,
+        description=(
+            "Per-simulation URL (Studio: comfortAudioUrl) of a superadmin-uploaded "
+            "comfort-audio track to play instead of the synthesized room tone. The "
+            "worker fetches + decodes it into the in-memory ambient loop; on any "
+            "fetch/decode failure it falls back to the synthesized tone. Only used "
+            "when comfort_audio_enabled is on."
+        ),
+    )
+    comfort_audio_volume: Optional[float] = Field(
+        default=None,
+        description=(
+            "Per-simulation comfort-audio playback volume (Studio: "
+            "comfortAudioVolume), 0..1. When None, falls back to "
+            "settings.COMFORT_AUDIO_VOLUME."
+        ),
+    )
     continuous_backchanneling: bool = Field(
         default=False,
         description=(
@@ -644,6 +662,11 @@ class Scenario(BaseModel):
                 "comfort_audio_enabled": bool(
                     prompt_data_dict.get("comfortAudioEnabled") or False
                 ),
+                "comfort_audio_url": prompt_data_dict.get("comfortAudioUrl")
+                or prompt_data_dict.get("comfort_audio_url"),
+                "comfort_audio_volume": prompt_data_dict.get("comfortAudioVolume")
+                if prompt_data_dict.get("comfortAudioVolume") is not None
+                else prompt_data_dict.get("comfort_audio_volume"),
                 "continuous_backchanneling": bool(
                     prompt_data_dict.get("continuousBackchanneling") or False
                 ),

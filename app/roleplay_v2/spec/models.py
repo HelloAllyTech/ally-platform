@@ -367,6 +367,10 @@ class ScenarioSpec(SpecBase):
     # SpecBase to_camel alias generator. Honored by the naturalness controller.
     filler_enabled: bool = False
     comfort_audio_enabled: bool = False
+    # Uploaded comfort-audio track URL + playback volume (0..1). camelCase
+    # aliases comfortAudioUrl / comfortAudioVolume accepted via SpecBase.
+    comfort_audio_url: Optional[str] = None
+    comfort_audio_volume: Optional[float] = None
     continuous_backchanneling: bool = False
     interim_reply_enabled: bool = True
     actor_model: Optional[ModelSpec] = None

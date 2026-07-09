@@ -1005,27 +1005,36 @@ class AgentWorker:
         )
         self.ctx.shutdown("max_duration_exceeded")
 
-    def _resolve_comfort_audio(self):
+    async def _resolve_comfort_audio(self):
         """Build the comfort-audio ambient source, or None when disabled.
 
-        Returns a LiveKit ``AudioConfig`` wrapping an INFINITE in-memory room-tone
+        Returns a LiveKit ``AudioConfig`` wrapping an INFINITE in-memory ambient
         iterator (played as the BackgroundAudioPlayer ambient sound), or ``None``
-        when comfort audio is off or synthesis fails. In-memory (not a temp WAV)
-        on purpose: a file-backed ambient re-opens/decodes the clip every loop,
-        and if that stalls past the mixer's per-stream timeout (e.g. while a
-        thinking-filler is also decoding) the mixer cancels + closes the ambient
-        generator and drops it for good — comfort would then stop the first time
-        a filler plays. An in-memory loop yields instantly and can't be dropped.
-        Best-effort: never raises.
+        when comfort audio is off or synthesis fails. The source is either a
+        superadmin-uploaded track (per-sim ``comfort_audio_url``, fetched +
+        decoded into memory) or, when no track is set / the fetch fails, the
+        synthesized room tone. In-memory (not a temp WAV) on purpose: a
+        file-backed ambient re-opens/decodes the clip every loop, and if that
+        stalls past the mixer's per-stream timeout (e.g. while a thinking-filler
+        is also decoding) the mixer cancels + closes the ambient generator and
+        drops it for good — comfort would then stop the first time a filler
+        plays. An in-memory loop yields instantly and can't be dropped.
+
+        Volume is the per-sim ``comfort_audio_volume`` when set, else the global
+        ``COMFORT_AUDIO_VOLUME`` default. Async because the uploaded-track fetch
+        is network I/O — it is bounded by a timeout so it never delays the
+        opening statement. Best-effort: never raises.
         """
         try:
             from app.core.livekit.comfort_audio import (
                 comfort_ambient_source,
+                fetch_and_decode_comfort_source,
                 is_comfort_audio_enabled,
             )
 
+            _pd = getattr(self.scenario, "prompt_data", None)
+
             if not is_comfort_audio_enabled(self.scenario):
-                _pd = getattr(self.scenario, "prompt_data", None)
                 logger.info(
                     "[COMFORT] disabled (global_enabled=%s comfort_audio_enabled=%s)",
                     getattr(settings, "COMFORT_AUDIO_ENABLED", None),
@@ -1033,15 +1042,48 @@ class AgentWorker:
                 )
                 return None
 
-            source = comfort_ambient_source()
+            url = getattr(_pd, "comfort_audio_url", None)
+            source = None
+            if url:
+                timeout_s = float(
+                    getattr(settings, "COMFORT_AUDIO_FETCH_TIMEOUT_S", 4.0)
+                )
+                max_bytes = int(
+                    getattr(settings, "COMFORT_AUDIO_MAX_BYTES", 10 * 1024 * 1024)
+                )
+                try:
+                    source = await asyncio.wait_for(
+                        fetch_and_decode_comfort_source(
+                            url, timeout_s=timeout_s, max_bytes=max_bytes
+                        ),
+                        timeout=timeout_s + 1.0,
+                    )
+                except Exception as e:  # noqa: BLE001 - fall back on any failure
+                    logger.warning(
+                        "[COMFORT] uploaded track unavailable, falling back to tone: %s",
+                        e,
+                    )
+                    source = None
+
+            used_upload = source is not None
+            if source is None:
+                source = comfort_ambient_source()
             if source is None:
                 return None
 
             from livekit.agents import AudioConfig
 
-            volume = float(getattr(settings, "COMFORT_AUDIO_VOLUME", 0.15))
+            vol = getattr(_pd, "comfort_audio_volume", None)
+            volume = (
+                float(vol)
+                if vol is not None
+                else float(getattr(settings, "COMFORT_AUDIO_VOLUME", 0.15))
+            )
+            volume = max(0.0, min(1.0, volume))
             logger.info(
-                "[COMFORT] room tone enabled (volume=%.2f, in-memory loop)", volume
+                "[COMFORT] room tone enabled (volume=%.2f, in-memory loop, uploaded=%s)",
+                volume,
+                used_upload,
             )
             return AudioConfig(source, volume=volume)
         except Exception as e:  # noqa: BLE001 - must never break a session
@@ -1082,7 +1124,7 @@ class AgentWorker:
             from app.core.livekit.interim_reply import is_interim_reply_enabled
 
             # ---- Comfort audio (ambient room tone) ---- cheap, in-memory PCM.
-            comfort_source = self._resolve_comfort_audio()
+            comfort_source = await self._resolve_comfort_audio()
 
             # Pure flag checks (no LLM/TTS): decide whether each layer COULD play,
             # so we can publish the track now and defer the actual synthesis.

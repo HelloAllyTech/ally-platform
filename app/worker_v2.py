@@ -196,6 +196,8 @@ class AgentWorkerV2:
         naturalness_prompt_data = SimpleNamespace(
             filler_enabled=self.spec.filler_enabled,
             comfort_audio_enabled=self.spec.comfort_audio_enabled,
+            comfort_audio_url=self.spec.comfort_audio_url,
+            comfort_audio_volume=self.spec.comfort_audio_volume,
             continuous_backchanneling=self.spec.continuous_backchanneling,
             interim_reply_enabled=self.spec.interim_reply_enabled,
             gender=None,
