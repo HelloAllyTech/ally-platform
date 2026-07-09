@@ -15,18 +15,22 @@ UVICORN_PID=$!
 poetry run python -m app.worker start &
 WORKER_PID=$!
 
-# Start Roleplay Studio v2 voice worker (LiveKit agent AGENT_NAME_V2) in background.
-# Gated on ROLEPLAY_V2_ENABLED (defaults to enabled when unset) so the kill-switch
-# stops the process itself, not just per-job dispatch.
-WORKER_V2_PID=""
-if [ "${ROLEPLAY_V2_ENABLED:-true}" != "false" ]; then
+# Start Roleplay Studio v2 voice worker (LiveKit agent AGENT_NAME_V2) in
+# background. Gated on ROLEPLAY_V2_ENABLED (defaults on when unset) so the
+# kill-switch stops the process itself, not just per-job dispatch.
+start_worker_v2() {
     poetry run python -m app.worker_v2 start &
     WORKER_V2_PID=$!
+}
+WORKER_V2_PID=""
+if [ "${ROLEPLAY_V2_ENABLED:-true}" != "false" ]; then
+    start_worker_v2
 fi
 
 echo "Started uvicorn (PID: $UVICORN_PID), worker (PID: $WORKER_PID), worker_v2 (PID: ${WORKER_V2_PID:-disabled})"
 
-# Function to handle shutdown gracefully
+# Function to handle shutdown gracefully. worker_v2 is a direct child so it
+# receives SIGTERM here and can drain live sessions.
 shutdown() {
     echo "Shutting down services..."
     kill $UVICORN_PID $WORKER_PID $WORKER_V2_PID 2>/dev/null || true
@@ -37,13 +41,31 @@ shutdown() {
 # Trap signals for graceful shutdown
 trap shutdown SIGTERM SIGINT
 
-# Wait for any process to exit
-wait -n
+# Supervisor loop: a worker_v2 crash is NON-fatal — it is auto-restarted and
+# must never take down the working v1 worker or uvicorn. Only uvicorn or the v1
+# worker exiting tears the container down (so it restarts and self-heals).
+# `wait -n || true` keeps `set -e` from exiting on a worker_v2 non-zero exit.
+while true; do
+    wait -n || true
+    if ! kill -0 "$UVICORN_PID" 2>/dev/null; then
+        echo "uvicorn exited; shutting down."
+        break
+    fi
+    if ! kill -0 "$WORKER_PID" 2>/dev/null; then
+        echo "v1 worker exited; shutting down."
+        break
+    fi
+    if [ "${ROLEPLAY_V2_ENABLED:-true}" != "false" ] \
+        && ! kill -0 "$WORKER_V2_PID" 2>/dev/null; then
+        echo "worker_v2 exited; restarting in 5s (v1 unaffected)..."
+        sleep 5
+        start_worker_v2
+    fi
+done
 
-# If we get here, one process exited - shut down the others
-echo "One service exited, shutting down remaining services..."
+# A critical service died - shut down the rest and exit non-zero so the
+# orchestrator restarts the container.
+echo "A critical service exited, shutting down remaining services..."
 kill $UVICORN_PID $WORKER_PID $WORKER_V2_PID 2>/dev/null || true
 wait $UVICORN_PID $WORKER_PID $WORKER_V2_PID 2>/dev/null || true
-
-# Exit with error since a service died unexpectedly
 exit 1

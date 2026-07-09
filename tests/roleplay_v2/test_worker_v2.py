@@ -116,7 +116,10 @@ class TestConfigure:
 
 class TestConfigDefaults:
     def test_v2_settings_present(self):
-        assert settings.AGENT_NAME_V2 == "AgentV2"
+        # AGENT_NAME_V2 is derived as f"{AGENT_NAME}V2" when not set explicitly,
+        # so it inherits the v1 name's per-environment namespacing. With the
+        # default AGENT_NAME="Agent" this is still "AgentV2".
+        assert settings.AGENT_NAME_V2 == f"{settings.AGENT_NAME}V2"
         assert settings.DIRECTOR_TIMEOUT_S == 8.0
         assert settings.DIRECTOR_GRACE_MS == 0.0
         assert settings.REHEARSAL_CONCURRENCY_LIMIT == 2

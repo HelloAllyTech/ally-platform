@@ -4,7 +4,7 @@ Configuration settings for the application.
 
 from typing import Optional
 
-from pydantic import AliasChoices, Field
+from pydantic import AliasChoices, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.core.constants import Environment
@@ -677,14 +677,30 @@ class Settings(BaseSettings):
             "jobs at the entrypoint. Never affects the v1 worker."
         ),
     )
-    AGENT_NAME_V2: str = Field(
-        default="AgentV2",
+    AGENT_NAME_V2: Optional[str] = Field(
+        default=None,
         description=(
             "LiveKit agent name the v2 worker registers under. Distinct from "
             "AGENT_NAME so ally-be dispatches engine='roleplay_v2' rooms to "
-            "the v2 worker pool and everything else to v1."
+            "the v2 worker pool and everything else to v1. Defaults to "
+            "f'{AGENT_NAME}V2' so it inherits the same per-environment "
+            "namespacing as the v1 name (avoids 'AgentV2' collisions when "
+            "workers share one LiveKit project); set explicitly to override."
         ),
     )
+
+    @model_validator(mode="after")
+    def _derive_agent_name_v2(self) -> "Settings":
+        """Default the v2 agent name to '<AGENT_NAME>V2' when not set explicitly.
+
+        Mirrors the v1 per-environment naming so ally-be's
+        LIVEKIT_ROLEPLAY_AGENT_NAME (which defaults to '<LIVEKIT_AGENT_NAME>V2')
+        and this worker register under the *same unique* name on a shared
+        LiveKit project, instead of every worker colliding on 'AgentV2'.
+        """
+        if not self.AGENT_NAME_V2:
+            self.AGENT_NAME_V2 = f"{self.AGENT_NAME}V2"
+        return self
     ACTOR_DEFAULT_MODEL: str = Field(
         default="gpt-4o-mini",
         description=(
