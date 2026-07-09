@@ -8,7 +8,6 @@ from typing import Optional, Set
 
 from livekit import agents, rtc
 from livekit.agents import Agent, AgentSession, JobProcess, RoomInputOptions
-from livekit.agents.cli.log import setup_logging
 from livekit.plugins import noise_cancellation, silero
 
 from app.core.agent.factory import (
@@ -38,7 +37,7 @@ from app.core.events.handlers import (
     create_termination_handler,
     setup_interruption_detection,
 )
-from app.core.logger import get_logger
+from app.core.logger import get_logger, setup_livekit_logging
 from app.core.metrics import turn_metrics
 from app.core.queue.utils import (
     send_session_paused_message,
@@ -59,10 +58,12 @@ from app.tts import BaseTTSClient
 # at the first turn, and turn detection silently falls back to VAD (feature inert).
 # Gated on the kill-switch so a disabled feature spawns no inference process.
 if settings.SEMANTIC_TURN_DETECTION_ENABLED:
-    from livekit.plugins.turn_detector import multilingual as _eou_multilingual  # noqa: F401
+    from livekit.plugins.turn_detector import (  # noqa: F401
+        multilingual as _eou_multilingual,
+    )
 
 logger = get_logger(__name__)
-setup_logging(
+setup_livekit_logging(
     settings.LIVEKIT_LOG_LEVEL,
     devmode=settings.LIVEKIT_LOG_DEV_MODE,
     console=settings.LIVEKIT_LOG_CONSOLE,
@@ -496,7 +497,9 @@ class AgentWorker:
                 "min_endpointing_delay": min_delay,
                 "max_endpointing_delay": max_delay,
             }
-        except Exception as e:  # noqa: BLE001 - never fail a session over turn detection
+        except (
+            Exception
+        ) as e:  # noqa: BLE001 - never fail a session over turn detection
             logger.warning(
                 "[TURN] semantic EOU unavailable (%s); falling back to VAD timeout",
                 e,
@@ -667,7 +670,10 @@ class AgentWorker:
             if self._interim_gen_task is not None and not self._interim_gen_task.done():
                 self._interim_gen_task.cancel()
             self._interim_gen_task = None
-            if self._interim_play_task is not None and not self._interim_play_task.done():
+            if (
+                self._interim_play_task is not None
+                and not self._interim_play_task.done()
+            ):
                 self._interim_play_task.cancel()
             self._interim_play_task = None
             # Tear down the background-audio track (comfort tone + filler +
@@ -1799,8 +1805,7 @@ class AgentWorker:
                 if self._bg_audio is None or self._user_speaking:
                     return
                 filler_playing = (
-                    self._filler_handle is not None
-                    and not self._filler_handle.done()
+                    self._filler_handle is not None and not self._filler_handle.done()
                 )
                 if self._interim_state == "ready" and not filler_playing:
                     break
@@ -1813,9 +1818,7 @@ class AgentWorker:
                 return
             text, path = clip
             volume = float(getattr(settings, "INTERIM_REPLY_VOLUME", 0.9))
-            self._interim_handle = self._bg_audio.play(
-                AudioConfig(path, volume=volume)
-            )
+            self._interim_handle = self._bg_audio.play(AudioConfig(path, volume=volume))
             self._interim_state = "playing"
 
             waited = time.monotonic() - start_wait
@@ -2121,10 +2124,7 @@ class AgentWorker:
         """
         try:
             from app.core.events.handlers import send_event_to_queue
-            from app.core.events.schemas import (
-                CoreEventMessageType,
-                StartMetricsData,
-            )
+            from app.core.events.schemas import CoreEventMessageType, StartMetricsData
 
             t = self._timing
 
@@ -2172,9 +2172,7 @@ class AgentWorker:
                 prep,
                 self.ctx.room.name,
             )
-            task = asyncio.create_task(
-                send_event_to_queue(message.model_dump_json())
-            )
+            task = asyncio.create_task(send_event_to_queue(message.model_dump_json()))
             self._background_tasks.add(task)
             task.add_done_callback(self._background_tasks.discard)
         except Exception:  # noqa: BLE001 - metrics must never break a session
@@ -2445,9 +2443,7 @@ def prewarm(proc: JobProcess):
         proc.userdata["bvc"] = noise_cancellation.BVC()
         logger.info("[PREWARM] noise-cancellation (BVC) prewarmed")
     except Exception as e:  # noqa: BLE001 - best-effort; falls back per-job
-        logger.warning(
-            "[PREWARM] BVC prewarm skipped (will build per-job): %s", e
-        )
+        logger.warning("[PREWARM] BVC prewarm skipped (will build per-job): %s", e)
 
 
 if __name__ == "__main__":

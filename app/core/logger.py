@@ -184,7 +184,11 @@ loggers = {
     # Route LiveKit's own logger through our handlers so its WARNING+ events
     # (notably job_memory_warn_mb breaches and process timeouts) reach Slack
     # instead of dying silently on stdout.
-    "livekit": {"level": settings.LOG_LEVEL, "handlers": ["stdout"], "propagate": False},
+    "livekit": {
+        "level": settings.LOG_LEVEL,
+        "handlers": ["stdout"],
+        "propagate": False,
+    },
     "livekit.agents": {
         "level": settings.LOG_LEVEL,
         "handlers": ["stdout"],
@@ -235,3 +239,33 @@ logger = logging.getLogger("lifeline-ai")
 def get_logger(logger_name: str) -> logging.Logger:
     """Returns a logger with the specified name."""
     return logging.getLogger(logger_name)
+
+
+def setup_livekit_logging(log_level: str, devmode: bool, console: bool) -> None:
+    """Run LiveKit's ``setup_logging`` without duplicating our stdout handler.
+
+    LiveKit's ``setup_logging`` attaches its own ``StreamHandler`` (a
+    ``JsonFormatter`` in production) to the **root** logger. Our ``dictConfig``
+    above already installs a stdout handler on root, so every propagating
+    record was being emitted twice — one bracketed line and one JSON line.
+
+    We still want ``setup_logging``'s side effects (silencing the noisy
+    third-party loggers, setting plugin log levels), so we call it and then
+    strip only the extra root handler it added, leaving our single dictConfig
+    handler. Nothing machine-parses these stdout logs — analytics and session
+    transcripts flow through the SQS event pipeline into Postgres, not the log
+    stream — so dropping the duplicate JSON copy is safe.
+
+    Import is local so this widely-imported module doesn't pull in livekit.
+    """
+    from livekit.agents.cli.log import setup_logging as _livekit_setup_logging
+
+    root = logging.getLogger()
+    handlers_before = list(root.handlers)
+    _livekit_setup_logging(log_level, devmode=devmode, console=console)
+    # Only de-dup when our dictConfig handler is already present, so we can
+    # never strip logging down to zero handlers.
+    if handlers_before:
+        for handler in list(root.handlers):
+            if handler not in handlers_before:
+                root.removeHandler(handler)

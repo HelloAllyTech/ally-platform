@@ -24,7 +24,6 @@ from typing import Optional, Set
 
 from livekit import agents
 from livekit.agents import Agent, AgentSession, JobProcess, RoomInputOptions
-from livekit.agents.cli.log import setup_logging
 from livekit.plugins import noise_cancellation, silero
 from livekit.plugins.langchain import LLMAdapter
 
@@ -35,7 +34,7 @@ from app.core.agent.factory import (
 )
 from app.core.config import settings
 from app.core.constants import DEFAULT_VAD_ACTIVATION_THRESHOLD, Environment
-from app.core.logger import get_logger
+from app.core.logger import get_logger, setup_livekit_logging
 from app.core.session_clock import SessionClock
 from app.llms import create_llm_client
 from app.roleplay_v2 import telemetry
@@ -58,7 +57,7 @@ if settings.SEMANTIC_TURN_DETECTION_ENABLED:
     )
 
 logger = get_logger(__name__)
-setup_logging(
+setup_livekit_logging(
     settings.LIVEKIT_LOG_LEVEL,
     devmode=settings.LIVEKIT_LOG_DEV_MODE,
     console=settings.LIVEKIT_LOG_CONSOLE,
@@ -559,7 +558,9 @@ class AgentWorkerV2:
             try:
                 await self._naturalness.aclose()
             except Exception:  # noqa: BLE001 - never block room teardown
-                logger.debug("[AgentWorkerV2] naturalness teardown failed", exc_info=True)
+                logger.debug(
+                    "[AgentWorkerV2] naturalness teardown failed", exc_info=True
+                )
         try:
             if self.director is not None:
                 await self.director.flush()
