@@ -34,7 +34,12 @@ from app.core.agent.factory import (
 )
 from app.core.config import settings
 from app.core.constants import DEFAULT_VAD_ACTIVATION_THRESHOLD, Environment
-from app.core.logger import get_logger, setup_livekit_logging
+from app.core.logger import (
+    get_logger,
+    make_child_logging_forward_only,
+    patch_livekit_parent_logger,
+    setup_livekit_logging,
+)
 from app.core.session_clock import SessionClock
 from app.llms import create_llm_client
 from app.roleplay_v2 import telemetry
@@ -614,6 +619,9 @@ async def entrypoint(ctx: agents.JobContext):
 
 def prewarm(proc: JobProcess):
     """Per-process prewarm: silero VAD + BVC (mirrors app/worker.py)."""
+    # Keep only LiveKit's log forwarder in the child so records emit once. See
+    # logger.py.
+    make_child_logging_forward_only()
     proc.userdata["vad"] = silero.VAD.load(
         activation_threshold=DEFAULT_VAD_ACTIVATION_THRESHOLD
     )
@@ -625,6 +633,9 @@ def prewarm(proc: JobProcess):
 
 
 if __name__ == "__main__":
+    # Prevent run_app's _configure_logger from adding a second JSON stdout
+    # handler to root in this (parent) process. See logger.py.
+    patch_livekit_parent_logger()
     agent_name = "" if settings.ENV == Environment.LOCAL else settings.AGENT_NAME_V2
     agents.cli.run_app(
         agents.WorkerOptions(

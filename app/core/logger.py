@@ -233,6 +233,13 @@ logging_config = {
 }
 
 logging.config.dictConfig(logging_config)
+
+# Tag the handlers we just installed so the LiveKit-dedup helpers below can tell
+# "ours" from the stdout handlers LiveKit adds to root (whose formatter varies:
+# JsonFormatter in prod, ColoredFormatter in devmode). Tagging is format-agnostic.
+for _h in logging.getLogger().handlers:
+    _h._ally_primary = True  # type: ignore[attr-defined]
+
 logger = logging.getLogger("lifeline-ai")
 
 
@@ -241,31 +248,79 @@ def get_logger(logger_name: str) -> logging.Logger:
     return logging.getLogger(logger_name)
 
 
+def _strip_foreign_root_handlers() -> None:
+    """Keep only OUR own tagged stdout handler and LiveKit's ``LogQueueHandler``
+    forwarder on root; drop any other handler LiveKit adds (its JSON handler in
+    prod, its ColoredFormatter handler in devmode). Tag-based rather than
+    formatter-based so it is robust across log modes. Best-effort — never raise
+    from logging setup.
+    """
+    try:
+        from livekit.agents.ipc.log_queue import LogQueueHandler
+    except Exception:  # noqa: BLE001
+        LogQueueHandler = ()  # type: ignore[assignment]
+    root = logging.getLogger()
+    root.handlers[:] = [
+        h
+        for h in root.handlers
+        if getattr(h, "_ally_primary", False) or isinstance(h, LogQueueHandler)
+    ]
+
+
 def setup_livekit_logging(log_level: str, devmode: bool, console: bool) -> None:
-    """Run LiveKit's ``setup_logging`` without duplicating our stdout handler.
+    """Run LiveKit's ``setup_logging`` for its side effects (silencing noisy
+    third-party loggers, setting plugin log levels) without leaving its JSON
+    stdout handler on root — our bracketed dictConfig handler stays the single
+    sink.
 
-    LiveKit's ``setup_logging`` attaches its own ``StreamHandler`` (a
-    ``JsonFormatter`` in production) to the **root** logger. Our ``dictConfig``
-    above already installs a stdout handler on root, so every propagating
-    record was being emitted twice — one bracketed line and one JSON line.
-
-    We still want ``setup_logging``'s side effects (silencing the noisy
-    third-party loggers, setting plugin log levels), so we call it and then
-    strip only the extra root handler it added, leaving our single dictConfig
-    handler. Nothing machine-parses these stdout logs — analytics and session
-    transcripts flow through the SQS event pipeline into Postgres, not the log
-    stream — so dropping the duplicate JSON copy is safe.
-
-    Import is local so this widely-imported module doesn't pull in livekit.
+    Called at module import in the worker, so it runs in BOTH the main process
+    and each re-imported job subprocess. It only covers ``setup_logging``'s
+    handler; the other two dedup points are ``patch_livekit_parent_logger``
+    (the run_app JSON handler in the parent) and
+    ``make_child_logging_forward_only`` (the child's local stdout emit). See
+    those for the full picture of LiveKit's multi-process log duplication.
     """
     from livekit.agents.cli.log import setup_logging as _livekit_setup_logging
 
-    root = logging.getLogger()
-    handlers_before = list(root.handlers)
     _livekit_setup_logging(log_level, devmode=devmode, console=console)
-    # Only de-dup when our dictConfig handler is already present, so we can
-    # never strip logging down to zero handlers.
-    if handlers_before:
-        for handler in list(root.handlers):
-            if handler not in handlers_before:
-                root.removeHandler(handler)
+    _strip_foreign_root_handlers()
+
+
+def patch_livekit_parent_logger() -> None:
+    """Stop ``run_app``'s ``cli._configure_logger`` from adding a SECOND JSON
+    stdout handler to the root logger in the main process. It runs inside
+    ``run_app`` — after our import-time setup — so we cannot strip it
+    afterwards, and LiveKit exposes no WorkerOptions flag to disable it. Replace
+    the private hook with a level-only version (LiveKit is version-pinned). Call
+    in the ``__main__`` block BEFORE ``run_app``. Best-effort — a rename in a
+    LiveKit upgrade degrades to the old duplication, not a crash.
+    """
+    try:
+        import livekit.agents.cli.cli as _lkcli
+
+        def _level_only(c, log_level):  # noqa: ANN001 - matches _configure_logger
+            logging.getLogger().setLevel(log_level)
+
+        _lkcli._configure_logger = _level_only
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def make_child_logging_forward_only() -> None:
+    """Make a job/prewarm subprocess forward-only. LiveKit installs a
+    ``LogQueueHandler`` on the child root that ships records to the parent,
+    which emits them once — the intended design. But our worker-module re-import
+    also left our stdout handler on the child root, so each child record was
+    emitted locally AND re-emitted by the parent. Drop everything except the
+    forwarder so the child forwards and the parent emits exactly once. Call at
+    the top of ``prewarm`` (runs in the child). No-op when no forwarder is
+    present (e.g. local console mode) so stdout logging still works there.
+    """
+    try:
+        from livekit.agents.ipc.log_queue import LogQueueHandler
+    except Exception:  # noqa: BLE001
+        return
+    root = logging.getLogger()
+    forwarders = [h for h in root.handlers if isinstance(h, LogQueueHandler)]
+    if forwarders:
+        root.handlers[:] = forwarders

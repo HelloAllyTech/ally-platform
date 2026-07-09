@@ -37,7 +37,12 @@ from app.core.events.handlers import (
     create_termination_handler,
     setup_interruption_detection,
 )
-from app.core.logger import get_logger, setup_livekit_logging
+from app.core.logger import (
+    get_logger,
+    make_child_logging_forward_only,
+    patch_livekit_parent_logger,
+    setup_livekit_logging,
+)
 from app.core.metrics import turn_metrics
 from app.core.queue.utils import (
     send_session_paused_message,
@@ -2419,6 +2424,9 @@ async def entrypoint(ctx: agents.JobContext):
 
 
 def prewarm(proc: JobProcess):
+    # First thing in the child: keep only LiveKit's log forwarder so records are
+    # emitted once (by the parent), not also locally. See logger.py.
+    make_child_logging_forward_only()
     logger.info("!!! PREWARM CALLED !!!")
     """Prewarm per-process objects so they aren't built on the per-job path.
 
@@ -2447,6 +2455,10 @@ def prewarm(proc: JobProcess):
 
 
 if __name__ == "__main__":
+    # Prevent run_app's _configure_logger from adding a second JSON stdout
+    # handler to root in this (parent) process; our bracketed handler stays the
+    # single sink. See logger.py.
+    patch_livekit_parent_logger()
     agent_name = "" if settings.ENV == Environment.LOCAL else settings.AGENT_NAME
     agents.cli.run_app(
         agents.WorkerOptions(
