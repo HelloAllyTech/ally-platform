@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections import deque
 from datetime import datetime
 from typing import TYPE_CHECKING, Awaitable, Callable, Optional, Set
 
@@ -88,7 +89,14 @@ def create_conversation_handler(room_id: str, joined_iso: str):
     BackgroundAudioPlayer (set up in the worker) so it can't race the reply; see
     app/core/livekit/filler_audio.py.
     """
-    seen_utterances = set()
+    # Bounded de-dup of utterances. A failed transcript publish retries within
+    # seconds, so a recent-window cap preserves dedup behavior exactly while
+    # keeping memory O(1) in call length — previously this set grew unbounded,
+    # holding the whole conversation's text in RAM until shutdown. The key is
+    # kept identical ((content, created_at)); only the size is bounded.
+    _SEEN_UTTERANCES_MAX = 512
+    seen_utterances: set = set()
+    seen_utterances_order: deque = deque()
 
     # Track when agent/user most recently started speaking.
     # These are consumed (reset to None) when conversation_item_added fires.
@@ -192,6 +200,9 @@ def create_conversation_handler(room_id: str, joined_iso: str):
             return
 
         seen_utterances.add(utterance_key)
+        seen_utterances_order.append(utterance_key)
+        if len(seen_utterances_order) > _SEEN_UTTERANCES_MAX:
+            seen_utterances.discard(seen_utterances_order.popleft())
 
         role = "CLIENT" if event.item.role == "assistant" else "COUNSELOR"
 
@@ -259,6 +270,7 @@ def create_conversation_handler(room_id: str, joined_iso: str):
         """Clean up the seen_utterances set."""
         count = len(seen_utterances)
         seen_utterances.clear()
+        seen_utterances_order.clear()
         _agent_speaking_start[0] = None
         _user_speaking_start[0] = None
         logger.debug(f"Cleaned up {count} utterance entries from conversation handler")
