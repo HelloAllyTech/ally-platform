@@ -277,8 +277,26 @@ class Settings(BaseSettings):
     COMFORT_AUDIO_VOLUME: float = Field(
         default=0.15,
         description=(
-            "Playback volume (0-1) of the comfort-audio room tone. Kept low so "
-            "it sits under speech as barely-there 'air', not audible noise."
+            "Fallback playback volume (0-1) of the comfort-audio room tone, used "
+            "when a simulation does not set its own comfort_audio_volume. Kept low "
+            "so the synthesized tone sits under speech as barely-there 'air'."
+        ),
+    )
+    COMFORT_AUDIO_FETCH_TIMEOUT_S: float = Field(
+        default=4.0,
+        description=(
+            "Max seconds to fetch + decode a per-simulation uploaded comfort-audio "
+            "track before falling back to the synthesized room tone. Bounds the "
+            "session-start critical path so a slow/broken URL can't delay the "
+            "opening statement."
+        ),
+    )
+    COMFORT_AUDIO_MAX_BYTES: int = Field(
+        default=10 * 1024 * 1024,
+        description=(
+            "Max size (bytes) of an uploaded comfort-audio track the worker will "
+            "download + decode. Larger responses are rejected and fall back to the "
+            "synthesized tone (memory-budget guard)."
         ),
     )
 

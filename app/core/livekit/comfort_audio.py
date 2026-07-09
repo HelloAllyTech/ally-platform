@@ -24,12 +24,13 @@ session continues normally — it must never break the agent.
 
 from __future__ import annotations
 
+import asyncio
 import os
 import random
 import struct
 import tempfile
 import wave
-from typing import AsyncIterator, Optional
+from typing import AsyncIterator, List, Optional
 
 from app.core.config import settings
 from app.core.logger import get_logger
@@ -181,6 +182,111 @@ def comfort_ambient_source(
         return _loop()
     except Exception as e:  # noqa: BLE001 - comfort audio must never break a session
         logger.warning("[COMFORT] failed to build in-memory source: %s", e)
+        return None
+
+
+def _decode_audio_to_frames(
+    data: bytes,
+    sample_rate: int,
+    frame_samples: int,
+) -> "List":
+    """Decode arbitrary audio bytes to 48 kHz mono int16 rtc.AudioFrames.
+
+    Synchronous (pydub shells out to ffmpeg, which is in the image) so callers
+    run it via ``asyncio.to_thread`` to avoid blocking the event loop. Returns
+    the list of pre-built frames (empty if the clip decodes to nothing). Raises
+    on decode failure — the async caller catches it and falls back.
+    """
+    from io import BytesIO
+
+    from livekit import rtc
+    from pydub import AudioSegment
+
+    segment = (
+        AudioSegment.from_file(BytesIO(data))
+        .set_frame_rate(sample_rate)
+        .set_channels(1)
+        .set_sample_width(2)  # int16
+    )
+    pcm = segment.raw_data  # little-endian int16 mono PCM
+    bytes_per_frame = max(1, frame_samples) * 2
+    frames = []
+    for off in range(0, len(pcm), bytes_per_frame):
+        chunk = pcm[off : off + bytes_per_frame]
+        n = len(chunk) // 2
+        if n:
+            frames.append(rtc.AudioFrame(chunk, sample_rate, 1, n))
+    return frames
+
+
+async def fetch_and_decode_comfort_source(
+    url: str,
+    sample_rate: int = 48000,
+    frame_samples: int = 4800,
+    timeout_s: float = 4.0,
+    max_bytes: int = 10 * 1024 * 1024,
+) -> "Optional[AsyncIterator]":
+    """Fetch a superadmin-uploaded comfort-audio track and return an INFINITE,
+    in-memory async iterator of its frames (48 kHz mono int16), or ``None``.
+
+    Same in-memory-loop contract as ``comfort_ambient_source``: the decoded PCM
+    is pre-partitioned into ``rtc.AudioFrame`` objects and looped from memory, so
+    the shared mixer's per-stream ``wait_for(__anext__)`` can never time out and
+    permanently drop the ambient stream. A file-backed or lazily-streamed decode
+    would reintroduce the "comfort stops the first time a filler plays" bug — do
+    not stream-decode here.
+
+    Best-effort: any failure (bad/oversized/non-audio response, decode error,
+    timeout) returns ``None`` so the caller falls back to the synthesized tone.
+    The fetch is bounded by ``timeout_s`` and the whole call is additionally
+    guarded by the caller's ``asyncio.wait_for`` on the session-start path.
+    """
+    if not url:
+        return None
+    try:
+        import httpx
+
+        async with httpx.AsyncClient(follow_redirects=True) as client:
+            resp = await client.get(url, timeout=timeout_s)
+            resp.raise_for_status()
+            data = resp.content
+
+        if not data:
+            logger.warning("[COMFORT] uploaded track empty: %s", url)
+            return None
+        if len(data) > max_bytes:
+            logger.warning(
+                "[COMFORT] uploaded track too large (%d bytes > %d) — falling back: %s",
+                len(data),
+                max_bytes,
+                url,
+            )
+            return None
+
+        frames = await asyncio.to_thread(
+            _decode_audio_to_frames, data, sample_rate, frame_samples
+        )
+        if not frames:
+            logger.warning("[COMFORT] uploaded track decoded to no frames: %s", url)
+            return None
+
+        async def _loop():
+            # Infinite loop over the pre-decoded frames (see comfort_ambient_source).
+            while True:
+                for f in frames:
+                    yield f
+
+        logger.info(
+            "[COMFORT] uploaded track ready (%d frame(s) @ %dHz) from %s",
+            len(frames),
+            sample_rate,
+            url,
+        )
+        return _loop()
+    except Exception as e:  # noqa: BLE001 - comfort audio must never break a session
+        logger.warning(
+            "[COMFORT] failed to fetch/decode uploaded track %s: %s", url, e
+        )
         return None
 
 
