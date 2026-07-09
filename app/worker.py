@@ -2457,7 +2457,11 @@ if __name__ == "__main__":
             agent_name=agent_name,
             entrypoint_fnc=entrypoint,
             prewarm_fnc=prewarm,
-            num_idle_processes=2,
+            # Each idle process prewarms silero VAD + BVC (~hundreds of MB), so
+            # every extra spare is pure baseline memory. One spare keeps session
+            # start instant for the common case; a same-instant second session
+            # just waits a few seconds for a cold job process to spawn.
+            num_idle_processes=1,
             api_key=settings.LIVEKIT_API_KEY,
             api_secret=settings.LIVEKIT_API_SECRET,
             ws_url=settings.LIVEKIT_URL,

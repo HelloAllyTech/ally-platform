@@ -669,6 +669,18 @@ class Settings(BaseSettings):
         ),
     )
 
+    # V2V tester (simulated learner bot; app/v2v_tester)
+    V2V_TESTER_ENABLED: bool = Field(
+        default=False,
+        description=(
+            "Kill-switch for the v2v tester bot. Each bot runs inside the "
+            "uvicorn process with its own LiveKit connection and STT/LLM/TTS "
+            "pipeline, so it competes with API serving for memory. Disabled "
+            "by default to shed baseline memory pressure; set to True to "
+            "re-enable POST /api/v1/v2v-tester/start."
+        ),
+    )
+
     # ---- Roleplay Studio v2 (spec-driven runtime; app/roleplay_v2) ----
     ROLEPLAY_V2_ENABLED: bool = Field(
         default=True,

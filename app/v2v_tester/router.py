@@ -5,9 +5,10 @@ room.  The bot runs as a fire-and-forget asyncio task — the endpoint returns
 immediately while the bot runs in the background.
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.api.dependencies import verify_api_key
+from app.core.config import settings
 from app.core.logger import get_logger
 from app.v2v_tester.schemas import StartV2VTesterRequest, StartV2VTesterResponse
 from app.v2v_tester.tester_bot import launch_tester
@@ -32,6 +33,16 @@ async def start_v2v_tester(
 
     Returns immediately — the bot runs as a background asyncio task.
     """
+    if not settings.V2V_TESTER_ENABLED:
+        logger.info(
+            "[V2V] tester disabled (V2V_TESTER_ENABLED=false); rejecting room=%s",
+            body.roomName,
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="v2v tester is disabled (V2V_TESTER_ENABLED=false)",
+        )
+
     logger.info(
         "[V2V] launching tester bot: room=%s maxExchanges=%d language=%s",
         body.roomName,
