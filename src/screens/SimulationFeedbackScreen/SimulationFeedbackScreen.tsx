@@ -70,7 +70,11 @@ export const SimulationFeedbackScreen: React.FC<
   const {fromLogs, scenarioSessionId, pathId, caseId, languageId} =
     route.params;
   const permissions = useAppSelector(state => state.user.permissions);
-  const {t} = useTranslation();
+  const {t, i18n} = useTranslation();
+  // Feedback text is generated server-side in this language; translations for a
+  // newly selected language are produced asynchronously, so the poll loop below
+  // must restart whenever it changes (see the effect on activeLanguageCode).
+  const activeLanguageCode = i18n.resolvedLanguage ?? i18n.language ?? 'en';
   const insets = useSafeAreaInsets();
 
   const [activeTabKey, setActiveTabKey] = useState<string>(
@@ -126,11 +130,29 @@ export const SimulationFeedbackScreen: React.FC<
     useLazyReactionsQuery: useLazyGetReactionsCountQuery,
   });
 
+  // Increments on every poll restart so stale in-flight retry chains (from a
+  // previous language or focus) stop scheduling further fetches.
+  const retryGenerationRef = useRef(0);
+
   const fetchSimulationDetailsWithRetry = useCallback(
-    async (retryCount = 0) => {
-      if (!scenarioSessionId) {
+    async (retryCount = 0, generation = retryGenerationRef.current) => {
+      if (!scenarioSessionId || generation !== retryGenerationRef.current) {
         return;
       }
+
+      const scheduleRetry = () => {
+        if (generation !== retryGenerationRef.current) {
+          return;
+        }
+        if (retryCount < MAX_RETRY_ATTEMPTS) {
+          retryTimeoutRef.current = setTimeout(() => {
+            fetchSimulationDetailsWithRetry(retryCount + 1, generation);
+          }, RETRY_DELAY);
+        } else {
+          setRetryLimitReached(true);
+        }
+      };
+
       try {
         const response = await getSimulationDetails({
           id: scenarioSessionId,
@@ -143,34 +165,35 @@ export const SimulationFeedbackScreen: React.FC<
           return;
         }
 
-        if (retryCount < MAX_RETRY_ATTEMPTS) {
-          retryTimeoutRef.current = setTimeout(() => {
-            fetchSimulationDetailsWithRetry(retryCount + 1);
-          }, RETRY_DELAY);
-        } else {
-          setRetryLimitReached(true);
-        }
+        scheduleRetry();
       } catch (error) {
-        if (retryCount < MAX_RETRY_ATTEMPTS) {
-          retryTimeoutRef.current = setTimeout(() => {
-            fetchSimulationDetailsWithRetry(retryCount + 1);
-          }, RETRY_DELAY);
-        } else {
-          setRetryLimitReached(true);
-        }
+        scheduleRetry();
       }
     },
     [scenarioSessionId, getSimulationDetails],
   );
 
+  const restartFeedbackPolling = useCallback(() => {
+    retryGenerationRef.current += 1;
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current);
+    }
+    setRetryLimitReached(false);
+    fetchSimulationDetailsWithRetry(0, retryGenerationRef.current);
+  }, [fetchSimulationDetailsWithRetry]);
+
+  // Runs on mount and again whenever the UI language changes: the backend
+  // returns the session without `feedback` while the translated copy is still
+  // generating, so the poll loop must restart to pick it up (web parity —
+  // useSimulationSummaryPolling keys its effect on the language the same way).
   useEffect(() => {
-    fetchSimulationDetailsWithRetry();
+    restartFeedbackPolling();
     return () => {
       if (retryTimeoutRef.current) {
         clearTimeout(retryTimeoutRef.current);
       }
     };
-  }, [fetchSimulationDetailsWithRetry]);
+  }, [activeLanguageCode, restartFeedbackPolling]);
 
   useEffect(() => {
     if (simulationDetails?.reviewId) {
@@ -202,7 +225,9 @@ export const SimulationFeedbackScreen: React.FC<
     }
   }, [fromLogs, simulationDetails, scenarioSessionId]);
 
-  // Refetch simulation details on screen focus to pick up review changes
+  // Refetch simulation details on screen focus to pick up review changes.
+  // Restarting the poll loop (rather than a one-shot fetch) also recovers
+  // feedback whose translation was still generating when the user left.
   const isFirstFocus = useRef(true);
   useFocusEffect(
     useCallback(() => {
@@ -211,9 +236,9 @@ export const SimulationFeedbackScreen: React.FC<
         return;
       }
       if (scenarioSessionId) {
-        getSimulationDetails({id: scenarioSessionId});
+        restartFeedbackPolling();
       }
-    }, [scenarioSessionId, getSimulationDetails]),
+    }, [scenarioSessionId, restartFeedbackPolling]),
   );
 
   const handleBack = useCallback(() => {
