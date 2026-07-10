@@ -292,7 +292,7 @@ class Settings(BaseSettings):
         ),
     )
     COMFORT_AUDIO_MAX_BYTES: int = Field(
-        default=10 * 1024 * 1024,
+        default=50 * 1024 * 1024,
         description=(
             "Max size (bytes) of an uploaded comfort-audio track the worker will "
             "download + decode. Larger responses are rejected and fall back to the "
