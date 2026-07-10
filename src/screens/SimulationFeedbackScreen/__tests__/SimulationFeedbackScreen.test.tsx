@@ -11,9 +11,11 @@ jest.mock('@react-navigation/native', () => ({
   },
 }));
 
+let mockLanguage = 'en';
 jest.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string) => key,
+    i18n: {resolvedLanguage: mockLanguage, language: mockLanguage},
   }),
 }));
 
@@ -108,9 +110,16 @@ jest.mock('@/components', () => {
   };
 });
 
+const mockSimulationDetailsTrigger = jest.fn(() => ({
+  unwrap: () =>
+    Promise.resolve({
+      scenario: {},
+      details: {summary: {feedback: {positives: [], areas_of_growth: []}}},
+    }),
+}));
 jest.mock('@/services', () => {
   const useLazyGetSimulationDetailsQuery = jest.fn(() => [
-    jest.fn().mockResolvedValue({data: {details: {}}}),
+    mockSimulationDetailsTrigger,
     {
       data: {
         details: {summary: {}},
@@ -236,6 +245,7 @@ describe('SimulationFeedbackScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useRealTimers();
+    mockLanguage = 'en';
   });
 
   it('renders summary tab when data exists', () => {
@@ -307,6 +317,42 @@ describe('SimulationFeedbackScreen', () => {
       <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1'}} as any} />,
     );
     expect(getByTestId('left-arrow-icon')).toBeTruthy();
+  });
+
+  it('restarts feedback polling when the UI language changes', async () => {
+    // An earlier test replaces this hook's return via mockReturnValue, which
+    // clearAllMocks does not undo — pin it back to the shared trigger.
+    const services = require('@/services');
+    (services.useLazyGetSimulationDetailsQuery as jest.Mock).mockReturnValue([
+      mockSimulationDetailsTrigger,
+      {data: {details: {summary: {}}}, isLoading: false},
+    ]);
+    // Build a fresh element each time — reusing the same element reference
+    // makes React bail out of re-rendering the subtree on rerender.
+    const makeScreen = () => (
+      <SimulationFeedbackScreen
+        navigation={{} as any}
+        route={{params: {scenarioSessionId: '1'}} as any}
+      />
+    );
+    const {rerender} = renderWithProviders(makeScreen());
+    await waitFor(() => {
+      expect(mockSimulationDetailsTrigger).toHaveBeenCalledTimes(1);
+    });
+
+    mockLanguage = 'hi';
+    rerender(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: {x: 0, y: 0, width: 375, height: 812},
+          insets: {top: 0, left: 0, right: 0, bottom: 0},
+        }}>
+        {makeScreen()}
+      </SafeAreaProvider>,
+    );
+    await waitFor(() => {
+      expect(mockSimulationDetailsTrigger).toHaveBeenCalledTimes(2);
+    });
   });
 
   it('renders tabs with correct count based on route params', () => {
