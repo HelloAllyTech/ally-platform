@@ -279,7 +279,7 @@ class NaturalnessController:
                     getattr(settings, "COMFORT_AUDIO_FETCH_TIMEOUT_S", 4.0)
                 )
                 max_bytes = int(
-                    getattr(settings, "COMFORT_AUDIO_MAX_BYTES", 10 * 1024 * 1024)
+                    getattr(settings, "COMFORT_AUDIO_MAX_BYTES", 50 * 1024 * 1024)
                 )
                 try:
                     source = await asyncio.wait_for(
