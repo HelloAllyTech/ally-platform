@@ -76,7 +76,7 @@ class TestNaturalnessController:
         # Teardown is a no-op and must never raise.
         await controller.aclose()
 
-    def test_comfort_resolver_none_when_disabled(self):
+    async def test_comfort_resolver_none_when_disabled(self):
         controller = NaturalnessController(
             room=SimpleNamespace(name="room-1"),
             session=SimpleNamespace(on=lambda *a, **k: (lambda f: f)),
@@ -87,7 +87,7 @@ class TestNaturalnessController:
             background_tasks=set(),
             read_history=lambda: [],
         )
-        assert controller._resolve_comfort_audio() is None
+        assert await controller._resolve_comfort_audio() is None
 
 
 class TestWorkerV2NaturalnessShim:

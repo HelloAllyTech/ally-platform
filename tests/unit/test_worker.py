@@ -1741,7 +1741,7 @@ class TestBackgroundAudioDeferral:
     async def test_setup_background_audio_defers_synthesis(self, monkeypatch):
         w = self._bg_worker()
         # No comfort tone; both naturalness layers "possible" via pure flags.
-        monkeypatch.setattr(w, "_resolve_comfort_audio", lambda: None)
+        monkeypatch.setattr(w, "_resolve_comfort_audio", AsyncMock(return_value=None))
         monkeypatch.setattr(
             "app.core.livekit.fillers.is_filler_enabled", lambda s: True
         )
@@ -1787,7 +1787,7 @@ class TestBackgroundAudioDeferral:
         self, monkeypatch
     ):
         w = self._bg_worker()
-        monkeypatch.setattr(w, "_resolve_comfort_audio", lambda: None)
+        monkeypatch.setattr(w, "_resolve_comfort_audio", AsyncMock(return_value=None))
         monkeypatch.setattr(
             "app.core.livekit.fillers.is_filler_enabled", lambda s: False
         )
