@@ -147,6 +147,17 @@ The copilot also sees rehearsal evidence directly: `get_rehearsal_findings` and
 prompt; `suggest_test_cases` now emits a structured `test_case_suggestions` SSE frame the
 studio renders as accept-to-persist cards.
 
+### Chat-first flow (the copilot drives the whole loop)
+
+The studio is chat-first: after the interview the copilot offers test cases, confirms config,
+and calls the side-effectful `start_auto_improve` tool (ally-be), which snapshots the draft and
+starts a copilot-linked run that narrates its progress into the chat
+(`ImprovementNarrationService` → plain-content assistant rows with structured metadata). On
+TARGETS_MET the best version is auto-accepted into the draft and the chat's ready message
+carries Test-live/Publish actions; weaker outcomes resolve conversationally via
+`resolve_improvement_run`. This repo is unaffected at runtime — the loop keeps driving the
+rehearsal harness through the existing `RehearsalConfig` subsets.
+
 ---
 
 ## Flow 3 — RUN (Actor + Director, in `ally-ai-learn`)
