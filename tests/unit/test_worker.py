@@ -1992,3 +1992,82 @@ class TestEmitStartMetrics:
         # Must swallow the failure — a metrics emit can never break a session.
         w._emit_start_metrics()
         await asyncio.sleep(0)
+
+
+class TestDispatchEntrypoint:
+    """Single-fleet router: worker.py serves both engines and picks v1 vs v2 by
+    the ``engine`` marker in room metadata (see dispatch_entrypoint)."""
+
+    def _ctx(self, metadata):
+        job = types.SimpleNamespace(id="job-1", metadata=metadata)
+        return types.SimpleNamespace(job=job)
+
+    # -------------------- _is_roleplay_v2_job --------------------
+
+    def test_v2_marker_detected(self):
+        ctx = self._ctx('{"engine": "roleplay_v2", "session": {}}')
+        assert worker._is_roleplay_v2_job(ctx) is True
+
+    def test_v1_metadata_not_v2(self):
+        ctx = self._ctx('{"version": "1.0", "scenario": {}}')
+        assert worker._is_roleplay_v2_job(ctx) is False
+
+    def test_wrong_engine_not_v2(self):
+        ctx = self._ctx('{"engine": "simulation"}')
+        assert worker._is_roleplay_v2_job(ctx) is False
+
+    def test_empty_metadata_not_v2(self):
+        assert worker._is_roleplay_v2_job(self._ctx(None)) is False
+        assert worker._is_roleplay_v2_job(self._ctx("")) is False
+
+    def test_malformed_metadata_not_v2(self):
+        # Never raise on a bad payload — treat as v1 (dispatcher's v1 path then
+        # surfaces any real metadata error).
+        assert worker._is_roleplay_v2_job(self._ctx("{not json")) is False
+
+    # -------------------- dispatch_entrypoint routing --------------------
+
+    @pytest.mark.asyncio
+    async def test_routes_v2_job_to_v2_runtime(self, monkeypatch):
+        v1 = AsyncMock()
+        v2 = AsyncMock()
+        monkeypatch.setattr(worker, "entrypoint", v1)
+        monkeypatch.setattr(worker, "roleplay_v2_entrypoint", v2)
+
+        ctx = self._ctx('{"engine": "roleplay_v2"}')
+        await worker.dispatch_entrypoint(ctx)
+
+        v2.assert_awaited_once_with(ctx)
+        v1.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_routes_v1_job_to_v1_runtime(self, monkeypatch):
+        v1 = AsyncMock()
+        v2 = AsyncMock()
+        monkeypatch.setattr(worker, "entrypoint", v1)
+        monkeypatch.setattr(worker, "roleplay_v2_entrypoint", v2)
+
+        ctx = self._ctx('{"version": "1.0", "scenario": {}}')
+        await worker.dispatch_entrypoint(ctx)
+
+        v1.assert_awaited_once_with(ctx)
+        v2.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_v2_import_failure_degrades_v2_only(self, monkeypatch):
+        # Simulate a failed v2 import (roleplay_v2_entrypoint is None). v1 must
+        # still work; v2 jobs must be refused, not misrouted onto the v1 brain.
+        v1 = AsyncMock()
+        monkeypatch.setattr(worker, "entrypoint", v1)
+        monkeypatch.setattr(worker, "roleplay_v2_entrypoint", None)
+
+        # v1 job: unaffected
+        v1_ctx = self._ctx('{"version": "1.0", "scenario": {}}')
+        await worker.dispatch_entrypoint(v1_ctx)
+        v1.assert_awaited_once_with(v1_ctx)
+
+        # v2 job: refused loudly, and NOT sent to the v1 entrypoint
+        v1.reset_mock()
+        with pytest.raises(RuntimeError):
+            await worker.dispatch_entrypoint(self._ctx('{"engine": "roleplay_v2"}'))
+        v1.assert_not_awaited()

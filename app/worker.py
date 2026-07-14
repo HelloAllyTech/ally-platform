@@ -74,6 +74,28 @@ setup_livekit_logging(
     console=settings.LIVEKIT_LOG_CONSOLE,
 )
 
+# Roleplay Studio v2 runtime, served by THIS same worker process (single fleet).
+# Importing worker_v2 here — rather than launching a second `python -m
+# app.worker_v2` process — means both engines share this process's prewarmed
+# VAD/BVC and the one EOU inference executor, so v2 adds no second copy of the
+# model set. The import is idempotent for logging (setup_livekit_logging strips
+# root back to our tagged handler) and re-registers the EOU runner from the same
+# `turn_detector.multilingual` module worker.py already imported above.
+#
+# GUARDED on purpose: this is a shared worker, so a v2 import/load-time failure
+# must NOT sink the live v1 path. On failure we still know the engine marker
+# (literal fallback) so v2 jobs are DETECTED and refused cleanly rather than
+# misrouted into the v1 brain, while v1 keeps running untouched.
+try:
+    from app.roleplay_v2.spec.models import SPEC_ENGINE_MARKER  # noqa: E402
+    from app.worker_v2 import entrypoint as roleplay_v2_entrypoint  # noqa: E402
+except Exception:  # noqa: BLE001 - v2 import must never break v1
+    logger.exception(
+        "[dispatch] roleplay_v2 runtime failed to import; v2 disabled, v1 unaffected"
+    )
+    SPEC_ENGINE_MARKER = "roleplay_v2"  # still detect v2 jobs to refuse them
+    roleplay_v2_entrypoint = None
+
 # Pause/resume control channel (LiveKit data packets, topic-agnostic; clients
 # branch on the JSON ``type`` field).
 # Pause/resume tuning — resolved from settings (env-overridable; see config.py
@@ -2465,6 +2487,44 @@ async def entrypoint(ctx: agents.JobContext):
         )
 
 
+def _is_roleplay_v2_job(ctx: agents.JobContext) -> bool:
+    """Cheap peek at the job's room metadata for the v2 engine marker (no full
+    spec parse). ally-be stamps ``engine: 'roleplay_v2'`` into the metadata of
+    every v2 room (see RoleplaySessionService.buildRoomMetadata in ally-be)."""
+    raw = getattr(ctx.job, "metadata", None)
+    if not raw:
+        return False
+    try:
+        data = json.loads(raw)
+    except (ValueError, TypeError):
+        return False
+    return isinstance(data, dict) and data.get("engine") == SPEC_ENGINE_MARKER
+
+
+async def dispatch_entrypoint(ctx: agents.JobContext):
+    """Single-fleet entrypoint. This one worker (one agent_name, one set of
+    prewarmed VAD/BVC, one EOU inference executor) serves BOTH the v1 scenario
+    engine and the Roleplay Studio v2 runtime. Route each job by the ``engine``
+    marker in room metadata: v2-marked rooms go to the v2 runtime, everything
+    else to v1.
+
+    The v2 entrypoint self-guards on ROLEPLAY_V2_ENABLED, so the worker-side
+    kill-switch still refuses v2 jobs cleanly when off. ally-be's flag+allowlist
+    is the primary who/whether gate; this dispatch is defense in depth.
+    """
+    if _is_roleplay_v2_job(ctx):
+        if roleplay_v2_entrypoint is None:
+            # v2 failed to import (see guarded import above). Refuse this v2 job
+            # loudly rather than misplay it on the v1 brain; v1 jobs are fine.
+            raise RuntimeError(
+                "roleplay_v2 runtime unavailable (import failed); refusing v2 "
+                "job. v1 is unaffected."
+            )
+        logger.info("[dispatch] job %s -> roleplay_v2 runtime", ctx.job.id)
+        return await roleplay_v2_entrypoint(ctx)
+    return await entrypoint(ctx)
+
+
 def prewarm(proc: JobProcess):
     # First thing in the child: keep only LiveKit's log forwarder so records are
     # emitted once (by the parent), not also locally. See logger.py.
@@ -2505,7 +2565,9 @@ if __name__ == "__main__":
     agents.cli.run_app(
         agents.WorkerOptions(
             agent_name=agent_name,
-            entrypoint_fnc=entrypoint,
+            # Single-fleet router: v1 + v2 both served here (see
+            # dispatch_entrypoint), so v2 registers no second agent name.
+            entrypoint_fnc=dispatch_entrypoint,
             prewarm_fnc=prewarm,
             # Each idle process prewarms silero VAD + BVC (~hundreds of MB), so
             # every extra spare is pure baseline memory. One spare keeps session
