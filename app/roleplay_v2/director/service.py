@@ -130,6 +130,7 @@ class DirectorService:
         spec_doc = {
             "title": self.spec.title,
             "competencyId": self.spec.competency_id,
+            "competency": self.spec.competency_label,
             "rubric": self.spec.rubric.model_dump(by_alias=True),
             "stateMachine": self.spec.state_machine.model_dump(by_alias=True),
             # The Director (unlike the Actor) sees the FULL ledger — secret

@@ -75,7 +75,7 @@ class SimulatedTrainee:
             "trainee/base",
             prompt_data=prompt_data,
             scenario_title=spec.title,
-            competency=spec.competency_id or "general counseling skills",
+            competency=spec.competency_label or "general counseling skills",
             language_label=(
                 f"{get_language_name_from_code(language_code)} ({language_code})"
             ),

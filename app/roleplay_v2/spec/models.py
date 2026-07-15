@@ -358,7 +358,11 @@ class SpecVoice(SpecBase):
 
 class ScenarioSpec(SpecBase):
     title: str
+    # Primary competency (kept for back-compat). competency_ids/_names carry the
+    # first-class multi-select; camelCase aliases accepted via SpecBase.
     competency_id: Optional[str] = None
+    competency_ids: Optional[List[str]] = None
+    competency_names: Optional[List[str]] = None
     persona: Persona
     state_machine: StateMachine
     disclosure_ledger: DisclosureLedger = Field(default_factory=DisclosureLedger)
@@ -384,6 +388,22 @@ class ScenarioSpec(SpecBase):
     # `ui` is authoring-only; accepted and ignored so the runtime never breaks
     # on studio-side additions.
     ui: Optional[Dict[str, Any]] = None
+
+    @property
+    def competency_label(self) -> Optional[str]:
+        """Human-readable competency string for actor/trainee/director prompts.
+
+        Prefers the resolved names of the multi-select (joined), then the ids,
+        then the legacy scalar competency_id — so old single-competency specs
+        keep working while multi-competency specs name every competency.
+        """
+        names = [n for n in (self.competency_names or []) if n and n.strip()]
+        if names:
+            return ", ".join(names)
+        ids = [i for i in (self.competency_ids or []) if i and i.strip()]
+        if ids:
+            return ", ".join(ids)
+        return self.competency_id
 
     @model_validator(mode="after")
     def _validate_cross_references(self) -> "ScenarioSpec":

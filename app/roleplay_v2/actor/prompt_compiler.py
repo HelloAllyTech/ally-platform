@@ -75,7 +75,7 @@ def compile_static_prefix(
         title=spec.title,
         identity_core=spec.persona.identity_core.strip(),
         scenario_context=spec.persona.scenario_context.strip(),
-        competency=spec.competency_id or "general counseling skills",
+        competency=spec.competency_label or "general counseling skills",
         language_code=language_code,
         language_label=language_label,
         linguistic_samples=_format_language_samples([]),
