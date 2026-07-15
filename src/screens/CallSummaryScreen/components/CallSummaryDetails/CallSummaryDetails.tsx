@@ -52,6 +52,12 @@ const CallSummaryDetailsComponent: React.FC<Props> = ({
 
   const {data: customFieldValues} = useGetCustomFieldValuesQuery(chatId!, {
     skip: !chatId || !customFieldsActive,
+    // Values can change server-side after the screen was last cached — an
+    // async AI fill lands seconds after the call, or another user edits them.
+    // The mutation has no cache tags, so without this a re-open would show
+    // stale/empty values until the cache expired. The once-per-chat seed guard
+    // below keeps a fresh fetch from clobbering in-progress edits.
+    refetchOnMountOrArgChange: true,
   });
 
   const [upsertCustomFieldValues] = useUpsertCustomFieldValuesMutation();
