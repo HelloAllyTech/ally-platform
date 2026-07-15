@@ -344,6 +344,12 @@ class AgentWorker:
         # Event to signal room disconnection to entrypoint
         self._room_disconnected_event: Optional[asyncio.Event] = None
 
+        # Mid-session stall watchdog (armed in initialize()): detects a wedged
+        # session (learner turn left unanswered), dumps stacks, and fails it
+        # cleanly. See app/core/session_watchdog.py.
+        self._stall_watchdog = None
+        self._loop = None
+
     async def configure(self):
         """
         - Parse metadata and extract scenario
@@ -454,6 +460,85 @@ class AgentWorker:
 
         # Register callbacks
         self._register_callbacks()
+
+        # Arm the mid-session stall watchdog now that the session + handlers
+        # exist. Best-effort; never blocks session start.
+        self._setup_stall_watchdog()
+
+    def _setup_stall_watchdog(self) -> None:
+        """Arm the per-session stall watchdog.
+
+        Detects the wedge signature (a finalized learner turn with no agent
+        response for the configured threshold), dumps every thread's stack so the
+        hang is locatable, ends the session cleanly, and — if the event loop is
+        truly blocked — force-exits this (per-job) process so the room frees.
+        Fully guarded: any failure leaves the session running without it.
+        """
+        if not getattr(settings, "SESSION_STALL_WATCHDOG_ENABLED", True):
+            return
+        try:
+            from app.core.session_watchdog import SessionStallWatchdog
+
+            self._loop = asyncio.get_running_loop()
+            room = self.ctx.room.name
+
+            def _on_stall() -> None:
+                # Scheduled onto the event loop. If the loop is blocked this never
+                # runs, and the watchdog's force-exit escalation frees the room.
+                try:
+                    self._loop.call_soon_threadsafe(
+                        lambda: self.ctx.shutdown("watchdog_session_stall")
+                    )
+                except Exception:  # noqa: BLE001
+                    logger.exception("[WATCHDOG] failed to schedule shutdown")
+
+            wd = SessionStallWatchdog(
+                on_stall=_on_stall,
+                threshold_s=getattr(settings, "SESSION_STALL_THRESHOLD_S", 75.0),
+                poll_s=getattr(settings, "SESSION_STALL_POLL_S", 5.0),
+                force_exit_grace_s=getattr(
+                    settings, "SESSION_STALL_FORCE_EXIT_GRACE_S", 30.0
+                ),
+                force_exit_enabled=getattr(
+                    settings, "SESSION_STALL_FORCE_EXIT_ENABLED", True
+                ),
+                room=room,
+            )
+            self._stall_watchdog = wd
+
+            # A finalized learner turn (role "user") arms the timer; the agent
+            # producing output clears it.
+            @self.session.on("conversation_item_added")
+            def _wd_on_item(ev):
+                try:
+                    role = getattr(getattr(ev, "item", None), "role", None)
+                    if role == "user":
+                        wd.note_user_turn_finalized()
+                    elif role == "assistant":
+                        wd.note_agent_response()
+                except Exception:  # noqa: BLE001
+                    pass
+
+            # Clear only when the agent actually PRODUCES audio ("speaking"), not
+            # merely when it starts "thinking" — so a hang after thinking is still
+            # caught.
+            @self.session.on("agent_state_changed")
+            def _wd_on_agent_state(ev):
+                try:
+                    if getattr(ev, "new_state", None) == "speaking":
+                        wd.note_agent_response()
+                except Exception:  # noqa: BLE001
+                    pass
+
+            wd.start()
+            logger.info(
+                "[WATCHDOG] stall watchdog armed (threshold=%.0fs, room=%s)",
+                getattr(settings, "SESSION_STALL_THRESHOLD_S", 75.0),
+                room,
+            )
+        except Exception:  # noqa: BLE001 - watchdog must never break a session
+            logger.exception("[WATCHDOG] failed to arm; continuing without it")
+            self._stall_watchdog = None
 
     def _create_session(self):
         """Create agent session with STT and TTS."""
@@ -678,6 +763,13 @@ class AgentWorker:
 
         # Wrap shutdown handler to include conversation handler cleanup
         async def shutdown_with_cleanup():
+            # Stop the stall watchdog first so a clean shutdown cancels its
+            # force-exit escalation.
+            if self._stall_watchdog is not None:
+                try:
+                    self._stall_watchdog.stop()
+                except Exception:  # noqa: BLE001
+                    pass
             try:
                 self._cleanup_conversation_handler()
             except Exception as e:
@@ -824,6 +916,10 @@ class AgentWorker:
         logger.info("[PAUSE] Pausing simulation")
         # Freeze the clock first so any concurrent graph turn sees paused state.
         clock.pause()
+
+        # Suspend the stall watchdog — nothing is owed while paused.
+        if self._stall_watchdog is not None:
+            self._stall_watchdog.suspend()
 
         # Stop listening (no STT/turns) and stop speaking.
         try:

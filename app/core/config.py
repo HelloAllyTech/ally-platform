@@ -162,6 +162,39 @@ class Settings(BaseSettings):
         ),
     )
 
+    # ---- Session stall watchdog (mid-session freeze detection) ----
+    # Detects a wedged session (learner turn finalized but no agent response for
+    # SESSION_STALL_THRESHOLD_S), dumps all thread stacks so the hang location is
+    # captured, ends the session cleanly, and — if the loop is truly blocked —
+    # force-exits the (per-job) process so the room frees. See
+    # app/core/session_watchdog.py.
+    SESSION_STALL_WATCHDOG_ENABLED: bool = Field(
+        default=True, description="Enable the mid-session stall watchdog"
+    )
+    SESSION_STALL_THRESHOLD_S: float = Field(
+        default=75.0,
+        description=(
+            "Seconds a finalized learner turn may go unanswered before the "
+            "session is treated as wedged (well above normal turn latency)."
+        ),
+    )
+    SESSION_STALL_POLL_S: float = Field(
+        default=5.0, description="Watchdog poll interval (seconds)"
+    )
+    SESSION_STALL_FORCE_EXIT_GRACE_S: float = Field(
+        default=30.0,
+        description=(
+            "After a stall is detected and a clean shutdown is requested, wait "
+            "this long; if the session hasn't ended (event loop blocked), "
+            "force-exit the job process."
+        ),
+    )
+    SESSION_STALL_FORCE_EXIT_ENABLED: bool = Field(
+        default=True,
+        description="Allow the watchdog to force-exit a wedged job process as a "
+        "last resort (kill-switch for the escalation).",
+    )
+
     # ---- Pause / resume tuning (overridable via env; defaults shown) ----
     PAUSE_CAP_SECONDS: float = Field(
         default=600.0,
