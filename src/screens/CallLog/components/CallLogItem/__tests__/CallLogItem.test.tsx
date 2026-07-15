@@ -109,6 +109,41 @@ describe('CallLogItem', () => {
     expect(getByText('help')).toBeTruthy();
   });
 
+  it('renders tags without crashing for out-of-range or fractional positivity_rating', () => {
+    // Regression: the AI can emit ratings outside the integer 1-5 range (e.g.
+    // 0.3), which are not keys in TAG_COLORS. Reading .bg on the undefined
+    // lookup used to crash the whole screen.
+    const oddRatingsItem: any = {
+      ...baseItem,
+      details: {
+        ...baseItem.details,
+        summary: {
+          tags: [
+            { tag: 'fractional', positivity_rating: 0.3 },
+            { tag: 'zero', positivity_rating: 0 },
+            { tag: 'too-high', positivity_rating: 7 },
+            { tag: 'missing' }, // positivity_rating undefined
+          ],
+        },
+      },
+    };
+
+    const {getByText} = render(
+      <CallLogItem
+        item={oddRatingsItem}
+        expanded={true}
+        logType={(require('@/constants').LogType as any).REAL}
+        onToggle={jest.fn()}
+        onItemPress={jest.fn()}
+      />,
+    );
+
+    expect(getByText('fractional')).toBeTruthy();
+    expect(getByText('zero')).toBeTruthy();
+    expect(getByText('too-high')).toBeTruthy();
+    expect(getByText('missing')).toBeTruthy();
+  });
+
   it('shows "Mode: Scribe" when expanded and mode is SCRIBE', () => {
     const scribeItem: any = {
       ...baseItem,
