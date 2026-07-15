@@ -250,29 +250,72 @@ class RehearsalService:
             trainee_llm = self._build_trainee_llm(spec)
             judge_llm = self._build_judge_llm(spec)
 
-            for index, (profile, test_case) in enumerate(units):
+            # Units are fully independent sessions (own room / engine / state
+            # store / emitter), so run them in PARALLEL with a bounded fan-out
+            # rather than serially — this is the dominant lever on a run's
+            # wall-clock (the default 3 profiles previously ran back-to-back).
+            # An IN_PROGRESS PATCH is still emitted as each unit finishes (now
+            # completion-order, which aggregation is agnostic to); a per-unit
+            # crash still fails the whole run, surfaced once in-flight units
+            # settle so no task is orphaned.
+            unit_fanout = asyncio.Semaphore(
+                max(1, int(getattr(settings, "REHEARSAL_UNIT_CONCURRENCY_LIMIT", 3)))
+            )
+            progress_lock = asyncio.Lock()
+            # Keyed by unit index so the final transcripts stay in a stable
+            # (unit) order regardless of completion order — aggregation is
+            # order-agnostic, but a deterministic order keeps the report/consumers
+            # predictable.
+            results_by_index: List[Optional[ProfileTranscript]] = [None] * len(units)
+
+            async def _run_unit(
+                index: int, profile: str, test_case: Optional[RehearsalTestCase]
+            ) -> None:
+                # Skip units not yet started when a cancel lands; in-flight ones
+                # break between turns inside _run_profile and return a partial.
                 if self._cancel_requested:
-                    break
-                profile_result = await self._run_profile(
-                    spec,
-                    profile,
-                    turns_per_profile,
-                    actor_llm=actor_llm,
-                    director_llm=director_llm,
-                    trainee_llm=trainee_llm,
-                    judge_llm=judge_llm,
-                    test_case=test_case,
-                )
-                self.transcripts.append(profile_result)
-                self.progress = RehearsalProgress(completed=index + 1, total=len(units))
-                # Contract: an IN_PROGRESS progress PATCH after each profile.
-                await self._send_webhook(
-                    RehearsalWebhookPayload(
+                    return
+                async with unit_fanout:
+                    if self._cancel_requested:
+                        return
+                    profile_result = await self._run_profile(
+                        spec,
+                        profile,
+                        turns_per_profile,
+                        actor_llm=actor_llm,
+                        director_llm=director_llm,
+                        trainee_llm=trainee_llm,
+                        judge_llm=judge_llm,
+                        test_case=test_case,
+                    )
+                async with progress_lock:
+                    results_by_index[index] = profile_result
+                    completed = [r for r in results_by_index if r is not None]
+                    self.transcripts = completed
+                    self.progress = RehearsalProgress(
+                        completed=len(completed), total=len(units)
+                    )
+                    payload = RehearsalWebhookPayload(
                         status=RehearsalStatus.IN_PROGRESS,
                         progress=self.progress,
-                        transcripts=self.transcripts,
+                        transcripts=list(completed),
                     )
-                )
+                # Send outside the lock so webhook latency doesn't serialize units.
+                await self._send_webhook(payload)
+
+            outcomes = await asyncio.gather(
+                *(
+                    _run_unit(index, profile, test_case)
+                    for index, (profile, test_case) in enumerate(units)
+                ),
+                return_exceptions=True,
+            )
+            self.transcripts = [r for r in results_by_index if r is not None]
+            # A crashed unit fails the run (as before) — re-raise the first real
+            # error now that every in-flight unit has settled.
+            for outcome in outcomes:
+                if isinstance(outcome, BaseException):
+                    raise outcome
 
             if self._cancel_requested:
                 logger.info(

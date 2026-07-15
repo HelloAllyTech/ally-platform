@@ -69,9 +69,7 @@ class TestConfigure:
             return SimpleNamespace(tts_instance=object())
 
         def fake_llm(llm_config=None, language_code=None, **kwargs):
-            captured.setdefault("llm_configs", []).append(
-                (llm_config, language_code)
-            )
+            captured.setdefault("llm_configs", []).append((llm_config, language_code))
             return SimpleNamespace(llm_instance=object())
 
         monkeypatch.setattr(worker_v2, "configure_stt_client", fake_stt)
@@ -96,9 +94,7 @@ class TestConfigure:
         )
 
         # Actor + director LLMs built from the spec's model choices.
-        (actor_cfg, actor_lang), (director_cfg, director_lang) = captured[
-            "llm_configs"
-        ]
+        (actor_cfg, actor_lang), (director_cfg, director_lang) = captured["llm_configs"]
         assert actor_cfg["provider"] == "openai"
         assert actor_cfg["config"]["model"] == "gpt-4o-mini"
         assert actor_lang == "en-IN"
@@ -123,7 +119,8 @@ class TestConfigDefaults:
         assert settings.DIRECTOR_TIMEOUT_S == 8.0
         assert settings.DIRECTOR_GRACE_MS == 0.0
         assert settings.REHEARSAL_CONCURRENCY_LIMIT == 2
-        assert settings.REHEARSAL_TURNS_DEFAULT == 12
+        assert settings.REHEARSAL_UNIT_CONCURRENCY_LIMIT == 3
+        assert settings.REHEARSAL_TURNS_DEFAULT == 8
         assert settings.ROLEPLAY_V2_ENABLED is True
         assert settings.ACTOR_DEFAULT_MODEL
         assert settings.DIRECTOR_MODEL
