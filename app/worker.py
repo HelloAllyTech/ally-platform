@@ -2562,6 +2562,19 @@ if __name__ == "__main__":
     # single sink. See logger.py.
     patch_livekit_parent_logger()
     agent_name = "" if settings.ENV == Environment.LOCAL else settings.AGENT_NAME
+
+    # ECS autoscaling signal: publish this task's active-session count to
+    # CloudWatch so a target-tracking policy can scale the fleet on real demand
+    # (CPU/memory metrics can't — see app/core/worker_metrics.py). This rides the
+    # load_fnc hook, returning the EXACT default worker load (dispatch behaviour
+    # unchanged) and side-emitting the metric. make_load_fnc() returns None on an
+    # unexpected livekit version, in which case we omit load_fnc entirely and the
+    # worker uses LiveKit's own default — never a degraded dispatch path.
+    from app.core.worker_metrics import make_load_fnc
+
+    _load_fnc = make_load_fnc()
+    _load_kwargs = {"load_fnc": _load_fnc} if _load_fnc is not None else {}
+
     agents.cli.run_app(
         agents.WorkerOptions(
             agent_name=agent_name,
@@ -2569,6 +2582,7 @@ if __name__ == "__main__":
             # dispatch_entrypoint), so v2 registers no second agent name.
             entrypoint_fnc=dispatch_entrypoint,
             prewarm_fnc=prewarm,
+            **_load_kwargs,
             # Keep TWO warm job processes ready. A cold job process takes ~6s to
             # spin up (imports + silero VAD/BVC prewarm), which races LiveKit's
             # ~7.5s assignment window — a single spare (1) means the 2nd near-

@@ -101,6 +101,29 @@ class Settings(BaseSettings):
         ..., description="SQS queue name for message and events"
     )
 
+    # ---- ECS autoscaling signal (worker → CloudWatch) ----
+    # The worker publishes its active-session count to CloudWatch so ECS
+    # target-tracking can scale the learn-core task count on real demand. The
+    # built-in CPU/Memory metrics are useless here (worker is I/O-bound, ~0.5%
+    # CPU; memory is baseline-dominated), so this custom metric is the only
+    # usable scaling signal. Best-effort and fully guarded — see
+    # app/core/worker_metrics.py. Only emits when ENV == PROD (dev/local never
+    # touch the prod scaling namespace).
+    ECS_METRICS_ENABLED: bool = Field(
+        default=True, description="Emit active-session metric to CloudWatch (PROD only)"
+    )
+    ECS_METRICS_NAMESPACE: str = Field(
+        default="Ally/LearnCore", description="CloudWatch namespace for worker metrics"
+    )
+    ECS_METRICS_SERVICE: str = Field(
+        default="ally-prd-svc-learn-core",
+        description="Value of the CloudWatch `Service` dimension (the ECS service)",
+    )
+    ECS_METRICS_EMIT_INTERVAL_S: float = Field(
+        default=60.0,
+        description="Minimum seconds between CloudWatch emits (throttle; per task)",
+    )
+
     ELEVEN_API_KEY: str = Field(...)
     SARVAM_API_KEY: str = Field(...)
     SARVAM_TTS_TIMEOUT: float = Field(
@@ -731,11 +754,10 @@ class Settings(BaseSettings):
         if not self.AGENT_NAME_V2:
             self.AGENT_NAME_V2 = f"{self.AGENT_NAME}V2"
         return self
+
     ACTOR_DEFAULT_MODEL: str = Field(
         default="gpt-4o-mini",
-        description=(
-            "Default model for the v2 Actor when the spec has no actorModel."
-        ),
+        description=("Default model for the v2 Actor when the spec has no actorModel."),
     )
     DIRECTOR_PROVIDER: str = Field(
         default="openai",
@@ -747,8 +769,7 @@ class Settings(BaseSettings):
     DIRECTOR_MODEL: str = Field(
         default="gpt-4o-mini",
         description=(
-            "Default model for the v2 Director when the spec has no "
-            "directorModel."
+            "Default model for the v2 Director when the spec has no " "directorModel."
         ),
     )
     DIRECTOR_TIMEOUT_S: float = Field(

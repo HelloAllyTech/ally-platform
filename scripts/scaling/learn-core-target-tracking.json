@@ -1,0 +1,15 @@
+{
+  "_comment": "ECS target-tracking policy for learn-core session-based autoscaling. Each worker task emits its own active_jobs to the Ally/LearnCore ActiveSessions metric, so the CloudWatch Average statistic across tasks == average sessions per task (no RunningTaskCount / Container Insights needed). Adding tasks pulls the average down (fresh tasks report ~0), giving the inverse-proportional-to-capacity behaviour target tracking requires. Apply with: aws application-autoscaling put-scaling-policy --service-namespace ecs --resource-id service/ally-prd-mb-ecs-cluster/ally-prd-svc-learn-core --scalable-dimension ecs:service:DesiredCount --policy-name learn-core-sessions-per-task --policy-type TargetTrackingScaling --target-tracking-scaling-policy-configuration file://scripts/scaling/learn-core-target-tracking.json  (the _comment key must be stripped first — AWS rejects unknown keys). TargetValue/cooldowns are a conservative first cut; tune after a load test.",
+  "TargetValue": 3.0,
+  "CustomizedMetricSpecification": {
+    "Namespace": "Ally/LearnCore",
+    "MetricName": "ActiveSessions",
+    "Dimensions": [
+      { "Name": "Service", "Value": "ally-prd-svc-learn-core" }
+    ],
+    "Statistic": "Average",
+    "Unit": "Count"
+  },
+  "ScaleInCooldown": 300,
+  "ScaleOutCooldown": 60
+}
