@@ -7,6 +7,7 @@ import pytest
 from app.tts import Gender, create_tts_client, get_default_tts_config
 from app.tts.deepgram import DeepgramTTSClient
 from app.tts.elevenlabs import ElevenLabsTTSClient
+from app.tts.google import GoogleTTSClient
 from app.tts.sarvam import SarvamTTSClient
 
 
@@ -859,3 +860,59 @@ class TestTTSNewStructureIntegration:
             target_language_code="hi-IN", speaker="anushka", api_key="test-key"
         )
         assert result == mock_tts_instance
+
+
+class TestGoogleProvider:
+    """Google TTS — audio-encoding handling for Chirp 3 HD voices.
+
+    Regression: Chirp 3 HD voices reject the LiveKit plugin's default PCM
+    encoding (Google 400 "only supports LINEAR16/MP3/OGG_OPUS/MULAW/ALAW",
+    retryable=False), so every synthesis failed and the agent joined but never
+    spoke — sessions appeared "stuck" (seen live on mr-IN-Chirp3-HD-Leda). We
+    force OGG_OPUS for Chirp voices and leave non-Chirp voices on the default.
+    """
+
+    @patch("app.tts.google.GoogleTTSClient.validate_voice")
+    @patch("app.tts.google.google.TTS")
+    @patch("app.tts.google.settings")
+    def test_chirp_voice_forces_ogg_opus(
+        self, mock_settings, mock_tts_class, mock_validate
+    ):
+        from google.cloud import texttospeech
+
+        mock_settings.GOOGLE_TTS_CREDENTIALS_FILE = None
+        mock_validate.return_value = True
+        mock_tts_class.return_value = Mock()
+
+        client = GoogleTTSClient(
+            language_code="mr-IN",
+            voice_name="mr-IN-Chirp3-HD-Leda",
+            gender="female",
+        )
+        _ = client.tts_instance
+
+        kwargs = mock_tts_class.call_args.kwargs
+        assert kwargs["audio_encoding"] == texttospeech.AudioEncoding.OGG_OPUS
+        # Chirp voices resolve to the chirp_3 plugin model.
+        assert kwargs["model_name"] == "chirp_3"
+
+    @patch("app.tts.google.GoogleTTSClient.validate_voice")
+    @patch("app.tts.google.google.TTS")
+    @patch("app.tts.google.settings")
+    def test_non_chirp_voice_keeps_default_encoding(
+        self, mock_settings, mock_tts_class, mock_validate
+    ):
+        mock_settings.GOOGLE_TTS_CREDENTIALS_FILE = None
+        mock_validate.return_value = True
+        mock_tts_class.return_value = Mock()
+
+        client = GoogleTTSClient(
+            language_code="en-US",
+            voice_name="en-US-Neural2-A",
+            gender="female",
+        )
+        _ = client.tts_instance
+
+        kwargs = mock_tts_class.call_args.kwargs
+        # No override → plugin keeps its PCM default for non-Chirp voices.
+        assert "audio_encoding" not in kwargs

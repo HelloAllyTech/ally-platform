@@ -2,6 +2,7 @@
 
 from typing import Any, Dict, Literal, Optional
 
+from google.cloud import texttospeech
 from livekit.plugins import google
 
 from app.core.config import settings
@@ -312,6 +313,16 @@ class GoogleTTSClient(BaseTTSClient):
                 tts_kwargs["voice_cloning_key"] = self._voice_cloning_key
             if self._model_name is not None:
                 tts_kwargs["model_name"] = self._model_name
+            # Chirp 3 HD voices REJECT the plugin's default PCM encoding: Google
+            # returns 400 "This voice currently only supports the following audio
+            # encodings: LINEAR16, MP3, OGG_OPUS, MULAW, ALAW" (retryable=False),
+            # so every synthesis fails and the agent joins but can never speak —
+            # the session just appears "stuck". OGG_OPUS is the one encoding Chirp
+            # 3 HD supports that the plugin's streaming path also allows, so force
+            # it for Chirp voices. Non-Chirp voices keep the plugin default (PCM),
+            # unchanged.
+            if self._model_name == _GOOGLE_TTS_CHIRP3_MODEL_NAME:
+                tts_kwargs["audio_encoding"] = texttospeech.AudioEncoding.OGG_OPUS
             if self._credentials_info:
                 tts_kwargs["credentials_info"] = self._credentials_info
             if self._credentials_file:
