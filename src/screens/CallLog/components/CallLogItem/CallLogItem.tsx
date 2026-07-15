@@ -158,8 +158,18 @@ export const CallLogItem = ({
           {(tags?.length ?? 0) > 0 && (
             <View style={styles.tagsRow}>
               {tags?.map?.((tagItem, idx) => {
-                const rating = tagItem.positivity_rating ?? 5;
-                const tagColor = TAG_COLORS[rating as keyof typeof TAG_COLORS];
+                // positivity_rating is expected to be an integer 1-5, but the
+                // AI sometimes emits out-of-range or fractional values (e.g.
+                // 0.3). TAG_COLORS only has keys 1-5, so an unnormalised lookup
+                // returns undefined and reading .bg/.text crashed the screen.
+                // Normalise to the nearest valid key and keep a neutral fallback.
+                const rawRating = Number(tagItem.positivity_rating ?? 5);
+                const ratingKey = Number.isFinite(rawRating)
+                  ? Math.min(5, Math.max(1, Math.round(rawRating)))
+                  : 5;
+                const tagColor =
+                  TAG_COLORS[ratingKey as keyof typeof TAG_COLORS] ??
+                  TAG_COLORS[3];
                 return (
                   <Tag
                     key={idx}
