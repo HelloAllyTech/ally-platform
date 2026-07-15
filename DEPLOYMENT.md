@@ -114,8 +114,22 @@ aws application-autoscaling register-scalable-target --service-namespace ecs \
   --scalable-dimension ecs:service:DesiredCount --min-capacity 32 --max-capacity 32
 ```
 
-**Still open:** load-test to confirm real sessions-per-task on t3.medium and set the target
-+ bounds from data (the 12/3/40 above are conservative guesses).
+**Load-test findings (2026-07-15, partial):** a bounded synthetic test via
+`scripts/load-test-agent.py` (pin fleet to 1–2 tasks, ramp fake users) did NOT yield a
+clean per-task ceiling — the driver's OpenAI calls (Whisper/TTS) hit heavy
+`APIConnectionError` from the container at 7–12 concurrent bots, so sessions were mostly
+*held idle* rather than actively conversing, and load concentration onto one task was
+imperfect. What IS defensible:
+- The metric pipeline works under real load (a live session shows as `ActiveSessions`).
+- **Idle baseline memory ≈ 2.15 GB** of the 3500 limit (prewarmed VAD/BVC + `num_idle=2`).
+- Roughly **~190 MB per held (idle-ish) session** → memory headroom allows only ~5–6
+  idle sessions/task; *active* sessions cost more (LLM context, audio buffers), so the real
+  ceiling is lower. CPU stayed low (~0.6 vCPU at ~4 sessions) — **memory is the tighter
+  constraint**, not CPU.
+- Conclusion: the **target of 3 sessions/task is a reasonable-to-conservative** setting
+  against a rough ~5 ceiling; no retune made. A clean number still needs either a
+  **reliably-connected load driver** (not this container) or **observing real sessions** via
+  the now-live `ActiveSessions` metric as organic concurrency grows.
 
 ## Rollback (to the shared fleet)
 `aws ecs update-service --cluster ally-prd-mb-ecs-cluster --service ally-prd-svc-learn-core --capacity-provider-strategy capacityProvider=ondemand,base=1,weight=1 --task-definition <a-learn-core-revision> --force-new-deployment`
