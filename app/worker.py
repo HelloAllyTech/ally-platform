@@ -2569,11 +2569,16 @@ if __name__ == "__main__":
             # dispatch_entrypoint), so v2 registers no second agent name.
             entrypoint_fnc=dispatch_entrypoint,
             prewarm_fnc=prewarm,
-            # Each idle process prewarms silero VAD + BVC (~hundreds of MB), so
-            # every extra spare is pure baseline memory. One spare keeps session
-            # start instant for the common case; a same-instant second session
-            # just waits a few seconds for a cold job process to spawn.
-            num_idle_processes=1,
+            # Keep TWO warm job processes ready. A cold job process takes ~6s to
+            # spin up (imports + silero VAD/BVC prewarm), which races LiveKit's
+            # ~7.5s assignment window — a single spare (1) means the 2nd near-
+            # simultaneous session cold-spawns on the critical path and
+            # intermittently misses the window → AssignmentTimeoutError → the
+            # agent never joins. Two spares give an instant hand-off for the
+            # common 1-2 concurrent case so jobs are assigned immediately.
+            # Costs ~one extra prewarmed process (VAD+BVC) of baseline memory;
+            # the task memory was raised (see task def) to absorb it.
+            num_idle_processes=2,
             api_key=settings.LIVEKIT_API_KEY,
             api_secret=settings.LIVEKIT_API_SECRET,
             ws_url=settings.LIVEKIT_URL,
