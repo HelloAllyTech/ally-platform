@@ -136,35 +136,64 @@ export const CustomFieldsSection: React.FC<CustomFieldsSectionProps> = ({
         switch (def.fieldType) {
           case CustomFieldType.TEXT:
             return (
-              <EditableField
+              <FieldRow
                 key={def.id}
-                fieldKey={def.id as any}
                 label={def.name}
-                value={value}
-                onChangeText={text => onValueChange(def.id, text || null)}
-                canEdit={fieldIsEditable}
-                isEditing={isEditing}
-                isEnhancing={false}
-                placeholder="-"
+                value={value ?? '-'}
+                renderEdit={
+                  isEditing && fieldIsEditable
+                    ? () => (
+                        <View style={styles.editFieldContainer}>
+                          <EditableField
+                            fieldKey={def.id as any}
+                            label={def.name}
+                            value={value}
+                            onChangeText={text =>
+                              onValueChange(def.id, text || null)
+                            }
+                            canEdit={fieldIsEditable}
+                            isEditing={isEditing}
+                            isEnhancing={false}
+                            placeholder="-"
+                          />
+                        </View>
+                      )
+                    : undefined
+                }
               />
             );
 
           case CustomFieldType.NUMBER:
-            // Must render a real, wired input — the previous static <Text>
+            // Wrap in FieldRow so the field name is always shown, but keep a
+            // real, wired input via renderEdit — a previous static <Text>
             // meant typed numbers never reached onValueChange, so the edit
             // never saved and the field appeared to revert to the old value.
             return (
-              <EditableField
+              <FieldRow
                 key={def.id}
-                fieldKey={def.id as any}
                 label={def.name}
-                value={value}
-                onChangeText={text => onValueChange(def.id, text || null)}
-                canEdit={fieldIsEditable}
-                isEditing={isEditing}
-                isEnhancing={false}
-                placeholder="-"
-                keyboardType="numeric"
+                value={value ?? '-'}
+                renderEdit={
+                  isEditing && fieldIsEditable
+                    ? () => (
+                        <View style={styles.editFieldContainer}>
+                          <EditableField
+                            fieldKey={def.id as any}
+                            label={def.name}
+                            value={value}
+                            onChangeText={text =>
+                              onValueChange(def.id, text || null)
+                            }
+                            canEdit={fieldIsEditable}
+                            isEditing={isEditing}
+                            isEnhancing={false}
+                            placeholder="-"
+                            keyboardType="numeric"
+                          />
+                        </View>
+                      )
+                    : undefined
+                }
               />
             );
 
@@ -249,16 +278,30 @@ export const CustomFieldsSection: React.FC<CustomFieldsSectionProps> = ({
 
           case CustomFieldType.DATE:
             return (
-              <EditableField
+              <FieldRow
                 key={def.id}
-                fieldKey={def.id as any}
                 label={def.name}
-                value={value}
-                onChangeText={text => onValueChange(def.id, text || null)}
-                canEdit={fieldIsEditable}
-                isEditing={isEditing}
-                isEnhancing={false}
-                placeholder="YYYY-MM-DD"
+                value={value ?? '-'}
+                renderEdit={
+                  isEditing && fieldIsEditable
+                    ? () => (
+                        <View style={styles.editFieldContainer}>
+                          <EditableField
+                            fieldKey={def.id as any}
+                            label={def.name}
+                            value={value}
+                            onChangeText={text =>
+                              onValueChange(def.id, text || null)
+                            }
+                            canEdit={fieldIsEditable}
+                            isEditing={isEditing}
+                            isEnhancing={false}
+                            placeholder="YYYY-MM-DD"
+                          />
+                        </View>
+                      )
+                    : undefined
+                }
               />
             );
 
@@ -318,6 +361,9 @@ const styles = ScaledSheet.create({
   dropdownContainer: {
     flex: 1,
     maxWidth: '200@ms',
+  },
+  editFieldContainer: {
+    flex: 1,
   },
   multiSelectTrigger: {
     flex: 1,
