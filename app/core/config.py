@@ -792,9 +792,19 @@ class Settings(BaseSettings):
     REHEARSAL_CONCURRENCY_LIMIT: int = Field(
         default=2,
         description=(
-            "Maximum number of v2 rehearsals running concurrently. Each "
-            "rehearsal is 3 profile runs × N turns × 3 LLM calls per turn, "
-            "so this bounds cost and memory; excess requests queue."
+            "Maximum number of v2 rehearsals (whole runs) executing "
+            "concurrently across the process; excess requests queue. Bounds "
+            "cost/memory at the run level; within a run, units fan out up to "
+            "REHEARSAL_UNIT_CONCURRENCY_LIMIT."
+        ),
+    )
+    REHEARSAL_UNIT_CONCURRENCY_LIMIT: int = Field(
+        default=3,
+        description=(
+            "Maximum trainee-profile / test-case units executed in parallel "
+            "within a single rehearsal run. Units are independent sessions, so "
+            "this is the main lever on a run's wall-clock (the 3 default "
+            "profiles run concurrently). Bounded to avoid provider rate limits."
         ),
     )
     REHEARSAL_JUDGE_MODEL: str = Field(
@@ -805,10 +815,12 @@ class Settings(BaseSettings):
         ),
     )
     REHEARSAL_TURNS_DEFAULT: int = Field(
-        default=12,
+        default=8,
         description=(
             "Default trainee turns per rehearsal profile when the request "
-            "omits config.turns_per_profile."
+            "omits config.turns_per_profile. Kept in sync with ally-be's "
+            "REHEARSAL_DEFAULT_TURNS_PER_PROFILE (8), which drives the "
+            "auto-improve path and always sends an explicit value."
         ),
     )
 
