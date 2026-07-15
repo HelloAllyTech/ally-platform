@@ -18,7 +18,7 @@ platform services (core/web/redis/metabase/core-ai), which share a separate ASG.
 | **ASG** | **`ally-prd-mb-ecs-cluster-asg-learn`** (min 4 / max 36) |
 | **Launch template** | **`ally-prd-mb-ecs-cluster-lt-learn`** (clone of the shared LT, instance type swapped). Default/`$Latest` = **version 2 = t3.medium**. |
 | **Instance type** | **`t3.medium`** (2 vCPU / 4 GB) — see "Why t3.medium, not bigger" below |
-| Task def family | `ally-prd-td-learn-core` — container **CPU 1536, memory 3500, stopTimeout 120** |
+| Task def family | `ally-prd-td-learn-core` — container **CPU 1024, memory 3500, stopTimeout 120** |
 | Worker | `num_idle_processes=2` (2 warm job processes; see app/worker.py) → **64 warm job slots across 32 tasks** |
 | Placement | `binpack` by MEMORY (moot — 1 task/instance, port-bound; see below) |
 | Service desired | 32 (autoscaler pinned min=max=32) |
@@ -40,9 +40,9 @@ The task binds a **fixed `hostPort: 8000` on bridge networking**, so **exactly o
 runs per instance** regardless of instance size. A bigger box (r6i.xlarge etc.) therefore
 runs the *same single task* — you pay ~4× for zero extra density. We tried r6i.xlarge and
 it was pure waste. The correct capacity lever is **horizontal**: more t3.medium instances =
-more tasks = more warm slots. CPU reservation (1536) is likewise moot for packing — with
-one task per instance nothing else competes for the box; it's kept at 1536 only so a task
-won't schedule onto a smaller/over-subscribed host.
+more tasks = more warm slots. CPU reservation (1024) is likewise moot for packing — with
+one task per instance nothing else competes for the box; the exact value only needs to fit
+under the instance's vCPU (t3.medium = 2048 units) so the task schedules.
 
 > To ever get >1 task/instance you must switch to **dynamic host ports** (`hostPort: 0`) +
 > an SG ephemeral-range rule + ALB dynamic target registration. That is deferred as
@@ -118,4 +118,4 @@ aws application-autoscaling register-scalable-target --service-namespace ecs \
 + bounds from data (the 12/3/40 above are conservative guesses).
 
 ## Rollback (to the shared fleet)
-`aws ecs update-service --cluster ally-prd-mb-ecs-cluster --service ally-prd-svc-learn-core --capacity-provider-strategy capacityProvider=ondemand,base=1,weight=1 --task-definition <a-revision-with-cpu-1536> --force-new-deployment`
+`aws ecs update-service --cluster ally-prd-mb-ecs-cluster --service ally-prd-svc-learn-core --capacity-provider-strategy capacityProvider=ondemand,base=1,weight=1 --task-definition <a-learn-core-revision> --force-new-deployment`
