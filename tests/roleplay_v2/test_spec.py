@@ -7,6 +7,7 @@ from app.roleplay_v2.spec.models import (
     RoleplaySpecEnvelope,
     ScenarioSpec,
     SpecLanguage,
+    SpecSessionInfo,
     StateMachine,
 )
 from app.roleplay_v2.spec.parse import parse_spec_metadata
@@ -117,6 +118,24 @@ class TestEnvelope:
         assert voice is not None
         assert voice.provider == "elevenlabs"
         assert voice.config.voice_id == "EXAVITQu4vr4xnSDxMaL"
+
+    # Regression: ally-be sends languageId / session.userId as JSON *numbers*,
+    # but we model them as strings. Before coerce_numbers_to_str these raised a
+    # ValidationError inside the v2 entrypoint's configure(), so the agent never
+    # joined the room ("Waiting for the agent to join" / director hang).
+    def test_integer_id_fields_coerced_to_str(self):
+        assert SpecLanguage.model_validate({"languageId": 1}).language_id == "1"
+        assert SpecSessionInfo.model_validate({"userId": 1}).user_id == "1"
+
+    def test_envelope_with_integer_ids_validates(self, sample_envelope_dict):
+        d = sample_envelope_dict
+        # Integers at the envelope paths ally-be actually sends as numbers
+        # (spec.language coercion is covered by test_integer_id_fields_coerced_to_str).
+        d["language"]["languageId"] = 1
+        d["session"]["userId"] = 1
+        env = RoleplaySpecEnvelope.model_validate(d)
+        assert env.language.language_id == "1"
+        assert env.session.user_id == "1"
 
     async def test_ensure_spec_returns_inline_spec(self, sample_envelope):
         spec = await sample_envelope.ensure_spec()

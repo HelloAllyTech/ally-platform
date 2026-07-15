@@ -60,6 +60,12 @@ class SpecBase(BaseModel):
         alias_generator=to_camel,
         populate_by_name=True,
         extra="ignore",
+        # ally-be sends some ID fields (languageId, session.userId) as JSON
+        # numbers, but we model them as strings. Coerce numbers→str so the
+        # envelope validates instead of throwing a ValidationError in the v2
+        # entrypoint's configure() (which would leave the agent unable to join).
+        # Only affects str-typed fields; int/float fields are unaffected.
+        coerce_numbers_to_str=True,
     )
 
 
