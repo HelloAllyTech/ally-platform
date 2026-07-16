@@ -78,7 +78,7 @@ export const SimulationFeedbackScreen: React.FC<
   const insets = useSafeAreaInsets();
 
   const [activeTabKey, setActiveTabKey] = useState<string>(
-    SimulationSummaryTabKey.SUMMARY,
+    fromLogs ? SimulationSummaryTabKey.SKILLS : SimulationSummaryTabKey.SUMMARY,
   );
   const [isFeedbackPopupVisible, setIsFeedbackPopupVisible] =
     useState<boolean>(false);
@@ -448,8 +448,9 @@ export const SimulationFeedbackScreen: React.FC<
         pathId,
         caseId,
         shortSession,
+        skillsFirst: fromLogs,
       }),
-    [t, pathId, caseId, shortSession],
+    [t, pathId, caseId, shortSession, fromLogs],
   );
 
   const tabIndex = useMemo(() => {
