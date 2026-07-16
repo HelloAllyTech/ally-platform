@@ -706,6 +706,7 @@
     },
     "tabs": {
       "annotatedTranscript": "குறிப்புகளுடன் கூடிய உரையாடல்",
+      "transcriptTranslationFailed": "டிரான்ஸ்கிரிப்ட் ஏற்ற முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
       "upNext": "அடுத்து",
       "askAi": "AI-இடம் கேள்",
       "deeperReflection": "ஆழ்ந்த சிந்தனை",

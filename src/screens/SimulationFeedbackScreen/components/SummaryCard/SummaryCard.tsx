@@ -6,18 +6,25 @@ import {colors, fontFamily, typography} from '@/theme';
 
 interface SummaryCardProps {
   title?: string;
+  titleRight?: React.ReactNode;
   children: React.ReactNode;
   containerStyle?: StyleProp<ViewStyle>;
 }
 
 export const SummaryCard: React.FC<SummaryCardProps> = ({
   title,
+  titleRight,
   children,
   containerStyle,
 }) => {
   return (
     <View style={[styles.container, containerStyle]}>
-      {!!title && <Text style={styles.title}>{title}</Text>}
+      {!!title && (
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>{title}</Text>
+          {!!titleRight && titleRight}
+        </View>
+      )}
       {children}
     </View>
   );
@@ -39,15 +46,22 @@ const styles = ScaledSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '8@ms',
+    marginBottom: '16@vs',
+    borderBottomWidth: '0.5@ms',
+    borderBottomColor: colors.ds.stroke.primary,
+    paddingBottom: '14@vs',
+  },
   title: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
     ...typography.body.medium,
     fontSize: '14@ms',
     color: colors.ds.typography.highEmphasis,
-    marginBottom: '16@vs',
     letterSpacing: '0.25@ms',
-    borderBottomWidth: '0.5@ms',
-    borderBottomColor: colors.ds.stroke.primary,
-    paddingBottom: '14@vs',
+    flexShrink: 1,
   },
 });

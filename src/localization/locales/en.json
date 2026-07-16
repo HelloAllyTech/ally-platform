@@ -706,6 +706,7 @@
     },
     "tabs": {
       "annotatedTranscript": "Annotated Transcript",
+      "transcriptTranslationFailed": "Failed to load transcript. Please retry.",
       "upNext": "Up next",
       "askAi": "Ask AI",
       "deeperReflection": "Deeper Reflection",

@@ -53,6 +53,14 @@ export const SUPPORTED_LANGUAGES = [
 
 export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 
+export const TRANSCRIPT_LANGUAGE_OPTIONS: {code: string; label: string}[] = [
+  {code: LanguageCode.EN, label: 'English (Original)'},
+  {code: LanguageCode.HI, label: 'हिंदी'},
+  {code: LanguageCode.MR, label: 'मराठी'},
+  {code: LanguageCode.TA, label: 'தமிழ்'},
+  {code: LanguageCode.KN, label: 'ಕನ್ನಡ'},
+];
+
 export const TAG_COLORS = {
   1: {bg: '#FEE1E180', text: '#C62828'},
   2: {bg: '#FFE8D580', text: '#F55A00'},

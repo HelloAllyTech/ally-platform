@@ -706,6 +706,7 @@
     },
     "tabs": {
       "annotatedTranscript": "ಟಿಪ್ಪಣಿ ಮಾಡಿದ ಟ್ರಾನ್ಸ್‌ಕ್ರಿಪ್ಟ್",
+      "transcriptTranslationFailed": "ಟ್ರಾನ್ಸ್‌ಕ್ರಿಪ್ಟ್ ಲೋಡ್ ಮಾಡಲು ವಿಫಲವಾಗಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
       "upNext": "ಮುಂದೆ",
       "askAi": "AI ಅನ್ನು ಕೇಳಿ",
       "deeperReflection": "ಆಳವಾದ ಪ್ರತಿಬಿಂಬ",

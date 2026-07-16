@@ -14,13 +14,15 @@ const LIMIT = 10;
 export const useSimulationTranscriptDetails = (
   scenarioSessionId: string,
   sessionStartedAt?: string,
+  languageCode?: string,
 ) => {
   const [messages, setMessages] = useState<SimulationMessage[]>([]);
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const listRef = useRef<FlatList>(null);
+  const pagingLockRef = useRef(false);
 
-  const [getMessages, {data, isLoading, isFetching}] =
+  const [getMessages, {data, isLoading, isFetching, isError, error}] =
     useLazyGetSimulationMessagesQuery();
 
   const queryParams = useMemo(
@@ -29,57 +31,95 @@ export const useSimulationTranscriptDetails = (
       limit: LIMIT,
       sortOrder: SortOrder.ASC,
       sortBy: 'startSeconds',
+      languageCode,
     }),
-    [scenarioSessionId],
+    [scenarioSessionId, languageCode],
   );
 
-  useEffect(() => {
-    if (data) {
-      const newMessages = data.messages || [];
-      if (newMessages.length === 0) {
-        setHasMore(false);
-        return;
-      }
+  const applyResult = useCallback(
+    (
+      append: boolean,
+      result?: {messages: SimulationMessage[]; count: number},
+    ) => {
+      const newMessages = result?.messages || [];
       setMessages(prev => {
-        const updated = [...prev, ...newMessages];
-        if (typeof data.count === 'number' && updated.length >= data.count) {
+        const base = append ? prev : [];
+        const seenIds = new Set(base.map(m => m.id));
+        const deduped = newMessages.filter(m => {
+          if (seenIds.has(m.id)) return false;
+          seenIds.add(m.id);
+          return true;
+        });
+        const updated = [...base, ...deduped];
+        const reachedCount =
+          typeof result?.count === 'number' && updated.length >= result.count;
+        // An empty page means the server has no more data. A non-empty page
+        // that dedupes down to nothing (append only) means we looped back
+        // onto data we already have - stop instead of refetching forever.
+        const noNewData =
+          newMessages.length === 0 || (append && deduped.length === 0);
+        if (reachedCount || noNewData) {
           setHasMore(false);
         }
         return updated;
       });
-    }
-  }, [data]);
+    },
+    [],
+  );
 
-  // Reset and load first page on id change
+  // Reset and load first page on id/language change. The existing message
+  // list is kept until the new page arrives so a failed request (e.g. an
+  // unsupported translation) doesn't blank out an already-loaded transcript.
   useEffect(() => {
     if (!scenarioSessionId) return;
 
-    setMessages([]);
     setHasMore(true);
     setOffset(0);
+    pagingLockRef.current = true;
 
-    getMessages({
-      ...queryParams,
-      offset: 0,
-    });
-  }, [scenarioSessionId, getMessages, queryParams]);
+    let cancelled = false;
+    getMessages({...queryParams, offset: 0})
+      .unwrap()
+      .then(result => {
+        if (!cancelled) applyResult(false, result);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) pagingLockRef.current = false;
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [scenarioSessionId, getMessages, queryParams, applyResult]);
 
   const fetchMessages = useCallback(
     (currentOffset: number) => {
-      if (!hasMore) return;
+      if (!hasMore || pagingLockRef.current) return;
+      pagingLockRef.current = true;
 
       getMessages({
         ...queryParams,
         offset: currentOffset,
-      });
-
-      setOffset(currentOffset + LIMIT);
+      })
+        .unwrap()
+        .then(result => {
+          applyResult(true, result);
+          // Only advance past this page once it has actually landed, so a
+          // failed fetch can be retried at the same offset instead of the
+          // page being silently skipped.
+          setOffset(currentOffset + LIMIT);
+        })
+        .catch(() => {})
+        .finally(() => {
+          pagingLockRef.current = false;
+        });
     },
-    [getMessages, hasMore, queryParams],
+    [getMessages, hasMore, queryParams, applyResult],
   );
 
   const handleEndReached = useCallback(() => {
-    if (!isLoading && !isFetching && hasMore) {
+    if (!isLoading && !isFetching && hasMore && !pagingLockRef.current) {
       fetchMessages(offset);
     }
   }, [isLoading, isFetching, hasMore, fetchMessages, offset]);
@@ -108,6 +148,8 @@ export const useSimulationTranscriptDetails = (
     rawData: data,
     isLoading,
     isFetching,
+    isError,
+    error,
     hasMore,
     handleEndReached,
     listRef,

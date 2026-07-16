@@ -1,8 +1,10 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {ActivityIndicator, FlatList, Text} from 'react-native';
+import {ActivityIndicator, FlatList, Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
+import {CustomDropdown, useErrorToast} from '@/components';
 import {EmptyTranscript} from '@/components/EmptyTranscript/EmptyTranscript';
+import {TRANSCRIPT_LANGUAGE_OPTIONS} from '@/constants';
 import {useSimulationTranscriptDetails} from '@/hooks/useSimulationTranscriptDetails';
 import {useTranslate} from '@/hooks/useTranslate';
 import {colors, fontFamily} from '@/theme';
@@ -32,14 +34,38 @@ export const SimulationTranscript: React.FC<{
   onRecordingPlaybackFailed,
 }) => {
   const {t} = useTranslate();
+  const {showErrorToast} = useErrorToast();
+  const [transcriptLanguage, setTranscriptLanguage] = useState('en');
+  const [isLanguageDropdownOpen, setIsLanguageDropdownOpen] = useState(false);
   const {
     formattedMessages,
     isLoading,
     isFetching,
+    isError,
+    error,
     listRef,
     handleEndReached,
     hasMore,
-  } = useSimulationTranscriptDetails(sessionId, startedAt);
+  } = useSimulationTranscriptDetails(sessionId, startedAt, transcriptLanguage);
+
+  const getTranscriptLanguageLabel = useCallback(
+    (code: string) =>
+      TRANSCRIPT_LANGUAGE_OPTIONS.find(o => o.code === code)?.label ??
+      'English (Original)',
+    [],
+  );
+
+  const getTranscriptLanguageCode = useCallback(
+    (label: string) =>
+      TRANSCRIPT_LANGUAGE_OPTIONS.find(o => o.label === label)?.code ?? 'en',
+    [],
+  );
+
+  useEffect(() => {
+    if (isError) {
+      showErrorToast(error, 'postSim.tabs.transcriptTranslationFailed');
+    }
+  }, [isError, error, showErrorToast]);
 
   const [playbackSeconds, setPlaybackSeconds] = useState(0);
   const [externalSeek, setExternalSeek] = useState<ExternalSeekRequest | null>(
@@ -180,22 +206,39 @@ export const SimulationTranscript: React.FC<{
     );
   };
 
+  const hasTranscript = formattedMessages.length > 0;
+  const isInitialTranscriptLoading =
+    (isLoading || isFetching) && !hasTranscript;
+  // Recording and transcript load independently; show a single combined
+  // spinner for the card instead of one per data source.
+  const showCombinedLoader = recordingUrlLoading || isInitialTranscriptLoading;
+
   const renderEmptyComponent = () => {
-    if (isLoading) {
-      return (
-        <ActivityIndicator
-          size="large"
-          color={colors.ds.theme.primary}
-          style={styles.loadingIndicator}
-        />
-      );
+    if (showCombinedLoader) {
+      return null;
     }
     return <EmptyTranscript />;
   };
 
   return (
-    <SummaryCard title={t('postSim.tabs.annotatedTranscript')}>
-      {recordingUrlLoading ? (
+    <SummaryCard
+      title={t('postSim.tabs.annotatedTranscript')}
+      titleRight={
+        <View style={styles.languagePicker}>
+          <CustomDropdown
+            value={getTranscriptLanguageLabel(transcriptLanguage)}
+            options={TRANSCRIPT_LANGUAGE_OPTIONS.map(o => o.label)}
+            onSelect={label =>
+              setTranscriptLanguage(getTranscriptLanguageCode(label))
+            }
+            isOpen={isLanguageDropdownOpen}
+            setIsOpen={setIsLanguageDropdownOpen}
+            alignModalRight
+            fixedWidth={140}
+          />
+        </View>
+      }>
+      {showCombinedLoader ? (
         <ActivityIndicator
           color={colors.ds.theme.primary}
           size="large"
@@ -250,6 +293,10 @@ export const SimulationTranscript: React.FC<{
 };
 
 const styles = ScaledSheet.create({
+  languagePicker: {
+    maxWidth: '140@ms',
+    minWidth: '110@ms',
+  },
   audioLoadingPlaceholder: {
     marginHorizontal: 0,
     marginBottom: '12@ms',
@@ -270,8 +317,5 @@ const styles = ScaledSheet.create({
   },
   contentContainer: {
     paddingBottom: '100@mvs',
-  },
-  loadingIndicator: {
-    marginTop: '40@vs',
   },
 });

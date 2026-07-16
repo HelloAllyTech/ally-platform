@@ -706,6 +706,7 @@
     },
     "tabs": {
       "annotatedTranscript": "एनोटेट ट्रांसक्रिप्ट",
+      "transcriptTranslationFailed": "ट्रांसक्रिप्ट लोड करने में विफल। कृपया पुनः प्रयास करें।",
       "upNext": "अगला",
       "askAi": "AI से पूछें",
       "deeperReflection": "गहन चिंतन",
