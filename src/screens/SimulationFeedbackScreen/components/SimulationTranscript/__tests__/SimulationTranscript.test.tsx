@@ -16,6 +16,15 @@ jest.mock('@/components/EmptyTranscript/EmptyTranscript', () => ({
   EmptyTranscript: () => null,
 }));
 
+jest.mock('@/components', () => {
+  const React = require('react');
+  const {View} = require('react-native');
+  return {
+    useErrorToast: () => ({showErrorToast: jest.fn()}),
+    CustomDropdown: () => <View testID="language-dropdown" />,
+  };
+});
+
 jest.mock('@/store/hooks', () => ({
   useAppSelector: jest.fn().mockImplementation(selector =>
     selector({
@@ -40,6 +49,8 @@ jest.mock('@/hooks/useSimulationTranscriptDetails', () => ({
     ],
     isLoading: true,
     isFetching: false,
+    isError: false,
+    error: undefined,
     hasMore: false,
     listRef: {current: null},
     handleEndReached: jest.fn(),

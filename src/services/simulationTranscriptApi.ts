@@ -30,6 +30,7 @@ interface SimulationMessagesParams {
   offset?: number;
   sortBy?: string;
   sortOrder?: string;
+  languageCode?: string;
 }
 
 export interface SimulationSessionRecordingParams {
@@ -55,7 +56,14 @@ export const simulationTranscriptApi = api.injectEndpoints({
       SimulationMessagesResponse,
       SimulationMessagesParams
     >({
-      query: ({scenarioSessionId, limit, offset, sortBy, sortOrder}) => ({
+      query: ({
+        scenarioSessionId,
+        limit,
+        offset,
+        sortBy,
+        sortOrder,
+        languageCode,
+      }) => ({
         url: API_ROUTES.LEARN.SIMULATION_MESSAGES(scenarioSessionId),
         method: API_METHODS.GET,
         params: {
@@ -64,6 +72,7 @@ export const simulationTranscriptApi = api.injectEndpoints({
           sortBy,
           sortOrder,
           includeTags: true,
+          languageCode,
         },
       }),
     }),
