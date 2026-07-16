@@ -200,6 +200,18 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
       contentContainerStyle={styles.scrollContent}
       showsVerticalScrollIndicator={false}>
       <SummaryCard title={t('callFeedback.sessionSkills.sectionTitle')}>
+        {isChecklistMode && (
+          <>
+            <ExpandableFeedbackSection
+              title={t('postSim.skills.strengths')}
+              items={positives}
+            />
+            <ExpandableFeedbackSection
+              title={t('postSim.skills.areasForGrowth')}
+              items={improvements}
+            />
+          </>
+        )}
         <View style={styles.overallScoreContainer}>
           <CircularProgress
             progress={overallScore}
@@ -263,18 +275,6 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
             )}
           </View>
         </View>
-        {isChecklistMode && (
-          <>
-            <ExpandableFeedbackSection
-              title={t('postSim.skills.strengths')}
-              items={positives}
-            />
-            <ExpandableFeedbackSection
-              title={t('postSim.skills.areasForGrowth')}
-              items={improvements}
-            />
-          </>
-        )}
       </SummaryCard>
     </ScrollView>
   );

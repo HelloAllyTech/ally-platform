@@ -19,7 +19,13 @@ export const getSimulationSummaryTabs = (
     pathId,
     caseId,
     shortSession,
-  }: {pathId?: string; caseId?: string; shortSession?: boolean},
+    skillsFirst,
+  }: {
+    pathId?: string;
+    caseId?: string;
+    shortSession?: boolean;
+    skillsFirst?: boolean;
+  },
 ) => {
   const summaryTab = {
     key: SimulationSummaryTabKey.SUMMARY,
@@ -31,29 +37,32 @@ export const getSimulationSummaryTabs = (
     return [summaryTab];
   }
 
-  const tabs = [
-    summaryTab,
-    {
-      key: SimulationSummaryTabKey.ASK_AI,
-      title: t('postSim.tabs.askAi'),
-      testID: 'tab-1',
-    },
-    {
-      key: SimulationSummaryTabKey.TRANSCRIPTION,
-      title: t('postSim.tabs.annotatedTranscript'),
-      testID: 'tab-2',
-    },
-    {
-      key: SimulationSummaryTabKey.SKILLS,
-      title: t('postSim.tabs.skillsDemonstrated'),
-      testID: 'tab-3',
-    },
-    {
-      key: SimulationSummaryTabKey.REFLECTION,
-      title: t('postSim.tabs.deeperReflection'),
-      testID: 'tab-4',
-    },
-  ];
+  const askAiTab = {
+    key: SimulationSummaryTabKey.ASK_AI,
+    title: t('postSim.tabs.askAi'),
+    testID: 'tab-1',
+  };
+  const transcriptionTab = {
+    key: SimulationSummaryTabKey.TRANSCRIPTION,
+    title: t('postSim.tabs.annotatedTranscript'),
+    testID: 'tab-2',
+  };
+  const skillsTab = {
+    key: SimulationSummaryTabKey.SKILLS,
+    title: t('postSim.tabs.skillsDemonstrated'),
+    testID: 'tab-3',
+  };
+  const reflectionTab = {
+    key: SimulationSummaryTabKey.REFLECTION,
+    title: t('postSim.tabs.deeperReflection'),
+    testID: 'tab-4',
+  };
+
+  // Reviewers (opened from call logs) land on Skills Demonstrated first so the
+  // substance of the feedback is one tap closer; learners keep Session Review.
+  const tabs = skillsFirst
+    ? [skillsTab, summaryTab, askAiTab, transcriptionTab, reflectionTab]
+    : [summaryTab, askAiTab, transcriptionTab, skillsTab, reflectionTab];
 
   if (pathId || caseId) {
     tabs.push({
