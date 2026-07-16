@@ -524,6 +524,38 @@ describe('SimulationAssistantScreen', () => {
     expect(getByTestId('session-checklist')).toBeDefined();
   });
 
+  it('falls back to participant tiles when CHECKLIST mode has no checklist events', async () => {
+    const connectedHandlers: Array<() => void> = [];
+    (mockOn as jest.Mock).mockImplementation((event: string, cb: any) => {
+      if (event === 'connected') connectedHandlers.push(cb);
+      return undefined;
+    });
+
+    const emptyChecklistParams = {
+      ...baseRouteParams,
+      scenario: {
+        title: 'Checklist Scenario Without Events',
+        experienceMode: 'CHECKLIST',
+        checklistEvents: [],
+        checklistType: 'GUIDED',
+      },
+    };
+
+    const {getAllByTestId, queryByTestId} = await renderWithProviders(
+      <SimulationAssistantScreen
+        route={{params: emptyChecklistParams} as any}
+      />,
+    );
+
+    await waitFor(() => expect(mockConnect).toHaveBeenCalled());
+    await act(async () => connectedHandlers.forEach(fn => fn()));
+
+    // Regression: this configuration used to render neither layout (blank
+    // screen). It must fall back to the standard tiles without a checklist.
+    expect(getAllByTestId('participant-tile')).toHaveLength(2);
+    expect(queryByTestId('session-checklist')).toBeNull();
+  });
+
   it('hides the Focus button when experienceMode is NONE', async () => {
     const connectedHandlers: Array<() => void> = [];
     (mockOn as jest.Mock).mockImplementation((event: string, cb: any) => {

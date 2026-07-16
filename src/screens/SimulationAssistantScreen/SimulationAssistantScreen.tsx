@@ -88,6 +88,12 @@ type Props = RootStackScreenProps<'SimulationAssistant'>;
 export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const {sessionData, scenario, pathId, caseId, languageId} = route.params;
   const isChecklistMode = scenario?.experienceMode === ExperienceMode.CHECKLIST;
+  // CHECKLIST-mode scenarios can come back with zero checklist-visible events
+  // (backend filters on checklistVisibilityStatus). Fall back to the standard
+  // layout in that case — matches web, where tiles always render and only the
+  // checklist panel is gated on items.
+  const hasChecklist =
+    isChecklistMode && (scenario?.checklistEvents?.length ?? 0) > 0;
   const isNoneMode = scenario?.experienceMode === ExperienceMode.NONE;
   const {liveKitServerUrl, accessToken, id: sessionId} = sessionData;
   const [startTime, setStartTime] = useState<Date | null>(null);
@@ -695,76 +701,69 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
             />
           )}
           <>
-            {isSimulationInProgress &&
-              isChecklistMode &&
-              scenario?.checklistEvents &&
-              scenario?.checklistEvents.length > 0 && (
-                <View style={styles.participantsContent}>
+            {isSimulationInProgress && hasChecklist && (
+              <View style={styles.participantsContent}>
+                <View
+                  style={[
+                    styles.participantsContainer,
+                    styles.participantsHorizontal,
+                    styles.participantsCompact,
+                  ]}>
                   <View
                     style={[
-                      styles.participantsContainer,
-                      styles.participantsHorizontal,
-                      styles.participantsCompact,
+                      styles.participantWrapper,
+                      styles.participantWrapperWithOverlay,
                     ]}>
-                    <View
-                      style={[
-                        styles.participantWrapper,
-                        styles.participantWrapperWithOverlay,
-                      ]}>
-                      <ParticipantTile
-                        participant={remoteParticipant}
-                        publication={remoteAudioPub}
-                        avatarUrl={scenario?.coverImageUrl ?? null}
-                        name={scenario?.metadata?.name || scenario?.title}
-                        turnState={remoteTurnState}
-                        {...(scenario?.title
-                          ? {
-                              topLeftOverlay: (
-                                <ScenarioInfoOverlay
-                                  ref={scenarioInfoRef}
-                                  title={scenario?.title}
-                                  triggerWarnings={getTriggerWarningNames(
-                                    scenario?.triggerWarnings,
-                                  )}
-                                />
-                              ),
-                              overlayRef:
-                                scenarioInfoRef as React.RefObject<ScenarioInfoOverlayRef>,
-                            }
-                          : {})}
-                      />
-                    </View>
-                    <View style={styles.participantWrapper}>
-                      <ParticipantTile
-                        participant={localParticipant}
-                        publication={localAudioPub}
-                        avatarUrl={userData?.profileImageUrl ?? null}
-                        name={userData?.name}
-                        isMicEnabled={isMicEnabled}
-                        turnState={localTurnState}
-                      />
-                    </View>
+                    <ParticipantTile
+                      participant={remoteParticipant}
+                      publication={remoteAudioPub}
+                      avatarUrl={scenario?.coverImageUrl ?? null}
+                      name={scenario?.metadata?.name || scenario?.title}
+                      turnState={remoteTurnState}
+                      {...(scenario?.title
+                        ? {
+                            topLeftOverlay: (
+                              <ScenarioInfoOverlay
+                                ref={scenarioInfoRef}
+                                title={scenario?.title}
+                                triggerWarnings={getTriggerWarningNames(
+                                  scenario?.triggerWarnings,
+                                )}
+                              />
+                            ),
+                            overlayRef:
+                              scenarioInfoRef as React.RefObject<ScenarioInfoOverlayRef>,
+                          }
+                        : {})}
+                    />
                   </View>
-                  {isSimulationInProgress && !isFocusMode && (
-                    <View style={styles.checklistWrapper}>
-                      <SessionChecklist
-                        mode={
-                          scenario.checklistType
-                            ? scenario.checklistType
-                            : ChecklistType.OFF
-                        }
-                        items={scenario.checklistEvents}
-                        triggeredEvents={detectedEvents}
-                      />
-                    </View>
-                  )}
+                  <View style={styles.participantWrapper}>
+                    <ParticipantTile
+                      participant={localParticipant}
+                      publication={localAudioPub}
+                      avatarUrl={userData?.profileImageUrl ?? null}
+                      name={userData?.name}
+                      isMicEnabled={isMicEnabled}
+                      turnState={localTurnState}
+                    />
+                  </View>
                 </View>
-              )}
+                {isSimulationInProgress && !isFocusMode && (
+                  <View style={styles.checklistWrapper}>
+                    <SessionChecklist
+                      mode={scenario?.checklistType ?? ChecklistType.OFF}
+                      items={scenario?.checklistEvents ?? []}
+                      triggeredEvents={detectedEvents}
+                    />
+                  </View>
+                )}
+              </View>
+            )}
           </>
           <>
             {!isSimulationInProgress
               ? renderLoader()
-              : !isChecklistMode && (
+              : !hasChecklist && (
                   <>
                     <View style={styles.participantsContent}>
                       <View
