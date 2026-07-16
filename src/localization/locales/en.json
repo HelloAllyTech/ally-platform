@@ -718,6 +718,7 @@
       "description": "We need more interaction data to provide meaningful feedback."
     },
     "feedback": {
+      "generating": "Generating your feedback…",
       "sessionFeedback": "Session Feedback",
       "noData": "No data found",
       "dialog": {

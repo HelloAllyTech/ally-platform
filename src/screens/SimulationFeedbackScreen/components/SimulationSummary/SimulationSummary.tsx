@@ -18,12 +18,15 @@ interface SimulationSummaryProps {
   data: SimulationSummaryData | null;
   positives?: string[];
   improvements?: (string | FeedbackItem)[];
+  /** True while the summary/translation for the active language is still generating. */
+  isFeedbackGenerating?: boolean;
 }
 
 export const SimulationSummary: React.FC<SimulationSummaryProps> = ({
   data,
   positives = [],
   improvements = [],
+  isFeedbackGenerating = false,
 }) => {
   const {t} = useTranslate();
 
@@ -109,10 +112,12 @@ export const SimulationSummary: React.FC<SimulationSummaryProps> = ({
               <ExpandableFeedbackSection
                 title={t('postSim.skills.strengths')}
                 items={positives}
+                isGenerating={isFeedbackGenerating}
               />
               <ExpandableFeedbackSection
                 title={t('postSim.skills.areasForGrowth')}
                 items={improvements}
+                isGenerating={isFeedbackGenerating}
               />
             </>
           )}

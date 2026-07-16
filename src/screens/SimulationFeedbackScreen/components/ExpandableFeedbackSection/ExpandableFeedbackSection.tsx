@@ -13,6 +13,12 @@ interface ExpandableFeedbackSectionProps {
   title: string;
   items: (string | FeedbackItem)[];
   collapsedItemCount?: number;
+  /**
+   * True while the summary/translation for the active language is still being
+   * generated server-side. Shows "Generating your feedback…" instead of the
+   * empty state (web parity — SkillsTab/FeedbackSection).
+   */
+  isGenerating?: boolean;
 }
 
 const normalizeItem = (item: string | FeedbackItem): FeedbackItem =>
@@ -20,7 +26,7 @@ const normalizeItem = (item: string | FeedbackItem): FeedbackItem =>
 
 export const ExpandableFeedbackSection: React.FC<
   ExpandableFeedbackSectionProps
-> = ({title, items, collapsedItemCount = 3}) => {
+> = ({title, items, collapsedItemCount = 3, isGenerating = false}) => {
   const {t} = useTranslate();
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -53,7 +59,11 @@ export const ExpandableFeedbackSection: React.FC<
         {displayItems.length > 0 ? (
           displayItems.map(renderFeedbackItem)
         ) : (
-          <Text style={styles.noDataText}>{t('postSim.feedback.noData')}</Text>
+          <Text style={styles.noDataText}>
+            {isGenerating
+              ? t('postSim.feedback.generating')
+              : t('postSim.feedback.noData')}
+          </Text>
         )}
         {items.length > collapsedItemCount && (
           <TouchableOpacity
