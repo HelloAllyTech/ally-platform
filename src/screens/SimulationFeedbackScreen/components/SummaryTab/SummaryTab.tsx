@@ -44,6 +44,9 @@ export const SummaryTab: React.FC<SummaryTabProps> = ({
           data={simulationDetails ?? null}
           positives={positives}
           improvements={improvements}
+          isFeedbackGenerating={
+            !simulationDetails?.details?.summary?.feedback && !retryLimitReached
+          }
         />
       )}
     </KeyboardAwareScrollView>

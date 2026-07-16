@@ -59,6 +59,7 @@ export const TabView = <T extends string = string>({
           onPress={() => onTabChange(tab.key)}
           activeOpacity={0.7}>
           <Text
+            numberOfLines={1}
             style={[
               styles.tabText,
               labelTextStyle,
@@ -83,8 +84,7 @@ const styles = ScaledSheet.create({
   },
   tab: {
     paddingVertical: '12@ms',
-    paddingLeft: '4@ms',
-    paddingRight: '2@ms',
+    paddingHorizontal: '4@ms',
     borderRadius: '7@ms',
     alignItems: 'center',
     justifyContent: 'center',
@@ -105,6 +105,7 @@ const styles = ScaledSheet.create({
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     ...typography.label.medium,
     color: colors.ds.typography.mediumEmphasis,
+    textAlign: 'center',
   },
   activeTabText: {
     color: colors.ds.typography.highEmphasis,

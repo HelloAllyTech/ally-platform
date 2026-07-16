@@ -57,12 +57,15 @@ export interface SessionSkillsProps {
   simulationDetails?: SimulationSummaryData | null;
   /** True when this tab is the currently active tab. Used to refetch on re-activation. */
   isActive?: boolean;
+  /** True when the screen's feedback poll loop has given up (see SimulationFeedbackScreen). */
+  retryLimitReached?: boolean;
 }
 
 export const SessionSkills: React.FC<SessionSkillsProps> = ({
   scenarioSessionId,
   simulationDetails,
   isActive = false,
+  retryLimitReached = false,
 }) => {
   const {t} = useTranslate();
 
@@ -161,6 +164,10 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
   const improvements = getImprovementsWithRecommendations(
     simulationDetails ?? null,
   );
+  // The backend omits `summary.feedback` while the summary (or its translation
+  // for the active UI language) is still generating; the screen keeps polling.
+  const isFeedbackGenerating =
+    !simulationDetails?.details?.summary?.feedback && !retryLimitReached;
 
   if (isLoading || isFetching) {
     return (
@@ -205,10 +212,12 @@ export const SessionSkills: React.FC<SessionSkillsProps> = ({
             <ExpandableFeedbackSection
               title={t('postSim.skills.strengths')}
               items={positives}
+              isGenerating={isFeedbackGenerating}
             />
             <ExpandableFeedbackSection
               title={t('postSim.skills.areasForGrowth')}
               items={improvements}
+              isGenerating={isFeedbackGenerating}
             />
           </>
         )}

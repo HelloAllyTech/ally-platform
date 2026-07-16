@@ -102,10 +102,6 @@ export const SimulationFeedbackScreen: React.FC<
 
   const [getSimulationDetails, {data: simulationDetails}] =
     useLazyGetSimulationDetailsQuery();
-  console.log(
-    '🚀 ~ SimulationFeedbackScreen ~ simulationDetails:',
-    simulationDetails?.details,
-  );
 
   const {data: reviewData} = useGetReviewByIdQuery(
     {reviewId: reviewId || ''},
@@ -499,6 +495,7 @@ export const SimulationFeedbackScreen: React.FC<
               scenarioSessionId={scenarioSessionId}
               simulationDetails={simulationDetails}
               isActive={activeTabKey === SimulationSummaryTabKey.SKILLS}
+              retryLimitReached={retryLimitReached}
             />
           );
         case SimulationSummaryTabKey.REFLECTION:

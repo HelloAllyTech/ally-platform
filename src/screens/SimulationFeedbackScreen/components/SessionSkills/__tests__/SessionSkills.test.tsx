@@ -125,4 +125,52 @@ describe('SessionSkills', () => {
     expect(getByText('50%')).toBeTruthy();
     expect(getByText('75%')).toBeTruthy();
   });
+
+  describe('checklist-mode feedback sections', () => {
+    const checklistDetails = (feedback?: object) =>
+      ({
+        scenario: {metadata: {experienceMode: 'CHECKLIST'}},
+        details: {summary: feedback ? {feedback} : {}},
+      }) as any;
+
+    it('shows "generating" while feedback/translation is still being produced', () => {
+      const {getAllByText, queryByText} = render(
+        <SessionSkills
+          {...defaultProps}
+          simulationDetails={checklistDetails()}
+        />,
+      );
+      expect(getAllByText('postSim.feedback.generating')).toHaveLength(2);
+      expect(queryByText('postSim.feedback.noData')).toBeNull();
+    });
+
+    it('shows "no data" once the poll retry limit is reached', () => {
+      const {getAllByText, queryByText} = render(
+        <SessionSkills
+          {...defaultProps}
+          simulationDetails={checklistDetails()}
+          retryLimitReached
+        />,
+      );
+      expect(getAllByText('postSim.feedback.noData')).toHaveLength(2);
+      expect(queryByText('postSim.feedback.generating')).toBeNull();
+    });
+
+    it('renders the feedback items once they arrive', () => {
+      const {getByText, queryByText} = render(
+        <SessionSkills
+          {...defaultProps}
+          simulationDetails={checklistDetails({
+            positives: ['Great listening'],
+            areasOfGrowth: [
+              {improvement: 'Pace the call', recommendation: 'Slow down'},
+            ],
+          })}
+        />,
+      );
+      expect(getByText('Great listening')).toBeTruthy();
+      expect(getByText('Pace the call')).toBeTruthy();
+      expect(queryByText('postSim.feedback.generating')).toBeNull();
+    });
+  });
 });

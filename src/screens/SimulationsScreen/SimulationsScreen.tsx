@@ -363,6 +363,7 @@ export const SimulationsScreen: React.FC = () => {
             ]}
             activeTab={activeTab}
             onTabChange={setActiveTab}
+            tabWidthMode="content"
           />
         </View>
         {renderTabContent()}
