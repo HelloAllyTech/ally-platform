@@ -178,6 +178,8 @@ class DirectorEmitter:
         ledger: Dict[str, str],
         cumulative_score: float,
         behavior_hits: Dict[str, int],
+        director_commits: int = 0,
+        director_misses: int = 0,
     ) -> None:
         self._send_sqs(
             MSG_SESSION_SUMMARY,
@@ -187,6 +189,11 @@ class DirectorEmitter:
                 "ledger": ledger,
                 "cumulative_score": cumulative_score,
                 "behavior_hits": behavior_hits,
+                # Director health — how many turns were scored vs. missed
+                # (timeout/error). Lets downstream observe live scoring
+                # reliability; additive keys, safe for existing consumers.
+                "director_commits": director_commits,
+                "director_misses": director_misses,
             },
         )
 

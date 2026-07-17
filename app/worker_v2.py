@@ -68,6 +68,11 @@ setup_livekit_logging(
     console=settings.LIVEKIT_LOG_CONSOLE,
 )
 
+# Neutral default thinking-filler phrases used when a spec enables fillers but
+# authors none of its own. Short, character-agnostic hesitations that fit most
+# personas; a spec's `fillerPhrases` overrides this entirely.
+DEFAULT_V2_FILLER_PHRASES = ["hmm", "well", "let me think", "you know", "i mean"]
+
 
 class AgentWorkerV2:
     """Lifecycle: configure → initialize → start (mirrors AgentWorker)."""
@@ -103,6 +108,11 @@ class AgentWorkerV2:
         self._room_disconnected_event: Optional[asyncio.Event] = None
         self._summary_sent = False
         self._timing: dict[str, float] = {}
+        # Mid-session stall watchdog (armed in _register_callbacks): detects a
+        # wedged session (a finalized learner turn with no agent response) and
+        # force-frees the room. Shares the v1 SessionStallWatchdog.
+        self._stall_watchdog = None
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
 
     # ------------------------------------------------------------------
     # Phase 1 — configure
@@ -201,9 +211,10 @@ class AgentWorkerV2:
             continuous_backchanneling=self.spec.continuous_backchanneling,
             interim_reply_enabled=self.spec.interim_reply_enabled,
             gender=None,
-            # No Studio-authored static filler phrases for v2 — thinking filler
-            # relies on predictive fillers (needs history + PREDICTIVE_FILLER_ENABLED).
-            allowed_fillers=None,
+            # Static thinking-filler phrases: Studio-authored when provided,
+            # otherwise a neutral default set so v2 has working fillers even
+            # when predictive fillers are unavailable (no history / disabled).
+            allowed_fillers=(self.spec.filler_phrases or DEFAULT_V2_FILLER_PHRASES),
             language_label=language_code,
             # Persona grounding for back-channel / interim / predictive phrase gen.
             title=self.spec.title,
@@ -362,7 +373,76 @@ class AgentWorkerV2:
                 if self._room_disconnected_event is not None:
                     self._room_disconnected_event.set()
 
+        self._setup_stall_watchdog()
         self.ctx.add_shutdown_callback(self._shutdown_handler)
+
+    def _setup_stall_watchdog(self) -> None:
+        """Arm the per-session stall watchdog (mirrors v1 worker.py).
+
+        The v2 runtime previously had only a 30s orphan deadline; a frozen
+        session (wedged TTS/LLM after the learner spoke) would hang until the
+        room timed out. This detects the wedge, dumps thread stacks, ends the
+        session cleanly, and force-exits the per-job process if the loop is
+        truly blocked. Fully guarded — any failure leaves the session running.
+        """
+        if not getattr(settings, "SESSION_STALL_WATCHDOG_ENABLED", True):
+            return
+        try:
+            from app.core.session_watchdog import SessionStallWatchdog
+
+            self._loop = asyncio.get_running_loop()
+            room = self.ctx.room.name
+
+            def _on_stall() -> None:
+                try:
+                    self._loop.call_soon_threadsafe(
+                        lambda: self.ctx.shutdown("watchdog_session_stall")
+                    )
+                except Exception:  # noqa: BLE001
+                    logger.exception("[WATCHDOG] failed to schedule shutdown")
+
+            wd = SessionStallWatchdog(
+                on_stall=_on_stall,
+                threshold_s=getattr(settings, "SESSION_STALL_THRESHOLD_S", 75.0),
+                poll_s=getattr(settings, "SESSION_STALL_POLL_S", 5.0),
+                force_exit_grace_s=getattr(
+                    settings, "SESSION_STALL_FORCE_EXIT_GRACE_S", 30.0
+                ),
+                force_exit_enabled=getattr(
+                    settings, "SESSION_STALL_FORCE_EXIT_ENABLED", True
+                ),
+                room=room,
+            )
+            self._stall_watchdog = wd
+
+            @self.session.on("conversation_item_added")
+            def _wd_on_item(ev):
+                try:
+                    role = getattr(getattr(ev, "item", None), "role", None)
+                    if role == "user":
+                        wd.note_user_turn_finalized()
+                    elif role == "assistant":
+                        wd.note_agent_response()
+                except Exception:  # noqa: BLE001
+                    pass
+
+            @self.session.on("agent_state_changed")
+            def _wd_on_agent_state(ev):
+                try:
+                    if getattr(ev, "new_state", None) == "speaking":
+                        wd.note_agent_response()
+                except Exception:  # noqa: BLE001
+                    pass
+
+            wd.start()
+            logger.info(
+                "[WATCHDOG] v2 stall watchdog armed (threshold=%.0fs, room=%s)",
+                getattr(settings, "SESSION_STALL_THRESHOLD_S", 75.0),
+                room,
+            )
+        except Exception:  # noqa: BLE001 - watchdog must never break a session
+            logger.exception("[WATCHDOG] failed to arm v2 stall watchdog")
+            self._stall_watchdog = None
 
     def _resolve_stt_meta(self) -> tuple[str, str]:
         """(provider, model) for AI-cost tagging, read off the built client.
@@ -557,6 +637,13 @@ class AgentWorkerV2:
     async def _shutdown_handler(self):
         """Flush the Director, ship the session summary, drop metrics state."""
         logger.info("[AgentWorkerV2] Shutting down session %s", self.ctx.room.name)
+        # Stop the watchdog first so this clean shutdown cancels its force-exit
+        # escalation.
+        if self._stall_watchdog is not None:
+            try:
+                self._stall_watchdog.stop()
+            except Exception:  # noqa: BLE001
+                pass
         try:
             self._cleanup_conversation_handler()
         except Exception:  # noqa: BLE001

@@ -37,9 +37,11 @@ from app.prompts.resolver import load_template
 from app.roleplay_v2 import telemetry
 from app.roleplay_v2.director.emitters import DirectorEmitter
 from app.roleplay_v2.director.schemas import DirectorVerdict
+from app.roleplay_v2.spec import secret_matching
 from app.roleplay_v2.spec.models import ScenarioSpec
 from app.roleplay_v2.spec.runtime_state import (
     LEDGER_LOCKED,
+    LEDGER_UNLOCKED,
     RuntimeSessionState,
     RuntimeStateStore,
 )
@@ -89,6 +91,11 @@ class DirectorService:
             else float(
                 getattr(settings, "DIRECTOR_TIMEOUT_S", DEFAULT_DIRECTOR_TIMEOUT_S)
             )
+        )
+        # Minimum confidence before IRREVERSIBLE actions (transitions/unlocks)
+        # are applied; scoring is never gated. 0 disables the gate.
+        self._min_confidence = float(
+            getattr(settings, "DIRECTOR_MIN_CONFIDENCE", 0.0) or 0.0
         )
         # Rolling conversation window: (turn_index, trainee_text, actor_text).
         self._window: Deque[Tuple[int, str, str]] = deque(maxlen=window_turns)
@@ -312,8 +319,14 @@ class DirectorService:
                 continue
             if transition.id not in satisfied:
                 continue
+            # Both behavior clauses are evaluated against the SESSION-WIDE set
+            # of observed behaviors, not just this turn's. A trainee rarely
+            # exhibits several distinct behaviors in a single utterance, so an
+            # all-of guard checked against one turn would almost never fire and
+            # legitimate state progress would stall (the behaviors were shown,
+            # just across different turns).
             if transition.when_behaviors_all and not (
-                set(transition.when_behaviors_all) <= observed
+                set(transition.when_behaviors_all) <= session_observed
             ):
                 continue
             if transition.when_behaviors_any and not (
@@ -334,6 +347,7 @@ class DirectorService:
                     (set(transition.when_behaviors_any) & observed)
                     or (set(transition.when_behaviors_all) & observed)
                     or (set(transition.when_behaviors_any) & session_observed)
+                    or (set(transition.when_behaviors_all) & session_observed)
                 ),
                 None,
             )
@@ -355,6 +369,13 @@ class DirectorService:
         observed: Set[str],
     ) -> List[Tuple[str, Optional[str]]]:
         """[(secret_id, unlock_condition_id)] for legal unlocks only."""
+        # An unlock condition names the behaviors that earn a secret. Those
+        # behaviors are frequently demonstrated turns BEFORE the Director
+        # proposes the unlock (trust is built gradually), so the condition is
+        # checked against the session-wide behavior set, not just this turn.
+        session_observed = observed | {
+            b for b, hits in snapshot.behavior_hits.items() if hits > 0
+        }
         unlocks: List[Tuple[str, Optional[str]]] = []
         for secret_id in verdict.unlock_ids:
             secret = self.spec.get_secret(secret_id)
@@ -376,11 +397,59 @@ class DirectorService:
                 continue
             condition_id = None
             for cond in secret.unlock_conditions:
-                if not cond.behavior_ids or (set(cond.behavior_ids) & observed):
+                if not cond.behavior_ids or (set(cond.behavior_ids) & session_observed):
                     condition_id = cond.id
                     break
             unlocks.append((secret_id, condition_id))
         return unlocks
+
+    def _locked_secret_leak(
+        self, snapshot: RuntimeSessionState, text: Optional[str]
+    ) -> Optional[str]:
+        """Return the id of any still-LOCKED secret whose content appears in
+        ``text`` (a Director-authored stage direction), else None.
+
+        The Director sees full secret content, so a poorly-behaved verdict
+        could smuggle a withheld secret back into the scene via the free-form
+        stage direction that is injected into the actor's next turn card.
+        This is the live-path counterpart of the rehearsal judge's leak scan.
+        """
+        if not text:
+            return None
+        for secret in self.spec.disclosure_ledger.secrets:
+            if snapshot.ledger.get(secret.id, LEDGER_LOCKED) != LEDGER_LOCKED:
+                continue
+            if secret_matching.text_discloses_secret(text, secret.content):
+                return secret.id
+        return None
+
+    def _actor_text_for_turn(self, turn_index: int) -> Optional[str]:
+        """The actor's utterance for a turn, from the rolling window."""
+        for t_idx, _trainee, actor in reversed(self._window):
+            if t_idx == turn_index:
+                return actor
+        return None
+
+    async def _mark_revealed_secrets(
+        self, snapshot: RuntimeSessionState, turn_index: int, unlocked_now: Set[str]
+    ) -> None:
+        """Advance ledger unlocked→revealed for any secret the actor actually
+        voiced this turn, so telemetry distinguishes 'may share' from 'shared'
+        and the turn card's [ALREADY SHARED] branch reflects reality."""
+        actor_text = self._actor_text_for_turn(turn_index)
+        if not actor_text:
+            return
+        # A secret can be spoken the same turn it unlocks, or on any later
+        # turn while UNLOCKED (not yet REVEALED).
+        candidates = set(unlocked_now) | {
+            sid for sid, status in snapshot.ledger.items() if status == LEDGER_UNLOCKED
+        }
+        for secret_id in candidates:
+            secret = self.spec.get_secret(secret_id)
+            if secret is None:
+                continue
+            if secret_matching.text_discloses_secret(actor_text, secret.content):
+                await self.state_store.mark_revealed(secret_id)
 
     def _validate_fired_events(
         self,
@@ -398,15 +467,16 @@ class DirectorService:
                 continue
             if event.trigger == "behavior" and not (set(event.behavior_ids) & observed):
                 continue
-            if (
-                event.trigger == "score"
-                and event.score_threshold is not None
-                and new_cumulative > event.score_threshold
-            ):
-                # Score events fire when the trainee's cumulative score SINKS
-                # to the threshold or below (they model interventions on a
-                # struggling trainee).
-                continue
+            if event.trigger == "score" and event.score_threshold is not None:
+                # A score event fires when the cumulative score crosses the
+                # threshold in the configured direction: at_or_below models an
+                # intervention on a struggling trainee (default); at_or_above
+                # models a positive-reinforcement beat for a trainee doing well.
+                if event.score_comparison == "at_or_above":
+                    if new_cumulative < event.score_threshold:
+                        continue
+                elif new_cumulative > event.score_threshold:
+                    continue
             fired.append(event_id)
         return fired
 
@@ -439,13 +509,33 @@ class DirectorService:
             score_delta += behavior.signed_weight
         new_cumulative = snapshot.cumulative_score + score_delta
 
-        next_state_id, guard_id, observed_behavior = self._validate_transition(
-            verdict, snapshot, observed, new_cumulative
+        # Confidence gate: on a low-confidence turn, still record behavior
+        # scores (additive + auditable) but hold back IRREVERSIBLE actions —
+        # state transitions and disclosure unlocks — that reshape the session.
+        confident = (
+            self._min_confidence <= 0.0 or verdict.confidence >= self._min_confidence
         )
+        if not confident:
+            logger.info(
+                "[roleplay_v2] Director verdict for turn %d below confidence "
+                "gate (%.2f < %.2f) — transitions/unlocks held",
+                turn_index,
+                verdict.confidence,
+                self._min_confidence,
+            )
+
+        if confident:
+            next_state_id, guard_id, observed_behavior = self._validate_transition(
+                verdict, snapshot, observed, new_cumulative
+            )
+        else:
+            next_state_id, guard_id, observed_behavior = None, None, None
         effective_state_id = next_state_id or snapshot.current_state_id
 
-        unlocks = self._validate_unlocks(
-            verdict, snapshot, effective_state_id, observed
+        unlocks = (
+            self._validate_unlocks(verdict, snapshot, effective_state_id, observed)
+            if confident
+            else []
         )
         fired_event_ids = self._validate_fired_events(
             verdict, snapshot, observed, new_cumulative
@@ -456,6 +546,21 @@ class DirectorService:
         direction_kind = "stage_direction"
         direction_event_id: Optional[str] = None
         stage_direction = truncate_stage_direction(verdict.stage_direction)
+        # Live leak guard: never inject a Director-authored direction that
+        # discloses a still-locked secret into the actor's next turn card
+        # (trainer-authored engineered directions below are trusted).
+        leaked_secret_id = self._locked_secret_leak(snapshot, stage_direction)
+        if leaked_secret_id is not None:
+            logger.warning(
+                "[roleplay_v2] Dropped Director stage direction on turn %d — "
+                "it disclosed still-locked secret %r",
+                turn_index,
+                leaked_secret_id,
+            )
+            telemetry.record_turn_fields(
+                self.emitter.room_id, director_direction_leak_blocked=1
+            )
+            stage_direction = None
         if fired_event_ids:
             event = self.spec.get_event(fired_event_ids[0])
             if event is not None and event.direction:
@@ -479,6 +584,12 @@ class DirectorService:
                 turn_index,
             )
             return False
+
+        # Advance ledger unlocked→revealed for any secret the actor actually
+        # voiced (this turn or earlier while unlocked).
+        await self._mark_revealed_secrets(
+            snapshot, turn_index, {secret_id for secret_id, _ in unlocks}
+        )
 
         self._emit_turn_results(
             turn_index,
@@ -670,5 +781,7 @@ class DirectorService:
             ledger=snapshot.ledger,
             cumulative_score=snapshot.cumulative_score,
             behavior_hits=snapshot.behavior_hits,
+            director_commits=snapshot.director_commits,
+            director_misses=snapshot.director_misses,
         )
         await self.emitter.flush()
