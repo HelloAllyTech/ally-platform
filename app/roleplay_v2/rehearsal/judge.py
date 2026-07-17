@@ -21,7 +21,6 @@ computed exactly:
 from __future__ import annotations
 
 import json
-import re
 from typing import Any, Dict, List, Optional, Sequence
 
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -34,13 +33,10 @@ from app.roleplay_v2.rehearsal.schemas import (
     TestVerdict,
     TranscriptTurn,
 )
+from app.roleplay_v2.spec import secret_matching
 from app.roleplay_v2.spec.models import ScenarioSpec
 
 logger = get_logger(__name__)
-
-# A sentence of secret content this long is distinctive enough that verbatim
-# containment in a client turn is a leak, not coincidence.
-_MIN_LEAK_FRAGMENT_CHARS = 25
 
 
 class SecretLeak(BaseModel):
@@ -96,19 +92,10 @@ class TestCaseEvaluation(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def _normalize(text: str) -> str:
-    return re.sub(r"\s+", " ", (text or "")).strip().lower()
-
-
-def _leak_fragments(content: str) -> List[str]:
-    """The whole secret plus each substantial sentence of it."""
-    whole = _normalize(content)
-    fragments = [whole] if whole else []
-    for sentence in re.split(r"(?<=[.!?])\s+", content or ""):
-        normalized = _normalize(sentence)
-        if len(normalized) >= _MIN_LEAK_FRAGMENT_CHARS and normalized != whole:
-            fragments.append(normalized)
-    return fragments
+# Shared with the live Director leak guard so the two never drift (see
+# app/roleplay_v2/spec/secret_matching.py).
+_normalize = secret_matching.normalize_text
+_leak_fragments = secret_matching.leak_fragments
 
 
 def _unlock_turns(director_trace: Sequence[Dict[str, Any]]) -> Dict[str, int]:
@@ -217,6 +204,35 @@ def _build_judge_user_message(
     return "\n".join(lines)
 
 
+async def _invoke_judge_once(
+    judge_llm: Any, system_prompt: str, user_message: str
+) -> Optional[RehearsalSessionJudgement]:
+    """One judge LLM call → parsed judgement, or None on failure."""
+    try:
+        structured = judge_llm.with_structured_output(
+            RehearsalSessionJudgement, method="json_mode"
+        )
+        result = await structured.ainvoke(
+            [
+                SystemMessage(content=system_prompt),
+                HumanMessage(content=user_message),
+            ]
+        )
+        if isinstance(result, RehearsalSessionJudgement):
+            return result
+        if isinstance(result, dict):
+            return result.get("parsed") or RehearsalSessionJudgement.model_validate(
+                result
+            )
+    except Exception:
+        logger.exception("[roleplay_v2] LLM judge call failed")
+    return None
+
+
+def _mean_int(values: Sequence[int]) -> int:
+    return round(sum(values) / len(values)) if values else 0
+
+
 async def judge_session(
     spec: ScenarioSpec,
     profile: str,
@@ -225,8 +241,27 @@ async def judge_session(
     judge_llm: Any,
     *,
     prompt_data: Any = None,
+    samples: Optional[int] = None,
 ) -> RehearsalSessionJudgement:
-    """LLM-judge one run, then apply the deterministic overrides."""
+    """LLM-judge one run, then apply the deterministic overrides.
+
+    The two soft dimensions (persona_consistency, difficulty_calibration) have
+    no deterministic backstop, so they are the noisiest single-shot scores.
+    When ``samples`` (or settings.REHEARSAL_JUDGE_SAMPLES) > 1, the judge is
+    called that many times and those two dimensions are averaged; every other
+    field comes from the first successful sample.
+    """
+    from app.core.config import settings
+
+    n_samples = max(
+        1,
+        int(
+            samples
+            if samples is not None
+            else getattr(settings, "REHEARSAL_JUDGE_SAMPLES", 1)
+        ),
+    )
+
     base = (load_template("judge/system", prompt_data) or "").strip()
     spec_json = json.dumps(
         spec.model_dump(by_alias=True, exclude={"ui"}),
@@ -239,30 +274,31 @@ async def judge_session(
     )
     user_message = _build_judge_user_message(profile, transcript, director_trace)
 
-    judgement: Optional[RehearsalSessionJudgement] = None
-    try:
-        structured = judge_llm.with_structured_output(
-            RehearsalSessionJudgement, method="json_mode"
-        )
-        result = await structured.ainvoke(
-            [
-                SystemMessage(content=system_prompt),
-                HumanMessage(content=user_message),
-            ]
-        )
-        if isinstance(result, RehearsalSessionJudgement):
-            judgement = result
-        elif isinstance(result, dict):
-            judgement = result.get(
-                "parsed"
-            ) or RehearsalSessionJudgement.model_validate(result)
-    except Exception:
-        logger.exception("[roleplay_v2] LLM judge failed; deterministic-only scores")
+    samples_out: List[RehearsalSessionJudgement] = []
+    for _ in range(n_samples):
+        one = await _invoke_judge_once(judge_llm, system_prompt, user_message)
+        if one is not None:
+            samples_out.append(one)
+
+    judgement: Optional[RehearsalSessionJudgement] = (
+        samples_out[0] if samples_out else None
+    )
     if judgement is None:
+        logger.warning(
+            "[roleplay_v2] LLM judge produced no usable sample; deterministic-only"
+        )
         judgement = RehearsalSessionJudgement(
             critique_markdown=(
                 "LLM judge unavailable — deterministic checks only for this run."
             )
+        )
+    elif len(samples_out) > 1:
+        # Average the two backstop-less soft dimensions across samples.
+        judgement.persona_consistency = _mean_int(
+            [s.persona_consistency for s in samples_out]
+        )
+        judgement.difficulty_calibration = _mean_int(
+            [s.difficulty_calibration for s in samples_out]
         )
 
     # ---- Hybrid overrides (deterministic wins on conflict) ----

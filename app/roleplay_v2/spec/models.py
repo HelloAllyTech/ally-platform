@@ -254,6 +254,13 @@ class EngineeredEvent(SpecBase):
     at_seconds: Optional[float] = None
     behavior_ids: List[str] = Field(default_factory=list)
     score_threshold: Optional[float] = None
+    # For score-triggered events: whether the beat fires when the trainee's
+    # cumulative score sinks to/below the threshold ("at_or_below", the
+    # default — models an intervention on a struggling trainee) or rises
+    # to/above it ("at_or_above" — models a positive-reinforcement beat).
+    # Optional & additive: specs that omit it keep the original decline-only
+    # behavior, so the frozen cross-repo contract stays backward-compatible.
+    score_comparison: Literal["at_or_below", "at_or_above"] = "at_or_below"
     direction: str = ""
     once: bool = True
 
@@ -383,6 +390,11 @@ class ScenarioSpec(SpecBase):
     comfort_audio_volume: Optional[float] = None
     continuous_backchanneling: bool = False
     interim_reply_enabled: bool = True
+    # Optional Studio-authored static thinking-filler phrases (e.g. ["hmm",
+    # "let me think"]). When empty, filler falls back to the runtime default
+    # set so v2 has working static fillers even without predictive fillers.
+    # Optional & additive (extra="ignore" keeps the frozen contract intact).
+    filler_phrases: List[str] = Field(default_factory=list)
     actor_model: Optional[ModelSpec] = None
     director_model: Optional[ModelSpec] = None
     # `ui` is authoring-only; accepted and ignored so the runtime never breaks
@@ -530,30 +542,53 @@ class RoleplaySpecEnvelope(SpecBase):
         return None
 
     async def ensure_spec(self) -> ScenarioSpec:
-        """Return the inline spec, fetching from specFetch.url when absent."""
+        """Return the inline spec, fetching from specFetch.url when absent.
+
+        The fetch happens in ``configure()`` before the agent can join, so a
+        transient network blip would strand the room. Retry the GET a few
+        times with exponential backoff and fail with an actionable message.
+        """
         if self.spec is not None:
             return self.spec
         if self.spec_fetch is None:
             raise ValueError(
                 "roleplay_v2 metadata has neither an inline spec nor a specFetch"
             )
-        # Deferred import: httpx is only needed on the fetch path.
+        # Deferred imports: only needed on the fetch path.
+        import asyncio
+
         import httpx
 
         from app.core.config import settings
 
-        logger.info(
-            "[roleplay_v2] Fetching spec version=%s from %s",
-            self.spec_fetch.version_id,
-            self.spec_fetch.url,
-        )
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.get(
-                self.spec_fetch.url,
-                headers={"x-api-key": settings.CORE_SERVICE_API_KEY},
+        attempts = max(1, int(getattr(settings, "SPEC_FETCH_MAX_ATTEMPTS", 3)))
+        last_exc: Optional[Exception] = None
+        payload: Any = None
+        for attempt in range(1, attempts + 1):
+            logger.info(
+                "[roleplay_v2] Fetching spec version=%s (attempt %d/%d)",
+                self.spec_fetch.version_id,
+                attempt,
+                attempts,
             )
-            resp.raise_for_status()
-            payload = resp.json()
+            try:
+                async with httpx.AsyncClient(timeout=15.0) as client:
+                    resp = await client.get(
+                        self.spec_fetch.url,
+                        headers={"x-api-key": settings.CORE_SERVICE_API_KEY},
+                    )
+                    resp.raise_for_status()
+                    payload = resp.json()
+                break
+            except Exception as exc:  # noqa: BLE001 - retried below
+                last_exc = exc
+                if attempt < attempts:
+                    await asyncio.sleep(0.5 * (2 ** (attempt - 1)))
+        if payload is None:
+            raise RuntimeError(
+                f"roleplay_v2 spec fetch failed after {attempts} attempt(s) for "
+                f"version {self.spec_fetch.version_id}: {last_exc}"
+            ) from last_exc
         # The fetch endpoint may return either the bare spec document or a
         # wrapper with a `spec` key; accept both.
         if isinstance(payload, dict) and "spec" in payload and "title" not in payload:

@@ -800,9 +800,23 @@ class Settings(BaseSettings):
         ),
     )
     DIRECTOR_MODEL: str = Field(
-        default="gpt-4o-mini",
+        default="gpt-4o",
         description=(
-            "Default model for the v2 Director when the spec has no " "directorModel."
+            "Default model for the v2 Director when the spec has no "
+            "directorModel. The Director is the referee (scoring, transitions, "
+            "unlocks) and runs OFF the voice critical path, so it can afford a "
+            "stronger model than the Actor — accuracy matters more than latency "
+            "here. Must support json_mode structured output."
+        ),
+    )
+    DIRECTOR_MIN_CONFIDENCE: float = Field(
+        default=0.4,
+        description=(
+            "Minimum self-reported Director confidence (0..1) required before "
+            "IRREVERSIBLE verdict actions — state transitions and disclosure "
+            "unlocks — are applied. Behavior scoring is never gated (it is "
+            "additive and auditable); only actions that reshape the session "
+            "are held back on a low-confidence turn. 0 disables the gate."
         ),
     )
     DIRECTOR_TIMEOUT_S: float = Field(
@@ -811,6 +825,14 @@ class Settings(BaseSettings):
             "Hard timeout (seconds) for one Director verdict. The Director "
             "runs OFF the voice critical path, so on timeout the turn simply "
             "goes undirected (a recorded miss) — it never delays the actor."
+        ),
+    )
+    SPEC_FETCH_MAX_ATTEMPTS: int = Field(
+        default=3,
+        description=(
+            "How many times the v2 runtime retries GETting a large spec from "
+            "the specFetch webhook (exponential backoff) before failing the "
+            "session in configure(). Only the >55KB spec path uses this."
         ),
     )
     DIRECTOR_GRACE_MS: float = Field(
@@ -845,6 +867,16 @@ class Settings(BaseSettings):
         description=(
             "Default judge model for rehearsals (config.judge_model in the "
             "request overrides per-run)."
+        ),
+    )
+    REHEARSAL_JUDGE_SAMPLES: int = Field(
+        default=1,
+        description=(
+            "How many times the rehearsal judge is sampled per run. The two "
+            "SOFT dimensions with no deterministic backstop — persona_"
+            "consistency and difficulty_calibration — are averaged across "
+            "samples to reduce single-shot LLM noise; all other fields come "
+            "from the first sample. 1 (default) = original single-shot behavior."
         ),
     )
     REHEARSAL_TURNS_DEFAULT: int = Field(
