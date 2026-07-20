@@ -111,6 +111,9 @@ jest.mock('@/store/hooks', () => ({
 jest.mock('@/services/callsApi', () => ({
   useLazyGetCallLogsQuery: () => [jest.fn().mockResolvedValue({ data: { data: [] } }), { isFetching: false }],
 }));
+jest.mock('@/services/customFieldsApi', () => ({
+  useGetCustomFieldDefinitionsQuery: () => ({ data: [] }),
+}));
 jest.mock('@/services/simulationsApi', () => ({
   useLazyGetSimulationLogsQuery: () => [jest.fn().mockResolvedValue({ data: { data: [] } }), { isFetching: false }],
 }));
@@ -131,6 +134,7 @@ jest.mock('../components', () => ({
   CallLogItem: () => <></>,
   FeatureNotAvailable: ({ description }: any) => <>{description}</>,
   StartSessionModal: () => <></>,
+  CallLogFilterSheet: () => <></>,
 }));
 
 // Permissions

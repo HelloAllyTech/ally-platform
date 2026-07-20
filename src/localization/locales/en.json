@@ -237,6 +237,17 @@
     "menu": {
       "archives": "Archives"
     },
+    "filters": {
+      "title": "Filters",
+      "apply": "Apply",
+      "clear": "Clear",
+      "noFields": "No filterable fields available",
+      "searchPlaceholder": "Search…",
+      "min": "Min",
+      "max": "Max",
+      "from": "From",
+      "to": "To"
+    },
     "actions": {
       "uploadAudio": "Upload audio",
       "startSession": "Start Session"

@@ -1,4 +1,5 @@
 export {Badge} from './Badge';
+export {CallLogFilterSheet} from './CallLogFilterSheet';
 export {CallLogHeader} from './CallLogHeader';
 export {CallLogItem} from './CallLogItem';
 export {Tag} from './Tag';
