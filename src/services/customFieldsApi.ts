@@ -1,46 +1,17 @@
 import {API_METHODS, API_ROUTES} from '@/constants';
 
 import {api} from './api';
+import {
+  CustomFieldDefinition,
+  CustomFieldValue,
+  UpsertCustomFieldValuesInput,
+} from './customFieldsApi.types';
 
-export enum CustomFieldType {
-  SINGLE_SELECT = 'SINGLE_SELECT',
-  MULTI_SELECT = 'MULTI_SELECT',
-  DATE = 'DATE',
-  TEXT = 'TEXT',
-  NUMBER = 'NUMBER',
-  BOOLEAN = 'BOOLEAN',
-}
-
-export enum CustomFieldEditPermission {
-  ADMIN_ONLY = 'ADMIN_ONLY',
-  COUNSELLOR_ONLY = 'COUNSELLOR_ONLY',
-  BOTH = 'BOTH',
-}
-
-export interface CustomFieldOption {
-  id: string;
-  label: string;
-  order: number;
-}
-
-export interface CustomFieldDefinition {
-  id: string;
-  name: string;
-  fieldType: CustomFieldType;
-  sectionKey: string;
-  editPermission: CustomFieldEditPermission;
-  options?: CustomFieldOption[];
-  showInTable: boolean;
-}
-
-export interface CustomFieldValue {
-  fieldDefinitionId: string;
-  value: string | null;
-}
-
-export interface UpsertCustomFieldValuesInput {
-  values: {fieldDefinitionId: string; value?: string}[];
-}
+// Re-export the shared custom-field types/enums so existing
+// `@/services/customFieldsApi` importers keep working. New lightweight
+// consumers should import from './customFieldsApi.types' directly to avoid
+// pulling in the `api` (and i18n) chain.
+export * from './customFieldsApi.types';
 
 export const customFieldsApi = api.injectEndpoints({
   overrideExisting: true,

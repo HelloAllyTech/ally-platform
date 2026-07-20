@@ -42,6 +42,7 @@ import {
 } from '@/hooks';
 import {getFirstVisibleTab} from '@/navigation/TabNavigator';
 import {useLazyGetCallLogsQuery} from '@/services/callsApi';
+import {useGetCustomFieldDefinitionsQuery} from '@/services/customFieldsApi';
 import {useCreateNoteMutation} from '@/services/scribeNoteApi';
 import {useLazyGetVisibleChatTypesQuery} from '@/services/settingsApi';
 import {useLazyGetSimulationLogsQuery} from '@/services/simulationsApi';
@@ -51,12 +52,19 @@ import {colors} from '@/theme';
 import {logger} from '@/utils/logger';
 
 import {
+  CallLogFilterSheet,
   CallLogHeader,
   CallLogItem,
   FeatureNotAvailable,
   StartSessionModal,
 } from './components';
 import {LogItem} from './types';
+import {
+  buildFieldFiltersParam,
+  countActiveFilters,
+  filterableDefs,
+  FilterState,
+} from './utils/fieldFilters';
 
 // Number of items to fetch per page for pagination
 const ITEMS_PER_PAGE = 10;
@@ -72,6 +80,8 @@ export const CallLogScreen: React.FC = () => {
   const route = useRoute();
 
   const [search, setSearch] = useState('');
+  const [filterState, setFilterState] = useState<FilterState>({});
+  const [showFilterSheet, setShowFilterSheet] = useState(false);
   const [expandedIdx, setExpandedIdx] = useState(-1);
   const [activeTab, setActiveTab] = useState<LogType>(LogType.REAL);
   const [isViewingArchivedRealLogs, setIsViewingArchivedRealLogs] =
@@ -107,6 +117,21 @@ export const CallLogScreen: React.FC = () => {
   const [getVisibleChatTypes, {data: enabledChatTypes}] =
     useLazyGetVisibleChatTypesQuery();
   const {checkCounselorChat} = useCounselorChat();
+
+  const canViewCallLogs = permissions?.includes(
+    USER_PERMISSIONS.VIEW_CALL_LOGS,
+  );
+  const {data: customFieldDefs = []} = useGetCustomFieldDefinitionsQuery(
+    undefined,
+    {
+      skip: !canViewCallLogs,
+    },
+  );
+  const fieldFiltersParam = useMemo(
+    () => buildFieldFiltersParam(filterState),
+    [filterState],
+  );
+  const activeFilterCount = countActiveFilters(filterState);
 
   // Check if this is the first visible tab
   const isFirstTab = useMemo(() => {
@@ -215,6 +240,7 @@ export const CallLogScreen: React.FC = () => {
       limit: ITEMS_PER_PAGE,
       offset: 0,
       archive: false,
+      fieldFilters: fieldFiltersParam,
     });
     if (result.data?.data) {
       // This is to avoid showing the ongoing call log
@@ -226,7 +252,7 @@ export const CallLogScreen: React.FC = () => {
     } else {
       setAllRealLogs([]);
     }
-  }, [currentChat?.chatId, getCallLogs]);
+  }, [currentChat?.chatId, getCallLogs, fieldFiltersParam]);
 
   /**
    * Fetches the initial set of simulation logs
@@ -252,6 +278,7 @@ export const CallLogScreen: React.FC = () => {
       limit: ITEMS_PER_PAGE,
       offset: 0,
       archive: true,
+      fieldFilters: fieldFiltersParam,
     });
     const logsResponse = result.data?.data;
     if (logsResponse) {
@@ -260,7 +287,7 @@ export const CallLogScreen: React.FC = () => {
     } else {
       setAllArchivedRealLogs([]);
     }
-  }, [getCallLogs]);
+  }, [getCallLogs, fieldFiltersParam]);
 
   // Use useFocusEffect to refresh data when screen comes into focus
   useFocusEffect(
@@ -304,6 +331,7 @@ export const CallLogScreen: React.FC = () => {
         limit: ITEMS_PER_PAGE,
         offset: newOffset,
         archive: true,
+        fieldFilters: fieldFiltersParam,
       });
       if (result?.data?.data) {
         setAllArchivedRealLogs(prev => [
@@ -322,6 +350,7 @@ export const CallLogScreen: React.FC = () => {
           limit: ITEMS_PER_PAGE,
           offset: newOffset,
           archive: false,
+          fieldFilters: fieldFiltersParam,
         });
 
         if (result?.data?.data) {
@@ -372,6 +401,20 @@ export const CallLogScreen: React.FC = () => {
   const handleArchivePress = async () => {
     setIsViewingArchivedRealLogs(true);
   };
+
+  // Applying filters updates filterState → fieldFiltersParam → the fetch
+  // callbacks' identities change, so the focus effect re-runs and refetches
+  // page 0 with the new filters.
+  const handleApplyFilters = (state: FilterState) => {
+    setFilterState(state);
+  };
+
+  // The filter button/sheet apply only to real (incl. archived) call logs, not
+  // simulations, and only when the tenant has at least one filterable field.
+  const showFilterAction =
+    canViewCallLogs &&
+    filterableDefs(customFieldDefs).length > 0 &&
+    (isViewingArchivedRealLogs || activeTab === LogType.REAL);
 
   const handleItemPress = (item: LogItem) => {
     if (isViewingArchivedRealLogs) {
@@ -560,6 +603,10 @@ export const CallLogScreen: React.FC = () => {
         showBackButton={isViewingArchivedRealLogs}
         onGoBack={() => setIsViewingArchivedRealLogs(false)}
         onArchivePress={handleArchivePress}
+        onFilterPress={
+          showFilterAction ? () => setShowFilterSheet(true) : undefined
+        }
+        activeFilterCount={activeFilterCount}
         isFetching={isFetchingRealLogs || isFetchingSimulationLogs}
         showActionsMenu={
           !isViewingArchivedRealLogs &&
@@ -644,6 +691,13 @@ export const CallLogScreen: React.FC = () => {
         showCreateNote={canCreateNote}
         onCreateNote={handleCreateNote}
         isCreatingNote={isCreatingNote}
+      />
+      <CallLogFilterSheet
+        visible={showFilterSheet}
+        onClose={() => setShowFilterSheet(false)}
+        definitions={customFieldDefs}
+        appliedState={filterState}
+        onApply={handleApplyFilters}
       />
     </View>
   );

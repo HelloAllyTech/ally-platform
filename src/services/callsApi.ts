@@ -17,11 +17,22 @@ export const callsAPI = api.injectEndpoints({
   endpoints: builder => ({
     getCallLogs: builder.query<
       CallLogsResponse,
-      {limit: number; offset: number; archive: boolean}
+      {
+        limit: number;
+        offset: number;
+        archive: boolean;
+        /** JSON-encoded array of custom/default-field filters. */
+        fieldFilters?: string;
+      }
     >({
-      query: ({limit, offset, archive}) => ({
+      query: ({limit, offset, archive, fieldFilters}) => ({
         url: API_ROUTES.CHATS.CALL_LOGS,
-        params: {limit, offset, archive},
+        params: {
+          limit,
+          offset,
+          archive,
+          ...(fieldFilters ? {fieldFilters} : {}),
+        },
       }),
     }),
     archiveCallLog: builder.mutation<void, ArchiveCallLogsRequest>({

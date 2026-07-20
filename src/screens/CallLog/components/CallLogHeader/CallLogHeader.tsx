@@ -1,17 +1,20 @@
 import React, {useEffect, useMemo} from 'react';
-import {Animated, TouchableOpacity, View} from 'react-native';
+import {Animated, Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {ArchiveIcon, LeftArrow, ReplayIcon} from '@/assets';
+import {ArchiveIcon, FilterIcon, LeftArrow, ReplayIcon} from '@/assets';
 import {ActionsMenu, TabScreenHeader} from '@/components';
 import {useTranslate} from '@/hooks';
-import {colors} from '@/theme';
+import {colors, fontFamily, typography} from '@/theme';
 
 interface CallLogHeaderProps {
   search: string;
   onSearchChange: (text: string) => void;
   onRefresh?: () => void;
   onArchivePress?: () => void;
+  onFilterPress?: () => void;
+  /** Number of active filters, shown as a badge on the filter button. */
+  activeFilterCount?: number;
   isFetching?: boolean;
   title?: string;
   subtitle?: string;
@@ -25,6 +28,8 @@ export const CallLogHeader: React.FC<CallLogHeaderProps> = ({
   onSearchChange: _onSearchChange,
   onRefresh,
   onArchivePress,
+  onFilterPress,
+  activeFilterCount = 0,
   isFetching = false,
   title,
   subtitle,
@@ -63,6 +68,19 @@ export const CallLogHeader: React.FC<CallLogHeaderProps> = ({
           styles.actionsContainer,
           showBackButton ? styles.rightContentOptionalPadding : undefined,
         ]}>
+        {onFilterPress && (
+          <TouchableOpacity
+            onPress={onFilterPress}
+            accessibilityLabel="Filter"
+            style={styles.filterButton}>
+            <FilterIcon width={16} height={16} />
+            {activeFilterCount > 0 && (
+              <View style={styles.filterBadge}>
+                <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        )}
         <TouchableOpacity onPress={onRefresh} accessibilityLabel="Refresh">
           <Animated.View
             style={[styles.iconContainer, {transform: [{rotate: rotation}]}]}>
@@ -125,7 +143,30 @@ const styles = ScaledSheet.create({
   actionsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: '8@ms',
+    gap: '12@ms',
+  },
+  filterButton: {
+    width: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  filterBadge: {
+    position: 'absolute',
+    top: '-6@ms',
+    right: '-8@ms',
+    minWidth: '14@ms',
+    height: '14@ms',
+    paddingHorizontal: '3@ms',
+    borderRadius: '7@ms',
+    backgroundColor: colors.azureBlue,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  filterBadgeText: {
+    ...typography.body.nano,
+    ...fontFamily.ROBOTO.REGULAR,
+    color: colors.white,
   },
   backButton: {
     justifyContent: 'center',
