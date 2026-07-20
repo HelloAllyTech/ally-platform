@@ -8,17 +8,18 @@ import {CustomFieldDefinition} from '@/services/customFieldsApi.types';
 import {colors, fontFamily, typography} from '@/theme';
 
 import {
-  controlForFieldType,
-  filterableDefs,
+  FilterFieldDef,
   FilterState,
   FilterValue,
-  optionsForDef,
+  getFilterFields,
 } from '../../utils/fieldFilters';
 
 interface CallLogFilterSheetProps {
   visible: boolean;
   onClose: () => void;
   definitions: CustomFieldDefinition[];
+  /** Tenant tag options for the built-in Tags filter. */
+  tagOptions?: {label: string; value: string}[];
   /** Currently-applied filter state, used to seed the draft when opened. */
   appliedState: FilterState;
   onApply: (state: FilterState) => void;
@@ -32,6 +33,7 @@ export const CallLogFilterSheet: React.FC<CallLogFilterSheetProps> = ({
   visible,
   onClose,
   definitions,
+  tagOptions = [],
   appliedState,
   onApply,
 }) => {
@@ -44,7 +46,7 @@ export const CallLogFilterSheet: React.FC<CallLogFilterSheetProps> = ({
     if (visible) setDraft(appliedState);
   }, [visible, appliedState]);
 
-  const defs = filterableDefs(definitions);
+  const fields = getFilterFields(definitions, tagOptions);
 
   const setValue = (id: string, value: FilterValue) =>
     setDraft(prev => ({...prev, [id]: value}));
@@ -74,22 +76,22 @@ export const CallLogFilterSheet: React.FC<CallLogFilterSheetProps> = ({
     onClose();
   };
 
-  const renderControl = (def: CustomFieldDefinition) => {
-    const control = controlForFieldType(def.fieldType);
-    const value = draft[def.id];
+  const renderControl = (field: FilterFieldDef) => {
+    const {key, control, options = []} = field;
+    const value = draft[key];
 
     switch (control) {
       case 'multiselect':
         return (
           <View style={styles.chipRow}>
-            {optionsForDef(def).map(opt => {
+            {options.map(opt => {
               const selected =
                 Array.isArray(value) && value.includes(opt.value);
               return (
                 <TouchableOpacity
                   key={opt.value}
                   style={[styles.chip, selected && styles.chipSelected]}
-                  onPress={() => toggleOption(def.id, opt.value)}>
+                  onPress={() => toggleOption(key, opt.value)}>
                   <Text
                     style={[
                       styles.chipText,
@@ -115,7 +117,7 @@ export const CallLogFilterSheet: React.FC<CallLogFilterSheetProps> = ({
                     : t('calls.filters.from')
                 }
                 value={rangeAt(value, 0)}
-                onChangeText={text => setRange(def.id, 0, text)}
+                onChangeText={text => setRange(key, 0, text)}
               />
             </View>
             <Text style={styles.rangeDash}>–</Text>
@@ -127,7 +129,7 @@ export const CallLogFilterSheet: React.FC<CallLogFilterSheetProps> = ({
                     : t('calls.filters.to')
                 }
                 value={rangeAt(value, 1)}
-                onChangeText={text => setRange(def.id, 1, text)}
+                onChangeText={text => setRange(key, 1, text)}
               />
             </View>
           </View>
@@ -139,7 +141,7 @@ export const CallLogFilterSheet: React.FC<CallLogFilterSheetProps> = ({
           <LineTextInput
             placeholder={t('calls.filters.searchPlaceholder')}
             value={typeof value === 'string' ? value : ''}
-            onChangeText={text => setValue(def.id, text)}
+            onChangeText={text => setValue(key, text)}
           />
         );
     }
@@ -153,17 +155,17 @@ export const CallLogFilterSheet: React.FC<CallLogFilterSheetProps> = ({
       backgroundColor={colors.white}>
       <View style={styles.container}>
         <Text style={styles.title}>{t('calls.filters.title')}</Text>
-        {defs.length === 0 ? (
+        {fields.length === 0 ? (
           <Text style={styles.empty}>{t('calls.filters.noFields')}</Text>
         ) : (
           <ScrollView
             style={styles.scroll}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}>
-            {defs.map(def => (
-              <View key={def.id} style={styles.field}>
-                <Text style={styles.fieldLabel}>{def.name}</Text>
-                {renderControl(def)}
+            {fields.map(field => (
+              <View key={field.key} style={styles.field}>
+                <Text style={styles.fieldLabel}>{field.label}</Text>
+                {renderControl(field)}
               </View>
             ))}
           </ScrollView>

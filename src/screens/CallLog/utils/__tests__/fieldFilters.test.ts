@@ -3,10 +3,12 @@
 import {CustomFieldType} from '@/services/customFieldsApi.types';
 
 import {
+  buildBuiltinParams,
   buildFieldFiltersParam,
   controlForFieldType,
   countActiveFilters,
   filterableDefs,
+  getFilterFields,
   optionsForDef,
 } from '../fieldFilters';
 
@@ -74,5 +76,84 @@ describe('buildFieldFiltersParam / countActiveFilters', () => {
   it('returns undefined when nothing is set', () => {
     expect(buildFieldFiltersParam({})).toBeUndefined();
     expect(buildFieldFiltersParam({a: '', b: []})).toBeUndefined();
+  });
+
+  it('excludes built-in keys from the custom fieldFilters param', () => {
+    const param = buildFieldFiltersParam({
+      mode: ['SCRIBE'],
+      duration: ['5', '10'],
+      customUuid: 'anx',
+    });
+    expect(JSON.parse(param!)).toEqual([
+      {fieldDefinitionId: 'customUuid', value: 'anx'},
+    ]);
+  });
+});
+
+describe('buildBuiltinParams', () => {
+  it('maps built-in keys to API params (duration minutes -> seconds)', () => {
+    const params = buildBuiltinParams({
+      dateAndTime: ['2026-01-01', '2026-02-01'],
+      duration: ['5', '10'],
+      mode: ['SCRIBE', 'DICTATION'],
+      status: ['SUCCESS'],
+      source: ['UPLOAD'],
+      tags: ['anxiety'],
+      someCustom: 'ignored',
+    });
+    expect(params).toEqual({
+      startDate: '2026-01-01',
+      endDate: '2026-02-01',
+      minDuration: 300,
+      maxDuration: 600,
+      mode: 'SCRIBE,DICTATION',
+      status: 'SUCCESS',
+      source: 'UPLOAD',
+      tags: 'anxiety',
+    });
+  });
+
+  it('leaves unset built-in params undefined', () => {
+    const params = buildBuiltinParams({mode: ['DICTATION']});
+    expect(params.mode).toBe('DICTATION');
+    expect(params.status).toBeUndefined();
+    expect(params.startDate).toBeUndefined();
+    expect(params.minDuration).toBeUndefined();
+  });
+});
+
+describe('getFilterFields', () => {
+  it('lists built-in fields first, then filterable custom fields', () => {
+    const fields = getFilterFields(
+      [
+        {
+          id: 'd1',
+          name: 'Diagnosis',
+          fieldType: CustomFieldType.TEXT,
+          filterable: true,
+        },
+      ] as any,
+      [{label: 'anx', value: 'anx'}],
+    );
+    const keys = fields.map(f => f.key);
+    // Built-in keys present (incl. tags because tagOptions provided)
+    expect(keys).toEqual(
+      expect.arrayContaining([
+        'dateAndTime',
+        'duration',
+        'mode',
+        'status',
+        'source',
+        'tags',
+        'd1',
+      ]),
+    );
+    // Custom field comes after the built-ins
+    expect(keys.indexOf('d1')).toBeGreaterThan(keys.indexOf('source'));
+  });
+
+  it('omits the Tags field when no tag options exist', () => {
+    const fields = getFilterFields([], []);
+    expect(fields.map(f => f.key)).not.toContain('tags');
   });
 });
