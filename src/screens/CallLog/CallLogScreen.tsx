@@ -41,7 +41,10 @@ import {
   useUser,
 } from '@/hooks';
 import {getFirstVisibleTab} from '@/navigation/TabNavigator';
-import {useLazyGetCallLogsQuery} from '@/services/callsApi';
+import {
+  useGetCallTagsQuery,
+  useLazyGetCallLogsQuery,
+} from '@/services/callsApi';
 import {useGetCustomFieldDefinitionsQuery} from '@/services/customFieldsApi';
 import {useCreateNoteMutation} from '@/services/scribeNoteApi';
 import {useLazyGetVisibleChatTypesQuery} from '@/services/settingsApi';
@@ -60,9 +63,9 @@ import {
 } from './components';
 import {LogItem} from './types';
 import {
+  buildBuiltinParams,
   buildFieldFiltersParam,
   countActiveFilters,
-  filterableDefs,
   FilterState,
 } from './utils/fieldFilters';
 
@@ -127,8 +130,19 @@ export const CallLogScreen: React.FC = () => {
       skip: !canViewCallLogs,
     },
   );
+  const {data: tagsData} = useGetCallTagsQuery(undefined, {
+    skip: !canViewCallLogs,
+  });
+  const tagOptions = useMemo(
+    () => (tagsData?.data ?? []).map(tag => ({label: tag, value: tag})),
+    [tagsData],
+  );
   const fieldFiltersParam = useMemo(
     () => buildFieldFiltersParam(filterState),
+    [filterState],
+  );
+  const builtinParams = useMemo(
+    () => buildBuiltinParams(filterState),
     [filterState],
   );
   const activeFilterCount = countActiveFilters(filterState);
@@ -241,6 +255,7 @@ export const CallLogScreen: React.FC = () => {
       offset: 0,
       archive: false,
       fieldFilters: fieldFiltersParam,
+      ...builtinParams,
     });
     if (result.data?.data) {
       // This is to avoid showing the ongoing call log
@@ -252,7 +267,7 @@ export const CallLogScreen: React.FC = () => {
     } else {
       setAllRealLogs([]);
     }
-  }, [currentChat?.chatId, getCallLogs, fieldFiltersParam]);
+  }, [currentChat?.chatId, getCallLogs, fieldFiltersParam, builtinParams]);
 
   /**
    * Fetches the initial set of simulation logs
@@ -279,6 +294,7 @@ export const CallLogScreen: React.FC = () => {
       offset: 0,
       archive: true,
       fieldFilters: fieldFiltersParam,
+      ...builtinParams,
     });
     const logsResponse = result.data?.data;
     if (logsResponse) {
@@ -287,7 +303,7 @@ export const CallLogScreen: React.FC = () => {
     } else {
       setAllArchivedRealLogs([]);
     }
-  }, [getCallLogs, fieldFiltersParam]);
+  }, [getCallLogs, fieldFiltersParam, builtinParams]);
 
   // Use useFocusEffect to refresh data when screen comes into focus
   useFocusEffect(
@@ -332,6 +348,7 @@ export const CallLogScreen: React.FC = () => {
         offset: newOffset,
         archive: true,
         fieldFilters: fieldFiltersParam,
+        ...builtinParams,
       });
       if (result?.data?.data) {
         setAllArchivedRealLogs(prev => [
@@ -351,6 +368,7 @@ export const CallLogScreen: React.FC = () => {
           offset: newOffset,
           archive: false,
           fieldFilters: fieldFiltersParam,
+          ...builtinParams,
         });
 
         if (result?.data?.data) {
@@ -410,10 +428,10 @@ export const CallLogScreen: React.FC = () => {
   };
 
   // The filter button/sheet apply only to real (incl. archived) call logs, not
-  // simulations, and only when the tenant has at least one filterable field.
+  // simulations. Built-in column filters are always available, so gate only on
+  // the view + permission.
   const showFilterAction =
-    canViewCallLogs &&
-    filterableDefs(customFieldDefs).length > 0 &&
+    !!canViewCallLogs &&
     (isViewingArchivedRealLogs || activeTab === LogType.REAL);
 
   const handleItemPress = (item: LogItem) => {
@@ -696,6 +714,7 @@ export const CallLogScreen: React.FC = () => {
         visible={showFilterSheet}
         onClose={() => setShowFilterSheet(false)}
         definitions={customFieldDefs}
+        tagOptions={tagOptions}
         appliedState={filterState}
         onApply={handleApplyFilters}
       />

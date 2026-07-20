@@ -110,6 +110,7 @@ jest.mock('@/store/hooks', () => ({
 // Services
 jest.mock('@/services/callsApi', () => ({
   useLazyGetCallLogsQuery: () => [jest.fn().mockResolvedValue({ data: { data: [] } }), { isFetching: false }],
+  useGetCallTagsQuery: () => ({ data: { data: [], count: 0 } }),
 }));
 jest.mock('@/services/customFieldsApi', () => ({
   useGetCustomFieldDefinitionsQuery: () => ({ data: [] }),

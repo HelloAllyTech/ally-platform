@@ -136,6 +136,7 @@ export const API_ROUTES = {
     SUMMARY_FEEDBACK: (chatId: number) => `/chats/${chatId}/summary-feedback`,
     ENHANCE: '/chats/enhance',
     CALL_LOGS: '/chats/call-logs',
+    TAGS: '/chats/tags',
     SUMMARY_TAG_RATINGS: '/chats/summary/tag-positivity-ratings',
     MESSAGES_FEEDBACK: (chatId: number) => `/chats/messages/${chatId}/feedback`,
     MESSAGES_FEEDBACK_BY_ID: (feedbackId: number) =>
