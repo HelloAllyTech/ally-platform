@@ -6,3 +6,4 @@ export {SimulationControls} from './SimulationControls';
 export {SessionGoalTimer} from './SessionGoalTimer';
 export {SessionChecklist} from './SessionChecklist';
 export {SessionInfoTabs} from './SessionInfoTabs';
+export {SessionProgress} from './SessionProgress';
