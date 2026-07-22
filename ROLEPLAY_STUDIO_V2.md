@@ -1,6 +1,6 @@
 # Roleplay Studio v2
 
-> This is the same cross-repo reference kept in `ally-be` and `ally-ai-learn`. This repo owns the **runtime** (`app/worker_v2.py`, `app/roleplay_v2/`) and the Actor/Director/Trainee/Judge prompts under `app/prompts/`.
+> This is the same cross-repo reference kept in `ally-be` and `ally-ai-learn`. This repo owns the **runtime** (`app/worker_v2.py`, `app/roleplay_v2/`) and the Actor/Director prompts under `app/prompts/`.
 
 An AI-copilot-driven studio for designing voice roleplays. A trainer answers a few
 questions; the system compiles a **Scenario Spec** and runs it as a live, voice-based
@@ -16,20 +16,19 @@ or prompts change.
 
 | Repo | Role in Studio v2 |
 |------|-------------------|
-| `ally-be` (this repo) | Owns the **Scenario Spec** + versioning, the **Copilot** (spec authoring), session dispatch, the **Rehearsal** lifecycle, and all Director telemetry persistence. Module: `src/roleplay-studio/`. |
-| `ally-ai-learn` | The **runtime**: a separate LiveKit worker (`worker_v2`) that plays a spec as an **Actor + Director** voice session, plus the **rehearsal harness** (simulated trainees + QA judge). Package: `app/roleplay_v2/`. |
-| `ally-web` | The **studio UI** (`apps/ally-admin-dashboard`): copilot chat, live spec panel, state-machine editor, rehearsal review, publish + live preview. |
+| `ally-be` | Owns the **Scenario Spec** + versioning, the **Copilot** (spec authoring), session dispatch, and all Director telemetry persistence. Module: `src/roleplay-studio/`. |
+| `ally-ai-learn` (this repo) | The **runtime**: a separate LiveKit worker (`worker_v2`) that plays a spec as an **Actor + Director** voice session. Package: `app/roleplay_v2/`. |
+| `ally-web` | The **studio UI** (`apps/ally-admin-dashboard`): copilot chat, live spec panel, state-machine editor, publish + live preview. |
 
 ---
 
 ## Mental model
 
 The unit of work is the **Scenario Spec** — one versioned JSON document that fully describes a
-roleplay. Three LLM roles revolve around it:
+roleplay. Two LLM roles revolve around it:
 
 - **Copilot** (`ally-be`) *builds* the spec by interviewing the trainer.
 - **Actor + Director** (`ally-ai-learn`) *run* the spec as a live voice roleplay.
-- **Simulated Trainees + Judge** (`ally-ai-learn`) *test* the spec before publish.
 
 The spec is the single source of truth. Every prompt either writes it, reads it, or is compiled
 from it. Three concerns are modeled **separately** so they can be controlled independently:
@@ -66,101 +65,31 @@ At runtime the compiler maps the spec into two layered prompts (see **Run**).
 Trainer ⇄ copilot chat, streamed over SSE
 (`POST /v1/roleplay-studio/copilot/sessions/:id/messages/stream`).
 
-1. **Interview — 4 questions, one at a time** (via the `ask_trainer` tool): skill trained →
-   learner profile → client sketch → success criteria.
+1. **Interview — questions, one at a time** (via the `ask_trainer` tool): competency →
+   character context → difficulty → character follow-ups → behaviours → language(s).
 2. **Inference** — the copilot translates human answers into machinery: resistance profile,
    the state machine, tiered disclosure ledger, rubric, engineered beats, opening line, prosody,
    difficulty.
 3. **Persist** — after every answer it calls `update_spec` (small RFC-6902 patches); each patch
-   appends an immutable `roleplay_spec_versions` snapshot. `compile_spec` validates;
-   `suggest_test_cases` + `propose_rehearsal` set up verification.
+   appends an immutable `roleplay_spec_versions` snapshot. `compile_spec` validates the draft
+   before the trainer tests live or publishes.
 
 Orchestrator: `src/roleplay-studio/service/copilot-orchestrator.service.ts` (Anthropic tool loop).
-Tools: `copilot-tools.service.ts` (`update_spec`, `ask_trainer`, `suggest_test_cases`,
-`pick_voice`, `get_competencies`, `compile_spec`, `propose_rehearsal`).
+Tools: `copilot-tools.service.ts` (`update_spec`, `ask_trainer`, `pick_voice`,
+`get_competencies`, `get_competency_behaviours`, `review_behaviours`, `get_languages`,
+`compile_spec`).
 
 **Prompts** (`src/prompts/roleplay_copilot/`):
 
 | Prompt | Role |
 |--------|------|
-| `interviewer_system.txt` | Copilot system prompt: the 4-question protocol, tool policy (one question/turn, patch after every answer), and the design quality bar |
-| `inference_pass.txt` | Rules for inferring the mechanics (resistance, disclosure tiers, state-machine shape, events, opening line, prosody, difficulty) from the four answers |
+| `interviewer_system.txt` | Copilot system prompt: the interview protocol, tool policy (one question/turn, patch after every answer), and the design quality bar |
+| `inference_pass.txt` | Rules for inferring the mechanics (resistance, disclosure tiers, state-machine shape, events, opening line, prosody, difficulty) from the answers |
 | `spec_compiler.txt` | Backs `compile_spec`: validate/normalize the draft and report fixable errors |
-| `rehearsal_critique.txt` | Turns rehearsal judge findings into concrete proposed spec patches |
 
 ---
 
-## Flow 2 — TEST (Rehearsal harness, in `ally-ai-learn`)
-
-Before publish, the spec is exercised by three scripted trainees running through the **real
-Actor + Director loop** (text-only), then scored by a QA judge. `ally-be` launches it
-(`POST /v1/roleplay-studio/specs/:specId/versions/:versionId/rehearsals` →
-`ai-learn POST /api/v1/roleplay-rehearsal/run`) and receives results via webhook.
-
-**Prompts** (`app/prompts/trainee/`, `app/prompts/judge/`):
-
-| Prompt | Role |
-|--------|------|
-| `trainee/base.txt` | Shared simulated-trainee (counselor) framing |
-| `trainee/skilled.txt` | Textbook competency behaviors — should progress states legitimately |
-| `trainee/poor.txt` | Closed questions, advice-giving, judgment — must **not** be handed progress |
-| `trainee/adversarial.txt` | Demands secrets, breaks character, prompt injection — stress-tests discipline |
-| `trainee/stagnation_steering.txt` | Anti-repetition nudge when the simulated conversation loops |
-| `judge/system.txt` | QA judge: scores **persona consistency, disclosure discipline, difficulty calibration, rubric coverage** (0–100), flags secret leaks, writes a spec-level critique |
-
-The judge's numeric scores are **cross-checked in code** with deterministic secret-leak
-detection (string containment before unlock) and rubric coverage; the deterministic result wins
-on conflict. Findings feed `rehearsal_critique.txt` back in the copilot as accept/reject patches.
-
-The Actor and Director prompts (below) are used **verbatim** in rehearsal — that's the point:
-the harness tests the real runtime, not a stand-in.
-
-### Evidence-rich critique + persisted proposals
-
-The post-rehearsal critique is fed more than the judge summary: `CritiqueEvidenceService`
-condenses the stored transcripts + director traces (failed test cases in full, leak-window
-exchanges, state-path timelines, uncovered rubric behaviors) under a char budget, and the
-prompt also receives the spec's **proposal history** so the model never re-proposes a patch
-that was rejected or failed verification. Every proposal is normalized to flat RFC-6902 `ops`,
-pre-validated against the critiqued version (invalid → `SKIPPED_INVALID`), persisted to
-`roleplay_critique_proposals` with a predicted `expectedEffect` (dimensions/test cases it
-should move), and lifecycle-tracked: `PROPOSED → APPLIED/REJECTED → VERIFIED /
-FAILED_VERIFICATION` once a later rehearsal confirms or contradicts the prediction.
-
-### Flow 2b — AUTO-IMPROVE (autonomous iteration loop, in `ally-be`)
-
-`ImprovementOrchestratorService` closes the loop end-to-end: **rehearse → critique → apply the
-proposals to a scratch version lineage (`roleplay_spec_versions.source = auto_improve` — the
-trainer's draft is never touched mid-run) → re-rehearse**, advancing on rehearsal webhooks (a
-Redis TTL watchdog finishes a stalled run with its best-so-far). Stop conditions: targets met
-(deterministic-first — all selected agent test cases PASSED and no PASSED→FAILED flip vs the
-baseline round, then judged minimums with a ±5 noise band), the critic produces no new
-proposals (an ops-hash guard also hard-skips retried patches), or `maxRounds` (default 3).
-Intermediate rounds can run a **cheap targeted scope** (only the failing profiles/test cases —
-this repo's `RehearsalConfig` already supports profile/test-case subsets, so no harness change
-was needed); a cheap round that meets targets is re-verified at full scope before the loop
-stops. The trainer then reviews the score trajectory + cumulative diff and **accepts** (best
-version's spec is copied into the draft, `source = auto_improve_accepted`) or **discards**.
-
-The copilot also sees rehearsal evidence directly: `get_rehearsal_findings` and
-`get_improvement_run_status` tools, plus a one-line "latest rehearsal" note in its system
-prompt; `suggest_test_cases` now emits a structured `test_case_suggestions` SSE frame the
-studio renders as accept-to-persist cards.
-
-### Chat-first flow (the copilot drives the whole loop)
-
-The studio is chat-first: after the interview the copilot offers test cases, confirms config,
-and calls the side-effectful `start_auto_improve` tool (ally-be), which snapshots the draft and
-starts a copilot-linked run that narrates its progress into the chat
-(`ImprovementNarrationService` → plain-content assistant rows with structured metadata). On
-TARGETS_MET the best version is auto-accepted into the draft and the chat's ready message
-carries Test-live/Publish actions; weaker outcomes resolve conversationally via
-`resolve_improvement_run`. This repo is unaffected at runtime — the loop keeps driving the
-rehearsal harness through the existing `RehearsalConfig` subsets.
-
----
-
-## Flow 3 — RUN (Actor + Director, in `ally-ai-learn`)
+## Flow 2 — RUN (Actor + Director, in `ally-ai-learn`)
 
 `ally-be` dispatches a LiveKit room to the v2 agent (`LIVEKIT_ROLEPLAY_AGENT_NAME`, default
 `AgentV2`) with the compiled spec in room metadata. `worker_v2` parses it and builds STT/TTS/LLM.
@@ -181,7 +110,7 @@ turn-index guard).
 
 | Prompt (`app/prompts/director/`) | Role |
 |----------------------------------|------|
-| `system.txt` | The Director's 8 duties: judge trainee behaviors vs rubric (with verbatim evidence), evaluate guards, propose next state, unlock disclosures, fire engineered events, write the next stage direction, nominate retrieval topics, optional coaching feedback |
+| `system.txt` | The Director's duties: judge trainee behaviors vs rubric (with verbatim evidence), evaluate guards, propose next state, unlock disclosures, fire engineered events, write the next stage direction, nominate retrieval topics, optional coaching feedback |
 | `turn_user.txt` | Per-turn message: rolling conversation window + serialized runtime state → "return the verdict JSON" |
 
 ### The loop in one breath
@@ -195,24 +124,17 @@ studio's live observer panel (LiveKit data channel, topic `director`) and persis
 
 ---
 
-## Prompt catalog (all 14)
+## Prompt catalog (all 7)
 
 | Prompt | Repo · path | Phase | Role |
 |--------|-------------|-------|------|
-| `interviewer_system` | ally-be · `prompts/roleplay_copilot/` | Build | Copilot system: 4-Q interview + build rules |
-| `inference_pass` | ally-be · `prompts/roleplay_copilot/` | Build | Infer mechanics from the 4 answers |
+| `interviewer_system` | ally-be · `prompts/roleplay_copilot/` | Build | Copilot system: interview + build rules |
+| `inference_pass` | ally-be · `prompts/roleplay_copilot/` | Build | Infer mechanics from the answers |
 | `spec_compiler` | ally-be · `prompts/roleplay_copilot/` | Build | Validate/normalize the draft spec |
-| `rehearsal_critique` | ally-be · `prompts/roleplay_copilot/` | Test→Build | Judge findings → proposed spec patches |
-| `actor/static_prefix` | ally-ai-learn · `prompts/actor/` | Run + Test | Stable identity/context/style (compiled once) |
-| `actor/turn_card` | ally-ai-learn · `prompts/actor/` | Run + Test | Per-turn state + ledger + memory + direction |
-| `director/system` | ally-ai-learn · `prompts/director/` | Run + Test | Referee: score, transition, unlock, direct |
-| `director/turn_user` | ally-ai-learn · `prompts/director/` | Run + Test | Per-turn window + state → verdict request |
-| `trainee/base` | ally-ai-learn · `prompts/trainee/` | Test | Simulated-trainee framing |
-| `trainee/skilled` | ally-ai-learn · `prompts/trainee/` | Test | Competent counselor profile |
-| `trainee/poor` | ally-ai-learn · `prompts/trainee/` | Test | Weak counselor profile |
-| `trainee/adversarial` | ally-ai-learn · `prompts/trainee/` | Test | Hostile / injection profile |
-| `trainee/stagnation_steering` | ally-ai-learn · `prompts/trainee/` | Test | Anti-loop nudge |
-| `judge/system` | ally-ai-learn · `prompts/judge/` | Test | QA-scores the runtime vs the spec |
+| `actor/static_prefix` | ally-ai-learn · `prompts/actor/` | Run | Stable identity/context/style (compiled once) |
+| `actor/turn_card` | ally-ai-learn · `prompts/actor/` | Run | Per-turn state + ledger + memory + direction |
+| `director/system` | ally-ai-learn · `prompts/director/` | Run | Referee: score, transition, unlock, direct |
+| `director/turn_user` | ally-ai-learn · `prompts/director/` | Run | Per-turn window + state → verdict request |
 
 All prompts are managed templates: `ally-be` syncs `src/prompts/**` into the `prompts` registry on
 boot (dashboard-overridable); `ally-ai-learn` resolves `app/prompts/**` with an optional
@@ -234,5 +156,4 @@ rejects editing v2 rows (422). See `DATA_SCHEMA.md` §3.9 for the tables.
 - Spec + versioning + publish: `src/roleplay-studio/service/roleplay-spec.service.ts`, `spec-validator.service.ts`
 - Copilot: `service/copilot-orchestrator.service.ts`, `service/copilot-tools.service.ts`
 - Session dispatch + Director telemetry: `service/roleplay-session.service.ts`, `processor/*`
-- Rehearsal: `service/rehearsal.service.ts`, `controller/rehearsal-webhook.controller.ts`
-- Runtime (ally-ai-learn): `app/worker_v2.py`, `app/roleplay_v2/{actor,director,session,rehearsal}/`
+- Runtime (ally-ai-learn): `app/worker_v2.py`, `app/roleplay_v2/{actor,director,session,spec}/`

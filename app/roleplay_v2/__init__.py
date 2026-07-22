@@ -10,10 +10,7 @@ without touching it:
 - ``director`` — the per-turn referee: observes trainee behaviors, walks the
   state machine, unlocks disclosure-ledger secrets, and issues stage
   directions. Emits results over SQS and the "director" data channel.
-- ``session``  — text-mode turn loop shared by the rehearsal harness and the
-  local demo REPL.
-- ``rehearsal``— the offline QA harness: simulated trainees, an LLM judge
-  with deterministic overrides, and the webhook-driven service.
+- ``session``  — text-mode turn loop used by the local demo REPL.
 
 The voice entrypoint is ``app/worker_v2.py`` (a sibling of ``app/worker.py``;
 v1 is untouched).

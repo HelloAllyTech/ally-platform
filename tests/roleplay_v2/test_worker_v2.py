@@ -118,18 +118,6 @@ class TestConfigDefaults:
         assert settings.AGENT_NAME_V2 == f"{settings.AGENT_NAME}V2"
         assert settings.DIRECTOR_TIMEOUT_S == 8.0
         assert settings.DIRECTOR_GRACE_MS == 0.0
-        assert settings.REHEARSAL_CONCURRENCY_LIMIT == 2
-        assert settings.REHEARSAL_UNIT_CONCURRENCY_LIMIT == 3
-        assert settings.REHEARSAL_TURNS_DEFAULT == 8
         assert settings.ROLEPLAY_V2_ENABLED is True
         assert settings.ACTOR_DEFAULT_MODEL
         assert settings.DIRECTOR_MODEL
-        assert settings.REHEARSAL_JUDGE_MODEL
-
-    def test_webhook_endpoint_constant(self):
-        from app.core.constants import ROLEPLAY_REHEARSAL_WEBHOOK_ENDPOINT
-
-        assert (
-            ROLEPLAY_REHEARSAL_WEBHOOK_ENDPOINT
-            == "/v1/roleplay-studio/rehearsals/webhook"
-        )
