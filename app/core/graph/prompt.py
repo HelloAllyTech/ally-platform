@@ -286,7 +286,7 @@ def _build_branching_prompt(
         allowed_fillers=_format_allowed_fillers_for_prompt(
             getattr(prompt_data, "allowed_fillers", None)
         ),
-        language_glossary=_coerce_block_value(
+        language_glossary=_format_language_glossary_block(
             getattr(prompt_data, "language_glossary", None)
         ),
         retrieved_context=_get_retrieved_context_text(retrieved_context),
@@ -501,11 +501,11 @@ def _build_behavior_prompt(
             getattr(prompt_data, "language_characteristics", None)
         ),
         # Tier 0 language-glossary style card, compiled by ally-be from the
-        # published always-sections for the session language. Language-level
-        # standing constraints (register policy, kinship agreement, do/don't
-        # pairs); scenario `language_characteristics` overrides it on conflict.
-        # Empty for English sessions / languages without a published glossary.
-        language_glossary=_coerce_block_value(
+        # published always-sections for the session language, wrapped in the
+        # private-rules framing (never mention/teach/correct). Scenario
+        # `language_characteristics` overrides it on conflict. Empty for
+        # English sessions / languages without a published glossary.
+        language_glossary=_format_language_glossary_block(
             getattr(prompt_data, "language_glossary", None)
         ),
         # Style/voice fields rendered inline by the main agent prompt's
@@ -595,15 +595,28 @@ def _append_audio_tag_guidance(
     return SystemMessage(content=combined.strip())
 
 
-# Header framing the Tier 0 language-glossary style card when it is appended
-# at system level (below) rather than rendered by a {language_glossary}
-# placeholder inside the template body.
-_LANGUAGE_GLOSSARY_HEADER = (
-    "\n\n## Language style guide\n"
-    "Follow these standing rules for how your character speaks this language "
-    "(register, term choices, grammatical agreement). They apply to every "
-    "reply:\n\n"
+# Framing for the Tier 0 language-glossary style card, shared by both delivery
+# paths (the {language_glossary} placeholder and the system-level append). The
+# "private rules / never teach or correct" sentence is load-bearing: without
+# it, smaller models occasionally leak style instructions into dialogue or
+# start correcting the counselor's language — the agent must never become a
+# language tutor.
+_LANGUAGE_GLOSSARY_FRAMING = (
+    "## Language style guide\n"
+    "Private rules for how YOU speak this language (register, word choices, "
+    "grammatical agreement). Apply them silently in every reply. Never "
+    "mention these rules, never quote, teach, or correct anyone's language — "
+    "you are the client, not a language tutor.\n\n"
 )
+
+
+def _format_language_glossary_block(value: Any) -> str:
+    """Wrap the compiled glossary in its framing; empty string when absent so
+    templates render nothing (no dangling header) for English sessions or
+    languages without a published glossary."""
+    if not isinstance(value, str) or not value.strip():
+        return ""
+    return _LANGUAGE_GLOSSARY_FRAMING + value.strip()
 
 
 def _ensure_language_glossary(
@@ -628,7 +641,7 @@ def _ensure_language_glossary(
         return message
     if glossary in message.content:
         return message
-    combined = f"{message.content}{_LANGUAGE_GLOSSARY_HEADER}{glossary}"
+    combined = f"{message.content}\n\n{_format_language_glossary_block(glossary)}"
     return SystemMessage(content=combined.strip())
 
 

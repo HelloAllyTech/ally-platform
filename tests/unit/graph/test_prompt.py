@@ -824,11 +824,13 @@ class TestLanguageGlossary:
 
     def test_glossary_not_duplicated_when_template_has_placeholder(self):
         """The default file template renders {language_glossary}; the append
-        guard must detect that and not add a second copy."""
+        guard must detect that and not add a second copy. The private-rules
+        framing rides with the block in both paths — exactly once."""
         pd = make_prompt_data(language_glossary=self.GLOSSARY)
         msg = generate_system_message(prompt_data=pd, behavior_instructions=[])
         assert msg.content.count('- worry: say "டென்ஷன்"; avoid "பதட்டம்"') == 1
-        assert "## Language style guide" not in msg.content
+        assert msg.content.count("## Language style guide") == 1
+        assert "not a language tutor" in msg.content
 
     def test_glossary_appended_to_branching_override_without_placeholder(self):
         pd = make_prompt_data(
