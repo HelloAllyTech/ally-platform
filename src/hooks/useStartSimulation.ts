@@ -97,7 +97,14 @@ export const useStartSimulation = (): UseStartSimulationReturn => {
             accessToken: startResp.accessToken.token,
             liveKitServerUrl: startResp.accessToken.serverUrl,
           },
-          scenario: startResp.scenario,
+          // Reminders are also gated server-side, but check remindersEnabled
+          // here too so the client never displays them when the switch is off.
+          scenario: {
+            ...startResp.scenario,
+            reminders: startResp.scenario?.remindersEnabled
+              ? (startResp.scenario?.reminders ?? [])
+              : [],
+          },
           ...(params.scenarioPathSessionItemId && {
             pathSessionItemId: params.scenarioPathSessionItemId,
           }),
