@@ -168,6 +168,18 @@ class PromptData(BaseModel):
             "block. Lets the same language sound different across scenarios."
         ),
     )
+    language_glossary: Optional[str] = Field(
+        default=None,
+        description=(
+            "Compiled Tier 0 language-glossary 'style card' for the session "
+            "language (register policy, pronoun/kinship agreement rules, "
+            "do/don't term pairs). Language-level (not per-scenario), compiled "
+            "by ally-be from published glossary sections and injected into "
+            "every turn's system prompt via the {language_glossary} "
+            "placeholder. Empty/absent for English sessions or languages "
+            "without a published glossary."
+        ),
+    )
     knowledge_sources: Optional[List[Dict[str, str]]] = Field(
         default=None,
         description=(
@@ -657,6 +669,8 @@ class Scenario(BaseModel):
                     "languageCharacteristics"
                 )
                 or prompt_data_dict.get("language_characteristics"),
+                "language_glossary": prompt_data_dict.get("languageGlossary")
+                or prompt_data_dict.get("language_glossary"),
                 "knowledge_sources": prompt_data_dict.get("knowledgeSources"),
                 "filler_enabled": bool(prompt_data_dict.get("fillerEnabled") or False),
                 "comfort_audio_enabled": bool(
@@ -664,9 +678,11 @@ class Scenario(BaseModel):
                 ),
                 "comfort_audio_url": prompt_data_dict.get("comfortAudioUrl")
                 or prompt_data_dict.get("comfort_audio_url"),
-                "comfort_audio_volume": prompt_data_dict.get("comfortAudioVolume")
-                if prompt_data_dict.get("comfortAudioVolume") is not None
-                else prompt_data_dict.get("comfort_audio_volume"),
+                "comfort_audio_volume": (
+                    prompt_data_dict.get("comfortAudioVolume")
+                    if prompt_data_dict.get("comfortAudioVolume") is not None
+                    else prompt_data_dict.get("comfort_audio_volume")
+                ),
                 "continuous_backchanneling": bool(
                     prompt_data_dict.get("continuousBackchanneling") or False
                 ),

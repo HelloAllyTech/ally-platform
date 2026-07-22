@@ -767,3 +767,40 @@ class TestOptionalFieldsDefensiveGuards:
         )
         assert msg.content is not None
         assert len(msg.content) > 0
+
+
+class TestLanguageGlossary:
+    """Tier 0 language-glossary style card ({language_glossary} placeholder)."""
+
+    GLOSSARY = (
+        '## Core style\n- worry: say "டென்ஷன்"; avoid "பதட்டம்"\n'
+        "## Pronouns & kinship\n- Mother: always she-forms.\n  e.g. அம்மா சொன்னாங்க"
+    )
+
+    def test_behavior_prompt_includes_glossary_when_present(self):
+        pd = make_prompt_data(language_glossary=self.GLOSSARY)
+        msg = generate_system_message(prompt_data=pd, behavior_instructions=[])
+        assert '- worry: say "டென்ஷன்"; avoid "பதட்டம்"' in msg.content
+        assert "அம்மா சொன்னாங்க" in msg.content
+
+    def test_behavior_prompt_renders_clean_without_glossary(self):
+        pd = make_prompt_data()
+        msg = generate_system_message(prompt_data=pd, behavior_instructions=[])
+        # No leftover literal placeholder, no glossary content
+        assert "{language_glossary}" not in msg.content
+        assert "டென்ஷன்" not in msg.content
+
+    def test_branching_prompt_includes_glossary_when_present(self):
+        pd = make_prompt_data(language_glossary=self.GLOSSARY)
+        msg = generate_system_message(
+            prompt_data=pd, next_instruction="Focus on rapport."
+        )
+        assert '- worry: say "டென்ஷன்"; avoid "பதட்டம்"' in msg.content
+        assert "Important Instruction: Focus on rapport." in msg.content
+
+    def test_branching_prompt_renders_clean_without_glossary(self):
+        pd = make_prompt_data()
+        msg = generate_system_message(
+            prompt_data=pd, next_instruction="Focus on rapport."
+        )
+        assert "{language_glossary}" not in msg.content

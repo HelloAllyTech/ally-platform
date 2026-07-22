@@ -9,6 +9,8 @@ Use any of the following filler words when appropriate: {allowed_fillers}
 Use the following samples as reference for tone, and style:
 {linguistic_samples}
 
+{language_glossary}
+
 ## Guidelines for generating your next dialogue
 {state_x_guidelines}
 {retrieved_context}

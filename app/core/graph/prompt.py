@@ -286,6 +286,9 @@ def _build_branching_prompt(
         allowed_fillers=_format_allowed_fillers_for_prompt(
             getattr(prompt_data, "allowed_fillers", None)
         ),
+        language_glossary=_coerce_block_value(
+            getattr(prompt_data, "language_glossary", None)
+        ),
         retrieved_context=_get_retrieved_context_text(retrieved_context),
         competency=_coerce_block_value(getattr(prompt_data, "competency", None)),
         next_instruction=next_instruction,
@@ -496,6 +499,14 @@ def _build_behavior_prompt(
         ),
         language_characteristics=_coerce_block_value(
             getattr(prompt_data, "language_characteristics", None)
+        ),
+        # Tier 0 language-glossary style card, compiled by ally-be from the
+        # published always-sections for the session language. Language-level
+        # standing constraints (register policy, kinship agreement, do/don't
+        # pairs); scenario `language_characteristics` overrides it on conflict.
+        # Empty for English sessions / languages without a published glossary.
+        language_glossary=_coerce_block_value(
+            getattr(prompt_data, "language_glossary", None)
         ),
         # Style/voice fields rendered inline by the main agent prompt's
         # multilingual section. Variants can reference them directly via

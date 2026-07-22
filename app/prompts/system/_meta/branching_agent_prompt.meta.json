@@ -13,6 +13,7 @@
         "character_profile_text",
         "language_code",
         "language_label",
+        "language_glossary",
         "samples",
         "allowed_fillers",
         "retrieved_context",
