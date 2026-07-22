@@ -1,5 +1,5 @@
 import React from 'react';
-import {act, fireEvent, render, waitFor} from '@testing-library/react-native';
+import {act, fireEvent, render, waitFor, within} from '@testing-library/react-native';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 
 import {SCREEN_NAMES, FEEDBACK_MIN_DISPLAY_MS} from '../../../constants';
@@ -245,11 +245,11 @@ jest.mock('@/assets/icons', () => {
 
 // Mock ParticipantTile
 jest.mock('../components/ParticipantTile/ParticipantTile', () => ({
-  ParticipantTile: ({name, avatarUrl, topLeftOverlay}: any) => {
+  ParticipantTile: ({name, avatarUrl, topLeftOverlay, compact}: any) => {
     const React = require('react');
     const {View, Text} = require('react-native');
     return (
-      <View testID="participant-tile">
+      <View testID="participant-tile" data-compact={String(!!compact)}>
         <Text testID="participant-name">{name}</Text>
         {avatarUrl && <Text testID="avatar-url">{avatarUrl}</Text>}
         {topLeftOverlay}
@@ -448,6 +448,33 @@ describe('SimulationAssistantScreen', () => {
 
     // Should render scenario info overlay for remote participant
     expect(getByTestId('scenario-info-overlay')).toBeDefined();
+  });
+
+  it("renders the learner's own tile as a compact PiP self-view nested over the AI tile, not an equal-size tile", async () => {
+    const connectedHandlers: Array<() => void> = [];
+    (mockOn as jest.Mock).mockImplementation((event: string, cb: any) => {
+      if (event === 'connected') connectedHandlers.push(cb);
+      return undefined;
+    });
+
+    const {getAllByTestId, getByTestId} = await renderWithProviders(
+      <SimulationAssistantScreen route={{params: baseRouteParams} as any} />,
+    );
+
+    await waitFor(() => expect(mockConnect).toHaveBeenCalled());
+    await act(async () => connectedHandlers.forEach(fn => fn()));
+
+    const tiles = getAllByTestId('participant-tile');
+    expect(tiles).toHaveLength(2);
+    // Exactly one tile (the learner's) is compact; the AI tile is not.
+    const compactFlags = tiles.map(tile => tile.props['data-compact']);
+    expect(compactFlags.sort()).toEqual(['false', 'true']);
+
+    // The compact (learner) tile renders INSIDE the PiP wrapper, not as a
+    // sibling equal-size tile.
+    const pip = getByTestId('participant-pip');
+    const tileInsidePip = within(pip).getByTestId('participant-tile');
+    expect(tileInsidePip.props['data-compact']).toBe('true');
   });
 
   it('displays scenario title in info overlay', async () => {

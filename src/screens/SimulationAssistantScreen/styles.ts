@@ -104,6 +104,27 @@ export const styles = ScaledSheet.create({
   participantsCompact: {
     height: '180@ms',
   },
+  // Learner's self-view: a small inlaid picture-in-picture bubble over the AI
+  // tile (like a WhatsApp video call) rather than an equal-size tile of its
+  // own. participantWrapperWithOverlay is the positioning parent (RN Views
+  // default to position:'relative', so no extra style needed there).
+  pipWrapper: {
+    position: 'absolute',
+    bottom: '10@ms',
+    right: '10@ms',
+    width: '84@ms',
+    height: '116@ms',
+    borderRadius: '12@ms',
+    overflow: 'hidden',
+    borderWidth: '2@ms',
+    borderColor: '#3D4045',
+    zIndex: 20,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    elevation: 6,
+  },
   // Reminders/Description live on a swipeable second page (react-native-pager-view)
   // rather than an inline panel, so they don't compete for space with the
   // avatars/checklist on the main call view.
