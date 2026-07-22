@@ -13,12 +13,13 @@ import {
 import {Room, RoomEvent, Track} from 'livekit-client';
 import {useTranslation} from 'react-i18next';
 import {Text, View} from 'react-native';
+import PagerView from 'react-native-pager-view';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import SoundPlayer from 'react-native-sound-player';
 
 import {sounds} from '@/assets';
 import {EndSessionIcon} from '@/assets/icons';
-import {IllustratedModal, useErrorToast} from '@/components';
+import {IllustratedModal, Pagination, useErrorToast} from '@/components';
 import {DEFAULT_MAX_TIME_VALUE, SCREEN_NAMES} from '@/constants';
 import {useAppNavigation, useHardwareBackPressHandler, useUser} from '@/hooks';
 import type {RootStackScreenProps} from '@/navigation/types';
@@ -136,6 +137,10 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   );
   const [showEndingSoon, setShowEndingSoon] = useState<boolean>(false);
   const [isFocusMode, setIsFocusMode] = useState<boolean>(false);
+  // Which page of the reminders/description swipe pager is active (0 = main
+  // call view, 1 = SessionInfoTabs) — drives the dot indicator. The pager
+  // itself only mounts when hasSessionInfo is true (see render below).
+  const [pagerIndex, setPagerIndex] = useState<number>(0);
   // Pause/resume: paused time is excluded from the displayed timer and the
   // scenario time limit. `pausedOffsetMs` accumulates completed pauses.
   // NOTE: this is the CLIENT-side clock (drives the scenario time-limit only).
@@ -648,6 +653,13 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     armControlAck,
   ]);
 
+  const handlePageSelected = useCallback(
+    (e: {nativeEvent: {position: number}}) => {
+      setPagerIndex(e.nativeEvent.position);
+    },
+    [],
+  );
+
   const renderLoader = () => {
     const getLoadingText = () => {
       if (
@@ -676,6 +688,143 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     );
   };
 
+  // Main call view (avatars + optional checklist) — page 1 of the swipe
+  // pager when reminders/description exist, or the screen's only content
+  // otherwise. SessionInfoTabs is NOT rendered here; it's page 2 (see below).
+  const renderMainContent = () => (
+    <>
+      <>
+        {isSimulationInProgress && hasChecklist && (
+          <View style={styles.participantsContent}>
+            <View
+              style={[
+                styles.participantsContainer,
+                styles.participantsHorizontal,
+                styles.participantsCompact,
+              ]}>
+              <View
+                style={[
+                  styles.participantWrapper,
+                  styles.participantWrapperWithOverlay,
+                ]}>
+                <ParticipantTile
+                  participant={remoteParticipant}
+                  publication={remoteAudioPub}
+                  avatarUrl={scenario?.coverImageUrl ?? null}
+                  name={scenario?.metadata?.name || scenario?.title}
+                  turnState={remoteTurnState}
+                  {...(scenario?.title
+                    ? {
+                        topLeftOverlay: (
+                          <ScenarioInfoOverlay
+                            ref={scenarioInfoRef}
+                            title={scenario?.title}
+                            triggerWarnings={getTriggerWarningNames(
+                              scenario?.triggerWarnings,
+                            )}
+                          />
+                        ),
+                        overlayRef:
+                          scenarioInfoRef as React.RefObject<ScenarioInfoOverlayRef>,
+                      }
+                    : {})}
+                />
+              </View>
+              <View style={styles.participantWrapper}>
+                <ParticipantTile
+                  participant={localParticipant}
+                  publication={localAudioPub}
+                  avatarUrl={userData?.profileImageUrl ?? null}
+                  name={userData?.name}
+                  isMicEnabled={isMicEnabled}
+                  turnState={localTurnState}
+                />
+              </View>
+            </View>
+            {isSimulationInProgress && !isFocusMode && (
+              <View style={styles.checklistWrapper}>
+                <SessionChecklist
+                  mode={scenario?.checklistType ?? ChecklistType.OFF}
+                  items={scenario?.checklistEvents ?? []}
+                  triggeredEvents={detectedEvents}
+                />
+              </View>
+            )}
+          </View>
+        )}
+      </>
+      <>
+        {!isSimulationInProgress
+          ? renderLoader()
+          : !hasChecklist && (
+              <>
+                <View style={styles.participantsContent}>
+                  <View
+                    style={[
+                      styles.participantsContainer,
+                      isFocusMode
+                        ? styles.participantsVertical
+                        : isControlButtonMaximized
+                          ? feedback
+                            ? styles.participantsHorizontal
+                            : styles.participantsVertical
+                          : styles.participantsVertical,
+                    ]}>
+                    <View
+                      style={[
+                        styles.participantWrapper,
+                        styles.participantWrapperWithOverlay,
+                      ]}>
+                      <ParticipantTile
+                        participant={remoteParticipant}
+                        publication={remoteAudioPub}
+                        avatarUrl={scenario?.coverImageUrl ?? null}
+                        name={scenario?.metadata?.name || scenario?.title}
+                        turnState={remoteTurnState}
+                        {...(scenario?.title
+                          ? {
+                              topLeftOverlay: (
+                                <ScenarioInfoOverlay
+                                  ref={scenarioInfoRef}
+                                  title={scenario?.title}
+                                  triggerWarnings={getTriggerWarningNames(
+                                    scenario?.triggerWarnings,
+                                  )}
+                                />
+                              ),
+                              overlayRef:
+                                scenarioInfoRef as React.RefObject<ScenarioInfoOverlayRef>,
+                            }
+                          : {})}
+                      />
+                    </View>
+                    <View style={styles.participantWrapper}>
+                      <ParticipantTile
+                        participant={localParticipant}
+                        publication={localAudioPub}
+                        avatarUrl={userData?.profileImageUrl ?? null}
+                        name={userData?.name}
+                        isMicEnabled={isMicEnabled}
+                        turnState={localTurnState}
+                      />
+                    </View>
+                  </View>
+                </View>
+                {!isFocusMode && feedback && (
+                  <View style={styles.liveFeedbackWrapper}>
+                    <LiveFeedback
+                      key={feedbackKey}
+                      message={feedback.text}
+                      emoji={feedback.emoji}
+                    />
+                  </View>
+                )}
+              </>
+            )}
+      </>
+    </>
+  );
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <RoomContext.Provider value={room}>
@@ -703,149 +852,28 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
               pausedOffsetMs={pausedOffsetMs}
             />
           )}
-          <>
-            {isSimulationInProgress && hasChecklist && (
-              <View style={styles.participantsContent}>
-                <View
-                  style={[
-                    styles.participantsContainer,
-                    styles.participantsHorizontal,
-                    styles.participantsCompact,
-                  ]}>
-                  <View
-                    style={[
-                      styles.participantWrapper,
-                      styles.participantWrapperWithOverlay,
-                    ]}>
-                    <ParticipantTile
-                      participant={remoteParticipant}
-                      publication={remoteAudioPub}
-                      avatarUrl={scenario?.coverImageUrl ?? null}
-                      name={scenario?.metadata?.name || scenario?.title}
-                      turnState={remoteTurnState}
-                      {...(scenario?.title
-                        ? {
-                            topLeftOverlay: (
-                              <ScenarioInfoOverlay
-                                ref={scenarioInfoRef}
-                                title={scenario?.title}
-                                triggerWarnings={getTriggerWarningNames(
-                                  scenario?.triggerWarnings,
-                                )}
-                              />
-                            ),
-                            overlayRef:
-                              scenarioInfoRef as React.RefObject<ScenarioInfoOverlayRef>,
-                          }
-                        : {})}
-                    />
-                  </View>
-                  <View style={styles.participantWrapper}>
-                    <ParticipantTile
-                      participant={localParticipant}
-                      publication={localAudioPub}
-                      avatarUrl={userData?.profileImageUrl ?? null}
-                      name={userData?.name}
-                      isMicEnabled={isMicEnabled}
-                      turnState={localTurnState}
-                    />
-                  </View>
-                </View>
-                {isSimulationInProgress && !isFocusMode && (
-                  <View style={styles.checklistWrapper}>
-                    <SessionChecklist
-                      mode={scenario?.checklistType ?? ChecklistType.OFF}
-                      items={scenario?.checklistEvents ?? []}
-                      triggeredEvents={detectedEvents}
-                    />
-                    {hasSessionInfo && (
-                      <SessionInfoTabs
-                        reminders={scenario?.reminders}
-                        description={scenario?.description}
-                      />
-                    )}
-                  </View>
-                )}
+          {hasSessionInfo ? (
+            <PagerView
+              testID="simulation-info-pager"
+              style={styles.pager}
+              initialPage={0}
+              onPageSelected={handlePageSelected}>
+              <View key="1" style={styles.pagerPage}>
+                {renderMainContent()}
               </View>
-            )}
-          </>
-          <>
-            {!isSimulationInProgress
-              ? renderLoader()
-              : !hasChecklist && (
-                  <>
-                    <View style={styles.participantsContent}>
-                      <View
-                        style={[
-                          styles.participantsContainer,
-                          isFocusMode
-                            ? styles.participantsVertical
-                            : isControlButtonMaximized
-                              ? feedback
-                                ? styles.participantsHorizontal
-                                : styles.participantsVertical
-                              : styles.participantsVertical,
-                        ]}>
-                        <View
-                          style={[
-                            styles.participantWrapper,
-                            styles.participantWrapperWithOverlay,
-                          ]}>
-                          <ParticipantTile
-                            participant={remoteParticipant}
-                            publication={remoteAudioPub}
-                            avatarUrl={scenario?.coverImageUrl ?? null}
-                            name={scenario?.metadata?.name || scenario?.title}
-                            turnState={remoteTurnState}
-                            {...(scenario?.title
-                              ? {
-                                  topLeftOverlay: (
-                                    <ScenarioInfoOverlay
-                                      ref={scenarioInfoRef}
-                                      title={scenario?.title}
-                                      triggerWarnings={getTriggerWarningNames(
-                                        scenario?.triggerWarnings,
-                                      )}
-                                    />
-                                  ),
-                                  overlayRef:
-                                    scenarioInfoRef as React.RefObject<ScenarioInfoOverlayRef>,
-                                }
-                              : {})}
-                          />
-                        </View>
-                        <View style={styles.participantWrapper}>
-                          <ParticipantTile
-                            participant={localParticipant}
-                            publication={localAudioPub}
-                            avatarUrl={userData?.profileImageUrl ?? null}
-                            name={userData?.name}
-                            isMicEnabled={isMicEnabled}
-                            turnState={localTurnState}
-                          />
-                        </View>
-                      </View>
-                    </View>
-                    {!isFocusMode && feedback && (
-                      <View style={styles.liveFeedbackWrapper}>
-                        <LiveFeedback
-                          key={feedbackKey}
-                          message={feedback.text}
-                          emoji={feedback.emoji}
-                        />
-                      </View>
-                    )}
-                    {!isFocusMode && hasSessionInfo && (
-                      <View style={styles.infoTabsWrapper}>
-                        <SessionInfoTabs
-                          reminders={scenario?.reminders}
-                          description={scenario?.description}
-                        />
-                      </View>
-                    )}
-                  </>
-                )}
-          </>
+              <View key="2" style={styles.pagerPage}>
+                <SessionInfoTabs
+                  reminders={scenario?.reminders}
+                  description={scenario?.description}
+                />
+              </View>
+            </PagerView>
+          ) : (
+            <View style={styles.pagerPage}>{renderMainContent()}</View>
+          )}
+          {hasSessionInfo && (
+            <Pagination totalItems={2} currentIndex={pagerIndex} />
+          )}
 
           {isSimulationInProgress && scenario?.showScoreMeter !== false && (
             <View style={styles.scoreMeterContainer}>
