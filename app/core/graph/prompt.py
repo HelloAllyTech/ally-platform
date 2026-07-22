@@ -595,6 +595,43 @@ def _append_audio_tag_guidance(
     return SystemMessage(content=combined.strip())
 
 
+# Header framing the Tier 0 language-glossary style card when it is appended
+# at system level (below) rather than rendered by a {language_glossary}
+# placeholder inside the template body.
+_LANGUAGE_GLOSSARY_HEADER = (
+    "\n\n## Language style guide\n"
+    "Follow these standing rules for how your character speaks this language "
+    "(register, term choices, grammatical agreement). They apply to every "
+    "reply:\n\n"
+)
+
+
+def _ensure_language_glossary(
+    message: SystemMessage, prompt_data: PromptData
+) -> SystemMessage:
+    """Guarantee the Tier 0 language glossary reaches the model.
+
+    File-backed templates render it via the {language_glossary} placeholder,
+    but the runtime body may instead be a dashboard override, a legacy
+    per-language variant row, or a translated body — none of which carry the
+    placeholder. Same pattern as `_append_audio_tag_guidance`: append AFTER
+    templating so no studio prompt ever needs editing for the glossary to
+    work. If the compiled glossary text is already present (the template
+    rendered the placeholder), the message is returned unchanged, so the
+    template keeps control of placement when it wants it.
+    """
+    raw = getattr(prompt_data, "language_glossary", None)
+    if not isinstance(raw, str):
+        return message
+    glossary = raw.strip()
+    if not glossary:
+        return message
+    if glossary in message.content:
+        return message
+    combined = f"{message.content}{_LANGUAGE_GLOSSARY_HEADER}{glossary}"
+    return SystemMessage(content=combined.strip())
+
+
 def generate_system_message(
     prompt_data: PromptData,
     next_instruction: Optional[str] = None,
@@ -626,6 +663,7 @@ def generate_system_message(
             LOG_PREFIX,
             language_code or "None",
         )
+        msg = _ensure_language_glossary(msg, prompt_data)
         return _append_audio_tag_guidance(msg, audio_tag_instructions)
 
     if behavior_instructions is not None:
@@ -646,6 +684,7 @@ def generate_system_message(
             LOG_PREFIX,
             language_code or "None",
         )
+        msg = _ensure_language_glossary(msg, prompt_data)
         return _append_audio_tag_guidance(msg, audio_tag_instructions)
 
     logger.warning(
@@ -665,6 +704,7 @@ def generate_system_message(
         LOG_PREFIX,
         language_code or "None",
     )
+    msg = _ensure_language_glossary(msg, prompt_data)
     return _append_audio_tag_guidance(msg, audio_tag_instructions)
 
 

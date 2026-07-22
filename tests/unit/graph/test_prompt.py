@@ -804,3 +804,44 @@ class TestLanguageGlossary:
             prompt_data=pd, next_instruction="Focus on rapport."
         )
         assert "{language_glossary}" not in msg.content
+
+    def test_glossary_appended_to_override_body_without_placeholder(self):
+        """Dashboard-override / legacy-variant bodies predate the
+        {language_glossary} placeholder — the system-level append must still
+        deliver the glossary without any studio prompt edit."""
+        pd = make_prompt_data(
+            language_glossary=self.GLOSSARY,
+            prompts={
+                "ally_ai_learn_system_main_agent_prompt": {
+                    "prompt": "You are {name}. Speak naturally.",
+                    "availableVariables": ["name"],
+                }
+            },
+        )
+        msg = generate_system_message(prompt_data=pd, behavior_instructions=[])
+        assert "## Language style guide" in msg.content
+        assert msg.content.count('- worry: say "டென்ஷன்"; avoid "பதட்டம்"') == 1
+
+    def test_glossary_not_duplicated_when_template_has_placeholder(self):
+        """The default file template renders {language_glossary}; the append
+        guard must detect that and not add a second copy."""
+        pd = make_prompt_data(language_glossary=self.GLOSSARY)
+        msg = generate_system_message(prompt_data=pd, behavior_instructions=[])
+        assert msg.content.count('- worry: say "டென்ஷன்"; avoid "பதட்டம்"') == 1
+        assert "## Language style guide" not in msg.content
+
+    def test_glossary_appended_to_branching_override_without_placeholder(self):
+        pd = make_prompt_data(
+            language_glossary=self.GLOSSARY,
+            prompts={
+                "ally_ai_learn_system_branching_agent_prompt": {
+                    "prompt": "You are {name}. {next_instruction}",
+                    "availableVariables": ["name", "next_instruction"],
+                }
+            },
+        )
+        msg = generate_system_message(
+            prompt_data=pd, next_instruction="Focus on rapport."
+        )
+        assert "## Language style guide" in msg.content
+        assert msg.content.count('- worry: say "டென்ஷன்"; avoid "பதட்டம்"') == 1
