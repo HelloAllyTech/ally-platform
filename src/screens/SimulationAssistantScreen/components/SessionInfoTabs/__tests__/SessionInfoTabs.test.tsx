@@ -41,6 +41,7 @@ import React from 'react';
 import {fireEvent, render} from '@testing-library/react-native';
 
 import {SessionInfoTabs} from '../SessionInfoTabs';
+import {SessionInfoTab} from '../types';
 
 const description = '<p>You are speaking with <strong>Asha</strong>, a caller in distress.</p>';
 const reminders = ['Speak slowly and calmly.', 'Validate feelings before problem-solving.'];
@@ -96,5 +97,41 @@ describe('SessionInfoTabs', () => {
     );
     fireEvent.press(getByTestId('session-info-tab-reminders'));
     expect(getByText('No reminders for this scenario yet.')).toBeTruthy();
+  });
+
+  it('hides its own tab header when hideHeader is set, for a parent-driven tab bar', () => {
+    const {queryByTestId, getByTestId} = render(
+      <SessionInfoTabs
+        description={description}
+        reminders={reminders}
+        hideHeader
+        activeTab={SessionInfoTab.REMINDERS}
+      />,
+    );
+    expect(queryByTestId('session-info-tab-reminders')).toBeNull();
+    expect(queryByTestId('session-info-tab-description')).toBeNull();
+    expect(getByTestId('session-info-reminders')).toBeTruthy();
+  });
+
+  it('renders content for the externally-controlled activeTab', () => {
+    const {getByTestId, rerender} = render(
+      <SessionInfoTabs
+        description={description}
+        reminders={reminders}
+        hideHeader
+        activeTab={SessionInfoTab.DESCRIPTION}
+      />,
+    );
+    expect(getByTestId('session-info-description')).toBeTruthy();
+
+    rerender(
+      <SessionInfoTabs
+        description={description}
+        reminders={reminders}
+        hideHeader
+        activeTab={SessionInfoTab.REMINDERS}
+      />,
+    );
+    expect(getByTestId('session-info-reminders')).toBeTruthy();
   });
 });

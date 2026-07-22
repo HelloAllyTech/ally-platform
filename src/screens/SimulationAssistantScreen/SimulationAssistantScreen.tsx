@@ -12,14 +12,13 @@ import {
 } from '@sayem314/react-native-keep-awake';
 import {Room, RoomEvent, Track} from 'livekit-client';
 import {useTranslation} from 'react-i18next';
-import {Text, View} from 'react-native';
-import PagerView from 'react-native-pager-view';
+import {Text, TouchableOpacity, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import SoundPlayer from 'react-native-sound-player';
 
 import {sounds} from '@/assets';
-import {EndSessionIcon} from '@/assets/icons';
-import {IllustratedModal, Pagination, useErrorToast} from '@/components';
+import {BulbIcon, CallIcon, EndSessionIcon, NotesIcon} from '@/assets/icons';
+import {IllustratedModal, useErrorToast} from '@/components';
 import {DEFAULT_MAX_TIME_VALUE, SCREEN_NAMES} from '@/constants';
 import {useAppNavigation, useHardwareBackPressHandler, useUser} from '@/hooks';
 import type {RootStackScreenProps} from '@/navigation/types';
@@ -60,6 +59,7 @@ import {
   ScenarioInfoOverlay,
   ScenarioInfoOverlayRef,
 } from './components/ScenarioInfoOverlay';
+import {SessionInfoTab} from './components/SessionInfoTabs/types';
 import {styles} from './styles';
 
 // Tiny delay before connect to avoid React effect mount/unmount races. Was
@@ -98,8 +98,9 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const hasChecklist =
     isChecklistMode && (scenario?.checklistEvents?.length ?? 0) > 0;
   const isNoneMode = scenario?.experienceMode === ExperienceMode.NONE;
-  const hasSessionInfo =
-    (scenario?.reminders?.length ?? 0) > 0 || !!scenario?.description;
+  const hasReminders = (scenario?.reminders?.length ?? 0) > 0;
+  const hasDescription = !!scenario?.description;
+  const hasSessionInfo = hasReminders || hasDescription;
   const hasStateNames = (scenario?.stateNames?.length ?? 0) > 0;
   const {liveKitServerUrl, accessToken, id: sessionId} = sessionData;
   const [startTime, setStartTime] = useState<Date | null>(null);
@@ -139,10 +140,12 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   );
   const [showEndingSoon, setShowEndingSoon] = useState<boolean>(false);
   const [isFocusMode, setIsFocusMode] = useState<boolean>(false);
-  // Which page of the reminders/description swipe pager is active (0 = main
-  // call view, 1 = SessionInfoTabs) — drives the dot indicator. The pager
-  // itself only mounts when hasSessionInfo is true (see render below).
-  const [pagerIndex, setPagerIndex] = useState<number>(0);
+  // Which tab of the unified Call/Reminders/Description tab bar is active —
+  // tapping a tab switches instantly (no swipe). The tab bar itself only
+  // renders when hasSessionInfo is true (see render below).
+  const [activeInfoTab, setActiveInfoTab] = useState<'call' | SessionInfoTab>(
+    'call',
+  );
   // Pause/resume: paused time is excluded from the displayed timer and the
   // scenario time limit. `pausedOffsetMs` accumulates completed pauses.
   // NOTE: this is the CLIENT-side clock (drives the scenario time-limit only).
@@ -655,13 +658,6 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     armControlAck,
   ]);
 
-  const handlePageSelected = useCallback(
-    (e: {nativeEvent: {position: number}}) => {
-      setPagerIndex(e.nativeEvent.position);
-    },
-    [],
-  );
-
   const renderLoader = () => {
     const getLoadingText = () => {
       if (
@@ -690,9 +686,9 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     );
   };
 
-  // Main call view (avatars + optional checklist) — page 1 of the swipe
-  // pager when reminders/description exist, or the screen's only content
-  // otherwise. SessionInfoTabs is NOT rendered here; it's page 2 (see below).
+  // Main call view (avatars + optional checklist) — shown for the "Call" tab
+  // when reminders/description exist, or the screen's only content
+  // otherwise. SessionInfoTabs renders separately for the other tabs (see below).
   const renderMainContent = () => (
     <>
       <>
@@ -836,6 +832,36 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     </>
   );
 
+  // Unified Call/Reminders/Description tab bar — tapping a tab switches
+  // instantly (no swipe needed), matching the flat tab structure used on
+  // web's SessionSidebar. "Call" always shows; Reminders/Description only
+  // appear when the scenario actually has that content.
+  const infoTabs: {
+    id: 'call' | SessionInfoTab;
+    label: string;
+    Icon: typeof CallIcon;
+  }[] = [
+    {id: 'call', label: t('simulationPage.callTab'), Icon: CallIcon},
+    ...(hasReminders
+      ? [
+          {
+            id: SessionInfoTab.REMINDERS,
+            label: t('simulationPage.remindersTab'),
+            Icon: BulbIcon,
+          } as const,
+        ]
+      : []),
+    ...(hasDescription
+      ? [
+          {
+            id: SessionInfoTab.DESCRIPTION,
+            label: t('simulationPage.descriptionTab'),
+            Icon: NotesIcon,
+          } as const,
+        ]
+      : []),
+  ];
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <RoomContext.Provider value={room}>
@@ -874,28 +900,49 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
               />
             </View>
           )}
-          {hasSessionInfo ? (
-            <PagerView
-              testID="simulation-info-pager"
-              style={styles.pager}
-              initialPage={0}
-              onPageSelected={handlePageSelected}>
-              <View key="1" style={styles.pagerPage}>
-                {renderMainContent()}
-              </View>
-              <View key="2" style={styles.pagerPage}>
-                <SessionInfoTabs
-                  reminders={scenario?.reminders}
-                  description={scenario?.description}
-                />
-              </View>
-            </PagerView>
-          ) : (
-            <View style={styles.pagerPage}>{renderMainContent()}</View>
-          )}
           {hasSessionInfo && (
-            <Pagination totalItems={2} currentIndex={pagerIndex} />
+            <View style={styles.infoTabBar} testID="simulation-info-tab-bar">
+              {infoTabs.map(tab => {
+                const isActive = activeInfoTab === tab.id;
+                const {Icon} = tab;
+                return (
+                  <TouchableOpacity
+                    key={tab.id}
+                    activeOpacity={0.7}
+                    testID={`simulation-info-tab-${tab.id}`}
+                    onPress={() => setActiveInfoTab(tab.id)}
+                    style={styles.infoTabButton}>
+                    <Icon
+                      width={16}
+                      height={16}
+                      color={isActive ? 'white' : '#9CA3AF'}
+                    />
+                    <Text
+                      style={[
+                        styles.infoTabLabel,
+                        isActive && styles.infoTabLabelActive,
+                      ]}>
+                      {tab.label}
+                    </Text>
+                    {isActive && <View style={styles.infoTabIndicator} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           )}
+          <View style={styles.pagerPage}>
+            {activeInfoTab === 'call' ? (
+              renderMainContent()
+            ) : (
+              <SessionInfoTabs
+                reminders={scenario?.reminders}
+                description={scenario?.description}
+                hideHeader
+                activeTab={activeInfoTab}
+                onTabChange={setActiveInfoTab}
+              />
+            )}
+          </View>
 
           {isSimulationInProgress && scenario?.showScoreMeter !== false && (
             <View style={styles.scoreMeterContainer}>

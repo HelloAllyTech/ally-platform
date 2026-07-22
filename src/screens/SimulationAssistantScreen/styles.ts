@@ -130,15 +130,44 @@ export const styles = ScaledSheet.create({
     shadowRadius: 6,
     elevation: 6,
   },
-  // Reminders/Description live on a swipeable second page (react-native-pager-view)
-  // rather than an inline panel, so they don't compete for space with the
-  // avatars/checklist on the main call view.
-  pager: {
-    flex: 1,
-    width: '100%',
-  },
+  // Reminders/Description live behind a Call/Reminders/Description tab bar
+  // (tap to switch, no swipe) rather than an inline panel, so they don't
+  // compete for space with the avatars/checklist on the main call view.
   pagerPage: {
     flex: 1,
     width: '100%',
+  },
+  infoTabBar: {
+    flexDirection: 'row',
+    gap: '16@ms',
+    marginBottom: '12@vs',
+    borderBottomWidth: 1,
+    borderBottomColor: '#3D4045',
+  },
+  infoTabButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: '6@ms',
+    paddingVertical: '8@vs',
+    paddingHorizontal: '4@ms',
+  },
+  infoTabLabel: {
+    fontSize: '14@ms',
+    fontWeight: '500',
+    color: '#9CA3AF',
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+  },
+  infoTabLabelActive: {
+    color: 'white',
+  },
+  infoTabIndicator: {
+    position: 'absolute',
+    bottom: '-1@vs',
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: '#57f646',
+    borderTopLeftRadius: '2@ms',
+    borderTopRightRadius: '2@ms',
   },
 });
