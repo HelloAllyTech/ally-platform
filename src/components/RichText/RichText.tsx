@@ -118,21 +118,38 @@ const renderInline = (
     ];
   });
 
+type RichTextVariant = 'light' | 'dark';
+
+// Dark-background override (roleplay screen's Session Info panel, bg #1D2020)
+// — light variant/callers are untouched (style arrays drop falsy entries).
+const darkOverrides = StyleSheet.create({
+  text: {color: '#D9D9DC'},
+  hr: {backgroundColor: '#3D4045'},
+  blockquote: {borderLeftColor: '#3D4045'},
+});
+
 const renderListItem = (
   item: HtmlElementNode,
   ordered: boolean,
   index: number,
   key: string,
+  variant: RichTextVariant,
 ): React.ReactNode => {
   const itemBody = item.children.some(isBlockChild) ? (
-    renderBlocks(item.children, key)
+    renderBlocks(item.children, key, variant)
   ) : (
-    <Text style={styles.listItemText}>{renderInline(item.children, key)}</Text>
+    <Text
+      style={[styles.listItemText, variant === 'dark' && darkOverrides.text]}>
+      {renderInline(item.children, key)}
+    </Text>
   );
 
   return (
     <View key={key} style={styles.listItem}>
-      <Text style={styles.listMarker}>{ordered ? `${index + 1}.` : '•'}</Text>
+      <Text
+        style={[styles.listMarker, variant === 'dark' && darkOverrides.text]}>
+        {ordered ? `${index + 1}.` : '•'}
+      </Text>
       <View style={styles.listItemContent}>{itemBody}</View>
     </View>
   );
@@ -141,32 +158,44 @@ const renderListItem = (
 const renderBlockElement = (
   node: HtmlElementNode,
   key: string,
+  variant: RichTextVariant,
 ): React.ReactNode => {
+  const textStyle = variant === 'dark' && darkOverrides.text;
   switch (node.tag) {
     case 'h1':
       return (
-        <Text key={key} style={styles.h1}>
+        <Text key={key} style={[styles.h1, textStyle]}>
           {renderInline(node.children, key)}
         </Text>
       );
     case 'h2':
       return (
-        <Text key={key} style={styles.h2}>
+        <Text key={key} style={[styles.h2, textStyle]}>
           {renderInline(node.children, key)}
         </Text>
       );
     case 'h3':
       return (
-        <Text key={key} style={styles.h3}>
+        <Text key={key} style={[styles.h3, textStyle]}>
           {renderInline(node.children, key)}
         </Text>
       );
     case 'hr':
-      return <View key={key} style={styles.hr} />;
+      return (
+        <View
+          key={key}
+          style={[styles.hr, variant === 'dark' && darkOverrides.hr]}
+        />
+      );
     case 'blockquote':
       return (
-        <View key={key} style={styles.blockquote}>
-          {renderBlocks(node.children, key)}
+        <View
+          key={key}
+          style={[
+            styles.blockquote,
+            variant === 'dark' && darkOverrides.blockquote,
+          ]}>
+          {renderBlocks(node.children, key, variant)}
         </View>
       );
     case 'ul':
@@ -179,14 +208,14 @@ const renderBlockElement = (
       return (
         <View key={key} style={styles.list}>
           {items.map((item, index) =>
-            renderListItem(item, ordered, index, `${key}-${index}`),
+            renderListItem(item, ordered, index, `${key}-${index}`, variant),
           )}
         </View>
       );
     }
     case 'p':
       return (
-        <Text key={key} style={styles.paragraph}>
+        <Text key={key} style={[styles.paragraph, textStyle]}>
           {renderInline(node.children, key)}
         </Text>
       );
@@ -194,13 +223,17 @@ const renderBlockElement = (
       // Unknown wrappers (e.g. div, section) are unwrapped.
       return (
         <React.Fragment key={key}>
-          {renderBlocks(node.children, key)}
+          {renderBlocks(node.children, key, variant)}
         </React.Fragment>
       );
   }
 };
 
-function renderBlocks(nodes: HtmlNode[], keyPrefix: string): React.ReactNode[] {
+function renderBlocks(
+  nodes: HtmlNode[],
+  keyPrefix: string,
+  variant: RichTextVariant,
+): React.ReactNode[] {
   const blocks: React.ReactNode[] = [];
   let inlineBuffer: HtmlNode[] = [];
   let paragraphCount = 0;
@@ -214,7 +247,9 @@ function renderBlocks(nodes: HtmlNode[], keyPrefix: string): React.ReactNode[] {
     if (hasContent) {
       const key = `${keyPrefix}-p-${paragraphCount++}`;
       blocks.push(
-        <Text key={key} style={styles.paragraph}>
+        <Text
+          key={key}
+          style={[styles.paragraph, variant === 'dark' && darkOverrides.text]}>
           {renderInline(inlineBuffer, key)}
         </Text>,
       );
@@ -233,7 +268,7 @@ function renderBlocks(nodes: HtmlNode[], keyPrefix: string): React.ReactNode[] {
       return;
     }
     flushInline();
-    blocks.push(renderBlockElement(node, `${keyPrefix}-${index}`));
+    blocks.push(renderBlockElement(node, `${keyPrefix}-${index}`, variant));
   });
 
   flushInline();
@@ -243,13 +278,21 @@ function renderBlocks(nodes: HtmlNode[], keyPrefix: string): React.ReactNode[] {
 export interface RichTextProps {
   html: string | undefined | null;
   style?: StyleProp<ViewStyle>;
+  /** 'dark' recolors text for dark backgrounds (e.g. the roleplay screen's
+   * Session Info panel). Defaults to 'light' — the original light-background
+   * behavior used by the pre-practice scenario details screen. */
+  variant?: RichTextVariant;
 }
 
-export const RichText: React.FC<RichTextProps> = ({html, style}) => {
+export const RichText: React.FC<RichTextProps> = ({
+  html,
+  style,
+  variant = 'light',
+}) => {
   const blocks = useMemo(() => {
     if (!html || html.trim().length === 0) return null;
-    return renderBlocks(parseHtml(html).children, 'rt');
-  }, [html]);
+    return renderBlocks(parseHtml(html).children, 'rt', variant);
+  }, [html, variant]);
 
   if (!blocks || blocks.length === 0) return null;
 
