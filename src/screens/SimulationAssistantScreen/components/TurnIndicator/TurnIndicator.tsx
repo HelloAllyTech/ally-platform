@@ -9,6 +9,9 @@ import {TurnState} from '@/types';
 
 interface TurnIndicatorProps {
   turnState: TurnState;
+  /** Smaller padding/text for the PiP self-view bubble, where the pill has far
+   * less width to work with than the full-size tile. */
+  compact?: boolean;
 }
 
 const getLabelKey = (state: TurnState): TranslationType | null => {
@@ -30,7 +33,10 @@ const getLabelKey = (state: TurnState): TranslationType | null => {
   }
 };
 
-export const TurnIndicator: React.FC<TurnIndicatorProps> = ({turnState}) => {
+export const TurnIndicator: React.FC<TurnIndicatorProps> = ({
+  turnState,
+  compact = false,
+}) => {
   const {t} = useTranslate();
   const labelKey = getLabelKey(turnState);
   const label = labelKey ? t(labelKey) : '';
@@ -43,8 +49,13 @@ export const TurnIndicator: React.FC<TurnIndicatorProps> = ({turnState}) => {
       style={[
         styles.container,
         isUserAction ? styles.bgPrimaryLight : styles.bgPrimary,
+        compact && styles.containerCompact,
       ]}>
-      <Text style={styles.label}>{label}</Text>
+      <Text
+        style={[styles.label, compact && styles.labelCompact]}
+        numberOfLines={2}>
+        {label}
+      </Text>
     </View>
   );
 };
@@ -54,6 +65,13 @@ const styles = ScaledSheet.create({
     paddingHorizontal: '10@ms',
     paddingVertical: '5@ms',
     borderRadius: '6@ms',
+    maxWidth: '160@ms',
+  },
+  containerCompact: {
+    paddingHorizontal: '6@ms',
+    paddingVertical: '3@ms',
+    borderRadius: '4@ms',
+    maxWidth: '80@ms',
   },
   bgPrimary: {
     backgroundColor: colors.ds.theme.primary,
@@ -66,5 +84,8 @@ const styles = ScaledSheet.create({
     fontSize: '11@ms',
     color: colors.white,
     fontStyle: 'italic',
+  },
+  labelCompact: {
+    fontSize: '9@ms',
   },
 });

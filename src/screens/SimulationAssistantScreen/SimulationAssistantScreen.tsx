@@ -729,16 +729,20 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
                       }
                     : {})}
                 />
-              </View>
-              <View style={styles.participantWrapper}>
-                <ParticipantTile
-                  participant={localParticipant}
-                  publication={localAudioPub}
-                  avatarUrl={userData?.profileImageUrl ?? null}
-                  name={userData?.name}
-                  isMicEnabled={isMicEnabled}
-                  turnState={localTurnState}
-                />
+                {/* Learner's own self-view: a small inlaid picture-in-picture
+                    bubble over the AI tile, like a WhatsApp video call,
+                    rather than an equal-size tile of its own. */}
+                <View style={styles.pipWrapper} testID="participant-pip">
+                  <ParticipantTile
+                    participant={localParticipant}
+                    publication={localAudioPub}
+                    avatarUrl={userData?.profileImageUrl ?? null}
+                    name={userData?.name}
+                    isMicEnabled={isMicEnabled}
+                    turnState={localTurnState}
+                    compact
+                  />
+                </View>
               </View>
             </View>
             {isSimulationInProgress && !isFocusMode && (
@@ -797,16 +801,21 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
                             }
                           : {})}
                       />
-                    </View>
-                    <View style={styles.participantWrapper}>
-                      <ParticipantTile
-                        participant={localParticipant}
-                        publication={localAudioPub}
-                        avatarUrl={userData?.profileImageUrl ?? null}
-                        name={userData?.name}
-                        isMicEnabled={isMicEnabled}
-                        turnState={localTurnState}
-                      />
+                      {/* Learner's own self-view: a small inlaid
+                          picture-in-picture bubble over the AI tile, like a
+                          WhatsApp video call, rather than an equal-size tile
+                          of its own. */}
+                      <View style={styles.pipWrapper} testID="participant-pip">
+                        <ParticipantTile
+                          participant={localParticipant}
+                          publication={localAudioPub}
+                          avatarUrl={userData?.profileImageUrl ?? null}
+                          name={userData?.name}
+                          isMicEnabled={isMicEnabled}
+                          turnState={localTurnState}
+                          compact
+                        />
+                      </View>
                     </View>
                   </View>
                 </View>

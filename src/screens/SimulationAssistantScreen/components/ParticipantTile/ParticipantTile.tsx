@@ -22,9 +22,14 @@ interface ParticipantTileProps {
   overlayRef?: React.RefObject<ScenarioInfoOverlayRef> | null;
   isMicEnabled?: boolean;
   turnState?: TurnState;
+  /** Small picture-in-picture self-view sizing: same name + turn-status info
+   * as the full-size tile, just shrunk to fit a small bubble instead of an
+   * equal-size tile of its own. */
+  compact?: boolean;
 }
 
 const PLACEHOLDER_ICON_SIZE = ms(90);
+const PLACEHOLDER_ICON_SIZE_COMPACT = ms(36);
 
 export const ParticipantTile: React.FC<ParticipantTileProps> = ({
   participant,
@@ -35,6 +40,7 @@ export const ParticipantTile: React.FC<ParticipantTileProps> = ({
   overlayRef,
   isMicEnabled = true,
   turnState,
+  compact = false,
 }) => {
   const trackRef = React.useMemo(
     () => ({
@@ -68,8 +74,12 @@ export const ParticipantTile: React.FC<ParticipantTileProps> = ({
         ) : (
           <View style={styles.placeholderContainer}>
             <UserIcon
-              width={PLACEHOLDER_ICON_SIZE}
-              height={PLACEHOLDER_ICON_SIZE}
+              width={
+                compact ? PLACEHOLDER_ICON_SIZE_COMPACT : PLACEHOLDER_ICON_SIZE
+              }
+              height={
+                compact ? PLACEHOLDER_ICON_SIZE_COMPACT : PLACEHOLDER_ICON_SIZE
+              }
             />
           </View>
         )}
@@ -78,14 +88,22 @@ export const ParticipantTile: React.FC<ParticipantTileProps> = ({
         {topLeftOverlay}
 
         {turnState && turnState !== TurnState.IDLE && (
-          <View style={styles.turnIndicatorOverlay}>
-            <TurnIndicator turnState={turnState} />
+          <View
+            style={[
+              styles.turnIndicatorOverlay,
+              compact && styles.turnIndicatorOverlayCompact,
+            ]}>
+            <TurnIndicator turnState={turnState} compact={compact} />
           </View>
         )}
 
         {/* Active Speaker Overlay (Bottom Left) */}
         {name && (
-          <View style={styles.speakerOverlay}>
+          <View
+            style={[
+              styles.speakerOverlay,
+              compact && styles.speakerOverlayCompact,
+            ]}>
             <View style={styles.indicatorWrapper}>
               {isMicEnabled ? (
                 <SpeakingIndicator isSpeaking={isSpeaking} />
@@ -94,7 +112,7 @@ export const ParticipantTile: React.FC<ParticipantTileProps> = ({
               )}
             </View>
             <Text
-              style={styles.speakerName}
+              style={[styles.speakerName, compact && styles.speakerNameCompact]}
               numberOfLines={1}
               ellipsizeMode="tail">
               {name}
@@ -135,6 +153,10 @@ const styles = ScaledSheet.create({
     right: '12@ms',
     zIndex: 2,
   },
+  turnIndicatorOverlayCompact: {
+    top: '6@ms',
+    right: '6@ms',
+  },
   speakerOverlay: {
     position: 'absolute',
     bottom: '12@ms',
@@ -148,6 +170,12 @@ const styles = ScaledSheet.create({
     overflow: 'hidden',
     maxWidth: '85%',
   },
+  speakerOverlayCompact: {
+    bottom: '6@ms',
+    left: '6@ms',
+    paddingVertical: '3@ms',
+    paddingHorizontal: '6@ms',
+  },
   indicatorWrapper: {
     marginRight: '8@ms',
   },
@@ -156,5 +184,8 @@ const styles = ScaledSheet.create({
     fontSize: '12@ms',
     color: colors.white,
     maxWidth: '88%',
+  },
+  speakerNameCompact: {
+    fontSize: '9@ms',
   },
 });
