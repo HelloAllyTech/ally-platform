@@ -50,6 +50,7 @@ import {
   SessionChecklist,
   SessionGoalTimer,
   SessionInfoTabs,
+  SessionProgress,
   SessionScoreMeter,
   SimulationControls,
   SimulationTimer,
@@ -99,6 +100,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const isNoneMode = scenario?.experienceMode === ExperienceMode.NONE;
   const hasSessionInfo =
     (scenario?.reminders?.length ?? 0) > 0 || !!scenario?.description;
+  const hasStateNames = (scenario?.stateNames?.length ?? 0) > 0;
   const {liveKitServerUrl, accessToken, id: sessionId} = sessionData;
   const [startTime, setStartTime] = useState<Date | null>(null);
   const navigation = useAppNavigation();
@@ -860,6 +862,17 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
               isPaused={isPaused}
               pausedOffsetMs={pausedOffsetMs}
             />
+          )}
+          {/* Always visible regardless of which pager page is active — same
+              placement/behavior as web's SessionSidebar stepper strip. */}
+          {isSimulationInProgress && hasStateNames && (
+            <View style={styles.stateProgressWrapper}>
+              <SessionProgress
+                stateNames={scenario?.stateNames ?? []}
+                difficultyLevel={scenario?.difficultyLevel ?? ''}
+                score={accumulatedScore}
+              />
+            </View>
           )}
           {hasSessionInfo ? (
             <PagerView

@@ -101,6 +101,11 @@ export const styles = ScaledSheet.create({
     width: '100%',
     flex: 1, // Allow it to expanded if needed, or adjust based on layout
   },
+  stateProgressWrapper: {
+    marginVertical: '10@mvs',
+    width: '100%',
+    flexShrink: 0,
+  },
   participantsCompact: {
     height: '180@ms',
   },

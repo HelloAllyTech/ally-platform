@@ -165,6 +165,14 @@ jest.mock('../components', () => {
     LiveFeedback: ({message}: any) => <Text>{message}</Text>,
     SessionScoreMeter: ({score}: any) => <Text testID="score">{String(score)}</Text>,
     SessionChecklist: () => <View testID="session-checklist" />,
+    SessionProgress: ({stateNames, difficultyLevel, score}: any) => (
+      <View
+        testID="session-progress"
+        data-state-names={JSON.stringify(stateNames)}
+        data-difficulty={difficultyLevel}
+        data-score={String(score)}
+      />
+    ),
     SessionInfoTabs: ({reminders, description}: any) => (
       <View
         testID="session-info-tabs"
@@ -521,6 +529,65 @@ describe('SimulationAssistantScreen', () => {
 
     // Should show timer when connected and agent has joined
     expect(getByTestId('timer')).toBeDefined();
+  });
+
+  it('shows the state-name stepper once connected when the scenario has stateNames', async () => {
+    const connectedHandlers: Array<() => void> = [];
+    const participantConnectedHandlers: Array<() => void> = [];
+    (mockOn as jest.Mock).mockImplementation((event: string, cb: any) => {
+      if (event === 'connected') connectedHandlers.push(cb);
+      if (event === 'participantConnected') participantConnectedHandlers.push(cb);
+      return undefined;
+    });
+
+    const paramsWithStateNames = {
+      ...baseRouteParams,
+      scenario: {
+        title: 'Persona',
+        difficultyLevel: 'EASY',
+        stateNames: [
+          {name: 'Resistive', stateId: '1'},
+          {name: 'Hopeful', stateId: '2'},
+        ],
+      },
+    };
+
+    const {getByTestId} = await renderWithProviders(
+      <SimulationAssistantScreen route={{params: paramsWithStateNames} as any} />,
+    );
+
+    await waitFor(() => expect(mockConnect).toHaveBeenCalled());
+    await act(async () => connectedHandlers.forEach(fn => fn()));
+    await act(async () => participantConnectedHandlers.forEach(fn => fn()));
+
+    const progress = getByTestId('session-progress');
+    expect(progress.props['data-state-names']).toBe(
+      JSON.stringify([
+        {name: 'Resistive', stateId: '1'},
+        {name: 'Hopeful', stateId: '2'},
+      ]),
+    );
+    expect(progress.props['data-difficulty']).toBe('EASY');
+  });
+
+  it('does not render the state-name stepper when the scenario has no stateNames', async () => {
+    const connectedHandlers: Array<() => void> = [];
+    const participantConnectedHandlers: Array<() => void> = [];
+    (mockOn as jest.Mock).mockImplementation((event: string, cb: any) => {
+      if (event === 'connected') connectedHandlers.push(cb);
+      if (event === 'participantConnected') participantConnectedHandlers.push(cb);
+      return undefined;
+    });
+
+    const {queryByTestId} = await renderWithProviders(
+      <SimulationAssistantScreen route={{params: baseRouteParams} as any} />,
+    );
+
+    await waitFor(() => expect(mockConnect).toHaveBeenCalled());
+    await act(async () => connectedHandlers.forEach(fn => fn()));
+    await act(async () => participantConnectedHandlers.forEach(fn => fn()));
+
+    expect(queryByTestId('session-progress')).toBeNull();
   });
 
   it('shows control buttons when simulation is in progress', async () => {
