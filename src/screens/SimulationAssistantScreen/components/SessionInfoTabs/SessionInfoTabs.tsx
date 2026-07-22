@@ -13,15 +13,20 @@ import {SessionInfoTab, SessionInfoTabsProps} from './types';
 export const SessionInfoTabs: FC<SessionInfoTabsProps> = ({
   reminders = [],
   description,
+  hideHeader = false,
+  activeTab: controlledActiveTab,
+  onTabChange,
 }) => {
   const {t} = useTranslation();
   // Reminders is the primary tab, but land on Description while a scenario
   // has no reminders so the learner never opens onto an empty panel.
-  const [activeTab, setActiveTab] = useState<SessionInfoTab>(
+  const [internalActiveTab, setInternalActiveTab] = useState<SessionInfoTab>(
     reminders.length > 0 || !description
       ? SessionInfoTab.REMINDERS
       : SessionInfoTab.DESCRIPTION,
   );
+  const activeTab = controlledActiveTab ?? internalActiveTab;
+  const setActiveTab = onTabChange ?? setInternalActiveTab;
 
   if (reminders.length === 0 && !description) return null;
 
@@ -45,31 +50,33 @@ export const SessionInfoTabs: FC<SessionInfoTabsProps> = ({
       style={styles.container}
       testID="session-info-tabs">
       {/* Tab header */}
-      <View style={styles.header}>
-        {tabs.map(tab => {
-          const isActive = activeTab === tab.id;
-          const {Icon} = tab;
-          return (
-            <TouchableOpacity
-              key={tab.id}
-              activeOpacity={0.7}
-              testID={`session-info-tab-${tab.id}`}
-              onPress={() => setActiveTab(tab.id)}
-              style={styles.tabButton}>
-              <Icon
-                width={16}
-                height={16}
-                color={isActive ? 'white' : '#9CA3AF'}
-              />
-              <Text
-                style={[styles.tabLabel, isActive && styles.tabLabelActive]}>
-                {tab.label}
-              </Text>
-              {isActive && <View style={styles.tabIndicator} />}
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+      {!hideHeader && (
+        <View style={styles.header}>
+          {tabs.map(tab => {
+            const isActive = activeTab === tab.id;
+            const {Icon} = tab;
+            return (
+              <TouchableOpacity
+                key={tab.id}
+                activeOpacity={0.7}
+                testID={`session-info-tab-${tab.id}`}
+                onPress={() => setActiveTab(tab.id)}
+                style={styles.tabButton}>
+                <Icon
+                  width={16}
+                  height={16}
+                  color={isActive ? 'white' : '#9CA3AF'}
+                />
+                <Text
+                  style={[styles.tabLabel, isActive && styles.tabLabelActive]}>
+                  {tab.label}
+                </Text>
+                {isActive && <View style={styles.tabIndicator} />}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
 
       {/* Tab content */}
       <ScrollView
