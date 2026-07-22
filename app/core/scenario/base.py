@@ -180,6 +180,18 @@ class PromptData(BaseModel):
             "without a published glossary."
         ),
     )
+    glossary_sections: Optional[List[Dict[str, str]]] = Field(
+        default=None,
+        description=(
+            "Tier 1 language-glossary sections for knowledge-retrieval title "
+            "selection: [{'title', 'content', 'retrievalHint'}, ...]. Titles "
+            "arrive pre-prefixed by ally-be (e.g. '[Tamil (India) glossary] "
+            "Clinical terms'). Merged into the retrieval knowledge map; "
+            "retrievalHint tells the selector when to pull a section (the "
+            "agent's NEXT reply needs it — production-side relevance, not "
+            "discussion-topic relevance)."
+        ),
+    )
     knowledge_sources: Optional[List[Dict[str, str]]] = Field(
         default=None,
         description=(
@@ -671,6 +683,8 @@ class Scenario(BaseModel):
                 or prompt_data_dict.get("language_characteristics"),
                 "language_glossary": prompt_data_dict.get("languageGlossary")
                 or prompt_data_dict.get("language_glossary"),
+                "glossary_sections": prompt_data_dict.get("glossarySections")
+                or prompt_data_dict.get("glossary_sections"),
                 "knowledge_sources": prompt_data_dict.get("knowledgeSources"),
                 "filler_enabled": bool(prompt_data_dict.get("fillerEnabled") or False),
                 "comfort_audio_enabled": bool(

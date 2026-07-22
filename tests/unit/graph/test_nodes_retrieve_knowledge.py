@@ -158,3 +158,37 @@ class TestRetrieveKnowledgeNodeErrorHandling:
             },
         )
         assert result == {"retrieved_context": None}
+
+
+class TestGlossarySectionsInNode:
+    @pytest.mark.asyncio
+    async def test_glossary_sections_alone_trigger_retrieval(self):
+        """Non-English sessions can have glossary sections without any
+        scenario knowledge sources — retrieval must still run."""
+        title = "[Tamil (India) glossary] Clinical terms"
+        pd = type(
+            "PD",
+            (),
+            {
+                "knowledge_sources": None,
+                "glossary_sections": [
+                    {
+                        "title": title,
+                        "content": '- worry: say "டென்ஷன்"',
+                        "retrievalHint": "Retrieve when clinical.",
+                    }
+                ],
+            },
+        )()
+        scenario = type("S", (), {"prompt_data": pd})()
+        result = await retrieve_knowledge(
+            _make_state(messages=[HumanMessage(content="மனசு சரியில்ல")]),
+            {
+                "configurable": {
+                    "scenario": scenario,
+                    "llm_client": FakeLLMClient([title]),
+                }
+            },
+        )
+        assert result["retrieved_context"] is not None
+        assert 'worry: say "டென்ஷன்"' in result["retrieved_context"]

@@ -163,15 +163,70 @@ def _store_cached_retrieval(cache_key: str, value: str) -> None:
         _RETRIEVAL_CACHE.popitem(last=False)
 
 
+def _build_selector_prompt(
+    available_titles: List[str], glossary_hints: Optional[Dict[str, str]]
+) -> str:
+    """Build the title-selection system prompt.
+
+    Without glossary sections this is the original single-criterion prompt
+    (behavior-preserving). With them, the prompt carries a dual-framing
+    instruction (LANGUAGE_GLOSSARY_DESIGN.md §5.2): scenario topics are
+    selected for what is being DISCUSSED (content-side, backward-looking),
+    glossary sections for what the agent's NEXT reply needs (production-side,
+    forward-looking) — with a deliberate bias toward inclusion, since a
+    missed glossary section sends the agent into a vocabulary domain unarmed
+    while a false positive only spends cap budget. Each glossary section's
+    `retrievalHint` is rendered under its title as its trigger description.
+    """
+    if not glossary_hints:
+        return (
+            "You are a knowledge retrieval assistant. Given a conversation between "
+            "a counselor and a client, identify which knowledge topics are relevant "
+            "to the current conversation.\n\n"
+            f"Available topics: {available_titles}\n\n"
+            "Return ONLY the titles that are directly relevant to what is being "
+            "discussed. If none are relevant, return an empty list."
+        )
+
+    lines: List[str] = []
+    for title in available_titles:
+        lines.append(f"- {title}")
+        hint = glossary_hints.get(title)
+        if hint:
+            lines.append(f"  when to retrieve: {hint}")
+    topics_block = "\n".join(lines)
+
+    return (
+        "You are a knowledge retrieval assistant for a role-played conversation "
+        "between a counselor and a client (the client is an AI agent).\n\n"
+        f"Available topics:\n{topics_block}\n\n"
+        "Two kinds of topics are listed:\n"
+        "- Scenario knowledge topics: return them only when they are directly "
+        "relevant to what is being discussed.\n"
+        "- Language glossary sections (titles in [brackets]): these help the "
+        "client character SPEAK its next reply in its language. Return a "
+        "glossary section when the next reply is likely to enter that "
+        "vocabulary domain, even if it has not been explicitly mentioned yet. "
+        "When the conversation seems to be entering a new topic area, prefer "
+        "including the matching glossary section.\n\n"
+        "Return ONLY relevant titles. If none are relevant, return an empty list."
+    )
+
+
 async def retrieve_relevant_knowledge(
     llm_client,
     messages: list,
     knowledge_map: Dict[str, str],
+    glossary_hints: Optional[Dict[str, str]] = None,
 ) -> str:
     """
     Use the scenario LLM to identify which knowledge-base titles are
     relevant to the recent conversation, then return the formatted
     content for those titles.
+
+    `knowledge_map` may include Tier 1 language-glossary sections (prefixed
+    titles); `glossary_hints` maps those titles to their retrieval-trigger
+    descriptions and switches the selector to the dual-framing prompt.
 
     Returns an empty string when nothing is relevant or on any error.
     """
@@ -183,6 +238,11 @@ async def retrieve_relevant_knowledge(
             f"{_get_llm_identity(llm_client)}:"
             f"{_build_cache_key(messages, knowledge_map)}"
         )
+        if glossary_hints:
+            hints_digest = hashlib.md5(
+                json.dumps(sorted(glossary_hints.items())).encode("utf-8")
+            ).hexdigest()
+            cache_key = f"{cache_key}:{hints_digest}"
         cached = _get_cached_retrieval(cache_key)
         if cached is not None:
             logger.debug("Knowledge retrieval cache hit")
@@ -197,14 +257,7 @@ async def retrieve_relevant_knowledge(
 
         available_titles = list(knowledge_map.keys())
 
-        system_prompt = (
-            "You are a knowledge retrieval assistant. Given a conversation between "
-            "a counselor and a client, identify which knowledge topics are relevant "
-            "to the current conversation.\n\n"
-            f"Available topics: {available_titles}\n\n"
-            "Return ONLY the titles that are directly relevant to what is being "
-            "discussed. If none are relevant, return an empty list."
-        )
+        system_prompt = _build_selector_prompt(available_titles, glossary_hints)
 
         structured_llm = llm_client.llm_instance.with_structured_output(RelevantKeys)
         result = await structured_llm.ainvoke(

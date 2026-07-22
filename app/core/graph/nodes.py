@@ -1652,14 +1652,32 @@ async def retrieve_knowledge(
         return {"retrieved_context": None}
 
     knowledge_sources = getattr(scenario.prompt_data, "knowledge_sources", None)
-    if not knowledge_sources:
+    # Tier 1 language-glossary sections (LANGUAGE_GLOSSARY_DESIGN.md §5.2):
+    # pre-prefixed titles + retrievalHint, shipped by ally-be for non-English
+    # sessions with published retrieved-mode sections. They join the same
+    # title-selection call as scenario knowledge — no extra LLM call.
+    glossary_sections = getattr(scenario.prompt_data, "glossary_sections", None)
+    if not knowledge_sources and not glossary_sections:
         # DEBUG: per-turn — most scenarios don't configure knowledge sources.
         logger.debug(
-            "[RAG] retrieve_knowledge: no knowledge_sources; skipping retrieval"
+            "[RAG] retrieve_knowledge: no knowledge_sources or glossary "
+            "sections; skipping retrieval"
         )
         return {"retrieved_context": None}
 
     knowledge_map = build_knowledge_map(knowledge_sources)
+    glossary_hints: dict[str, str] = {}
+    if isinstance(glossary_sections, list):
+        for entry in glossary_sections:
+            if not isinstance(entry, dict):
+                continue
+            title = entry.get("title", "")
+            content = entry.get("content", "")
+            if title and content:
+                knowledge_map[title] = content
+                hint = entry.get("retrievalHint", "")
+                if hint:
+                    glossary_hints[title] = hint
     if not knowledge_map:
         # DEBUG: per-turn — niche edge case (malformed sources).
         logger.debug(
@@ -1735,7 +1753,12 @@ async def retrieve_knowledge(
     # proceed without retrieved context — the agent still produces a reply.
     try:
         retrieved_context = await asyncio.wait_for(
-            retrieve_relevant_knowledge(llm_client, state.messages, knowledge_map),
+            retrieve_relevant_knowledge(
+                llm_client,
+                state.messages,
+                knowledge_map,
+                glossary_hints=glossary_hints or None,
+            ),
             timeout=8.0,
         )
     except asyncio.TimeoutError:

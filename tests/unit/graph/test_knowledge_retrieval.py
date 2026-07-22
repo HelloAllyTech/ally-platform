@@ -5,6 +5,7 @@ from app.core.graph.knowledge_retrieval import (
     _MAX_PER_MATCH_CHARS,
     _MAX_TOTAL_CONTEXT_CHARS,
     RelevantKeys,
+    _build_selector_prompt,
     _format_retrieved_context,
     build_knowledge_map,
     retrieve_relevant_knowledge,
@@ -239,3 +240,88 @@ class TestFormatRetrievedContextCaps:
             {"a": "alpha", "b": "beta"},
         )
         assert result.index("**b:**") < result.index("**a:**")
+
+
+class CapturingStructuredLLM:
+    def __init__(self, titles: list):
+        self._titles = titles
+        self.captured_messages = None
+
+    async def ainvoke(self, messages):
+        self.captured_messages = messages
+        return RelevantKeys(titles=self._titles)
+
+
+class CapturingLLMClient:
+    def __init__(self, titles: list):
+        self.structured = CapturingStructuredLLM(titles)
+        outer = self
+
+        class _Instance:
+            def with_structured_output(self, schema):
+                return outer.structured
+
+        self._llm_instance = _Instance()
+
+    @property
+    def llm_instance(self):
+        return self._llm_instance
+
+
+class TestGlossaryDualFramingSelector:
+    """Tier 1 glossary sections in title selection (design §5.2)."""
+
+    GLOSSARY_TITLE = "[Tamil (India) glossary] Clinical terms"
+    HINT = "Retrieve when the reply turns toward diagnosis or symptoms"
+
+    def test_selector_prompt_unchanged_without_glossary(self):
+        prompt = _build_selector_prompt(["school memories"], None)
+        assert "directly relevant to what is being discussed" in prompt
+        assert "glossary" not in prompt.lower()
+
+    def test_selector_prompt_dual_framing_with_hints(self):
+        prompt = _build_selector_prompt(
+            ["school memories", self.GLOSSARY_TITLE],
+            {self.GLOSSARY_TITLE: self.HINT},
+        )
+        assert f"- {self.GLOSSARY_TITLE}" in prompt
+        assert f"when to retrieve: {self.HINT}" in prompt
+        assert "SPEAK its next reply" in prompt
+        assert "prefer" in prompt
+
+    @pytest.mark.asyncio
+    async def test_glossary_section_retrieved_with_hint_in_prompt(self):
+        client = CapturingLLMClient([self.GLOSSARY_TITLE])
+        result = await retrieve_relevant_knowledge(
+            client,
+            [HumanMessage(content="மனசு சரியில்ல டாக்டர்")],
+            {
+                "school memories": "Bullied in 8th grade",
+                self.GLOSSARY_TITLE: '- worry: say "டென்ஷன்"',
+            },
+            glossary_hints={self.GLOSSARY_TITLE: self.HINT},
+        )
+        assert 'worry: say "டென்ஷன்"' in result
+        system_prompt = client.structured.captured_messages[0].content
+        assert f"when to retrieve: {self.HINT}" in system_prompt
+        assert "SPEAK its next reply" in system_prompt
+
+    @pytest.mark.asyncio
+    async def test_cache_key_accounts_for_glossary_hints(self):
+        """A no-hints result must not be served for the same map WITH hints."""
+        knowledge_map = {
+            "unique cache probe": "content-a",
+            self.GLOSSARY_TITLE: "content-b",
+        }
+        messages = [HumanMessage(content="cache probe message")]
+        empty = await retrieve_relevant_knowledge(
+            CapturingLLMClient([]), messages, knowledge_map
+        )
+        assert empty == ""
+        hit = await retrieve_relevant_knowledge(
+            CapturingLLMClient([self.GLOSSARY_TITLE]),
+            messages,
+            knowledge_map,
+            glossary_hints={self.GLOSSARY_TITLE: self.HINT},
+        )
+        assert "content-b" in hit
