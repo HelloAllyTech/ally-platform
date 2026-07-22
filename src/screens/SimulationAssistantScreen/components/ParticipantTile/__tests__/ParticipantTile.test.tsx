@@ -11,7 +11,9 @@ jest.mock('@/assets/icons', () => {
   const {View} = require('react-native');
   return {
     MicOffWhiteIcon: () => <View testID="mic-off-icon" />,
-    UserIcon: () => <View testID="user-icon" />,
+    UserIcon: ({width}: {width?: number}) => (
+      <View testID="user-icon" data-width={width} />
+    ),
   };
 });
 
@@ -144,6 +146,24 @@ describe('ParticipantTile', () => {
     expect(queryByText('Thinking...')).toBeNull();
     expect(queryByText('Speaking...')).toBeNull();
     expect(queryByText('Listening...')).toBeNull();
+  });
+
+  it('still shows the name and turn indicator text in compact (PiP) mode', () => {
+    const {getByText} = render(
+      <ParticipantTile name="Alice" turnState={TurnState.THINKING} compact />,
+    );
+    expect(getByText('Alice')).toBeTruthy();
+    expect(getByText('Thinking...')).toBeTruthy();
+  });
+
+  it('uses a smaller placeholder icon in compact mode', () => {
+    const {getByTestId, rerender} = render(<ParticipantTile />);
+    const normalWidth = getByTestId('user-icon').props['data-width'];
+
+    rerender(<ParticipantTile compact />);
+    const compactWidth = getByTestId('user-icon').props['data-width'];
+
+    expect(compactWidth).toBeLessThan(normalWidth);
   });
 
   it('calls overlayRef.close on press if overlay is open', () => {
