@@ -100,6 +100,17 @@ export const styles = ScaledSheet.create({
     marginVertical: '10@mvs',
     width: '100%',
     flex: 1, // Allow it to expanded if needed, or adjust based on layout
+    gap: '10@vs',
+  },
+  // Bounded (not flexGrow) so the voice-call avatars above keep visual
+  // priority — matches liveFeedbackWrapper/scoreMeterContainer's "bounded
+  // chrome below the main avatar area" pattern rather than competing for
+  // flex space with the avatar column.
+  infoTabsWrapper: {
+    marginTop: '10@mvs',
+    width: '100%',
+    maxHeight: '240@vs',
+    flexShrink: 0,
   },
   participantsCompact: {
     height: '180@ms',

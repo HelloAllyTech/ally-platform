@@ -5,3 +5,4 @@ export {EndingSoonModal} from './EndingSoonModal';
 export {SimulationControls} from './SimulationControls';
 export {SessionGoalTimer} from './SessionGoalTimer';
 export {SessionChecklist} from './SessionChecklist';
+export {SessionInfoTabs} from './SessionInfoTabs';

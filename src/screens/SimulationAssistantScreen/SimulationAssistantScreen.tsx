@@ -48,6 +48,7 @@ import {
   LiveFeedback,
   SessionChecklist,
   SessionGoalTimer,
+  SessionInfoTabs,
   SessionScoreMeter,
   SimulationControls,
   SimulationTimer,
@@ -95,6 +96,8 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const hasChecklist =
     isChecklistMode && (scenario?.checklistEvents?.length ?? 0) > 0;
   const isNoneMode = scenario?.experienceMode === ExperienceMode.NONE;
+  const hasSessionInfo =
+    (scenario?.reminders?.length ?? 0) > 0 || !!scenario?.description;
   const {liveKitServerUrl, accessToken, id: sessionId} = sessionData;
   const [startTime, setStartTime] = useState<Date | null>(null);
   const navigation = useAppNavigation();
@@ -755,6 +758,12 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
                       items={scenario?.checklistEvents ?? []}
                       triggeredEvents={detectedEvents}
                     />
+                    {hasSessionInfo && (
+                      <SessionInfoTabs
+                        reminders={scenario?.reminders}
+                        description={scenario?.description}
+                      />
+                    )}
                   </View>
                 )}
               </View>
@@ -823,6 +832,14 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
                           key={feedbackKey}
                           message={feedback.text}
                           emoji={feedback.emoji}
+                        />
+                      </View>
+                    )}
+                    {!isFocusMode && hasSessionInfo && (
+                      <View style={styles.infoTabsWrapper}>
+                        <SessionInfoTabs
+                          reminders={scenario?.reminders}
+                          description={scenario?.description}
                         />
                       </View>
                     )}
