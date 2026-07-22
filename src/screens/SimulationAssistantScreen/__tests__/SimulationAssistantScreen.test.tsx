@@ -138,7 +138,19 @@ jest.mock('@/components', () => {
     LiveFeedback: ({message}: any) => <Text>{message}</Text>,
     SessionScoreMeter: ({score}: any) => <Text testID="score">{String(score)}</Text>,
     SimulationTimer: () => <Text testID="timer">timer</Text>,
+    Pagination: ({totalItems, currentIndex}: any) => (
+      <View testID="pagination-dots" data-total={totalItems} data-current={currentIndex} />
+    ),
     __mocks: {mockShowErrorToast},
+  };
+});
+
+jest.mock('react-native-pager-view', () => {
+  const React = require('react');
+  const {View} = require('react-native');
+  return {
+    __esModule: true,
+    default: ({children, testID}: any) => <View testID={testID}>{children}</View>,
   };
 });
 
@@ -153,6 +165,13 @@ jest.mock('../components', () => {
     LiveFeedback: ({message}: any) => <Text>{message}</Text>,
     SessionScoreMeter: ({score}: any) => <Text testID="score">{String(score)}</Text>,
     SessionChecklist: () => <View testID="session-checklist" />,
+    SessionInfoTabs: ({reminders, description}: any) => (
+      <View
+        testID="session-info-tabs"
+        data-reminders={JSON.stringify(reminders)}
+        data-description={description}
+      />
+    ),
     SimulationTimer: () => <Text testID="timer">timer</Text>,
     SimulationControls: ({
       isMicEnabled,
@@ -582,6 +601,63 @@ describe('SimulationAssistantScreen', () => {
     expect(getByLabelText('mic')).toBeDefined();
     expect(getByLabelText('end')).toBeDefined();
     expect(queryByLabelText('focus')).toBeNull();
+  });
+
+  it('renders the reminders/description swipe pager and dot indicator when the scenario has session info', async () => {
+    const connectedHandlers: Array<() => void> = [];
+    (mockOn as jest.Mock).mockImplementation((event: string, cb: any) => {
+      if (event === 'connected') connectedHandlers.push(cb);
+      return undefined;
+    });
+
+    const paramsWithReminders = {
+      ...baseRouteParams,
+      scenario: {
+        title: 'Persona',
+        reminders: ['Maintain eye contact', 'Ask open-ended questions'],
+        description: 'A challenging caller',
+      },
+    };
+
+    const {getByTestId, getAllByTestId} = await renderWithProviders(
+      <SimulationAssistantScreen route={{params: paramsWithReminders} as any} />,
+    );
+
+    await waitFor(() => expect(mockConnect).toHaveBeenCalled());
+    await act(async () => connectedHandlers.forEach(fn => fn()));
+
+    expect(getByTestId('simulation-info-pager')).toBeDefined();
+    expect(getByTestId('session-info-tabs').props['data-reminders']).toBe(
+      JSON.stringify(['Maintain eye contact', 'Ask open-ended questions']),
+    );
+    expect(getByTestId('session-info-tabs').props['data-description']).toBe(
+      'A challenging caller',
+    );
+    const dots = getByTestId('pagination-dots');
+    expect(dots.props['data-total']).toBe(2);
+    expect(dots.props['data-current']).toBe(0);
+    // The main call view (avatars) still renders alongside the pager — the
+    // pager wraps it, it doesn't replace it.
+    expect(getAllByTestId('participant-tile')).toHaveLength(2);
+  });
+
+  it('does not render the pager or dot indicator when the scenario has no reminders or description', async () => {
+    const connectedHandlers: Array<() => void> = [];
+    (mockOn as jest.Mock).mockImplementation((event: string, cb: any) => {
+      if (event === 'connected') connectedHandlers.push(cb);
+      return undefined;
+    });
+
+    const {queryByTestId} = await renderWithProviders(
+      <SimulationAssistantScreen route={{params: baseRouteParams} as any} />,
+    );
+
+    await waitFor(() => expect(mockConnect).toHaveBeenCalled());
+    await act(async () => connectedHandlers.forEach(fn => fn()));
+
+    expect(queryByTestId('simulation-info-pager')).toBeNull();
+    expect(queryByTestId('session-info-tabs')).toBeNull();
+    expect(queryByTestId('pagination-dots')).toBeNull();
   });
 });
 
