@@ -48,6 +48,8 @@ export interface Scenario {
   description?: string;
   /** Text reminders shown to the learner during the roleplay. */
   reminders?: string[];
+  /** Whether reminders are shown to the learner during the roleplay — reminders should only render when this is true. */
+  remindersEnabled?: boolean;
   /** Named conversational states (e.g. "Defensive" → "Cautiously Openness")
    * the learner progresses through, mapped from score + difficultyLevel. */
   stateNames?: StateInstruction[];

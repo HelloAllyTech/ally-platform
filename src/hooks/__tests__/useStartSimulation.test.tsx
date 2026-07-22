@@ -2,8 +2,10 @@ import {act, renderHook, waitFor} from '@testing-library/react-native';
 
 import {useStartSimulation} from '../useStartSimulation';
 
+const mockNavigate = jest.fn();
+
 jest.mock('@/hooks/useAppNavigation', () => ({
-  useAppNavigation: () => ({navigate: jest.fn()}),
+  useAppNavigation: () => ({navigate: mockNavigate}),
 }));
 
 jest.mock('@/hooks/useTranslate', () => ({
@@ -169,4 +171,75 @@ describe('useStartSimulation', () => {
     expect(result.current.showActiveSimulationModal).toBe(true);
     expect(result.current.activeSimulationId).toBe('active-sim-1');
   });
+
+  it('passes reminders through when remindersEnabled is true', async () => {
+    const {useStartScenarioSessionMutation} = require('@/services');
+    useStartScenarioSessionMutation.mockReturnValue([
+      jest.fn().mockReturnValue({
+        unwrap: jest.fn().mockResolvedValue({
+          scenarioSession: {id: 's1'},
+          accessToken: {token: 'tok', serverUrl: 'url'},
+          scenario: {
+            id: 1,
+            reminders: ['Maintain eye contact'],
+            remindersEnabled: true,
+          },
+        }),
+      }),
+    ]);
+
+    const {result} = renderHook(() => useStartSimulation());
+    await waitFor(() => {
+      expect(result.current.isMicPermissionGranted).toBe(true);
+    });
+
+    await act(async () => {
+      await result.current.startSimulation({scenarioId: 1});
+    });
+
+    expect(mockNavigate).toHaveBeenCalledWith(
+      'SimulationAssistant',
+      expect.objectContaining({
+        scenario: expect.objectContaining({
+          reminders: ['Maintain eye contact'],
+        }),
+      }),
+    );
+  });
+
+  it.each([[false], [undefined]])(
+    'strips reminders when remindersEnabled is %s',
+    async remindersEnabled => {
+      const {useStartScenarioSessionMutation} = require('@/services');
+      useStartScenarioSessionMutation.mockReturnValue([
+        jest.fn().mockReturnValue({
+          unwrap: jest.fn().mockResolvedValue({
+            scenarioSession: {id: 's1'},
+            accessToken: {token: 'tok', serverUrl: 'url'},
+            scenario: {
+              id: 1,
+              reminders: ['Maintain eye contact'],
+              remindersEnabled,
+            },
+          }),
+        }),
+      ]);
+
+      const {result} = renderHook(() => useStartSimulation());
+      await waitFor(() => {
+        expect(result.current.isMicPermissionGranted).toBe(true);
+      });
+
+      await act(async () => {
+        await result.current.startSimulation({scenarioId: 1});
+      });
+
+      expect(mockNavigate).toHaveBeenCalledWith(
+        'SimulationAssistant',
+        expect.objectContaining({
+          scenario: expect.objectContaining({reminders: []}),
+        }),
+      );
+    },
+  );
 });
