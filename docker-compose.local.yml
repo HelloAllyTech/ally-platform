@@ -27,6 +27,11 @@ services:
     environment:
       # Use host's LocalStack (from ally-be) - host.docker.internal works on Mac/Win
       AWS_ENDPOINT_URL: http://host.docker.internal:4566
+      # LocalStack partitions queues by region; ally-be + the localstack seed use
+      # us-east-1, but .env ships the prod ap-southeast-1. Without this override the
+      # worker's send_message 404s (QueueDoesNotExist) even with the full URL below,
+      # so no transcript/director/rubric event ever reaches Core.
+      AWS_REGION: us-east-1
       # Connect to ally-be API on host
       CORE_SERVICE_BASE_URL: http://host.docker.internal:8001
       # Full LocalStack queue URL - avoids get_queue_url and QueueDoesNotExist
