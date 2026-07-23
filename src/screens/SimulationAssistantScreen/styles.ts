@@ -96,11 +96,6 @@ export const styles = ScaledSheet.create({
     backgroundColor: colors.coralRed,
     borderRadius: '2@ms',
   },
-  checklistWrapper: {
-    marginVertical: '10@mvs',
-    width: '100%',
-    flex: 1, // Allow it to expanded if needed, or adjust based on layout
-  },
   stateProgressWrapper: {
     marginVertical: '10@mvs',
     width: '100%',
@@ -130,9 +125,9 @@ export const styles = ScaledSheet.create({
     shadowRadius: 6,
     elevation: 6,
   },
-  // Reminders/Description live behind a Call/Reminders/Description tab bar
-  // (tap to switch, no swipe) rather than an inline panel, so they don't
-  // compete for space with the avatars/checklist on the main call view.
+  // Checklist/Reminders/Description live behind a tab bar under the agent
+  // tile (tap to switch, no swipe) rather than the checklist being inlined
+  // into the main call view.
   pagerPage: {
     flex: 1,
     width: '100%',

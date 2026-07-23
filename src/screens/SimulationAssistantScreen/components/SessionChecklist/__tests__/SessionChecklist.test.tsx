@@ -203,4 +203,21 @@ describe('SessionChecklist', () => {
     fireEvent.press(getByText('Step 1'));
     expect(queryByText('Details 1')).toBeNull();
   });
+
+  it('hides the title/progress header when hideHeader is set, for a parent-driven tab bar', () => {
+    const {queryByText, getByText} = render(
+      <SessionChecklist
+        mode={ChecklistType.GUIDED}
+        items={mockItems}
+        triggeredEvents={['1']}
+        hideHeader
+      />,
+    );
+
+    expect(queryByText('simulationPage.sessionChecklist')).toBeNull();
+    expect(queryByText('Progress')).toBeNull();
+    // The list itself still renders.
+    expect(getByText('Step 1')).toBeTruthy();
+    expect(getByText('Step 2')).toBeTruthy();
+  });
 });
