@@ -1,0 +1,10 @@
+{
+    "name": "Roleplay v2 Trainee — Full-Session Profile",
+    "kind": "prompt",
+    "promptType": "roleplay_v2_trainee",
+    "hasStates": false,
+    "description": "Competent-neutral counselor profile for full_session agent-test-case rehearsals: conducts one ordinary complete session (opening → exploration → natural close) with no condition objective; deliberately NOT the maximal SKILLED performer so rubric scoring of the runtime is not distorted. Helpful rubric behaviors are injected as {helpful_behaviors} but used only where natural.",
+    "availableVariables": [
+        "helpful_behaviors"
+    ]
+}

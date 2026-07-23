@@ -844,6 +844,58 @@ class Settings(BaseSettings):
             "(<300ms) — it adds directly to voice latency."
         ),
     )
+    REHEARSAL_CONCURRENCY_LIMIT: int = Field(
+        default=2,
+        description=(
+            "Maximum number of v2 rehearsals (whole runs) executing "
+            "concurrently across the process; excess requests queue. Bounds "
+            "cost/memory at the run level; within a run, units fan out up to "
+            "REHEARSAL_UNIT_CONCURRENCY_LIMIT."
+        ),
+    )
+    REHEARSAL_UNIT_CONCURRENCY_LIMIT: int = Field(
+        default=3,
+        description=(
+            "Maximum trainee-profile / test-case units executed in parallel "
+            "within a single rehearsal run. Units are independent sessions, so "
+            "this is the main lever on a run's wall-clock (the 3 default "
+            "profiles run concurrently). Bounded to avoid provider rate limits."
+        ),
+    )
+    REHEARSAL_JUDGE_MODEL: str = Field(
+        default="gpt-4o-mini",
+        description=(
+            "Default judge model for rehearsals (config.judge_model in the "
+            "request overrides per-run)."
+        ),
+    )
+    REHEARSAL_JUDGE_SAMPLES: int = Field(
+        default=1,
+        description=(
+            "How many times the rehearsal judge is sampled per run. The two "
+            "SOFT dimensions with no deterministic backstop — persona_"
+            "consistency and difficulty_calibration — are averaged across "
+            "samples to reduce single-shot LLM noise; all other fields come "
+            "from the first sample. 1 (default) = original single-shot behavior."
+        ),
+    )
+    REHEARSAL_TURNS_DEFAULT: int = Field(
+        default=8,
+        description=(
+            "Default trainee turns per rehearsal profile when the request "
+            "omits config.turns_per_profile. Kept in sync with ally-be's "
+            "TEST_RUN_DEFAULT_TURNS_PER_CASE (8), which drives test runs and "
+            "always sends an explicit value."
+        ),
+    )
+    REHEARSAL_TRAINEE_MODEL: str = Field(
+        default="",
+        description=(
+            "Default trainee model for rehearsals (config.trainee_model in "
+            "the request overrides per-run). Empty (default) = use the app's "
+            "default LLM client."
+        ),
+    )
 
 
 settings = Settings()
