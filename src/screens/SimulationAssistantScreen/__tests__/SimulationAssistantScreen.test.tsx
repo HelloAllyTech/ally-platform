@@ -238,7 +238,7 @@ jest.mock('@/assets/icons', () => {
     EndSessionIcon: () => <View testID="end-session-icon" />,
     UserIcon: () => <View testID="user-icon" />,
     InfoBlackCircleIcon: () => <View testID="info-icon" />,
-    CallIcon: () => <View testID="call-icon" />,
+    ChecklistIcon: () => <View testID="checklist-icon" />,
     BulbIcon: () => <View testID="bulb-icon" />,
     NotesIcon: () => <View testID="notes-icon" />,
   };
@@ -690,7 +690,7 @@ describe('SimulationAssistantScreen', () => {
     expect(queryByLabelText('focus')).toBeNull();
   });
 
-  it('renders a Call/Reminders/Description tab bar when the scenario has session info', async () => {
+  it('renders a Reminders/Description tab bar under the agent tile when the scenario has session info', async () => {
     const connectedHandlers: Array<() => void> = [];
     (mockOn as jest.Mock).mockImplementation((event: string, cb: any) => {
       if (event === 'connected') connectedHandlers.push(cb);
@@ -714,18 +714,15 @@ describe('SimulationAssistantScreen', () => {
     await act(async () => connectedHandlers.forEach(fn => fn()));
 
     expect(getByTestId('simulation-info-tab-bar')).toBeDefined();
-    expect(getByTestId('simulation-info-tab-call')).toBeDefined();
+    expect(queryByTestId('simulation-info-tab-checklist')).toBeNull();
     expect(getByTestId('simulation-info-tab-reminders')).toBeDefined();
     expect(getByTestId('simulation-info-tab-description')).toBeDefined();
 
-    // Lands on the Call tab by default — the main call view (avatars) renders,
-    // and SessionInfoTabs isn't mounted yet (no swipe needed to reach it).
+    // The agent tile always renders, regardless of which tab is active — it
+    // isn't itself a tab.
     expect(getAllByTestId('participant-tile')).toHaveLength(2);
-    expect(queryByTestId('session-info-tabs')).toBeNull();
 
-    // Tapping the Reminders tab switches instantly — no scroll/swipe required.
-    fireEvent.press(getByTestId('simulation-info-tab-reminders'));
-
+    // Lands on the Reminders tab by default (no checklist in this scenario).
     expect(getByTestId('session-info-tabs').props['data-reminders']).toBe(
       JSON.stringify(['Maintain eye contact', 'Ask open-ended questions']),
     );
@@ -734,9 +731,48 @@ describe('SimulationAssistantScreen', () => {
     );
     expect(getByTestId('session-info-tabs').props['data-hide-header']).toBe('true');
     expect(getByTestId('session-info-tabs').props['data-active-tab']).toBe('reminders');
+
+    // Tapping the Description tab switches instantly — no scroll/swipe required.
+    fireEvent.press(getByTestId('simulation-info-tab-description'));
+    expect(getByTestId('session-info-tabs').props['data-active-tab']).toBe('description');
   });
 
-  it('does not render the tab bar when the scenario has no reminders or description', async () => {
+  it('includes a Checklist tab alongside Reminders/Description when the scenario has all three', async () => {
+    const connectedHandlers: Array<() => void> = [];
+    (mockOn as jest.Mock).mockImplementation((event: string, cb: any) => {
+      if (event === 'connected') connectedHandlers.push(cb);
+      return undefined;
+    });
+
+    const paramsWithEverything = {
+      ...baseRouteParams,
+      scenario: {
+        title: 'Persona',
+        experienceMode: 'CHECKLIST',
+        checklistEvents: [{id: '1', text: 'Step 1'}],
+        checklistType: 'GUIDED',
+        reminders: ['Maintain eye contact'],
+        description: 'A challenging caller',
+      },
+    };
+
+    const {getByTestId, queryByTestId} = await renderWithProviders(
+      <SimulationAssistantScreen route={{params: paramsWithEverything} as any} />,
+    );
+
+    await waitFor(() => expect(mockConnect).toHaveBeenCalled());
+    await act(async () => connectedHandlers.forEach(fn => fn()));
+
+    // Checklist takes priority as the default tab when present.
+    expect(getByTestId('session-checklist')).toBeDefined();
+    expect(queryByTestId('session-info-tabs')).toBeNull();
+
+    fireEvent.press(getByTestId('simulation-info-tab-reminders'));
+    expect(getByTestId('session-info-tabs').props['data-active-tab']).toBe('reminders');
+    expect(queryByTestId('session-checklist')).toBeNull();
+  });
+
+  it('does not render the tab bar when the scenario has no checklist, reminders, or description', async () => {
     const connectedHandlers: Array<() => void> = [];
     (mockOn as jest.Mock).mockImplementation((event: string, cb: any) => {
       if (event === 'connected') connectedHandlers.push(cb);
@@ -752,6 +788,7 @@ describe('SimulationAssistantScreen', () => {
 
     expect(queryByTestId('simulation-info-tab-bar')).toBeNull();
     expect(queryByTestId('session-info-tabs')).toBeNull();
+    expect(queryByTestId('session-checklist')).toBeNull();
   });
 });
 

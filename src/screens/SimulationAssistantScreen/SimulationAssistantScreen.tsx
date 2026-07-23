@@ -17,7 +17,12 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import SoundPlayer from 'react-native-sound-player';
 
 import {sounds} from '@/assets';
-import {BulbIcon, CallIcon, EndSessionIcon, NotesIcon} from '@/assets/icons';
+import {
+  BulbIcon,
+  ChecklistIcon,
+  EndSessionIcon,
+  NotesIcon,
+} from '@/assets/icons';
 import {IllustratedModal, useErrorToast} from '@/components';
 import {DEFAULT_MAX_TIME_VALUE, SCREEN_NAMES} from '@/constants';
 import {useAppNavigation, useHardwareBackPressHandler, useUser} from '@/hooks';
@@ -100,7 +105,10 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const isNoneMode = scenario?.experienceMode === ExperienceMode.NONE;
   const hasReminders = (scenario?.reminders?.length ?? 0) > 0;
   const hasDescription = !!scenario?.description;
-  const hasSessionInfo = hasReminders || hasDescription;
+  // Checklist/Reminders/Challenge Description all live under one tab bar
+  // below the agent tile, rather than the checklist being inlined into the
+  // main call view — mirrors web's unified SessionSidebar tabs.
+  const hasTabs = hasChecklist || hasReminders || hasDescription;
   const hasStateNames = (scenario?.stateNames?.length ?? 0) > 0;
   const {liveKitServerUrl, accessToken, id: sessionId} = sessionData;
   const [startTime, setStartTime] = useState<Date | null>(null);
@@ -140,12 +148,19 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   );
   const [showEndingSoon, setShowEndingSoon] = useState<boolean>(false);
   const [isFocusMode, setIsFocusMode] = useState<boolean>(false);
-  // Which tab of the unified Call/Reminders/Description tab bar is active —
-  // tapping a tab switches instantly (no swipe). The tab bar itself only
-  // renders when hasSessionInfo is true (see render below).
-  const [activeInfoTab, setActiveInfoTab] = useState<'call' | SessionInfoTab>(
-    'call',
-  );
+  // Which tab of the unified Checklist/Reminders/Description tab bar (below
+  // the agent tile) is active — tapping a tab switches instantly (no swipe).
+  // The tab bar itself only renders when hasTabs is true (see render below).
+  // Reminders/description are static session data (fixed at session start),
+  // so a plain lazy initializer — rather than an effect — is enough to land
+  // on the first available tab.
+  const [activeInfoTab, setActiveInfoTab] = useState<
+    'checklist' | SessionInfoTab
+  >(() => {
+    if (hasChecklist) return 'checklist';
+    if (hasReminders) return SessionInfoTab.REMINDERS;
+    return SessionInfoTab.DESCRIPTION;
+  });
   // Pause/resume: paused time is excluded from the displayed timer and the
   // scenario time limit. `pausedOffsetMs` accumulates completed pauses.
   // NOTE: this is the CLIENT-side clock (drives the scenario time-limit only).
@@ -686,162 +701,100 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
     );
   };
 
-  // Main call view (avatars + optional checklist) — shown for the "Call" tab
-  // when reminders/description exist, or the screen's only content
-  // otherwise. SessionInfoTabs renders separately for the other tabs (see below).
-  const renderMainContent = () => (
-    <>
-      <>
-        {isSimulationInProgress && hasChecklist && (
-          <View style={styles.participantsContent}>
-            <View
-              style={[
-                styles.participantsContainer,
-                styles.participantsHorizontal,
-                styles.participantsCompact,
-              ]}>
-              <View
-                style={[
-                  styles.participantWrapper,
-                  styles.participantWrapperWithOverlay,
-                ]}>
-                <ParticipantTile
-                  participant={remoteParticipant}
-                  publication={remoteAudioPub}
-                  avatarUrl={scenario?.coverImageUrl ?? null}
-                  name={scenario?.metadata?.name || scenario?.title}
-                  turnState={remoteTurnState}
-                  {...(scenario?.title
-                    ? {
-                        topLeftOverlay: (
-                          <ScenarioInfoOverlay
-                            ref={scenarioInfoRef}
-                            title={scenario?.title}
-                            triggerWarnings={getTriggerWarningNames(
-                              scenario?.triggerWarnings,
-                            )}
-                          />
-                        ),
-                        overlayRef:
-                          scenarioInfoRef as React.RefObject<ScenarioInfoOverlayRef>,
-                      }
-                    : {})}
-                />
-                {/* Learner's own self-view: a small inlaid picture-in-picture
-                    bubble over the AI tile, like a WhatsApp video call,
-                    rather than an equal-size tile of its own. */}
-                <View style={styles.pipWrapper} testID="participant-pip">
-                  <ParticipantTile
-                    participant={localParticipant}
-                    publication={localAudioPub}
-                    avatarUrl={userData?.profileImageUrl ?? null}
-                    name={userData?.name}
-                    isMicEnabled={isMicEnabled}
-                    turnState={localTurnState}
-                    compact
-                  />
-                </View>
-              </View>
-            </View>
-            {isSimulationInProgress && !isFocusMode && (
-              <View style={styles.checklistWrapper}>
-                <SessionChecklist
-                  mode={scenario?.checklistType ?? ChecklistType.OFF}
-                  items={scenario?.checklistEvents ?? []}
-                  triggeredEvents={detectedEvents}
-                />
-              </View>
-            )}
-          </View>
-        )}
-      </>
-      <>
-        {!isSimulationInProgress
-          ? renderLoader()
-          : !hasChecklist && (
-              <>
-                <View style={styles.participantsContent}>
-                  <View
-                    style={[
-                      styles.participantsContainer,
-                      isFocusMode
-                        ? styles.participantsVertical
-                        : isControlButtonMaximized
-                          ? feedback
-                            ? styles.participantsHorizontal
-                            : styles.participantsVertical
-                          : styles.participantsVertical,
-                    ]}>
-                    <View
-                      style={[
-                        styles.participantWrapper,
-                        styles.participantWrapperWithOverlay,
-                      ]}>
-                      <ParticipantTile
-                        participant={remoteParticipant}
-                        publication={remoteAudioPub}
-                        avatarUrl={scenario?.coverImageUrl ?? null}
-                        name={scenario?.metadata?.name || scenario?.title}
-                        turnState={remoteTurnState}
-                        {...(scenario?.title
-                          ? {
-                              topLeftOverlay: (
-                                <ScenarioInfoOverlay
-                                  ref={scenarioInfoRef}
-                                  title={scenario?.title}
-                                  triggerWarnings={getTriggerWarningNames(
-                                    scenario?.triggerWarnings,
-                                  )}
-                                />
-                              ),
-                              overlayRef:
-                                scenarioInfoRef as React.RefObject<ScenarioInfoOverlayRef>,
-                            }
-                          : {})}
-                      />
-                      {/* Learner's own self-view: a small inlaid
-                          picture-in-picture bubble over the AI tile, like a
-                          WhatsApp video call, rather than an equal-size tile
-                          of its own. */}
-                      <View style={styles.pipWrapper} testID="participant-pip">
-                        <ParticipantTile
-                          participant={localParticipant}
-                          publication={localAudioPub}
-                          avatarUrl={userData?.profileImageUrl ?? null}
-                          name={userData?.name}
-                          isMicEnabled={isMicEnabled}
-                          turnState={localTurnState}
-                          compact
-                        />
-                      </View>
-                    </View>
-                  </View>
-                </View>
-                {!isFocusMode && feedback && (
-                  <View style={styles.liveFeedbackWrapper}>
-                    <LiveFeedback
-                      key={feedbackKey}
-                      message={feedback.text}
-                      emoji={feedback.emoji}
+  // The agent tile always renders during a live session — checklist/reminders/
+  // description now live in the unified tab bar below it (see infoTabs),
+  // rather than the checklist being inlined here as it was previously.
+  const renderParticipants = () => (
+    <View style={styles.participantsContent}>
+      <View
+        style={[
+          styles.participantsContainer,
+          hasTabs
+            ? [styles.participantsHorizontal, styles.participantsCompact]
+            : isFocusMode
+              ? styles.participantsVertical
+              : isControlButtonMaximized
+                ? feedback
+                  ? styles.participantsHorizontal
+                  : styles.participantsVertical
+                : styles.participantsVertical,
+        ]}>
+        <View
+          style={[
+            styles.participantWrapper,
+            styles.participantWrapperWithOverlay,
+          ]}>
+          <ParticipantTile
+            participant={remoteParticipant}
+            publication={remoteAudioPub}
+            avatarUrl={scenario?.coverImageUrl ?? null}
+            name={scenario?.metadata?.name || scenario?.title}
+            turnState={remoteTurnState}
+            {...(scenario?.title
+              ? {
+                  topLeftOverlay: (
+                    <ScenarioInfoOverlay
+                      ref={scenarioInfoRef}
+                      title={scenario?.title}
+                      triggerWarnings={getTriggerWarningNames(
+                        scenario?.triggerWarnings,
+                      )}
                     />
-                  </View>
-                )}
-              </>
-            )}
-      </>
-    </>
+                  ),
+                  overlayRef:
+                    scenarioInfoRef as React.RefObject<ScenarioInfoOverlayRef>,
+                }
+              : {})}
+          />
+          {/* Learner's own self-view: a small inlaid picture-in-picture
+              bubble over the AI tile, like a WhatsApp video call,
+              rather than an equal-size tile of its own. */}
+          <View style={styles.pipWrapper} testID="participant-pip">
+            <ParticipantTile
+              participant={localParticipant}
+              publication={localAudioPub}
+              avatarUrl={userData?.profileImageUrl ?? null}
+              name={userData?.name}
+              isMicEnabled={isMicEnabled}
+              turnState={localTurnState}
+              compact
+            />
+          </View>
+        </View>
+      </View>
+      {/* Checklist mode already surfaces real-time progress via its own tab,
+          so the generic nudge overlay is redundant there — same behavior as
+          before this became a tab. */}
+      {!hasChecklist && !isFocusMode && feedback && (
+        <View style={styles.liveFeedbackWrapper}>
+          <LiveFeedback
+            key={feedbackKey}
+            message={feedback.text}
+            emoji={feedback.emoji}
+          />
+        </View>
+      )}
+    </View>
   );
 
-  // Unified Call/Reminders/Description tab bar — tapping a tab switches
-  // instantly (no swipe needed), matching the flat tab structure used on
-  // web's SessionSidebar. "Call" always shows; Reminders/Description only
-  // appear when the scenario actually has that content.
+  // Unified Checklist/Reminders/Description tab bar below the agent tile —
+  // tapping a tab switches instantly (no swipe needed), matching the flat
+  // tab structure used on web's SessionSidebar. Each tab only appears when
+  // the scenario actually has that content.
   const infoTabs: {
-    id: 'call' | SessionInfoTab;
+    id: 'checklist' | SessionInfoTab;
     label: string;
-    Icon: typeof CallIcon;
+    Icon: typeof ChecklistIcon;
   }[] = [
-    {id: 'call', label: t('simulationPage.callTab'), Icon: CallIcon},
+    ...(hasChecklist
+      ? [
+          {
+            id: 'checklist' as const,
+            label: t('simulationPage.checklistTab'),
+            Icon: ChecklistIcon,
+          },
+        ]
+      : []),
     ...(hasReminders
       ? [
           {
@@ -889,7 +842,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
               pausedOffsetMs={pausedOffsetMs}
             />
           )}
-          {/* Always visible regardless of which pager page is active — same
+          {/* Always visible regardless of which tab is active — same
               placement/behavior as web's SessionSidebar stepper strip. */}
           {isSimulationInProgress && hasStateNames && (
             <View style={styles.stateProgressWrapper}>
@@ -900,7 +853,8 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
               />
             </View>
           )}
-          {hasSessionInfo && (
+          {!isSimulationInProgress ? renderLoader() : renderParticipants()}
+          {hasTabs && (
             <View style={styles.infoTabBar} testID="simulation-info-tab-bar">
               {infoTabs.map(tab => {
                 const isActive = activeInfoTab === tab.id;
@@ -930,19 +884,26 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
               })}
             </View>
           )}
-          <View style={styles.pagerPage}>
-            {activeInfoTab === 'call' ? (
-              renderMainContent()
-            ) : (
-              <SessionInfoTabs
-                reminders={scenario?.reminders}
-                description={scenario?.description}
-                hideHeader
-                activeTab={activeInfoTab}
-                onTabChange={setActiveInfoTab}
-              />
-            )}
-          </View>
+          {hasTabs && (
+            <View style={styles.pagerPage}>
+              {activeInfoTab === 'checklist' ? (
+                <SessionChecklist
+                  mode={scenario?.checklistType ?? ChecklistType.OFF}
+                  items={scenario?.checklistEvents ?? []}
+                  triggeredEvents={detectedEvents}
+                  hideHeader
+                />
+              ) : (
+                <SessionInfoTabs
+                  reminders={scenario?.reminders}
+                  description={scenario?.description}
+                  hideHeader
+                  activeTab={activeInfoTab}
+                  onTabChange={setActiveInfoTab}
+                />
+              )}
+            </View>
+          )}
 
           {isSimulationInProgress && scenario?.showScoreMeter !== false && (
             <View style={styles.scoreMeterContainer}>

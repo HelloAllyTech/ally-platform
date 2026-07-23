@@ -13,6 +13,12 @@ export interface SessionChecklistProps {
   mode: ChecklistType;
   items: ChecklistItem[];
   triggeredEvents: string[];
+  /**
+   * Suppresses the internal title/progress header — used when a parent
+   * screen renders its own tab bar (e.g. a "Checklist" tab) rather than
+   * nesting a second header inside the tab content.
+   */
+  hideHeader?: boolean;
 }
 
 const CollapsibleContent: FC<{
@@ -40,6 +46,7 @@ export const SessionChecklist: FC<SessionChecklistProps> = ({
   mode,
   items,
   triggeredEvents,
+  hideHeader = false,
 }) => {
   const {t} = useTranslation();
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>(
@@ -84,34 +91,37 @@ export const SessionChecklist: FC<SessionChecklistProps> = ({
       style={styles.container}
       testID="session-checklist">
       {/* Header */}
-      <View
-        style={[
-          styles.header,
-          mode === ChecklistType.LIST && styles.headerList,
-        ]}>
+      {!hideHeader && (
         <View
-          style={
-            mode === ChecklistType.LIST
-              ? styles.headerIconContainerList
-              : styles.headerIconContainer
-          }>
-          <ChecklistIcon width={40} height={40} color="white" />
-        </View>
-        <View style={styles.headerTextContainer}>
-          <Text style={styles.headerTitle}>
-            {t('simulationPage.sessionChecklist')}
-          </Text>
-          {mode !== ChecklistType.LIST && (
-            <Text style={styles.headerSubtitle}>
-              {t('simulationPage.progress')}:{' '}
-              <Text style={styles.progressCompleted}>{completedCount}</Text> of{' '}
-              <Text style={styles.progressTotal}>
-                {totalCount} {t('simulationPage.completed')}
-              </Text>
+          style={[
+            styles.header,
+            mode === ChecklistType.LIST && styles.headerList,
+          ]}>
+          <View
+            style={
+              mode === ChecklistType.LIST
+                ? styles.headerIconContainerList
+                : styles.headerIconContainer
+            }>
+            <ChecklistIcon width={40} height={40} color="white" />
+          </View>
+          <View style={styles.headerTextContainer}>
+            <Text style={styles.headerTitle}>
+              {t('simulationPage.sessionChecklist')}
             </Text>
-          )}
+            {mode !== ChecklistType.LIST && (
+              <Text style={styles.headerSubtitle}>
+                {t('simulationPage.progress')}:{' '}
+                <Text style={styles.progressCompleted}>{completedCount}</Text>{' '}
+                of{' '}
+                <Text style={styles.progressTotal}>
+                  {totalCount} {t('simulationPage.completed')}
+                </Text>
+              </Text>
+            )}
+          </View>
         </View>
-      </View>
+      )}
 
       {/* List */}
       <ScrollView
