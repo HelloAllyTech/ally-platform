@@ -18,6 +18,7 @@ from app.core.agent.factory import (
     create_agent_with_adapter,
     initialize_agent_state,
     parse_room_metadata,
+    resolve_job_metadata,
     should_auto_start_conversation,
     should_say_opening_statement,
 )
@@ -373,9 +374,12 @@ class AgentWorker:
 
         SemanticSimilarityEvent._EMBEDDING_CLIENT = self.embedding_client
 
-        # Parse metadata
+        # Resolve then parse metadata. Slim dispatches (metadataFetch pointer)
+        # are fetched from ally-be here — after assignment, off LiveKit's 3s
+        # dispatch window; inline payloads pass through untouched.
+        raw_metadata = await resolve_job_metadata(self.ctx.job.metadata)
         rm_md_envelope = parse_room_metadata(
-            self.ctx.job.metadata,
+            raw_metadata,
             embedding_client=self.embedding_client,
             branching_llm_config=DEFAULT_BRANCHING_LLM_CONFIG,
         )

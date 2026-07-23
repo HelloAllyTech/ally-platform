@@ -29,6 +29,85 @@ logger = get_logger(__name__)
 # ====================================================================
 
 
+async def resolve_job_metadata(metadata: Optional[str]) -> Optional[str]:
+    """Return the full room-metadata JSON for a job, fetching it when the
+    dispatch carries only a slim pointer.
+
+    ally-be (LEARN_METADATA_FETCH_ENABLED) sends
+    ``{version, metadataFetch: {roomName, url}, scenarioSession?}`` instead of
+    the full ~180KB envelope, so the payload no longer rides inside LiveKit's
+    availability request (which blew the server's 3s dispatch window over the
+    high-RTT server↔worker link). This resolves the pointer via the
+    x-api-key-guarded webhook and overlays any slim-envelope
+    ``scenarioSession`` fields (e.g. conversationStartedAt injected by the
+    participant_joined handler) onto the fetched payload.
+
+    Inline (legacy) payloads — anything without a ``metadataFetch`` key,
+    including invalid JSON — pass through unchanged so ``parse_room_metadata``
+    keeps owning their error handling. Mirrors roleplay v2's
+    ``RoleplaySpecEnvelope.ensure_spec`` fetch/retry contract.
+    """
+    try:
+        parsed = json.loads(metadata or "")
+    except json.JSONDecodeError:
+        return metadata
+    if not isinstance(parsed, dict) or "metadataFetch" not in parsed:
+        return metadata
+
+    fetch = parsed.get("metadataFetch") or {}
+    url = fetch.get("url")
+    room_name = fetch.get("roomName")
+    if not url:
+        raise ValueError(f"metadataFetch pointer for room {room_name!r} has no url")
+
+    import httpx
+
+    attempts = max(1, int(getattr(settings, "SPEC_FETCH_MAX_ATTEMPTS", 3)))
+    last_exc: Optional[Exception] = None
+    payload: Any = None
+    for attempt in range(1, attempts + 1):
+        logger.info(
+            "[metadata-fetch] Fetching room metadata room=%s (attempt %d/%d)",
+            room_name,
+            attempt,
+            attempts,
+        )
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                resp = await client.get(
+                    url,
+                    headers={"x-api-key": settings.CORE_SERVICE_API_KEY},
+                )
+                resp.raise_for_status()
+                payload = resp.json()
+            break
+        except Exception as exc:  # noqa: BLE001 - retried below
+            last_exc = exc
+            if attempt < attempts:
+                await asyncio.sleep(0.5 * (2 ** (attempt - 1)))
+    if payload is None:
+        raise RuntimeError(
+            f"room metadata fetch failed after {attempts} attempt(s) for "
+            f"room {room_name!r}: {last_exc}"
+        ) from last_exc
+    if not isinstance(payload, dict):
+        raise ValueError(
+            f"room metadata fetch for room {room_name!r} returned "
+            f"{type(payload).__name__}, expected object"
+        )
+
+    # Dispatch-time scenarioSession fields (conversationStartedAt) are only in
+    # the slim envelope — the stored payload predates them. Slim keys win.
+    slim_session = parsed.get("scenarioSession")
+    if isinstance(slim_session, dict) and slim_session:
+        stored_session = payload.get("scenarioSession")
+        merged = dict(stored_session) if isinstance(stored_session, dict) else {}
+        merged.update(slim_session)
+        payload["scenarioSession"] = merged
+
+    return json.dumps(payload)
+
+
 def parse_room_metadata(
     metadata,
     embedding_client: Optional[BaseEmbeddingClient] = None,
