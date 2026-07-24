@@ -49,7 +49,6 @@ export const styles = ScaledSheet.create({
     marginBottom: '20@mvs',
   },
   participantsContent: {
-    height: '100%',
     flexShrink: 1,
     width: '100%',
     alignItems: 'center',
@@ -57,6 +56,13 @@ export const styles = ScaledSheet.create({
     marginTop: '8@mvs',
     marginBottom: '16@mvs',
     zIndex: 1,
+  },
+  // Only claim the full remaining height when there's nothing else (no tab
+  // bar) below the agent tile to share space with — otherwise a fixed 100%
+  // height here pushes the tab bar/content pane down past the fold, leaving
+  // a large empty gap above them.
+  participantsContentFull: {
+    height: '100%',
   },
   participantsContainer: {
     flexShrink: 1,

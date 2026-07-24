@@ -705,7 +705,11 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   // description now live in the unified tab bar below it (see infoTabs),
   // rather than the checklist being inlined here as it was previously.
   const renderParticipants = () => (
-    <View style={styles.participantsContent}>
+    <View
+      style={[
+        styles.participantsContent,
+        !hasTabs && styles.participantsContentFull,
+      ]}>
       <View
         style={[
           styles.participantsContainer,
