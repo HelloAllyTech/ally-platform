@@ -2,15 +2,24 @@
 
 from typing import Any, Dict, Optional
 
+from app.core.config import settings
 from app.core.constants import DEFAULT_LANGUAGE_CODE, DEFAULT_STT_CONFIG, STTProvider
 from app.core.logger import get_logger
 from app.stt.base import BaseSTTClient
-from app.stt.deepgram import DeepgramSTTClient
-from app.stt.elevenlabs import ElevenLabsSTTClient
-from app.stt.google import GoogleSTTClient
-from app.stt.sarvam import SarvamSTTClient
 
 logger = get_logger(__name__)
+
+# Each job process only ever needs ONE STT provider per session, so the concrete
+# provider classes are imported lazily inside create_stt_client() below (see
+# settings.LAZY_PROVIDER_IMPORTS_ENABLED) instead of here at module load — that
+# keeps the other providers' SDKs out of every worker's baseline memory. When
+# the flag is disabled, import all of them eagerly here to restore the old
+# behavior exactly.
+if not settings.LAZY_PROVIDER_IMPORTS_ENABLED:
+    from app.stt.deepgram import DeepgramSTTClient  # noqa: F401
+    from app.stt.elevenlabs import ElevenLabsSTTClient  # noqa: F401
+    from app.stt.google import GoogleSTTClient  # noqa: F401
+    from app.stt.sarvam import SarvamSTTClient  # noqa: F401
 
 
 def create_stt_client(
@@ -58,22 +67,33 @@ def create_stt_client(
     # Map provider to class and instantiate using from_config
     provider = provider.lower()
 
+    # Import only the requested provider. When LAZY_PROVIDER_IMPORTS_ENABLED is
+    # False, its module was already eagerly imported above, so this just fetches
+    # the cached module from sys.modules instead of actually loading anything.
     if provider == STTProvider.DEEPGRAM:
+        from app.stt.deepgram import DeepgramSTTClient
+
         return DeepgramSTTClient.from_config(
             config=config_dict,
             language_code=language_code,
         )
     elif provider == STTProvider.GOOGLE:
+        from app.stt.google import GoogleSTTClient
+
         return GoogleSTTClient.from_config(
             config=config_dict,
             language_code=language_code,
         )
     elif provider == STTProvider.SARVAM:
+        from app.stt.sarvam import SarvamSTTClient
+
         return SarvamSTTClient.from_config(
             config=config_dict,
             language_code=language_code,
         )
     elif provider == STTProvider.ELEVENLABS:
+        from app.stt.elevenlabs import ElevenLabsSTTClient
+
         return ElevenLabsSTTClient.from_config(
             config=config_dict,
             language_code=language_code,

@@ -7,13 +7,21 @@ from app.core.config import settings
 from app.core.constants import DEFAULT_LANGUAGE_CODE, TTSProvider
 from app.core.logger import get_logger
 from app.tts.base import BaseTTSClient
-from app.tts.deepgram import DeepgramTTSClient
-from app.tts.elevenlabs import ElevenLabsTTSClient
-from app.tts.google import GoogleTTSClient
-from app.tts.hume import HumeTTSClient
-from app.tts.sarvam import SarvamTTSClient
 
 logger = get_logger(__name__)
+
+# Each job process only ever needs ONE TTS provider per session, so the concrete
+# provider classes are imported lazily inside create_tts_client()/
+# _get_default_tts_client() below (see settings.LAZY_PROVIDER_IMPORTS_ENABLED)
+# instead of here at module load — that keeps the other providers' SDKs out of
+# every worker's baseline memory. When the flag is disabled, import all of them
+# eagerly here to restore the old behavior exactly.
+if not settings.LAZY_PROVIDER_IMPORTS_ENABLED:
+    from app.tts.deepgram import DeepgramTTSClient  # noqa: F401
+    from app.tts.elevenlabs import ElevenLabsTTSClient  # noqa: F401
+    from app.tts.google import GoogleTTSClient  # noqa: F401
+    from app.tts.hume import HumeTTSClient  # noqa: F401
+    from app.tts.sarvam import SarvamTTSClient  # noqa: F401
 
 
 class Gender(str, Enum):
@@ -46,6 +54,8 @@ def _get_default_tts_client(
             model = settings.DEFAULT_FEMALE_VOICE_MODEL
         else:
             model = settings.DEFAULT_NON_BINARY_VOICE_MODEL
+
+        from app.tts.deepgram import DeepgramTTSClient
 
         return DeepgramTTSClient(
             model=model,
@@ -133,9 +143,14 @@ def create_tts_client(
     logger.debug(f"[TTS Factory] Config dict: {config_dict}")
 
     try:
-        # Instantiate TTS client based on provider using from_config
+        # Instantiate TTS client based on provider using from_config. Import
+        # only the requested provider — when LAZY_PROVIDER_IMPORTS_ENABLED is
+        # False its module was already eagerly imported above, so this just
+        # fetches the cached module from sys.modules instead of loading it.
         if provider == TTSProvider.DEEPGRAM:
             logger.debug("[TTS Factory] Creating Deepgram TTS client")
+            from app.tts.deepgram import DeepgramTTSClient
+
             return DeepgramTTSClient.from_config(
                 config=config_dict,
                 language_code=language_code,
@@ -146,24 +161,32 @@ def create_tts_client(
                 f"[TTS Factory] Creating ElevenLabs TTS client with config: "
                 f"{config_dict}"
             )
+            from app.tts.elevenlabs import ElevenLabsTTSClient
+
             return ElevenLabsTTSClient.from_config(
                 config=config_dict,
                 language_code=language_code,
             )
 
         elif provider == TTSProvider.SARVAM:
+            from app.tts.sarvam import SarvamTTSClient
+
             return SarvamTTSClient.from_config(
                 config=config_dict,
                 language_code=language_code,
             )
 
         elif provider == TTSProvider.GOOGLE:
+            from app.tts.google import GoogleTTSClient
+
             return GoogleTTSClient.from_config(
                 config=config_dict,
                 language_code=language_code,
             )
 
         elif provider == TTSProvider.HUME:
+            from app.tts.hume import HumeTTSClient
+
             return HumeTTSClient.from_config(
                 config=config_dict,
                 language_code=language_code,
