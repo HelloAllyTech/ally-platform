@@ -436,7 +436,7 @@ class TestCreateTTSClientWithDefaults:
     """Test cases for create_tts_client function with defaults."""
 
     @pytest.mark.unit
-    @patch("app.tts.deepgram.DeepgramTTSClient")
+    @patch("app.tts.factory.DeepgramTTSClient")
     @patch("app.tts.factory.settings")
     def test_create_tts_client_default_male(self, mock_settings, mock_deepgram_client):
         """Test creating TTS client with defaults for male gender."""
@@ -455,7 +455,7 @@ class TestCreateTTSClientWithDefaults:
         )
 
     @pytest.mark.unit
-    @patch("app.tts.deepgram.DeepgramTTSClient")
+    @patch("app.tts.factory.DeepgramTTSClient")
     @patch("app.tts.factory.settings")
     def test_create_tts_client_default_female(
         self, mock_settings, mock_deepgram_client
@@ -476,7 +476,7 @@ class TestCreateTTSClientWithDefaults:
         )
 
     @pytest.mark.unit
-    @patch("app.tts.deepgram.DeepgramTTSClient")
+    @patch("app.tts.factory.DeepgramTTSClient")
     @patch("app.tts.factory.settings")
     def test_create_tts_client_default_non_binary(
         self, mock_settings, mock_deepgram_client
@@ -497,7 +497,7 @@ class TestCreateTTSClientWithDefaults:
         )
 
     @pytest.mark.unit
-    @patch("app.tts.deepgram.DeepgramTTSClient")
+    @patch("app.tts.factory.DeepgramTTSClient")
     @patch("app.tts.factory.settings")
     def test_create_tts_client_missing_setting_raises(
         self, mock_settings, mock_deepgram_client
@@ -511,7 +511,7 @@ class TestCreateTTSClientWithDefaults:
             create_tts_client(language_code="en-IN", gender=Gender.MALE)
 
     @pytest.mark.unit
-    @patch("app.tts.deepgram.DeepgramTTSClient")
+    @patch("app.tts.factory.DeepgramTTSClient")
     @patch("app.tts.factory.settings")
     def test_create_tts_client_creation_exception_raises(
         self, mock_settings, mock_deepgram_client
@@ -545,7 +545,7 @@ class TestCreateTTSClientWithConfig:
     """Test cases for create_tts_client function with config."""
 
     @pytest.mark.unit
-    @patch("app.tts.sarvam.SarvamTTSClient")
+    @patch("app.tts.factory.SarvamTTSClient")
     @patch("app.tts.factory.settings")
     def test_create_tts_client_with_sarvam_config(
         self, mock_settings, mock_sarvam_client
@@ -570,7 +570,7 @@ class TestCreateTTSClientWithConfig:
         assert result == mock_client
 
     @pytest.mark.unit
-    @patch("app.tts.deepgram.DeepgramTTSClient")
+    @patch("app.tts.factory.DeepgramTTSClient")
     @patch("app.tts.factory.settings")
     def test_create_tts_client_with_deepgram_config(
         self, mock_settings, mock_deepgram_client
@@ -618,7 +618,7 @@ class TestCreateTTSClientWithConfig:
         assert result == mock_client
 
     @pytest.mark.unit
-    @patch("app.tts.deepgram.DeepgramTTSClient")
+    @patch("app.tts.factory.DeepgramTTSClient")
     @patch("app.tts.factory._get_default_tts_client")
     @patch("app.tts.factory.logger")
     @patch("app.tts.factory.settings")
@@ -650,7 +650,7 @@ class TestCreateTTSClientWithConfig:
             create_tts_client(tts_config=tts_config, language_code="en-IN")
 
     @pytest.mark.unit
-    @patch("app.tts.deepgram.DeepgramTTSClient")
+    @patch("app.tts.factory.DeepgramTTSClient")
     @patch("app.tts.factory.settings")
     def test_create_tts_client_missing_provider_with_gender_falls_back(
         self, mock_settings, mock_deepgram_client
@@ -670,7 +670,7 @@ class TestCreateTTSClientWithConfig:
         mock_deepgram_client.assert_called_once()
 
     @pytest.mark.unit
-    @patch("app.tts.google.GoogleTTSClient")
+    @patch("app.tts.factory.GoogleTTSClient")
     def test_create_tts_client_with_google_config(self, mock_google_client):
         """Test creating Google TTS client from config."""
         mock_client_instance = Mock()
@@ -689,7 +689,7 @@ class TestCreateTTSClientWithConfig:
         assert result == mock_client_instance
 
     @pytest.mark.unit
-    @patch("app.tts.hume.HumeTTSClient")
+    @patch("app.tts.factory.HumeTTSClient")
     def test_create_tts_client_with_hume_config(self, mock_hume_client):
         """Test creating Hume TTS client from config."""
         mock_client_instance = Mock()
@@ -741,7 +741,7 @@ class TestCreateTTSClientWithConfig:
 
     @pytest.mark.unit
     @patch("app.tts.factory._get_default_tts_client")
-    @patch("app.tts.elevenlabs.ElevenLabsTTSClient")
+    @patch("app.tts.factory.ElevenLabsTTSClient")
     def test_create_tts_client_creation_failure_falls_back_with_gender(
         self, mock_elevenlabs_client, mock_get_default
     ):
@@ -765,7 +765,7 @@ class TestCreateTTSClientWithConfig:
     @pytest.mark.unit
     def test_create_tts_client_creation_failure_no_gender_raises(self):
         """Test that TTS creation failure without gender raises ValueError."""
-        with patch("app.tts.elevenlabs.ElevenLabsTTSClient") as mock_elevenlabs:
+        with patch("app.tts.factory.ElevenLabsTTSClient") as mock_elevenlabs:
             mock_elevenlabs.from_config.side_effect = ValueError("Creation failed")
 
             tts_config = {
@@ -820,7 +820,7 @@ class TestTTSNewStructureIntegration:
     """Integration tests for new TTS structure."""
 
     @pytest.mark.integration
-    @patch("app.tts.deepgram.DeepgramTTSClient")
+    @patch("app.tts.factory.DeepgramTTSClient")
     @patch("app.tts.factory.settings")
     def test_full_tts_creation_flow(self, mock_settings, mock_deepgram_client):
         """Test complete TTS creation flow with new structure."""

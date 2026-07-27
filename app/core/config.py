@@ -755,30 +755,6 @@ class Settings(BaseSettings):
         ),
     )
 
-    # ---- Memory optimization ----
-    LAZY_PROVIDER_IMPORTS_ENABLED: bool = Field(
-        default=True,
-        description=(
-            "When True, STT/TTS provider SDKs (Deepgram/ElevenLabs/Google/Sarvam/"
-            "Hume) are imported on demand inside the factory branch that actually "
-            "uses them, instead of eagerly at module import time. A session only "
-            "ever needs one STT + one TTS provider, so this keeps the other 3-4 "
-            "SDKs out of every worker process's baseline memory. Set to False to "
-            "restore eager imports (rollback/debugging safety net) without a "
-            "redeploy."
-        ),
-    )
-    VENDORED_STOPWORDS_ENABLED: bool = Field(
-        default=True,
-        description=(
-            "When True, the similarity-based event stopwords provider uses "
-            "small vendored word lists for languages not covered by "
-            "stopwordsiso, instead of importing advertools (which pulls in "
-            "pandas, ~50MB, purely to read a static dict). Set to False to fall "
-            "back to the advertools-backed lookup."
-        ),
-    )
-
     # ---- Roleplay Studio v2 (spec-driven runtime; app/roleplay_v2) ----
     ROLEPLAY_V2_ENABLED: bool = Field(
         default=True,

@@ -7,8 +7,6 @@ import logging
 from abc import ABC, abstractmethod
 from typing import FrozenSet, Set
 
-from app.core.config import settings
-
 logger = logging.getLogger(__name__)
 
 # Try to import libraries
@@ -21,26 +19,13 @@ except ImportError:
     STOPWORDS_ISO_AVAILABLE = False
     logger.warning("stopwordsiso not installed. Install with: pip install stopwordsiso")
 
-# advertools pulls in pandas (~50MB) purely to expose a static stopwords dict for
-# a handful of languages stopwords-iso doesn't cover (Tamil/Telugu/Urdu). When
-# settings.VENDORED_STOPWORDS_ENABLED is True (default), those languages are
-# served from vendored_stopwords.py instead and advertools is never imported.
-# Set the flag to False to fall back to the advertools-backed lookup.
-if settings.VENDORED_STOPWORDS_ENABLED:
-    from app.core.events.event_types.similarity_based.vendored_stopwords import (
-        VENDORED_STOPWORDS,
-    )
+try:
+    import advertools as adv
 
+    ADVERTOOLS_AVAILABLE = True
+except ImportError:
     ADVERTOOLS_AVAILABLE = False
-    adv = None
-else:
-    try:
-        import advertools as adv
-
-        ADVERTOOLS_AVAILABLE = True
-    except ImportError:
-        ADVERTOOLS_AVAILABLE = False
-        logger.warning("advertools not installed. Install with: pip install advertools")
+    logger.warning("advertools not installed. Install with: pip install advertools")
 
 # Language code mapping
 # stopwords-iso uses ISO 639-1 codes (hi, bn, mr)
@@ -213,14 +198,7 @@ class MultilingualStopwordsProvider(StopwordsProvider):
                     f"Trying next fallback..."
                 )
 
-        # Fallback to vendored word lists (Tamil/Telugu/Urdu) or, when disabled,
-        # the advertools-backed lookup they replace.
-        if settings.VENDORED_STOPWORDS_ENABLED and mapping.get("advertools"):
-            adv_lang = mapping["advertools"]
-            stopwords_list = VENDORED_STOPWORDS.get(adv_lang)
-            if stopwords_list:
-                return set(stopwords_list)
-
+        # Fallback to advertools
         if ADVERTOOLS_AVAILABLE and mapping.get("advertools"):
             adv_lang = mapping["advertools"]
             if adv_lang in adv.stopwords:

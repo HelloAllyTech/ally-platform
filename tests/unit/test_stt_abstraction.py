@@ -297,7 +297,7 @@ class TestSTTFactory:
     """Test cases for create_stt_client factory function."""
 
     @pytest.mark.unit
-    @patch("app.stt.deepgram.DeepgramSTTClient")
+    @patch("app.stt.factory.DeepgramSTTClient")
     def test_create_stt_client_with_defaults(self, mock_stt_client_class):
         """Test factory function uses defaults when no config provided."""
         mock_stt_instance = Mock()
@@ -315,7 +315,7 @@ class TestSTTFactory:
         assert client == mock_client
 
     @pytest.mark.unit
-    @patch("app.stt.deepgram.DeepgramSTTClient")
+    @patch("app.stt.factory.DeepgramSTTClient")
     def test_create_stt_client_with_metadata_config(self, mock_stt_client_class):
         """Test factory function uses config from metadata."""
         mock_stt_instance = Mock()
@@ -334,7 +334,7 @@ class TestSTTFactory:
         assert client == mock_client
 
     @pytest.mark.unit
-    @patch("app.stt.elevenlabs.ElevenLabsSTTClient")
+    @patch("app.stt.factory.ElevenLabsSTTClient")
     def test_create_stt_client_routes_to_elevenlabs(self, mock_stt_client_class):
         """Test factory routes elevenlabs provider to ElevenLabsSTTClient."""
         mock_client = Mock()
@@ -353,7 +353,7 @@ class TestSTTFactory:
         assert client == mock_client
 
     @pytest.mark.unit
-    @patch("app.stt.deepgram.DeepgramSTTClient")
+    @patch("app.stt.factory.DeepgramSTTClient")
     def test_create_stt_client_unsupported_provider(self, mock_stt_client_class):
         """Test error handling for unsupported provider."""
         stt_config = {"provider": "unsupported", "config": {"model": "test-model"}}
