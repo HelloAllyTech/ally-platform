@@ -34,39 +34,6 @@ export const styles = ScaledSheet.create({
   titleItalic: {
     ...fontFamily.REPLAY_PRO.BOLD_ITALIC,
   },
-  carouselContainer: {
-    alignItems: 'center',
-  },
-  description: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    fontSize: '12@ms',
-    lineHeight: '20@ms',
-    color: colors.darkGray2,
-    textAlign: 'center',
-    marginBottom: '16@mvs',
-    marginHorizontal: '23@ms',
-  },
-  optionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: '16@mvs',
-    justifyContent: 'center',
-  },
-  optionTextBlock: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  optionTitle: {
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    fontSize: '14@ms',
-    color: colors.darkGray12,
-  },
-  optionSubtitle: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    fontSize: '12@ms',
-    color: colors.charcoal2,
-    marginTop: '2@mvs',
-  },
   ctaBtn: {
     paddingHorizontal: '20@ms',
     width: '80%',
@@ -78,11 +45,6 @@ export const styles = ScaledSheet.create({
     color: colors.darkGray16,
     textAlign: 'center',
     marginTop: '16@mvs',
-  },
-  separator: {
-    height: 0.7,
-    backgroundColor: colors.lightGray5,
-    marginTop: '7@mvs',
   },
   marginB16: {
     marginBottom: '16@mvs',
