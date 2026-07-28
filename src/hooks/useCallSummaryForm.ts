@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useRef} from 'react';
+import {useEffect, useRef} from 'react';
 
 import {
   ChatSummaryStatus,
@@ -18,7 +18,9 @@ import {
 } from '@/services/callSummaryApi';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {
+  markFormDataSaved,
   selectFormData,
+  selectSavedFormData,
   selectSummary,
   selectSummaryData,
   setFormData,
@@ -28,10 +30,10 @@ import {mapTagsToString} from '@/utils/callSummary';
 
 export const useCallSummaryForm = () => {
   const dispatch = useAppDispatch();
-  const originalFormDataRef = useRef<SummaryFormData | null>(null);
 
   const summaryData = useAppSelector(selectSummaryData);
   const formData = useAppSelector(selectFormData);
+  const savedFormData = useAppSelector(selectSavedFormData);
   const summary = useAppSelector(selectSummary);
 
   const [updateCallSummary, {isLoading: isUpdating}] =
@@ -42,25 +44,48 @@ export const useCallSummaryForm = () => {
   const isManualNote =
     summaryData?.summaryStatus === ChatSummaryStatus.SUCCESS && !summary;
 
+  // The session this form currently holds. Seeding is keyed on it, so opening a
+  // different session always reseeds while a refetch of the *same* session does
+  // not throw away what the counsellor is typing.
+  const seededChatIdRef = useRef<number | null>(null);
+
   useEffect(() => {
-    if (summary || isManualNote) {
-      const transformedData = transformSummaryToFormData(
-        summary ?? ({} as SummaryDetails),
-        summaryData?.details?.callInfo,
-      );
-      dispatch(setFormData(transformedData));
-      // Store the original form data for comparison
-      originalFormDataRef.current = transformedData;
-    }
-  }, [dispatch, summary, isManualNote, summaryData?.details?.callInfo]);
+    if (!summary && !isManualNote) return;
+
+    const seeded = transformSummaryToFormData(
+      summary ?? ({} as SummaryDetails),
+      summaryData?.details?.callInfo,
+    );
+    const chatId = summaryData?.id ?? null;
+    const isNewSession = seededChatIdRef.current !== chatId;
+
+    // Unsaved edits win over the incoming server copy. This effect re-runs on
+    // every `summary` identity change — any refetch, an async AI fill, a
+    // regeneration landing — and it used to dispatch the server values
+    // wholesale, wiping whatever was typed AND resetting the baseline, so the
+    // loss wasn't even detectable as an unsaved change afterwards.
+    const unsaved = isNewSession
+      ? {}
+      : (Object.fromEntries(
+          getChangedSummaryFieldKeys(savedFormData, formData).map(key => [
+            key,
+            formData?.[key],
+          ]),
+        ) as Partial<SummaryFormData>);
+
+    dispatch(setFormData({...seeded, ...unsaved}));
+    // The baseline is always the server copy, so anything preserved above stays
+    // correctly marked as unsaved.
+    dispatch(markFormDataSaved(seeded));
+    seededChatIdRef.current = chatId;
+    // formData/savedFormData are read only to carry edits across a reseed; they
+    // must not retrigger it, or this would fire on every keystroke.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dispatch, summary, isManualNote, summaryData?.id]);
 
   const handleFieldChange =
     (field: SummaryFieldKey) => (value: string | null) => {
-      dispatch(
-        setFormData({
-          [field]: value,
-        }),
-      );
+      dispatch(setFormData({[field]: value}));
     };
 
   const handleSectionFieldsReset = (sectionKey: SectionKey) => {
@@ -85,10 +110,7 @@ export const useCallSummaryForm = () => {
   const handleSubmit = async () => {
     if (!summaryData) return;
 
-    const changedKeys = getChangedSummaryFieldKeys(
-      originalFormDataRef.current,
-      formData,
-    );
+    const changedKeys = getChangedSummaryFieldKeys(savedFormData, formData);
     if (changedKeys.length === 0) return;
 
     // Tag names go as typed; the backend keeps whatever rating each tag already
@@ -114,22 +136,26 @@ export const useCallSummaryForm = () => {
         summary: summaryPatch,
       },
     });
-    // The saved values are the new baseline, so a second save doesn't re-send
-    // fields that are already persisted.
+
     if (!('error' in result)) {
-      originalFormDataRef.current = formData;
+      // Mark only what was written. Merging (rather than replacing the whole
+      // baseline) keeps an edit made during the request dirty, so it still gets
+      // saved by the next submit.
+      dispatch(
+        markFormDataSaved(
+          Object.fromEntries(
+            changedKeys.map(key => [key, formData?.[key]]),
+          ) as Partial<SummaryFormData>,
+        ),
+      );
     }
     return result;
   };
 
-  // Same comparison the patch is built from, so the Save affordance and the
-  // payload can never disagree about what counts as a change.
-  const hasChanges = useCallback(
-    () =>
-      getChangedSummaryFieldKeys(originalFormDataRef.current, formData).length >
-      0,
-    [formData],
-  );
+  // Shared baseline, so every instance of this hook — and the payload itself —
+  // agree on what counts as an unsaved change.
+  const hasChanges =
+    getChangedSummaryFieldKeys(savedFormData, formData).length > 0;
 
   return {
     formData,
@@ -137,6 +163,6 @@ export const useCallSummaryForm = () => {
     handleFieldChange,
     handleSubmit,
     handleSectionFieldsReset,
-    hasChanges: hasChanges(),
+    hasChanges,
   };
 };

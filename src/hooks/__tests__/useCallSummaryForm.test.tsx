@@ -12,6 +12,7 @@ const mockState: any = {
     // freshly-seeded form. (This mock store has no subscription, so a dispatch
     // does not re-render on its own the way react-redux would.)
     formData: {notes: 'y', tags: ''},
+    savedFormData: {notes: 'y', tags: ''},
     summary: {notes: 'y', tags: []},
   },
 };
@@ -20,6 +21,12 @@ const mockDispatch = jest.fn((action: any) => {
   if (action?.type === 'set') {
     mockState.summary.formData = {
       ...mockState.summary.formData,
+      ...action.payload,
+    };
+  }
+  if (action?.type === 'saved') {
+    mockState.summary.savedFormData = {
+      ...mockState.summary.savedFormData,
       ...action.payload,
     };
   }
@@ -32,9 +39,11 @@ jest.mock('@/store/hooks', () => ({
 
 jest.mock('@/store/slices/summarySlice', () => ({
   selectFormData: (s: any) => s.summary.formData,
+  selectSavedFormData: (s: any) => s.summary.savedFormData,
   selectSummaryData: (s: any) => s.summary.summaryData,
   selectSummary: (s: any) => s.summary.summary,
   setFormData: (d: any) => ({type: 'set', payload: d}),
+  markFormDataSaved: (d: any) => ({type: 'saved', payload: d}),
 }));
 
 const mockUpdate = jest.fn(async () => ({data: {ok: true}}));
@@ -103,6 +112,7 @@ describe('useCallSummaryForm', () => {
     mockState.summary = {
       summaryData: {id: 1, details: {callInfo: {}, summary: {tags: []}}},
       formData: {notes: 'y', tags: ''},
+      savedFormData: {notes: 'y', tags: ''},
       summary: {notes: 'y', tags: []},
     };
   });
@@ -176,5 +186,45 @@ describe('useCallSummaryForm', () => {
     });
 
     expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it('keeps an unsaved edit when the server copy is refetched', async () => {
+    const {getByTestId, rerender} = render(<Test />);
+    await act(async () => {
+      getByTestId('change-notes').props.onPress();
+    });
+    rerender(<Test />);
+    expect(mockState.summary.formData.notes).toBe('z');
+
+    // A refetch / async AI fill / regeneration landing: `summary` gets a new
+    // identity while the counsellor is mid-edit. The seeding effect used to
+    // dispatch the server values wholesale and reset the baseline, so the typed
+    // value vanished and wasn't even flagged as unsaved any more.
+    mockState.summary.summary = {notes: 'y', tags: []};
+    rerender(<Test />);
+
+    expect(mockState.summary.formData.notes).toBe('z');
+    await waitFor(() =>
+      expect(getByTestId('hasChanges').props.children).toBe('true'),
+    );
+  });
+
+  it('reseeds from the server when a different session is opened', async () => {
+    const {getByTestId, rerender} = render(<Test />);
+    await act(async () => {
+      getByTestId('change-notes').props.onPress();
+    });
+    rerender(<Test />);
+    expect(mockState.summary.formData.notes).toBe('z');
+
+    // Different chat id: the previous session's edits must not follow it over.
+    mockState.summary.summaryData = {
+      id: 2,
+      details: {callInfo: {}, summary: {tags: []}},
+    };
+    mockState.summary.summary = {notes: 'y', tags: []};
+    rerender(<Test />);
+
+    expect(mockState.summary.formData.notes).toBe('y');
   });
 });

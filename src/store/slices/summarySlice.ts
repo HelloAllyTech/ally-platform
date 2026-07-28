@@ -8,12 +8,24 @@ import {SummaryFormData} from '@/types';
 interface SummaryState {
   summaryData: CallSummaryResponse | null;
   formData: SummaryFormData | null;
+  /**
+   * The last values known to be on the server: what the form was seeded with,
+   * plus anything since written successfully. Everything that differs from this
+   * is an unsaved edit.
+   *
+   * It lives in the store rather than a ref because useCallSummaryForm is
+   * instantiated in several places (the screen, the details pane, every section
+   * wrapper). A per-instance baseline meant each copy had its own idea of what
+   * had changed, and the instance that saves is not the one that took the edit.
+   */
+  savedFormData: SummaryFormData | null;
   visibleFields: SummaryFieldKey[];
 }
 
 const initialState: SummaryState = {
   summaryData: null,
   formData: null,
+  savedFormData: null,
   visibleFields: [],
 };
 
@@ -30,6 +42,20 @@ const summarySlice = createSlice({
         ...action.payload,
       } as SummaryFormData;
     },
+    /**
+     * Record values as persisted. Merged, not replaced: an edit made while the
+     * write was in flight must stay dirty, so only the keys actually written
+     * are marked clean.
+     */
+    markFormDataSaved: (
+      state,
+      action: PayloadAction<Partial<SummaryFormData>>,
+    ) => {
+      state.savedFormData = {
+        ...state.savedFormData,
+        ...action.payload,
+      } as SummaryFormData;
+    },
     setSummaryVisibleFields: (
       state,
       action: PayloadAction<SummaryFieldKey[]>,
@@ -39,6 +65,7 @@ const summarySlice = createSlice({
     clearSummaryStates: state => {
       state.summaryData = null;
       state.formData = null;
+      state.savedFormData = null;
     },
   },
 });
@@ -46,6 +73,7 @@ const summarySlice = createSlice({
 export const {
   setSummaryData,
   setFormData,
+  markFormDataSaved,
   clearSummaryStates,
   setSummaryVisibleFields,
 } = summarySlice.actions;
@@ -56,6 +84,8 @@ export default summarySlice.reducer;
 export const selectSummaryData = (state: AppRootState) =>
   state.summary.summaryData;
 export const selectFormData = (state: AppRootState) => state.summary.formData;
+export const selectSavedFormData = (state: AppRootState) =>
+  state.summary.savedFormData;
 
 export const selectSummary = createSelector(
   [selectSummaryData],
