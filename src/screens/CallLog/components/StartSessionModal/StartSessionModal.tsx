@@ -1,8 +1,8 @@
-import React, {useState} from 'react';
+import React from 'react';
 import {Modal, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
 
 import {CloseIcon} from '@/assets';
-import {Button, NotificationModal, SecurityCarousel} from '@/components';
+import {Button} from '@/components';
 import {useTranslate} from '@/hooks';
 
 import {styles} from './styles';
@@ -18,6 +18,18 @@ interface StartSessionModalProps {
   isCreatingNote?: boolean;
 }
 
+/**
+ * Picks how to start a session, and doubles as the consent gate for scribe.
+ *
+ * Starting scribe used to take three taps: this sheet, then a second dialog,
+ * then start. That second dialog was the *roleplay* pre-start warning ("the bot
+ * may be unresponsive, or have unusual lag times") — scribe has no bot, it
+ * listens and transcribes, so the copy was simply wrong. It's gone.
+ *
+ * Consent is why this sheet still exists: the counsellor reads the consent line
+ * and taps a mode, and that tap is the confirmation. Keep the consent text
+ * directly above the actions — it must not drift into a footnote.
+ */
 export const StartSessionModal: React.FC<StartSessionModalProps> = ({
   visible,
   onClose,
@@ -28,20 +40,10 @@ export const StartSessionModal: React.FC<StartSessionModalProps> = ({
   isCreatingNote,
 }) => {
   const {t} = useTranslate();
-  const [showNotification, setShowNotification] = useState(false);
 
-  const handleStart = () => {
-    setShowNotification(true);
-  };
-
-  const handleNotificationConfirm = () => {
-    setShowNotification(false);
+  const handleStartScribe = () => {
     onListenLive();
     onClose();
-  };
-
-  const handleNotificationCancel = () => {
-    setShowNotification(false);
   };
 
   if (!visible) return null;
@@ -65,32 +67,18 @@ export const StartSessionModal: React.FC<StartSessionModalProps> = ({
               {t('calls.dialog.startSession.titleItalic')}
             </Text>
           </Text>
-          <View style={styles.carouselContainer}>
-            <SecurityCarousel />
-          </View>
-          <Text style={styles.description}>
-            {t('calls.dialog.startSession.description1')}
+
+          <Text
+            style={[styles.consent, styles.marginB16]}
+            testID="start-session-consent">
+            {t('calls.dialog.startSession.footer')}
           </Text>
-
-          <View style={styles.separator} />
-
-          <View style={styles.optionRow}>
-            <View style={styles.optionTextBlock}>
-              <Text style={styles.optionTitle}>
-                {t('calls.dialog.startSession.embedTitle')}
-              </Text>
-              <Text style={styles.optionSubtitle}>
-                {t('calls.dialog.startSession.embedDesc')}
-              </Text>
-            </View>
-          </View>
-
-          <View style={[styles.separator, styles.marginB16]} />
 
           {hasMicrophoneChatType && (
             <Button
+              testID="start-session-scribe-mode"
               label={t('calls.dialog.startSession.startScribeMode')}
-              onPress={handleStart}
+              onPress={handleStartScribe}
               customContainerStyle={styles.ctaBtn}
             />
           )}
@@ -98,7 +86,7 @@ export const StartSessionModal: React.FC<StartSessionModalProps> = ({
           {showCreateNote && (
             <Button
               testID="start-session-create-note"
-              label={t('calls.createNote.button')}
+              label={t('calls.dialog.startSession.startDictationMode')}
               onPress={() => onCreateNote?.()}
               isLoading={isCreatingNote}
               customContainerStyle={[
@@ -115,17 +103,8 @@ export const StartSessionModal: React.FC<StartSessionModalProps> = ({
               customTextStyle={hasMicrophoneChatType ? {color: '#007AFF'} : {}}
             />
           )}
-
-          <Text style={styles.consent}>
-            {t('calls.dialog.startSession.footer')}
-          </Text>
         </View>
       </View>
-      <NotificationModal
-        visible={showNotification}
-        onConfirm={handleNotificationConfirm}
-        onClose={handleNotificationCancel}
-      />
     </Modal>
   );
 };
