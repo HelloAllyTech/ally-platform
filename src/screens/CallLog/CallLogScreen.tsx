@@ -188,16 +188,6 @@ export const CallLogScreen: React.FC = () => {
     [enabledChatTypes],
   );
 
-  const hasDictationChatType = useMemo(
-    () =>
-      Boolean(
-        enabledChatTypes?.some?.(
-          (chatType: CHAT_TYPES) => chatType === CHAT_TYPES.DICTATION_MODE,
-        ),
-      ),
-    [enabledChatTypes],
-  );
-
   // Manual scribe notes: counsellor permission + per-tenant toggle (the hook
   // skips the request for non-counsellors, so data stays undefined for them).
   const {data: scribeNoteCreationEnabled} = useScribeNoteCreationEnabled();
@@ -538,9 +528,7 @@ export const CallLogScreen: React.FC = () => {
     }
   };
 
-  const handleVoiceRecording = async (
-    mode: 'scribe' | 'dictation' = 'scribe',
-  ) => {
+  const handleVoiceRecording = async () => {
     try {
       const micPermission = MICROPHONE_PERMISSION;
 
@@ -555,7 +543,7 @@ export const CallLogScreen: React.FC = () => {
 
       if (finalStatus === RESULTS.GRANTED) {
         checkCounselorChat();
-        stackNavigation.navigate('Listening', {isMicrophoneMode: true, mode});
+        stackNavigation.navigate('Listening', {isMicrophoneMode: true});
         return;
       }
 
@@ -689,12 +677,9 @@ export const CallLogScreen: React.FC = () => {
           style={[
             styles.fab,
             {bottom: insets.bottom + ms(100)},
-            !(hasMicrophoneChatType || hasDictationChatType || canCreateNote) &&
-              styles.bgAshGray,
+            !(hasMicrophoneChatType || canCreateNote) && styles.bgAshGray,
           ]}
-          disabled={
-            !(hasMicrophoneChatType || hasDictationChatType || canCreateNote)
-          }
+          disabled={!(hasMicrophoneChatType || canCreateNote)}
           activeOpacity={0.9}
           onPress={() => setShowStartSession(true)}>
           <TranscribeIcon />
@@ -705,7 +690,6 @@ export const CallLogScreen: React.FC = () => {
         onClose={() => setShowStartSession(false)}
         onListenLive={handleVoiceRecording}
         hasMicrophoneChatType={hasMicrophoneChatType}
-        hasDictationChatType={hasDictationChatType}
         showCreateNote={canCreateNote}
         onCreateNote={handleCreateNote}
         isCreatingNote={isCreatingNote}

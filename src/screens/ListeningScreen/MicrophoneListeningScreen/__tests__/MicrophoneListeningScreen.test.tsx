@@ -95,7 +95,7 @@ jest.mock('../../utils', () => ({
 }));
 
 // Default mock – scribe mode
-const mockRouteParams = {params: {mode: 'scribe'}};
+const mockRouteParams = {params: {}};
 jest.mock('@react-navigation/native', () => ({
   useRoute: () => mockRouteParams,
 }));
@@ -139,7 +139,6 @@ describe('MicrophoneListeningScreen', () => {
     jest.clearAllMocks();
     mockUseListeningCommon.mockReturnValue({...defaultCommon});
     // reset to scribe by default
-    mockRouteParams.params = {mode: 'scribe'} as any;
   });
 
   it('shows loading state when chatData is null', () => {
@@ -179,22 +178,7 @@ describe('MicrophoneListeningScreen', () => {
     expect(getByTestId('listening-controls')).toBeTruthy();
   });
 
-  // --- Dictation mode tests ---
-
-  it('hides search panel in dictation mode (non-focus)', () => {
-    mockRouteParams.params = {mode: 'dictation'} as any;
-    mockUseListeningCommon.mockReturnValue({
-      ...defaultCommon,
-      chatData: {chatId: 'chat-123'},
-      isFocusMode: false,
-    });
-
-    const {queryByTestId} = render(<MicrophoneListeningScreen />);
-    expect(queryByTestId('search')).toBeNull();
-  });
-
   it('shows search panel in scribe mode (non-focus)', () => {
-    mockRouteParams.params = {mode: 'scribe'} as any;
     mockUseListeningCommon.mockReturnValue({
       ...defaultCommon,
       chatData: {chatId: 'chat-123'},

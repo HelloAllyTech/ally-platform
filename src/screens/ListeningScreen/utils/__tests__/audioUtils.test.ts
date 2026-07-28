@@ -44,13 +44,8 @@ describe('audioUtils', () => {
     expect(payload.mode).toBe('SCRIBE');
   });
 
-  it('builds start audio payload with explicit scribe mode', () => {
-    const payload = getStartAudioChatPayload('scribe');
-    expect(payload.mode).toBe('SCRIBE');
-  });
-
-  it('builds start audio payload with dictation mode', () => {
-    const payload = getStartAudioChatPayload('dictation');
-    expect(payload.mode).toBe('DICTATION');
+  it('never starts a session in the retired dictation mode', () => {
+    const payload = getStartAudioChatPayload();
+    expect(payload.mode).not.toBe('DICTATION');
   });
 });

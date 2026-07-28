@@ -44,55 +44,38 @@ describe('StartSessionModal', () => {
   });
 
   // --- Scribe-only tenant ---
-  it('shows only Start Scribe Mode button when only hasMicrophoneChatType is true', () => {
-    const {getByText, queryByText} = render(
-      <StartSessionModal
-        visible
-        onClose={jest.fn()}
-        onListenLive={jest.fn()}
-        hasMicrophoneChatType
-        hasDictationChatType={false}
-      />,
-    );
-
-    expect(getByText('calls.dialog.startSession.startScribeMode')).toBeTruthy();
-    expect(queryByText('calls.dialog.startSession.startDictationMode')).toBeNull();
-  });
-
-  // --- Dictation-only tenant ---
-  it('shows only Start Dictation Mode button when only hasDictationChatType is true', () => {
-    const {getByText, queryByText} = render(
-      <StartSessionModal
-        visible
-        onClose={jest.fn()}
-        onListenLive={jest.fn()}
-        hasMicrophoneChatType={false}
-        hasDictationChatType
-      />,
-    );
-
-    expect(getByText('calls.dialog.startSession.startDictationMode')).toBeTruthy();
-    expect(queryByText('calls.dialog.startSession.startScribeMode')).toBeNull();
-  });
-
-  // --- Both enabled ---
-  it('shows both buttons when both chat types are enabled', () => {
+  it('shows Start Scribe Mode button when hasMicrophoneChatType is true', () => {
     const {getByText} = render(
       <StartSessionModal
         visible
         onClose={jest.fn()}
         onListenLive={jest.fn()}
         hasMicrophoneChatType
-        hasDictationChatType
       />,
     );
 
     expect(getByText('calls.dialog.startSession.startScribeMode')).toBeTruthy();
-    expect(getByText('calls.dialog.startSession.startDictationMode')).toBeTruthy();
+  });
+
+  // --- Retired dictation mode ---
+  it('never offers the retired Start Dictation Mode button', () => {
+    const {queryByText} = render(
+      <StartSessionModal
+        visible
+        onClose={jest.fn()}
+        onListenLive={jest.fn()}
+        hasMicrophoneChatType
+        showCreateNote
+      />,
+    );
+
+    expect(
+      queryByText('calls.dialog.startSession.startDictationMode'),
+    ).toBeNull();
   });
 
   // --- Scribe flow ---
-  it('calls onListenLive with "scribe" when Start Scribe Mode is confirmed', () => {
+  it('calls onListenLive when Start Scribe Mode is confirmed', () => {
     const onClose = jest.fn();
     const onListenLive = jest.fn();
     const {getByText} = render(
@@ -101,33 +84,12 @@ describe('StartSessionModal', () => {
         onClose={onClose}
         onListenLive={onListenLive}
         hasMicrophoneChatType
-        hasDictationChatType={false}
       />,
     );
 
     fireEvent.press(getByText('calls.dialog.startSession.startScribeMode'));
     fireEvent.press(getByText('Start Session'));
-    expect(onListenLive).toHaveBeenCalledWith('scribe');
-    expect(onClose).toHaveBeenCalled();
-  });
-
-  // --- Dictation flow ---
-  it('calls onListenLive with "dictation" when Start Dictation Mode is confirmed', () => {
-    const onClose = jest.fn();
-    const onListenLive = jest.fn();
-    const {getByText} = render(
-      <StartSessionModal
-        visible
-        onClose={onClose}
-        onListenLive={onListenLive}
-        hasMicrophoneChatType={false}
-        hasDictationChatType
-      />,
-    );
-
-    fireEvent.press(getByText('calls.dialog.startSession.startDictationMode'));
-    fireEvent.press(getByText('Start Session'));
-    expect(onListenLive).toHaveBeenCalledWith('dictation');
+    expect(onListenLive).toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
   });
 

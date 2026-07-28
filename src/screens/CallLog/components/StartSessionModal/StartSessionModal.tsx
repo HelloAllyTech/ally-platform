@@ -10,9 +10,8 @@ import {styles} from './styles';
 interface StartSessionModalProps {
   visible: boolean;
   onClose: () => void;
-  onListenLive: (mode: 'scribe' | 'dictation') => void;
+  onListenLive: () => void;
   hasMicrophoneChatType?: boolean;
-  hasDictationChatType?: boolean;
   /** Tenant toggle + counsellor permission gate (see useScribeNoteCreationEnabled). */
   showCreateNote?: boolean;
   onCreateNote?: () => void;
@@ -24,25 +23,20 @@ export const StartSessionModal: React.FC<StartSessionModalProps> = ({
   onClose,
   onListenLive,
   hasMicrophoneChatType,
-  hasDictationChatType,
   showCreateNote,
   onCreateNote,
   isCreatingNote,
 }) => {
   const {t} = useTranslate();
   const [showNotification, setShowNotification] = useState(false);
-  const [selectedMode, setSelectedMode] = useState<'scribe' | 'dictation'>(
-    'scribe',
-  );
 
-  const handleStart = (mode: 'scribe' | 'dictation') => {
-    setSelectedMode(mode);
+  const handleStart = () => {
     setShowNotification(true);
   };
 
   const handleNotificationConfirm = () => {
     setShowNotification(false);
-    onListenLive(selectedMode);
+    onListenLive();
     onClose();
   };
 
@@ -96,15 +90,17 @@ export const StartSessionModal: React.FC<StartSessionModalProps> = ({
           {hasMicrophoneChatType && (
             <Button
               label={t('calls.dialog.startSession.startScribeMode')}
-              onPress={() => handleStart('scribe')}
+              onPress={handleStart}
               customContainerStyle={styles.ctaBtn}
             />
           )}
 
-          {hasDictationChatType && (
+          {showCreateNote && (
             <Button
-              label={t('calls.dialog.startSession.startDictationMode')}
-              onPress={() => handleStart('dictation')}
+              testID="start-session-create-note"
+              label={t('calls.createNote.button')}
+              onPress={() => onCreateNote?.()}
+              isLoading={isCreatingNote}
               customContainerStyle={[
                 styles.ctaBtn,
                 hasMicrophoneChatType
@@ -117,31 +113,6 @@ export const StartSessionModal: React.FC<StartSessionModalProps> = ({
                   : {},
               ]}
               customTextStyle={hasMicrophoneChatType ? {color: '#007AFF'} : {}}
-            />
-          )}
-
-          {showCreateNote && (
-            <Button
-              testID="start-session-create-note"
-              label={t('calls.createNote.button')}
-              onPress={() => onCreateNote?.()}
-              isLoading={isCreatingNote}
-              customContainerStyle={[
-                styles.ctaBtn,
-                hasMicrophoneChatType || hasDictationChatType
-                  ? {
-                      backgroundColor: 'white',
-                      borderWidth: 1,
-                      borderColor: '#007AFF',
-                      marginTop: 10,
-                    }
-                  : {},
-              ]}
-              customTextStyle={
-                hasMicrophoneChatType || hasDictationChatType
-                  ? {color: '#007AFF'}
-                  : {}
-              }
             />
           )}
 
