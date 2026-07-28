@@ -1,5 +1,4 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {useRoute} from '@react-navigation/native';
 import {
   ActivityIndicator,
   ScrollView,
@@ -51,9 +50,6 @@ import {
 
 export const MicrophoneListeningScreen = () => {
   const {t} = useTranslate();
-  const route = useRoute<any>();
-  const mode = route.params?.mode || 'scribe';
-  const isDictationMode = mode === 'dictation';
   const {isOffline} = useNetworkConnectivity();
   const {data: nudgeStatus} = useGetNudgeStatusQuery();
   const {userData} = useUser();
@@ -346,12 +342,12 @@ export const MicrophoneListeningScreen = () => {
       setTimeout(() => {
         emitSocketEvent(
           SocketEvent.START_AUDIO_CHAT,
-          getStartAudioChatPayload(mode),
+          getStartAudioChatPayload(),
         );
         setIsAudioChatEmitted(true);
       });
     }
-  }, [isAudioSessionReady, emitSocketEvent, isAudioChatEmitted, mode]);
+  }, [isAudioSessionReady, emitSocketEvent, isAudioChatEmitted]);
 
   const handleEndCall = useCallback(() => {
     handleEndCallCommon(() => {
@@ -484,14 +480,14 @@ export const MicrophoneListeningScreen = () => {
             />
           </View>
         </View>
-        {!isDictationMode && !!nudgeStatus && currentNudge && (
+        {!!nudgeStatus && currentNudge && (
           <NudgeSection
             nudge={currentNudge}
             isLoading={isLoading}
             onFeedbackSuccess={handleNudgeFeedbackSuccess}
           />
         )}
-        {!isDictationMode && <Search />}
+        <Search />
         <ScrollView
           style={styles.transcriptionScrollView}
           contentContainerStyle={styles.transcriptionContentContainer}
@@ -499,28 +495,19 @@ export const MicrophoneListeningScreen = () => {
           onContentSizeChange={() =>
             scrollViewRef.current?.scrollToEnd({animated: true})
           }>
-          {isDictationMode ? (
+          {allTranscriptions.map((transcription, index) => (
             <CallTranscriptItem
-              time=""
-              message={allTranscriptions.map(item => item.message).join(' ')}
-              speakerLabel=""
-              isDictation
+              key={index}
+              time={getElapsedSeconds(transcription.timestamp)}
+              message={transcription.message}
+              counselor={transcription.senderId === userId}
+              speakerLabel={
+                transcription.senderId === userId
+                  ? t('transcription.youLabel')
+                  : t('transcription.clientLabel')
+              }
             />
-          ) : (
-            allTranscriptions.map((transcription, index) => (
-              <CallTranscriptItem
-                key={index}
-                time={getElapsedSeconds(transcription.timestamp)}
-                message={transcription.message}
-                counselor={transcription.senderId === userId}
-                speakerLabel={
-                  transcription.senderId === userId
-                    ? t('transcription.youLabel')
-                    : t('transcription.clientLabel')
-                }
-              />
-            ))
-          )}
+          ))}
         </ScrollView>
       </View>
     );
@@ -553,7 +540,7 @@ export const MicrophoneListeningScreen = () => {
         showPauseResumeButton
         showEndSessionButton
         isPauseResumeDisabled={isWebMicrophoneMode}
-        showFocusModeButton={!isDictationMode && canShowFocusModeButton}
+        showFocusModeButton={canShowFocusModeButton}
         showMuteTooltip={showMuteTooltip}
         onDismissMuteTooltip={() => setIsMuteTooltipOpen(false)}
       />

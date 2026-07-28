@@ -9,9 +9,7 @@ export type RootStackParamList = {
   Splash: undefined;
   SuspendedAccount: undefined;
   CompleteProfile: undefined;
-  Listening:
-    | {isMicrophoneMode?: boolean; mode?: 'scribe' | 'dictation'}
-    | undefined;
+  Listening: {isMicrophoneMode?: boolean} | undefined;
   CallSummary: {callId?: number; fromLogs?: boolean} | undefined;
   CallLog: undefined;
   Breathing: undefined;

@@ -111,14 +111,12 @@ export const recorderAudioToAmplitudes = (base64Audio: string): number[] => {
   return amplitudes;
 };
 
-export const getStartAudioChatPayload = (
-  mode: 'scribe' | 'dictation' = 'scribe',
-) => ({
+// Live dictation sessions are retired, so every mic session the app starts is a
+// SCRIBE one. Existing DICTATION recordings and manual notes are unaffected —
+// only this entry point is gone.
+export const getStartAudioChatPayload = () => ({
   isLinear16Encoded: true,
   platform: AllyPlatforms.MOBILE,
   sampleRate: MICROPHONE_AUDIO_SAMPLE_RATE,
-  mode:
-    mode === 'dictation'
-      ? ScribeSessionMode.DICTATION
-      : ScribeSessionMode.SCRIBE,
+  mode: ScribeSessionMode.SCRIBE,
 });
