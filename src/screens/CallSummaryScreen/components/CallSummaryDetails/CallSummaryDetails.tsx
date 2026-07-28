@@ -106,7 +106,12 @@ const CallSummaryDetailsComponent: React.FC<Props> = ({
         .filter(id => sectionDefIds.has(id))
         .map(fieldDefinitionId => ({
           fieldDefinitionId,
-          value: customLocalValues[fieldDefinitionId] ?? undefined,
+          // Coalesce to null, not undefined: clearing a field stores null
+          // locally, but JSON.stringify drops undefined keys, so the PUT body
+          // omitted `value` entirely and the backend (which skips undefined
+          // properties on save) left the column untouched — the cleared value
+          // reappeared on reopen.
+          value: customLocalValues[fieldDefinitionId] ?? null,
         }));
       if (changed.length > 0) {
         await upsertCustomFieldValues({chatId, values: changed});

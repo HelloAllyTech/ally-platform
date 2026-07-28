@@ -8,12 +8,12 @@ import {
   summaryFields,
 } from '@/constants/summary';
 import {
+  getChangedSummaryFieldKeys,
   transformFormDataForSubmission,
   transformSummaryToFormData,
 } from '@/screens/CallSummaryScreen/utils/formDataTransformer';
 import {
   SummaryDetails,
-  useGetTagsMutation,
   useUpdateCallSummaryMutation,
 } from '@/services/callSummaryApi';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
@@ -36,7 +36,6 @@ export const useCallSummaryForm = () => {
 
   const [updateCallSummary, {isLoading: isUpdating}] =
     useUpdateCallSummaryMutation();
-  const [getTags] = useGetTagsMutation();
 
   // A manual scribe note has summaryStatus SUCCESS but no AI summary yet; its
   // form must still be seeded (with empty values) so the fields are editable.
@@ -85,42 +84,52 @@ export const useCallSummaryForm = () => {
 
   const handleSubmit = async () => {
     if (!summaryData) return;
-    let tagsResponse;
-    if (
-      formData?.[SUMMARY_FIELDS.TAGS] &&
-      formData?.[SUMMARY_FIELDS.TAGS] !==
-        mapTagsToString(summaryData?.details?.summary?.tags || [])
-    ) {
-      tagsResponse = await getTags({
-        tags: (formData[SUMMARY_FIELDS.TAGS] as string)?.split(',') || [],
-      });
-    }
-    const formattedFormData = transformFormDataForSubmission(
+
+    const changedKeys = getChangedSummaryFieldKeys(
+      originalFormDataRef.current,
       formData,
-      summaryData,
-      tagsResponse?.data || summary?.tags || [],
     );
-    return await updateCallSummary({
+    if (changedKeys.length === 0) return;
+
+    // Tag names go as typed; the backend keeps whatever rating each tag already
+    // had and starts new ones neutral. Nothing here calls the ratings LLM: it
+    // used to run before the write, so a slow AI service stalled the save, and
+    // on failure the payload fell back to the *stored* tags — silently throwing
+    // away what the counsellor had just typed.
+    const tagNames = changedKeys.includes(SUMMARY_FIELDS.TAGS)
+      ? String(formData?.[SUMMARY_FIELDS.TAGS] ?? '')
+          .split(',')
+          .map(tag => tag.trim())
+          .filter(Boolean)
+      : undefined;
+
+    const summaryPatch = transformFormDataForSubmission(
+      formData,
+      changedKeys,
+      tagNames,
+    );
+    const result = await updateCallSummary({
       chatId: summaryData.id,
       data: {
-        summary: formattedFormData,
+        summary: summaryPatch,
       },
     });
+    // The saved values are the new baseline, so a second save doesn't re-send
+    // fields that are already persisted.
+    if (!('error' in result)) {
+      originalFormDataRef.current = formData;
+    }
+    return result;
   };
 
-  // Check if form data has been modified
-  const hasChanges = useCallback(() => {
-    if (!originalFormDataRef.current || !formData) return false;
-
-    const original = originalFormDataRef.current;
-    const current = formData;
-
-    // Compare all fields in the form data
-    return Object.keys(current).some(key => {
-      const fieldKey = key as keyof SummaryFormData;
-      return original[fieldKey] !== current[fieldKey];
-    });
-  }, [formData]);
+  // Same comparison the patch is built from, so the Save affordance and the
+  // payload can never disagree about what counts as a change.
+  const hasChanges = useCallback(
+    () =>
+      getChangedSummaryFieldKeys(originalFormDataRef.current, formData).length >
+      0,
+    [formData],
+  );
 
   return {
     formData,

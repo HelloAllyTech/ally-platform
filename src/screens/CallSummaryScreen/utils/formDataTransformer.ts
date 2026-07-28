@@ -1,5 +1,5 @@
-import {SUMMARY_FIELDS} from '@/constants/summary';
-import {CallSummaryResponse, Tag} from '@/services/callSummaryApi';
+import {SUMMARY_FIELDS, SummaryFieldKey} from '@/constants/summary';
+import {CallSummaryResponse} from '@/services/callSummaryApi';
 import {SummaryFormData} from '@/types';
 import {mapTagsToString} from '@/utils/callSummary';
 
@@ -85,117 +85,51 @@ export const transformSummaryToFormData = (
     summary.ongoingRiskSuicidalThoughtsNotes || null,
 });
 
+export type SummaryPatch = Partial<CallSummaryResponse['details']['summary']>;
+
+/**
+ * Which form fields the counsellor actually changed, by comparing the current
+ * form against the baseline captured when it was seeded.
+ *
+ * The baseline is the right thing to diff against — NOT the live server copy.
+ * A server value can drift for reasons that have nothing to do with this user
+ * (an async AI fill, another editor, a regeneration landing), and diffing
+ * against it would count that drift as a local edit and write the stale seeded
+ * value back over it.
+ */
+export const getChangedSummaryFieldKeys = (
+  baseline: SummaryFormData | null,
+  current: SummaryFormData | null,
+): SummaryFieldKey[] => {
+  if (!baseline || !current) return [];
+  return (Object.keys(current) as SummaryFieldKey[]).filter(
+    key => baseline[key] !== current[key],
+  );
+};
+
+/**
+ * Build the summary patch to send: only the fields named in `changedKeys`.
+ *
+ * This used to spread the whole stored summary and write every field back,
+ * which meant a save reverted anything added after the form was seeded — an
+ * AI-filled field, or a regeneration that landed while the counsellor was
+ * typing. The backend merges a patch key-wise, so an omitted key keeps its
+ * stored value; a key present with null is cleared.
+ */
 export const transformFormDataForSubmission = (
   formData: SummaryFormData | null,
-  summaryData: CallSummaryResponse,
-  tags: Tag[],
-): CallSummaryResponse['details']['summary'] => {
-  return {
-    ...summaryData?.details?.summary,
-    [SUMMARY_FIELDS.AGE]: formData?.[SUMMARY_FIELDS.AGE] ?? null,
-    [SUMMARY_FIELDS.GENDER]: formData?.[SUMMARY_FIELDS.GENDER] ?? null,
-    [SUMMARY_FIELDS.PROFESSION]: formData?.[SUMMARY_FIELDS.PROFESSION] ?? null,
-    [SUMMARY_FIELDS.CONCERN_CODE]:
-      formData?.[SUMMARY_FIELDS.CONCERN_CODE] ?? null,
-    [SUMMARY_FIELDS.RELATIONSHIP_STATUS]:
-      formData?.[SUMMARY_FIELDS.RELATIONSHIP_STATUS] ?? null,
-    [SUMMARY_FIELDS.LOCATION]: formData?.[SUMMARY_FIELDS.LOCATION] ?? null,
-    [SUMMARY_FIELDS.COUNSELLOR]: formData?.[SUMMARY_FIELDS.COUNSELLOR] ?? null,
-    [SUMMARY_FIELDS.NEW_CALL_FOLLOW_UP]:
-      formData?.[SUMMARY_FIELDS.NEW_CALL_FOLLOW_UP] ?? null,
-    [SUMMARY_FIELDS.SESSION_SUMMARY]:
-      formData?.[SUMMARY_FIELDS.SESSION_SUMMARY] ?? null,
-    [SUMMARY_FIELDS.FLOW]: formData?.[SUMMARY_FIELDS.FLOW] ?? null,
-    [SUMMARY_FIELDS.KEY_CONCERNS]:
-      formData?.[SUMMARY_FIELDS.KEY_CONCERNS] ?? null,
-    [SUMMARY_FIELDS.OBJECTIVE_OBSERVATIONS]:
-      formData?.[SUMMARY_FIELDS.OBJECTIVE_OBSERVATIONS] ?? null,
-    [SUMMARY_FIELDS.SUBJECTIVE_OBSERVATIONS]:
-      formData?.[SUMMARY_FIELDS.SUBJECTIVE_OBSERVATIONS] ?? null,
-    [SUMMARY_FIELDS.ASSESSMENT]: formData?.[SUMMARY_FIELDS.ASSESSMENT] ?? null,
-    [SUMMARY_FIELDS.DOMINANT_FEELINGS]:
-      formData?.[SUMMARY_FIELDS.DOMINANT_FEELINGS] ?? null,
-    [SUMMARY_FIELDS.ISSUES_WORKED_ON]:
-      formData?.[SUMMARY_FIELDS.ISSUES_WORKED_ON] ?? null,
-    [SUMMARY_FIELDS.KEY_THERAPEUTIC_TECHNIQUES]:
-      formData?.[SUMMARY_FIELDS.KEY_THERAPEUTIC_TECHNIQUES] ?? null,
-    [SUMMARY_FIELDS.REFERRALS_PROVIDED]:
-      formData?.[SUMMARY_FIELDS.REFERRALS_PROVIDED] ?? null,
-    [SUMMARY_FIELDS.HOMEWORK_RECOMMENDED]:
-      formData?.[SUMMARY_FIELDS.HOMEWORK_RECOMMENDED] ?? null,
-    [SUMMARY_FIELDS.PLAN_FOR_NEXT_CALL]:
-      formData?.[SUMMARY_FIELDS.PLAN_FOR_NEXT_CALL] ?? null,
-    [SUMMARY_FIELDS.TAGS]: tags,
-    [SUMMARY_FIELDS.ADDITIONAL_NOTES]:
-      formData?.[SUMMARY_FIELDS.ADDITIONAL_NOTES] ?? null,
-
-    // Intake section
-    [SUMMARY_FIELDS.INTAKE_NOTES]:
-      formData?.[SUMMARY_FIELDS.INTAKE_NOTES] ?? null,
-    [SUMMARY_FIELDS.RISK_SELF_HARM]:
-      formData?.[SUMMARY_FIELDS.RISK_SELF_HARM] ?? null,
-    [SUMMARY_FIELDS.RISK_SELF_HARM_NOTES]:
-      formData?.[SUMMARY_FIELDS.RISK_SELF_HARM_NOTES] ?? null,
-    [SUMMARY_FIELDS.RISK_SUICIDAL_THOUGHTS]:
-      formData?.[SUMMARY_FIELDS.RISK_SUICIDAL_THOUGHTS] ?? null,
-    [SUMMARY_FIELDS.RISK_SUICIDAL_THOUGHTS_NOTES]:
-      formData?.[SUMMARY_FIELDS.RISK_SUICIDAL_THOUGHTS_NOTES] ?? null,
-    [SUMMARY_FIELDS.RISK_SUICIDAL_PLAN]:
-      formData?.[SUMMARY_FIELDS.RISK_SUICIDAL_PLAN] ?? null,
-    [SUMMARY_FIELDS.RISK_SUICIDAL_ACTION]:
-      formData?.[SUMMARY_FIELDS.RISK_SUICIDAL_ACTION] ?? null,
-    [SUMMARY_FIELDS.RISK_RUNNING_AWAY]:
-      formData?.[SUMMARY_FIELDS.RISK_RUNNING_AWAY] ?? null,
-    [SUMMARY_FIELDS.RISK_RUNNING_AWAY_NOTES]:
-      formData?.[SUMMARY_FIELDS.RISK_RUNNING_AWAY_NOTES] ?? null,
-    [SUMMARY_FIELDS.TRAUMA_PHYSICAL_ABUSE]:
-      formData?.[SUMMARY_FIELDS.TRAUMA_PHYSICAL_ABUSE] ?? null,
-    [SUMMARY_FIELDS.TRAUMA_SEXUAL_ABUSE]:
-      formData?.[SUMMARY_FIELDS.TRAUMA_SEXUAL_ABUSE] ?? null,
-    [SUMMARY_FIELDS.TRAUMA_VERBAL_ABUSE]:
-      formData?.[SUMMARY_FIELDS.TRAUMA_VERBAL_ABUSE] ?? null,
-    [SUMMARY_FIELDS.TRAUMA_NEGLECT]:
-      formData?.[SUMMARY_FIELDS.TRAUMA_NEGLECT] ?? null,
-    [SUMMARY_FIELDS.TRAUMA_SEPARATION_FROM_CAREGIVER_PARENT]:
-      formData?.[SUMMARY_FIELDS.TRAUMA_SEPARATION_FROM_CAREGIVER_PARENT] ??
-      null,
-    [SUMMARY_FIELDS.TRAUMA_WITNESSED_DOMESTIC_VIOLENCE]:
-      formData?.[SUMMARY_FIELDS.TRAUMA_WITNESSED_DOMESTIC_VIOLENCE] ?? null,
-    [SUMMARY_FIELDS.TRAUMA_NOTES]:
-      formData?.[SUMMARY_FIELDS.TRAUMA_NOTES] ?? null,
-    [SUMMARY_FIELDS.ASSESSMENT_PSYCHOLOGICAL_DIAGNOSIS]:
-      formData?.[SUMMARY_FIELDS.ASSESSMENT_PSYCHOLOGICAL_DIAGNOSIS] ?? null,
-    [SUMMARY_FIELDS.ASSESSMENT_PSYCHOLOGICAL_DIAGNOSIS_NOTES]:
-      formData?.[SUMMARY_FIELDS.ASSESSMENT_PSYCHOLOGICAL_DIAGNOSIS_NOTES] ??
-      null,
-    [SUMMARY_FIELDS.ASSESSMENT_USE_OF_PSYCHOTROPIC_MEDICATIONS]:
-      formData?.[SUMMARY_FIELDS.ASSESSMENT_USE_OF_PSYCHOTROPIC_MEDICATIONS] ??
-      null,
-    [SUMMARY_FIELDS.ASSESSMENT_USE_OF_PSYCHOTROPIC_MEDICATIONS_NOTES]:
-      formData?.[
-        SUMMARY_FIELDS.ASSESSMENT_USE_OF_PSYCHOTROPIC_MEDICATIONS_NOTES
-      ] ?? null,
-    [SUMMARY_FIELDS.ASSESSMENT_HALLUCINATIONS]:
-      formData?.[SUMMARY_FIELDS.ASSESSMENT_HALLUCINATIONS] ?? null,
-    [SUMMARY_FIELDS.ASSESSMENT_HALLUCINATIONS_NOTES]:
-      formData?.[SUMMARY_FIELDS.ASSESSMENT_HALLUCINATIONS_NOTES] ?? null,
-    [SUMMARY_FIELDS.ASSESSMENT_AFFECT]:
-      formData?.[SUMMARY_FIELDS.ASSESSMENT_AFFECT] ?? null,
-    [SUMMARY_FIELDS.ASSESSMENT_SPEECH]:
-      formData?.[SUMMARY_FIELDS.ASSESSMENT_SPEECH] ?? null,
-
-    // Ongoing Risks section
-    [SUMMARY_FIELDS.ONGOING_RISK_SELF_HARM]:
-      formData?.[SUMMARY_FIELDS.ONGOING_RISK_SELF_HARM] ?? null,
-    [SUMMARY_FIELDS.ONGOING_RISK_SELF_HARM_NOTES]:
-      formData?.[SUMMARY_FIELDS.ONGOING_RISK_SELF_HARM_NOTES] ?? null,
-    [SUMMARY_FIELDS.ONGOING_RISK_SUICIDAL_THOUGHTS]:
-      formData?.[SUMMARY_FIELDS.ONGOING_RISK_SUICIDAL_THOUGHTS] ?? null,
-    [SUMMARY_FIELDS.ONGOING_RISK_SUICIDAL_PLAN]:
-      formData?.[SUMMARY_FIELDS.ONGOING_RISK_SUICIDAL_PLAN] ?? null,
-    [SUMMARY_FIELDS.ONGOING_RISK_SUICIDAL_ACTION]:
-      formData?.[SUMMARY_FIELDS.ONGOING_RISK_SUICIDAL_ACTION] ?? null,
-    [SUMMARY_FIELDS.ONGOING_RISK_SUICIDAL_THOUGHTS_NOTES]:
-      formData?.[SUMMARY_FIELDS.ONGOING_RISK_SUICIDAL_THOUGHTS_NOTES] ?? null,
-  };
+  changedKeys: readonly SummaryFieldKey[],
+  tagNames?: string[],
+): SummaryPatch => {
+  const patch: Record<string, unknown> = {};
+  for (const key of changedKeys) {
+    if (key === SUMMARY_FIELDS.TAGS) {
+      // The field holds comma-separated text; the API takes tag names and keeps
+      // whatever rating each tag already had.
+      if (tagNames) patch[SUMMARY_FIELDS.TAGS] = tagNames;
+      continue;
+    }
+    patch[key] = formData?.[key] ?? null;
+  }
+  return patch as SummaryPatch;
 };

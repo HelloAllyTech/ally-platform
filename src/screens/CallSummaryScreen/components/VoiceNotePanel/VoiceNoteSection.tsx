@@ -7,6 +7,7 @@ import {useToast} from '@/components';
 import {
   ALWAYS_VISIBLE_SECTIONS,
   SUMMARY_FIELDS,
+  SummaryFieldKey,
   summaryFields,
   USER_PERMISSIONS,
 } from '@/constants';
@@ -16,11 +17,7 @@ import {
   useVoiceNoteRecorder,
 } from '@/hooks';
 import {transformFormDataForSubmission} from '@/screens/CallSummaryScreen/utils/formDataTransformer';
-import {
-  Tag,
-  useGetTagsMutation,
-  useUpdateCallSummaryMutation,
-} from '@/services/callSummaryApi';
+import {useUpdateCallSummaryMutation} from '@/services/callSummaryApi';
 import {
   CustomFieldDefinition,
   CustomFieldEditPermission,
@@ -180,7 +177,6 @@ export const VoiceNoteSection: React.FC<VoiceNoteSectionProps> = ({
   const [saveNoteTranscript] = useSaveNoteTranscriptMutation();
   const [updateCallSummary] = useUpdateCallSummaryMutation();
   const [upsertCustomFieldValues] = useUpsertCustomFieldValuesMutation();
-  const [getTags] = useGetTagsMutation();
 
   const recorder = useVoiceNoteRecorder();
   const [voiceOpen, setVoiceOpen] = useState(false);
@@ -323,25 +319,23 @@ export const VoiceNoteSection: React.FC<VoiceNoteSectionProps> = ({
       } as SummaryFormData;
       dispatch(setFormData(builtinUpdates));
 
-      let tags: Tag[] = summaryData.details?.summary?.tags ?? [];
+      // Only the dictated fields are sent. Sending the whole summary would
+      // revert anything added since this screen loaded its copy.
+      const changedKeys = Object.keys(builtinUpdates) as SummaryFieldKey[];
       const extractedTags = builtinUpdates[SUMMARY_FIELDS.TAGS];
-      if (extractedTags) {
-        const tagList = String(extractedTags)
-          .split(',')
-          .map(s => s.trim())
-          .filter(Boolean);
-        if (tagList.length > 0) {
-          const tagsResponse = await getTags({tags: tagList});
-          if ('data' in tagsResponse && tagsResponse.data) {
-            tags = tagsResponse.data;
-          }
-        }
-      }
+      // Tag names as dictated — the backend keeps the rating each tag already
+      // had, so no LLM call sits between the counsellor and their save.
+      const tagNames = extractedTags
+        ? String(extractedTags)
+            .split(',')
+            .map(tag => tag.trim())
+            .filter(Boolean)
+        : undefined;
 
       const summaryPayload = transformFormDataForSubmission(
         merged,
-        summaryData,
-        tags,
+        changedKeys,
+        tagNames,
       );
       await updateCallSummary({
         chatId,

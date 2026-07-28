@@ -31,7 +31,9 @@ jest.mock('../../SectionWrapper/SectionWrapper', () => ({
             key={d.id}
             testID={`field-${d.id}`}
             value={customFieldLocalValues?.[d.id] ?? ''}
-            onChangeText={(v: string) => onCustomFieldChange?.(d.id, v)}
+            // `v || null` mirrors the real editors in CustomFieldsSection:
+            // clearing a field reports null, not an empty string.
+            onChangeText={(v: string) => onCustomFieldChange?.(d.id, v || null)}
           />
         ))}
         {sectionConfig && (
@@ -204,5 +206,28 @@ describe('CallSummaryDetails — custom field save does not revert fields the us
       chatId: 1,
       values: [{fieldDefinitionId: 'cf-b', value: 'Depression'}],
     });
+  });
+
+  it('sends a cleared field as null so the backend actually clears it', async () => {
+    mockGetCustomFieldValues.mockReturnValue({
+      data: [{fieldDefinitionId: 'cf-b', value: 'Anxiety'}],
+    });
+
+    const {getByTestId} = render(
+      <CallSummaryDetails isLoading={false} onSubmit={jest.fn()} showSaveButton chatId={1} />,
+    );
+
+    fireEvent.changeText(getByTestId('field-cf-b'), '');
+
+    await act(async () => {
+      fireEvent.press(getByTestId('save-conditional'));
+    });
+
+    // null, not undefined: JSON.stringify drops undefined keys, so the PUT body
+    // omitted `value` and the backend left the column untouched — the cleared
+    // value came back on reopen.
+    const [{values}] = mockUpsertCustomFieldValues.mock.calls[0];
+    expect(values).toEqual([{fieldDefinitionId: 'cf-b', value: null}]);
+    expect(values[0].value).not.toBeUndefined();
   });
 });
