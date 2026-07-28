@@ -44,5 +44,8 @@ export interface CustomFieldValue {
 }
 
 export interface UpsertCustomFieldValuesInput {
-  values: {fieldDefinitionId: string; value?: string}[];
+  // `null` clears the field and must be sent explicitly: JSON.stringify drops
+  // undefined keys, and the backend reads a missing `value` as "leave this
+  // column alone", so an omitted value silently refills the old one.
+  values: {fieldDefinitionId: string; value?: string | null}[];
 }

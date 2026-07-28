@@ -8,7 +8,10 @@ import {useCallSummaryForm} from '../useCallSummaryForm';
 const mockState: any = {
   summary: {
     summaryData: {id: 1, details: {callInfo: {}, summary: {tags: []}}},
-    formData: {notes: 'x', tags: ''},
+    // Matches what the seeding effect writes, so the first render represents a
+    // freshly-seeded form. (This mock store has no subscription, so a dispatch
+    // does not re-render on its own the way react-redux would.)
+    formData: {notes: 'y', tags: ''},
     summary: {notes: 'y', tags: []},
   },
 };
@@ -35,15 +38,37 @@ jest.mock('@/store/slices/summarySlice', () => ({
 }));
 
 const mockUpdate = jest.fn(async () => ({data: {ok: true}}));
+// Kept only so the test can assert nothing reaches it any more: rating used to
+// run inline before the write.
 const mockGetTags = jest.fn(async () => ({data: []}));
 jest.mock('@/services/callSummaryApi', () => ({
   useUpdateCallSummaryMutation: () => [mockUpdate, {isLoading: false}],
   useGetTagsMutation: () => [mockGetTags],
 }));
 
+// Real behaviour, reimplemented here so the hook's use of it is exercised
+// without pulling the transformer's own dependency chain into this suite.
 jest.mock('@/screens/CallSummaryScreen/utils/formDataTransformer', () => ({
   transformSummaryToFormData: () => ({notes: 'y', tags: ''}),
-  transformFormDataForSubmission: (formData: any, _sd: any, _tags: any) => formData,
+  getChangedSummaryFieldKeys: (baseline: any, current: any) =>
+    !baseline || !current
+      ? []
+      : Object.keys(current).filter(key => baseline[key] !== current[key]),
+  transformFormDataForSubmission: (
+    formData: any,
+    changedKeys: string[],
+    tagNames?: string[],
+  ) => {
+    const patch: any = {};
+    for (const key of changedKeys) {
+      if (key === 'tags') {
+        if (tagNames) patch.tags = tagNames;
+        continue;
+      }
+      patch[key] = formData?.[key] ?? null;
+    }
+    return patch;
+  },
 }));
 
 jest.mock('@/constants/summary', () => ({
@@ -77,7 +102,7 @@ describe('useCallSummaryForm', () => {
     jest.clearAllMocks();
     mockState.summary = {
       summaryData: {id: 1, details: {callInfo: {}, summary: {tags: []}}},
-      formData: {notes: 'x', tags: ''},
+      formData: {notes: 'y', tags: ''},
       summary: {notes: 'y', tags: []},
     };
   });
@@ -94,38 +119,62 @@ describe('useCallSummaryForm', () => {
     expect(mockState.summary.formData.notes).toBeDefined();
   });
 
-  it('submits without tags update when tags unchanged', async () => {
-    const {getByTestId} = render(<Test />);
-    await act(async () => {
-      getByTestId('change-notes').props.onPress();
-      await getByTestId('submit').props.onPress();
-    });
-    await waitFor(() => expect(mockGetTags).not.toHaveBeenCalled());
-    expect(mockUpdate).toHaveBeenCalledWith({chatId: 1, data: {summary: expect.any(Object)}});
-  });
-
-  it('fetches tags and submits when tags changed; early return when no summaryData', async () => {
+  it('sends only the field the counsellor edited', async () => {
     const {getByTestId, rerender} = render(<Test />);
     await act(async () => {
-      getByTestId('change-tags').props.onPress();
+      getByTestId('change-notes').props.onPress();
     });
-    // force rerender to pick updated mockState via selector
     rerender(<Test />);
     await act(async () => {
       await getByTestId('submit').props.onPress();
     });
-    await waitFor(() => expect(mockGetTags).toHaveBeenCalled());
-    expect(mockUpdate).toHaveBeenCalledTimes(1);
 
-    // early return when no summaryData
+    // Not the whole summary: an untouched field must not be written back, or a
+    // value added since this screen loaded would be reverted.
+    expect(mockUpdate).toHaveBeenCalledWith({
+      chatId: 1,
+      data: {summary: {notes: 'z'}},
+    });
+    expect(mockGetTags).not.toHaveBeenCalled();
+  });
+
+  it('sends tag names without waiting on a ratings call', async () => {
+    const {getByTestId, rerender} = render(<Test />);
+    await act(async () => {
+      getByTestId('change-tags').props.onPress();
+    });
+    rerender(<Test />);
+    await act(async () => {
+      await getByTestId('submit').props.onPress();
+    });
+
+    expect(mockUpdate).toHaveBeenCalledWith({
+      chatId: 1,
+      data: {summary: {tags: ['a', 'b']}},
+    });
+    // The rating used to run before the write: it stalled the save on a slow AI
+    // service and, on failure, fell back to the stored tags — discarding what
+    // the counsellor had just typed.
+    expect(mockGetTags).not.toHaveBeenCalled();
+  });
+
+  it('does not write when nothing changed', async () => {
+    const {getByTestId} = render(<Test />);
+    await act(async () => {
+      await getByTestId('submit').props.onPress();
+    });
+
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it('does not write when there is no session loaded', async () => {
+    const {getByTestId, rerender} = render(<Test />);
     mockState.summary.summaryData = null as any;
     rerender(<Test />);
     await act(async () => {
       await getByTestId('submit').props.onPress();
     });
-    // update should still be called only once (no change after early return)
-    expect(mockUpdate).toHaveBeenCalledTimes(1);
+
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 });
-
-
