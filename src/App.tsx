@@ -4,7 +4,7 @@ import {SafeAreaProvider} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 import {Provider} from 'react-redux';
 
-import {NetworkLogs, ToastProvider} from '@/components';
+import {ErrorBoundary, NetworkLogs, ToastProvider} from '@/components';
 import {env} from '@/config/env';
 import {RootNavigator} from '@/navigation/RootNavigator';
 
@@ -19,7 +19,14 @@ export const App = () => {
         <SafeAreaProvider style={styles.container}>
           <StatusBar translucent backgroundColor="transparent" />
           <ToastProvider>
-            <RootNavigator />
+            {/*
+              Inside the providers so the fallback still has translations, theming
+              and safe-area context, and so resetting re-mounts the navigator
+              without discarding the store.
+            */}
+            <ErrorBoundary>
+              <RootNavigator />
+            </ErrorBoundary>
           </ToastProvider>
           {env.ENVIRONMENT === 'development' && <NetworkLogs />}
         </SafeAreaProvider>

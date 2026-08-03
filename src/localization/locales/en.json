@@ -438,6 +438,7 @@
     "error": "Error",
     "simulationEndedSuccess": "Simulation ended successfully",
     "somethingWentWrong": "Something went wrong!",
+    "unexpectedErrorDesc": "The app ran into an unexpected problem. Your saved work is safe.",
     "offlineNetworkTitle": "No internet connection",
     "offlineMicrophoneFailureTitle": "Microphone failure",
     "offline": {

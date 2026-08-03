@@ -1,6 +1,7 @@
 export {Button} from './Button';
 export type {ButtonProps} from './Button';
 export {CustomModal} from './CustomModal';
+export {ErrorBoundary} from './ErrorBoundary';
 export {IllustratedModal} from './IllustratedModal';
 export {IllustratedActionModal} from './IllustratedActionModal';
 export {CustomDropdown} from './Dropdown';
