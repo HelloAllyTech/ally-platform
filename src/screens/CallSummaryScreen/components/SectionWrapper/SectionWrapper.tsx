@@ -1,13 +1,15 @@
 import React, {memo, useEffect} from 'react';
+import {useTranslation} from 'react-i18next';
 import {View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
+import {useToast} from '@/components';
 import {
   ALWAYS_VISIBLE_SECTIONS,
   SECTION_LIST,
   SectionKey,
-  USER_PERMISSIONS,
   summaryFields,
+  USER_PERMISSIONS,
 } from '@/constants';
 import {useCallSummaryForm} from '@/hooks';
 import {useEnhanceCallSummaryMutation} from '@/services/callSummaryApi';
@@ -42,7 +44,10 @@ interface SectionWrapperProps {
   customFieldDefs?: CustomFieldDefinition[];
   customFieldValues?: CustomFieldValue[];
   customFieldLocalValues?: Record<string, string | null>;
-  onCustomFieldChange?: (fieldDefinitionId: string, value: string | null) => void;
+  onCustomFieldChange?: (
+    fieldDefinitionId: string,
+    value: string | null,
+  ) => void;
   onCustomFieldSave?: (sectionKey: string) => Promise<void>;
 }
 
@@ -61,28 +66,52 @@ const SectionWrapperComponent = ({
   onCustomFieldChange,
   onCustomFieldSave,
 }: SectionWrapperProps) => {
+  const {t} = useTranslation();
+  const {showToast} = useToast();
   const {handleSectionFieldsReset, handleFieldChange, formData} =
     useCallSummaryForm();
   const {chatId, counselorId} = useAppSelector(selectCallInfo);
   const visibleFields = useAppSelector(selectSummaryVisibleFields);
   const permissions = useAppSelector(state => state.user.permissions);
   const currentUserId = useAppSelector(state => state.user.user?.id);
-  const isAdmin = permissions?.includes(USER_PERMISSIONS.MANAGE_CUSTOM_FIELD_DEFINITIONS) ?? false;
-  const isCounsellorForCall = counselorId !== undefined && counselorId === currentUserId;
-  const [enhanceCallSummary, {isLoading: isEnhancing, data: enhancedResponse}] =
-    useEnhanceCallSummaryMutation();
+  const isAdmin =
+    permissions?.includes(USER_PERMISSIONS.MANAGE_CUSTOM_FIELD_DEFINITIONS) ??
+    false;
+  const isCounsellorForCall =
+    counselorId !== undefined && counselorId === currentUserId;
+  const [
+    enhanceCallSummary,
+    {isLoading: isEnhancing, data: enhancedResponse, error: enhanceError},
+  ] = useEnhanceCallSummaryMutation();
 
   useEffect(() => {
-    if (enhancedResponse) {
-      const field = summaryFields.find(
-        _field => _field.sectionKey === sectionConfig.key,
-      );
-      if (field) {
-        handleFieldChange(field.key)(enhancedResponse.enhanced_content);
-      }
+    // Guard on the CONTENT, not on the response object. A failed enhance used
+    // to arrive here as a truthy `{}` (the backend answered 200 with an empty
+    // body) and wrote `undefined` straight into the field — the wand wiped the
+    // counsellor's text instead of enhancing it.
+    if (!enhancedResponse?.enhanced_content) {
+      return;
+    }
+    const field = summaryFields.find(
+      _field => _field.sectionKey === sectionConfig.key,
+    );
+    if (field) {
+      handleFieldChange(field.key)(enhancedResponse.enhanced_content);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enhancedResponse, sectionConfig.key]);
+
+  useEffect(() => {
+    // Either a real error status or a 200 that carried no enhancement: both are
+    // dead ends the counsellor has to be told about, or the wand just looks
+    // broken.
+    const enhanceReturnedNothing =
+      enhancedResponse !== undefined && !enhancedResponse?.enhanced_content;
+    if (enhanceError || enhanceReturnedNothing) {
+      showToast(t('summary.enhanceFailed'), 'error');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enhanceError, enhancedResponse]);
 
   const onWandPress = () => {
     if (!chatId) return;

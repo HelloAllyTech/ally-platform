@@ -25,8 +25,21 @@ jest.mock('@/store/hooks', () => ({
 
 const mockEnhance = jest.fn();
 let mockEnhancedData: any = undefined;
+let mockEnhanceError: any = undefined;
 jest.mock('@/services/callSummaryApi', () => ({
-  useEnhanceCallSummaryMutation: () => [mockEnhance, { isLoading: false, data: mockEnhancedData }],
+  useEnhanceCallSummaryMutation: () => [
+    mockEnhance,
+    { isLoading: false, data: mockEnhancedData, error: mockEnhanceError },
+  ],
+}));
+
+const mockShowToast = jest.fn();
+jest.mock('@/components', () => ({
+  useToast: () => ({ showToast: mockShowToast, hideToast: jest.fn() }),
+}));
+
+jest.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: (key: string) => key }),
 }));
 
 jest.mock('@/services/customFieldsApi', () => ({
@@ -74,7 +87,23 @@ describe('CallSummaryScreen/SectionWrapper', () => {
     jest.clearAllMocks();
     mockFormData = {};
     mockEnhancedData = undefined;
+    mockEnhanceError = undefined;
   });
+
+  const renderSection = () =>
+    render(
+      <SectionWrapper
+        label="Section"
+        isExpanded={true}
+        onToggle={() => {}}
+        icon={<></>}
+        sectionConfig={{ key: SectionKey.SessionSummary as any, label: 'Section', labelKey: 'summary.sections.sessionSummary', icon: () => null, canEdit: true, canEnhance: true }}
+        index={0}
+        handleSubmit={() => {}}
+        isEditing={false}
+        setIsEditing={() => {}}
+      />,
+    );
 
   it('renders header label', () => {
     const {getByText} = render(
@@ -149,8 +178,38 @@ describe('CallSummaryScreen/SectionWrapper', () => {
       />,
     );
     expect(mockHandleFieldChange).toHaveBeenCalledWith(SUMMARY_FIELDS.SESSION_SUMMARY);
+    expect(mockShowToast).not.toHaveBeenCalled();
     unmount();
     mockEnhancedData = undefined;
+  });
+
+  // A failed enhance used to arrive as a truthy `{}` and blank the field.
+  it('never writes the field when the response carries no enhanced_content', () => {
+    mockFormData = { [SUMMARY_FIELDS.SESSION_SUMMARY]: 'content' } as any;
+    mockEnhancedData = {};
+
+    renderSection();
+
+    expect(mockHandleFieldChange).not.toHaveBeenCalled();
+    expect(mockShowToast).toHaveBeenCalledWith('summary.enhanceFailed', 'error');
+  });
+
+  it('toasts and leaves the field alone when the mutation errors', () => {
+    mockFormData = { [SUMMARY_FIELDS.SESSION_SUMMARY]: 'content' } as any;
+    mockEnhanceError = { status: 503, data: { message: 'Content enhancement failed' } };
+
+    renderSection();
+
+    expect(mockHandleFieldChange).not.toHaveBeenCalled();
+    expect(mockShowToast).toHaveBeenCalledWith('summary.enhanceFailed', 'error');
+  });
+
+  it('does not toast before the wand has been used', () => {
+    mockFormData = { [SUMMARY_FIELDS.SESSION_SUMMARY]: 'content' } as any;
+
+    renderSection();
+
+    expect(mockShowToast).not.toHaveBeenCalled();
   });
 
   it('onEditPress and onClosePress toggle isEditing and reset fields', () => {
