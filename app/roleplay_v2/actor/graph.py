@@ -46,6 +46,8 @@ def _emit_actor_usage(room_id: str, engine: ActorEngine, response: Any) -> None:
         total_tokens = int(usage.get("total_tokens", 0) or 0)
         if not (prompt_tokens or completion_tokens or total_tokens):
             return
+        input_details = usage.get("input_token_details") or {}
+        cached_tokens = int(input_details.get("cache_read", 0) or 0)
         from app.core.llm_usage.emitter import emit_ai_usage
 
         llm = engine.llm
@@ -59,6 +61,7 @@ def _emit_actor_usage(room_id: str, engine: ActorEngine, response: Any) -> None:
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
             total_tokens=total_tokens,
+            cached_tokens=cached_tokens,
         )
     except Exception:  # noqa: BLE001 - usage must never break a turn
         logger.debug("[roleplay_v2] actor usage emit skipped", exc_info=True)

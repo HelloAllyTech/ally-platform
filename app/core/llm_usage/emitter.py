@@ -27,6 +27,7 @@ def emit_ai_usage(
     prompt_tokens: int = 0,
     completion_tokens: int = 0,
     total_tokens: int = 0,
+    cached_tokens: int = 0,
     audio_ms: Optional[int] = None,
     characters: Optional[int] = None,
     scenario_id: Optional[int] = None,
@@ -63,6 +64,7 @@ def emit_ai_usage(
                 prompt_tokens=prompt_tokens,
                 completion_tokens=completion_tokens,
                 total_tokens=total_tokens,
+                cached_tokens=cached_tokens,
                 audio_ms=audio_ms,
                 characters=characters,
                 env=env,
@@ -82,13 +84,20 @@ def emit_llm_usage(
     provider: Optional[str],
     model: Optional[str],
     task: str = LLMTask.AGENT_TURN.value,
-    usage: Optional[Tuple[int, int, int]] = None,
+    usage: Optional[Tuple[int, ...]] = None,
     scenario_id: Optional[int] = None,
 ) -> None:
-    """Back-compat LLM helper — forwards to emit_ai_usage(service='llm')."""
+    """Back-compat LLM helper — forwards to emit_ai_usage(service='llm').
+
+    ``usage`` is (prompt, completion, total) or (prompt, completion, total,
+    cached) — the 3-tuple form is still accepted (cached defaults to 0) so
+    existing call sites that haven't been updated to extract cache_read
+    keep working unchanged.
+    """
     if not usage:
         return
-    prompt, completion, total = usage
+    prompt, completion, total = usage[0], usage[1], usage[2]
+    cached = usage[3] if len(usage) > 3 else 0
     emit_ai_usage(
         room_id,
         service="llm",
@@ -98,6 +107,7 @@ def emit_llm_usage(
         prompt_tokens=prompt,
         completion_tokens=completion,
         total_tokens=total,
+        cached_tokens=cached,
         scenario_id=scenario_id,
     )
 

@@ -268,6 +268,7 @@ class DirectorService:
 
         usage = getattr(raw, "usage_metadata", None) or {}
         if usage:
+            input_details = usage.get("input_token_details") or {}
             self.emitter.emit_llm_usage(
                 self._llm_provider,
                 str(self._llm_model) if self._llm_model else "unknown",
@@ -275,6 +276,7 @@ class DirectorService:
                     int(usage.get("input_tokens", 0) or 0),
                     int(usage.get("output_tokens", 0) or 0),
                     int(usage.get("total_tokens", 0) or 0),
+                    int(input_details.get("cache_read", 0) or 0),
                 ),
             )
         return verdict

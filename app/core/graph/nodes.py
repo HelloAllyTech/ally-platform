@@ -1356,13 +1356,29 @@ async def generate_response(
             from app.core.llm_usage.extract import extract_usage_from_aimessage
             from app.core.llm_usage.tasks import LLMTask
 
+            usage = extract_usage_from_aimessage(response)
             emit_llm_usage(
                 room_id=get_room_id(),
                 provider=_gen_config.get("llm_provider"),
                 model=llm_model_name,
                 task=LLMTask.AGENT_TURN.value,
-                usage=extract_usage_from_aimessage(response),
+                usage=usage,
             )
+            # Direct visibility into prompt-cache hits without waiting on the
+            # BE usage pipeline/dashboard — grep "[PROMPT_CACHE]" on a live
+            # session to confirm the reordered templates are actually
+            # landing in the provider's cache, not just eligible for it.
+            if usage:
+                prompt_tokens, _, _, cached_tokens = usage
+                hit_rate = (cached_tokens / prompt_tokens) if prompt_tokens else 0.0
+                logger.info(
+                    "[PROMPT_CACHE] model=%s prompt_tokens=%d cached_tokens=%d "
+                    "hit_rate=%.0f%%",
+                    llm_model_name,
+                    prompt_tokens,
+                    cached_tokens,
+                    hit_rate * 100,
+                )
         except Exception:
             pass
     except asyncio.TimeoutError:

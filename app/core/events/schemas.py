@@ -40,6 +40,10 @@ class LLMUsageData(BaseModel):
     prompt_tokens: int = 0
     completion_tokens: int = 0
     total_tokens: int = 0
+    # Prompt tokens served from the provider's cache (a cache hit) — lets a
+    # cache-hit-rate metric (cached_tokens / prompt_tokens) be computed
+    # downstream to verify prompt caching is actually landing.
+    cached_tokens: int = 0
     # STT billable audio duration (ms) / TTS billable characters.
     audio_ms: Optional[int] = None
     characters: Optional[int] = None
