@@ -1,5 +1,5 @@
 import React from 'react';
-import {render} from '@testing-library/react-native';
+import {fireEvent, render} from '@testing-library/react-native';
 
 jest.mock('react-i18next', () => ({
   useTranslation: () => ({t: (key: string) => key}),
@@ -187,6 +187,72 @@ describe('MicrophoneListeningScreen', () => {
 
     const {getByTestId} = render(<MicrophoneListeningScreen />);
     expect(getByTestId('search')).toBeTruthy();
+  });
+
+  describe('getting out of the screen', () => {
+    const lastBackPressHandler = () => {
+      const {useHardwareBackPressHandler} = require('@/hooks');
+      return useHardwareBackPressHandler.mock.calls.at(-1)?.[0];
+    };
+
+    it('offers a visible way out while still connecting', () => {
+      const common = {...defaultCommon};
+      mockUseListeningCommon.mockReturnValue(common);
+
+      const {getByTestId} = render(<MicrophoneListeningScreen />);
+      fireEvent.press(getByTestId('connecting-cancel'));
+
+      expect(common.handleGoBack).toHaveBeenCalled();
+    });
+
+    it('leaves on back press when no session has started', () => {
+      const common = {...defaultCommon};
+      mockUseListeningCommon.mockReturnValue(common);
+
+      render(<MicrophoneListeningScreen />);
+
+      expect(lastBackPressHandler()()).toBe(true);
+      expect(common.handleGoBack).toHaveBeenCalled();
+      expect(common.setShowCallEndConfirmation).not.toHaveBeenCalled();
+    });
+
+    it('leaves on back press from the disconnected view', () => {
+      const common = {
+        ...defaultCommon,
+        chatData: {chatId: 'chat-123'},
+        disconnectedType: 'MICROPHONE_FAILURE',
+      };
+      mockUseListeningCommon.mockReturnValue(common);
+
+      render(<MicrophoneListeningScreen />);
+
+      expect(lastBackPressHandler()()).toBe(true);
+      expect(common.handleGoBack).toHaveBeenCalled();
+    });
+
+    it('confirms before ending a live session on back press', () => {
+      const common = {...defaultCommon, chatData: {chatId: 'chat-123'}};
+      mockUseListeningCommon.mockReturnValue(common);
+
+      render(<MicrophoneListeningScreen />);
+
+      expect(lastBackPressHandler()()).toBe(true);
+      expect(common.setShowCallEndConfirmation).toHaveBeenCalledWith(true);
+      expect(common.handleGoBack).not.toHaveBeenCalled();
+    });
+
+    it('lets the second back press through once the confirmation is up', () => {
+      const common = {
+        ...defaultCommon,
+        chatData: {chatId: 'chat-123'},
+        showCallEndConfirmation: true,
+      };
+      mockUseListeningCommon.mockReturnValue(common);
+
+      render(<MicrophoneListeningScreen />);
+
+      expect(lastBackPressHandler()()).toBe(false);
+    });
   });
 
   it('renders transcriptions when in non-focus mode', () => {
