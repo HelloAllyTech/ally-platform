@@ -562,6 +562,46 @@ class Settings(BaseSettings):
         ),
     )
 
+    # ---- Non-English input compression (token-cost reduction) ----
+    # Per-scenario opt-in via prompt_data.input_compression_enabled (Studio
+    # toggle "Compress Input", default off). When on, and the scenario's
+    # configured language is non-English, long current-turn inputs are
+    # compressed (same language, preserved intent) before being sent to the
+    # main LLM. Runs as a parallel graph branch masked by process_events'
+    # latency, not sequentially before generate_response — see compress_input
+    # in app/core/graph/nodes.py. This setting is the GLOBAL kill-switch.
+    INPUT_COMPRESSION_ENABLED: bool = Field(
+        default=True,
+        description=(
+            "Global kill-switch for non-English input compression. When "
+            "False, no compression happens even if a scenario enables it. "
+            "Per-scenario opt-in is prompt_data.input_compression_enabled "
+            "(Studio toggle)."
+        ),
+    )
+    INPUT_COMPRESSION_MIN_TOKENS: int = Field(
+        default=50,
+        description=(
+            "Minimum estimated token count (tiktoken o200k_base) of the "
+            "current-turn input before compression is attempted. Shorter "
+            "inputs are sent through unchanged — compressing them wouldn't "
+            "meaningfully reduce tokens and would only add a call."
+        ),
+    )
+    INPUT_COMPRESSION_TIMEOUT: float = Field(
+        default=1.5,
+        description=(
+            "Timeout (seconds) for the compression LLM call. Kept short and "
+            "well below process_events' typical latency so a slow/failed "
+            "compression call falls back to the original text instead of "
+            "becoming the new tail latency on the turn."
+        ),
+    )
+    INPUT_COMPRESSION_MODEL: str = Field(
+        default="gpt-4o-mini",
+        description="Model used for the non-English input compression call.",
+    )
+
     LLM_TEMPERATURE: str = Field(...)
 
     GOOGLE_APPLICATION_CREDENTIALS: Optional[str] = Field(

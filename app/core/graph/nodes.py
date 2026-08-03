@@ -3,8 +3,10 @@ import json
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional, cast
 
+import tiktoken
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
+from openai import AsyncOpenAI
 
 from app.core.config import settings
 from app.core.constants import DEFAULT_LANGUAGE_CODE, DetectionType
@@ -1296,6 +1298,14 @@ async def generate_response(
         messages_to_send.append(system_message)
     messages_to_send.extend(history)
 
+    # Substitute the compressed current-turn input (if compress_input fired)
+    # ONLY in this throwaway outbound list — never in `history`/state.messages,
+    # which transcripts/event detection/scoring must keep seeing unchanged.
+    if state.compressed_input and messages_to_send:
+        last_idx = len(messages_to_send) - 1
+        if isinstance(messages_to_send[last_idx], HumanMessage):
+            messages_to_send[last_idx] = HumanMessage(content=state.compressed_input)
+
     # Get LLM instance
     llm_instance = llm_client.llm_instance
 
@@ -1464,6 +1474,7 @@ async def generate_response(
         "new_events": [],
         "next_instruction": None,
         "retrieved_context": None,
+        "compressed_input": None,
     }
 
 
@@ -1792,6 +1803,135 @@ async def retrieve_knowledge(
     else:
         logger.debug("[RAG] retrieve_knowledge: completed — no matches")
     return {"retrieved_context": retrieved_context or None}
+
+
+# Shared client across all compress_input calls, mirroring the
+# BinaryClassifierEvent / SimulationBehaviorInstruction pattern: a raw OpenAI
+# client (NOT create_llm_client/LangChain) so this auxiliary call is never
+# intercepted by LiveKit's LLMAdapter and streamed to TTS (issue #2836).
+_COMPRESSION_CLIENT: Optional[AsyncOpenAI] = None
+_COMPRESSION_ENCODING = None
+
+_INPUT_COMPRESSION_SYSTEM_PROMPT = (
+    "You compress a single conversational message while fully preserving its "
+    "meaning and intent, in the SAME language and script as the input. Keep "
+    "names, numbers, and any explicit requests or emotional content intact. "
+    "Do not translate the text, do not add commentary, and do not answer the "
+    "message — output only the compressed message text."
+)
+
+
+def _get_compression_client() -> AsyncOpenAI:
+    global _COMPRESSION_CLIENT
+    if _COMPRESSION_CLIENT is None:
+        _COMPRESSION_CLIENT = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+    return _COMPRESSION_CLIENT
+
+
+def _get_compression_encoding() -> "tiktoken.Encoding":
+    global _COMPRESSION_ENCODING
+    if _COMPRESSION_ENCODING is None:
+        _COMPRESSION_ENCODING = tiktoken.get_encoding("o200k_base")
+    return _COMPRESSION_ENCODING
+
+
+@instrumented_node("compress_input")
+async def compress_input(
+    state: SimulationState, config: Optional[RunnableConfig] = None
+) -> dict:
+    """
+    Compress the current-turn user input when it's long and the scenario's
+    configured language is non-English, to reduce the token cost of the main
+    LLM call.
+
+    Runs in parallel with process_events/detect_behaviors/retrieve_knowledge,
+    feeding generate_response directly (see graph_builder.py) rather than
+    sequentially before it — process_events is almost always the slowest
+    branch (~4s p50), so this call is masked/free on most turns. A short
+    timeout (settings.INPUT_COMPRESSION_TIMEOUT) bounds the worst case on
+    turns where it isn't masked, falling back to None (original text used)
+    on any timeout or error — this branch can never make a turn slower than
+    today's baseline, only equal or faster.
+
+    Never mutates state.messages: the compressed text is a separate state
+    field that only generate_response reads when building its outbound
+    prompt, so transcripts / event detection / behavior detection / scoring
+    keep seeing the original, uncompressed input.
+    """
+    scenario = None
+    if config and "configurable" in config:
+        scenario = config["configurable"].get("scenario")
+
+    if not scenario:
+        return {"compressed_input": None}
+
+    language_code = DEFAULT_LANGUAGE_CODE
+    if scenario.language_config:
+        language_code = scenario.language_config.language_code
+    is_non_english = (language_code or "").split("-")[0].lower() != "en"
+
+    scenario_enabled = bool(
+        getattr(getattr(scenario, "prompt_data", None), "input_compression_enabled", False)
+    )
+    if not is_non_english or not settings.INPUT_COMPRESSION_ENABLED or not scenario_enabled:
+        return {"compressed_input": None}
+
+    last_human_text: Optional[str] = None
+    for message in reversed(state.messages):
+        if isinstance(message, HumanMessage) and isinstance(message.content, str):
+            last_human_text = message.content
+            break
+
+    if not last_human_text or not last_human_text.strip():
+        return {"compressed_input": None}
+
+    encoding = _get_compression_encoding()
+    tokens_pre = len(encoding.encode(last_human_text))
+    if tokens_pre < settings.INPUT_COMPRESSION_MIN_TOKENS:
+        # DEBUG: per-turn — most voice turns are short and skip this path
+        # entirely, which is the common (near-zero-cost) case by design.
+        logger.debug(
+            "[compress_input] skipping — %d tokens below threshold %d",
+            tokens_pre,
+            settings.INPUT_COMPRESSION_MIN_TOKENS,
+        )
+        return {"compressed_input": None}
+
+    try:
+        client = _get_compression_client()
+        completion = await asyncio.wait_for(
+            client.chat.completions.create(
+                model=settings.INPUT_COMPRESSION_MODEL,
+                messages=[
+                    {"role": "system", "content": _INPUT_COMPRESSION_SYSTEM_PROMPT},
+                    {"role": "user", "content": last_human_text},
+                ],
+                temperature=0.0,
+            ),
+            timeout=settings.INPUT_COMPRESSION_TIMEOUT,
+        )
+        compressed = (completion.choices[0].message.content or "").strip()
+    except asyncio.TimeoutError:
+        logger.warning(
+            "[compress_input] timed out after %ss; using original input",
+            settings.INPUT_COMPRESSION_TIMEOUT,
+        )
+        return {"compressed_input": None}
+    except Exception as e:
+        logger.warning("[compress_input] compression call failed: %s", e)
+        return {"compressed_input": None}
+
+    if not compressed:
+        return {"compressed_input": None}
+
+    tokens_post = len(encoding.encode(compressed))
+    turn_metrics.record(
+        get_room_id(),
+        input_compression_tokens_pre=tokens_pre,
+        input_compression_tokens_post=tokens_post,
+        input_compression_fired=True,
+    )
+    return {"compressed_input": compressed}
 
 
 @instrumented_node("sync_events_and_behaviors_node")

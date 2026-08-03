@@ -221,6 +221,16 @@ def replace_retrieved_context(_: Optional[str], right: Optional[str]) -> Optiona
     return right
 
 
+def replace_compressed_input(_: Optional[str], right: Optional[str]) -> Optional[str]:
+    """
+    Reducer to replace compressed_input.
+
+    Always replaces with the new value (right).
+    This allows nodes to set or clear the compressed current-turn input.
+    """
+    return right
+
+
 def replace_feedback_to_send(
     _: Optional[EventFeedback], right: Optional[EventFeedback]
 ) -> Optional[EventFeedback]:
@@ -272,4 +282,7 @@ class SimulationState(BaseModel):
     ] = []  # Behavior detection results (from detect_behaviors node)
     retrieved_context: Annotated[Optional[str], replace_retrieved_context] = (
         None  # Retrieved knowledge context for prompt enrichment
+    )
+    compressed_input: Annotated[Optional[str], replace_compressed_input] = (
+        None  # Compressed current-turn input (non-English, token-cost reduction)
     )
