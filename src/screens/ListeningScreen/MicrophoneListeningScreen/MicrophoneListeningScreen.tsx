@@ -107,13 +107,33 @@ export const MicrophoneListeningScreen = () => {
       chatData,
     });
 
-  useHardwareBackPressHandler(() => {
+  /**
+   * There is only something to end once the session has a chat id, and the
+   * disconnected view carries its own actions. In both of the other states the
+   * end-session confirmation isn't rendered at all, so asking for confirmation
+   * there swallowed the back press and left the counsellor on a screen — usually
+   * "Connecting…" — with no way out of the app short of force-quitting it.
+   */
+  const hasLiveSession = Boolean(chatData?.chatId) && !disconnectedType;
+
+  const handleHardwareBackPress = useCallback(() => {
+    if (!hasLiveSession) {
+      handleGoBack();
+      return true;
+    }
     if (!showCallEndConfirmation) {
       setShowCallEndConfirmation(true);
       return true;
     }
     return false;
-  });
+  }, [
+    hasLiveSession,
+    handleGoBack,
+    showCallEndConfirmation,
+    setShowCallEndConfirmation,
+  ]);
+
+  useHardwareBackPressHandler(handleHardwareBackPress);
 
   useEffect(() => {
     setIsFocusModeLocal(commonFocusMode);
@@ -420,6 +440,17 @@ export const MicrophoneListeningScreen = () => {
         <Text style={styles.loadingText}>
           {t('listeningScreen.connecting')}
         </Text>
+        {/*
+          Connecting can stall behind a slow network for the five seconds it takes
+          the microphone-failure view to appear. Leaving the screen with no visible
+          exit for that long reads as a frozen app.
+        */}
+        <TouchableOpacity
+          onPress={handleGoBack}
+          style={styles.connectingCancel}
+          testID="connecting-cancel">
+          <Text style={styles.connectingCancelText}>{t('common.cancel')}</Text>
+        </TouchableOpacity>
       </View>
     );
   }

@@ -19,6 +19,17 @@ export const styles = ScaledSheet.create({
     color: colors.white,
     marginTop: '10@vs',
   },
+  connectingCancel: {
+    marginTop: '24@vs',
+    paddingVertical: '10@vs',
+    paddingHorizontal: '24@s',
+  },
+  connectingCancelText: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    fontSize: '14@ms',
+    color: colors.white,
+    textDecorationLine: 'underline',
+  },
   focusModeLayout: {
     flex: 1,
     justifyContent: 'center',
