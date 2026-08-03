@@ -64,6 +64,73 @@ describe('useLiveAudioStream', () => {
     expect(getByTestId('streaming').props.children).toBe('false');
   });
 
+  it('never starts the recorder before it has been initialised', async () => {
+    // Permission stays pending, so init() never runs. start() here would be a
+    // null dereference inside the native module.
+    const perms = require('react-native-permissions');
+    const audio = require('react-native-live-audio-stream');
+    let grant: (status: string) => void = () => {};
+    perms.check.mockReturnValueOnce(
+      new Promise(resolve => {
+        grant = resolve;
+      }),
+    );
+
+    const {getByTestId} = render(<Test />);
+
+    await act(async () => {
+      getByTestId('start').props.onPress();
+      jest.advanceTimersByTime(5000);
+    });
+
+    expect(audio.init).not.toHaveBeenCalled();
+    expect(audio.start).not.toHaveBeenCalled();
+    expect(getByTestId('streaming').props.children).toBe('false');
+
+    // The pending request is honoured as soon as permission lands.
+    await act(async () => {
+      grant('granted');
+    });
+
+    expect(audio.init).toHaveBeenCalledTimes(1);
+    expect(audio.start).toHaveBeenCalledTimes(1);
+    expect(getByTestId('streaming').props.children).toBe('true');
+  });
+
+  it('starts the recorder once, however often it is asked', async () => {
+    const audio = require('react-native-live-audio-stream');
+    const {getByTestId} = render(<Test />);
+    await waitFor(() => expect(getByTestId('perm').props.children).toBe('true'));
+
+    await act(async () => {
+      getByTestId('start').props.onPress();
+      getByTestId('start').props.onPress();
+    });
+
+    expect(audio.start).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps recording when the app returns to the foreground', async () => {
+    const audio = require('react-native-live-audio-stream');
+    const {getByTestId} = render(<Test />);
+    await waitFor(() => expect(getByTestId('perm').props.children).toBe('true'));
+
+    await act(async () => {
+      getByTestId('start').props.onPress();
+    });
+
+    // The permission re-check used to re-run an effect whose cleanup stopped the
+    // recorder, cutting a live session short.
+    await act(async () => {
+      (AppState as any)._currentState = 'background';
+      (AppState as any).emit?.('change', 'active');
+      jest.advanceTimersByTime(1000);
+    });
+
+    expect(audio.stop).not.toHaveBeenCalled();
+    expect(getByTestId('streaming').props.children).toBe('true');
+  });
+
   it('when coming to foreground without permission, rechecks', async () => {
     const perms = require('react-native-permissions');
     perms.check.mockResolvedValueOnce('denied');
