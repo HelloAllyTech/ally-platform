@@ -18,6 +18,7 @@ const loadAppWithEnv = (environment: 'development' | 'production') => {
     return {
       __esModule: true,
       ToastProvider: ({children}: any) => <>{children}</>,
+      ErrorBoundary: ({children}: any) => <>{children}</>,
       NetworkLogs: () => <Text testID="network-logs">logs</Text>,
     };
   });

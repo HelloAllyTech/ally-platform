@@ -238,9 +238,18 @@ jest.mock('react-native-size-matters', () => ({
 }));
 
 // Mock @/components
+jest.mock('@react-native-firebase/crashlytics', () => ({
+  __esModule: true,
+  default: () => ({
+    log: jest.fn(),
+    recordError: jest.fn(),
+  }),
+}));
+
 jest.mock('@/components', () => {
   const React = require('react');
   return {
+    ErrorBoundary: ({children}: any) => children,
     Button: jest.fn(({label, onPress, isDisabled}) =>
       React.createElement(
         'TouchableOpacity',
