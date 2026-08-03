@@ -395,10 +395,14 @@ class SarvamSTTClient(BaseSTTClient):
         # Create the underlying STT instance
         # Note: LiveKit Sarvam STT uses 'language' parameter, not 'language_code'
         # The monkey-patch for _build_websocket_url is applied at module import time
+        # high_vad_sensitivity=True enables Sarvam's faster (~0.5s) server-side
+        # silence boundary instead of the slower default, to cut EOU/finalization
+        # latency for regional-language turns.
         self._stt_instance = sarvam.STT(
             model=self._model,
             language=self._language_code,
             api_key=self._api_key,
+            high_vad_sensitivity=True,
         )
 
     @classmethod

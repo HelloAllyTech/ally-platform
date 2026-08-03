@@ -108,6 +108,14 @@ def create_metrics_hook(
                 delay = getattr(metric, "end_of_utterance_delay", None)
                 if delay is not None and delay >= 0:
                     turn_metrics.record(room_name, eou_delay_ms=int(delay * 1000))
+                # transcription_delay = pure STT finalization time (transcript
+                # obtained after end of user speech), isolated from VAD-wait/
+                # EOU-decision which eou_delay_ms bundles together.
+                stt_delay = getattr(metric, "transcription_delay", None)
+                if stt_delay is not None and stt_delay >= 0:
+                    turn_metrics.record(
+                        room_name, stt_finalize_ms=int(stt_delay * 1000)
+                    )
             elif metric_cls == "LLMMetrics":
                 ttft = getattr(metric, "ttft", None)
                 if ttft is not None and ttft >= 0:

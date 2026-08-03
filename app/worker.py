@@ -683,6 +683,15 @@ class AgentWorker:
                         turn_metrics.record(
                             metrics_room_name, eou_delay_ms=int(delay * 1000)
                         )
+                    # transcription_delay = time to obtain the transcript after
+                    # end of user speech, i.e. pure STT finalization time,
+                    # isolated from VAD-wait/EOU-decision (which eou_delay_ms
+                    # bundles together). Key lever for regional-language latency.
+                    stt_delay = getattr(metric, "transcription_delay", None)
+                    if stt_delay is not None and stt_delay >= 0:
+                        turn_metrics.record(
+                            metrics_room_name, stt_finalize_ms=int(stt_delay * 1000)
+                        )
                 elif metric_cls == "LLMMetrics":
                     ttft = getattr(metric, "ttft", None)
                     if ttft is not None and ttft >= 0:

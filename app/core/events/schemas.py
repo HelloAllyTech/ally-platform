@@ -62,6 +62,11 @@ class TurnMetricsData(BaseModel):
 
     # Framework timings (LiveKit MetricsCollectedEvent)
     eou_delay_ms: Optional[int] = None
+    # Pure STT finalization time (LiveKit EOUMetrics.transcription_delay):
+    # time to obtain the transcript after end of user speech, isolated from
+    # VAD-wait/EOU-decision time which eou_delay_ms bundles together. Added
+    # to pinpoint regional-language STT latency vs. endpointing config.
+    stt_finalize_ms: Optional[int] = None
     llm_ttft_ms: Optional[int] = None
     tts_ttfb_ms: Optional[int] = None
 

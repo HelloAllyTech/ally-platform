@@ -37,6 +37,7 @@ _turn_counters: Dict[str, int] = {}
 _RECORD_FIELDS = {
     "invocation_id",
     "eou_delay_ms",
+    "stt_finalize_ms",
     "llm_ttft_ms",
     "tts_ttfb_ms",
     "orchestration_ms",
