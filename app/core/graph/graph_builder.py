@@ -5,7 +5,6 @@ from langgraph.graph.state import CompiledStateGraph
 from app.core.config import settings
 from app.core.graph.nodes import (
     clear_events_and_detected_data,
-    compress_input,
     detect_behaviors,
     generate_response,
     process_deferred_events,
@@ -77,20 +76,15 @@ def build_simulation_graph() -> StateGraph[SimulationState]:
     Build the LangGraph state graph.
 
     Flow:
-    1. START splits into four parallel paths:
+    1. START splits into three parallel paths:
        - detect_behaviors: Detects behaviors from behavior instructions
        - process_events: Detects events, updates EventRegistry
        - retrieve_knowledge: Retrieves relevant knowledge context (as subgraph)
-       - compress_input: Compresses long non-English current-turn input
-         (opt-in, off by default) to reduce main-LLM token cost; feeds
-         generate_response directly rather than the sync barrier below, since
-         it's the only consumer
     2. sync_events_and_behaviors_node:
-        Convergence point for the events/behaviors/knowledge paths
+        Convergence point for all three parallel paths
     3. resolve_branching_instruction: Resolves branching instructions with LLM calls
        (as subgraph)
-    4. generate_response: Generates LLM response based on detected events;
-       gated on BOTH resolve_branching_instruction and compress_input
+    4. generate_response: Generates LLM response based on detected events
     5. publish_done_thinking: Terminal node on the reply path; fires the
        done_thinking signal once the reply has finished streaming.
     6. send_event_feedback: Sends event and behavior feedback to the UI and clears
@@ -138,11 +132,6 @@ def build_simulation_graph() -> StateGraph[SimulationState]:
     retrieve_knowledge_subgraph = build_retrieve_knowledge_subgraph()
     graph.add_node("retrieve_knowledge", retrieve_knowledge_subgraph)
 
-    # compress_input runs in parallel from START, like the three nodes above,
-    # but feeds generate_response directly (not the sync barrier) since it's
-    # the only consumer — see INPUT_COMPRESSION_* / compress_input for why.
-    graph.add_node("compress_input", compress_input)
-
     # sync_events_and_behaviors_node acts as a convergence point for
     # detect_behaviors, process_events, and retrieve_knowledge
     # before resolve_branching_instruction
@@ -163,13 +152,6 @@ def build_simulation_graph() -> StateGraph[SimulationState]:
     graph.add_edge(START, "detect_behaviors")
     graph.add_edge(START, events_node)
     graph.add_edge(START, "retrieve_knowledge")
-    graph.add_edge(START, "compress_input")
-
-    # compress_input feeds generate_response directly (a second incoming edge,
-    # alongside resolve_branching_instruction below) rather than joining the
-    # sync barrier — it has exactly one consumer, and this placement gives it
-    # a strictly larger "masked by process_events" window at no extra cost.
-    graph.add_edge("compress_input", "generate_response")
 
     # The event node and retrieve_knowledge always gate the response (the reply
     # consumes branching instructions + retrieved_context).
@@ -211,23 +193,20 @@ def _build_report_graph() -> StateGraph:
     Construct the report-specific StateGraph (topology only, not compiled).
 
     Reuses the core simulation nodes (process_events, resolve_branching_instruction,
-    generate_response, detect_behaviors, retrieve_knowledge, compress_input) but
-    omits the LiveKit/TTS/UI-only nodes:
+    generate_response, detect_behaviors, retrieve_knowledge) but omits the
+    LiveKit/TTS/UI-only nodes:
     - send_event_feedback  (UI score/emoji feedback sending)
 
     Uses SimulationState so nodes are shared without any adaptation.
     The UI-only fields (non_branching_feedback_data, feedback_to_send,
     behavior_feedback_data) carry their defaults and are simply never sent to UI.
-    compress_input applies here too (offline self-play turns can be non-English)
-    — same opt-in gating, no latency concern in this offline/batch context.
 
     Flow:
         START → [process_events, retrieve_knowledge (subgraph),
         detect_behaviors] (parallel)
               → sync_events_and_behaviors_node
               → resolve_branching_instruction (subgraph)
-        START → compress_input (parallel) ─────────────────┐
-              → resolve_branching_instruction, compress_input → generate_response
+              → generate_response
               → clear_events_and_detected_data → END
 
     Not called directly — use ``get_report_graph()`` which caches the result.
@@ -250,10 +229,6 @@ def _build_report_graph() -> StateGraph:
     # and retrieve_knowledge from START
     graph.add_node("detect_behaviors", detect_behaviors)
 
-    # compress_input runs in parallel from START and feeds generate_response
-    # directly, same as in build_simulation_graph() — see that node's docstring.
-    graph.add_node("compress_input", compress_input)
-
     # Sync node for fan-in of all three parallel paths before
     # resolve_branching_instruction
     graph.add_node("sync_events_and_behaviors_node", sync_events_and_behaviors_node)
@@ -265,8 +240,6 @@ def _build_report_graph() -> StateGraph:
     graph.add_edge(START, "process_events")
     graph.add_edge(START, "retrieve_knowledge")
     graph.add_edge(START, "detect_behaviors")
-    graph.add_edge(START, "compress_input")
-    graph.add_edge("compress_input", "generate_response")
 
     # All three converge at sync node
     graph.add_edge("process_events", "sync_events_and_behaviors_node")

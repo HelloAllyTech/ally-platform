@@ -36,7 +36,6 @@ _NODE_METRIC_FIELDS = {
     # (process_deferred_events runs off-gate and is intentionally not mapped here.)
     "process_gating_events": "process_events_ms",
     "detect_behaviors": "behaviors_ms",
-    "compress_input": "input_compression_ms",
 }
 
 # Set on first node entry of an invocation. Same value visible to nodes

@@ -82,14 +82,6 @@ class TurnMetricsData(BaseModel):
     # Parallel fan-out branch totals (for fan-in bottleneck analysis)
     process_events_ms: Optional[int] = None
     behaviors_ms: Optional[int] = None
-    # Non-English input compression (token-cost reduction) — see compress_input
-    # in app/core/graph/nodes.py. tokens_pre/post let dashboards measure the
-    # actual token-count reduction; fired distinguishes "skipped" (short input
-    # / gates off) from "attempted" turns.
-    input_compression_ms: Optional[int] = None
-    input_compression_tokens_pre: Optional[int] = None
-    input_compression_tokens_post: Optional[int] = None
-    input_compression_fired: Optional[bool] = None
 
     # Dimensions / flags
     scenario_id: Optional[int] = None
