@@ -1,6 +1,7 @@
 from typing import Any, Dict, List, Literal, Mapping, Optional
 
 from app.core.branching_instructions.base import BranchingInstruction
+from app.core.config import settings
 from app.core.constants import DEFAULT_LANGUAGE_CODE, DetectionType, VisibilityType
 from app.core.embeddings import BaseEmbeddingClient
 from app.core.events.base import BaseEvent, DetectionConfig
@@ -118,6 +119,14 @@ def _create_event_by_detection_type(
 
     try:
         if detection_type == DetectionType.SENTENCE_SIMILARITY:
+            if not settings.SENTENCE_SIMILARITY_DETECTION_ENABLED:
+                log.warning(
+                    "Event '%s' (SENTENCE_SIMILARITY) skipped: detection disabled "
+                    "(SENTENCE_SIMILARITY_DETECTION_ENABLED=False)",
+                    event_id,
+                )
+                return None
+
             sentences = []
             if raw_data and isinstance(raw_data, dict) and "sentences" in raw_data:
                 sentences = raw_data.get("sentences", [])
@@ -182,6 +191,14 @@ def _create_event_by_detection_type(
             )
 
         elif detection_type == DetectionType.SEMANTIC_SIMILARITY:
+            if not settings.SEMANTIC_SIMILARITY_DETECTION_ENABLED:
+                log.warning(
+                    "Event '%s' (SEMANTIC_SIMILARITY) skipped: detection disabled "
+                    "(SEMANTIC_SIMILARITY_DETECTION_ENABLED=False)",
+                    event_id,
+                )
+                return None
+
             sentences = []
             similarity_threshold = None
             if raw_data and isinstance(raw_data, dict):

@@ -88,6 +88,36 @@ class Settings(BaseSettings):
         ),
     )
 
+    # ---- Sentence/Semantic Similarity event deprecation ----
+    # Both event-detection types are being deprecated product-wide. Semantic
+    # Similarity specifically makes a live per-turn OpenAI embeddings API call
+    # on the process_events critical path (Sentence Similarity is pure local
+    # string matching, no latency cost of its own) — these are the kill-switches
+    # for STOPPING DETECTION on already-configured scenarios, independent of
+    # whether new events of these types can still be created upstream. Default
+    # True (no behavior change) until explicitly flipped per environment; a
+    # scenario whose event gets skipped degrades the same way an unrecognized
+    # detection type already does (logged, silently never fires) — see
+    # factory.py's existing "unknown detection type" path.
+    SEMANTIC_SIMILARITY_DETECTION_ENABLED: bool = Field(
+        default=True,
+        description=(
+            "Global kill-switch for Semantic Similarity event detection. When "
+            "False, these events are never constructed and never fire — "
+            "removes their per-turn embeddings API call from process_events_ms."
+        ),
+    )
+    SENTENCE_SIMILARITY_DETECTION_ENABLED: bool = Field(
+        default=True,
+        description=(
+            "Global kill-switch for Sentence Similarity event detection. When "
+            "False, these events are never constructed and never fire. Purely "
+            "local string matching today (no latency cost), gated for product "
+            "parity with SEMANTIC_SIMILARITY_DETECTION_ENABLED during the "
+            "deprecation of both event types."
+        ),
+    )
+
     DEEPGRAM_API_KEY: str = Field(...)
 
     # AWS SES settings

@@ -1,5 +1,6 @@
 import pytest
 
+from app.core.config import settings
 from app.core.constants import DetectionType, VisibilityType
 from app.core.events.event_types.similarity_based.similarity_event import (
     SimilarityEvent,
@@ -142,3 +143,94 @@ class TestEventsFactory:
         assert evs[0].event_id == "E1"
         # Should default to SENTENCE_SIMILARITY
         assert evs[0].detection_type == DetectionType.SENTENCE_SIMILARITY
+
+
+class TestSimilarityDetectionKillSwitches:
+    """SENTENCE_SIMILARITY_DETECTION_ENABLED / SEMANTIC_SIMILARITY_DETECTION_ENABLED —
+    both event types are being deprecated; these flags stop DETECTION (not just
+    creation) for already-configured scenarios. Default True == today's behavior,
+    unchanged."""
+
+    def test_sentence_similarity_created_when_flag_is_default_true(self):
+        metadata = {
+            "events": [
+                {
+                    "id": "E1",
+                    "detectionType": "SENTENCE_SIMILARITY",
+                    "data": {"sentences": ["hello there"]},
+                }
+            ]
+        }
+        evs = build_events_from_metadata(metadata)
+        assert len(evs) == 1
+        assert isinstance(evs[0], SimilarityEvent)
+
+    def test_sentence_similarity_skipped_when_flag_disabled(self, monkeypatch):
+        monkeypatch.setattr(settings, "SENTENCE_SIMILARITY_DETECTION_ENABLED", False)
+        logger = DummyLogger()
+        metadata = {
+            "events": [
+                {
+                    "id": "E1",
+                    "detectionType": "SENTENCE_SIMILARITY",
+                    "data": {"sentences": ["hello there"]},
+                }
+            ]
+        }
+        evs = build_events_from_metadata(metadata, on_unknown="warn", logger=logger)
+        assert evs == []
+        assert any("skipped" in w.lower() and "disabled" in w.lower() for w in logger.warnings)
+
+    def test_sentence_similarity_legacy_schema_also_skipped_when_flag_disabled(
+        self, monkeypatch
+    ):
+        # The old-format "sentences"-with-no-detectionType path defaults to
+        # SENTENCE_SIMILARITY (see test_build_events_backward_compatibility_old_schema)
+        # — confirm the kill-switch gates that path too, not just the explicit-type one.
+        monkeypatch.setattr(settings, "SENTENCE_SIMILARITY_DETECTION_ENABLED", False)
+        metadata = {"events": [{"id": "E1", "sentences": ["hello there"], "score": 5}]}
+        evs = build_events_from_metadata(metadata)
+        assert evs == []
+
+    def test_semantic_similarity_skipped_when_flag_disabled(self, monkeypatch):
+        monkeypatch.setattr(settings, "SEMANTIC_SIMILARITY_DETECTION_ENABLED", False)
+        logger = DummyLogger()
+        metadata = {
+            "events": [
+                {
+                    "id": "E1",
+                    "detectionType": "SEMANTIC_SIMILARITY",
+                    "data": {"sentences": ["hello there"], "threshold": 0.7},
+                }
+            ]
+        }
+        # No embedding_client passed — the flag check must short-circuit before
+        # SemanticSimilarityEvent.create() would ever need one.
+        evs = build_events_from_metadata(metadata, on_unknown="warn", logger=logger)
+        assert evs == []
+        assert any("skipped" in w.lower() and "disabled" in w.lower() for w in logger.warnings)
+
+    def test_combination_depending_on_disabled_similarity_leaf_is_unsatisfied_not_error(
+        self, monkeypatch
+    ):
+        # A COMBINATION event whose dependent leaf is gated off must degrade to
+        # "not happened", never raise — matches the existing "unknown event id"
+        # skip behavior (event_registry.get() returns None).
+        monkeypatch.setattr(settings, "SENTENCE_SIMILARITY_DETECTION_ENABLED", False)
+        metadata = {
+            "events": [
+                {"id": "S1", "detectionType": "SENTENCE_SIMILARITY", "data": {"sentences": ["hi"]}},
+                {
+                    "id": "C1",
+                    "detectionType": "COMBINATION",
+                    "data": {
+                        "dependent_events": ["S1"],
+                        "expression": {"type": "IDENTIFIER", "id": "S1"},
+                    },
+                },
+            ]
+        }
+        evs = build_events_from_metadata(metadata, on_unknown="warn")
+        ids = [e.event_id for e in evs]
+        assert "S1" not in ids
+        assert "C1" in ids
