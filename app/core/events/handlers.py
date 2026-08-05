@@ -327,6 +327,7 @@ def create_connection_state_handler(
     language_code=None,
     prompt_data=None,
     rolling_summary_store=None,
+    finalize_task_ref: Optional[list] = None,
 ) -> Callable[[rtc.ConnectionState], None]:
     """
     Create a connection state change handler.
@@ -382,6 +383,8 @@ def create_connection_state_handler(
                 )
                 background_tasks.add(task)
                 task.add_done_callback(background_tasks.discard)
+                if finalize_task_ref is not None:
+                    finalize_task_ref[:] = [task]
                 set_final_score_sent(True)
             except Exception as e:
                 logger.exception(f"Failed to finalize session: {e}")
@@ -446,6 +449,7 @@ def create_shutdown_handler(
     language_code=None,
     prompt_data=None,
     rolling_summary_store=None,
+    finalize_task_ref: Optional[list] = None,
 ) -> Callable[[], None]:
     """
     Create a shutdown callback handler.
@@ -532,6 +536,30 @@ def create_shutdown_handler(
                 logger.info("Session finalized successfully")
             except Exception as e:
                 logger.exception(f"Failed to finalize session: {e}")
+
+        # Drain the in-flight finalize task (spawned by the connection-state
+        # handler on disconnect) BEFORE cleanup cancels background tasks. For
+        # short sessions (no maintained summary yet) the phase-2 final
+        # compaction inside finalize is the ONLY source of session memory,
+        # and it needs a few seconds of LLM time the old path never granted
+        # (observed live: the task died inside wait_for, CancelledError
+        # skipped every log). The room is already gone — holding the job
+        # process briefly is free; LiveKit's drain budget is far larger.
+        # Cap above ROLLING_SUMMARY_TIMEOUT so a healthy compaction always
+        # fits; shield so OUR timeout doesn't cancel it (cleanup will, if it
+        # is truly stuck).
+        pending_finalize = finalize_task_ref[0] if finalize_task_ref else None
+        if pending_finalize is not None and not pending_finalize.done():
+            logger.info("Draining in-flight finalize task before cleanup")
+            try:
+                await asyncio.wait_for(asyncio.shield(pending_finalize), timeout=12.0)
+            except asyncio.TimeoutError:
+                logger.warning(
+                    "Finalize task did not finish within 12s; "
+                    "session memory may be lost for this session"
+                )
+            except Exception:  # noqa: BLE001 - drain must never break shutdown
+                pass
 
         # Cleanup background tasks
         await cleanup_background_tasks()

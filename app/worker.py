@@ -755,6 +755,12 @@ class AgentWorker:
         )
         _memory_prompt_data = getattr(self.scenario, "prompt_data", None)
 
+        # Shared single-slot ref so the shutdown handler can DRAIN the
+        # finalize task the connection-state handler spawns on disconnect
+        # (instead of cleanup cancelling it mid-LLM-call — which silently
+        # dropped session memory for short sessions).
+        self._finalize_task_ref: list = []
+
         # Connection state handler
         connection_handler = create_connection_state_handler(
             event_orchestrator=self.event_orchestrator,
@@ -767,6 +773,7 @@ class AgentWorker:
             language_code=_memory_language_code,
             prompt_data=_memory_prompt_data,
             rolling_summary_store=self.rolling_summary_store,
+            finalize_task_ref=self._finalize_task_ref,
         )
 
         @self.ctx.room.on("connection_state_changed")
@@ -799,6 +806,7 @@ class AgentWorker:
             language_code=_memory_language_code,
             prompt_data=_memory_prompt_data,
             rolling_summary_store=self.rolling_summary_store,
+            finalize_task_ref=self._finalize_task_ref,
         )
 
         # Wrap shutdown handler to include conversation handler cleanup
