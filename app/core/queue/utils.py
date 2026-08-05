@@ -198,6 +198,7 @@ async def _emit_session_memory(
                     new_messages=messages[covered_count:],
                     llm_client=llm_client,
                     prompt_data=prompt_data,
+                    room_id=room_id,
                 ),
                 timeout=settings.ROLLING_SUMMARY_TIMEOUT,
             )

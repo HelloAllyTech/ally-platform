@@ -1544,11 +1544,19 @@ async def generate_response(
         if _clock is not None:
             _clock.last_agent_utterance = response.content
 
+    # NOTE: retrieved_context is deliberately NOT cleared here. The
+    # refresh-cadence reuse in retrieve_knowledge re-injects
+    # state.retrieved_context on off-cadence turns — clearing it after every
+    # reply (a leftover from before the cadence feature) made those turns
+    # re-inject an already-wiped None, so the persona LOST its knowledge
+    # context on every other turn and the system prompt flip-flopped ~700
+    # chars turn-to-turn (observed live: alternating prompt-cache misses).
+    # retrieve_knowledge owns the context lifecycle now: it recomputes,
+    # reuses, or returns None on its disabled/error paths every turn.
     return {
         "messages": [AIMessage(content=response.content)],
         "new_events": [],
         "next_instruction": None,
-        "retrieved_context": None,
     }
 
 
@@ -2025,6 +2033,7 @@ async def compact_history(
     scenario = cast(Scenario, configurable.get("scenario")) if configurable else None
     prompt_data = getattr(scenario, "prompt_data", None) if scenario else None
 
+    _room = configurable.get("room")
     schedule_compaction(
         store,
         previous_summary=store.summary,
@@ -2035,6 +2044,7 @@ async def compact_history(
         prompt_data=prompt_data,
         timeout=settings.ROLLING_SUMMARY_TIMEOUT,
         reason="chars" if (chars_due and not turns_due) else "cadence",
+        room_id=getattr(_room, "name", None),
     )
     return {}
 

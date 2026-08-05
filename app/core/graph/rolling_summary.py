@@ -166,11 +166,45 @@ def _format_turns(messages: List[BaseMessage]) -> str:
     return "\n".join(lines)
 
 
+def _emit_summarizer_usage(raw, llm_client, room_id: Optional[str]) -> None:
+    """Best-effort token-usage emission for the cost-by-task dashboard.
+
+    Without this, compaction cost was invisible: only agent_turn was ever
+    emitted, so the memory feature's spend could not be measured against its
+    benefit. Never raises."""
+    try:
+        from app.core.llm_usage.emitter import emit_llm_usage
+        from app.core.llm_usage.extract import extract_usage_from_aimessage
+        from app.core.llm_usage.tasks import LLMTask
+
+        usage = extract_usage_from_aimessage(raw)
+        if not usage:
+            return
+        if room_id is None:
+            from app.core.graph.instrumentation import get_room_id
+
+            room_id = get_room_id()
+        llm_instance = llm_client.llm_instance
+        emit_llm_usage(
+            room_id=room_id,
+            provider=getattr(llm_client, "provider", None),
+            model=(
+                getattr(llm_instance, "model_name", None)
+                or getattr(llm_instance, "model", None)
+            ),
+            task=LLMTask.ROLLING_SUMMARY.value,
+            usage=usage,
+        )
+    except Exception:  # noqa: BLE001 - usage must never break compaction
+        pass
+
+
 async def update_rolling_summary(
     previous_summary: Optional[str],
     new_messages: List[BaseMessage],
     llm_client: BaseLLMClient,
     prompt_data=None,
+    room_id: Optional[str] = None,
 ) -> tuple[Optional[str], Optional[dict]]:
     """Merge ``new_messages`` into ``previous_summary`` with one LLM call.
 
@@ -196,14 +230,28 @@ async def update_rolling_summary(
         f"{turns_text}"
     )
 
-    response = await llm_client.llm_instance.with_structured_output(
-        RollingSummaryStructured
+    # include_raw: with_structured_output alone returns only the parsed model,
+    # which carries no usage metadata — the raw AIMessage is needed to report
+    # the summarizer's token spend (task=rolling_summary).
+    result = await llm_client.llm_instance.with_structured_output(
+        RollingSummaryStructured, include_raw=True
     ).ainvoke(
         [
             SystemMessage(content=system_text),
             HumanMessage(content=user_text),
         ]
     )
+    if isinstance(result, dict):
+        response = result.get("parsed")
+        _emit_summarizer_usage(result.get("raw"), llm_client, room_id)
+        if response is None:
+            raise ValueError(
+                f"summarizer structured-output parse failed: "
+                f"{result.get('parsing_error')}"
+            )
+    else:
+        # Defensive: some providers/wrappers may ignore include_raw.
+        response = result
     rendered = render_structured_summary(response)
     if not rendered:
         return previous_summary, None
@@ -221,6 +269,7 @@ def schedule_compaction(
     prompt_data=None,
     timeout: float,
     reason: str = "cadence",
+    room_id: Optional[str] = None,
 ) -> bool:
     """Fire the summarizer as a DETACHED task writing into ``store``.
 
@@ -247,6 +296,7 @@ def schedule_compaction(
                     new_messages=delta,
                     llm_client=llm_client,
                     prompt_data=prompt_data,
+                    room_id=room_id,
                 ),
                 timeout=timeout,
             )
@@ -341,6 +391,7 @@ def maybe_compact_on_pause(
         prompt_data=prompt_data,
         timeout=settings.ROLLING_SUMMARY_TIMEOUT,
         reason="pause",
+        room_id=thread_id,
     )
     if scheduled:
         logger.info(

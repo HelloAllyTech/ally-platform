@@ -111,10 +111,14 @@ class TestUpdateRollingSummary:
     @pytest.mark.asyncio
     async def test_merges_previous_summary_and_new_turns(self):
         structured = AsyncMock()
-        structured.ainvoke.return_value = RollingSummaryStructured(
-            situation="updated summary",
-            disclosures=["shared job stress"],
-        )
+        structured.ainvoke.return_value = {
+            "raw": MagicMock(),
+            "parsed": RollingSummaryStructured(
+                situation="updated summary",
+                disclosures=["shared job stress"],
+            ),
+            "parsing_error": None,
+        }
         llm_client = MagicMock()
         llm_client.llm_instance.with_structured_output.return_value = structured
 
@@ -149,7 +153,11 @@ class TestUpdateRollingSummary:
     @pytest.mark.asyncio
     async def test_blank_llm_output_falls_back_to_previous(self):
         structured = AsyncMock()
-        structured.ainvoke.return_value = RollingSummaryStructured()
+        structured.ainvoke.return_value = {
+            "raw": MagicMock(),
+            "parsed": RollingSummaryStructured(),
+            "parsing_error": None,
+        }
         llm_client = MagicMock()
         llm_client.llm_instance.with_structured_output.return_value = structured
 
