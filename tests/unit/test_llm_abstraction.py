@@ -84,6 +84,7 @@ class TestOpenAILLMClient:
             timeout=30,
             max_retries=1,
             streaming=False,
+            stream_usage=True,
         )
         assert client.llm_instance == mock_llm_instance
 
@@ -107,6 +108,7 @@ class TestOpenAILLMClient:
             timeout=30,
             max_retries=1,
             streaming=False,
+            stream_usage=True,
         )
         assert client.llm_instance == mock_llm_instance
 
@@ -131,6 +133,7 @@ class TestOpenAILLMClient:
             timeout=30,
             max_retries=1,
             streaming=True,
+            stream_usage=True,
         )
 
     @pytest.mark.unit
@@ -158,6 +161,7 @@ class TestOpenAILLMClient:
             timeout=30,
             max_retries=1,
             streaming=False,
+            stream_usage=True,
         )
         assert client.llm_instance == mock_llm_instance
 
@@ -207,6 +211,7 @@ class TestOpenAILLMClient:
             timeout=30,
             max_retries=1,
             streaming=False,
+            stream_usage=True,
         )
         assert client.llm_instance == mock_llm_instance
 
@@ -235,6 +240,7 @@ class TestOpenAILLMClient:
             timeout=30,
             max_retries=1,
             streaming=False,
+            stream_usage=True,
         )
 
 
@@ -486,6 +492,7 @@ class TestOpenAILLMClientBaseUrl:
             timeout=30,
             max_retries=1,
             streaming=False,
+            stream_usage=True,
             base_url="http://localhost:11434/v1",
         )
 
@@ -514,6 +521,7 @@ class TestOpenAILLMClientBaseUrl:
             timeout=30,
             max_retries=1,
             streaming=False,
+            stream_usage=True,
             base_url="http://localhost:11434/v1",
         )
         assert client.llm_instance is not None
@@ -539,6 +547,7 @@ class TestOpenAILLMClientBaseUrl:
             timeout=30,
             max_retries=1,
             streaming=False,
+            stream_usage=True,
         )
 
     @pytest.mark.unit
@@ -564,6 +573,7 @@ class TestOpenAILLMClientBaseUrl:
             timeout=30,
             max_retries=1,
             streaming=False,
+            stream_usage=True,
             base_url="http://localhost:11434/v1",
         )
 
@@ -701,6 +711,7 @@ class TestLLMAbstractionIntegration:
             timeout=30,
             max_retries=1,
             streaming=False,
+            stream_usage=True,
         )
 
     @pytest.mark.integration

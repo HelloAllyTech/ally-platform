@@ -88,6 +88,13 @@ class OpenAILLMClient(BaseLLMClient):
             # LLMAdapter's stream_mode="messages" forwards them to TTS as they
             # arrive — TTS starts on the first token instead of the full reply.
             "streaming": settings.STREAM_RESPONSE,
+            # Streamed OpenAI responses carry NO usage metadata unless the
+            # stream_options include_usage flag is set — without this, every
+            # agent turn's usage extraction returned None, so llm_usage had
+            # no agent_turn rows (cost dashboard blind spot) and the
+            # [PROMPT_CACHE] hit-rate log never fired. Adds one final usage
+            # chunk to the stream; no effect on token latency or cost.
+            "stream_usage": True,
         }
         if self._base_url:
             chat_kwargs["base_url"] = self._base_url
