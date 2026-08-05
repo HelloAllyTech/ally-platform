@@ -40,6 +40,11 @@ class RollingSummaryStore:
 
     def __init__(self) -> None:
         self.summary: Optional[str] = None
+        # Machine-usable form of the summary (RollingSummaryStructured dump).
+        # The prompt uses the rendered text; session_memory ships BOTH so
+        # downstream consumers (case previousMemory, future Tracks reads,
+        # admin review, judges) never have to re-parse prose.
+        self.structured: Optional[dict] = None
         # How many leading messages of the conversation the summary covers.
         self.covered_count: int = 0
         # Total messages seen when the last compaction was scheduled.
@@ -51,10 +56,49 @@ class RollingSummaryStore:
         return self._task is not None and not self._task.done()
 
 
-class RollingSummaryResponse(BaseModel):
-    """Structured output for the summarizer call."""
+class RollingSummaryStructured(BaseModel):
+    """Structured output for the summarizer call.
 
-    summary: str
+    Some session state is too important to trust to prose — disclosures and
+    commitments must survive compaction verbatim-ish and be machine-checkable
+    (the CompactionDetails lesson: extract critical state mechanically, don't
+    hope the summary prose mentions it). The prompt receives the rendered
+    text; the structure travels alongside it into session_memory.
+    """
+
+    situation: str = ""
+    disclosures: List[str] = []
+    counsellor_actions: List[str] = []
+    emotional_arc: str = ""
+    unresolved: List[str] = []
+
+
+_SECTION_LABELS = [
+    ("situation", "Situation"),
+    ("disclosures", "You disclosed"),
+    ("counsellor_actions", "Counsellor did"),
+    ("emotional_arc", "Emotional arc"),
+    ("unresolved", "Unresolved"),
+]
+
+
+def render_structured_summary(structured: RollingSummaryStructured) -> str:
+    """Render the structure as the labeled-sections text the persona prompt
+    (and the case previousMemory sentence) consume. Empty sections are
+    omitted so short sessions don't carry dangling headers."""
+    lines: List[str] = []
+    for field, label in _SECTION_LABELS:
+        value = getattr(structured, field)
+        if isinstance(value, list):
+            items = [str(v).strip() for v in value if v and str(v).strip()]
+            if items:
+                lines.append(f"{label}:")
+                lines.extend(f"- {item}" for item in items)
+        else:
+            text = (value or "").strip()
+            if text:
+                lines.append(f"{label}: {text}")
+    return "\n".join(lines).strip()
 
 
 def message_chars(messages: List[BaseMessage]) -> int:
@@ -127,21 +171,23 @@ async def update_rolling_summary(
     new_messages: List[BaseMessage],
     llm_client: BaseLLMClient,
     prompt_data=None,
-) -> Optional[str]:
+) -> tuple[Optional[str], Optional[dict]]:
     """Merge ``new_messages`` into ``previous_summary`` with one LLM call.
 
-    Returns the updated summary text, or None when there is nothing to
-    summarize. Raises on LLM failure — callers decide the fallback (keep the
-    previous summary and retry on a later turn).
+    Returns ``(rendered_text, structured_dict)`` — the rendered labeled-
+    sections text for prompt injection, and the machine-usable structure for
+    session_memory. Returns ``(previous_summary, None)`` when there is
+    nothing to summarize. Raises on LLM failure — callers decide the fallback
+    (keep the previous summary and retry on a later trigger).
     """
     turns_text = _format_turns(new_messages)
     if not turns_text.strip():
-        return previous_summary
+        return previous_summary, None
 
     system_text = load_template(_FALLBACK_TEMPLATE_PATH, prompt_data)
     if not system_text:
         logger.warning("[ROLLING_SUMMARY] summarizer template resolved empty; skipping")
-        return previous_summary
+        return previous_summary, None
 
     user_text = (
         "Current summary (empty if this is the first update):\n"
@@ -151,15 +197,17 @@ async def update_rolling_summary(
     )
 
     response = await llm_client.llm_instance.with_structured_output(
-        RollingSummaryResponse
+        RollingSummaryStructured
     ).ainvoke(
         [
             SystemMessage(content=system_text),
             HumanMessage(content=user_text),
         ]
     )
-    summary = (response.summary or "").strip()
-    return summary or previous_summary
+    rendered = render_structured_summary(response)
+    if not rendered:
+        return previous_summary, None
+    return rendered, response.model_dump()
 
 
 def schedule_compaction(
@@ -193,7 +241,7 @@ def schedule_compaction(
 
         _start = datetime.now(timezone.utc)
         try:
-            summary = await asyncio.wait_for(
+            summary, structured = await asyncio.wait_for(
                 update_rolling_summary(
                     previous_summary=previous_summary,
                     new_messages=delta,
@@ -221,6 +269,8 @@ def schedule_compaction(
         if not summary:
             return
         store.summary = summary
+        if structured is not None:
+            store.structured = structured
         store.covered_count = boundary
         store.total_count = total_count
         _ms = int((datetime.now(timezone.utc) - _start).total_seconds() * 1000)

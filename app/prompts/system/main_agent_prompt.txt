@@ -67,7 +67,4 @@ How to use these rules:
 Behavior rules for this simulation:
 {behavior_instructions_json}
 
-## Additional Context
-{retrieved_context}
-
 Generate the next dialogue.

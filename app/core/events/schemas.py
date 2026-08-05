@@ -143,6 +143,11 @@ class SessionMemoryData(BaseModel):
     message_count: int = 0
     summarized_message_count: int = 0
     env: Optional[str] = None
+    # Machine-usable form of the summary (RollingSummaryStructured dump:
+    # situation, disclosures[], counsellor_actions[], emotional_arc,
+    # unresolved[]) so downstream consumers never re-parse prose. Optional —
+    # absent for memories produced before the structured summarizer.
+    structured: Optional[dict] = None
 
 
 class EventRegistryEntry(BaseModel):

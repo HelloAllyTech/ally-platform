@@ -20,7 +20,9 @@ from app.core.config import settings
 from app.core.graph.nodes import compact_history
 from app.core.graph.rolling_summary import (
     RollingSummaryStore,
+    RollingSummaryStructured,
     count_learner_turns,
+    render_structured_summary,
     summary_boundary_index,
     update_rolling_summary,
 )
@@ -109,17 +111,22 @@ class TestUpdateRollingSummary:
     @pytest.mark.asyncio
     async def test_merges_previous_summary_and_new_turns(self):
         structured = AsyncMock()
-        structured.ainvoke.return_value = MagicMock(summary="updated summary")
+        structured.ainvoke.return_value = RollingSummaryStructured(
+            situation="updated summary",
+            disclosures=["shared job stress"],
+        )
         llm_client = MagicMock()
         llm_client.llm_instance.with_structured_output.return_value = structured
 
-        result = await update_rolling_summary(
+        text, structure = await update_rolling_summary(
             previous_summary="old summary",
             new_messages=_conversation(2),
             llm_client=llm_client,
         )
 
-        assert result == "updated summary"
+        assert "Situation: updated summary" in text
+        assert "- shared job stress" in text
+        assert structure["disclosures"] == ["shared job stress"]
         sent = structured.ainvoke.call_args[0][0]
         # [system template, human payload]
         assert len(sent) == 2
@@ -130,27 +137,41 @@ class TestUpdateRollingSummary:
     @pytest.mark.asyncio
     async def test_empty_delta_keeps_previous_summary_without_llm_call(self):
         llm_client = MagicMock()
-        result = await update_rolling_summary(
+        text, structure = await update_rolling_summary(
             previous_summary="kept",
             new_messages=[],
             llm_client=llm_client,
         )
-        assert result == "kept"
+        assert text == "kept"
+        assert structure is None
         llm_client.llm_instance.with_structured_output.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_blank_llm_output_falls_back_to_previous(self):
         structured = AsyncMock()
-        structured.ainvoke.return_value = MagicMock(summary="   ")
+        structured.ainvoke.return_value = RollingSummaryStructured()
         llm_client = MagicMock()
         llm_client.llm_instance.with_structured_output.return_value = structured
 
-        result = await update_rolling_summary(
+        text, structure = await update_rolling_summary(
             previous_summary="previous",
             new_messages=_conversation(1),
             llm_client=llm_client,
         )
-        assert result == "previous"
+        assert text == "previous"
+        assert structure is None
+
+    def test_render_omits_empty_sections(self):
+        rendered = render_structured_summary(
+            RollingSummaryStructured(
+                situation="talking about work stress",
+                unresolved=["employer disclosure fear"],
+            )
+        )
+        assert rendered.startswith("Situation: talking about work stress")
+        assert "Unresolved:" in rendered
+        assert "You disclosed" not in rendered
+        assert "Counsellor did" not in rendered
 
 
 class TestCompactHistoryNode:
@@ -228,7 +249,7 @@ class TestCompactHistoryNode:
             patch.object(settings, "ROLLING_SUMMARY_TAIL_DIALOGUES", 6),
             patch(
                 "app.core.graph.rolling_summary.update_rolling_summary",
-                new=AsyncMock(return_value="new summary"),
+                new=AsyncMock(return_value=("new summary", {"situation": "s"})),
             ),
         ):
             result = await compact_history(
@@ -263,7 +284,7 @@ class TestCompactHistoryNode:
             patch.object(settings, "ROLLING_SUMMARY_DELTA_TRIGGER_CHARS", 3000),
             patch(
                 "app.core.graph.rolling_summary.update_rolling_summary",
-                new=AsyncMock(return_value="char-triggered summary"),
+                new=AsyncMock(return_value=("char-triggered summary", None)),
             ),
         ):
             result = await compact_history(

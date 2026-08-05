@@ -121,12 +121,18 @@ async def _emit_session_memory(
         logger.debug("session_memory skipped: ROLLING_SUMMARY_ENABLED is off")
         return
 
-    async def _send(summary_text: str, message_count: int, covered: int) -> None:
+    async def _send(
+        summary_text: str,
+        message_count: int,
+        covered: int,
+        structured: dict | None = None,
+    ) -> None:
         memory = SessionMemoryData(
             summary=summary_text,
             language=language_code,
             message_count=message_count,
             summarized_message_count=covered,
+            structured=structured,
         )
         message = CoreEventMessageType.create_session_memory(
             room_id=room_id, session_memory=memory
@@ -169,7 +175,12 @@ async def _emit_session_memory(
     # died inside wait_for and CancelledError skipped every log). Delivering
     # the last good summary must never depend on another LLM round-trip.
     if maintained:
-        await _send(maintained, message_count, covered_count)
+        await _send(
+            maintained,
+            message_count,
+            covered_count,
+            structured=getattr(store, "structured", None),
+        )
 
     # PHASE 2 — best-effort upgrade: fold the not-yet-covered tail in and
     # send a message with higher coverage. Core's processor keeps whichever
@@ -181,7 +192,7 @@ async def _emit_session_memory(
         from app.core.graph.rolling_summary import update_rolling_summary
 
         try:
-            upgraded = await asyncio.wait_for(
+            upgraded, upgraded_structured = await asyncio.wait_for(
                 update_rolling_summary(
                     previous_summary=maintained or None,
                     new_messages=messages[covered_count:],
@@ -204,7 +215,12 @@ async def _emit_session_memory(
             return
         upgraded = (upgraded or "").strip()
         if upgraded and upgraded != maintained:
-            await _send(upgraded, len(messages), len(messages))
+            await _send(
+                upgraded,
+                len(messages),
+                len(messages),
+                structured=upgraded_structured,
+            )
     elif not maintained:
         logger.info(
             "No rolling summary available for room=%s; skipping session_memory",

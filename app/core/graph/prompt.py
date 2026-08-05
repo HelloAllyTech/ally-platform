@@ -646,13 +646,49 @@ def _ensure_language_glossary(
     return SystemMessage(content=combined.strip())
 
 
-# Framing for the rolling conversation summary (episodic memory). Appended as
-# the LAST block of the system message — after the static persona / glossary /
-# audio-tag content — so everything before it stays a byte-stable prefix for
-# provider prompt caching (the summary is the one part that changes as the
-# session progresses). The "private memory / stay consistent" sentence keeps
-# the persona from re-introducing facts it already disclosed once older turns
-# are dropped from the verbatim history.
+# Header for retrieved knowledge context (RAG + Tier-1 glossary), appended in
+# the volatile SUFFIX of the system message when the template did not render
+# it. It refreshes every KNOWLEDGE_RETRIEVAL_REFRESH_TURNS turns — rendering
+# it mid-template invalidated the provider prompt cache for everything after
+# it on almost every turn. Placement policy: the DEFAULT main_agent_prompt no
+# longer renders {retrieved_context} (gets the cache-friendly suffix);
+# main_agent_prompt_full DELIBERATELY keeps it inline next to
+# {state_x_guidelines} (retrieval is state-coupled — states can blank it via
+# ragEnabled:false — so it belongs with the state guidance), and the
+# branching prompt keeps it inline too (branching turns swap templates and
+# bust the cache regardless, so there is nothing to win). Dashboard variants
+# keep control of placement the same way — the append skips itself when the
+# text is already present (same contract as _ensure_language_glossary).
+# Header wording kept identical to the old template block.
+_RETRIEVED_CONTEXT_HEADER = "## Additional Context\n"
+
+
+def _append_retrieved_context(
+    message: SystemMessage, retrieved_context: Optional[str]
+) -> SystemMessage:
+    """Append retrieved knowledge as a volatile-suffix block (cache-friendly).
+
+    Ordered AFTER the rolling summary: retrieved context churns roughly every
+    2 turns while the summary churns every ~4, and prefix caching means
+    everything after the first changed byte is re-processed — so the
+    faster-churning block goes last.
+    """
+    text = _coerce_block_value(retrieved_context)
+    if not text:
+        return message
+    if text in message.content:
+        return message
+    combined = f"{message.content}\n\n{_RETRIEVED_CONTEXT_HEADER}{text}"
+    return SystemMessage(content=combined.strip())
+
+
+# Framing for the rolling conversation summary (episodic memory). Appended in
+# the volatile suffix of the system message — after the static persona /
+# glossary / audio-tag content — so the static prefix stays byte-stable for
+# provider prompt caching (ordering within the suffix: summary before
+# retrieved context, ascending churn frequency). The "private memory / stay
+# consistent" sentence keeps the persona from re-introducing facts it already
+# disclosed once older turns are dropped from the verbatim history.
 _ROLLING_SUMMARY_FRAMING = (
     "## Conversation so far (your memory)\n"
     "Private summary of the earlier part of THIS conversation. Older turns are "
@@ -669,9 +705,9 @@ def _append_rolling_summary(
     """Append the rolling summary as the final system-prompt block.
 
     Same append-after-templating pattern as `_ensure_language_glossary`, so no
-    studio prompt ever needs editing. Deliberately applied LAST (after audio
-    tags): the summary is the only per-turn-changing block, and placing it at
-    the very end keeps the static prefix cache-stable.
+    studio prompt ever needs editing. Applied in the volatile suffix (after
+    the static audio tags, before the faster-churning retrieved context) so
+    the static prefix stays cache-stable.
     """
     summary = (rolling_summary or "").strip()
     if not summary:
@@ -720,7 +756,8 @@ def generate_system_message(
         )
         msg = _ensure_language_glossary(msg, prompt_data)
         msg = _append_audio_tag_guidance(msg, audio_tag_instructions)
-        return _append_rolling_summary(msg, rolling_summary)
+        msg = _append_rolling_summary(msg, rolling_summary)
+        return _append_retrieved_context(msg, retrieved_context)
 
     if behavior_instructions is not None:
         if not behavior_instructions:
@@ -742,7 +779,8 @@ def generate_system_message(
         )
         msg = _ensure_language_glossary(msg, prompt_data)
         msg = _append_audio_tag_guidance(msg, audio_tag_instructions)
-        return _append_rolling_summary(msg, rolling_summary)
+        msg = _append_rolling_summary(msg, rolling_summary)
+        return _append_retrieved_context(msg, retrieved_context)
 
     logger.warning(
         "No behavior_instructions provided, "
@@ -763,7 +801,8 @@ def generate_system_message(
     )
     msg = _ensure_language_glossary(msg, prompt_data)
     msg = _append_audio_tag_guidance(msg, audio_tag_instructions)
-    return _append_rolling_summary(msg, rolling_summary)
+    msg = _append_rolling_summary(msg, rolling_summary)
+    return _append_retrieved_context(msg, retrieved_context)
 
 
 def generate_prompt_content(
