@@ -1305,6 +1305,35 @@ async def generate_response(
         )
         history = history[_rs_covered:]
         summary_slice_applied = True
+        # EMERGENCY bound: if compaction stalls (summarizer outage/timeouts)
+        # the covered boundary stops advancing and this window would grow
+        # without bound — trim no longer catches it since the summary
+        # supersedes it. Past the char ceiling, mechanically trim and say so
+        # loudly: these turns are dropped WITHOUT summary coverage (bounded,
+        # observable degradation instead of quiet latency growth).
+        _emergency_chars = settings.ROLLING_SUMMARY_EMERGENCY_WINDOW_CHARS
+        if _emergency_chars > 0:
+            _window_chars = sum(
+                len(str(getattr(m, "content", "") or "")) for m in history
+            )
+            if _window_chars > _emergency_chars:
+                _emergency_keep = (
+                    settings.ROLLING_SUMMARY_TAIL_DIALOGUES
+                    + settings.ROLLING_SUMMARY_EVERY_TURNS
+                )
+                _trimmed = _trim_history_to_last_dialogues(history, _emergency_keep)
+                if len(_trimmed) < len(history):
+                    logger.warning(
+                        "[ROLLING_SUMMARY] EMERGENCY trim %d -> %d messages "
+                        "(window %d chars > %d): compaction is not keeping up; "
+                        "%d messages dropped WITHOUT summary coverage",
+                        len(history),
+                        len(_trimmed),
+                        _window_chars,
+                        _emergency_chars,
+                        len(history) - len(_trimmed),
+                    )
+                    history = _trimmed
     scenario_trim_on = bool(
         getattr(getattr(scenario, "prompt_data", None), "history_trim_enabled", False)
     )
@@ -1925,16 +1954,22 @@ async def compact_history(
     """
     Schedule an update of the rolling conversation summary (episodic memory).
 
-    Terminal node on the reply path. The summarizer LLM call runs as a
-    DETACHED asyncio task writing into the worker-owned RollingSummaryStore -
-    never inside the graph run - so neither this turn nor the next one waits
-    on it (a synchronous version measurably added ~1s to the next turn's
-    voice-to-voice latency in the Malayalam A/B run). Folds messages older
-    than the verbatim tail (ROLLING_SUMMARY_TAIL_DIALOGUES) into the
-    maintained summary once ROLLING_SUMMARY_EVERY_TURNS learner turns have
-    accumulated beyond the covered boundary. On any failure the previous
-    summary is kept and compaction retries on a later turn. Never writes
-    graph state - the store is the single source of truth (see
+    Terminal node on the reply path — the PRIMARY compaction trigger, firing
+    on cadence after replies regardless of whether the learner ever pauses
+    (the pause hook in rolling_summary.maybe_compact_on_pause is additive).
+    The summarizer LLM call runs as a DETACHED task writing into the
+    worker-owned RollingSummaryStore — never inside the graph run — so
+    neither this turn nor the next one waits on it (a synchronous version
+    measurably added ~1s to the next turn's voice-to-voice latency in the
+    Malayalam A/B run).
+
+    Triggers when the un-summarized delta beyond the verbatim tail reaches
+    ROLLING_SUMMARY_EVERY_TURNS learner turns OR
+    ROLLING_SUMMARY_DELTA_TRIGGER_CHARS characters (turns are not
+    equal-sized; the char gate catches verbose languages early). The tail
+    itself is bounded by ROLLING_SUMMARY_TAIL_MAX_CHARS. On any failure the
+    previous summary is kept and compaction retries on a later turn. Never
+    writes graph state — the store is the single source of truth (see
     RollingSummaryStore for why).
     """
     if not settings.ROLLING_SUMMARY_ENABLED:
@@ -1954,18 +1989,32 @@ async def compact_history(
 
     from app.core.graph.rolling_summary import (
         count_learner_turns,
+        message_chars,
+        schedule_compaction,
         summary_boundary_index,
-        update_rolling_summary,
     )
 
     messages = list(state.messages)
-    boundary = summary_boundary_index(messages, settings.ROLLING_SUMMARY_TAIL_DIALOGUES)
+    boundary = summary_boundary_index(
+        messages,
+        settings.ROLLING_SUMMARY_TAIL_DIALOGUES,
+        settings.ROLLING_SUMMARY_TAIL_MAX_CHARS,
+    )
     already_covered = max(0, store.covered_count)
     if boundary <= already_covered:
         return {}
 
     delta = messages[already_covered:boundary]
-    if count_learner_turns(delta) < max(1, settings.ROLLING_SUMMARY_EVERY_TURNS):
+    delta_turns = count_learner_turns(delta)
+    if delta_turns < 1:
+        return {}
+    delta_size = message_chars(delta)
+    turns_due = delta_turns >= max(1, settings.ROLLING_SUMMARY_EVERY_TURNS)
+    chars_due = (
+        settings.ROLLING_SUMMARY_DELTA_TRIGGER_CHARS > 0
+        and delta_size >= settings.ROLLING_SUMMARY_DELTA_TRIGGER_CHARS
+    )
+    if not (turns_due or chars_due):
         return {}
 
     llm_client = configurable.get("llm_client")
@@ -1975,56 +2024,18 @@ async def compact_history(
 
     scenario = cast(Scenario, configurable.get("scenario")) if configurable else None
     prompt_data = getattr(scenario, "prompt_data", None) if scenario else None
-    previous_summary = store.summary
-    total_count = len(messages)
 
-    async def _compact_in_background() -> None:
-        _compact_start = datetime.now(timezone.utc)
-        try:
-            summary = await asyncio.wait_for(
-                update_rolling_summary(
-                    previous_summary=previous_summary,
-                    new_messages=delta,
-                    llm_client=llm_client,
-                    prompt_data=prompt_data,
-                ),
-                timeout=settings.ROLLING_SUMMARY_TIMEOUT,
-            )
-        except asyncio.TimeoutError:
-            logger.warning(
-                "[ROLLING_SUMMARY] compaction timed out after %ss; keeping "
-                "previous summary (covers %d/%d messages)",
-                settings.ROLLING_SUMMARY_TIMEOUT,
-                already_covered,
-                total_count,
-            )
-            return
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            logger.exception(
-                "[ROLLING_SUMMARY] compaction failed; keeping previous summary"
-            )
-            return
-        if not summary:
-            return
-        store.summary = summary
-        store.covered_count = boundary
-        store.total_count = total_count
-        _compact_ms = int(
-            (datetime.now(timezone.utc) - _compact_start).total_seconds() * 1000
-        )
-        logger.info(
-            "[ROLLING_SUMMARY] compacted messages %d..%d (total %d); "
-            "summary_chars=%d duration_ms=%d (off-turn)",
-            already_covered,
-            boundary,
-            total_count,
-            len(summary),
-            _compact_ms,
-        )
-
-    store._task = asyncio.create_task(_compact_in_background())
+    schedule_compaction(
+        store,
+        previous_summary=store.summary,
+        delta=delta,
+        boundary=boundary,
+        total_count=len(messages),
+        llm_client=llm_client,
+        prompt_data=prompt_data,
+        timeout=settings.ROLLING_SUMMARY_TIMEOUT,
+        reason="chars" if (chars_due and not turns_due) else "cadence",
+    )
     return {}
 
 

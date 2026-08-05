@@ -632,6 +632,49 @@ class Settings(BaseSettings):
             "the previous summary is kept and compaction retries next turn."
         ),
     )
+    ROLLING_SUMMARY_TAIL_MAX_CHARS: int = Field(
+        default=4000,
+        description=(
+            "Character budget for the verbatim tail. Turns are not equal-sized "
+            "(a Malayalam monologue can be 10x a one-word reply), so when the "
+            "last ROLLING_SUMMARY_TAIL_DIALOGUES learner turns exceed this "
+            "budget the tail shrinks to fewer turns (never below 2) to keep "
+            "the prompt size flat across languages/verbosity. <=0 disables "
+            "the char bound (pure turn-count tail)."
+        ),
+    )
+    ROLLING_SUMMARY_DELTA_TRIGGER_CHARS: int = Field(
+        default=3000,
+        description=(
+            "Compact as soon as the un-summarized text beyond the tail reaches "
+            "this many characters, even if fewer than "
+            "ROLLING_SUMMARY_EVERY_TURNS learner turns have accumulated — "
+            "catches verbose turns early. <=0 disables the char trigger "
+            "(pure turn-count cadence)."
+        ),
+    )
+    ROLLING_SUMMARY_EMERGENCY_WINDOW_CHARS: int = Field(
+        default=9000,
+        description=(
+            "Hard ceiling on the verbatim window when a summary is active. "
+            "The summary normally SUPERSEDES history trim (nothing is dropped "
+            "uncovered), but if compaction stalls (summarizer outage/timeouts) "
+            "the boundary stops advancing and the window would grow without "
+            "bound. Past this ceiling an emergency mechanical trim applies "
+            "(loudly logged, turns dropped WITHOUT summary coverage) — "
+            "bounded, observable degradation instead of quiet latency growth. "
+            "<=0 disables the safety bound."
+        ),
+    )
+    ROLLING_SUMMARY_COMPACT_ON_PAUSE: bool = Field(
+        default=True,
+        description=(
+            "Opportunistically compact when the learner pauses the session — "
+            "free time, nobody is waiting on a reply. Purely ADDITIVE: the "
+            "per-turn cadence compaction remains the primary mechanism and "
+            "runs regardless of whether the learner ever pauses."
+        ),
+    )
     ROLLING_SUMMARY_MAX_CHARS: int = Field(
         default=2500,
         description=(

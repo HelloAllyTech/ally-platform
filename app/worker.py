@@ -996,6 +996,22 @@ class AgentWorker:
         await self._publish_control({"type": CTRL_PAUSED})
         await send_session_paused_message(self.ctx.room.name, _now_ms())
 
+        # Opportunistic episodic-memory compaction: the pause is free time
+        # (no turn in flight, nobody waiting on a reply), so fold everything
+        # beyond the verbatim tail into the rolling summary now. ADDITIVE to
+        # the per-turn cadence compaction — never a replacement for it.
+        try:
+            from app.core.graph.rolling_summary import maybe_compact_on_pause
+
+            maybe_compact_on_pause(
+                thread_id=self.ctx.room.name,
+                store=getattr(self, "rolling_summary_store", None),
+                llm_client=getattr(self, "llm_client", None),
+                prompt_data=getattr(self.scenario, "prompt_data", None),
+            )
+        except Exception:  # noqa: BLE001 - memory must never break a pause
+            logger.exception("[PAUSE] pause-compaction scheduling failed")
+
     async def resume(self) -> None:
         """Serialized entry point — see _resume_impl."""
         async with self._control_lock:

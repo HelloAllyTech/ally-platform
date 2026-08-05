@@ -77,6 +77,33 @@ class TestSummaryBoundary:
         assert count_learner_turns(_conversation(5)) == 5
         assert count_learner_turns([AIMessage(content="x")]) == 0
 
+    def test_char_budget_shrinks_oversized_tail(self):
+        # 10 learner turns of ~100 chars each (plus replies) — a 6-turn tail
+        # is ~1200 chars. With a 500-char budget the tail shrinks to fewer
+        # turns, moving the boundary later (more messages summarizable).
+        messages = []
+        for i in range(10):
+            messages.append(HumanMessage(content="x" * 100))
+            messages.append(AIMessage(content="y" * 100))
+        unbounded = summary_boundary_index(messages, tail_dialogues=6)
+        bounded = summary_boundary_index(messages, tail_dialogues=6, tail_max_chars=500)
+        assert bounded > unbounded
+
+    def test_char_budget_never_shrinks_below_min_tail(self):
+        # Two giant learner turns at the end — tail can shrink to 2 turns
+        # but never below, regardless of budget.
+        messages = _conversation(8)
+        for i in range(4):
+            messages.append(HumanMessage(content="z" * 5000))
+            messages.append(AIMessage(content="w" * 5000))
+        boundary = summary_boundary_index(
+            messages, tail_dialogues=6, tail_max_chars=100
+        )
+        human_indices = [
+            i for i, m in enumerate(messages) if isinstance(m, HumanMessage)
+        ]
+        assert boundary == human_indices[-2]
+
 
 class TestUpdateRollingSummary:
     @pytest.mark.asyncio
@@ -216,6 +243,36 @@ class TestCompactHistoryNode:
         assert store.summary == "new summary"
         assert store.covered_count == 12
         assert store.total_count == 24
+
+    @pytest.mark.asyncio
+    async def test_char_trigger_fires_below_turn_cadence(self):
+        # Only 2 learner turns beyond the boundary (below the 4-turn cadence),
+        # but they are huge — the char gate should trigger compaction.
+        messages = []
+        for i in range(8):
+            messages.append(HumanMessage(content="x" * 2000))
+            messages.append(AIMessage(content="y" * 2000))
+        store = RollingSummaryStore()
+        boundary = summary_boundary_index(messages, 6, 0)
+        store.covered_count = boundary - 4  # 2 learner turns pending
+        with (
+            patch.object(settings, "ROLLING_SUMMARY_ENABLED", True),
+            patch.object(settings, "ROLLING_SUMMARY_EVERY_TURNS", 4),
+            patch.object(settings, "ROLLING_SUMMARY_TAIL_DIALOGUES", 6),
+            patch.object(settings, "ROLLING_SUMMARY_TAIL_MAX_CHARS", 0),
+            patch.object(settings, "ROLLING_SUMMARY_DELTA_TRIGGER_CHARS", 3000),
+            patch(
+                "app.core.graph.rolling_summary.update_rolling_summary",
+                new=AsyncMock(return_value="char-triggered summary"),
+            ),
+        ):
+            result = await compact_history(
+                _state(messages), _config(llm_client=MagicMock(), store=store)
+            )
+            assert result == {}
+            assert store._task is not None
+            await store._task
+        assert store.summary == "char-triggered summary"
 
     @pytest.mark.asyncio
     async def test_background_failure_keeps_previous_store(self):

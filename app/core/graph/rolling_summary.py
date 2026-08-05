@@ -57,20 +57,46 @@ class RollingSummaryResponse(BaseModel):
     summary: str
 
 
-def summary_boundary_index(messages: List[BaseMessage], tail_dialogues: int) -> int:
+def message_chars(messages: List[BaseMessage]) -> int:
+    """Total content characters in the slice (cheap token proxy)."""
+    return sum(len(str(getattr(m, "content", "") or "")) for m in messages)
+
+
+# The tail never shrinks below this many learner turns, no matter how large
+# they are — conversational coherence needs a minimum verbatim exchange.
+_MIN_TAIL_DIALOGUES = 2
+
+
+def summary_boundary_index(
+    messages: List[BaseMessage],
+    tail_dialogues: int,
+    tail_max_chars: int = 0,
+) -> int:
     """Index up to which messages may be folded into the rolling summary.
 
     The last ``tail_dialogues`` learner turns (and everything after the
     earliest kept turn) stay verbatim — same anchoring rule as
     ``_trim_history_to_last_dialogues``. Returns 0 (nothing summarizable)
     while the conversation is shorter than the tail.
+
+    ``tail_max_chars`` adds a size bound: turns are not equal-sized, so when
+    the turn-counted tail exceeds the char budget it shrinks to fewer learner
+    turns (never below ``_MIN_TAIL_DIALOGUES``), keeping the verbatim window
+    flat across languages/verbosity.
     """
     if tail_dialogues <= 0:
         return len(messages)
     human_indices = [i for i, m in enumerate(messages) if isinstance(m, HumanMessage)]
     if len(human_indices) <= tail_dialogues:
         return 0
-    return human_indices[-tail_dialogues]
+    keep = tail_dialogues
+    if tail_max_chars > 0:
+        while (
+            keep > _MIN_TAIL_DIALOGUES
+            and message_chars(messages[human_indices[-keep] :]) > tail_max_chars
+        ):
+            keep -= 1
+    return human_indices[-keep]
 
 
 def count_learner_turns(messages: List[BaseMessage]) -> int:
@@ -134,3 +160,143 @@ async def update_rolling_summary(
     )
     summary = (response.summary or "").strip()
     return summary or previous_summary
+
+
+def schedule_compaction(
+    store: RollingSummaryStore,
+    *,
+    previous_summary: Optional[str],
+    delta: List[BaseMessage],
+    boundary: int,
+    total_count: int,
+    llm_client: BaseLLMClient,
+    prompt_data=None,
+    timeout: float,
+    reason: str = "cadence",
+) -> bool:
+    """Fire the summarizer as a DETACHED task writing into ``store``.
+
+    Shared by the per-turn compact_history node (reason="cadence", the
+    primary mechanism) and the opportunistic pause hook (reason="pause").
+    Returns False without scheduling when a compaction is already in flight.
+    On any failure the previous summary is kept — compaction simply retries
+    on a later trigger.
+    """
+    if store.in_flight:
+        logger.debug("[ROLLING_SUMMARY] compaction already in flight; skipping")
+        return False
+
+    already_covered = max(0, store.covered_count)
+
+    async def _compact_in_background() -> None:
+        from datetime import datetime, timezone
+
+        _start = datetime.now(timezone.utc)
+        try:
+            summary = await asyncio.wait_for(
+                update_rolling_summary(
+                    previous_summary=previous_summary,
+                    new_messages=delta,
+                    llm_client=llm_client,
+                    prompt_data=prompt_data,
+                ),
+                timeout=timeout,
+            )
+        except asyncio.TimeoutError:
+            logger.warning(
+                "[ROLLING_SUMMARY] compaction timed out after %ss; keeping "
+                "previous summary (covers %d/%d messages)",
+                timeout,
+                already_covered,
+                total_count,
+            )
+            return
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception(
+                "[ROLLING_SUMMARY] compaction failed; keeping previous summary"
+            )
+            return
+        if not summary:
+            return
+        store.summary = summary
+        store.covered_count = boundary
+        store.total_count = total_count
+        _ms = int((datetime.now(timezone.utc) - _start).total_seconds() * 1000)
+        logger.info(
+            "[ROLLING_SUMMARY] compacted messages %d..%d (total %d); "
+            "summary_chars=%d duration_ms=%d reason=%s (off-turn)",
+            already_covered,
+            boundary,
+            total_count,
+            len(summary),
+            _ms,
+            reason,
+        )
+
+    store._task = asyncio.create_task(_compact_in_background())
+    return True
+
+
+def maybe_compact_on_pause(
+    thread_id: str,
+    store: Optional[RollingSummaryStore],
+    llm_client: Optional[BaseLLMClient],
+    prompt_data=None,
+) -> bool:
+    """Opportunistic compaction when the learner pauses — free time, nobody
+    is waiting on a reply, so no cadence gate: anything beyond the tail is
+    folded. Purely ADDITIVE to the per-turn cadence compaction (the primary
+    mechanism, which never depends on the learner pausing). Best-effort: any
+    failure just means the cadence path catches up on the next turn.
+    """
+    from app.core.config import settings
+
+    if not (
+        settings.ROLLING_SUMMARY_ENABLED and settings.ROLLING_SUMMARY_COMPACT_ON_PAUSE
+    ):
+        return False
+    if store is None or llm_client is None or store.in_flight:
+        return False
+
+    try:
+        from app.core.graph import agent_graph
+
+        state = agent_graph.get_state({"configurable": {"thread_id": thread_id}})
+        values = state.values if state and state.values else {}
+        messages = values.get("messages") or []
+    except Exception:
+        logger.debug("[ROLLING_SUMMARY] pause compaction: graph state unreadable")
+        return False
+
+    boundary = summary_boundary_index(
+        messages,
+        settings.ROLLING_SUMMARY_TAIL_DIALOGUES,
+        settings.ROLLING_SUMMARY_TAIL_MAX_CHARS,
+    )
+    covered = max(0, store.covered_count)
+    if boundary <= covered:
+        return False
+    delta = messages[covered:boundary]
+    if count_learner_turns(delta) < 1:
+        return False
+    scheduled = schedule_compaction(
+        store,
+        previous_summary=store.summary,
+        delta=delta,
+        boundary=boundary,
+        total_count=len(messages),
+        llm_client=llm_client,
+        prompt_data=prompt_data,
+        timeout=settings.ROLLING_SUMMARY_TIMEOUT,
+        reason="pause",
+    )
+    if scheduled:
+        logger.info(
+            "[ROLLING_SUMMARY] pause compaction scheduled (%d..%d of %d messages)",
+            covered,
+            boundary,
+            len(messages),
+        )
+    return scheduled
