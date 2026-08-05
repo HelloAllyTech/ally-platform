@@ -23,6 +23,7 @@ from app.core.graph.instrumentation import (
 from app.core.graph.knowledge_retrieval import (
     build_knowledge_map,
     retrieve_relevant_knowledge,
+    selected_glossary_sections,
 )
 from app.core.graph.prompt import (
     _get_selected_prompt_has_states as _selected_prompt_has_states_for_retrieval,
@@ -1791,6 +1792,20 @@ async def retrieve_knowledge(
         )
     else:
         logger.debug("[RAG] retrieve_knowledge: completed — no matches")
+
+    # Per-turn glossary selection analytics: which Tier 1 sections the
+    # selector actually pulled (section codes). Rides turn_metrics.metadata
+    # → scenario_session_turn_metrics, giving per-section hit rate without
+    # log archaeology. Only stamped when the session has glossary sections.
+    if glossary_sections:
+        turn_metrics.record(
+            get_room_id(),
+            metadata={
+                "glossary_selected": selected_glossary_sections(
+                    retrieved_context, glossary_sections
+                ),
+            },
+        )
     return {"retrieved_context": retrieved_context or None}
 
 

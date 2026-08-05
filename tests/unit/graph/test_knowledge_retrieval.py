@@ -325,3 +325,57 @@ class TestGlossaryDualFramingSelector:
             glossary_hints={self.GLOSSARY_TITLE: self.HINT},
         )
         assert "content-b" in hit
+
+
+class TestSelectedGlossarySections:
+    """selected_glossary_sections: per-turn Tier 1 selection for analytics."""
+
+    SECTIONS = [
+        {
+            "title": "[Malayalam (India) glossary] Emotions & Feelings",
+            "content": "## Emotions & Feelings\n- sad: ...",
+            "sectionCode": "emotions",
+        },
+        {
+            "title": "[Malayalam (India) glossary] Clinical & Health Terms",
+            "content": "## Clinical & Health Terms\n- doctor: ...",
+            "sectionCode": "clinical_terms",
+        },
+    ]
+
+    def test_matches_formatted_context_framing(self):
+        from app.core.graph.knowledge_retrieval import selected_glossary_sections
+
+        context = (
+            "**[Malayalam (India) glossary] Emotions & Feelings:**\n"
+            "## Emotions & Feelings\n- sad: ..."
+        )
+        assert selected_glossary_sections(context, self.SECTIONS) == ["emotions"]
+
+    def test_falls_back_to_title_without_section_code(self):
+        from app.core.graph.knowledge_retrieval import selected_glossary_sections
+
+        sections = [{"title": "[X glossary] Emotions", "content": "c"}]
+        context = "**[X glossary] Emotions:**\nc"
+        assert selected_glossary_sections(context, sections) == [
+            "[X glossary] Emotions"
+        ]
+
+    def test_empty_context_or_bad_sections(self):
+        from app.core.graph.knowledge_retrieval import selected_glossary_sections
+
+        assert selected_glossary_sections(None, self.SECTIONS) == []
+        assert selected_glossary_sections("", self.SECTIONS) == []
+        assert selected_glossary_sections("**anything:**", None) == []
+        assert selected_glossary_sections("**anything:**", ["not-a-dict"]) == []
+
+    def test_unselected_sections_are_excluded(self):
+        from app.core.graph.knowledge_retrieval import selected_glossary_sections
+
+        context = (
+            "**[Malayalam (India) glossary] Clinical & Health Terms:**\n"
+            "## Clinical & Health Terms\n- doctor: ..."
+        )
+        assert selected_glossary_sections(context, self.SECTIONS) == [
+            "clinical_terms"
+        ]

@@ -103,3 +103,27 @@ def test_discard_inflight_drops_turn_but_keeps_counter():
     assert rec["turn_index"] == 1  # not reset to 0
     assert rec["response_latency_ms"] == 5000  # no pause inflation
     assert "llm_response_ms" not in rec  # discarded turn's components gone
+
+
+def test_metadata_merges_across_call_sites():
+    # retrieval and generation both write metadata; neither may erase the other
+    tm.note_user_speech_end("room-1", 100.0)
+    tm.record("room-1", metadata={"glossary_selected": ["emotions"]})
+    tm.record("room-1", metadata={"llm_provider": "openai"})
+    rec = tm.finalize("room-1", 101.0)
+
+    assert rec is not None
+    assert rec["metadata"] == {
+        "glossary_selected": ["emotions"],
+        "llm_provider": "openai",
+    }
+
+
+def test_metadata_same_key_last_writer_wins():
+    tm.note_user_speech_end("room-1", 100.0)
+    tm.record("room-1", metadata={"a": 1})
+    tm.record("room-1", metadata={"a": 2})
+    rec = tm.finalize("room-1", 101.0)
+
+    assert rec is not None
+    assert rec["metadata"] == {"a": 2}

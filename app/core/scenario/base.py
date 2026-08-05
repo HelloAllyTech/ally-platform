@@ -192,6 +192,16 @@ class PromptData(BaseModel):
             "discussion-topic relevance)."
         ),
     )
+    glossary_meta: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description=(
+            "Glossary provenance stamped by ally-be at session start: "
+            "{'versions': {sectionCode: version}, 'tier0Tokens': int} over "
+            "the published sections (both tiers) this session was served. "
+            "Echoed into start_metrics metadata so judged outcomes can be "
+            "grouped by the exact glossary a session ran with."
+        ),
+    )
     knowledge_sources: Optional[List[Dict[str, str]]] = Field(
         default=None,
         description=(
@@ -685,6 +695,8 @@ class Scenario(BaseModel):
                 or prompt_data_dict.get("language_glossary"),
                 "glossary_sections": prompt_data_dict.get("glossarySections")
                 or prompt_data_dict.get("glossary_sections"),
+                "glossary_meta": prompt_data_dict.get("glossaryMeta")
+                or prompt_data_dict.get("glossary_meta"),
                 "knowledge_sources": prompt_data_dict.get("knowledgeSources"),
                 "filler_enabled": bool(prompt_data_dict.get("fillerEnabled") or False),
                 "comfort_audio_enabled": bool(

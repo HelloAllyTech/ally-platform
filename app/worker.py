@@ -2327,6 +2327,26 @@ class AgentWorker:
                 None,
             )
 
+            # Glossary provenance (LANGUAGE_GLOSSARY_DESIGN.md §10): what this
+            # session actually RECEIVED — delivery confirmation the server-side
+            # stamp can't give. Joins judged outcomes to the exact glossary
+            # (section versions) a session ran with.
+            prompt_data = getattr(self.scenario, "prompt_data", None)
+            tier0 = getattr(prompt_data, "language_glossary", None)
+            tier1 = getattr(prompt_data, "glossary_sections", None)
+            glossary_meta = getattr(prompt_data, "glossary_meta", None)
+            glossary = None
+            if tier0 or tier1 or glossary_meta:
+                glossary = {
+                    "tier0_chars": len(tier0) if isinstance(tier0, str) else 0,
+                    "tier1_sections": len(tier1) if isinstance(tier1, list) else 0,
+                }
+                if isinstance(glossary_meta, dict):
+                    if isinstance(glossary_meta.get("versions"), dict):
+                        glossary["versions"] = glossary_meta["versions"]
+                    if glossary_meta.get("tier0Tokens") is not None:
+                        glossary["tier0_tokens"] = glossary_meta["tier0Tokens"]
+
             data = StartMetricsData(
                 start_latency_ms=total,
                 configure_ms=configure,
@@ -2336,6 +2356,7 @@ class AgentWorker:
                 opening_playout_ms=_ms("opening_ms"),
                 language=language,
                 env=settings.ENV.value,
+                metadata={"glossary": glossary} if glossary else None,
             )
             message = CoreEventMessageType.create_start_metrics(
                 self.ctx.room.name, data

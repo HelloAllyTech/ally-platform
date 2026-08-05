@@ -1980,6 +1980,55 @@ class TestEmitStartMetrics:
         emit.assert_not_awaited()
 
     @pytest.mark.asyncio
+    async def test_glossary_provenance_rides_metadata(self, monkeypatch):
+        import json
+
+        emit = AsyncMock()
+        monkeypatch.setattr(event_handler, "send_event_to_queue", emit)
+
+        w = self._worker()
+        w.scenario = types.SimpleNamespace(
+            language_config=types.SimpleNamespace(language_code="ml-IN"),
+            prompt_data=types.SimpleNamespace(
+                language_glossary="## Core style\n- speak colloquially",
+                glossary_sections=[{"title": "a"}, {"title": "b"}, {"title": "c"}],
+                glossary_meta={
+                    "versions": {"core_style": 4, "clinical_terms": 2},
+                    "tier0Tokens": 381,
+                },
+            ),
+        )
+        w._timing = {"configure_ms": 10.0, "connect_ms": 20.0}
+
+        w._emit_start_metrics()
+        await asyncio.sleep(0)
+
+        payload = json.loads(emit.await_args.args[0])
+        glossary = payload["data"]["start_metrics"]["metadata"]["glossary"]
+        assert glossary["tier0_chars"] == len("## Core style\n- speak colloquially")
+        assert glossary["tier1_sections"] == 3
+        assert glossary["versions"] == {"core_style": 4, "clinical_terms": 2}
+        assert glossary["tier0_tokens"] == 381
+
+    @pytest.mark.asyncio
+    async def test_no_glossary_metadata_for_sessions_without_glossary(
+        self, monkeypatch
+    ):
+        import json
+
+        emit = AsyncMock()
+        monkeypatch.setattr(event_handler, "send_event_to_queue", emit)
+
+        w = self._worker()  # scenario has no prompt_data at all
+        w._timing = {"configure_ms": 10.0, "connect_ms": 20.0}
+
+        w._emit_start_metrics()
+        await asyncio.sleep(0)
+
+        payload = json.loads(emit.await_args.args[0])
+        assert payload["data"]["start_metrics"]["metadata"] is None
+
+    @pytest.mark.asyncio
     async def test_never_raises_on_emit_failure(self, monkeypatch):
         def _boom(*a, **k):
             raise RuntimeError("queue down")

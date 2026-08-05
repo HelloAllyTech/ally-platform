@@ -96,6 +96,13 @@ def record(room_id: str, **fields: Any) -> None:
     for key, value in fields.items():
         if value is None or key not in _RECORD_FIELDS:
             continue
+        # ``metadata`` is a grab-bag dict written by independent call sites
+        # (retrieval, generation, …) — merge instead of last-writer-wins so
+        # one site's keys can't silently erase another's.
+        if key == "metadata" and isinstance(value, dict):
+            existing = turn.get("metadata")
+            turn["metadata"] = {**existing, **value} if isinstance(existing, dict) else dict(value)
+            continue
         turn[key] = value
 
 

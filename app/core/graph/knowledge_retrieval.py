@@ -1,7 +1,7 @@
 import hashlib
 import json
 from collections import OrderedDict
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
@@ -57,6 +57,31 @@ def build_knowledge_map(
             knowledge_map[title] = content
 
     return knowledge_map
+
+
+def selected_glossary_sections(
+    retrieved_context: Optional[str],
+    glossary_sections: Any,
+) -> List[str]:
+    """Which Tier 1 glossary sections landed in this turn's retrieved context.
+
+    Matches the exact ``**{title}:**`` framing `_format_retrieved_context`
+    emits, so it also works on LRU-cache hits (the cache stores the formatted
+    string). Returns the stable ``sectionCode`` when ally-be shipped it,
+    falling back to the prefixed title. Feeds turn-metrics analytics
+    (per-section hit rate — a published section that's never selected is dead
+    weight or has a bad retrievalHint).
+    """
+    if not retrieved_context or not isinstance(glossary_sections, list):
+        return []
+    selected: List[str] = []
+    for entry in glossary_sections:
+        if not isinstance(entry, dict):
+            continue
+        title = entry.get("title", "")
+        if title and f"**{title}:**" in retrieved_context:
+            selected.append(entry.get("sectionCode") or title)
+    return selected
 
 
 def _format_retrieved_context(
