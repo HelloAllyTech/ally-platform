@@ -762,6 +762,29 @@ class Settings(BaseSettings):
             "memory per worker process."
         ),
     )
+    KNOWLEDGE_RETRIEVAL_REFRESH_ENABLED: bool = Field(
+        default=True,
+        description=(
+            "Global kill-switch for knowledge-retrieval refresh-cadence "
+            "caching. The exact-content-hash cache above rarely hits during "
+            "live conversation (conversation content is novel every turn), "
+            "so the RAG title-selection LLM call otherwise runs on the "
+            "critical path almost every turn. When True, that call only "
+            "runs every KNOWLEDGE_RETRIEVAL_REFRESH_TURNS turns, reusing the "
+            "previous turn's retrieved_context in between — bounded "
+            "staleness (retrieved knowledge can lag the live topic by up to "
+            "that many turns) in exchange for skipping the call on most "
+            "turns. When False, retrieval runs every turn as before."
+        ),
+    )
+    KNOWLEDGE_RETRIEVAL_REFRESH_TURNS: int = Field(
+        default=2,
+        description=(
+            "How many turns to reuse the previous retrieved_context before "
+            "recomputing knowledge retrieval. <=0 disables the cadence "
+            "(falls back to running every turn, same as REFRESH_ENABLED=False)."
+        ),
+    )
 
     # Scenario report generation settings
     REPORT_CONCURRENCY_LIMIT: int = Field(

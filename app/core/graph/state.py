@@ -233,6 +233,15 @@ def replace_feedback_to_send(
     return right
 
 
+def replace_turns_until_knowledge_refresh(_: int, right: int) -> int:
+    """
+    Reducer to replace turns_until_knowledge_refresh.
+
+    Always replaces with the new value (right).
+    """
+    return right
+
+
 class SimulationState(BaseModel):
     """
     State model for the LangGraph simulation workflow.
@@ -272,4 +281,10 @@ class SimulationState(BaseModel):
     ] = []  # Behavior detection results (from detect_behaviors node)
     retrieved_context: Annotated[Optional[str], replace_retrieved_context] = (
         None  # Retrieved knowledge context for prompt enrichment
+    )
+    turns_until_knowledge_refresh: Annotated[
+        int, replace_turns_until_knowledge_refresh
+    ] = (
+        0  # Countdown of turns to reuse retrieved_context before recomputing.
+        # 0 (default) forces a fresh computation on the first eligible turn.
     )

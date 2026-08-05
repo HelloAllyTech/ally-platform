@@ -1754,6 +1754,33 @@ async def retrieve_knowledge(
             active_state.get("ragEnabled") if active_state else None,
         )
 
+    # Refresh-cadence cache: the exact-content-hash cache inside
+    # retrieve_relevant_knowledge rarely hits during live conversation
+    # (content is novel every turn), so without this the title-selection
+    # LLM call runs on the critical path almost every turn. Instead, only
+    # recompute every KNOWLEDGE_RETRIEVAL_REFRESH_TURNS turns and reuse the
+    # previous retrieved_context in between — bounded staleness (retrieved
+    # knowledge can lag the live topic by up to that many turns) in exchange
+    # for skipping the call on most turns.
+    if (
+        settings.KNOWLEDGE_RETRIEVAL_REFRESH_ENABLED
+        and settings.KNOWLEDGE_RETRIEVAL_REFRESH_TURNS > 0
+        and state.turns_until_knowledge_refresh > 0
+    ):
+        logger.debug(
+            "[RAG_REFRESH] retrieve_knowledge: reusing cached context "
+            "(%d turn(s) until refresh)",
+            state.turns_until_knowledge_refresh,
+        )
+        # Cheap hit/skip signal for dashboards — merges into the same
+        # metadata jsonb the glossary analytics below already use, no
+        # migration needed.
+        turn_metrics.record(get_room_id(), metadata={"knowledgeRetrievalReused": True})
+        return {
+            "retrieved_context": state.retrieved_context,
+            "turns_until_knowledge_refresh": state.turns_until_knowledge_refresh - 1,
+        }
+
     knowledge_summary = ", ".join(
         [f"{k}: {v[:20]}..." for k, v in knowledge_map.items()]
     )
@@ -1797,6 +1824,7 @@ async def retrieve_knowledge(
     # selector actually pulled (section codes). Rides turn_metrics.metadata
     # → scenario_session_turn_metrics, giving per-section hit rate without
     # log archaeology. Only stamped when the session has glossary sections.
+    turn_metrics.record(get_room_id(), metadata={"knowledgeRetrievalReused": False})
     if glossary_sections:
         turn_metrics.record(
             get_room_id(),
@@ -1806,7 +1834,15 @@ async def retrieve_knowledge(
                 ),
             },
         )
-    return {"retrieved_context": retrieved_context or None}
+    next_refresh_countdown = (
+        max(settings.KNOWLEDGE_RETRIEVAL_REFRESH_TURNS - 1, 0)
+        if settings.KNOWLEDGE_RETRIEVAL_REFRESH_ENABLED
+        else 0
+    )
+    return {
+        "retrieved_context": retrieved_context or None,
+        "turns_until_knowledge_refresh": next_refresh_countdown,
+    }
 
 
 @instrumented_node("sync_events_and_behaviors_node")
