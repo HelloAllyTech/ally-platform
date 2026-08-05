@@ -715,6 +715,26 @@ class Scenario(BaseModel):
             }
 
             prompt_data_obj = PromptData(**mapped_data)
+            # Session-start glossary visibility (LANGUAGE_GLOSSARY_DESIGN.md §10):
+            # one line per session proving whether the Tier 0 card / Tier 1
+            # sections arrived, and flagging the gap when a non-English session
+            # has neither. Logs can't show the system prompt, so this is the
+            # ground truth for "did the glossary reach the agent".
+            tier0 = mapped_data.get("language_glossary")
+            tier1 = mapped_data.get("glossary_sections")
+            label = mapped_data.get("language_label")
+            if tier0 or tier1:
+                logger.info(
+                    "[GLOSSARY] prompt data language=%s tier0_chars=%d tier1_sections=%d",
+                    label,
+                    len(tier0) if isinstance(tier0, str) else 0,
+                    len(tier1) if isinstance(tier1, list) else 0,
+                )
+            elif label and not str(label).startswith("English"):
+                logger.info(
+                    "[GLOSSARY] prompt data language=%s has no glossary (nothing published?)",
+                    label,
+                )
             return prompt_data_obj
         except Exception as e:
             logger.error(f"Error instantiating PromptData from mapped data: {e}")
