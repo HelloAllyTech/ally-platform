@@ -323,6 +323,10 @@ def create_connection_state_handler(
     set_final_score_sent: Callable[[bool], None],
     background_tasks: Set[asyncio.Task],
     score_keeper=None,
+    llm_client=None,
+    language_code=None,
+    prompt_data=None,
+    rolling_summary_store=None,
 ) -> Callable[[rtc.ConnectionState], None]:
     """
     Create a connection state change handler.
@@ -334,6 +338,8 @@ def create_connection_state_handler(
         set_final_score_sent: Callable to set final_score_sent flag
         background_tasks: Set to track background tasks
         score_keeper: Optional ScoreKeeper instance for behavior scores
+        llm_client / language_code / prompt_data: forwarded to
+            finalize_session for the session-memory emission (all optional)
 
     Returns:
         Connection state handler function
@@ -368,6 +374,10 @@ def create_connection_state_handler(
                         thread_id=room_name,
                         event_orchestrator=event_orchestrator,
                         score_keeper=score_keeper,
+                        llm_client=llm_client,
+                        language_code=language_code,
+                        prompt_data=prompt_data,
+                        rolling_summary_store=rolling_summary_store,
                     )
                 )
                 background_tasks.add(task)
@@ -432,6 +442,10 @@ def create_shutdown_handler(
     set_final_score_sent: Callable[[bool], None],
     cleanup_background_tasks: Callable[[], None],
     score_keeper=None,
+    llm_client=None,
+    language_code=None,
+    prompt_data=None,
+    rolling_summary_store=None,
 ) -> Callable[[], None]:
     """
     Create a shutdown callback handler.
@@ -443,6 +457,8 @@ def create_shutdown_handler(
         set_final_score_sent: Callable to set final_score_sent flag
         cleanup_background_tasks: Async function to cleanup background tasks
         score_keeper: Optional ScoreKeeper instance for behavior scores
+        llm_client / language_code / prompt_data: forwarded to
+            finalize_session for the session-memory emission (all optional)
 
     Returns:
         Async shutdown handler function
@@ -507,6 +523,10 @@ def create_shutdown_handler(
                     thread_id=room_name,
                     event_orchestrator=event_orchestrator,
                     score_keeper=score_keeper,
+                    llm_client=llm_client,
+                    language_code=language_code,
+                    prompt_data=prompt_data,
+                    rolling_summary_store=rolling_summary_store,
                 )
                 set_final_score_sent(True)
                 logger.info("Session finalized successfully")

@@ -5,6 +5,7 @@ from langgraph.graph.state import CompiledStateGraph
 from app.core.config import settings
 from app.core.graph.nodes import (
     clear_events_and_detected_data,
+    compact_history,
     detect_behaviors,
     generate_response,
     process_deferred_events,
@@ -68,6 +69,24 @@ def build_retrieve_knowledge_subgraph() -> CompiledStateGraph[SimulationState]:
     subgraph.add_node("retrieve_knowledge", retrieve_knowledge)
     subgraph.add_edge(START, "retrieve_knowledge")
     subgraph.add_edge("retrieve_knowledge", END)
+    return subgraph.compile()
+
+
+def build_compact_history_subgraph() -> CompiledStateGraph[SimulationState]:
+    """
+    Build a subgraph for the rolling-summary compactor.
+
+    compact_history makes an LLM call (the summarizer), so it needs the same
+    subgraph isolation as resolve_branching_instruction / retrieve_knowledge —
+    otherwise its output would stream to TTS (LiveKit issue #2836).
+
+    Returns:
+        Compiled subgraph that updates the rolling conversation summary
+    """
+    subgraph = StateGraph(SimulationState)
+    subgraph.add_node("compact_history", compact_history)
+    subgraph.add_edge(START, "compact_history")
+    subgraph.add_edge("compact_history", END)
     return subgraph.compile()
 
 
@@ -182,7 +201,20 @@ def build_simulation_graph() -> StateGraph[SimulationState]:
     graph.add_edge("resolve_branching_instruction", "send_event_feedback")
 
     graph.add_edge("generate_response", "publish_done_thinking")
-    graph.add_edge("publish_done_thinking", END)
+
+    if settings.ROLLING_SUMMARY_ENABLED:
+        # Rolling-summary compactor: strictly AFTER publish_done_thinking (the
+        # reply has fully streamed; the done_thinking signal is already out),
+        # so its summarizer LLM call never adds latency to the spoken reply.
+        # It extends the graph run by one bounded call every
+        # ROLLING_SUMMARY_EVERY_TURNS turns. Subgraph-wrapped so its LLM
+        # output never streams to TTS.
+        compact_history_subgraph = build_compact_history_subgraph()
+        graph.add_node("compact_history", compact_history_subgraph)
+        graph.add_edge("publish_done_thinking", "compact_history")
+        graph.add_edge("compact_history", END)
+    else:
+        graph.add_edge("publish_done_thinking", END)
     graph.add_edge("send_event_feedback", END)
 
     return graph

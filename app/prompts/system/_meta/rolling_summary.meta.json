@@ -1,0 +1,5 @@
+{
+    "name": "Rolling Summary System Prompt",
+    "kind": "prompt",
+    "description": "System prompt for the incremental rolling-summary (episodic memory) compactor: merges the newest conversation turns into the maintained session summary that is injected into the persona prompt and shipped to Core as session memory at session end."
+}

@@ -288,3 +288,8 @@ class SimulationState(BaseModel):
         0  # Countdown of turns to reuse retrieved_context before recomputing.
         # 0 (default) forces a fresh computation on the first eligible turn.
     )
+    # NOTE: the rolling summary (episodic memory) deliberately does NOT live in
+    # graph state — it is held in the worker-owned RollingSummaryStore (see
+    # app/core/graph/rolling_summary.py) and passed via config, so background
+    # compaction never touches checkpoints and the summary survives a cancelled
+    # final graph run.

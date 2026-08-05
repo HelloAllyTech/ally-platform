@@ -23,6 +23,7 @@ class CoreMessageType(str, Enum):
     TURN_METRICS = "turn_metrics"
     START_METRICS = "start_metrics"
     LLM_USAGE = "llm_usage"
+    SESSION_MEMORY = "session_memory"
 
 
 class LLMUsageData(BaseModel):
@@ -123,6 +124,25 @@ class StartMetricsData(BaseModel):
     language: Optional[str] = None
     env: Optional[str] = None
     metadata: Optional[dict] = None
+
+
+class SessionMemoryData(BaseModel):
+    """End-of-session episodic memory shipped to Core once per session.
+
+    ``summary`` is the final rolling conversation summary (see
+    ROLLING_SUMMARY_* in app/core/config.py) — Core persists it case-scoped so
+    the next session in the same case can carry real continuity in
+    ``previousMemory`` instead of a one-sentence stub. ``language`` is the
+    session's BCP-47 code (the summary is written in the conversation
+    language). ``message_count`` / ``summarized_message_count`` record
+    coverage: when they differ, the summary's final compaction was skipped or
+    timed out and the last turns are only in the transcript rows."""
+
+    summary: str
+    language: Optional[str] = None
+    message_count: int = 0
+    summarized_message_count: int = 0
+    env: Optional[str] = None
 
 
 class EventRegistryEntry(BaseModel):
@@ -235,6 +255,9 @@ class CoreEventMessageTypeData(BaseModel):
     llm_usage: Optional[LLMUsageData] = Field(
         default=None, description="Per-LLM-call token usage"
     )
+    session_memory: Optional[SessionMemoryData] = Field(
+        default=None, description="End-of-session episodic memory summary"
+    )
 
 
 class CoreEventMessageType(BaseModel):
@@ -326,6 +349,21 @@ class CoreEventMessageType(BaseModel):
         return cls(
             message_type=CoreMessageType.LLM_USAGE,
             data=CoreEventMessageTypeData(llm_usage=llm_usage),
+            room_id=room_id,
+            timestamp=int(time.time()),
+        )
+
+    @classmethod
+    def create_session_memory(
+        cls,
+        room_id: str,
+        session_memory: SessionMemoryData,
+    ) -> "CoreEventMessageType":
+        """Create the once-per-session episodic-memory message for Core. Wire
+        shape mirrors turn_metrics: data.session_memory = {...}."""
+        return cls(
+            message_type=CoreMessageType.SESSION_MEMORY,
+            data=CoreEventMessageTypeData(session_memory=session_memory),
             room_id=room_id,
             timestamp=int(time.time()),
         )

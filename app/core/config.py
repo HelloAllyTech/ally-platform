@@ -592,6 +592,54 @@ class Settings(BaseSettings):
         ),
     )
 
+    # ---- Rolling conversation summary (episodic memory) ----
+    # Maintains a compact "what has happened so far" summary of the conversation
+    # as LangGraph state, updated off the voice-to-voice critical path (after the
+    # reply has streamed). generate_response then sends [summary + verbatim tail]
+    # instead of the full history, and the summary is appended to the system
+    # prompt as the LAST block so the static persona prefix stays byte-stable for
+    # provider prompt caching. At session end the final summary is shipped to
+    # Core as a `session_memory` SQS message (case-level episodic memory).
+    ROLLING_SUMMARY_ENABLED: bool = Field(
+        default=False,
+        description=(
+            "Global switch for the rolling conversation summary (episodic "
+            "memory). When False, no compaction runs, prompts are unchanged and "
+            "no session_memory message is emitted."
+        ),
+    )
+    ROLLING_SUMMARY_EVERY_TURNS: int = Field(
+        default=4,
+        description=(
+            "Compact when at least this many learner turns have accumulated "
+            "beyond the already-summarized boundary (excluding the verbatim "
+            "tail). Higher = fewer summarizer LLM calls, staler summary."
+        ),
+    )
+    ROLLING_SUMMARY_TAIL_DIALOGUES: int = Field(
+        default=6,
+        description=(
+            "How many recent learner turns (and their replies) are always kept "
+            "verbatim and never folded into the rolling summary. The summary "
+            "covers everything OLDER than this tail."
+        ),
+    )
+    ROLLING_SUMMARY_TIMEOUT: float = Field(
+        default=8.0,
+        description=(
+            "Seconds to wait for one summarizer LLM call (both the per-turn "
+            "compaction and the final compaction at session end). On timeout "
+            "the previous summary is kept and compaction retries next turn."
+        ),
+    )
+    ROLLING_SUMMARY_MAX_CHARS: int = Field(
+        default=2500,
+        description=(
+            "Hard cap on the summary characters injected into the system "
+            "prompt (defensive bound against a runaway summarizer)."
+        ),
+    )
+
     LLM_TEMPERATURE: str = Field(...)
 
     GOOGLE_APPLICATION_CREDENTIALS: Optional[str] = Field(

@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional
 
 from langchain_core.messages import SystemMessage
 
+from app.core.config import settings
 from app.core.logger import get_logger
 from app.core.scenario.base import (
     PromptData,
@@ -645,6 +646,43 @@ def _ensure_language_glossary(
     return SystemMessage(content=combined.strip())
 
 
+# Framing for the rolling conversation summary (episodic memory). Appended as
+# the LAST block of the system message — after the static persona / glossary /
+# audio-tag content — so everything before it stays a byte-stable prefix for
+# provider prompt caching (the summary is the one part that changes as the
+# session progresses). The "private memory / stay consistent" sentence keeps
+# the persona from re-introducing facts it already disclosed once older turns
+# are dropped from the verbatim history.
+_ROLLING_SUMMARY_FRAMING = (
+    "## Conversation so far (your memory)\n"
+    "Private summary of the earlier part of THIS conversation. Older turns are "
+    "not repeated verbatim below — treat everything here as things that already "
+    "happened and stay consistent with them: never re-introduce yourself, never "
+    "repeat a disclosure as if new, and remember what the counsellor already "
+    "said or promised.\n\n"
+)
+
+
+def _append_rolling_summary(
+    message: SystemMessage, rolling_summary: Optional[str]
+) -> SystemMessage:
+    """Append the rolling summary as the final system-prompt block.
+
+    Same append-after-templating pattern as `_ensure_language_glossary`, so no
+    studio prompt ever needs editing. Deliberately applied LAST (after audio
+    tags): the summary is the only per-turn-changing block, and placing it at
+    the very end keeps the static prefix cache-stable.
+    """
+    summary = (rolling_summary or "").strip()
+    if not summary:
+        return message
+    max_chars = getattr(settings, "ROLLING_SUMMARY_MAX_CHARS", 0) or 0
+    if max_chars > 0 and len(summary) > max_chars:
+        summary = summary[:max_chars]
+    combined = f"{message.content}\n\n{_ROLLING_SUMMARY_FRAMING}{summary}"
+    return SystemMessage(content=combined.strip())
+
+
 def generate_system_message(
     prompt_data: PromptData,
     next_instruction: Optional[str] = None,
@@ -654,6 +692,7 @@ def generate_system_message(
     retrieved_context: Optional[str] = None,
     current_score: Optional[int] = None,
     audio_tag_instructions: Optional[str] = None,
+    rolling_summary: Optional[str] = None,
 ) -> SystemMessage:
     """
     Generates a SystemMessage prompt for an AI roleplay assistant
@@ -666,6 +705,9 @@ def generate_system_message(
     `audio_tag_instructions`, when provided (ElevenLabs v3 only), is appended
     so the persona emits voice audio tags inline as it generates — see
     `_append_audio_tag_guidance`.
+
+    `rolling_summary`, when provided (ROLLING_SUMMARY_ENABLED), is appended as
+    the final block — see `_append_rolling_summary` for why it must stay last.
     """
     if next_instruction:
         msg = _build_branching_prompt(
@@ -677,7 +719,8 @@ def generate_system_message(
             language_code or "None",
         )
         msg = _ensure_language_glossary(msg, prompt_data)
-        return _append_audio_tag_guidance(msg, audio_tag_instructions)
+        msg = _append_audio_tag_guidance(msg, audio_tag_instructions)
+        return _append_rolling_summary(msg, rolling_summary)
 
     if behavior_instructions is not None:
         if not behavior_instructions:
@@ -698,7 +741,8 @@ def generate_system_message(
             language_code or "None",
         )
         msg = _ensure_language_glossary(msg, prompt_data)
-        return _append_audio_tag_guidance(msg, audio_tag_instructions)
+        msg = _append_audio_tag_guidance(msg, audio_tag_instructions)
+        return _append_rolling_summary(msg, rolling_summary)
 
     logger.warning(
         "No behavior_instructions provided, "
@@ -718,7 +762,8 @@ def generate_system_message(
         language_code or "None",
     )
     msg = _ensure_language_glossary(msg, prompt_data)
-    return _append_audio_tag_guidance(msg, audio_tag_instructions)
+    msg = _append_audio_tag_guidance(msg, audio_tag_instructions)
+    return _append_rolling_summary(msg, rolling_summary)
 
 
 def generate_prompt_content(

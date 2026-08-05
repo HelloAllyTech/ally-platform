@@ -445,6 +445,14 @@ class AgentWorker:
         # and the agent config so all scoring flows through one instance.
         self.score_keeper = ScoreKeeper()
 
+        # Rolling-summary store (episodic memory): worker-owned like the
+        # SessionClock. Written by compact_history's detached task, read by
+        # generate_response for prompt composition and by finalize_session for
+        # the end-of-session session_memory message.
+        from app.core.graph.rolling_summary import RollingSummaryStore
+
+        self.rolling_summary_store = RollingSummaryStore()
+
         # Setup orchestrator (receives the ScoreKeeper)
         self._setup_event_orchestrator(self.score_keeper)
 
@@ -460,6 +468,7 @@ class AgentWorker:
             tts_client=self.tts_client,
             score_keeper=self.score_keeper,
             session_clock=self.session_clock,
+            rolling_summary_store=self.rolling_summary_store,
         )
 
         # Register callbacks
@@ -736,6 +745,16 @@ class AgentWorker:
         # Store cleanup handler for shutdown
         self._cleanup_conversation_handler = cleanup_conversation_handler
 
+        # Session-memory context forwarded to finalize_session by both the
+        # connection-state and shutdown handlers (the finalize guard ensures
+        # only one of them actually emits).
+        _memory_language_code = (
+            self.scenario.language_config.language_code
+            if getattr(self.scenario, "language_config", None)
+            else None
+        )
+        _memory_prompt_data = getattr(self.scenario, "prompt_data", None)
+
         # Connection state handler
         connection_handler = create_connection_state_handler(
             event_orchestrator=self.event_orchestrator,
@@ -744,6 +763,10 @@ class AgentWorker:
             set_final_score_sent=lambda val: setattr(self, "final_score_sent", val),
             background_tasks=self._background_tasks,
             score_keeper=self.score_keeper,
+            llm_client=self.llm_client,
+            language_code=_memory_language_code,
+            prompt_data=_memory_prompt_data,
+            rolling_summary_store=self.rolling_summary_store,
         )
 
         @self.ctx.room.on("connection_state_changed")
@@ -772,6 +795,10 @@ class AgentWorker:
                 self._background_tasks
             ),
             score_keeper=self.score_keeper,
+            llm_client=self.llm_client,
+            language_code=_memory_language_code,
+            prompt_data=_memory_prompt_data,
+            rolling_summary_store=self.rolling_summary_store,
         )
 
         # Wrap shutdown handler to include conversation handler cleanup
@@ -1191,7 +1218,8 @@ class AgentWorker:
                     )
                 except Exception as e:  # noqa: BLE001 - fall back on any failure
                     logger.warning(
-                        "[COMFORT] uploaded track unavailable, falling back to tone: %s",
+                        "[COMFORT] uploaded track unavailable, "
+                        "falling back to tone: %s",
                         e,
                     )
                     source = None
@@ -1212,7 +1240,8 @@ class AgentWorker:
             )
             volume = max(0.0, min(1.0, volume))
             logger.info(
-                "[COMFORT] room tone enabled (volume=%.2f, in-memory loop, uploaded=%s)",
+                "[COMFORT] room tone enabled "
+                "(volume=%.2f, in-memory loop, uploaded=%s)",
                 volume,
                 used_upload,
             )

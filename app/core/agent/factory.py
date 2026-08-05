@@ -461,6 +461,7 @@ def create_agent_with_adapter(
     tts_client: Optional[BaseTTSClient] = None,
     score_keeper: Optional[ScoreKeeper] = None,
     session_clock=None,
+    rolling_summary_store=None,
 ) -> Agent:
     """
     Create LLM adapter and agent instance.
@@ -502,6 +503,11 @@ def create_agent_with_adapter(
     # the paused-state gate read by the graph nodes).
     if session_clock is not None:
         configurable["session_clock"] = session_clock
+
+    # Rolling-summary store (episodic memory): worker-owned holder read by
+    # generate_response and written by compact_history's background task.
+    if rolling_summary_store is not None:
+        configurable["rolling_summary_store"] = rolling_summary_store
 
     # Lazy import to avoid circular dependency
     from app.core.graph import agent_graph
