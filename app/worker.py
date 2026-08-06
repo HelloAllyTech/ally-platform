@@ -449,9 +449,12 @@ class AgentWorker:
         # SessionClock. Written by compact_history's detached task, read by
         # generate_response for prompt composition and by finalize_session for
         # the end-of-session session_memory message.
+        from app.core.graph.knowledge_retrieval import RetrievedContextStore
         from app.core.graph.rolling_summary import RollingSummaryStore
 
         self.rolling_summary_store = RollingSummaryStore()
+        # Async knowledge retrieval (stale-while-revalidate) handoff.
+        self.retrieved_context_store = RetrievedContextStore()
 
         # Setup orchestrator (receives the ScoreKeeper)
         self._setup_event_orchestrator(self.score_keeper)
@@ -469,6 +472,7 @@ class AgentWorker:
             score_keeper=self.score_keeper,
             session_clock=self.session_clock,
             rolling_summary_store=self.rolling_summary_store,
+            retrieved_context_store=self.retrieved_context_store,
         )
 
         # Register callbacks

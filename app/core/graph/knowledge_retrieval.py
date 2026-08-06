@@ -12,6 +12,26 @@ from app.core.logger import get_logger
 
 logger = get_logger(__name__)
 
+
+class RetrievedContextStore:
+    """Worker-owned holder for asynchronously refreshed knowledge context.
+
+    Mirrors RollingSummaryStore: the title-selection LLM call runs as a
+    DETACHED task writing here, so refresh-due turns serve the previous
+    context instantly instead of paying ~1s inside the reply gate
+    (KNOWLEDGE_RETRIEVAL_ASYNC). Graph state still carries the value the
+    prompt consumed each turn; this store is the freshness handoff.
+    """
+
+    def __init__(self) -> None:
+        self.context = None
+        self._task = None
+
+    @property
+    def in_flight(self) -> bool:
+        return self._task is not None and not self._task.done()
+
+
 _RETRIEVAL_CACHE: "OrderedDict[str, str]" = OrderedDict()
 
 # Cap injected RAG context to keep prompt budgets predictable. Without

@@ -1868,8 +1868,21 @@ async def retrieve_knowledge(
         # metadata jsonb the glossary analytics below already use, no
         # migration needed.
         turn_metrics.record(get_room_id(), metadata={"knowledgeRetrievalReused": True})
+        # Prefer a background-refreshed context the moment it lands
+        # (KNOWLEDGE_RETRIEVAL_ASYNC) instead of waiting for the next
+        # refresh-due turn.
+        _rc_store = (
+            (config or {}).get("configurable", {}).get("retrieved_context_store")
+        )
+        _reused = (
+            _rc_store.context
+            if settings.KNOWLEDGE_RETRIEVAL_ASYNC
+            and _rc_store is not None
+            and _rc_store.context is not None
+            else state.retrieved_context
+        )
         return {
-            "retrieved_context": state.retrieved_context,
+            "retrieved_context": _reused,
             "turns_until_knowledge_refresh": state.turns_until_knowledge_refresh - 1,
         }
 
@@ -1882,6 +1895,69 @@ async def retrieve_knowledge(
         len(knowledge_map),
         knowledge_summary,
     )
+
+    # Stale-while-revalidate (KNOWLEDGE_RETRIEVAL_ASYNC): once a first
+    # context exists, refresh-due turns serve the previous context
+    # immediately and recompute in a DETACHED task — the ~1s title-selection
+    # call leaves the reply gate entirely (same pattern as the
+    # episodic-memory compactor). Staleness bound: one refresh cycle. The
+    # first computation of a session falls through to the synchronous path
+    # below so turn 1 keeps its context.
+    _rc_store = (config or {}).get("configurable", {}).get("retrieved_context_store")
+    if (
+        settings.KNOWLEDGE_RETRIEVAL_ASYNC
+        and _rc_store is not None
+        and (_rc_store.context is not None or state.retrieved_context is not None)
+    ):
+        if _rc_store.context is None:
+            # Seed from state (e.g. worker restarted mid-session or store
+            # created after a sync first computation stored to state only).
+            _rc_store.context = state.retrieved_context
+        if not _rc_store.in_flight:
+            _messages_snapshot = list(state.messages)
+
+            async def _refresh_in_background() -> None:
+                try:
+                    fresh = await asyncio.wait_for(
+                        retrieve_relevant_knowledge(
+                            llm_client,
+                            _messages_snapshot,
+                            knowledge_map,
+                            glossary_hints=glossary_hints or None,
+                        ),
+                        timeout=8.0,
+                    )
+                except asyncio.CancelledError:
+                    raise
+                except Exception:  # noqa: BLE001
+                    logger.warning(
+                        "[RAG_ASYNC] background refresh failed; keeping "
+                        "previous context"
+                    )
+                    return
+                _rc_store.context = fresh or None
+                logger.debug(
+                    "[RAG_ASYNC] background refresh complete — context_chars=%d",
+                    len(fresh or ""),
+                )
+
+            _rc_store._task = asyncio.create_task(_refresh_in_background())
+        turn_metrics.record(
+            get_room_id(),
+            metadata={
+                "knowledgeRetrievalReused": True,
+                "knowledgeRetrievalAsync": True,
+            },
+        )
+        next_refresh_countdown = (
+            max(settings.KNOWLEDGE_RETRIEVAL_REFRESH_TURNS - 1, 0)
+            if settings.KNOWLEDGE_RETRIEVAL_REFRESH_ENABLED
+            else 0
+        )
+        return {
+            "retrieved_context": _rc_store.context,
+            "turns_until_knowledge_refresh": next_refresh_countdown,
+        }
 
     # Wrap in asyncio.wait_for so a hanging upstream LLM doesn't keep this
     # parallel branch (and therefore the graph join) waiting forever, which
@@ -1926,6 +2002,8 @@ async def retrieve_knowledge(
                 ),
             },
         )
+    if _rc_store is not None:
+        _rc_store.context = retrieved_context or None
     next_refresh_countdown = (
         max(settings.KNOWLEDGE_RETRIEVAL_REFRESH_TURNS - 1, 0)
         if settings.KNOWLEDGE_RETRIEVAL_REFRESH_ENABLED

@@ -462,6 +462,7 @@ def create_agent_with_adapter(
     score_keeper: Optional[ScoreKeeper] = None,
     session_clock=None,
     rolling_summary_store=None,
+    retrieved_context_store=None,
 ) -> Agent:
     """
     Create LLM adapter and agent instance.
@@ -508,6 +509,11 @@ def create_agent_with_adapter(
     # generate_response and written by compact_history's background task.
     if rolling_summary_store is not None:
         configurable["rolling_summary_store"] = rolling_summary_store
+
+    # Retrieved-context store (async knowledge retrieval): worker-owned
+    # holder for stale-while-revalidate refreshes (KNOWLEDGE_RETRIEVAL_ASYNC).
+    if retrieved_context_store is not None:
+        configurable["retrieved_context_store"] = retrieved_context_store
 
     # Lazy import to avoid circular dependency
     from app.core.graph import agent_graph

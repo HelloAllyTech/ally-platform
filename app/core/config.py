@@ -878,6 +878,19 @@ class Settings(BaseSettings):
             "(falls back to running every turn, same as REFRESH_ENABLED=False)."
         ),
     )
+    KNOWLEDGE_RETRIEVAL_ASYNC: bool = Field(
+        default=True,
+        description=(
+            "Stale-while-revalidate knowledge retrieval: on refresh-due turns "
+            "serve the previous context immediately and recompute in a "
+            "DETACHED task (same pattern as the episodic-memory compactor), "
+            "removing the ~1s title-selection LLM call from the reply gate "
+            "entirely. The FIRST computation of a session stays synchronous "
+            "so turn 1 keeps its context. Staleness bound is one refresh "
+            "cycle — the same trade the refresh cadence already accepted. "
+            "False restores in-gate recomputation on refresh turns."
+        ),
+    )
 
     # Scenario report generation settings
     REPORT_CONCURRENCY_LIMIT: int = Field(
