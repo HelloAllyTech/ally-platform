@@ -52,27 +52,31 @@ _GOOGLE_STT_MODEL = "chirp_2"
 _GOOGLE_STT_LOCATION = "asia-southeast1"
 
 
-def _pick_google_voice(language: str) -> Optional[str]:
-    """Pick a non-Chirp voice for the language (prefer female Wavenet).
+def _pick_google_voice_sync(language: str) -> Optional[str]:
+    """Pick a voice for the language (prefer female Chirp3-HD).
 
     Chirp3-HD voices reject the plugin's default PCM encoding (Google 400
     "Unsupported audio encoding", non-retryable) — the same quirk the agent's
-    GoogleTTSClient works around with OGG_OPUS. The tester just needs any
-    intelligible voice, so it avoids Chirp entirely: Wavenet/Standard accept
-    the default encoding for every Indian locale.
+    GoogleTTSClient works around with OGG_OPUS (handled in _make_tts).
+
+    Sync gRPC client — call via _pick_google_voice so the event loop isn't
+    blocked; the channel is closed explicitly (it does not die with the
+    function, and leaked channels held threads + memory across tester runs).
     """
     try:
         from google.cloud import texttospeech
 
         client = texttospeech.TextToSpeechClient()
-        voices = client.list_voices(language_code=language).voices
+        try:
+            voices = client.list_voices(language_code=language).voices
+        finally:
+            client.transport.close()
         female = [
             v for v in voices if v.ssml_gender == texttospeech.SsmlVoiceGender.FEMALE
         ]
         # Prefer Chirp3-HD: natural prosody survives the agent's audio
         # pipeline far better than flat Wavenet/Standard synthesis (and it
-        # is closer to what a real learner sounds like). Requires OGG_OPUS
-        # encoding — handled in _make_tts.
+        # is closer to what a real learner sounds like).
         chirp = [v for v in (female or voices) if "Chirp3-HD" in v.name]
         pick = (chirp or female or list(voices) or [None])[0]
         return pick.name if pick else None
@@ -81,12 +85,18 @@ def _pick_google_voice(language: str) -> Optional[str]:
         return None
 
 
-def _make_tts(language: str, http_session: aiohttp.ClientSession):
+async def _pick_google_voice(language: str) -> Optional[str]:
+    return await asyncio.get_event_loop().run_in_executor(
+        None, _pick_google_voice_sync, language
+    )
+
+
+async def _make_tts(language: str, http_session: aiohttp.ClientSession):
     """Google TTS for the tester, any language."""
     from google.cloud import texttospeech
     from livekit.plugins import google
 
-    voice = _pick_google_voice(language)
+    voice = await _pick_google_voice(language)
     logger.info("[V2V] tester google voice for %s: %s", language, voice or "auto")
     kwargs: dict = {"language": language, "gender": "female"}
     if voice:
@@ -189,17 +199,31 @@ class V2VTesterBot:
         self._utterance_queue: asyncio.Queue[Optional[str]] = asyncio.Queue()
         # Track tasks we need to cancel on shutdown.
         self._bg_tasks: set[asyncio.Task] = set()
+        # The single audio track the STT pipeline is attached to (the agent
+        # publishes more than one; transcribing each doubled the pipelines).
+        self._stt_track_sid: Optional[str] = None
 
     # ── Public entry point ────────────────────────────────────────────────────
 
     async def run(self) -> None:
-        """Connect, converse for max_exchanges turns, then disconnect."""
+        """Connect, converse for max_exchanges turns, then disconnect.
+
+        Every resource acquired here is released in the single finally below
+        — including on failures during setup (room connect, voice discovery,
+        TTS creation). The pre-fix version only guarded the conversation
+        loop, so an early failure leaked a connected rtc.Room + aiohttp
+        session in the worker process per attempt, which is how repeated
+        broken launches drove the container's memory up.
+        """
         logger.info("[V2V] starting tester bot for room=%s", self.room_name)
         # Create the aiohttp session early so the track_subscribed handler
         # (registered below) can reference it via self._http_session.
         self._http_session = aiohttp.ClientSession()
         room = rtc.Room()
         self._room = room
+        tts = None
+        llm = None
+        connected = False
 
         @room.on("track_subscribed")
         def _on_track_subscribed(
@@ -207,17 +231,31 @@ class V2VTesterBot:
             _pub: rtc.RemoteTrackPublication,
             participant: rtc.RemoteParticipant,
         ) -> None:
-            if track.kind == rtc.TrackKind.KIND_AUDIO:
+            if track.kind != rtc.TrackKind.KIND_AUDIO:
+                return
+            # ONE STT pipeline per run: the agent publishes more than one
+            # audio track (observed live), and transcribing each one ran a
+            # duplicate Google streaming recognizer for the whole session —
+            # double memory/cost and occasional duplicate utterances.
+            if self._stt_track_sid is not None:
                 logger.info(
-                    "[V2V] subscribed to audio from participant=%s",
+                    "[V2V] ignoring extra audio track from %s (STT already "
+                    "attached to %s)",
                     participant.identity,
+                    self._stt_track_sid,
                 )
-                task = asyncio.create_task(
-                    self._stream_and_transcribe(track, self._http_session),
-                    name=f"v2v-stt-{participant.identity}",
-                )
-                self._bg_tasks.add(task)
-                task.add_done_callback(self._bg_tasks.discard)
+                return
+            self._stt_track_sid = track.sid
+            logger.info(
+                "[V2V] subscribed to audio from participant=%s",
+                participant.identity,
+            )
+            task = asyncio.create_task(
+                self._stream_and_transcribe(track, self._http_session),
+                name=f"v2v-stt-{participant.identity}",
+            )
+            self._bg_tasks.add(task)
+            task.add_done_callback(self._bg_tasks.discard)
 
         @room.on("track_published")
         def _on_track_published(
@@ -239,65 +277,66 @@ class V2VTesterBot:
                 participant.kind,
             )
 
-        await room.connect(
-            settings.LIVEKIT_URL,
-            self.tester_token,
-            options=rtc.RoomOptions(auto_subscribe=True),
-        )
-        logger.info("[V2V] joined room=%s as v2v-tester", self.room_name)
+        try:
+            await room.connect(
+                settings.LIVEKIT_URL,
+                self.tester_token,
+                options=rtc.RoomOptions(auto_subscribe=True),
+            )
+            connected = True
+            logger.info("[V2V] joined room=%s as v2v-tester", self.room_name)
 
-        # Log who is already in the room when we join.
-        existing = list(room.remote_participants.values())
-        if existing:
-            for p in existing:
+            # Log who is already in the room when we join.
+            existing = list(room.remote_participants.values())
+            if existing:
+                for p in existing:
+                    logger.info(
+                        "[V2V] existing participant: identity=%s kind=%s tracks=%d",
+                        p.identity,
+                        p.kind,
+                        len(p.track_publications),
+                    )
+            else:
                 logger.info(
-                    "[V2V] existing participant: identity=%s kind=%s tracks=%d",
-                    p.identity,
-                    p.kind,
-                    len(p.track_publications),
+                    "[V2V] no other participants in room yet — waiting for counselor"
                 )
-        else:
+
+            # Create the TTS first: AudioSource's sample rate must match the
+            # TTS output rate or LiveKit rejects the frames with an
+            # InvalidState error.
+            tts = await _make_tts(self.language, self._http_session)
+            tts_sample_rate = int(getattr(tts, "sample_rate", 24000) or 24000)
             logger.info(
-                "[V2V] no other participants in room yet — waiting for counselor"
+                "[V2V] tester providers: tts=%s (rate=%d) language=%s",
+                type(tts).__module__,
+                tts_sample_rate,
+                self.language,
             )
 
-        # Create the TTS first: AudioSource's sample rate must match the TTS
-        # output rate (Deepgram Aura = 24 kHz, Sarvam bulbul differs) or
-        # LiveKit rejects the frames with an InvalidState error.
-        tts = _make_tts(self.language, self._http_session)
-        tts_sample_rate = int(getattr(tts, "sample_rate", 24000) or 24000)
-        logger.info(
-            "[V2V] tester providers: tts=%s (rate=%d) language=%s",
-            type(tts).__module__,
-            tts_sample_rate,
-            self.language,
-        )
+            # Publish a microphone track so the agent can hear us.
+            self._audio_source = rtc.AudioSource(
+                sample_rate=tts_sample_rate, num_channels=1, queue_size_ms=1000
+            )
+            local_track = rtc.LocalAudioTrack.create_audio_track(
+                "v2v-learner-mic", self._audio_source
+            )
+            pub_options = rtc.TrackPublishOptions()
+            pub_options.source = rtc.TrackSource.SOURCE_MICROPHONE
+            await room.local_participant.publish_track(local_track, pub_options)
+            llm = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
 
-        # Publish a microphone track so the agent can hear us.
-        self._audio_source = rtc.AudioSource(
-            sample_rate=tts_sample_rate, num_channels=1, queue_size_ms=1000
-        )
-        local_track = rtc.LocalAudioTrack.create_audio_track(
-            "v2v-learner-mic", self._audio_source
-        )
-        pub_options = rtc.TrackPublishOptions()
-        pub_options.source = rtc.TrackSource.SOURCE_MICROPHONE
-        await room.local_participant.publish_track(local_track, pub_options)
-        llm = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+            # Build the system prompt once.
+            context_block = (
+                f"Context: {self.scenario_context}" if self.scenario_context else ""
+            )
+            system_prompt = _LEARNER_SYSTEM.format(
+                scenario_title=self.scenario_title or "general counselling session",
+                scenario_context_block=context_block,
+                language=self.language,
+            )
+            conversation: list[dict] = []
+            self._conversation = conversation
 
-        # Build the system prompt once.
-        context_block = (
-            f"Context: {self.scenario_context}" if self.scenario_context else ""
-        )
-        system_prompt = _LEARNER_SYSTEM.format(
-            scenario_title=self.scenario_title or "general counselling session",
-            scenario_context_block=context_block,
-            language=self.language,
-        )
-        conversation: list[dict] = []
-        self._conversation = conversation
-
-        try:
             await self._converse(
                 tts, llm, system_prompt, conversation, self._http_session
             )
@@ -305,10 +344,27 @@ class V2VTesterBot:
             for t in list(self._bg_tasks):
                 t.cancel()
             # End the session on ally-be so summary generation fires in both
-            # local dev (no room_finished webhook) and production.
-            await self._end_session_on_backend(self._http_session)
+            # local dev (no room_finished webhook) and production. Only when
+            # the run got far enough to have a session to end.
+            if connected:
+                await self._end_session_on_backend(self._http_session)
+            # Close every provider client — leaked gRPC channels / httpx
+            # pools survive the run and accumulate in the worker process.
+            for closable in (tts, llm, self._audio_source):
+                aclose = getattr(closable, "aclose", None) or getattr(
+                    closable, "close", None
+                )
+                if aclose is None:
+                    continue
+                try:
+                    result = aclose()
+                    if asyncio.iscoroutine(result):
+                        await result
+                except Exception:  # noqa: BLE001
+                    logger.debug("[V2V] provider close failed", exc_info=True)
             await self._http_session.close()
-            await room.disconnect()
+            if connected:
+                await room.disconnect()
             logger.info("[V2V] disconnected from room=%s", self.room_name)
 
     # ── Conversation loop ─────────────────────────────────────────────────────
@@ -543,7 +599,18 @@ class V2VTesterBot:
         finally:
             if silence_deadline:
                 silence_deadline.cancel()
+            if flush_handle is not None:
+                flush_handle.cancel()
             await stt_stream.aclose()
+            # rtc.AudioStream and the STT plugin instance both hold native /
+            # gRPC resources beyond the stream object closed above.
+            await audio_stream.aclose()
+            plugin_close = getattr(stt_plugin, "aclose", None)
+            if plugin_close is not None:
+                try:
+                    await plugin_close()
+                except Exception:  # noqa: BLE001
+                    logger.debug("[V2V] stt plugin close failed", exc_info=True)
 
     # ── LLM: generate learner reply ───────────────────────────────────────────
 
@@ -609,6 +676,16 @@ class V2VTesterBot:
 # ── Background task launcher (called from the FastAPI router) ─────────────────
 
 
+# Live tester tasks in THIS worker process. A tester run costs ~200MB
+# (rtc room + streaming STT/TTS pipelines) on containers that have OOM'd
+# before, so concurrent runs per process are hard-capped.
+_active_testers: set[asyncio.Task] = set()
+
+
+def active_tester_count() -> int:
+    return len(_active_testers)
+
+
 def launch_tester(
     room_name: str,
     tester_token: str,
@@ -622,7 +699,16 @@ def launch_tester(
     """
     Spawn the tester bot as a fire-and-forget asyncio task and return the task
     so callers can attach callbacks or cancel on shutdown.
+
+    Raises RuntimeError when the per-process concurrency cap
+    (V2V_TESTER_MAX_CONCURRENT) is already reached — the router surfaces
+    this as HTTP 429.
     """
+    if len(_active_testers) >= settings.V2V_TESTER_MAX_CONCURRENT:
+        raise RuntimeError(
+            f"v2v tester concurrency cap reached "
+            f"({settings.V2V_TESTER_MAX_CONCURRENT} active in this process)"
+        )
     bot = V2VTesterBot(
         room_name=room_name,
         tester_token=tester_token,
@@ -634,8 +720,10 @@ def launch_tester(
         counselor_id=counselor_id,
     )
     task = asyncio.create_task(bot.run(), name=f"v2v-tester-{room_name}")
+    _active_testers.add(task)
 
     def _log_done(t: asyncio.Task) -> None:
+        _active_testers.discard(t)
         exc = t.exception() if not t.cancelled() else None
         if exc:
             logger.error("[V2V] tester bot failed for room=%s: %s", room_name, exc)

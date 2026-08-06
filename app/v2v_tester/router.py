@@ -51,15 +51,21 @@ async def start_v2v_tester(
         body.language,
     )
 
-    launch_tester(
-        room_name=body.roomName,
-        tester_token=body.testerToken,
-        max_exchanges=body.maxExchanges,
-        language=body.language,
-        scenario_title=body.scenarioTitle,
-        scenario_context=body.scenarioContext,
-        scenario_session_id=body.scenarioSessionId,
-        counselor_id=body.counselorId,
-    )
+    try:
+        launch_tester(
+            room_name=body.roomName,
+            tester_token=body.testerToken,
+            max_exchanges=body.maxExchanges,
+            language=body.language,
+            scenario_title=body.scenarioTitle,
+            scenario_context=body.scenarioContext,
+            scenario_session_id=body.scenarioSessionId,
+            counselor_id=body.counselorId,
+        )
+    except RuntimeError as exc:
+        # Per-process concurrency cap (memory guard) — the caller can retry
+        # once the active run finishes.
+        logger.warning("[V2V] launch rejected: %s", exc)
+        raise HTTPException(status_code=429, detail=str(exc))
 
     return StartV2VTesterResponse(roomName=body.roomName)

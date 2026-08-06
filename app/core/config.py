@@ -913,6 +913,15 @@ class Settings(BaseSettings):
             "re-enable POST /api/v1/v2v-tester/start."
         ),
     )
+    V2V_TESTER_MAX_CONCURRENT: int = Field(
+        default=1,
+        description=(
+            "Per-process cap on simultaneously running tester bots. One run "
+            "costs ~200MB (rtc room + streaming STT/TTS); launches beyond "
+            "the cap are rejected with HTTP 429 instead of risking an OOM "
+            "of the worker process (which would kill live agent sessions)."
+        ),
+    )
 
     # ---- Memory optimization ----
     LAZY_PROVIDER_IMPORTS_ENABLED: bool = Field(
