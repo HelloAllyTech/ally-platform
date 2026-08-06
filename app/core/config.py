@@ -601,11 +601,13 @@ class Settings(BaseSettings):
     # provider prompt caching. At session end the final summary is shipped to
     # Core as a `session_memory` SQS message (case-level episodic memory).
     ROLLING_SUMMARY_ENABLED: bool = Field(
-        default=False,
+        default=True,
         description=(
             "Global switch for the rolling conversation summary (episodic "
-            "memory). When False, no compaction runs, prompts are unchanged and "
-            "no session_memory message is emitted."
+            "memory). ON by default (validated via live A/B and automated v2v "
+            "baselines: latency-neutral, ~$0.001/session). Set false as the "
+            "kill switch: no compaction runs, prompts are unchanged and no "
+            "session_memory message is emitted."
         ),
     )
     ROLLING_SUMMARY_EVERY_TURNS: int = Field(
