@@ -2242,12 +2242,24 @@ class AgentWorker:
             # constructed on the per-job critical path; fall back to a fresh one.
             userdata = getattr(getattr(self.ctx, "proc", None), "userdata", {}) or {}
             bvc = userdata.get("bvc") or noise_cancellation.BVC()
+            # V2V test rooms: DISABLE noise cancellation. Krisp BVC is
+            # Background VOICE Cancellation — it can classify a synthetic
+            # tester voice as non-primary audio and silently remove it, so
+            # the agent's VAD never fires (observed live: agent deaf to a
+            # Google Wavenet tester while the more natural Sarvam voice
+            # passed). There is no background noise to cancel in a
+            # machine-to-machine test; the tester joins before the agent, so
+            # its identity is already visible here.
+            _remote = getattr(self.ctx.room, "remote_participants", None) or {}
+            _is_v2v_room = any(p.identity == "v2v-tester" for p in _remote.values())
+            if _is_v2v_room:
+                logger.info("[AgentWorker] v2v test room — noise cancellation off")
             await self.session.start(
                 # ... (rest of the args identical)
                 room=self.ctx.room,
                 agent=self.agent,
                 room_input_options=RoomInputOptions(
-                    noise_cancellation=bvc,
+                    noise_cancellation=None if _is_v2v_room else bvc,
                 ),
             )
 

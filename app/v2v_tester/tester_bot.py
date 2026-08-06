@@ -23,13 +23,14 @@ configurable idle timeout.
 
 from __future__ import annotations
 
+import array
 import asyncio
+import math
 from typing import Optional
 
 import aiohttp
 from livekit import rtc
 from livekit.agents import stt as lk_stt
-from livekit.plugins import deepgram
 from openai import AsyncOpenAI
 
 from app.core.config import settings
@@ -39,93 +40,78 @@ logger = get_logger(__name__)
 
 # ── Language mapping helpers ──────────────────────────────────────────────────
 
-# English tester voice: Deepgram Aura (cheap, already wired). Distinct from
-# counselor voices so transcripts are distinguishable.
-_TESTER_TTS_MODEL = "aura-2-andromeda-en"
+# Tester providers: Google STT + TTS ONLY (per Gopi 2026-08-06). Google's
+# streaming APIs tolerate idle/silence (unlike Sarvam's WS, which drops
+# connections fed silence every ~15s and ate utterances landing in reconnect
+# windows), support all our Indian languages, and need no per-provider
+# special-casing. Requires valid Google ADC on the host (mounted gcloud
+# config) — expired ADC makes both sides silently fail, so _make_stt/_make_tts
+# failures surface loudly at bot start rather than mid-conversation.
+# Voice: let Google pick a female voice for the session language — distinct
+# from the counselor voice catalog's picks, and valid for every locale
+# without maintaining a voice map.
+_GOOGLE_STT_MODEL = "chirp_2"
+_GOOGLE_STT_LOCATION = "asia-southeast1"
 
-# Indian-language tester stack: Sarvam for both STT and TTS — the same
-# providers the counselor runs in production, so a v2v run exercises the real
-# pipeline. Speaker chosen to differ from the counselor voice catalog's
-# common picks (abhilash/meera) so the two sides remain distinguishable.
-_SARVAM_LANG_ROOTS = {"hi", "ta", "te", "kn", "ml", "mr", "bn", "gu", "pa", "od", "or"}
-_SARVAM_TESTER_SPEAKER = "anushka"
-_SARVAM_TESTER_TTS_MODEL = "bulbul:v2"
-_SARVAM_TESTER_STT_MODEL = "saarika:v2.5"
 
+def _pick_google_voice(language: str) -> Optional[str]:
+    """Pick a non-Chirp voice for the language (prefer female Wavenet).
 
-def _uses_sarvam(language: str) -> bool:
-    return language.split("-")[0].lower() in _SARVAM_LANG_ROOTS
+    Chirp3-HD voices reject the plugin's default PCM encoding (Google 400
+    "Unsupported audio encoding", non-retryable) — the same quirk the agent's
+    GoogleTTSClient works around with OGG_OPUS. The tester just needs any
+    intelligible voice, so it avoids Chirp entirely: Wavenet/Standard accept
+    the default encoding for every Indian locale.
+    """
+    try:
+        from google.cloud import texttospeech
+
+        client = texttospeech.TextToSpeechClient()
+        voices = client.list_voices(language_code=language).voices
+        female = [
+            v for v in voices if v.ssml_gender == texttospeech.SsmlVoiceGender.FEMALE
+        ]
+        # Prefer Chirp3-HD: natural prosody survives the agent's audio
+        # pipeline far better than flat Wavenet/Standard synthesis (and it
+        # is closer to what a real learner sounds like). Requires OGG_OPUS
+        # encoding — handled in _make_tts.
+        chirp = [v for v in (female or voices) if "Chirp3-HD" in v.name]
+        pick = (chirp or female or list(voices) or [None])[0]
+        return pick.name if pick else None
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("[V2V] voice discovery failed for %s: %s", language, exc)
+        return None
 
 
 def _make_tts(language: str, http_session: aiohttp.ClientSession):
-    """Language-appropriate tester TTS plugin instance.
+    """Google TTS for the tester, any language."""
+    from google.cloud import texttospeech
+    from livekit.plugins import google
 
-    Constructed directly (not via app.tts.factory): the tester runs as a
-    plain LiveKit participant, NOT inside an agent job context, so the plugin
-    cannot fetch the job-shared aiohttp session — it must be passed
-    explicitly (first v2v run failed with "Attempted to use an http session
-    outside of a job context" when the factory-built instance omitted it).
-    """
-    if _uses_sarvam(language):
-        from livekit.plugins import sarvam
-
-        from app.core.constants import convert_language_code_for_sarvam
-
-        return sarvam.TTS(
-            target_language_code=convert_language_code_for_sarvam(language),
-            model=_SARVAM_TESTER_TTS_MODEL,
-            speaker=_SARVAM_TESTER_SPEAKER,
-            api_key=settings.SARVAM_API_KEY,
-            http_session=http_session,
-        )
-    return deepgram.TTS(
-        model=_TESTER_TTS_MODEL,
-        api_key=settings.DEEPGRAM_API_KEY,
-        http_session=http_session,
-    )
+    voice = _pick_google_voice(language)
+    logger.info("[V2V] tester google voice for %s: %s", language, voice or "auto")
+    kwargs: dict = {"language": language, "gender": "female"}
+    if voice:
+        kwargs["voice_name"] = voice
+        if "Chirp" in voice:
+            # Chirp voices need BOTH workarounds the agent's GoogleTTSClient
+            # carries: an explicit chirp_3 model_name (otherwise the plugin
+            # infers a Gemini model and Google rejects the pairing) and
+            # OGG_OPUS encoding (Chirp rejects the plugin's default PCM).
+            kwargs["model_name"] = "chirp_3"
+            kwargs["audio_encoding"] = texttospeech.AudioEncoding.OGG_OPUS
+    return google.TTS(**kwargs)
 
 
 def _make_stt(language: str, http_session: aiohttp.ClientSession):
-    """Language-appropriate tester STT plugin instance (streaming)."""
-    if _uses_sarvam(language):
-        from app.stt.factory import create_stt_client
+    """Google streaming STT (chirp_2) for the tester, any language."""
+    from livekit.plugins import google
 
-        client = create_stt_client(
-            stt_config={
-                "provider": "sarvam",
-                "config": {"model": _SARVAM_TESTER_STT_MODEL},
-            },
-            language_code=language,
-        )
-        return client.stt_instance
-    return deepgram.STT(
-        model="nova-2",
-        language=_deepgram_lang(language),
-        api_key=settings.DEEPGRAM_API_KEY,
-        http_session=http_session,
-    )
-
-
-# BCP-47 root → Deepgram language code (Deepgram uses ISO-639-1).
-_DEEPGRAM_LANG: dict[str, str] = {
-    "en": "en",
-    "en-US": "en",
-    "en-IN": "en",
-    "hi": "hi",
-    "hi-IN": "hi",
-    "mr": "hi",  # Deepgram doesn't support Marathi; Hindi is the closest
-    "mr-IN": "hi",
-    "ta": "ta",
-    "ta-IN": "ta",
-    "te-IN": "te",
-    "kn-IN": "kn",
-    "ml-IN": "ml",
-}
-
-
-def _deepgram_lang(language: str) -> str:
-    return _DEEPGRAM_LANG.get(language) or _DEEPGRAM_LANG.get(
-        language.split("-")[0], "en"
+    return google.STT(
+        languages=[language],
+        model=_GOOGLE_STT_MODEL,
+        location=_GOOGLE_STT_LOCATION,
+        interim_results=False,
     )
 
 
@@ -150,6 +136,15 @@ or rephrasing is natural.
 """
 
 # ── Tester bot ────────────────────────────────────────────────────────────────
+
+# Energy gate for the tester's STT feed: Sarvam's WS server drops
+# connections fed continuous silence after ~15s, and an utterance landing in
+# a reconnect window is lost entirely (observed live twice: exchange 9/14 and
+# 6/14 eaten). Only push frames while the counselor is audibly speaking,
+# with a hangover so trailing quiet syllables still flow. int16 RMS; TTS
+# playback measures well above this, channel silence near zero.
+_RMS_GATE_THRESHOLD = 250.0
+_RMS_HANGOVER_S = 2.0
 
 # How long (seconds) to wait for the counselor to speak before giving up.
 _IDLE_TIMEOUT_S = 90.0
@@ -182,6 +177,15 @@ class V2VTesterBot:
 
         self._room: Optional[rtc.Room] = None
         self._audio_source: Optional[rtc.AudioSource] = None
+        # Run metrics, shipped to ally-be on end (metadata.v2vMetrics) and
+        # logged as [V2V_METRICS] — the evaluation baseline Gopi asked for.
+        self._metrics: dict = {
+            "maxExchanges": max_exchanges,
+            "exchangesCompleted": 0,
+            "utterancesHeard": 0,
+            "ttsFailures": 0,
+            "endReason": "unknown",
+        }
         self._http_session: Optional[aiohttp.ClientSession] = None
         # Queue used to pass each counselor utterance to the main loop.
         self._utterance_queue: asyncio.Queue[Optional[str]] = asyncio.Queue()
@@ -330,6 +334,7 @@ class V2VTesterBot:
                 )
             except asyncio.TimeoutError:
                 logger.info("[V2V] counselor idle timeout — ending session")
+                self._metrics["endReason"] = "idle_timeout"
                 return
 
             if not counselor_text or not counselor_text.strip():
@@ -351,8 +356,10 @@ class V2VTesterBot:
 
             # Speak the reply.
             await self._speak(tts, learner_reply)
+            self._metrics["exchangesCompleted"] = exchange_idx + 1
 
         logger.info("[V2V] max_exchanges=%d reached", self.max_exchanges)
+        self._metrics["endReason"] = "max_exchanges"
 
     # ── Session end ───────────────────────────────────────────────────────────
 
@@ -371,7 +378,17 @@ class V2VTesterBot:
             "x-api-key": settings.CORE_SERVICE_API_KEY,
             "Content-Type": "application/json",
         }
-        payload = {"counselorId": self.counselor_id}
+        logger.info(
+            "[V2V_METRICS] room=%s exchanges=%d/%d utterances_heard=%d "
+            "tts_failures=%d end_reason=%s",
+            self.room_name,
+            self._metrics["exchangesCompleted"],
+            self._metrics["maxExchanges"],
+            self._metrics["utterancesHeard"],
+            self._metrics["ttsFailures"],
+            self._metrics["endReason"],
+        )
+        payload = {"counselorId": self.counselor_id, "metrics": self._metrics}
         try:
             async with http_session.post(url, json=payload, headers=headers) as resp:
                 if resp.status == 200:
@@ -425,6 +442,7 @@ class V2VTesterBot:
                 utterance = " ".join(pending_chunks).strip()
                 pending_chunks.clear()
                 logger.info("[V2V] STT utterance (debounced): %r", utterance[:120])
+                self._metrics["utterancesHeard"] += 1
                 asyncio.ensure_future(self._utterance_queue.put(utterance))
 
         async def _collect() -> None:
@@ -458,10 +476,29 @@ class V2VTesterBot:
             logger.debug("[V2V] silence gate fired — flushing STT stream")
             stt_stream.flush()
 
+        def _frame_rms(frame) -> float:
+            samples = array.array("h")
+            samples.frombytes(bytes(frame.data))
+            if not samples:
+                return 0.0
+            step = max(1, len(samples) // 160)
+            acc = 0
+            n = 0
+            for i in range(0, len(samples), step):
+                v = samples[i]
+                acc += v * v
+                n += 1
+            return math.sqrt(acc / max(1, n))
+
+        last_voice_ts = 0.0
         try:
             async for audio_event in audio_stream:
-                stt_stream.push_frame(audio_event.frame)
-                _schedule_flush()
+                now = loop.time()
+                if _frame_rms(audio_event.frame) > _RMS_GATE_THRESHOLD:
+                    last_voice_ts = now
+                if now - last_voice_ts <= _RMS_HANGOVER_S:
+                    stt_stream.push_frame(audio_event.frame)
+                    _schedule_flush()
         except Exception:  # noqa: BLE001
             logger.debug("[V2V] audio stream ended", exc_info=True)
         finally:
@@ -498,20 +535,22 @@ class V2VTesterBot:
     # ── TTS: synthesize and publish audio frames ──────────────────────────────
 
     async def _speak(self, tts, text: str) -> None:
+        """Synthesize and publish the reply. Retries once: a single dropped
+        synthesis deadlocks the whole run (the counselor never hears the
+        reply, so both sides wait until the idle timeout — observed live at
+        exchange 11/14 with a retryable Sarvam WS blip)."""
+        for attempt in (1, 2):
+            if await self._speak_once(tts, text):
+                return
+            logger.warning("[V2V] TTS attempt %d failed; retrying", attempt)
+        self._metrics["ttsFailures"] += 1
+        logger.warning("[V2V] TTS failed after retry; reply dropped")
+
+    async def _speak_once(self, tts, text: str) -> bool:
         if not self._audio_source or not text:
-            return
+            return True
         try:
-            # Sarvam: the plugin's REST synthesize() path is broken in the
-            # pinned version (libav InvalidDataError decoding the response);
-            # the WebSocket stream() path is what the live agent uses and it
-            # works — use it here too. Deepgram Aura keeps REST synthesize().
-            if "sarvam" in type(tts).__module__:
-                stream = tts.stream()
-                stream.push_text(text)
-                stream.flush()
-                stream.end_input()
-            else:
-                stream = tts.synthesize(text)
+            stream = tts.synthesize(text)
             async for ev in stream:
                 frame = getattr(ev, "frame", None)
                 if frame is not None:
@@ -522,8 +561,10 @@ class V2VTesterBot:
                     await aclose()
                 except Exception:  # noqa: BLE001
                     pass
+            return True
         except Exception as exc:  # noqa: BLE001
             logger.warning("[V2V] TTS error: %s", exc)
+            return False
 
 
 # ── Background task launcher (called from the FastAPI router) ─────────────────
