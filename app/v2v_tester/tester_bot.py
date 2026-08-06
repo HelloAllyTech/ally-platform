@@ -23,9 +23,7 @@ configurable idle timeout.
 
 from __future__ import annotations
 
-import array
 import asyncio
-import math
 from typing import Optional
 
 import aiohttp
@@ -136,15 +134,6 @@ or rephrasing is natural.
 """
 
 # ── Tester bot ────────────────────────────────────────────────────────────────
-
-# Energy gate for the tester's STT feed: Sarvam's WS server drops
-# connections fed continuous silence after ~15s, and an utterance landing in
-# a reconnect window is lost entirely (observed live twice: exchange 9/14 and
-# 6/14 eaten). Only push frames while the counselor is audibly speaking,
-# with a hangover so trailing quiet syllables still flow. int16 RMS; TTS
-# playback measures well above this, channel silence near zero.
-_RMS_GATE_THRESHOLD = 250.0
-_RMS_HANGOVER_S = 2.0
 
 # How long (seconds) to wait for the counselor to speak before giving up.
 _IDLE_TIMEOUT_S = 90.0
@@ -538,29 +527,17 @@ class V2VTesterBot:
             logger.debug("[V2V] silence gate fired — flushing STT stream")
             stt_stream.flush()
 
-        def _frame_rms(frame) -> float:
-            samples = array.array("h")
-            samples.frombytes(bytes(frame.data))
-            if not samples:
-                return 0.0
-            step = max(1, len(samples) // 160)
-            acc = 0
-            n = 0
-            for i in range(0, len(samples), step):
-                v = samples[i]
-                acc += v * v
-                n += 1
-            return math.sqrt(acc / max(1, n))
-
-        last_voice_ts = 0.0
+        # NOTE: frames are pushed UNGATED. An RMS energy gate (added for
+        # Sarvam, whose WS dropped silence-fed connections) backfired with
+        # Google streaming STT: starving the stream of audio during quiet
+        # periods triggered "stream timed out, restarting", and an utterance
+        # arriving mid-restart was lost (run 9's final exchange). Google's
+        # plugin keeps the stream healthy on continuous audio, silence
+        # included, and manages its own 5-minute restarts.
         try:
             async for audio_event in audio_stream:
-                now = loop.time()
-                if _frame_rms(audio_event.frame) > _RMS_GATE_THRESHOLD:
-                    last_voice_ts = now
-                if now - last_voice_ts <= _RMS_HANGOVER_S:
-                    stt_stream.push_frame(audio_event.frame)
-                    _schedule_flush()
+                stt_stream.push_frame(audio_event.frame)
+                _schedule_flush()
         except Exception:  # noqa: BLE001
             logger.debug("[V2V] audio stream ended", exc_info=True)
         finally:
