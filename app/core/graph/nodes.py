@@ -1935,7 +1935,11 @@ async def retrieve_knowledge(
                         "previous context"
                     )
                     return
-                _rc_store.context = fresh or None
+                # "" (computed, nothing relevant) is a valid cached result —
+                # keep it distinct from None (never computed) so empty-RAG
+                # scenarios don't re-run the ~1s selection call in-gate on
+                # every refresh turn.
+                _rc_store.context = fresh or ""
                 logger.debug(
                     "[RAG_ASYNC] background refresh complete — context_chars=%d",
                     len(fresh or ""),
