@@ -1,0 +1,58 @@
+# Which documentation covers which code.
+#
+# Read by the shared docs-guard workflow (helloallytech/.github) on every PR, and by
+# the weekly wiki reconciler. Adding a rule here is how you make a doc impossible to
+# forget. Spec: https://tech.helloally.ai/#/wiki/contributing/docs-system.md
+#
+# requires:
+#   <path>              a file in this repo — the PR must touch it
+#   wiki:<page>         a page in the wiki repo — the PR body must carry a Wiki-PR: trailer
+#
+# Escape hatch: add the `docs:skip` label, or a `Wiki-PR: none — <reason>` trailer.
+
+version: 1
+repo: ally-ai-learn
+
+rules:
+  - id: event-types
+    watch:
+      - "app/core/events/event_types/**"
+      - "app/core/events/factory.py"
+    requires: docs/04-event-types-reference.md
+    why: >
+      The event-type reference enumerates every detection type. A new type that is not
+      listed there is invisible to anyone configuring a scenario.
+
+  - id: providers
+    watch:
+      - "app/tts/**"
+      - "app/stt/**"
+      - "app/llms/**"
+    requires:
+      any_of:
+        - docs/05-tts-providers.md
+        - docs/06-stt-providers.md
+        - docs/07-llm-providers.md
+    why: Each provider family has a doc listing the supported providers and their config.
+
+  - id: graph-pipeline
+    watch:
+      - "app/core/graph/**"
+    requires: docs/02-graph-pipeline.md
+    why: The LangGraph node order and state shape are documented, not inferable at a glance.
+
+  - id: repo-page-architecture
+    watch:
+      - "app/worker.py"
+      - "app/main.py"
+    requires: wiki:repos/ally-ai-learn.md
+    why: Worker lifecycle and entry points are what the platform-level docs describe.
+
+  - id: agent-entrypoints-in-sync
+    watch:
+      - "AGENTS.md"
+      - "CLAUDE.md"
+    requires: mirror
+    why: >
+      AGENTS.md and CLAUDE.md must stay byte-identical. `mirror` asserts equality rather
+      than requiring a companion edit.
