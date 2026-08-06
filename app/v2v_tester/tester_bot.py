@@ -183,7 +183,16 @@ class V2VTesterBot:
             "maxExchanges": max_exchanges,
             "exchangesCompleted": 0,
             "utterancesHeard": 0,
+            # Degenerate STT captures (very short fragments like a lone
+            # "ഇറങ്ങുന്നു.") — a per-run signal of transcription trouble AND
+            # the inputs that stress the agent's coherence guardrail.
+            "sttFragments": 0,
             "ttsFailures": 0,
+            # Learner turns the end-of-run judge flags as breaking the
+            # counselor role (the tester LLM occasionally answers as the
+            # client) — tester-quality signal so agent metrics aren't
+            # polluted by a misbehaving tester.
+            "roleDriftTurns": None,
             "endReason": "unknown",
         }
         self._http_session: Optional[aiohttp.ClientSession] = None
@@ -297,6 +306,7 @@ class V2VTesterBot:
             language=self.language,
         )
         conversation: list[dict] = []
+        self._conversation = conversation
 
         try:
             await self._converse(
@@ -363,6 +373,53 @@ class V2VTesterBot:
 
     # ── Session end ───────────────────────────────────────────────────────────
 
+    async def _assess_role_fidelity(self) -> None:
+        """One cheap end-of-run judge call: count learner turns that broke
+        the counselor role (the tester LLM occasionally answers as the
+        client). Tester-quality metric — keeps a misbehaving tester from
+        polluting the agent's evaluation. Best-effort; None when skipped."""
+        learner_turns = [
+            m["content"]
+            for m in getattr(self, "_conversation", [])
+            if m.get("role") == "user"
+        ]
+        if not learner_turns:
+            return
+        try:
+            from openai import AsyncOpenAI
+
+            llm = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+            numbered = "\n".join(f"{i + 1}. {t}" for i, t in enumerate(learner_turns))
+            resp = await asyncio.wait_for(
+                llm.chat.completions.create(
+                    model="gpt-4o-mini",
+                    max_tokens=20,
+                    temperature=0,
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": (
+                                "The numbered lines are turns spoken by a "
+                                "TRAINEE COUNSELOR in a counseling role-play. "
+                                "A turn breaks role if the speaker talks as "
+                                "the CLIENT (describing their own stress or "
+                                "problems as the one seeking help) instead of "
+                                "counseling. Reply with ONLY the count of "
+                                "role-breaking turns as an integer."
+                            ),
+                        },
+                        {"role": "user", "content": numbered},
+                    ],
+                ),
+                timeout=15.0,
+            )
+            text = (resp.choices[0].message.content or "").strip()
+            digits = "".join(ch for ch in text if ch.isdigit())
+            if digits:
+                self._metrics["roleDriftTurns"] = int(digits)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("[V2V] role-fidelity check failed: %s", exc)
+
     async def _end_session_on_backend(
         self, http_session: aiohttp.ClientSession
     ) -> None:
@@ -378,14 +435,17 @@ class V2VTesterBot:
             "x-api-key": settings.CORE_SERVICE_API_KEY,
             "Content-Type": "application/json",
         }
+        await self._assess_role_fidelity()
         logger.info(
             "[V2V_METRICS] room=%s exchanges=%d/%d utterances_heard=%d "
-            "tts_failures=%d end_reason=%s",
+            "stt_fragments=%d tts_failures=%d role_drift=%s end_reason=%s",
             self.room_name,
             self._metrics["exchangesCompleted"],
             self._metrics["maxExchanges"],
             self._metrics["utterancesHeard"],
+            self._metrics["sttFragments"],
             self._metrics["ttsFailures"],
+            self._metrics["roleDriftTurns"],
             self._metrics["endReason"],
         )
         payload = {"counselorId": self.counselor_id, "metrics": self._metrics}
@@ -443,6 +503,8 @@ class V2VTesterBot:
                 pending_chunks.clear()
                 logger.info("[V2V] STT utterance (debounced): %r", utterance[:120])
                 self._metrics["utterancesHeard"] += 1
+                if len(utterance) < 20:
+                    self._metrics["sttFragments"] += 1
                 asyncio.ensure_future(self._utterance_queue.put(utterance))
 
         async def _collect() -> None:
