@@ -552,10 +552,12 @@ def create_shutdown_handler(
         if pending_finalize is not None and not pending_finalize.done():
             logger.info("Draining in-flight finalize task before cleanup")
             try:
-                await asyncio.wait_for(asyncio.shield(pending_finalize), timeout=12.0)
+                # Budget: one full compaction attempt (ROLLING_SUMMARY_TIMEOUT,
+                # 8s) + the 6s retry in finalize_session, with headroom.
+                await asyncio.wait_for(asyncio.shield(pending_finalize), timeout=16.0)
             except asyncio.TimeoutError:
                 logger.warning(
-                    "Finalize task did not finish within 12s; "
+                    "Finalize task did not finish within 16s; "
                     "session memory may be lost for this session"
                 )
             except Exception:  # noqa: BLE001 - drain must never break shutdown

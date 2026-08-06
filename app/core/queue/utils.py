@@ -191,28 +191,44 @@ async def _emit_session_memory(
     if llm_client is not None and messages and covered_count < len(messages):
         from app.core.graph.rolling_summary import update_rolling_summary
 
-        try:
-            upgraded, upgraded_structured = await asyncio.wait_for(
-                update_rolling_summary(
-                    previous_summary=maintained or None,
-                    new_messages=messages[covered_count:],
-                    llm_client=llm_client,
-                    prompt_data=prompt_data,
-                    room_id=room_id,
-                ),
-                timeout=settings.ROLLING_SUMMARY_TIMEOUT,
-            )
-        except Exception as e:
-            logger.warning(
-                "Final session-memory compaction failed (%s); %s",
-                e,
-                (
-                    f"phase-1 summary covering {covered_count}/{message_count} "
-                    "messages already sent"
-                    if maintained
-                    else "no summary was available to send"
-                ),
-            )
+        # Two attempts: a transient LLM stall (observed live: TimeoutError on
+        # a 6-exchange session) must not silently lose the session's ONLY
+        # memory when there is no maintained summary to fall back on. The
+        # retry uses a shorter timeout so both attempts fit the shutdown
+        # drain window (handlers.py).
+        upgraded = upgraded_structured = None
+        for attempt, attempt_timeout in enumerate(
+            (settings.ROLLING_SUMMARY_TIMEOUT, 6.0), start=1
+        ):
+            try:
+                upgraded, upgraded_structured = await asyncio.wait_for(
+                    update_rolling_summary(
+                        previous_summary=maintained or None,
+                        new_messages=messages[covered_count:],
+                        llm_client=llm_client,
+                        prompt_data=prompt_data,
+                        room_id=room_id,
+                    ),
+                    timeout=attempt_timeout,
+                )
+                break
+            except Exception as e:
+                logger.warning(
+                    "Final session-memory compaction attempt %d failed (%r); %s",
+                    attempt,
+                    e,
+                    (
+                        "retrying once"
+                        if attempt == 1
+                        else (
+                            f"phase-1 summary covering {covered_count}/"
+                            f"{message_count} messages already sent"
+                            if maintained
+                            else "no summary was available to send"
+                        )
+                    ),
+                )
+        if upgraded is None:
             return
         upgraded = (upgraded or "").strip()
         if upgraded and upgraded != maintained:
