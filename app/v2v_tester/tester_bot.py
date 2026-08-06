@@ -3,10 +3,19 @@ V2V tester bot: simulated learner that joins a LiveKit room, listens to the
 counselor AI, and responds using a cheap LLM + TTS voice.
 
 Flow per exchange:
-  counselor speaks → Deepgram streaming STT → final transcript
+  counselor speaks → streaming STT (language-appropriate provider) → transcript
       → gpt-4o-mini generates learner reply
-      → Deepgram Aura TTS synthesizes audio
+      → language-appropriate TTS synthesizes audio
       → audio frames published to LiveKit room
+
+Provider selection mirrors the live platform (via the app.stt/app.tts
+factories): Indian languages use Sarvam for BOTH sides (the same stack the
+counselor runs, so the test exercises production providers) with a tester
+speaker distinct from the counselor voices; English stays on Deepgram
+(nova STT + Aura TTS). This is what makes v2v testing usable beyond
+English — previously both STT and TTS were hardcoded to Deepgram, so a
+Malayalam test had an English-accented tester voice the counselor's Sarvam
+STT could not reliably transcribe.
 
 The bot disconnects after `max_exchanges` counselor→learner exchanges or a
 configurable idle timeout.
@@ -30,11 +39,72 @@ logger = get_logger(__name__)
 
 # ── Language mapping helpers ──────────────────────────────────────────────────
 
-# Tester bot uses Deepgram Aura TTS (already wired in the system, no extra
-# credentials).  Use a voice different from the counselor's so transcripts are
-# distinguishable.  Deepgram Aura is English-only; non-English sessions will
-# still work but the tester voice will have an English accent.
+# English tester voice: Deepgram Aura (cheap, already wired). Distinct from
+# counselor voices so transcripts are distinguishable.
 _TESTER_TTS_MODEL = "aura-2-andromeda-en"
+
+# Indian-language tester stack: Sarvam for both STT and TTS — the same
+# providers the counselor runs in production, so a v2v run exercises the real
+# pipeline. Speaker chosen to differ from the counselor voice catalog's
+# common picks (abhilash/meera) so the two sides remain distinguishable.
+_SARVAM_LANG_ROOTS = {"hi", "ta", "te", "kn", "ml", "mr", "bn", "gu", "pa", "od", "or"}
+_SARVAM_TESTER_SPEAKER = "anushka"
+_SARVAM_TESTER_TTS_MODEL = "bulbul:v2"
+_SARVAM_TESTER_STT_MODEL = "saarika:v2.5"
+
+
+def _uses_sarvam(language: str) -> bool:
+    return language.split("-")[0].lower() in _SARVAM_LANG_ROOTS
+
+
+def _make_tts(language: str, http_session: aiohttp.ClientSession):
+    """Language-appropriate tester TTS plugin instance.
+
+    Constructed directly (not via app.tts.factory): the tester runs as a
+    plain LiveKit participant, NOT inside an agent job context, so the plugin
+    cannot fetch the job-shared aiohttp session — it must be passed
+    explicitly (first v2v run failed with "Attempted to use an http session
+    outside of a job context" when the factory-built instance omitted it).
+    """
+    if _uses_sarvam(language):
+        from livekit.plugins import sarvam
+
+        from app.core.constants import convert_language_code_for_sarvam
+
+        return sarvam.TTS(
+            target_language_code=convert_language_code_for_sarvam(language),
+            model=_SARVAM_TESTER_TTS_MODEL,
+            speaker=_SARVAM_TESTER_SPEAKER,
+            api_key=settings.SARVAM_API_KEY,
+            http_session=http_session,
+        )
+    return deepgram.TTS(
+        model=_TESTER_TTS_MODEL,
+        api_key=settings.DEEPGRAM_API_KEY,
+        http_session=http_session,
+    )
+
+
+def _make_stt(language: str, http_session: aiohttp.ClientSession):
+    """Language-appropriate tester STT plugin instance (streaming)."""
+    if _uses_sarvam(language):
+        from app.stt.factory import create_stt_client
+
+        client = create_stt_client(
+            stt_config={
+                "provider": "sarvam",
+                "config": {"model": _SARVAM_TESTER_STT_MODEL},
+            },
+            language_code=language,
+        )
+        return client.stt_instance
+    return deepgram.STT(
+        model="nova-2",
+        language=_deepgram_lang(language),
+        api_key=settings.DEEPGRAM_API_KEY,
+        http_session=http_session,
+    )
+
 
 # BCP-47 root → Deepgram language code (Deepgram uses ISO-639-1).
 _DEEPGRAM_LANG: dict[str, str] = {
@@ -43,7 +113,7 @@ _DEEPGRAM_LANG: dict[str, str] = {
     "en-IN": "en",
     "hi": "hi",
     "hi-IN": "hi",
-    "mr": "hi",   # Deepgram doesn't support Marathi; Hindi is the closest
+    "mr": "hi",  # Deepgram doesn't support Marathi; Hindi is the closest
     "mr-IN": "hi",
     "ta": "ta",
     "ta-IN": "ta",
@@ -185,13 +255,25 @@ class V2VTesterBot:
                     len(p.track_publications),
                 )
         else:
-            logger.info("[V2V] no other participants in room yet — waiting for counselor")
+            logger.info(
+                "[V2V] no other participants in room yet — waiting for counselor"
+            )
+
+        # Create the TTS first: AudioSource's sample rate must match the TTS
+        # output rate (Deepgram Aura = 24 kHz, Sarvam bulbul differs) or
+        # LiveKit rejects the frames with an InvalidState error.
+        tts = _make_tts(self.language, self._http_session)
+        tts_sample_rate = int(getattr(tts, "sample_rate", 24000) or 24000)
+        logger.info(
+            "[V2V] tester providers: tts=%s (rate=%d) language=%s",
+            type(tts).__module__,
+            tts_sample_rate,
+            self.language,
+        )
 
         # Publish a microphone track so the agent can hear us.
-        # Deepgram TTS outputs 24 kHz linear16 by default — AudioSource must
-        # match or LiveKit rejects the frames with an InvalidState error.
         self._audio_source = rtc.AudioSource(
-            sample_rate=24000, num_channels=1, queue_size_ms=1000
+            sample_rate=tts_sample_rate, num_channels=1, queue_size_ms=1000
         )
         local_track = rtc.LocalAudioTrack.create_audio_track(
             "v2v-learner-mic", self._audio_source
@@ -199,12 +281,6 @@ class V2VTesterBot:
         pub_options = rtc.TrackPublishOptions()
         pub_options.source = rtc.TrackSource.SOURCE_MICROPHONE
         await room.local_participant.publish_track(local_track, pub_options)
-
-        tts = deepgram.TTS(
-            model=_TESTER_TTS_MODEL,
-            api_key=settings.DEEPGRAM_API_KEY,
-            http_session=self._http_session,
-        )
         llm = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
 
         # Build the system prompt once.
@@ -219,7 +295,9 @@ class V2VTesterBot:
         conversation: list[dict] = []
 
         try:
-            await self._converse(tts, llm, system_prompt, conversation, self._http_session)
+            await self._converse(
+                tts, llm, system_prompt, conversation, self._http_session
+            )
         finally:
             for t in list(self._bg_tasks):
                 t.cancel()
@@ -234,7 +312,7 @@ class V2VTesterBot:
 
     async def _converse(
         self,
-        tts: deepgram.TTS,
+        tts,
         llm: AsyncOpenAI,
         system_prompt: str,
         conversation: list[dict],
@@ -264,9 +342,7 @@ class V2VTesterBot:
             conversation.append({"role": "assistant", "content": counselor_text})
 
             # Generate a short learner reply.
-            learner_reply = await self._generate_reply(
-                llm, system_prompt, conversation
-            )
+            learner_reply = await self._generate_reply(llm, system_prompt, conversation)
             if not learner_reply:
                 continue
 
@@ -280,7 +356,9 @@ class V2VTesterBot:
 
     # ── Session end ───────────────────────────────────────────────────────────
 
-    async def _end_session_on_backend(self, http_session: aiohttp.ClientSession) -> None:
+    async def _end_session_on_backend(
+        self, http_session: aiohttp.ClientSession
+    ) -> None:
         """
         Call ally-be's internal end-v2v endpoint so summary generation runs
         in local dev (no room_finished webhook) and production alike.
@@ -318,21 +396,18 @@ class V2VTesterBot:
 
     # ── STT: stream counselor audio → transcript ──────────────────────────────
 
-    async def _stream_and_transcribe(self, track: rtc.Track, http_session: aiohttp.ClientSession) -> None:
+    async def _stream_and_transcribe(
+        self, track: rtc.Track, http_session: aiohttp.ClientSession
+    ) -> None:
         """
         Subscribe to a remote audio track and emit utterances to
         _utterance_queue as the counselor finishes each sentence.
 
-        Uses Deepgram streaming STT + a silence-gate timer.  When
+        Uses language-appropriate streaming STT + a silence-gate timer.  When
         _SILENCE_GATE_S of silence is detected we flush and collect the
         partial transcript accumulated so far.
         """
-        stt_plugin = deepgram.STT(
-            model="nova-2",
-            language=_deepgram_lang(self.language),
-            api_key=settings.DEEPGRAM_API_KEY,
-            http_session=http_session,
-        )
+        stt_plugin = _make_stt(self.language, http_session)
         audio_stream = rtc.AudioStream(track, sample_rate=16000, num_channels=1)
         stt_stream = stt_plugin.stream()
 
@@ -408,7 +483,10 @@ class V2VTesterBot:
                     model="gpt-4o-mini",
                     max_tokens=80,
                     temperature=0.8,
-                    messages=[{"role": "system", "content": system_prompt}, *conversation],
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        *conversation,
+                    ],
                 ),
                 timeout=15.0,
             )
@@ -419,11 +497,21 @@ class V2VTesterBot:
 
     # ── TTS: synthesize and publish audio frames ──────────────────────────────
 
-    async def _speak(self, tts: deepgram.TTS, text: str) -> None:
+    async def _speak(self, tts, text: str) -> None:
         if not self._audio_source or not text:
             return
         try:
-            stream = tts.synthesize(text)
+            # Sarvam: the plugin's REST synthesize() path is broken in the
+            # pinned version (libav InvalidDataError decoding the response);
+            # the WebSocket stream() path is what the live agent uses and it
+            # works — use it here too. Deepgram Aura keeps REST synthesize().
+            if "sarvam" in type(tts).__module__:
+                stream = tts.stream()
+                stream.push_text(text)
+                stream.flush()
+                stream.end_input()
+            else:
+                stream = tts.synthesize(text)
             async for ev in stream:
                 frame = getattr(ev, "frame", None)
                 if frame is not None:
@@ -439,6 +527,7 @@ class V2VTesterBot:
 
 
 # ── Background task launcher (called from the FastAPI router) ─────────────────
+
 
 def launch_tester(
     room_name: str,

@@ -27,9 +27,10 @@ async def start_v2v_tester(
     Start an AI simulated learner bot in the given LiveKit room.
 
     The bot joins as a plain participant (not a LiveKit agent), subscribes to
-    the counselor AI's audio, transcribes it via Deepgram, generates learner
-    responses with gpt-4o-mini, and speaks them back using a cheap Google
-    Standard TTS voice.
+    the counselor AI's audio, transcribes it with a language-appropriate STT
+    (Sarvam for Indian languages, Deepgram for English), generates learner
+    responses with gpt-4o-mini, and speaks them back with a matching TTS
+    voice (Sarvam bulbul / Deepgram Aura).
 
     Returns immediately — the bot runs as a background asyncio task.
     """
