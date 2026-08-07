@@ -10,11 +10,19 @@ twice anywhere in this platform, that's a bug worth fixing.
 fronted by [`docs/readme.md`](docs/readme.md), which is organised by intent ("I want to add
 a new provider" → the two docs you need). Use it; it will beat searching the tree.
 
-## Before you touch anything user-facing
+## Before you write an implementation plan
 
-Read [Product Best Practices](https://tech.helloally.ai/#/wiki/product/best-practices.md)
-and the one subsection that matches your change. Internal work — refactors, migrations,
-infra, tests — is exempt.
+Call the stacks MCP's `search_chunks` tool with **2-3 queries** covering the task's main
+topics, incorporate what comes back, and cite chunk titles. The `stacks` server is declared
+in this repo's committed [`.mcp.json`](.mcp.json) and reads `STACKS_API_KEY` from the
+environment - setup, query technique and citation format:
+[Planning with Stacks](https://tech.helloally.ai/#/wiki/contributing/planning-with-stacks.md).
+Trivial mechanical changes (rename, dependency bump, typo) are exempt.
+
+Stacks **replaced** the wiki's Product Management Best Practices, deprecated 2026-08-07:
+nothing there is a gate, and Stacks wins on conflict. Those pages still record Ally-specific
+traps a general corpus won't have, so check them when a query comes back empty on something
+Ally-specific.
 
 ## What am I doing?
 
@@ -36,7 +44,8 @@ infra, tests — is exempt.
 - `app/worker.py` — the LiveKit agent. `app/main.py` — the FastAPI surface.
 - `app/core/graph/` — LangGraph: process_events → resolve_branching →
   generate_response/detect_behaviors → apply_voice → send_feedback.
-- `app/core/events/` — 9 event types, orchestrator, registry, scoring, eligibility.
+- `app/core/events/` — one package per event type, plus orchestrator, registry, scoring,
+  eligibility. `docs/04-event-types-reference.md` is the authoritative list.
 - `app/tts/`, `app/stt/`, `app/llms/` — each with a `factory.py`.
 - `app/prompts/` — system, branching, prosody, events.
 
@@ -88,10 +97,11 @@ git clone --depth=1 https://github.com/helloallytech/helloallytech.github.io .wi
 ## Canonical docs
 
 The [Ally Developer Wiki](https://tech.helloally.ai) is the source of truth for platform
-architecture, SDLC rules, and product practice —
+architecture and SDLC rules (product practice now comes from Stacks) —
 [this repo's page](https://tech.helloally.ai/#/wiki/repos/ally-ai-learn.md) ·
 [architecture](https://tech.helloally.ai/#/wiki/platform/architecture.md) ·
 [contributing](https://tech.helloally.ai/#/wiki/contributing/guide.md) ·
+[planning with Stacks](https://tech.helloally.ai/#/wiki/contributing/planning-with-stacks.md) ·
 [how the docs system works](https://tech.helloally.ai/#/wiki/contributing/docs-system.md).
 
 > ⚠️ The wiki is **public**. Never add secrets, credentials, IP addresses, internal
