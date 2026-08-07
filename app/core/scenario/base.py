@@ -732,6 +732,11 @@ class Scenario(BaseModel):
                 "history_trim_enabled": bool(
                     prompt_data_dict.get("historyTrimEnabled") or False
                 ),
+                "turn_max_endpointing_delay": (
+                    prompt_data_dict.get("turnMaxEndpointingDelay")
+                    if prompt_data_dict.get("turnMaxEndpointingDelay") is not None
+                    else prompt_data_dict.get("turn_max_endpointing_delay")
+                ),
                 "selected_main_prompt_code": prompt_data_dict.get(
                     "selectedMainPromptCode"
                 ),

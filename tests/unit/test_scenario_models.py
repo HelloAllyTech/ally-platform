@@ -577,6 +577,30 @@ class TestScenario:
         assert result.profession == "Teacher"
         assert len(result.opening_statements) == 2
 
+    def test_scenario_build_prompt_data_maps_turn_max_endpointing_delay(self):
+        """_build_prompt_data must map the incoming camelCase
+        turnMaxEndpointingDelay onto PromptData.turn_max_endpointing_delay.
+
+        Regression test: this field's Pydantic definition and its consumer
+        (_resolve_turn_detection) were both correct, but the value was
+        silently dropped because mapped_data (this hand-maintained dict) had
+        no entry for it — every field must be explicitly wired here, there
+        is no generic camelCase->snake_case conversion.
+        """
+        raw_payload = {"promptData": {"turnMaxEndpointingDelay": 1.5}}
+
+        result = Scenario._build_prompt_data(raw_payload)
+
+        assert result.turn_max_endpointing_delay == 1.5
+
+    def test_scenario_build_prompt_data_turn_max_endpointing_delay_unset(self):
+        """Absent from the payload -> None, not 0 or some other falsy default."""
+        raw_payload = {"promptData": {"name": "Test Character"}}
+
+        result = Scenario._build_prompt_data(raw_payload)
+
+        assert result.turn_max_endpointing_delay is None
+
     @pytest.mark.unit
     def test_scenario_build_prompt_data_missing_key(self, mock_logger):
         """Test _build_prompt_data with missing promptData key."""
