@@ -1,37 +1,108 @@
-# ally-ai-learn — Documentation lives in the Ally Developer Wiki
+# ally-ai-learn — start here
 
-The canonical documentation for the Ally platform is maintained centrally in the
-**Ally Developer Wiki**. Read it before starting work, and update it whenever you
-change architecture, workflows, environment setup, or SDLC rules.
+LiveKit voice-training agent: FastAPI + LiveKit Agents + LangGraph. Python 3.12+, Poetry.
 
-- 🌐 Browse: https://tech.helloally.ai
-- 📁 Source: the `helloallytech.github.io` repo, `wiki/` folder (`wiki/repos/ally-ai-learn.md` for this service)
+This file is a **router**: find your task below, read what it points at, skip the rest.
+Conventions with a canonical home are linked, never restated — if you find a rule written
+twice anywhere in this platform, that's a bug worth fixing.
+
+**This repo has the deepest local docs on the platform** — 14 numbered guides in `docs/`,
+fronted by [`docs/readme.md`](docs/readme.md), which is organised by intent ("I want to add
+a new provider" → the two docs you need). Use it; it will beat searching the tree.
 
 ## Before you write an implementation plan
 
-**Call the stacks MCP's `search_chunks` tool with 2–3 queries covering the task's main topics, and
-incorporate relevant returned guidance, citing chunk titles.**
-
-The `stacks` server is declared in this repo's committed `.mcp.json`; it reads your
-`STACKS_API_KEY` from the environment, so no key is ever committed. Setup, query technique and the
-citation format: https://tech.helloally.ai/#/wiki/contributing/planning-with-stacks.md
-
+Call the stacks MCP's `search_chunks` tool with **2-3 queries** covering the task's main
+topics, incorporate what comes back, and cite chunk titles. The `stacks` server is declared
+in this repo's committed [`.mcp.json`](.mcp.json) and reads `STACKS_API_KEY` from the
+environment - setup, query technique and citation format:
+[Planning with Stacks](https://tech.helloally.ai/#/wiki/contributing/planning-with-stacks.md).
 Trivial mechanical changes (rename, dependency bump, typo) are exempt.
 
-Stacks **replaced** the wiki's `Product Management Best Practices` section, which was deprecated
-on 2026-08-07 and is kept for history only — nothing in it is a gate, and where it conflicts with
-Stacks, Stacks wins. It still records Ally-specific traps a general corpus won't have, so it is
-worth checking when a query comes back empty on something Ally-specific.
+Stacks **replaced** the wiki's Product Management Best Practices, deprecated 2026-08-07:
+nothing there is a gate, and Stacks wins on conflict. Those pages still record Ally-specific
+traps a general corpus won't have, so check them when a query comes back empty on something
+Ally-specific.
 
-## Key pages
-- This repo — https://tech.helloally.ai/#/wiki/repos/ally-ai-learn.md
-- Platform overview — https://tech.helloally.ai/#/wiki/platform/overview.md
-- Architecture & data flow — https://tech.helloally.ai/#/wiki/platform/architecture.md
-- Cross-repo agent guide (conventions, common tasks, gotchas) — https://tech.helloally.ai/#/wiki/platform/agent-guide.md
-- *(Deprecated 2026-08-07)* Product Management Best Practices — https://tech.helloally.ai/#/wiki/product/best-practices.md — replaced by Stacks; kept for history, no longer a gate.
-- Contributing / SDLC rules — https://tech.helloally.ai/#/wiki/contributing/guide.md
-- **Planning with the Stacks MCP** (search before every implementation plan) — https://tech.helloally.ai/#/wiki/contributing/planning-with-stacks.md
-- Developer setup — https://tech.helloally.ai/#/wiki/contributing/dev-setup.md
+## What am I doing?
+
+| Task | Read first |
+|---|---|
+| Understanding the system at all | [`docs/architecture.md`](docs/architecture.md) → [`docs/01-worker-lifecycle.md`](docs/01-worker-lifecycle.md) → [`docs/02-graph-pipeline.md`](docs/02-graph-pipeline.md) |
+| Adding an event type | [`docs/03-event-system.md`](docs/03-event-system.md) + [`docs/04-event-types-reference.md`](docs/04-event-types-reference.md), then the recipe below |
+| Adding a TTS / STT / LLM provider | [`docs/05-tts-providers.md`](docs/05-tts-providers.md) · [`docs/06-stt-providers.md`](docs/06-stt-providers.md) · [`docs/07-llm-providers.md`](docs/07-llm-providers.md) |
+| Scenario configuration | [`docs/09-scenario-engine.md`](docs/09-scenario-engine.md), then [`docs/10-branching-instructions.md`](docs/10-branching-instructions.md) |
+| Prompt overrides | [`docs/12-prompts-system.md`](docs/12-prompts-system.md) |
+| Queue / SQS messaging | [`docs/11-queue-messaging.md`](docs/11-queue-messaging.md) |
+| Ending a simulation | [`docs/13-event-termination.md`](docs/13-event-termination.md) |
+| Local setup | [`docs/getting-started.md`](docs/getting-started.md), [`docs/LOCAL_DEV.md`](docs/LOCAL_DEV.md) |
+| Deploying | [`DEPLOYMENT.md`](DEPLOYMENT.md), [`.github/RELEASE_GUIDE.md`](.github/RELEASE_GUIDE.md) |
+| Anything else | [`WIKI-ROUTING.md`](WIKI-ROUTING.md) — one line per wiki page, tells you which to fetch |
+
+## Repo shape
+
+- `app/worker.py` — the LiveKit agent. `app/main.py` — the FastAPI surface.
+- `app/core/graph/` — LangGraph: process_events → resolve_branching →
+  generate_response/detect_behaviors → apply_voice → send_feedback.
+- `app/core/events/` — one package per event type, plus orchestrator, registry, scoring,
+  eligibility. `docs/04-event-types-reference.md` is the authoritative list.
+- `app/tts/`, `app/stt/`, `app/llms/` — each with a `factory.py`.
+- `app/prompts/` — system, branching, prosody, events.
+
+## Recipes
+
+**New event type** — class in `app/core/events/event_types/`, register in
+`app/core/events/factory.py`, prompts in `app/prompts/events/`, then update
+`docs/04-event-types-reference.md` (CI enforces this).
+
+**New provider** — class in `app/tts|stt|llms/`, extend that family's `factory.py`, update
+the matching `docs/05–07` file.
+
+## Gotchas that change what you write
+
+- **Rooms come from ally-be.** This agent joins LiveKit rooms it did not create; room
+  metadata carries the scenario configuration. Don't assume you can set it here.
+- **Registration is the easy thing to forget.** A provider or event type that isn't in its
+  `factory.py` fails silently at runtime rather than at import.
+- **Events have eligibility constraints**, not just triggers — read
+  [`docs/03-event-system.md`](docs/03-event-system.md) before debugging one that "never fires".
+- **SQS in dev is LocalStack**, started by docker-compose. Queue URLs differ from production.
+- **Python 3.12+.** Not the system Python on most machines.
+
+## Commands
+
+```bash
+make install
+make test
+make lint
+make fix       # format + autofix
+```
+
+## When your change outdates a doc
+
+[`.docs-map.yml`](.docs-map.yml) declares which docs cover which code, and CI enforces it.
+Adding an event type without touching `docs/04-event-types-reference.md` fails the build —
+either update it, or apply the `docs:skip` label with a reason.
+
+Wiki edits do **not** need a hand-rolled second PR:
+
+```bash
+git clone --depth=1 https://github.com/helloallytech/helloallytech.github.io .wiki-tmp
+# edit .wiki-tmp/wiki/**
+.wiki-tmp/scripts/wiki-pr.sh "<url of this PR>"     # prints the Wiki-PR: trailer to paste
+```
+
+`.wiki-tmp/` is gitignored. The wiki PR merges when this one does.
+
+## Canonical docs
+
+The [Ally Developer Wiki](https://tech.helloally.ai) is the source of truth for platform
+architecture and SDLC rules (product practice now comes from Stacks) —
+[this repo's page](https://tech.helloally.ai/#/wiki/repos/ally-ai-learn.md) ·
+[architecture](https://tech.helloally.ai/#/wiki/platform/architecture.md) ·
+[contributing](https://tech.helloally.ai/#/wiki/contributing/guide.md) ·
+[planning with Stacks](https://tech.helloally.ai/#/wiki/contributing/planning-with-stacks.md) ·
+[how the docs system works](https://tech.helloally.ai/#/wiki/contributing/docs-system.md).
 
 > ⚠️ The wiki is **public**. Never add secrets, credentials, IP addresses, internal
 > hostnames/domains, or cloud region details to it.

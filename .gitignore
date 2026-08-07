@@ -255,3 +255,6 @@ credentials.json
 private_key*
 public_key*
 .claude/
+
+# Scratch clone of the wiki, created by the wiki-pr flow (see AGENTS.md)
+.wiki-tmp/
