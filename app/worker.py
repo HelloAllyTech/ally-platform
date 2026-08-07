@@ -596,6 +596,14 @@ class AgentWorker:
         Fully defensive: with no VAD, or the flag off, or the model unavailable
         (e.g. weights weren't baked into the image), we fall back to the plain
         "vad" timeout so a session never fails to start over turn detection.
+
+        max_delay honors a per-scenario override (prompt_data.
+        turn_max_endpointing_delay) when settings.
+        TURN_ENDPOINTING_SCENARIO_OVERRIDE_ENABLED is True — lets individual
+        scenarios pick their own speed-vs-interruption trade-off instead of
+        sharing one platform-wide ceiling. Falls back to the global setting
+        when unset, disabled, or no scenario is available.
+
         Returns ``(turn_detection, endpointing_kwargs)``.
         """
         if not vad:
@@ -606,7 +614,18 @@ class AgentWorker:
             from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
             min_delay = float(getattr(settings, "TURN_MIN_ENDPOINTING_DELAY", 0.5))
-            max_delay = float(getattr(settings, "TURN_MAX_ENDPOINTING_DELAY", 3.0))
+            scenario_max_delay = None
+            if getattr(settings, "TURN_ENDPOINTING_SCENARIO_OVERRIDE_ENABLED", True):
+                scenario_max_delay = getattr(
+                    getattr(self.scenario, "prompt_data", None),
+                    "turn_max_endpointing_delay",
+                    None,
+                )
+            max_delay = float(
+                scenario_max_delay
+                if scenario_max_delay is not None
+                else getattr(settings, "TURN_MAX_ENDPOINTING_DELAY", 3.0)
+            )
             # The EOU model weights are loaded once per WORKER by the inference
             # executor (registered at module import — see the top-of-file note),
             # so this per-job construction is a lightweight handle to that

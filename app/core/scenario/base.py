@@ -292,6 +292,20 @@ class PromptData(BaseModel):
             "settings.HISTORY_TRIM_* and app/core/graph/nodes.py."
         ),
     )
+    turn_max_endpointing_delay: Optional[float] = Field(
+        default=None,
+        description=(
+            "Per-simulation override (seconds) for settings."
+            "TURN_MAX_ENDPOINTING_DELAY — how long semantic turn-detection will "
+            "wait for a learner who seems mid-thought before giving up and "
+            "replying anyway. None (default) uses the global setting. Lower = "
+            "faster replies but more risk of interrupting; higher = fewer "
+            "interruptions but more perceived dead air. Only takes effect when "
+            "settings.SEMANTIC_TURN_DETECTION_ENABLED and settings."
+            "TURN_ENDPOINTING_SCENARIO_OVERRIDE_ENABLED are both True. See "
+            "app/worker.py:_resolve_turn_detection."
+        ),
+    )
     selected_main_prompt_code: Optional[str] = Field(
         default=None,
         description=(

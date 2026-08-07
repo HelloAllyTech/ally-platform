@@ -569,6 +569,16 @@ class Settings(BaseSettings):
             "learner is likely mid-thought. LiveKit default 3.0."
         ),
     )
+    TURN_ENDPOINTING_SCENARIO_OVERRIDE_ENABLED: bool = Field(
+        default=True,
+        description=(
+            "Global kill-switch for prompt_data.turn_max_endpointing_delay "
+            "(per-scenario override of TURN_MAX_ENDPOINTING_DELAY). When False, "
+            "every scenario uses the global TURN_MAX_ENDPOINTING_DELAY "
+            "regardless of its own setting — an instant way to force one "
+            "platform-wide value without touching scenario config."
+        ),
+    )
 
     # ---- Conversation-history trimming (prompt shortening) ----
     # Per-scenario opt-in via prompt_data.history_trim_enabled (Studio toggle

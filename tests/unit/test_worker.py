@@ -254,6 +254,81 @@ class TestWorker:
         assert isinstance(td, FakeMultilingualModel)
         assert "eou_load_ms" in w._timing
 
+    def test_resolve_turn_detection_scenario_override_used(self, monkeypatch):
+        import livekit.plugins.turn_detector.multilingual as ml
+
+        class FakeMultilingualModel:
+            def __init__(self):
+                pass
+
+        monkeypatch.setattr(ml, "MultilingualModel", FakeMultilingualModel)
+        monkeypatch.setattr(
+            worker.settings, "SEMANTIC_TURN_DETECTION_ENABLED", True, raising=False
+        )
+        monkeypatch.setattr(
+            worker.settings, "TURN_MAX_ENDPOINTING_DELAY", 3.0, raising=False
+        )
+        monkeypatch.setattr(
+            worker.settings,
+            "TURN_ENDPOINTING_SCENARIO_OVERRIDE_ENABLED",
+            True,
+            raising=False,
+        )
+        w = self._bare_worker()
+        w.scenario = types.SimpleNamespace(
+            prompt_data=types.SimpleNamespace(turn_max_endpointing_delay=1.2)
+        )
+        td, kwargs = w._resolve_turn_detection("VAD")
+        assert kwargs["max_endpointing_delay"] == 1.2
+
+    def test_resolve_turn_detection_scenario_override_disabled_by_global_flag(
+        self, monkeypatch
+    ):
+        import livekit.plugins.turn_detector.multilingual as ml
+
+        class FakeMultilingualModel:
+            def __init__(self):
+                pass
+
+        monkeypatch.setattr(ml, "MultilingualModel", FakeMultilingualModel)
+        monkeypatch.setattr(
+            worker.settings, "SEMANTIC_TURN_DETECTION_ENABLED", True, raising=False
+        )
+        monkeypatch.setattr(
+            worker.settings, "TURN_MAX_ENDPOINTING_DELAY", 3.0, raising=False
+        )
+        monkeypatch.setattr(
+            worker.settings,
+            "TURN_ENDPOINTING_SCENARIO_OVERRIDE_ENABLED",
+            False,
+            raising=False,
+        )
+        w = self._bare_worker()
+        w.scenario = types.SimpleNamespace(
+            prompt_data=types.SimpleNamespace(turn_max_endpointing_delay=1.2)
+        )
+        td, kwargs = w._resolve_turn_detection("VAD")
+        # Global flag off -> scenario override ignored, global value used.
+        assert kwargs["max_endpointing_delay"] == 3.0
+
+    def test_resolve_turn_detection_no_scenario_uses_global(self, monkeypatch):
+        import livekit.plugins.turn_detector.multilingual as ml
+
+        class FakeMultilingualModel:
+            def __init__(self):
+                pass
+
+        monkeypatch.setattr(ml, "MultilingualModel", FakeMultilingualModel)
+        monkeypatch.setattr(
+            worker.settings, "SEMANTIC_TURN_DETECTION_ENABLED", True, raising=False
+        )
+        monkeypatch.setattr(
+            worker.settings, "TURN_MAX_ENDPOINTING_DELAY", 3.0, raising=False
+        )
+        # self.scenario stays None (bare worker, never assigned).
+        td, kwargs = self._bare_worker()._resolve_turn_detection("VAD")
+        assert kwargs["max_endpointing_delay"] == 3.0
+
     def test_eou_runner_registered_at_import(self):
         # Importing app.worker must register the multilingual EOU inference runner
         # so the worker creates + warms its inference executor at bootstrap. Without
