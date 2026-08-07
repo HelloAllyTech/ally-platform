@@ -307,6 +307,11 @@ class AgentWorkerV2:
         Semantic EOU layered on VAD when enabled; plain VAD timeout as the
         universal fallback so a session never fails to start over turn
         detection.
+
+        Unlike v1, this does NOT honor a per-scenario max-endpointing-delay
+        override — v2 has no Scenario/PromptData object (it uses the
+        roleplay_v2 Persona/spec model instead), so there's no equivalent
+        field to read. Always uses the global settings.TURN_MAX_ENDPOINTING_DELAY.
         """
         if not vad:
             return None, {}
