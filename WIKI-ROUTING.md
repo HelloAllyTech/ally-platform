@@ -40,7 +40,7 @@ Fetch as `https://tech.helloally.ai/#/wiki/<path>`, or raw Markdown at `https://
 - `repos/ally-be.md` (1838w) — ally-be is the multi-tenant NestJS backend that owns Ally's primary PostgreSQL database and orchestrates auth…
 - `repos/ally-mobile.md` (1381w) — React Native iOS/Android app for mental-health counsellors, covering live sessions with transcription, peer reviews, voice-based…
 - `repos/ally-web.md` (1457w) — An Nx monorepo containing Ally's three user-facing web applications — a Next.js landing/resource site (port…
-- `repos/infra.md` (1411w) — The infra repo provisions Ally's Hetzner baremetal, Incus containers, and AWS services via Ansible +…
+- `repos/infra.md` (1961w) — The infra repo provisions Ally's Hetzner baremetal, Incus containers, and AWS services via Ansible +…
 
 ## Contributing & setup
 
@@ -52,7 +52,7 @@ Fetch as `https://tech.helloally.ai/#/wiki/<path>`, or raw Markdown at `https://
 
 ## Agent memory
 
-- `memory.md` (1244w) — Hard-won gotchas — read before touching auth, roles, permissions, migrations, or shared frontend modules. Each…
+- `memory.md` (1662w) — Hard-won gotchas — read before touching auth, roles, permissions, migrations, or shared frontend modules. Each…
 
 ## Skills
 
@@ -71,4 +71,4 @@ Fetch as `https://tech.helloally.ai/#/wiki/<path>`, or raw Markdown at `https://
 - `index.md` — human navigation catalog — ROUTING.md supersedes it for agents
 - `log.md` — append-only history — read only when auditing what changed
 
-_38 pages, 51,606 words total. Loading all of it would cost roughly 68,808 tokens — which is the entire reason this index exists._
+_38 pages, 52,977 words total. Loading all of it would cost roughly 70,636 tokens — which is the entire reason this index exists._
