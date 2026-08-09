@@ -71,4 +71,4 @@ Fetch as `https://tech.helloally.ai/#/wiki/<path>`, or raw Markdown at `https://
 - `index.md` — human navigation catalog — ROUTING.md supersedes it for agents
 - `log.md` — append-only history — read only when auditing what changed
 
-_38 pages, 53,311 words total. Loading all of it would cost roughly 71,081 tokens — which is the entire reason this index exists._
+_38 pages, 53,587 words total. Loading all of it would cost roughly 71,449 tokens — which is the entire reason this index exists._
