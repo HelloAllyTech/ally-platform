@@ -631,8 +631,11 @@ async def process_gating_events(
     Runs the full pass (detection + the single registry/cascade/combination pass
     + scoring + termination) but over ONLY the gating subset: branching,
     guardrail, termination, and combination-referenced events. The reply gates on
-    this node; the remaining independent non-branching events are detected off the
-    gate in process_deferred_events.
+    this node; the remaining independent non-branching events are detected off
+    the gate as a genuinely detached background task (_run_deferred_events),
+    spawned below rather than wired as a graph node/edge — see that function's
+    docstring and EVENTS_OFF_GATE_DEFER_DETECTION for why a graph node would
+    still block the reply despite nothing on the reply path needing its output.
     """
     orchestrator = (
         config["configurable"].get("event_orchestrator")
@@ -645,44 +648,91 @@ async def process_gating_events(
         else set()
     )
     gate_permitted = [e for e in state.permitted_events if e.event_id not in deferrable]
-    return await _process_events_impl(state, config, gate_permitted)
+    result = await _process_events_impl(state, config, gate_permitted)
+    if orchestrator is not None:
+        orchestrator._spawn_background(
+            _run_deferred_events(state, config, orchestrator),
+            label="process_deferred_events",
+        )
+    return result
 
 
-@instrumented_node("process_deferred_events")
-async def process_deferred_events(
-    state: SimulationState, config: Optional[RunnableConfig] = None
-) -> dict:
+async def _send_deferred_ui_feedback(
+    feedback: list[BranchingAndFeedbackData], room
+) -> None:
+    """Send a standalone UI score update for deferred (off-gate) events.
+
+    send_event_feedback (the graph node) merges branching + non-branching +
+    behavior feedback into ONE cumulative per-turn message — it assumes all
+    three are available in the same superstep. Deferred events resolve on a
+    genuinely detached background task (see _run_deferred_events) that can
+    finish well after send_event_feedback has already fired for this turn,
+    so they can't join that merge. This mirrors the same selection logic
+    (highest-|score| feedback message, summed score) scoped to just this
+    detection, firing its own UI push whenever it's ready.
+    """
+    if room is None or not feedback:
+        return
+    events_with_feedback = [ed for ed in feedback if ed.feedback is not None]
+    if not events_with_feedback:
+        return
+    cumulative_score = sum(ed.score for ed in events_with_feedback)
+    selected = max(events_with_feedback, key=lambda e: abs(e.score))
+    detected_event_ids = [ed.event_id for ed in events_with_feedback]
+    ui_message = CustomUIEventMessageType.create(
+        score=cumulative_score,
+        emoji=selected.feedback.emoji,
+        message=selected.feedback.message or "",
+        timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+        show_feedback=selected.feedback.show_feedback,
+        detected_event_ids=detected_event_ids,
+    )
+    log_side_effect(
+        "ui_publish_score_deferred",
+        cumulative_score=cumulative_score,
+        event_count=len(events_with_feedback),
+    )
+    await send_event_to_ui(ui_message, room)
+
+
+async def _run_deferred_events(
+    state: SimulationState, config: Optional[RunnableConfig], orchestrator
+) -> None:
     """Off-gate detection + processing for non-reply-shaping events.
 
-    Runs in parallel with the spoken reply (downstream of process_gating_events,
-    joining at send_event_feedback). Detects ONLY the deferrable leaf events and
-    scores/sends them via orchestrator.orchestrate_deferred_events — without
-    re-running the registry/cascade/combination pass. The LLM never waits on
-    these classifier calls. See EVENTS_OFF_GATE_DEFER_DETECTION.
+    Spawned as a genuinely DETACHED background task from process_gating_events
+    (via orchestrator._spawn_background) rather than being a graph node.
+    LangGraph schedules nodes in "supersteps" with a hard barrier between
+    them — a graph node here would still block resolve_branching_instruction/
+    generate_response on this work every turn (confirmed in production:
+    process_gating_events completing put this and
+    sync_events_and_behaviors_node in the same superstep, so the reply waited
+    on deferred detection's full duration despite depending only on the
+    latter). Being outside the graph entirely means it cannot participate in
+    any superstep and therefore cannot block the reply. Detects ONLY the
+    deferrable leaf events and scores/sends them via
+    orchestrator.orchestrate_deferred_events — without re-running the
+    registry/cascade/combination pass. See EVENTS_OFF_GATE_DEFER_DETECTION.
     """
     # Pause gate (mirror process_events): do nothing while paused.
     if config and "configurable" in config:
         _clock = config["configurable"].get("session_clock")
         if _clock is not None and _clock.is_paused:
-            return {}
-
-    orchestrator = (
-        config["configurable"].get("event_orchestrator")
-        if config and "configurable" in config
-        else None
-    )
-    if orchestrator is None:
-        return {}
+            return
 
     deferrable = orchestrator.deferrable_detection_event_ids
     if not deferrable:
-        return {}
+        return
 
     deferred_permitted = [e for e in state.permitted_events if e.event_id in deferrable]
     if not deferred_permitted:
-        return {}
+        return
 
-    chat_messages, elapsed_time, live_score, orchestrator, room = (
+    # orchestrator is deliberately NOT re-taken from this tuple: it's already
+    # the same object passed into this function (both ultimately come from
+    # config["configurable"]["event_orchestrator"]) — reassigning it here was
+    # a redundant, easy-to-misread shadow of the parameter.
+    chat_messages, elapsed_time, live_score, _orchestrator_unused, room = (
         _prepare_event_context(state, config)
     )
 
@@ -691,12 +741,10 @@ async def process_deferred_events(
     )
     detected_ids = {e.event_id for e in new_events}
     if not detected_ids:
-        return {}
+        return
 
     feedback = await orchestrator.orchestrate_deferred_events(detected_ids, room)
-    if feedback:
-        return {"non_branching_feedback_data": feedback}
-    return {}
+    await _send_deferred_ui_feedback(feedback, room)
 
 
 @instrumented_node("resolve_branching_instruction")

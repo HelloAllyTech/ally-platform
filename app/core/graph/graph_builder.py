@@ -8,7 +8,6 @@ from app.core.graph.nodes import (
     compact_history,
     detect_behaviors,
     generate_response,
-    process_deferred_events,
     process_events,
     process_gating_events,
     publish_done_thinking,
@@ -120,9 +119,24 @@ def build_simulation_graph() -> StateGraph[SimulationState]:
     # Build the main graph
     graph = StateGraph(SimulationState)
     # EVENTS_OFF_GATE_DEFER_DETECTION splits event handling into a gating node
-    # (detects only reply-shaping events; gates the reply) and a deferred node
-    # (detects + scores + sends the rest, off the critical path). The flag-OFF
-    # path keeps the single process_events node — today's topology exactly.
+    # (detects only reply-shaping events; gates the reply) and deferred
+    # (non-reply-shaping) detection. The flag-OFF path keeps the single
+    # process_events node — today's topology exactly.
+    #
+    # Deferred detection is NOT a graph node (it used to be — see git history
+    # for `process_deferred_events`). LangGraph schedules nodes in
+    # "supersteps" with a hard barrier between them: nothing in the next
+    # superstep can start until EVERYTHING in the current one finishes, even
+    # tasks nothing downstream depends on. process_gating_events completing
+    # triggers both sync_events_and_behaviors_node AND (formerly)
+    # process_deferred_events into the same superstep, so the reply
+    # (resolve_branching_instruction, one superstep later) waited on deferred
+    # detection's full duration every turn — exactly the latency
+    # EVENTS_OFF_GATE_DEFER_DETECTION was supposed to eliminate. Deferred
+    # detection now runs as a genuinely detached asyncio task, spawned from
+    # inside process_gating_events via orchestrator._spawn_background (see
+    # app/core/graph/nodes.py), which is outside LangGraph's scheduler
+    # entirely and therefore cannot block any superstep.
     events_node = (
         "process_gating_events"
         if settings.EVENTS_OFF_GATE_DEFER_DETECTION
@@ -130,7 +144,6 @@ def build_simulation_graph() -> StateGraph[SimulationState]:
     )
     if settings.EVENTS_OFF_GATE_DEFER_DETECTION:
         graph.add_node("process_gating_events", process_gating_events)
-        graph.add_node("process_deferred_events", process_deferred_events)
     else:
         graph.add_node("process_events", process_events)
 
@@ -176,16 +189,6 @@ def build_simulation_graph() -> StateGraph[SimulationState]:
     # consumes branching instructions + retrieved_context).
     graph.add_edge(events_node, "sync_events_and_behaviors_node")
     graph.add_edge("retrieve_knowledge", "sync_events_and_behaviors_node")
-
-    if settings.EVENTS_OFF_GATE_DEFER_DETECTION:
-        # Deferred (non-reply-shaping) event detection runs downstream of the gate
-        # node — so the single registry/cascade pass has completed and there is no
-        # concurrent registry mutation — but in PARALLEL with the spoken reply,
-        # joining only at send_event_feedback (the UI branch). The reply
-        # (generate_response) never waits on it. See
-        # EVENTS_OFF_GATE_DEFER_DETECTION.
-        graph.add_edge("process_gating_events", "process_deferred_events")
-        graph.add_edge("process_deferred_events", "send_event_feedback")
 
     if settings.BEHAVIORS_OFF_GATE:
         # Behaviors only drive scoring + UI feedback (not the reply text), so
