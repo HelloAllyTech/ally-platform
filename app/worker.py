@@ -2816,6 +2816,21 @@ if __name__ == "__main__":
             ws_url=settings.LIVEKIT_URL,
             # Increased from 10 to 600 seconds (10 minutes) for longer conversations
             drain_timeout=600,
+            # Reconnect budget before the worker gives up for good. The SDK
+            # default of 16 backs off as min(n*2, 10)s, so it stops trying after
+            # only ~2.5 minutes — and it does NOT exit the process. The asyncio
+            # task dies, the container stays up, `start.sh`'s `wait -n` self-heal
+            # never fires, and the fleet sits RUNNING and silently deaf until a
+            # human redeploys it. That is exactly what happened on 2026-08-09:
+            # LiveKit moved hosts, every task exhausted 16 attempts during the
+            # cutover, and all 12 stayed dark for 19h while ECS, the container
+            # health signal and the CloudWatch metrics all read green.
+            # 360 attempts ≈ 1 hour of retrying, so any realistic LiveKit
+            # restart or migration is ridden out without a restart. If it IS
+            # still failing after an hour the worker is genuinely wedged: the
+            # SDK then sets `_connection_failed`, its health server on :8081
+            # starts returning 503, and the orchestrator replaces the task.
+            max_retry=360,
             job_memory_warn_mb=650,
             initialize_process_timeout=120,
         )
