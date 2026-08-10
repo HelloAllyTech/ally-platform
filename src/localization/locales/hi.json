@@ -237,6 +237,17 @@
     "menu": {
       "archives": "संग्रह"
     },
+    "filters": {
+      "title": "फ़िल्टर",
+      "apply": "लागू करें",
+      "clear": "साफ़ करें",
+      "noFields": "फ़िल्टर करने योग्य कोई फ़ील्ड उपलब्ध नहीं है",
+      "searchPlaceholder": "खोजें…",
+      "min": "न्यूनतम",
+      "max": "अधिकतम",
+      "from": "से",
+      "to": "तक"
+    },
     "actions": {
       "uploadAudio": "ऑडियो अपलोड करें",
       "startSession": "सत्र शुरू करें"
@@ -427,6 +438,7 @@
     "error": "त्रुटि",
     "simulationEndedSuccess": "सिमुलेशन सफलतापूर्वक समाप्त हुआ",
     "somethingWentWrong": "कुछ गलत हो गया!",
+    "unexpectedErrorDesc": "ऐप में एक अनपेक्षित समस्या आ गई। आपका सहेजा गया काम सुरक्षित है।",
     "offlineNetworkTitle": "कोई इंटरनेट कनेक्शन नहीं",
     "offlineMicrophoneFailureTitle": "माइक्रोफ़ोन विफलता",
     "offline": {
@@ -493,7 +505,8 @@
     "select": "चुनें",
     "unableToOpenLink": "लिंक खोलने में असमर्थ",
     "checkInternet": "कृपया अपना इंटरनेट कनेक्शन जांचें और पुनः प्रयास करें।",
-    "unknownError": "अज्ञात त्रुटि"
+    "unknownError": "अज्ञात त्रुटि",
+    "practiceAgain": "फिर से अभ्यास करें"
   },
   "months": {
     "short": [
@@ -1061,6 +1074,7 @@
     "save": "रिपोर्ट सहेजें",
     "saving": "सहेजा जा रहा है...",
     "enhance": "बढ़ाएं",
+    "enhanceFailed": "इस टेक्स्ट को बेहतर नहीं बनाया जा सका। कृपया पुनः प्रयास करें।",
     "tabs": {
       "returnToSelf": "स्वयं की ओर लौटें",
       "sessionSummary": "सत्र सारांश",
@@ -1229,6 +1243,8 @@
     "notesTooltip": "आपके नोट्स स्वचालित रूप से सहेजे जाते हैं और सारांश बनने के बाद “अतिरिक्त नोट्स” के अंतर्गत दिखाई देंगे।",
     "notesPlaceholder": "अपने विचार लिखें",
     "summaryFeedbackSubmittedFailed": "सारांश फीडबैक सबमिट करने में विफल",
+    "retryStarted": "सारांश फिर से तैयार किया जा रहा है…",
+    "retryFailed": "सारांश का पुनः प्रयास नहीं किया जा सका। कृपया पुनः प्रयास करें।",
     "processing": {
       "generatingTranscription": "ट्रांसक्रिप्शन जनरेट हो रहा है",
       "deletingAudio": "ऑडियो हटाया जा रहा है",
@@ -1475,7 +1491,11 @@
     "noActiveSimulation": "कोई सक्रिय सिमुलेशन नहीं मिला",
     "sessionEndedSuccessfully": "सत्र सफलतापूर्वक समाप्त हुआ",
     "triggerWarnings": "ट्रिगर चेतावनियाँ",
-    "language": "भाषा चुनें"
+    "language": "भाषा चुनें",
+    "completed_one": "पूर्ण",
+    "completed_other": "पूर्ण · {{count}}×",
+    "completedChip_one": "एक बार पूर्ण",
+    "completedChip_other": "{{count}} बार पूर्ण"
   },
   "replyBottomSheet": {
     "title": "उत्तर",

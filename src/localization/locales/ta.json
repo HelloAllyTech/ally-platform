@@ -237,6 +237,17 @@
     "menu": {
       "archives": "காப்பகங்கள்"
     },
+    "filters": {
+      "title": "வடிகட்டிகள்",
+      "apply": "பயன்படுத்து",
+      "clear": "அழி",
+      "noFields": "வடிகட்டக்கூடிய புலங்கள் எதுவும் இல்லை",
+      "searchPlaceholder": "தேடு…",
+      "min": "குறைந்தபட்சம்",
+      "max": "அதிகபட்சம்",
+      "from": "முதல்",
+      "to": "வரை"
+    },
     "actions": {
       "uploadAudio": "ஆடியோவைப் பதிவேற்று",
       "startSession": "அமர்வைத் தொடங்கு"
@@ -427,6 +438,7 @@
     "error": "பிழை",
     "simulationEndedSuccess": "சிமுலேஷன் வெற்றிகரமாக முடிந்தது",
     "somethingWentWrong": "ஏதோ தவறு நடந்துவிட்டது!",
+    "unexpectedErrorDesc": "செயலியில் எதிர்பாராத சிக்கல் ஏற்பட்டது. நீங்கள் சேமித்த பணி பாதுகாப்பாக உள்ளது.",
     "offlineNetworkTitle": "இணைய இணைப்பு இல்லை",
     "offlineMicrophoneFailureTitle": "மைக்ரோஃபோன் கோளாறு",
     "offline": {
@@ -493,7 +505,8 @@
     "select": "தேர்ந்தெடுக்கவும்",
     "unableToOpenLink": "இணைப்பைத் திறக்க முடியவில்லை",
     "checkInternet": "உங்கள் இணைய இணைப்பைச் சரிபார்த்து மீண்டும் முயற்சிக்கவும்.",
-    "unknownError": "அறியப்படாத பிழை"
+    "unknownError": "அறியப்படாத பிழை",
+    "practiceAgain": "மீண்டும் பயிற்சி செய்"
   },
   "months": {
     "short": [
@@ -1061,6 +1074,7 @@
     "save": "அறிக்கையைச் சேமி",
     "saving": "சேமிக்கிறது...",
     "enhance": "மேம்படுத்து",
+    "enhanceFailed": "இந்த உரையை மேம்படுத்த முடியவில்லை. மீண்டும் முயற்சி செய்.",
     "tabs": {
       "returnToSelf": "சுயநிலைக்குத் திரும்பு",
       "sessionSummary": "அமர்வுச் சுருக்கம்",
@@ -1229,6 +1243,8 @@
     "notesTooltip": "உங்கள் குறிப்புகள் தானாகவே சேமிக்கப்படும், சுருக்கம் உருவாக்கப்பட்ட பிறகு “கூடுதல் குறிப்புகள்” என்பதன் கீழ் தோன்றும்.",
     "notesPlaceholder": "உங்கள் எண்ணங்களை எழுதுங்கள்",
     "summaryFeedbackSubmittedFailed": "சுருக்கக் கருத்தைச் சமர்ப்பிக்க முடியவில்லை",
+    "retryStarted": "சுருக்கம் மீண்டும் உருவாக்கப்படுகிறது…",
+    "retryFailed": "சுருக்கத்தை மீண்டும் முயற்சிக்க முடியவில்லை. மீண்டும் முயற்சி செய்.",
     "processing": {
       "generatingTranscription": "உரையாக்கத்தை உருவாக்குகிறது",
       "deletingAudio": "ஆடியோவை நீக்குகிறது",
@@ -1475,7 +1491,11 @@
     "noActiveSimulation": "செயலில் உள்ள சிமுலேஷன் எதுவும் காணப்படவில்லை",
     "sessionEndedSuccessfully": "அமர்வு வெற்றிகரமாக முடிந்தது",
     "triggerWarnings": "எச்சரிக்கைகள்",
-    "language": "மொழியைத் தேர்ந்தெடு"
+    "language": "மொழியைத் தேர்ந்தெடு",
+    "completed_one": "நிறைவு",
+    "completed_other": "நிறைவு · {{count}}×",
+    "completedChip_one": "ஒருமுறை நிறைவு",
+    "completedChip_other": "{{count}} முறை நிறைவு"
   },
   "replyBottomSheet": {
     "title": "பதில்கள்",
