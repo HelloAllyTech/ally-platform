@@ -237,6 +237,17 @@
     "menu": {
       "archives": "ಆರ್ಕೈವ್‌ಗಳು"
     },
+    "filters": {
+      "title": "ಫಿಲ್ಟರ್‌ಗಳು",
+      "apply": "ಅನ್ವಯಿಸಿ",
+      "clear": "ತೆರವುಗೊಳಿಸಿ",
+      "noFields": "ಫಿಲ್ಟರ್ ಮಾಡಬಹುದಾದ ಯಾವುದೇ ಕ್ಷೇತ್ರಗಳು ಲಭ್ಯವಿಲ್ಲ",
+      "searchPlaceholder": "ಹುಡುಕಿ…",
+      "min": "ಕನಿಷ್ಠ",
+      "max": "ಗರಿಷ್ಠ",
+      "from": "ಇಂದ",
+      "to": "ವರೆಗೆ"
+    },
     "actions": {
       "uploadAudio": "ಆಡಿಯೋ ಅಪ್‌ಲೋಡ್ ಮಾಡಿ",
       "startSession": "ಸೆಷನ್ ಪ್ರಾರಂಭಿಸಿ"
@@ -427,6 +438,7 @@
     "error": "ದೋಷ",
     "simulationEndedSuccess": "ಸಿಮ್ಯುಲೇಶನ್ ಯಶಸ್ವಿಯಾಗಿ ಕೊನೆಗೊಂಡಿದೆ",
     "somethingWentWrong": "ಏನೋ ತಪ್ಪಾಗಿದೆ!",
+    "unexpectedErrorDesc": "ಅಪ್ಲಿಕೇಶನ್‌ನಲ್ಲಿ ಅನಿರೀಕ್ಷಿತ ಸಮಸ್ಯೆ ಎದುರಾಗಿದೆ. ನೀವು ಉಳಿಸಿದ ಕೆಲಸ ಸುರಕ್ಷಿತವಾಗಿದೆ.",
     "offlineNetworkTitle": "ಇಂಟರ್ನೆಟ್ ಸಂಪರ್ಕವಿಲ್ಲ",
     "offlineMicrophoneFailureTitle": "ಮೈಕ್ರೊಫೋನ್ ವೈಫಲ್ಯ",
     "offline": {
@@ -493,7 +505,8 @@
     "select": "ಆಯ್ಕೆಮಾಡಿ",
     "unableToOpenLink": "ಲಿಂಕ್ ತೆರೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
     "checkInternet": "ದಯವಿಟ್ಟು ನಿಮ್ಮ ಇಂಟರ್ನೆಟ್ ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
-    "unknownError": "ಅಜ್ಞಾತ ದೋಷ"
+    "unknownError": "ಅಜ್ಞಾತ ದೋಷ",
+    "practiceAgain": "ಮತ್ತೆ ಅಭ್ಯಾಸ ಮಾಡಿ"
   },
   "months": {
     "short": [
@@ -1061,6 +1074,7 @@
     "save": "ವರದಿಯನ್ನು ಉಳಿಸಿ",
     "saving": "ಉಳಿಸಲಾಗುತ್ತಿದೆ...",
     "enhance": "ವರ್ಧಿಸಿ",
+    "enhanceFailed": "ಈ ಪಠ್ಯವನ್ನು ಸುಧಾರಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮರು ಪ್ರಯತ್ನಿಸಿ.",
     "tabs": {
       "returnToSelf": "ನಿಮ್ಮ ಬಳಿಗೆ ಹಿಂತಿರುಗಿ",
       "sessionSummary": "ಸೆಷನ್ ಸಾರಾಂಶ",
@@ -1229,6 +1243,8 @@
     "notesTooltip": "ನಿಮ್ಮ ಟಿಪ್ಪಣಿಗಳನ್ನು ಸ್ವಯಂಚಾಲಿತವಾಗಿ ಉಳಿಸಲಾಗುತ್ತದೆ ಮತ್ತು ಸಾರಾಂಶವನ್ನು ರಚಿಸಿದ ನಂತರ “ಹೆಚ್ಚುವರಿ ಟಿಪ್ಪಣಿಗಳು” ಅಡಿಯಲ್ಲಿ ಕಾಣಿಸಿಕೊಳ್ಳುತ್ತದೆ.",
     "notesPlaceholder": "ನಿಮ್ಮ ಆಲೋಚನೆಗಳನ್ನು ಬರೆಯಿರಿ",
     "summaryFeedbackSubmittedFailed": "ಸಾರಾಂಶದ ಪ್ರತಿಕ್ರಿಯೆಯನ್ನು ಸಲ್ಲಿಸಲು ವಿಫಲವಾಗಿದೆ",
+    "retryStarted": "ಸಾರಾಂಶವನ್ನು ಮತ್ತೆ ರಚಿಸಲಾಗುತ್ತಿದೆ…",
+    "retryFailed": "ಸಾರಾಂಶವನ್ನು ಮರು ಪ್ರಯತ್ನಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮರು ಪ್ರಯತ್ನಿಸಿ.",
     "processing": {
       "generatingTranscription": "ಟ್ರಾನ್ಸ್‌ಕ್ರಿಪ್ಶನ್ ರಚಿಸಲಾಗುತ್ತಿದೆ",
       "deletingAudio": "ಆಡಿಯೊವನ್ನು ಅಳಿಸಲಾಗುತ್ತಿದೆ",
@@ -1475,7 +1491,11 @@
     "noActiveSimulation": "ಯಾವುದೇ ಸಕ್ರಿಯ ಸಿಮ್ಯುಲೇಶನ್ ಕಂಡುಬಂದಿಲ್ಲ",
     "sessionEndedSuccessfully": "ಸೆಷನ್ ಯಶಸ್ವಿಯಾಗಿ ಕೊನೆಗೊಂಡಿದೆ",
     "triggerWarnings": "ಟ್ರಿಗ್ಗರ್ ಎಚ್ಚರಿಕೆಗಳು",
-    "language": "ಭಾಷೆಯನ್ನು ಆಯ್ಕೆಮಾಡಿ"
+    "language": "ಭಾಷೆಯನ್ನು ಆಯ್ಕೆಮಾಡಿ",
+    "completed_one": "ಪೂರ್ಣಗೊಂಡಿದೆ",
+    "completed_other": "ಪೂರ್ಣಗೊಂಡಿದೆ · {{count}}×",
+    "completedChip_one": "ಒಮ್ಮೆ ಪೂರ್ಣಗೊಂಡಿದೆ",
+    "completedChip_other": "{{count}} ಬಾರಿ ಪೂರ್ಣಗೊಂಡಿದೆ"
   },
   "replyBottomSheet": {
     "title": "ಪ್ರತ್ಯುತ್ತರಗಳು",

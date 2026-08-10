@@ -237,6 +237,17 @@
     "menu": {
       "archives": "संग्रह"
     },
+    "filters": {
+      "title": "फिल्टर",
+      "apply": "लागू करा",
+      "clear": "साफ करा",
+      "noFields": "फिल्टर करण्यायोग्य कोणतीही फील्ड उपलब्ध नाहीत",
+      "searchPlaceholder": "शोधा…",
+      "min": "किमान",
+      "max": "कमाल",
+      "from": "पासून",
+      "to": "पर्यंत"
+    },
     "actions": {
       "uploadAudio": "ऑडिओ अपलोड करा",
       "startSession": "सत्र सुरू करा"
@@ -427,6 +438,7 @@
     "error": "त्रुटी",
     "simulationEndedSuccess": "सिमुलेशन यशस्वीरित्या समाप्त झाले",
     "somethingWentWrong": "काहीतरी चूक झाली!",
+    "unexpectedErrorDesc": "अ‍ॅपमध्ये एक अनपेक्षित समस्या आली. तुमचे सेव्ह केलेले काम सुरक्षित आहे.",
     "offlineNetworkTitle": "इंटरनेट कनेक्शन नाही",
     "offlineMicrophoneFailureTitle": "मायक्रोफोन बिघाड",
     "offline": {
@@ -493,7 +505,8 @@
     "select": "निवडा",
     "unableToOpenLink": "लिंक उघडण्यात अक्षम",
     "checkInternet": "कृपया तुमचे इंटरनेट कनेक्शन तपासा आणि पुन्हा प्रयत्न करा.",
-    "unknownError": "अज्ञात त्रुटी"
+    "unknownError": "अज्ञात त्रुटी",
+    "practiceAgain": "पुन्हा सराव करा"
   },
   "months": {
     "short": [
@@ -1061,6 +1074,7 @@
     "save": "अहवाल सेव्ह करा",
     "saving": "सेव्ह करत आहे...",
     "enhance": "वर्धित करा",
+    "enhanceFailed": "हा मजकूर सुधारता आला नाही. कृपया पुन्हा प्रयत्न करा.",
     "tabs": {
       "returnToSelf": "स्वतःकडे परत या",
       "sessionSummary": "सत्र सारांश",
@@ -1229,6 +1243,8 @@
     "notesTooltip": "तुमच्या नोट्स स्वयंचलितपणे जतन केल्या जातात आणि सारांश तयार झाल्यानंतर “अतिरिक्त नोट्स” अंतर्गत दिसतील.",
     "notesPlaceholder": "तुमचे विचार लिहून काढा",
     "summaryFeedbackSubmittedFailed": "सारांश अभिप्राय सबमिट करण्यात अयशस्वी",
+    "retryStarted": "सारांश पुन्हा तयार केला जात आहे…",
+    "retryFailed": "सारांशाचा पुन्हा प्रयत्न करता आला नाही. कृपया पुन्हा प्रयत्न करा.",
     "processing": {
       "generatingTranscription": "ट्रान्सक्रिप्शन तयार करत आहे",
       "deletingAudio": "ऑडिओ हटवत आहे",
@@ -1475,7 +1491,11 @@
     "noActiveSimulation": "कोणतेही सक्रिय सिमुलेशन आढळले नाही",
     "sessionEndedSuccessfully": "सत्र यशस्वीरित्या समाप्त झाले",
     "triggerWarnings": "ट्रिगर इशारे",
-    "language": "भाषा निवडा"
+    "language": "भाषा निवडा",
+    "completed_one": "पूर्ण",
+    "completed_other": "पूर्ण · {{count}}×",
+    "completedChip_one": "एकदा पूर्ण",
+    "completedChip_other": "{{count}} वेळा पूर्ण"
   },
   "replyBottomSheet": {
     "title": "प्रत्युत्तरे",
