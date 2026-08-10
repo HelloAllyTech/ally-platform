@@ -22,7 +22,7 @@ Fetch as `https://tech.helloally.ai/#/wiki/<path>`, or raw Markdown at `https://
 
 ## Platform & architecture
 
-- `platform/agent-guide.md` (996w) — Quick-reference for AI assistants and developers working across Ally repos — per-repo entry points, cross-repo…
+- `platform/agent-guide.md` (1049w) — Quick-reference for AI assistants and developers working across Ally repos — per-repo entry points, cross-repo…
 - `platform/ai-lab.md` (693w) — The admin AI Lab — author prompt Skills with variables, execute Runs against Anthropic/OpenAI, and…
 - `platform/analytics-agent.md` (2181w) — The Analytics Agent tab — ask an analytics question in English, get a narrated answer…
 - `platform/architecture.md` (683w) — How Ally's services connect — data flow, integration points, message queues, storage, and authentication across…
@@ -44,15 +44,15 @@ Fetch as `https://tech.helloally.ai/#/wiki/<path>`, or raw Markdown at `https://
 
 ## Contributing & setup
 
-- `contributing/dev-setup.md` (554w) — How to clone all Ally repositories and start the full local development environment
+- `contributing/dev-setup.md` (610w) — How to clone all Ally repositories and start the full local development environment
 - `contributing/docs-system.md` (1366w) — How Ally's documentation is routed, deduplicated, enforced in CI, and kept current — the contract…
-- `contributing/guide.md` (704w) — Branch naming, commit conventions, code standards, and the pull-request process shared across all Ally repositories
-- `contributing/planning-with-stacks.md` (877w) — Every implementation plan starts with a Stacks MCP search — how to run the queries…
+- `contributing/guide.md` (744w) — Branch naming, commit conventions, code standards, and the pull-request process shared across all Ally repositories
+- `contributing/planning-with-stacks.md` (1431w) — Search Stacks whenever a product judgement comes up — while planning and while coding —…
 - `contributing/release-process.md` (768w) — The shared production-release process for every Ally service — semantic versioning policy, the automated pipeline…
 
 ## Agent memory
 
-- `memory.md` (1875w) — Hard-won gotchas — read before touching auth, roles, permissions, migrations, or shared frontend modules. Each…
+- `memory.md` (1888w) — Hard-won gotchas — read before touching auth, roles, permissions, migrations, or shared frontend modules. Each…
 
 ## Skills
 
@@ -63,7 +63,7 @@ Fetch as `https://tech.helloally.ai/#/wiki/<path>`, or raw Markdown at `https://
 
 - `getting-started.md` (310w) — A guide outlining how humans and agents operate this knowledge base
 - `overview.md` (285w) — Repository overview and active directories layout description
-- `welcome.md` (418w) — Welcome to the Ally Developer Wiki — the canonical knowledge base for the Ally platform
+- `welcome.md` (427w) — Welcome to the Ally Developer Wiki — the canonical knowledge base for the Ally platform
 
 ## Don't load these for a task
 
@@ -71,4 +71,4 @@ Fetch as `https://tech.helloally.ai/#/wiki/<path>`, or raw Markdown at `https://
 - `index.md` — human navigation catalog — ROUTING.md supersedes it for agents
 - `log.md` — append-only history — read only when auditing what changed
 
-_38 pages, 54,419 words total. Loading all of it would cost roughly 72,558 tokens — which is the entire reason this index exists._
+_38 pages, 55,604 words total. Loading all of it would cost roughly 74,138 tokens — which is the entire reason this index exists._
