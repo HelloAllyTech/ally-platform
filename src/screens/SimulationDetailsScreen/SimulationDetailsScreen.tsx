@@ -11,7 +11,12 @@ import {
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {LeftArrowIcon, NoCreditsIcon, ShareIcon} from '@/assets';
+import {
+  LeftArrowIcon,
+  NoCreditsIcon,
+  ShareIcon,
+  TickRoundIcon,
+} from '@/assets';
 import {
   Button,
   CustomDropdown,
@@ -118,6 +123,10 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
     );
   };
 
+  // Completing a scenario never locks it — the CTA turns into an invitation to
+  // run it again rather than going away.
+  const attemptCount = scenario.completion?.attemptCount ?? 0;
+
   const renderDetailsSection = () => {
     const videoUrl = scenario.coverVideoUrl;
     const imageUrl = scenario.coverImageUrl;
@@ -160,6 +169,20 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
             <ShareIcon />
           </TouchableOpacity>
         </View>
+
+        {attemptCount > 0 && (
+          <View style={styles.completedChip}>
+            <TickRoundIcon
+              width={14}
+              height={14}
+              color={colors.ds.green[700]}
+            />
+            <Text style={styles.completedChipText}>
+              {t('simulations.completedChip', {count: attemptCount})}
+            </Text>
+          </View>
+        )}
+
         <Text style={styles.fieldLabel}>
           {t('learn.scenario.scenarioLabel')}
         </Text>
@@ -193,7 +216,11 @@ export const SimulationDetailsScreen: React.FC<Props> = ({route}) => {
     return (
       <View style={styles.ctaWrapper}>
         <Button
-          label={`${t('common.start')} ${t('common.simulation')}`}
+          label={
+            attemptCount > 0
+              ? t('common.practiceAgain')
+              : `${t('common.start')} ${t('common.simulation')}`
+          }
           onPress={startSimulationPress}
           isLoading={isCreatingRoom}
           isDisabled={isStartSimulationDisabled}
@@ -385,6 +412,22 @@ const styles = ScaledSheet.create({
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     ...typography.label.large,
     color: colors.ds.typography.mediumEmphasis,
+  },
+  completedChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: '4@ms',
+    backgroundColor: colors.ds.green[50],
+    borderRadius: radius.full,
+    paddingVertical: '4@ms',
+    paddingHorizontal: '8@ms',
+    marginBottom: '4@ms',
+  },
+  completedChipText: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    ...typography.label.large,
+    color: colors.ds.green[700],
   },
   languageDropdownContainer: {
     marginBottom: '12@ms',

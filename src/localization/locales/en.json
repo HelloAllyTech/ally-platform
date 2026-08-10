@@ -505,7 +505,8 @@
     "select": "Select",
     "unableToOpenLink": "Unable to open the link",
     "checkInternet": "Please check your internet connection and try again.",
-    "unknownError": "Unknown error"
+    "unknownError": "Unknown error",
+    "practiceAgain": "Practise again"
   },
   "months": {
     "short": [
@@ -1490,7 +1491,11 @@
     "noActiveSimulation": "No active simulation found",
     "sessionEndedSuccessfully": "Session ended successfully",
     "triggerWarnings": "Trigger warnings",
-    "language": "Select Language"
+    "language": "Select Language",
+    "completed_one": "Completed",
+    "completed_other": "Completed · {{count}}×",
+    "completedChip_one": "Completed once",
+    "completedChip_other": "Completed {{count}} times"
   },
   "replyBottomSheet": {
     "title": "Replies",

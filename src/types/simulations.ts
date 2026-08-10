@@ -75,6 +75,16 @@ export interface Scenario {
   showScoreMeter?: boolean;
   pauseEnabled?: boolean;
   availableLanguages?: LanguageOption[];
+  completion?: ScenarioCompletion | null;
+}
+
+/**
+ * The current learner's completion record for a scenario. Null/absent means
+ * they have never completed it — guard on the object, not on `attemptCount`.
+ */
+export interface ScenarioCompletion {
+  attemptCount: number;
+  lastCompletedAt: string | null;
 }
 
 export interface ScenariosResponse {
