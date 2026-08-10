@@ -12,7 +12,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 import {useSelector} from 'react-redux';
 
-import {BoltIcon} from '@/assets';
+import {BoltIcon, TickRoundIcon} from '@/assets';
 import {
   BadgePopup,
   CircularProgress,
@@ -122,6 +122,8 @@ export const SimulationsScreen: React.FC = () => {
   };
 
   const renderSimulationItem = ({item}: {item: Scenario}) => {
+    const attemptCount = item.completion?.attemptCount ?? 0;
+
     return (
       <SimulationCard
         title={item.title}
@@ -129,6 +131,20 @@ export const SimulationsScreen: React.FC = () => {
         coverImageUrl={item.coverImageUrl}
         onPress={() => handleScenarioPress(item)}
         triggerWarnings={getTriggerWarningNames(item.triggerWarnings)}
+        rightAccessory={
+          attemptCount > 0 ? (
+            <View style={styles.completedBadge}>
+              <TickRoundIcon
+                width={16}
+                height={16}
+                color={colors.ds.green[700]}
+              />
+              <Text style={styles.completedBadgeText}>
+                {t('simulations.completed', {count: attemptCount})}
+              </Text>
+            </View>
+          ) : null
+        }
       />
     );
   };
@@ -453,5 +469,16 @@ const styles = ScaledSheet.create({
   },
   tabMargin: {
     marginVertical: '16@ms',
+  },
+  completedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: '4@ms',
+  },
+  completedBadgeText: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    ...typography.body.nano,
+    fontWeight: fontWeights.medium,
+    color: colors.ds.green[700],
   },
 });
