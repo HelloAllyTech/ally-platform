@@ -35,7 +35,7 @@ Fetch as `https://tech.helloally.ai/#/wiki/<path>`, or raw Markdown at `https://
 
 ## Per-repo pages
 
-- `repos/ally-ai-learn.md` (1269w) — A LiveKit-based voice AI agent (FastAPI + LangGraph) that simulates mental-health client conversations, detecting counseling…
+- `repos/ally-ai-learn.md` (1616w) — A LiveKit-based voice AI agent (FastAPI + LangGraph) that simulates mental-health client conversations, detecting counseling…
 - `repos/ally-ai.md` (1022w) — ally-ai (internally "Lifeline AI") is the FastAPI AI copilot service that provides conversation analysis, summaries…
 - `repos/ally-be.md` (1838w) — ally-be is the multi-tenant NestJS backend that owns Ally's primary PostgreSQL database and orchestrates auth…
 - `repos/ally-mobile.md` (1381w) — React Native iOS/Android app for mental-health counsellors, covering live sessions with transcription, peer reviews, voice-based…
@@ -52,7 +52,7 @@ Fetch as `https://tech.helloally.ai/#/wiki/<path>`, or raw Markdown at `https://
 
 ## Agent memory
 
-- `memory.md` (1662w) — Hard-won gotchas — read before touching auth, roles, permissions, migrations, or shared frontend modules. Each…
+- `memory.md` (1875w) — Hard-won gotchas — read before touching auth, roles, permissions, migrations, or shared frontend modules. Each…
 
 ## Skills
 
@@ -71,4 +71,4 @@ Fetch as `https://tech.helloally.ai/#/wiki/<path>`, or raw Markdown at `https://
 - `index.md` — human navigation catalog — ROUTING.md supersedes it for agents
 - `log.md` — append-only history — read only when auditing what changed
 
-_38 pages, 53,587 words total. Loading all of it would cost roughly 71,449 tokens — which is the entire reason this index exists._
+_38 pages, 54,419 words total. Loading all of it would cost roughly 72,558 tokens — which is the entire reason this index exists._
