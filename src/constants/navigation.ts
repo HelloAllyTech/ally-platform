@@ -13,6 +13,8 @@ export const SCREEN_NAMES = {
   SIMULATION_DETAILS: 'SimulationDetails',
   SIMULATION_PATH_DETAILS: 'SimulationPathDetails',
   CASE_DETAILS: 'CaseDetails',
+  COURSE_OVERVIEW: 'CourseOverview',
+  COURSE_ITEM_PLAYER: 'CourseItemPlayer',
   SIMULATION_ASSISTANT: 'SimulationAssistant',
   SIMULATION_FEEDBACK: 'SimulationFeedback',
   ACHIEVEMENTS: 'Achievements',

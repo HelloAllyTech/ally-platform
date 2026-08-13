@@ -183,6 +183,9 @@ export const api = createApi({
     'GeneralComments',
     'ReflectionPrompts',
     'UnreadReviewCount',
+    'LearnTracks',
+    'LearnTrackDetail',
+    'LearnTrackNext',
   ],
   endpoints: () => ({}),
 });

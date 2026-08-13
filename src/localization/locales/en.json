@@ -565,6 +565,7 @@
   },
   "learn": {
     "tabs": {
+      "courses": "Courses",
       "simulations": "Simulations",
       "tracks": "Learning Pathways",
       "cases": "Cases"
@@ -642,6 +643,7 @@
       "prefix": "Choose your",
       "case": "Case",
       "track": "Track",
+      "course": "Course",
       "scenario": "situation"
     },
     "details": {
@@ -661,6 +663,124 @@
       }
     },
     "evaluationChecklist": "Evaluation Checklist"
+  },
+  "courses": {
+    "progress": "{{completed}} of {{total}}",
+    "courseCompleted": "Course completed",
+    "lockedTooltip": "Complete the previous items to unlock this",
+    "notFound": "Course not found",
+    "status": {
+      "completed": "Completed",
+      "inProgress": "In progress"
+    },
+    "meta": {
+      "quiz": "Quiz",
+      "questions_one": "{{count}} question",
+      "questions_other": "{{count}} questions",
+      "passScore": "pass {{score}}%",
+      "video": "Video",
+      "videoDuration_one": "{{minutes}} min video",
+      "videoDuration_other": "{{minutes}} min video",
+      "article": "Article",
+      "journal": "Journal",
+      "prompts_one": "{{count}} prompt",
+      "prompts_other": "{{count}} prompts",
+      "roleplay": "Role play",
+      "minScore": "min score {{score}}%",
+      "case": "Case"
+    },
+    "player": {
+      "exit": "Exit",
+      "prev": "Prev",
+      "next": "Next",
+      "finish": "Finish",
+      "overallProgress": "{{pct}}% complete",
+      "loadFailed": "Couldn't load this item.",
+      "retry": "Retry"
+    },
+    "celebration": {
+      "sectionCompleteTitle": "Section complete!",
+      "sectionCompleteBody": "Nice work — keep going.",
+      "trackCompleteTitle": "Course complete!",
+      "trackCompleteBody": "You've finished every item in this course.",
+      "continue": "Continue",
+      "backToLearn": "Back to Learn",
+      "itemsCompleted_one": "{{count}} item completed",
+      "itemsCompleted_other": "{{count}} items completed"
+    },
+    "article": {
+      "markRead": "Mark as read",
+      "keepReading": "Keep reading",
+      "read": "Read"
+    },
+    "video": {
+      "markWatched": "Mark as watched",
+      "watched": "Watched",
+      "openVideo": "Open video"
+    },
+    "journal": {
+      "submit": "Submit",
+      "submitted": "Submitted",
+      "placeholder": "Write your response…",
+      "required": "Required",
+      "saving": "Saving…",
+      "saved": "Saved",
+      "saveFailed": "Save failed"
+    },
+    "roleplay": {
+      "intro": "Tap below to start this role play.",
+      "start": "Start",
+      "openCase": "Open case",
+      "replay": "Replay",
+      "completed": "Completed",
+      "completedOn": "Completed on {{date}}"
+    },
+    "quiz": {
+      "intro": {
+        "title": "Quiz time",
+        "questionCount_one": "{{count}} question",
+        "questionCount_other": "{{count}} questions",
+        "passScore": "Pass score: {{score}}%",
+        "attemptsLeft_one": "{{count}} attempt left",
+        "attemptsLeft_other": "{{count}} attempts left",
+        "unlimitedAttempts": "Unlimited attempts",
+        "start": "Start quiz",
+        "noAttemptsLeft": "No attempts remaining"
+      },
+      "question": {
+        "progress": "Question {{current}} of {{total}}",
+        "next": "Next",
+        "back": "Back",
+        "submit": "Submit quiz",
+        "selectPrompt": "Select one",
+        "selectMultiple": "Select all that apply",
+        "true": "True",
+        "false": "False",
+        "orderPrompt": "Put these in order",
+        "matchPrompt": "Match the pairs",
+        "dragHandle": "Drag to reorder",
+        "moveUp": "Move up",
+        "moveDown": "Move down",
+        "wordCount_one": "{{count}}/{{min}} word",
+        "wordCount_other": "{{count}}/{{min}} words",
+        "aiGraded": "This answer is graded by AI"
+      },
+      "results": {
+        "title": "Results",
+        "passed": "Passed",
+        "failed": "Failed",
+        "correct": "Correct",
+        "incorrect": "Incorrect",
+        "explanation": "Explanation",
+        "feedback": "Feedback",
+        "pendingGrading": "Grading in progress",
+        "finishGrading": "Finish grading",
+        "grading": "Grading…",
+        "retry": "Retry quiz",
+        "next": "Next",
+        "attemptsUsed": "Attempt {{used}} of {{max}}"
+      }
+    }
   },
   "nav": {
     "sidebar": {
@@ -1024,6 +1144,7 @@
     "errorUpdatePrivacy": "Failed to update privacy settings",
     "noPathsAvailable": "No paths available",
     "noCasesAvailable": "No cases available",
+    "noCoursesAvailable": "No courses available",
     "privacyUpdated": "Privacy setting updated",
     "shareScreenTitle": "Share this simulation",
     "turnIndicator": {
@@ -1460,6 +1581,8 @@
     "tracks": "Learning Pathways",
     "case": "Case",
     "cases": "Cases",
+    "course": "Course",
+    "courses": "Courses",
     "learnIntro": "Use <blue>AI-voice based</blue> real-world practice <blue>situation</blue> to build mental health skills.",
     "scenariosCaps": "SCENARIOS",
     "scenarioLabel": "Situation",

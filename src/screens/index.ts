@@ -13,6 +13,8 @@ export {SimulationsScreen} from './SimulationsScreen';
 export {SimulationDetailsScreen} from './SimulationDetailsScreen';
 export {SimulationPathDetailsScreen} from './SimulationPathDetailsScreen';
 export {CaseDetailsScreen} from './CaseDetailsScreen';
+export {CourseOverviewScreen} from './CourseOverviewScreen';
+export {CourseItemPlayerScreen} from './CourseItemPlayerScreen';
 export {SimulationAssistantScreen} from './SimulationAssistantScreen';
 export {SimulationFeedbackScreen} from './SimulationFeedbackScreen';
 export {LeaderboardScreen} from './LeaderboardScreen';

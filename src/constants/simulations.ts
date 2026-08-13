@@ -48,6 +48,7 @@ export enum ScenarioStatus {
 }
 
 export enum SimulationTabs {
+  COURSES = 'COURSES',
   SIMULATIONS = 'SIMULATIONS',
   PATHS = 'PATHS',
   CASES = 'CASES',
