@@ -17,6 +17,8 @@ import React from 'react';
 import {act, render, waitFor} from '@testing-library/react-native';
 import {Animated, Platform} from 'react-native';
 
+import {SCREEN_WIDTH} from '@/constants/general';
+
 import {BoxBreathingAnimation} from '../BoxBreathingAnimation';
 
 // Mock react-native-reanimated
@@ -72,18 +74,12 @@ describe('BoxBreathingAnimation', () => {
     jest.useFakeTimers();
 
     // Ensure tests run with Android platform semantics so SoundPlayer logic is exercised
-    Object.defineProperty(Platform, 'OS', {
-      configurable: true,
-      get: () => 'android',
-    });
+    Platform.OS = 'android';
   });
 
   afterEach(() => {
     jest.useRealTimers();
-    Object.defineProperty(Platform, 'OS', {
-      configurable: true,
-      get: () => originalPlatformOS,
-    });
+    Platform.OS = originalPlatformOS;
   });
 
   it('renders correctly with default props', () => {
@@ -166,10 +162,14 @@ describe('BoxBreathingAnimation', () => {
     // Stop playing
     rerender(<BoxBreathingAnimation {...defaultProps} isPlaying={false} />);
 
+    // The dot resets to the top-left corner of the square, which is sized from the
+    // window (`Math.min(SCREEN_WIDTH * 0.8, 350)`) — derived, not hardcoded, so this
+    // keeps meaning something if the test window size changes.
+    const corner = -Math.min(SCREEN_WIDTH * 0.8, 350) * 0.5;
     const dot = getByTestId('animated-dot');
     expect(dot.props.style.transform).toEqual([
-      {translateX: -175},
-      {translateY: -175},
+      {translateX: corner},
+      {translateY: corner},
     ]);
   });
 

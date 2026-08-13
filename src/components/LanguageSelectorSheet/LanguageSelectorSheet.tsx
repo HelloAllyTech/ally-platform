@@ -17,20 +17,34 @@ import {api} from '@/services/api';
 import {store} from '@/store/store';
 import {colors, fontFamily, typography} from '@/theme';
 
+// `latinLabel` is not decoration. Indic glyphs come from a fallback font, not from
+// ours (see `src/theme/fonts.ts`); if that fallback ever fails, `label` draws as
+// empty space and a row with nothing in it reads as an unresponsive control. This is
+// also the one screen a user stuck in an unreadable language has to operate.
 const LANGUAGE_OPTIONS = [
-  {code: 'en', label: 'English'},
-  {code: 'hi', label: 'हिंदी'},
-  {code: 'mr', label: 'मराठी'},
-  {code: 'ta', label: 'தமிழ்'},
-  {code: 'kn', label: 'ಕನ್ನಡ'},
+  {code: 'en', label: 'English', latinLabel: 'English'},
+  {code: 'hi', label: 'हिंदी', latinLabel: 'Hindi'},
+  {code: 'mr', label: 'मराठी', latinLabel: 'Marathi'},
+  {code: 'ta', label: 'தமிழ்', latinLabel: 'Tamil'},
+  {code: 'kn', label: 'ಕನ್ನಡ', latinLabel: 'Kannada'},
 ] as const;
 
 type LanguageCode = (typeof LANGUAGE_OPTIONS)[number]['code'];
 
 const RTL_LANGS = new Set<string>(['ar', 'fa', 'ur', 'he']);
 
-export const getLabelFromCode = (code: string): string =>
-  LANGUAGE_OPTIONS.find(o => o.code === code)?.label ?? 'English';
+/**
+ * Label for the currently active language. Carries the Latin name alongside the
+ * native one so the settings row still says something on a device that cannot
+ * draw the native script.
+ */
+export const getLabelFromCode = (code: string): string => {
+  const option = LANGUAGE_OPTIONS.find(o => o.code === code);
+  if (!option) return 'English';
+  return option.label === option.latinLabel
+    ? option.label
+    : `${option.label} (${option.latinLabel})`;
+};
 
 interface LanguageSelectorSheetProps {
   visible: boolean;
@@ -82,14 +96,25 @@ export const LanguageSelectorSheet: React.FC<LanguageSelectorSheetProps> = ({
               <TouchableOpacity
                 style={styles.option}
                 onPress={() => void handleSelect(item.code)}
-                activeOpacity={0.7}>
-                <Text
-                  style={[
-                    styles.optionText,
-                    isSelected && styles.optionTextSelected,
-                  ]}>
-                  {item.label}
-                </Text>
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityState={{selected: isSelected}}
+                accessibilityLabel={item.latinLabel}
+                testID={`language-option-${item.code}`}>
+                <View style={styles.optionLabels}>
+                  <Text
+                    style={[
+                      styles.optionText,
+                      isSelected && styles.optionTextSelected,
+                    ]}>
+                    {item.label}
+                  </Text>
+                  {item.latinLabel !== item.label && (
+                    <Text style={styles.optionLatinText}>
+                      {item.latinLabel}
+                    </Text>
+                  )}
+                </View>
                 {isSelected && <View style={styles.selectedDot} />}
               </TouchableOpacity>
             );
@@ -115,9 +140,15 @@ const styles = ScaledSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    // Keeps the row a comfortable tap target even when the label draws blank.
+    minHeight: '48@mvs',
     paddingVertical: '14@mvs',
     borderBottomWidth: 0.5,
     borderBottomColor: colors.ds.stroke.primary,
+  },
+  optionLabels: {
+    flex: 1,
+    gap: '2@mvs',
   },
   optionText: {
     ...typography.body.large,
@@ -127,6 +158,11 @@ const styles = ScaledSheet.create({
   optionTextSelected: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
     color: colors.ds.typography.highEmphasis,
+  },
+  optionLatinText: {
+    ...typography.body.small,
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    color: colors.ds.typography.lowEmphasis,
   },
   selectedDot: {
     width: '8@ms',

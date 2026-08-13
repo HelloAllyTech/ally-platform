@@ -41,9 +41,16 @@ export const useStoragePermissions = (): UseStoragePermissionsResult => {
     let hasPermission = true;
 
     if (androidVersion < 33) {
-      hasPermission = await checkAndRequestStoragePermission(
-        PERMISSIONS.ANDROID.WRITE_EXTERNAL_STORAGE,
-      );
+      try {
+        hasPermission = await checkAndRequestStoragePermission(
+          PERMISSIONS.ANDROID.WRITE_EXTERNAL_STORAGE,
+        );
+      } catch {
+        // The permissions module can reject outright (native module missing or
+        // wedged). Treat that as "not granted" and send the user to Settings
+        // rather than letting the rejection escape into the caller's flow.
+        hasPermission = false;
+      }
     }
 
     if (!hasPermission) {

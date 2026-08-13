@@ -69,9 +69,15 @@ something Ally-specific.
 
 - **Two app IDs.** Dev is `com.helloally.app.dev`, production is `com.helloally.app`. They
   install side by side; check which one you are looking at before believing a bug reproduced.
-- **Bundled fonts carry no Indic glyphs.** Text in Malayalam, Tamil or Kannada can render as
-  nothing at all on some Android ROMs rather than falling back — a language picker whose rows
-  are invisible looks exactly like a broken build. Test a non-Latin language on a real device.
+- **Bundled fonts carry no Indic glyphs; a fallback supplies them.** Nothing we ship covers
+  Devanagari, Tamil or Kannada, and Android gives an asset-loaded typeface no fallback chain —
+  on One UI and MIUI that text draws blank, so a language picker looks like a dead control.
+  Two halves cover it, both keyed to the family names in `src/theme/fonts.ts`: on Android 10+
+  `ScriptFallbackFonts.kt` registers each name with a bundled Noto Sans face per script
+  (`android/app/src/main/assets/fonts/`, Android-only, not linked via `react-native.config.js`);
+  on Android 7–9 `src/theme/scriptSafeFontFallback.ts` moves Indic text to the platform font.
+  Adding a font or a language means touching both. Test a non-Latin language on a real device —
+  the jest suite cannot see either half (the RN preset mocks `Text`; the Kotlin isn't unit-tested).
 - **Released builds are frozen contracts.** Users stay on old versions for a long time. A
   backend value the app parses strictly will lock those users out when it changes — that has
   cost us a login outage. Be lenient about values that can only narrow a match.

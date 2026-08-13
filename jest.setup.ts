@@ -3,80 +3,68 @@ jest.mock('@testing-library/jest-native/extend-expect', () => {
   // Empty mock to prevent loading the actual module
 });
 
-// Mock react-native components and modules
-jest.mock('react-native', () => {
-  const React = require('react');
-  const RN = jest.requireActual('react-native');
-
-  RN.NativeEventEmitter = jest.fn().mockImplementation(() => ({
-    addListener: jest.fn(),
-    removeListener: jest.fn(),
-  }));
-
-  RN.Platform = {
+/**
+ * A deterministic, writable Platform for every test.
+ *
+ * This mocks the module React Native itself loads, not the `react-native` index:
+ * that index exposes `Platform` (and everything else) as a getter with no setter,
+ * so the `RN.Platform = {...}` form silently does nothing and tests keep reading
+ * the real Platform — `Version` included, which reads through stubbed-out
+ * TurboModule constants and comes back `undefined`. Mocking the leaf module means
+ * `import {Platform} from 'react-native'` and React Native's own internals see one
+ * and the same object.
+ *
+ * Every field is a plain writable property, so a test can say `Platform.OS =
+ * 'android'` or `Platform.Version = 28` and restore it afterwards.
+ */
+jest.mock('react-native/Libraries/Utilities/Platform', () => {
+  const Platform = {
     OS: 'ios',
     Version: 13,
     isPad: false,
     isTV: false,
     isTesting: true,
-    select: jest.fn(obj => obj.ios),
+    constants: {
+      isTesting: true,
+      reactNativeVersion: {major: 0, minor: 79, patch: 1},
+    },
+    // Reads OS at call time, so it follows a test that reassigns it.
+    select: <T>(spec: Record<string, T>): T | undefined =>
+      Platform.OS in spec
+        ? spec[Platform.OS]
+        : 'native' in spec
+          ? spec.native
+          : spec.default,
   };
 
-  RN.Dimensions = {
-    get: jest.fn(
-      dim =>
-        ({
-          window: {
-            width: 375,
-            height: 812,
-            scale: 1,
-            fontScale: 1,
-          },
-          screen: {
-            width: 375,
-            height: 812,
-            scale: 1,
-            fontScale: 1,
-          },
-        })[dim],
-    ),
+  return {__esModule: true, default: Platform};
+});
+
+/**
+ * A phone-sized window, at scale 1 so layout maths in tests stays readable. Same
+ * reasoning as above about mocking the leaf module: `useWindowDimensions` imports
+ * `Dimensions` directly, so overriding it on the index would leave the two
+ * disagreeing about the size of the screen.
+ */
+jest.mock('react-native/Libraries/Utilities/Dimensions', () => {
+  const window = {width: 375, height: 812, scale: 1, fontScale: 1};
+  const Dimensions = {
+    get: jest.fn((dim: string) => ({window, screen: window})[dim]),
     set: jest.fn(),
-    addEventListener: jest.fn(),
+    addEventListener: jest.fn(() => ({remove: jest.fn()})),
     removeEventListener: jest.fn(),
   };
 
-  RN.NativeModules = {};
-  RN.TurboModuleRegistry = {
-    get: jest.fn(),
-    getEnforcing: jest.fn(),
-  };
-
-  RN.StyleSheet = {
-    create: jest.fn(styles => styles),
-    flatten: jest.fn(),
-  };
-
-  RN.I18nManager = {
-    isRTL: false,
-  };
-
-  // Mock basic React Native components
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  RN.TouchableOpacity = (props: any) =>
-    React.createElement('TouchableOpacity', props, props.children);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  RN.View = (props: any) => React.createElement('View', props, props.children);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  RN.Text = ({children, ...props}: any) =>
-    React.createElement('Text', props, children);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  RN.Image = (props: any) => React.createElement('Image', props);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  RN.ActivityIndicator = ({...props}: any) =>
-    React.createElement('ActivityIndicator', props);
-
-  return RN;
+  return {__esModule: true, default: Dimensions};
 });
+
+// Nothing else needs mocking here: React Native's own jest preset already replaces
+// Text, View, Image, TouchableOpacity, ActivityIndicator, NativeModules and the
+// TurboModule registry, and the real StyleSheet, I18nManager and NativeEventEmitter
+// work fine under it. This file used to restate all of those through `RN.x = ...`
+// assignments that never bound to anything — and several would have been a step
+// backwards had they bound (a `StyleSheet.flatten` returning undefined, an
+// `I18nManager` with no `forceRTL`, an empty `NativeModules`).
 
 // Silence react-native-reanimated warnings in tests
 jest.mock('react-native-reanimated', () =>
