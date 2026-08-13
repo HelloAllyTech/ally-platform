@@ -47,7 +47,7 @@ Fetch as `https://tech.helloally.ai/#/wiki/<path>`, or raw Markdown at `https://
 - `contributing/dev-setup.md` (637w) — How to clone all Ally repositories and start the full local development environment
 - `contributing/docs-system.md` (1366w) — How Ally's documentation is routed, deduplicated, enforced in CI, and kept current — the contract…
 - `contributing/guide.md` (767w) — Branch naming, commit conventions, code standards, and the pull-request process shared across all Ally repositories
-- `contributing/planning-with-stacks.md` (2075w) — Pull Stacks context whenever a product judgement comes up — while planning and while coding…
+- `contributing/planning-with-stacks.md` (2326w) — Pull Stacks context whenever a product judgement comes up — while planning and while coding…
 - `contributing/release-process.md` (768w) — The shared production-release process for every Ally service — semantic versioning policy, the automated pipeline…
 
 ## Agent memory
@@ -71,4 +71,4 @@ Fetch as `https://tech.helloally.ai/#/wiki/<path>`, or raw Markdown at `https://
 - `index.md` — human navigation catalog — ROUTING.md supersedes it for agents
 - `log.md` — append-only history — read only when auditing what changed
 
-_38 pages, 57,805 words total. Loading all of it would cost roughly 77,073 tokens — which is the entire reason this index exists._
+_38 pages, 58,056 words total. Loading all of it would cost roughly 77,408 tokens — which is the entire reason this index exists._
