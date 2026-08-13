@@ -231,8 +231,14 @@ describe('createAndroidChannel', () => {
 describe('requestNotificationPermission', () => {
   let mockRequest: jest.Mock;
 
+  // Platform.Version is a getter-only in RN's test environment — override via
+  // Object.defineProperty so the Android version check can be controlled.
   const setPlatformVersion = (version: number) => {
-    Platform.Version = version;
+    Object.defineProperty(Platform, 'Version', {
+      value: version,
+      configurable: true,
+      writable: true,
+    });
   };
 
   beforeEach(() => {

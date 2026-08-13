@@ -7,15 +7,10 @@ import {Provider} from 'react-redux';
 import {ErrorBoundary, NetworkLogs, ToastProvider} from '@/components';
 import {env} from '@/config/env';
 import {RootNavigator} from '@/navigation/RootNavigator';
-import {installScriptSafeFontFallback} from '@/theme';
 
 import {store} from './store/store';
 
 import './localization/i18n';
-
-// Before the first render: keeps Indic text legible on ROMs that don't fall back
-// from our Latin-only bundled fonts.
-installScriptSafeFontFallback();
 
 export const App = () => {
   return (
