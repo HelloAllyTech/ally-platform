@@ -2,6 +2,7 @@
 export {colors, legacyColors} from './colors';
 export type {Colors, LegacyColors} from './colors';
 export {fontFamily} from './fonts';
+export {installScriptSafeFontFallback} from './scriptSafeFontFallback';
 export {typography, fontWeights} from './typography';
 export type {TypographyStyle, FontWeight} from './typography';
 export {globalStyles} from './helpers';
