@@ -64,3 +64,6 @@ export * from './leaderboard';
 
 // Simulation Summary types
 export * from './simulationSummary';
+
+// Courses (Track 2.0) types
+export * from './courses';

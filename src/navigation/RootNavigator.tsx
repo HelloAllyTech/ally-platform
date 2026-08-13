@@ -26,6 +26,8 @@ import {
   CallSummaryScreen,
   CaseDetailsScreen,
   CompleteProfileScreen,
+  CourseItemPlayerScreen,
+  CourseOverviewScreen,
   ListeningScreen,
   ProfileSettingsScreen,
   ReactionsScreen,
@@ -323,6 +325,15 @@ const NavigationContent = ({
           <Stack.Screen
             name={SCREEN_NAMES.CASE_DETAILS}
             component={CaseDetailsScreen}
+          />
+          <Stack.Screen
+            name={SCREEN_NAMES.COURSE_OVERVIEW}
+            component={CourseOverviewScreen}
+          />
+          <Stack.Screen
+            name={SCREEN_NAMES.COURSE_ITEM_PLAYER}
+            component={CourseItemPlayerScreen}
+            options={{gestureEnabled: false}}
           />
           <Stack.Screen name={SCREEN_NAMES.SPLASH} component={SplashScreen} />
           <Stack.Screen

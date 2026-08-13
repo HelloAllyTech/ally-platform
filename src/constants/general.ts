@@ -218,6 +218,24 @@ export const API_ROUTES = {
     ) =>
       `/learn/scenario-session/${scenarioSessionId}/reflection-prompts/${reflectionPromptId}`,
   },
+  TRACKS: {
+    LIST: '/learn/tracks',
+    DETAIL: (trackId: string) => `/learn/tracks/${trackId}`,
+    NEXT_ITEM: (trackId: string) => `/learn/tracks/${trackId}/next-item`,
+    ENROLL: (trackId: string) => `/learn/tracks/${trackId}/enroll`,
+    START_ITEM: (itemId: string) => `/learn/tracks/items/${itemId}/start`,
+    ARTICLE_READ: (itemId: string) =>
+      `/learn/tracks/items/${itemId}/article-read`,
+    VIDEO_PROGRESS: (itemId: string) =>
+      `/learn/tracks/items/${itemId}/video-progress`,
+    QUIZ_ATTEMPTS: (itemId: string) =>
+      `/learn/tracks/items/${itemId}/quiz-attempts`,
+    QUIZ_REGRADE: (itemId: string, attemptId: string) =>
+      `/learn/tracks/items/${itemId}/quiz-attempts/${attemptId}/regrade`,
+    JOURNAL_DRAFT: (itemId: string) => `/learn/tracks/items/${itemId}/journal`,
+    JOURNAL_SUBMIT: (itemId: string) =>
+      `/learn/tracks/items/${itemId}/journal/submit`,
+  },
   SIMULATION_REVIEWS: {
     REVIEWS: '/scenario-session-reviews',
     CREATE_REVIEW: '/scenario-session-reviews',
