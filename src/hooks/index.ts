@@ -16,6 +16,8 @@ export * from './useLeaderboardNotification';
 export * from './useLearningPathDetails';
 export * from './useListeningScreen';
 export * from './useLiveAudioStream';
+export * from './useTrackPlayerNavigation';
+export * from './useVideoWatchProgress';
 export * from './useNavigationAwareCounselorChat';
 export * from './useNetworkConnectivity';
 export * from './usePermissionAlert';

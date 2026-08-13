@@ -60,5 +60,39 @@ target 'ally' do
         c.build_settings['ENABLE_USER_SCRIPT_SANDBOXING'] = 'NO'
       end
     end
+
+    # fmt 11.0.2's consteval-checked format strings fail to compile under
+    # Xcode 26's stricter clang ("call to consteval function ... is not a
+    # constant expression"), which breaks the whole build. Two halves are
+    # needed and BOTH are required — the -D alone does nothing, because
+    # fmt's base.h unconditionally re-#defines FMT_USE_CONSTEVAL from its
+    # own compiler sniffing and clobbers any value passed on the command
+    # line. So we also wrap that block in an #ifndef so the -D survives.
+    # Pods/ is gitignored, so the header edit has to happen here to be
+    # reproducible on a fresh checkout. Remove both halves once React
+    # Native bumps its pinned fmt version.
+    installer.pods_project.targets.each do |t|
+      next unless t.name == 'fmt'
+      t.build_configurations.each do |c|
+        flags = c.build_settings['OTHER_CPLUSPLUSFLAGS'] || '$(inherited)'
+        flags = [flags] if flags.is_a?(String)
+        next if flags.include?('-DFMT_USE_CONSTEVAL=0')
+        c.build_settings['OTHER_CPLUSPLUSFLAGS'] = flags + ['-DFMT_USE_CONSTEVAL=0']
+      end
+    end
+
+    fmt_base_h = File.join(installer.sandbox.root, 'fmt', 'include', 'fmt', 'base.h')
+    if File.exist?(fmt_base_h)
+      src = File.read(fmt_base_h)
+      marker = '#ifndef FMT_USE_CONSTEVAL'
+      sniff_start = "// Detect consteval, C++20 constexpr extensions and std::is_constant_evaluated.\n"
+      sniff_end = "#  define FMT_USE_CONSTEVAL 0\n#endif\n"
+      if !src.include?(marker) && src.include?(sniff_start) && src.include?(sniff_end)
+        patched = src.sub(sniff_start, "#{sniff_start}#{marker}\n")
+                     .sub(sniff_end, "#{sniff_end}#endif\n")
+        File.write(fmt_base_h, patched)
+        Pod::UI.puts '[fmt] guarded FMT_USE_CONSTEVAL so -D can override it'.green
+      end
+    end
   end
 end

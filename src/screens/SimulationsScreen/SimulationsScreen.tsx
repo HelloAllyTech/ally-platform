@@ -1,4 +1,4 @@
-import React, {useCallback, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
   NavigationProp,
   ParamListBase,
@@ -30,12 +30,13 @@ import {
 import {getFirstVisibleTab} from '@/navigation/TabNavigator';
 import {
   useGetCasesQuery,
+  useGetLearnTracksQuery,
   useGetScenariosQuery,
   useGetSimulationPathsQuery,
 } from '@/services';
 import {AppRootState} from '@/store/store';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
-import type {Case, Scenario, SimulationPath} from '@/types';
+import type {Case, Scenario, SimulationPath, TrackListItem} from '@/types';
 import {getTriggerWarningNames} from '@/utils';
 
 export const SimulationsScreen: React.FC = () => {
@@ -68,10 +69,56 @@ export const SimulationsScreen: React.FC = () => {
     refetch: refetchCases,
   } = useGetCasesQuery();
 
+  const {
+    data: tracksData,
+    isFetching: isFetchingTracks,
+    refetch: refetchTracks,
+  } = useGetLearnTracksQuery();
+
   const {credits, getCreditsInfo} = useSimulationCredits();
 
-  const keyExtractor = (item: Scenario | SimulationPath | Case) =>
-    item.id?.toString();
+  // Hide a tab entirely once its query has resolved with no data; a tab
+  // stays visible while fetching so it doesn't flash-hide before data loads.
+  const showCoursesTab = isFetchingTracks || (tracksData?.length ?? 0) > 0;
+  const showCasesTab = isFetchingCases || (casesData?.length ?? 0) > 0;
+  const showSimulationsTab =
+    isFetchingScenarios || (scenariosData?.length ?? 0) > 0;
+  const showPathsTab = isFetchingPaths || (pathsData?.length ?? 0) > 0;
+
+  const tabs = useMemo(
+    () => [
+      ...(showCoursesTab
+        ? [{key: SimulationTabs.COURSES, label: t('simulations.courses')}]
+        : []),
+      ...(showCasesTab
+        ? [{key: SimulationTabs.CASES, label: t('simulations.cases')}]
+        : []),
+      ...(showSimulationsTab
+        ? [
+            {
+              key: SimulationTabs.SIMULATIONS,
+              label: t('simulations.simulation'),
+            },
+          ]
+        : []),
+      ...(showPathsTab
+        ? [{key: SimulationTabs.PATHS, label: t('simulations.tracks')}]
+        : []),
+    ],
+    [showCoursesTab, showCasesTab, showSimulationsTab, showPathsTab, t],
+  );
+
+  // Tabs can hide/show as their queries resolve — if the active tab
+  // disappears, fall back to the first tab that's still visible.
+  useEffect(() => {
+    if (tabs.length > 0 && !tabs.some(tab => tab.key === activeTab)) {
+      setActiveTab(tabs[0].key);
+    }
+  }, [tabs, activeTab]);
+
+  const keyExtractor = (
+    item: Scenario | SimulationPath | Case | TrackListItem,
+  ) => item.id?.toString();
 
   // Check if this is the first visible tab
   const isFirstTab = useMemo(() => {
@@ -111,14 +158,56 @@ export const SimulationsScreen: React.FC = () => {
     });
   };
 
+  const handleCoursePress = (track: TrackListItem) => {
+    navigation.navigate(SCREEN_NAMES.COURSE_OVERVIEW, {
+      trackId: track.id,
+    });
+  };
+
   const handleRefresh = () => {
-    if (activeTab === SimulationTabs.SIMULATIONS) {
+    if (activeTab === SimulationTabs.COURSES) {
+      refetchTracks();
+    } else if (activeTab === SimulationTabs.SIMULATIONS) {
       refetchScenarios();
     } else if (activeTab === SimulationTabs.PATHS) {
       refetchPaths();
     } else {
       refetchCases();
     }
+  };
+
+  const renderCourseItem = ({item}: {item: TrackListItem}) => {
+    const progress = item.completedItems;
+    const total = item.totalItems;
+    const showProgress = !!progress && !!total;
+    const isCompleted = !!progress && progress >= total;
+
+    return (
+      <SimulationCard
+        title={item.title || ''}
+        description={item.description || ''}
+        coverImageUrl={item.coverImageUrl}
+        onPress={() => handleCoursePress(item)}
+        rightAccessory={
+          showProgress ? (
+            <View style={styles.progressContainer}>
+              <CircularProgress
+                progress={progress}
+                max={total}
+                size={33}
+                strokeWidth={3}
+                progressColor={
+                  isCompleted ? colors.ds.green[400] : colors.blue
+                }>
+                <Text style={styles.progressText}>
+                  {progress}/{total}
+                </Text>
+              </CircularProgress>
+            </View>
+          ) : null
+        }
+      />
+    );
   };
 
   const renderSimulationItem = ({item}: {item: Scenario}) => {
@@ -221,11 +310,13 @@ export const SimulationsScreen: React.FC = () => {
     () => (
       <View style={styles.empty}>
         <Text style={styles.emptyTitle}>
-          {activeTab === SimulationTabs.SIMULATIONS
-            ? t('simulationPage.noSimulationsAvailable')
-            : activeTab === SimulationTabs.PATHS
-              ? t('simulationPage.noPathsAvailable')
-              : t('simulationPage.noCasesAvailable')}
+          {activeTab === SimulationTabs.COURSES
+            ? t('simulationPage.noCoursesAvailable')
+            : activeTab === SimulationTabs.SIMULATIONS
+              ? t('simulationPage.noSimulationsAvailable')
+              : activeTab === SimulationTabs.PATHS
+                ? t('simulationPage.noPathsAvailable')
+                : t('simulationPage.noCasesAvailable')}
         </Text>
       </View>
     ),
@@ -263,21 +354,25 @@ export const SimulationsScreen: React.FC = () => {
   };
 
   const renderTabContent = () => {
+    const isCoursesTab = activeTab === SimulationTabs.COURSES;
     const isSimulationsTab = activeTab === SimulationTabs.SIMULATIONS;
     const isPathsTab = activeTab === SimulationTabs.PATHS;
-    const isCasesTab = activeTab === SimulationTabs.CASES;
 
-    const isFetching = isSimulationsTab
-      ? isFetchingScenarios
-      : isPathsTab
-        ? isFetchingPaths
-        : isFetchingCases;
+    const isFetching = isCoursesTab
+      ? isFetchingTracks
+      : isSimulationsTab
+        ? isFetchingScenarios
+        : isPathsTab
+          ? isFetchingPaths
+          : isFetchingCases;
 
-    const tabLabel = isSimulationsTab
-      ? 'simulation'
-      : isPathsTab
-        ? 'track'
-        : 'case';
+    const tabLabel = isCoursesTab
+      ? 'course'
+      : isSimulationsTab
+        ? 'simulation'
+        : isPathsTab
+          ? 'track'
+          : 'case';
 
     return (
       <>
@@ -287,7 +382,24 @@ export const SimulationsScreen: React.FC = () => {
             {t(`simulations.${tabLabel}`)}
           </Text>
         </Text>
-        {isSimulationsTab ? (
+        {isCoursesTab ? (
+          <FlatList
+            contentContainerStyle={styles.list}
+            data={tracksData ?? []}
+            keyExtractor={keyExtractor}
+            renderItem={renderCourseItem}
+            ListEmptyComponent={
+              !isFetching ? ListEmptyElement : <SimulationsSkeleton count={4} />
+            }
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={isFetching}
+                onRefresh={handleRefresh}
+              />
+            }
+          />
+        ) : isSimulationsTab ? (
           <FlatList
             contentContainerStyle={styles.list}
             data={scenariosData ?? []}
@@ -363,20 +475,7 @@ export const SimulationsScreen: React.FC = () => {
         </View>
         <View style={styles.tabMargin}>
           <TabView
-            tabs={[
-              {
-                key: SimulationTabs.SIMULATIONS,
-                label: t('simulations.simulation'),
-              },
-              {
-                key: SimulationTabs.PATHS,
-                label: t('simulations.tracks'),
-              },
-              {
-                key: SimulationTabs.CASES,
-                label: t('simulations.cases'),
-              },
-            ]}
+            tabs={tabs}
             activeTab={activeTab}
             onTabChange={setActiveTab}
             tabWidthMode="content"

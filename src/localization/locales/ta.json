@@ -567,7 +567,8 @@
     "tabs": {
       "simulations": "சிமுலேஷன்கள்",
       "tracks": "கற்றல் பாதைகள்",
-      "cases": "வழக்குகள்"
+      "cases": "வழக்குகள்",
+      "courses": "படிப்புகள்"
     },
     "header": {
       "prefix": "உதவித் திறன்களை வளர்க்க",
@@ -642,7 +643,8 @@
       "prefix": "உங்கள்",
       "case": "வழக்கு",
       "track": "பாதை",
-      "scenario": "சூழ்நிலையைத் தேர்ந்தெடுக்கவும்"
+      "scenario": "சூழ்நிலையைத் தேர்ந்தெடுக்கவும்",
+      "course": "படிப்பு"
     },
     "details": {
       "progress": "{{total}}-இல் {{completed}} முடிந்தது",
@@ -1047,7 +1049,8 @@
       "content": "நிச்சயமாக அமர்வை முடிக்க விரும்புகிறீர்களா?",
       "endSession": "அமர்வைக் முடி",
       "cancel": "ரத்துசெய்"
-    }
+    },
+    "noCoursesAvailable": "படிப்புகள் எதுவும் இல்லை"
   },
   "stressBuster": {
     "messages": {
@@ -1495,7 +1498,9 @@
     "completed_one": "நிறைவு",
     "completed_other": "நிறைவு · {{count}}×",
     "completedChip_one": "ஒருமுறை நிறைவு",
-    "completedChip_other": "{{count}} முறை நிறைவு"
+    "completedChip_other": "{{count}} முறை நிறைவு",
+    "course": "படிப்பு",
+    "courses": "படிப்புகள்"
   },
   "replyBottomSheet": {
     "title": "பதில்கள்",
@@ -1565,5 +1570,123 @@
   },
   "accessibility": {
     "openMenu": "மெனுவைத் திறக்கவும்"
+  },
+  "courses": {
+    "progress": "{{total}} இல் {{completed}}",
+    "courseCompleted": "படிப்பு முடிந்தது",
+    "lockedTooltip": "இதைத் திறக்க முந்தைய உருப்படிகளை முடிக்கவும்",
+    "notFound": "படிப்பு கிடைக்கவில்லை",
+    "status": {
+      "completed": "முடிந்தது",
+      "inProgress": "நடந்து கொண்டிருக்கிறது"
+    },
+    "meta": {
+      "quiz": "வினாடி வினா",
+      "questions_one": "{{count}} கேள்வி",
+      "questions_other": "{{count}} கேள்விகள்",
+      "passScore": "தேர்ச்சி மதிப்பெண் {{score}}%",
+      "video": "வீடியோ",
+      "videoDuration_one": "{{minutes}} நிமிட வீடியோ",
+      "videoDuration_other": "{{minutes}} நிமிட வீடியோ",
+      "article": "கட்டுரை",
+      "journal": "பதிவேடு",
+      "prompts_one": "{{count}} கேள்வி",
+      "prompts_other": "{{count}} கேள்விகள்",
+      "roleplay": "ரோல்-ப்ளே",
+      "minScore": "குறைந்தபட்ச மதிப்பெண் {{score}}%",
+      "case": "வழக்கு"
+    },
+    "player": {
+      "exit": "வெளியேறு",
+      "prev": "முந்தைய",
+      "next": "அடுத்து",
+      "finish": "முடி",
+      "overallProgress": "{{pct}}% முடிந்தது",
+      "loadFailed": "இந்த உருப்படியை ஏற்ற முடியவில்லை.",
+      "retry": "மீண்டும் முயல்"
+    },
+    "celebration": {
+      "sectionCompleteTitle": "பிரிவு முடிந்தது!",
+      "sectionCompleteBody": "அருமையாகச் செய்தீர்கள் — தொடருங்கள்.",
+      "trackCompleteTitle": "படிப்பு முடிந்தது!",
+      "trackCompleteBody": "இந்தப் படிப்பில் உள்ள ஒவ்வொரு உருப்படியையும் நீங்கள் முடித்துவிட்டீர்கள்.",
+      "continue": "தொடரவும்",
+      "backToLearn": "மீண்டும் கற்கச் செல்",
+      "itemsCompleted_one": "{{count}} உருப்படி முடிந்தது",
+      "itemsCompleted_other": "{{count}} உருப்படிகள் முடிந்தன"
+    },
+    "article": {
+      "markRead": "படித்ததாகக் குறிக்கவும்",
+      "keepReading": "படிப்பதைத் தொடரவும்",
+      "read": "படிக்கப்பட்டது"
+    },
+    "video": {
+      "markWatched": "பார்த்ததாகக் குறிக்கவும்",
+      "watched": "பார்க்கப்பட்டது",
+      "openVideo": "வீடியோவைத் திற"
+    },
+    "journal": {
+      "submit": "சமர்ப்பிக்கவும்",
+      "submitted": "சமர்ப்பிக்கப்பட்டது",
+      "placeholder": "உங்கள் பதிலை எழுதுங்கள்…",
+      "required": "தேவை",
+      "saving": "சேமிக்கிறது…",
+      "saved": "சேமிக்கப்பட்டது",
+      "saveFailed": "சேமிப்பு தோல்வியடைந்தது"
+    },
+    "roleplay": {
+      "intro": "இந்த ரோல்-ப்ளேயைத் தொடங்க கீழே தட்டவும்.",
+      "start": "தொடங்கு",
+      "openCase": "வழக்கைத் திற",
+      "replay": "மீண்டும் விளையாடு",
+      "completed": "முடிந்தது",
+      "completedOn": "{{date}} அன்று முடிந்தது"
+    },
+    "quiz": {
+      "intro": {
+        "title": "வினாடி வினா நேரம்",
+        "questionCount_one": "{{count}} கேள்வி",
+        "questionCount_other": "{{count}} கேள்விகள்",
+        "passScore": "தேர்ச்சி மதிப்பெண்: {{score}}%",
+        "attemptsLeft_one": "{{count}} முயற்சி மீதம்",
+        "attemptsLeft_other": "{{count}} முயற்சிகள் மீதம்",
+        "unlimitedAttempts": "வரம்பற்ற முயற்சிகள்",
+        "start": "வினாடி வினாவைத் தொடங்கு",
+        "noAttemptsLeft": "முயற்சிகள் எதுவும் மீதமில்லை"
+      },
+      "question": {
+        "progress": "கேள்வி {{current}} / {{total}}",
+        "next": "அடுத்து",
+        "back": "பின்",
+        "submit": "வினாடி வினாவைச் சமர்ப்பிக்கவும்",
+        "selectPrompt": "ஒன்றைத் தேர்ந்தெடு",
+        "selectMultiple": "பொருந்தும் அனைத்தையும் தேர்ந்தெடு",
+        "true": "சரி",
+        "false": "தவறு",
+        "orderPrompt": "இவற்றை வரிசைப்படுத்தவும்",
+        "matchPrompt": "இணைகளைப் பொருத்தவும்",
+        "dragHandle": "வரிசைமாற்ற இழுக்கவும்",
+        "moveUp": "மேலே நகர்த்து",
+        "moveDown": "கீழே நகர்த்து",
+        "wordCount_one": "{{count}}/{{min}} சொல்",
+        "wordCount_other": "{{count}}/{{min}} சொற்கள்",
+        "aiGraded": "இந்த பதில் AI ஆல் மதிப்பிடப்படுகிறது"
+      },
+      "results": {
+        "title": "முடிவுகள்",
+        "passed": "தேர்ச்சி",
+        "failed": "தோல்வி",
+        "correct": "சரி",
+        "incorrect": "தவறு",
+        "explanation": "விளக்கம்",
+        "feedback": "கருத்து",
+        "pendingGrading": "மதிப்பீடு நடந்து கொண்டிருக்கிறது",
+        "finishGrading": "மதிப்பீட்டை முடி",
+        "grading": "மதிப்பிடுகிறது…",
+        "retry": "வினாடி வினாவை மீண்டும் முயல்",
+        "next": "அடுத்து",
+        "attemptsUsed": "முயற்சி {{used}} / {{max}}"
+      }
+    }
   }
 }
