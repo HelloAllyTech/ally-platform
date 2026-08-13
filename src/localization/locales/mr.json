@@ -567,7 +567,8 @@
     "tabs": {
       "simulations": "सिमुलेशन्स",
       "tracks": "लर्निंग पाथवेज",
-      "cases": "केसेस"
+      "cases": "केसेस",
+      "courses": "कोर्सेस"
     },
     "header": {
       "prefix": "वापरून",
@@ -642,7 +643,8 @@
       "prefix": "तुमचा/तुमची",
       "case": "केस",
       "track": "ट्रॅक",
-      "scenario": "परिस्थिती निवडा"
+      "scenario": "परिस्थिती निवडा",
+      "course": "कोर्स"
     },
     "details": {
       "progress": "{{total}} पैकी {{completed}} पूर्ण",
@@ -1047,7 +1049,8 @@
       "content": "तुम्हाला नक्की हे सत्र थांबवायचे आहे का?",
       "endSession": "सत्र थांबवा",
       "cancel": "रद्द करा"
-    }
+    },
+    "noCoursesAvailable": "कोणतेही कोर्सेस उपलब्ध नाहीत"
   },
   "stressBuster": {
     "messages": {
@@ -1495,7 +1498,9 @@
     "completed_one": "पूर्ण",
     "completed_other": "पूर्ण · {{count}}×",
     "completedChip_one": "एकदा पूर्ण",
-    "completedChip_other": "{{count}} वेळा पूर्ण"
+    "completedChip_other": "{{count}} वेळा पूर्ण",
+    "course": "कोर्स",
+    "courses": "कोर्सेस"
   },
   "replyBottomSheet": {
     "title": "प्रत्युत्तरे",
@@ -1565,5 +1570,123 @@
   },
   "accessibility": {
     "openMenu": "मेनू उघडा"
+  },
+  "courses": {
+    "progress": "{{total}} पैकी {{completed}}",
+    "courseCompleted": "कोर्स पूर्ण झाला",
+    "lockedTooltip": "हे अनलॉक करण्यासाठी आधीचे आयटम पूर्ण करा",
+    "notFound": "कोर्स सापडला नाही",
+    "status": {
+      "completed": "पूर्ण",
+      "inProgress": "सुरू आहे"
+    },
+    "meta": {
+      "quiz": "क्विझ",
+      "questions_one": "{{count}} प्रश्न",
+      "questions_other": "{{count}} प्रश्न",
+      "passScore": "पास स्कोर {{score}}%",
+      "video": "व्हिडिओ",
+      "videoDuration_one": "{{minutes}} मिनिटांचा व्हिडिओ",
+      "videoDuration_other": "{{minutes}} मिनिटांचा व्हिडिओ",
+      "article": "लेख",
+      "journal": "जर्नल",
+      "prompts_one": "{{count}} प्रॉम्प्ट",
+      "prompts_other": "{{count}} प्रॉम्प्ट्स",
+      "roleplay": "रोल-प्ले",
+      "minScore": "किमान स्कोर {{score}}%",
+      "case": "केस"
+    },
+    "player": {
+      "exit": "बाहेर पडा",
+      "prev": "मागील",
+      "next": "पुढे",
+      "finish": "पूर्ण करा",
+      "overallProgress": "{{pct}}% पूर्ण",
+      "loadFailed": "हा आयटम लोड होऊ शकला नाही.",
+      "retry": "पुन्हा प्रयत्न करा"
+    },
+    "celebration": {
+      "sectionCompleteTitle": "सेक्शन पूर्ण झाला!",
+      "sectionCompleteBody": "छान काम — असेच पुढे चालू ठेवा.",
+      "trackCompleteTitle": "कोर्स पूर्ण झाला!",
+      "trackCompleteBody": "तुम्ही या कोर्समधील सर्व आयटम पूर्ण केले आहेत.",
+      "continue": "सुरू ठेवा",
+      "backToLearn": "शिका वर परत जा",
+      "itemsCompleted_one": "{{count}} आयटम पूर्ण",
+      "itemsCompleted_other": "{{count}} आयटम पूर्ण"
+    },
+    "article": {
+      "markRead": "वाचले असे चिन्हांकित करा",
+      "keepReading": "वाचन सुरू ठेवा",
+      "read": "वाचले"
+    },
+    "video": {
+      "markWatched": "पाहिले असे चिन्हांकित करा",
+      "watched": "पाहिले",
+      "openVideo": "व्हिडिओ उघडा"
+    },
+    "journal": {
+      "submit": "सबमिट करा",
+      "submitted": "सबमिट केले",
+      "placeholder": "तुमचे उत्तर लिहा…",
+      "required": "आवश्यक",
+      "saving": "सेव्ह होत आहे…",
+      "saved": "सेव्ह केले",
+      "saveFailed": "सेव्ह करण्यात अयशस्वी"
+    },
+    "roleplay": {
+      "intro": "हा रोल-प्ले सुरू करण्यासाठी खाली टॅप करा.",
+      "start": "सुरू करा",
+      "openCase": "केस उघडा",
+      "replay": "पुन्हा खेळा",
+      "completed": "पूर्ण",
+      "completedOn": "{{date}} रोजी पूर्ण झाले"
+    },
+    "quiz": {
+      "intro": {
+        "title": "क्विझची वेळ",
+        "questionCount_one": "{{count}} प्रश्न",
+        "questionCount_other": "{{count}} प्रश्न",
+        "passScore": "पास स्कोर: {{score}}%",
+        "attemptsLeft_one": "{{count}} प्रयत्न शिल्लक",
+        "attemptsLeft_other": "{{count}} प्रयत्न शिल्लक",
+        "unlimitedAttempts": "अमर्याद प्रयत्न",
+        "start": "क्विझ सुरू करा",
+        "noAttemptsLeft": "प्रयत्न शिल्लक नाहीत"
+      },
+      "question": {
+        "progress": "प्रश्न {{current}} / {{total}}",
+        "next": "पुढे",
+        "back": "मागे",
+        "submit": "क्विझ सबमिट करा",
+        "selectPrompt": "एक निवडा",
+        "selectMultiple": "लागू होणारे सर्व निवडा",
+        "true": "खरे",
+        "false": "खोटे",
+        "orderPrompt": "यांना क्रमाने लावा",
+        "matchPrompt": "जोड्या जुळवा",
+        "dragHandle": "क्रम बदलण्यासाठी ओढा",
+        "moveUp": "वर हलवा",
+        "moveDown": "खाली हलवा",
+        "wordCount_one": "{{count}}/{{min}} शब्द",
+        "wordCount_other": "{{count}}/{{min}} शब्द",
+        "aiGraded": "या उत्तराचे मूल्यांकन AI द्वारे केले जाते"
+      },
+      "results": {
+        "title": "परिणाम",
+        "passed": "पास",
+        "failed": "फेल",
+        "correct": "बरोबर",
+        "incorrect": "चुकीचे",
+        "explanation": "स्पष्टीकरण",
+        "feedback": "फीडबॅक",
+        "pendingGrading": "मूल्यांकन सुरू आहे",
+        "finishGrading": "मूल्यांकन पूर्ण करा",
+        "grading": "मूल्यांकन होत आहे…",
+        "retry": "क्विझ पुन्हा द्या",
+        "next": "पुढे",
+        "attemptsUsed": "प्रयत्न {{used}} / {{max}}"
+      }
+    }
   }
 }

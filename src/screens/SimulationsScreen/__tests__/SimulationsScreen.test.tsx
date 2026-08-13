@@ -1,5 +1,5 @@
 import React from 'react';
-import {render, waitFor, fireEvent} from '@testing-library/react-native';
+import {render, waitFor, fireEvent, within} from '@testing-library/react-native';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 
 import {SimulationsScreen} from '../SimulationsScreen';
@@ -154,6 +154,7 @@ jest.mock('@/services', () => ({
   useGetScenariosQuery: jest.fn(),
   useGetSimulationPathsQuery: jest.fn(),
   useGetCasesQuery: jest.fn(),
+  useGetLearnTracksQuery: jest.fn(),
 }));
 
 describe('SimulationsScreen', () => {
@@ -163,6 +164,8 @@ describe('SimulationsScreen', () => {
     .useGetSimulationPathsQuery as jest.Mock;
   const useGetCasesQueryMock = require('@/services')
     .useGetCasesQuery as jest.Mock;
+  const useGetLearnTracksQueryMock = require('@/services')
+    .useGetLearnTracksQuery as jest.Mock;
 
   const renderWithSafeArea = (ui: React.ReactElement) =>
     render(
@@ -185,6 +188,12 @@ describe('SimulationsScreen', () => {
     });
     // Provide default mock for useGetCasesQuery
     useGetCasesQueryMock.mockReturnValue({
+      data: undefined,
+      isFetching: false,
+      refetch: jest.fn(),
+    });
+    // Provide default mock for useGetLearnTracksQuery
+    useGetLearnTracksQueryMock.mockReturnValue({
       data: undefined,
       isFetching: false,
       refetch: jest.fn(),
@@ -252,6 +261,119 @@ describe('SimulationsScreen', () => {
 
     // Both scenarios should be rendered
     expect(getByText('B Coming Soon')).toBeTruthy();
+  });
+
+  describe('tab order and hide-when-empty', () => {
+    const populateAllTabs = () => {
+      useGetLearnTracksQueryMock.mockReturnValue({
+        data: [{id: 't1', title: 'Track 1', totalItems: 4, completedItems: 1}],
+        isFetching: false,
+        refetch: jest.fn(),
+      });
+      useGetScenariosQueryMock.mockReturnValue({
+        data: [{id: 1, title: 'Scenario 1', description: 'desc', coverImageUrl: ''}],
+        isFetching: false,
+        refetch: jest.fn(),
+      });
+      useGetSimulationPathsQueryMock.mockReturnValue({
+        data: [{id: 'p1', title: 'Path 1', totalScenarios: 3, completedScenarios: 1}],
+        isFetching: false,
+        refetch: jest.fn(),
+      });
+      useGetCasesQueryMock.mockReturnValue({
+        data: [{id: 'c1', title: 'Case 1', totalScenarios: 2, completedScenarios: 0}],
+        isFetching: false,
+        refetch: jest.fn(),
+      });
+    };
+
+    it('renders tabs in the order Courses, Cases, Simulations, Learning Pathways when all have data', () => {
+      populateAllTabs();
+      const {getByTestId} = renderWithSafeArea(<SimulationsScreen />);
+      const tabView = getByTestId('tab-view');
+      const testIds = within(tabView)
+        .getAllByTestId(/^tab-(COURSES|CASES|SIMULATIONS|PATHS)$/)
+        .map(node => node.props.testID);
+      expect(testIds).toEqual([
+        'tab-COURSES',
+        'tab-CASES',
+        'tab-SIMULATIONS',
+        'tab-PATHS',
+      ]);
+    });
+
+    it('hides the Courses tab when there are no tracks and fetching has finished', () => {
+      populateAllTabs();
+      useGetLearnTracksQueryMock.mockReturnValue({
+        data: [],
+        isFetching: false,
+        refetch: jest.fn(),
+      });
+
+      const {queryByTestId} = renderWithSafeArea(<SimulationsScreen />);
+      expect(queryByTestId('tab-COURSES')).toBeNull();
+    });
+
+    it('hides the Simulations tab when there are no scenarios and fetching has finished', () => {
+      populateAllTabs();
+      useGetScenariosQueryMock.mockReturnValue({
+        data: [],
+        isFetching: false,
+        refetch: jest.fn(),
+      });
+
+      const {queryByTestId} = renderWithSafeArea(<SimulationsScreen />);
+      expect(queryByTestId('tab-SIMULATIONS')).toBeNull();
+    });
+
+    it('hides the Cases tab when there are no cases and fetching has finished', () => {
+      populateAllTabs();
+      useGetCasesQueryMock.mockReturnValue({
+        data: [],
+        isFetching: false,
+        refetch: jest.fn(),
+      });
+
+      const {queryByTestId} = renderWithSafeArea(<SimulationsScreen />);
+      expect(queryByTestId('tab-CASES')).toBeNull();
+    });
+
+    it('hides the Learning Pathways tab when there are no paths and fetching has finished', () => {
+      populateAllTabs();
+      useGetSimulationPathsQueryMock.mockReturnValue({
+        data: [],
+        isFetching: false,
+        refetch: jest.fn(),
+      });
+
+      const {queryByTestId} = renderWithSafeArea(<SimulationsScreen />);
+      expect(queryByTestId('tab-PATHS')).toBeNull();
+    });
+
+    it('keeps a tab visible while it is still fetching, even though it will resolve empty', () => {
+      populateAllTabs();
+      useGetCasesQueryMock.mockReturnValue({
+        data: [],
+        isFetching: true,
+        refetch: jest.fn(),
+      });
+
+      const {getByTestId} = renderWithSafeArea(<SimulationsScreen />);
+      expect(getByTestId('tab-CASES')).toBeTruthy();
+    });
+
+    it('navigates to the course overview screen when a course card is pressed', () => {
+      populateAllTabs();
+      const {getAllByTestId, getByTestId} = renderWithSafeArea(<SimulationsScreen />);
+      fireEvent.press(getByTestId('tab-COURSES'));
+
+      const {mockNavigate} = require('@/hooks/useAppNavigation');
+      fireEvent.press(getAllByTestId('simulation-card')[0]);
+      expect(mockNavigate).toHaveBeenCalledWith(
+        SCREEN_NAMES.COURSE_OVERVIEW,
+        {trackId: 't1'},
+      );
+    });
   });
 });
 

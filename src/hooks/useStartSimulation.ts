@@ -13,6 +13,8 @@ interface StartSimulationParams {
   scenarioId: number;
   scenarioPathSessionItemId?: string;
   caseSessionItemId?: string;
+  /** Links this session to a Track 2.0 roleplay item's progress row. */
+  trackItemProgressId?: string;
   pathId?: string;
   caseId?: string;
   languageId?: number;
@@ -86,6 +88,9 @@ export const useStartSimulation = (): UseStartSimulationReturn => {
         }),
         ...(params.caseSessionItemId && {
           caseSessionItemId: params.caseSessionItemId,
+        }),
+        ...(params.trackItemProgressId && {
+          trackItemProgressId: params.trackItemProgressId,
         }),
         ...(params.languageId && {languageId: params.languageId}),
       }).unwrap();

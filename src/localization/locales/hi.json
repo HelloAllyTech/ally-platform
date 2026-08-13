@@ -567,7 +567,8 @@
     "tabs": {
       "simulations": "सिमुलेशन",
       "tracks": "सीखने के मार्ग",
-      "cases": "केस"
+      "cases": "केस",
+      "courses": "कोर्स"
     },
     "header": {
       "prefix": "उपयोग करें",
@@ -642,7 +643,8 @@
       "prefix": "अपना चुनें",
       "case": "केस",
       "track": "ट्रैक",
-      "scenario": "स्थिति"
+      "scenario": "स्थिति",
+      "course": "कोर्स"
     },
     "details": {
       "progress": "{{total}} में से {{completed}} पूरे हुए",
@@ -1047,7 +1049,8 @@
       "content": "क्या आप वाकई सत्र को समाप्त करना चाहते हैं?",
       "endSession": "सत्र समाप्त करें",
       "cancel": "रद्द करें"
-    }
+    },
+    "noCoursesAvailable": "कोई कोर्स उपलब्ध नहीं है"
   },
   "stressBuster": {
     "messages": {
@@ -1495,7 +1498,9 @@
     "completed_one": "पूर्ण",
     "completed_other": "पूर्ण · {{count}}×",
     "completedChip_one": "एक बार पूर्ण",
-    "completedChip_other": "{{count}} बार पूर्ण"
+    "completedChip_other": "{{count}} बार पूर्ण",
+    "course": "कोर्स",
+    "courses": "कोर्स"
   },
   "replyBottomSheet": {
     "title": "उत्तर",
@@ -1565,5 +1570,123 @@
   },
   "accessibility": {
     "openMenu": "मेन्यू खोलें"
+  },
+  "courses": {
+    "progress": "{{total}} में से {{completed}}",
+    "courseCompleted": "कोर्स पूर्ण हुआ",
+    "lockedTooltip": "इसे अनलॉक करने के लिए पिछले आइटम पूरे करें",
+    "notFound": "कोर्स नहीं मिला",
+    "status": {
+      "completed": "पूर्ण",
+      "inProgress": "जारी है"
+    },
+    "meta": {
+      "quiz": "क्विज़",
+      "questions_one": "{{count}} प्रश्न",
+      "questions_other": "{{count}} प्रश्न",
+      "passScore": "पास स्कोर {{score}}%",
+      "video": "वीडियो",
+      "videoDuration_one": "{{minutes}} मिनट का वीडियो",
+      "videoDuration_other": "{{minutes}} मिनट का वीडियो",
+      "article": "लेख",
+      "journal": "जर्नल",
+      "prompts_one": "{{count}} प्रॉम्प्ट",
+      "prompts_other": "{{count}} प्रॉम्प्ट",
+      "roleplay": "रोल-प्ले",
+      "minScore": "न्यूनतम स्कोर {{score}}%",
+      "case": "केस"
+    },
+    "player": {
+      "exit": "बाहर जाएं",
+      "prev": "पिछला",
+      "next": "अगला",
+      "finish": "समाप्त करें",
+      "overallProgress": "{{pct}}% पूर्ण",
+      "loadFailed": "यह आइटम लोड नहीं हो सका.",
+      "retry": "पुनः प्रयास करें"
+    },
+    "celebration": {
+      "sectionCompleteTitle": "सेक्शन पूर्ण!",
+      "sectionCompleteBody": "बहुत बढ़िया — आगे बढ़ते रहें.",
+      "trackCompleteTitle": "कोर्स पूर्ण!",
+      "trackCompleteBody": "आपने इस कोर्स का हर आइटम पूरा कर लिया है.",
+      "continue": "जारी रखें",
+      "backToLearn": "सीखने पर वापस जाएं",
+      "itemsCompleted_one": "{{count}} आइटम पूर्ण",
+      "itemsCompleted_other": "{{count}} आइटम पूर्ण"
+    },
+    "article": {
+      "markRead": "पढ़ा गया चिह्नित करें",
+      "keepReading": "पढ़ना जारी रखें",
+      "read": "पढ़ा गया"
+    },
+    "video": {
+      "markWatched": "देखा गया चिह्नित करें",
+      "watched": "देखा गया",
+      "openVideo": "वीडियो खोलें"
+    },
+    "journal": {
+      "submit": "सबमिट करें",
+      "submitted": "सबमिट किया गया",
+      "placeholder": "अपना जवाब लिखें…",
+      "required": "आवश्यक",
+      "saving": "सहेजा जा रहा है…",
+      "saved": "सहेजा गया",
+      "saveFailed": "सहेजने में विफल"
+    },
+    "roleplay": {
+      "intro": "यह रोल-प्ले शुरू करने के लिए नीचे टैप करें.",
+      "start": "शुरू करें",
+      "openCase": "केस खोलें",
+      "replay": "फिर से खेलें",
+      "completed": "पूर्ण",
+      "completedOn": "{{date}} को पूर्ण हुआ"
+    },
+    "quiz": {
+      "intro": {
+        "title": "क्विज़ का समय",
+        "questionCount_one": "{{count}} प्रश्न",
+        "questionCount_other": "{{count}} प्रश्न",
+        "passScore": "पास स्कोर: {{score}}%",
+        "attemptsLeft_one": "{{count}} प्रयास शेष",
+        "attemptsLeft_other": "{{count}} प्रयास शेष",
+        "unlimitedAttempts": "असीमित प्रयास",
+        "start": "क्विज़ शुरू करें",
+        "noAttemptsLeft": "कोई प्रयास शेष नहीं"
+      },
+      "question": {
+        "progress": "प्रश्न {{current}} / {{total}}",
+        "next": "अगला",
+        "back": "पीछे",
+        "submit": "क्विज़ सबमिट करें",
+        "selectPrompt": "एक चुनें",
+        "selectMultiple": "जो लागू हो, वे सभी चुनें",
+        "true": "सही",
+        "false": "गलत",
+        "orderPrompt": "इन्हें क्रम में लगाएं",
+        "matchPrompt": "जोड़ी मिलाएं",
+        "dragHandle": "क्रम बदलने के लिए खींचें",
+        "moveUp": "ऊपर ले जाएं",
+        "moveDown": "नीचे ले जाएं",
+        "wordCount_one": "{{count}}/{{min}} शब्द",
+        "wordCount_other": "{{count}}/{{min}} शब्द",
+        "aiGraded": "इस उत्तर की जांच AI द्वारा की जाती है"
+      },
+      "results": {
+        "title": "परिणाम",
+        "passed": "पास",
+        "failed": "फेल",
+        "correct": "सही",
+        "incorrect": "गलत",
+        "explanation": "स्पष्टीकरण",
+        "feedback": "फीडबैक",
+        "pendingGrading": "जांच जारी है",
+        "finishGrading": "जांच पूरी करें",
+        "grading": "जांच हो रही है…",
+        "retry": "क्विज़ फिर से लें",
+        "next": "अगला",
+        "attemptsUsed": "प्रयास {{used}} / {{max}}"
+      }
+    }
   }
 }

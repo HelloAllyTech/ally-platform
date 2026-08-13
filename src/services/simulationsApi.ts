@@ -104,6 +104,7 @@ export const simulationsApi = api.injectEndpoints({
         scenarioId: number;
         scenarioPathSessionItemId?: string;
         caseSessionItemId?: string;
+        trackItemProgressId?: string;
         languageId?: number;
       }
     >({
@@ -111,6 +112,7 @@ export const simulationsApi = api.injectEndpoints({
         scenarioId,
         scenarioPathSessionItemId,
         caseSessionItemId,
+        trackItemProgressId,
         languageId,
       }) => ({
         url: API_ROUTES.LEARN.SCENARIO_SESSION_START,
@@ -119,6 +121,7 @@ export const simulationsApi = api.injectEndpoints({
           scenarioId,
           ...(scenarioPathSessionItemId && {scenarioPathSessionItemId}),
           ...(caseSessionItemId && {caseSessionItemId}),
+          ...(trackItemProgressId && {trackItemProgressId}),
           ...(languageId && {languageId}),
         },
       }),
@@ -275,6 +278,7 @@ export const {
   useGetAvailableLanguagesQuery,
   useListRoomsQuery,
   useGetScenariosQuery,
+  useGetScenarioByIdQuery,
   useAddSimulationFeedbackMutation,
   useGetSimulationLogsQuery,
   useLazyGetSimulationLogsQuery,
