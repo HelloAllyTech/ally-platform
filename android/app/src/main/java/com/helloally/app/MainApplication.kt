@@ -12,7 +12,6 @@ import com.facebook.react.defaults.DefaultReactNativeHost
 import com.facebook.react.soloader.OpenSourceMergedSoMapping
 import com.facebook.soloader.SoLoader
 import com.helloally.app.commentableText.CommentableTextViewPackage
-import com.helloally.app.fonts.ScriptFallbackFonts
 import com.livekit.reactnative.LiveKitReactNative
 import com.livekit.reactnative.audio.AudioType
 
@@ -40,8 +39,6 @@ class MainApplication : Application(), ReactApplication {
   override fun onCreate() {
     super.onCreate()
     SoLoader.init(this, OpenSourceMergedSoMapping)
-    // Before any React view renders: gives our Latin-only fonts an Indic fallback.
-    ScriptFallbackFonts.install(this)
     // Initialize LiveKit with MediaAudioType for device speaker output
     LiveKitReactNative.setup(this, AudioType.MediaAudioType())
     if (BuildConfig.IS_NEW_ARCHITECTURE_ENABLED) {

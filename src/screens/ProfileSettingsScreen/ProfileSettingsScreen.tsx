@@ -187,9 +187,7 @@ export const ProfileSettingsScreen: React.FC = () => {
               <TouchableOpacity
                 style={styles.fieldValueTouchable}
                 onPress={() => setIsLanguageSheetOpen(true)}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-                testID="language-selector-row">
+                activeOpacity={0.7}>
                 <Text style={styles.fieldValueText}>
                   {currentLanguageLabel}
                 </Text>
