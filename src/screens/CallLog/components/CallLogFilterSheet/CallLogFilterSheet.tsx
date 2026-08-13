@@ -152,6 +152,9 @@ export const CallLogFilterSheet: React.FC<CallLogFilterSheetProps> = ({
       visible={visible}
       onClose={onClose}
       initialSnapPoint={70}
+      // The scroll view below is flex:1, so it reports no height of its own; with
+      // dynamic sizing left on, this sheet's snap points never resolve.
+      enableDynamicSizing={false}
       backgroundColor={colors.white}>
       <View style={styles.container}>
         <Text style={styles.title}>{t('calls.filters.title')}</Text>

@@ -1,12 +1,6 @@
 import React, {useCallback} from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {
-  FlatList,
-  I18nManager,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import {I18nManager, Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {BottomSheet} from '@/components/BottomSheet';
@@ -69,32 +63,34 @@ export const LanguageSelectorSheet: React.FC<LanguageSelectorSheetProps> = ({
       onClose={onClose}
       initialSnapPoint={45}
       allowFullExpand={false}
+      // Without this the 45% above is discarded and the sheet sizes itself to its
+      // content, which never resolves reliably — see the note in BottomSheet.tsx.
+      enableDynamicSizing={false}
       backgroundColor={colors.white}>
       <View style={styles.container}>
         <Text style={styles.title}>{t('languageSelector.title')}</Text>
-        <FlatList
-          data={LANGUAGE_OPTIONS}
-          keyExtractor={item => item.code}
-          scrollEnabled={false}
-          renderItem={({item}) => {
-            const isSelected = item.code === currentCode;
-            return (
-              <TouchableOpacity
-                style={styles.option}
-                onPress={() => void handleSelect(item.code)}
-                activeOpacity={0.7}>
-                <Text
-                  style={[
-                    styles.optionText,
-                    isSelected && styles.optionTextSelected,
-                  ]}>
-                  {item.label}
-                </Text>
-                {isSelected && <View style={styles.selectedDot} />}
-              </TouchableOpacity>
-            );
-          }}
-        />
+        {LANGUAGE_OPTIONS.map(option => {
+          const isSelected = option.code === currentCode;
+          return (
+            <TouchableOpacity
+              key={option.code}
+              style={styles.option}
+              onPress={() => void handleSelect(option.code)}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityState={{selected: isSelected}}
+              testID={`language-option-${option.code}`}>
+              <Text
+                style={[
+                  styles.optionText,
+                  isSelected && styles.optionTextSelected,
+                ]}>
+                {option.label}
+              </Text>
+              {isSelected && <View style={styles.selectedDot} />}
+            </TouchableOpacity>
+          );
+        })}
       </View>
     </BottomSheet>
   );

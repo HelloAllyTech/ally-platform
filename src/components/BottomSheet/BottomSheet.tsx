@@ -10,6 +10,11 @@ import {colors} from '@/theme';
 
 import {BottomSheetProps} from './types';
 
+// Enough frames for layout to land on a slow device, short enough that a genuine
+// failure surfaces immediately rather than looking like a hang.
+const OPEN_ATTEMPTS = 6;
+const OPEN_RETRY_MS = 50;
+
 export const BottomSheet: React.FC<BottomSheetProps> = ({
   visible,
   onClose,
@@ -74,13 +79,52 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
     return points;
   }, [customSnapPoints, initialSnapPoint, allowFullExpand]);
 
-  // Handle visibility changes via ref methods
+  // Handle visibility changes via ref methods.
+  //
+  // `snapToIndex` is a SILENT no-op until @gorhom/bottom-sheet has resolved its snap
+  // points from layout — see `useAnimatedDetents`, which returns no detents at all
+  // while the container is unmeasured, or (with `enableDynamicSizing`) while the
+  // content has not reported a height. A single dropped call leaves this component
+  // closed while the caller's `visible` stays true: `onChange` never fires, so
+  // `onClose` never runs, and every further tap is a state write that changes
+  // nothing. The control reads as dead until the user leaves the screen. So retry
+  // for a few frames, and say so in dev if it never takes.
   useEffect(() => {
-    if (visible) {
-      bottomSheetRef.current?.snapToIndex(initialIndex);
-    } else if (currentIndexRef.current !== -1) {
-      bottomSheetRef.current?.close();
+    if (!visible) {
+      if (currentIndexRef.current !== -1) {
+        bottomSheetRef.current?.close();
+      }
+      return;
     }
+
+    let attempts = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const tryOpen = () => {
+      if (currentIndexRef.current !== -1) return; // already open
+      bottomSheetRef.current?.snapToIndex(initialIndex);
+      attempts += 1;
+
+      if (attempts >= OPEN_ATTEMPTS) {
+        if (__DEV__ && currentIndexRef.current === -1) {
+          console.warn(
+            '[BottomSheet] asked to open but the sheet stayed closed after ' +
+              `${OPEN_ATTEMPTS} attempts. Its snap points never resolved — with ` +
+              'enableDynamicSizing the content must report a height, which a bare ' +
+              'ScrollView or FlatList child never does.',
+          );
+        }
+        return;
+      }
+
+      timer = setTimeout(tryOpen, OPEN_RETRY_MS);
+    };
+
+    tryOpen();
+
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
   }, [visible, initialIndex]);
 
   const renderBackdrop = useCallback(

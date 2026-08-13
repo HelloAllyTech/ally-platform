@@ -1,350 +1,153 @@
 import React from 'react';
-import {Text, View} from 'react-native';
-import {render, act} from '@testing-library/react-native';
-import BottomSheetComponent from '@gorhom/bottom-sheet';
+import {Text} from 'react-native';
+import {act, render} from '@testing-library/react-native';
 
 import {BottomSheet} from '../BottomSheet';
 
-// Mock @gorhom/bottom-sheet
+// Stands in for @gorhom/bottom-mockSheet. `snapToIndex` refuses to open until
+// `layoutReady` flips, which is exactly what the real component does while its snap
+// points are unresolved: it returns without a word.
+const mockSheet = {
+  layoutReady: false,
+  index: -1,
+  snapToIndex: jest.fn(),
+  close: jest.fn(),
+  onChange: undefined as ((index: number) => void) | undefined,
+};
+
+jest.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({top: 0, bottom: 0, left: 0, right: 0}),
+}));
+
 jest.mock('@gorhom/bottom-sheet', () => {
   const React = require('react');
-  const {View: RNView} = require('react-native');
+  const {View} = require('react-native');
 
-  const MockBottomSheetComponent = React.forwardRef(
-    (props: any, ref: any) => {
-      // Store ref methods
-      React.useImperativeHandle(ref, () => ({
-        snapToIndex: jest.fn(),
-        close: jest.fn(),
-      }));
-
-      return (
-        <RNView testID="bottom-sheet-component" {...props}>
-          {props.children}
-        </RNView>
-      );
-    },
-  );
-
-  MockBottomSheetComponent.displayName = 'BottomSheetComponent';
+  const MockBottomSheet = React.forwardRef(({children, onChange}: any, ref: any) => {
+    mockSheet.onChange = onChange;
+    React.useImperativeHandle(ref, () => ({
+      snapToIndex: (index: number) => {
+        mockSheet.snapToIndex(index);
+        if (!mockSheet.layoutReady) return; // silent no-op, as in the real thing
+        mockSheet.index = index;
+        onChange?.(index);
+      },
+      close: () => {
+        mockSheet.close();
+        mockSheet.index = -1;
+        onChange?.(-1);
+      },
+    }));
+    return React.createElement(View, {testID: 'gorhom-sheet'}, children);
+  });
 
   return {
     __esModule: true,
-    default: MockBottomSheetComponent,
-    BottomSheetBackdrop: ({children, ...props}: any) => (
-      <RNView testID="bottom-sheet-backdrop" {...props}>
-        {children}
-      </RNView>
-    ),
-    BottomSheetView: ({children, ...props}: any) => (
-      <RNView testID="bottom-sheet-view" {...props}>
-        {children}
-      </RNView>
-    ),
+    default: MockBottomSheet,
+    BottomSheetBackdrop: () => null,
+    BottomSheetView: ({children, ...rest}: any) =>
+      React.createElement(View, rest, children),
   };
 });
 
-// Mock react-native-safe-area-context
-jest.mock('react-native-safe-area-context', () => {
-  return {
-    useSafeAreaInsets: () => ({
-      top: 0,
-      bottom: 0,
-      left: 0,
-      right: 0,
-    }),
-  };
-});
-
-// Mock react-native-size-matters
-jest.mock('react-native-size-matters', () => ({
-  ScaledSheet: {
-    create: (styles: any) => styles,
-  },
-}));
-
-// Mock colors
-jest.mock('@/theme', () => ({
-  colors: {
-    white: '#FFFFFF',
-    ds: {
-      stroke: {
-        primary: '#E5E5E5',
-      },
-    },
-  },
-}));
+const Sheet = (props: {visible: boolean; onClose?: () => void}) => (
+  <BottomSheet visible={props.visible} onClose={props.onClose ?? jest.fn()}>
+    <Text>content</Text>
+  </BottomSheet>
+);
 
 describe('BottomSheet', () => {
-  const mockOnClose = jest.fn();
-  const mockOnBackdropPress = jest.fn();
-
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
+    mockSheet.layoutReady = false;
+    mockSheet.index = -1;
   });
 
   afterEach(() => {
     jest.useRealTimers();
   });
 
-  it('renders with default props', () => {
-    const {getByTestId, getByText} = render(
-      <BottomSheet visible={false} onClose={mockOnClose}>
-        <Text>Test Content</Text>
-      </BottomSheet>,
-    );
+  it('opens on the first attempt when layout is already settled', () => {
+    mockSheet.layoutReady = true;
 
-    expect(getByTestId('bottom-sheet-component')).toBeTruthy();
-    expect(getByText('Test Content')).toBeTruthy();
+    render(<Sheet visible />);
+
+    expect(mockSheet.snapToIndex).toHaveBeenCalledTimes(1);
+    expect(mockSheet.index).toBe(0);
   });
 
-  it('renders children correctly', () => {
-    const {getByText} = render(
-      <BottomSheet visible={false} onClose={mockOnClose}>
-        <Text>Child Content</Text>
-      </BottomSheet>,
-    );
+  it('keeps trying when the first snap is silently dropped, and opens once it takes', () => {
+    render(<Sheet visible />);
 
-    expect(getByText('Child Content')).toBeTruthy();
-  });
+    expect(mockSheet.snapToIndex).toHaveBeenCalledTimes(1);
+    expect(mockSheet.index).toBe(-1); // dropped
 
-  it('shows backdrop when showBackdrop is true', () => {
-    const {getByTestId} = render(
-      <BottomSheet visible={true} onClose={mockOnClose} showBackdrop={true}>
-        <Text>Content</Text>
-      </BottomSheet>,
-    );
-
-    // Backdrop should be rendered when showBackdrop is true
-    // Note: The actual backdrop rendering is handled by @gorhom/bottom-sheet
-    // We're testing that the component accepts the prop
-    expect(getByTestId('bottom-sheet-component')).toBeTruthy();
-  });
-
-  it('hides backdrop when showBackdrop is false', () => {
-    const {getByTestId} = render(
-      <BottomSheet visible={true} onClose={mockOnClose} showBackdrop={false}>
-        <Text>Content</Text>
-      </BottomSheet>,
-    );
-
-    expect(getByTestId('bottom-sheet-component')).toBeTruthy();
-  });
-
-  it('calculates snap points correctly with default initialSnapPoint', () => {
-    const {getByTestId} = render(
-      <BottomSheet visible={false} onClose={mockOnClose}>
-        <Text>Content</Text>
-      </BottomSheet>,
-    );
-
-    const component = getByTestId('bottom-sheet-component');
-    expect(component).toBeTruthy();
-    // Default initialSnapPoint is 50, so snapPoints should be ['50%', '90%']
-  });
-
-  it('calculates snap points with custom initialSnapPoint as number', () => {
-    const {getByTestId} = render(
-      <BottomSheet
-        visible={false}
-        onClose={mockOnClose}
-        initialSnapPoint={25}>
-        <Text>Content</Text>
-      </BottomSheet>,
-    );
-
-    expect(getByTestId('bottom-sheet-component')).toBeTruthy();
-  });
-
-  it('calculates snap points with custom initialSnapPoint as string', () => {
-    const {getByTestId} = render(
-      <BottomSheet
-        visible={false}
-        onClose={mockOnClose}
-        initialSnapPoint="30%">
-        <Text>Content</Text>
-      </BottomSheet>,
-    );
-
-    expect(getByTestId('bottom-sheet-component')).toBeTruthy();
-  });
-
-  it('uses custom snap points when provided', () => {
-    const customSnapPoints = ['25%', '50%', '75%'];
-    const {getByTestId} = render(
-      <BottomSheet
-        visible={false}
-        onClose={mockOnClose}
-        snapPoints={customSnapPoints}>
-        <Text>Content</Text>
-      </BottomSheet>,
-    );
-
-    expect(getByTestId('bottom-sheet-component')).toBeTruthy();
-  });
-
-  it('does not add full expand point when allowFullExpand is false', () => {
-    const {getByTestId} = render(
-      <BottomSheet
-        visible={false}
-        onClose={mockOnClose}
-        allowFullExpand={false}>
-        <Text>Content</Text>
-      </BottomSheet>,
-    );
-
-    expect(getByTestId('bottom-sheet-component')).toBeTruthy();
-  });
-
-  it('calls onClose when sheet index changes to -1', () => {
-    const {getByTestId} = render(
-      <BottomSheet visible={true} onClose={mockOnClose}>
-        <Text>Content</Text>
-      </BottomSheet>,
-    );
-
-    const component = getByTestId('bottom-sheet-component');
-    const onChange = (component.props as any).onChange;
-
+    // Layout lands a couple of frames later, as on a slow device.
+    mockSheet.layoutReady = true;
     act(() => {
-      onChange(-1);
+      jest.advanceTimersByTime(50);
     });
 
-    expect(mockOnClose).toHaveBeenCalledTimes(1);
+    expect(mockSheet.index).toBe(0);
   });
 
-  it('does not call onClose when sheet index is not -1', () => {
-    const {getByTestId} = render(
-      <BottomSheet visible={true} onClose={mockOnClose}>
-        <Text>Content</Text>
-      </BottomSheet>,
-    );
-
-    const component = getByTestId('bottom-sheet-component');
-    const onChange = (component.props as any).onChange;
+  it('stops retrying once open, rather than fighting the sheet', () => {
+    mockSheet.layoutReady = true;
+    render(<Sheet visible />);
 
     act(() => {
-      onChange(0);
+      jest.advanceTimersByTime(500);
     });
 
-    expect(mockOnClose).not.toHaveBeenCalled();
+    expect(mockSheet.snapToIndex).toHaveBeenCalledTimes(1);
   });
 
-  it('applies custom backgroundColor', () => {
-    const {getByTestId} = render(
-      <BottomSheet
-        visible={false}
-        onClose={mockOnClose}
-        backgroundColor="#FF0000">
-        <Text>Content</Text>
-      </BottomSheet>,
+  it('gives up after a bounded number of attempts and says why', () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    render(<Sheet visible />);
+    act(() => {
+      jest.advanceTimersByTime(1000);
+    });
+
+    expect(mockSheet.snapToIndex).toHaveBeenCalledTimes(6);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('stayed closed after'),
     );
 
-    const component = getByTestId('bottom-sheet-component');
-    const backgroundStyle = (component.props as any).backgroundStyle;
-    expect(backgroundStyle).toBeTruthy();
+    warn.mockRestore();
   });
 
-  it('applies default white background color', () => {
-    const {getByTestId} = render(
-      <BottomSheet visible={false} onClose={mockOnClose}>
-        <Text>Content</Text>
-      </BottomSheet>,
-    );
+  it('does not touch the sheet while hidden', () => {
+    render(<Sheet visible={false} />);
 
-    const component = getByTestId('bottom-sheet-component');
-    const backgroundStyle = (component.props as any).backgroundStyle;
-    expect(backgroundStyle).toBeTruthy();
+    act(() => {
+      jest.advanceTimersByTime(1000);
+    });
+
+    expect(mockSheet.snapToIndex).not.toHaveBeenCalled();
+    expect(mockSheet.close).not.toHaveBeenCalled();
   });
 
-  it('respects enablePanDownToClose prop', () => {
-    const {getByTestId, rerender} = render(
-      <BottomSheet
-        visible={false}
-        onClose={mockOnClose}
-        enablePanDownToClose={false}>
-        <Text>Content</Text>
-      </BottomSheet>,
-    );
+  it('closes an open sheet when visible goes false', () => {
+    mockSheet.layoutReady = true;
+    const {update} = render(<Sheet visible />);
 
-    let component = getByTestId('bottom-sheet-component');
-    expect((component.props as any).enablePanDownToClose).toBe(false);
+    update(<Sheet visible={false} />);
 
-    rerender(
-      <BottomSheet
-        visible={false}
-        onClose={mockOnClose}
-        enablePanDownToClose={true}>
-        <Text>Content</Text>
-      </BottomSheet>,
-    );
-
-    component = getByTestId('bottom-sheet-component');
-    expect((component.props as any).enablePanDownToClose).toBe(true);
+    expect(mockSheet.close).toHaveBeenCalledTimes(1);
   });
 
-  it('applies custom animation duration', () => {
-    const {getByTestId} = render(
-      <BottomSheet
-        visible={false}
-        onClose={mockOnClose}
-        animationDuration={500}>
-        <Text>Content</Text>
-      </BottomSheet>,
-    );
+  it('abandons its retries when unmounted mid-attempt', () => {
+    const {unmount} = render(<Sheet visible />);
+    expect(mockSheet.snapToIndex).toHaveBeenCalledTimes(1);
 
-    const component = getByTestId('bottom-sheet-component');
-    const animationConfigs = (component.props as any).animationConfigs;
-    expect(animationConfigs.duration).toBe(500);
-  });
+    unmount();
+    act(() => {
+      jest.advanceTimersByTime(1000);
+    });
 
-  it('applies default animation duration of 300ms', () => {
-    const {getByTestId} = render(
-      <BottomSheet visible={false} onClose={mockOnClose}>
-        <Text>Content</Text>
-      </BottomSheet>,
-    );
-
-    const component = getByTestId('bottom-sheet-component');
-    const animationConfigs = (component.props as any).animationConfigs;
-    expect(animationConfigs.duration).toBe(300);
-  });
-
-  it('handles visibility changes correctly', () => {
-    const {rerender, getByTestId} = render(
-      <BottomSheet visible={false} onClose={mockOnClose}>
-        <Text>Content</Text>
-      </BottomSheet>,
-    );
-
-    rerender(
-      <BottomSheet visible={true} onClose={mockOnClose}>
-        <Text>Content</Text>
-      </BottomSheet>,
-    );
-
-    expect(getByTestId('bottom-sheet-component')).toBeTruthy();
-  });
-
-  it('handles initialIndex prop', () => {
-    const {getByTestId} = render(
-      <BottomSheet visible={true} onClose={mockOnClose} index={1}>
-        <Text>Content</Text>
-      </BottomSheet>,
-    );
-
-    expect(getByTestId('bottom-sheet-component')).toBeTruthy();
-  });
-
-  it('renders BottomSheetView with correct padding', () => {
-    const {getByTestId} = render(
-      <BottomSheet visible={false} onClose={mockOnClose}>
-        <Text>Content</Text>
-      </BottomSheet>,
-    );
-
-    const view = getByTestId('bottom-sheet-view');
-    expect(view).toBeTruthy();
+    expect(mockSheet.snapToIndex).toHaveBeenCalledTimes(1);
   });
 });

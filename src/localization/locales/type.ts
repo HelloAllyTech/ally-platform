@@ -19,4 +19,16 @@ export type Paths<T> = {
     : K;
 }[keyof T];
 
-export type TranslationType = Paths<Translation>;
+// i18next stores a plural as one entry per category — `thing_one`, `thing_other` —
+// but you call it by the base key and let `count` pick the form. The base key exists
+// only at runtime, so derive it here; without this, every plural in the catalogue is
+// a type error at the call site (34 of them today).
+type PluralSuffix = 'zero' | 'one' | 'two' | 'few' | 'many' | 'other';
+
+type PluralBaseKey<K> = K extends `${infer Base}_${PluralSuffix}`
+  ? Base
+  : never;
+
+export type TranslationType =
+  | Paths<Translation>
+  | PluralBaseKey<Paths<Translation>>;
