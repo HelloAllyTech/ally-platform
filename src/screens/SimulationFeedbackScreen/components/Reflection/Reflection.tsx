@@ -63,44 +63,48 @@ export const Reflection: React.FC<ReflectionProps> = ({scenarioSessionId}) => {
     };
   }, []);
 
-  useEffect(() => {
-    const showEvent =
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent =
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-
-    const showSub = Keyboard.addListener(showEvent, e => {
-      const kbHeight = e.endCoordinates.height;
-      setKeyboardHeight(kbHeight);
-
-      if (!isKeyboardVisible.current) {
-        isKeyboardVisible.current = true;
-        setTimeout(() => {
-          const promptId = focusedInputId.current;
-          const inputRef = promptId ? inputRefs.current[promptId] : null;
-          if (!inputRef || !scrollViewRef.current) {
-            return;
-          }
-          inputRef.measureInWindow((_x, y, _w, h) => {
-            if (y === undefined || y === null) {
-              return;
-            }
-            const screenHeight = Dimensions.get('window').height;
-            const keyboardTop = screenHeight - kbHeight;
-            const inputBottom = y + h;
-            if (inputBottom > keyboardTop - SCROLL_PADDING) {
-              const delta = inputBottom - keyboardTop + SCROLL_PADDING;
-              scrollViewRef.current?.scrollTo({
-                y: scrollOffsetRef.current + delta,
-                animated: true,
-              });
-            }
-          });
-        }, 350);
+  const scrollFocusedInputIntoView = useCallback((kbHeight: number) => {
+    const promptId = focusedInputId.current;
+    const inputRef = promptId ? inputRefs.current[promptId] : null;
+    if (!inputRef || !scrollViewRef.current) {
+      return;
+    }
+    inputRef.measureInWindow((_x, y, _w, h) => {
+      if (y === undefined || y === null) {
+        return;
+      }
+      const screenHeight = Dimensions.get('window').height;
+      const keyboardTop = screenHeight - kbHeight;
+      const inputBottom = y + h;
+      if (inputBottom > keyboardTop - SCROLL_PADDING) {
+        const delta = inputBottom - keyboardTop + SCROLL_PADDING;
+        scrollViewRef.current?.scrollTo({
+          y: scrollOffsetRef.current + delta,
+          animated: true,
+        });
       }
     });
+  }, []);
 
-    const hideSub = Keyboard.addListener(hideEvent, () => {
+  // Android's windowSoftInputMode="adjustPan" (app-wide, see AndroidManifest)
+  // already pans the whole window to keep the focused input visible. Running
+  // this same compensation in JS on top of that fights the OS's own pan and
+  // produces an unpredictable offset, which is what made the input look like
+  // it landed outside the visible screen. iOS has no such native behaviour,
+  // so it still needs the manual measure + scroll below.
+  useEffect(() => {
+    if (Platform.OS !== 'ios') {
+      return;
+    }
+
+    const showSub = Keyboard.addListener('keyboardWillShow', e => {
+      const kbHeight = e.endCoordinates.height;
+      setKeyboardHeight(kbHeight);
+      isKeyboardVisible.current = true;
+      setTimeout(() => scrollFocusedInputIntoView(kbHeight), 350);
+    });
+
+    const hideSub = Keyboard.addListener('keyboardWillHide', () => {
       setKeyboardHeight(0);
       isKeyboardVisible.current = false;
     });
@@ -109,7 +113,7 @@ export const Reflection: React.FC<ReflectionProps> = ({scenarioSessionId}) => {
       showSub.remove();
       hideSub.remove();
     };
-  }, []);
+  }, [scrollFocusedInputIntoView]);
 
   const handleScroll = useCallback(
     (e: {nativeEvent: {contentOffset: {y: number}}}) => {
@@ -194,6 +198,15 @@ export const Reflection: React.FC<ReflectionProps> = ({scenarioSessionId}) => {
                 }
                 onFocus={() => {
                   focusedInputId.current = prompt.id;
+                  // Keyboard is already up from a previous input — its
+                  // show event won't fire again for this focus change, so
+                  // re-run the scroll-into-view check for the new input.
+                  if (Platform.OS === 'ios' && isKeyboardVisible.current) {
+                    setTimeout(
+                      () => scrollFocusedInputIntoView(keyboardHeight),
+                      50,
+                    );
+                  }
                 }}
                 onBlur={() => {
                   focusedInputId.current = null;

@@ -52,17 +52,14 @@ export const getSimulationSummaryTabs = (
     title: t('postSim.tabs.skillsDemonstrated'),
     testID: 'tab-3',
   };
-  const reflectionTab = {
-    key: SimulationSummaryTabKey.REFLECTION,
-    title: t('postSim.tabs.deeperReflection'),
-    testID: 'tab-4',
-  };
 
   // Reviewers (opened from call logs) land on Skills Demonstrated first so the
   // substance of the feedback is one tap closer; learners keep Session Review.
+  // Deeper Reflection is hidden for now (SimulationSummaryTabKey.REFLECTION /
+  // Reflection component still exist, just not linked into this tab list).
   const tabs = skillsFirst
-    ? [skillsTab, summaryTab, askAiTab, transcriptionTab, reflectionTab]
-    : [summaryTab, askAiTab, transcriptionTab, skillsTab, reflectionTab];
+    ? [skillsTab, summaryTab, askAiTab, transcriptionTab]
+    : [summaryTab, askAiTab, transcriptionTab, skillsTab];
 
   if (pathId || caseId) {
     tabs.push({
