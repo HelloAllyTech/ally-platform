@@ -14,8 +14,7 @@ the agent's response.
 """
 
 import asyncio
-import time
-from typing import ClassVar, List, Optional, Tuple
+from typing import ClassVar, List, Optional
 
 from openai import AsyncOpenAI
 from openai.types.chat import (
@@ -131,188 +130,21 @@ class GuardrailEvent(BaseEvent):
 
         # Shadow-mode instrumentation only (COHERENCE guards specifically —
         # the pre-filter's signals are designed for mis-transcription, not
-        # the CATEGORY guards' content-boundary checks). Each shadow task
-        # runs concurrently with the real call so it never adds latency, and
-        # its result is only ever logged, never returned. See
-        # CoherencePrefilter's module docstring and
-        # COHERENCE_LEAN_PROMPT_SHADOW_ENABLED's description for why neither
-        # gates anything yet.
-        if self.detector_type != "COHERENCE" or not (
-            settings.COHERENCE_PREFILTER_SHADOW_ENABLED
-            or settings.COHERENCE_LEAN_PROMPT_SHADOW_ENABLED
-            or settings.COHERENCE_MODEL_SWAP_SHADOW_ENABLED
+        # the CATEGORY guards' content-boundary checks). Runs concurrently
+        # with the real call so it never adds latency, and its result is
+        # only ever logged, never returned. See CoherencePrefilter's module
+        # docstring for why this doesn't gate anything yet.
+        if (
+            self.detector_type == "COHERENCE"
+            and settings.COHERENCE_PREFILTER_SHADOW_ENABLED
         ):
-            return await self._classify(last.content, context)
-
-        # A Task (not a bare coroutine) so both the gather below and the
-        # shadow loggers can await the real call's outcome — a plain
-        # coroutine can only be awaited once.
-        real_task = asyncio.ensure_future(self._classify_timed(last.content, context))
-        shadow_tasks = []
-        if settings.COHERENCE_PREFILTER_SHADOW_ENABLED:
-            shadow_tasks.append(self._log_shadow_prefilter(last.content, context))
-        if settings.COHERENCE_LEAN_PROMPT_SHADOW_ENABLED:
-            shadow_tasks.append(
-                self._log_shadow_lean_classify(
-                    last.content, conversations[:-1], real_task
-                )
+            real_result, _ = await asyncio.gather(
+                self._classify(last.content, context),
+                self._log_shadow_prefilter(last.content, context),
             )
-        if settings.COHERENCE_MODEL_SWAP_SHADOW_ENABLED:
-            shadow_tasks.append(
-                self._log_shadow_model_swap(last.content, context, real_task)
-            )
+            return real_result
 
-        (real_result, _real_latency_ms), *_ = await asyncio.gather(
-            real_task, *shadow_tasks
-        )
-        return real_result
-
-    async def _classify_timed(
-        self, text: str, conversation_context: str
-    ) -> Tuple[bool, float]:
-        """Wraps _classify with latency timing, for comparison against the
-        Phase 1b lean shadow call in [GUARDRAIL_LEAN_SHADOW] logs."""
-        start = time.perf_counter()
-        result = await self._classify(text, conversation_context)
-        elapsed_ms = (time.perf_counter() - start) * 1000
-        return result, elapsed_ms
-
-    async def _classify_lean(
-        self, text: str, conversation_context: str
-    ) -> Tuple[bool, float]:
-        """Phase 1b shadow-test call: same judgment as _classify but with a
-        leaner system prompt (3 few-shot examples instead of 6) and less
-        conversation context. Raises on failure — the caller
-        (_log_shadow_lean_classify) logs and swallows, since this must never
-        affect the real guard's result."""
-        client = self._get_client(self.llm_base_url)
-        system_prompt = load_and_format(
-            "events/coherence_guardrail_system_lean",
-            helper_dialogue=self.data.helper_dialogue,
-        )
-        user_prompt = load_and_format(
-            "events/coherence_guardrail_user",
-            counselor_message=text,
-            conversation_context=conversation_context or "(no prior conversation)",
-        )
-        messages = [
-            ChatCompletionSystemMessageParam(content=system_prompt, role="system"),
-            ChatCompletionUserMessageParam(content=user_prompt, role="user"),
-        ]
-
-        start = time.perf_counter()
-        completion = await client.beta.chat.completions.parse(
-            model=self.model,
-            messages=messages,
-            response_format=ClassificationResultStrOp,
-        )
-        elapsed_ms = (time.perf_counter() - start) * 1000
-        return completion.choices[0].message.parsed.is_class, elapsed_ms
-
-    async def _log_shadow_lean_classify(
-        self,
-        counselor_message: str,
-        history: List[ChatMessage],
-        real_task: "asyncio.Future[Tuple[bool, float]]",
-    ) -> None:
-        """Best-effort: run the lean shadow classify call and log its
-        verdict + latency against the real call's.
-
-        Never raises — a failure here must never affect the real guard.
-        """
-        try:
-            # Deferred: see the matching comment in _log_shadow_prefilter.
-            from app.core.graph.instrumentation import get_room_id
-
-            lean_context = self._format_context(
-                history, turns=settings.COHERENCE_LEAN_CONTEXT_TURNS
-            )
-            lean_is_violation, lean_latency_ms = await self._classify_lean(
-                counselor_message, lean_context
-            )
-            _real_is_violation, real_latency_ms = await real_task
-            logger.info(
-                "[GUARDRAIL_LEAN_SHADOW] event=%s | room=%s | "
-                "lean_is_violation=%s | lean_latency_ms=%s | "
-                "real_latency_ms=%s | counselor='%s...'",
-                self.event_id,
-                get_room_id(),
-                lean_is_violation,
-                f"{lean_latency_ms:.0f}",
-                f"{real_latency_ms:.0f}",
-                counselor_message[:60],
-            )
-        except Exception as e:
-            logger.debug(f"[GUARDRAIL_LEAN_SHADOW] failed for {self.event_id}: {e}")
-
-    async def _classify_model_swap(
-        self, text: str, conversation_context: str
-    ) -> Tuple[bool, float]:
-        """Phase 1c shadow-test call: the exact same prompt and context as
-        _classify's COHERENCE branch, but on a different model (see
-        COHERENCE_MODEL_SWAP_CANDIDATE) — isolates the model itself as a
-        variable, independent of the prompt-size trim Phase 1b measures.
-        Raises on failure — the caller (_log_shadow_model_swap) logs and
-        swallows, since this must never affect the real guard's result."""
-        client = self._get_client(self.llm_base_url)
-        system_prompt = load_and_format(
-            "events/coherence_guardrail_system",
-            helper_dialogue=self.data.helper_dialogue,
-        )
-        user_prompt = load_and_format(
-            "events/coherence_guardrail_user",
-            counselor_message=text,
-            conversation_context=conversation_context or "(no prior conversation)",
-        )
-        messages = [
-            ChatCompletionSystemMessageParam(content=system_prompt, role="system"),
-            ChatCompletionUserMessageParam(content=user_prompt, role="user"),
-        ]
-
-        start = time.perf_counter()
-        completion = await client.beta.chat.completions.parse(
-            model=settings.COHERENCE_MODEL_SWAP_CANDIDATE,
-            messages=messages,
-            response_format=ClassificationResultStrOp,
-        )
-        elapsed_ms = (time.perf_counter() - start) * 1000
-        return completion.choices[0].message.parsed.is_class, elapsed_ms
-
-    async def _log_shadow_model_swap(
-        self,
-        counselor_message: str,
-        context: str,
-        real_task: "asyncio.Future[Tuple[bool, float]]",
-    ) -> None:
-        """Best-effort: run the model-swap shadow classify call and log its
-        verdict + latency against the real call's.
-
-        Never raises — a failure here must never affect the real guard.
-        """
-        try:
-            # Deferred: see the matching comment in _log_shadow_prefilter.
-            from app.core.graph.instrumentation import get_room_id
-
-            swap_is_violation, swap_latency_ms = await self._classify_model_swap(
-                counselor_message, context
-            )
-            _real_is_violation, real_latency_ms = await real_task
-            logger.info(
-                "[GUARDRAIL_MODEL_SWAP_SHADOW] event=%s | room=%s | "
-                "swap_is_violation=%s | swap_model=%s | swap_latency_ms=%s | "
-                "real_latency_ms=%s | counselor='%s...'",
-                self.event_id,
-                get_room_id(),
-                swap_is_violation,
-                settings.COHERENCE_MODEL_SWAP_CANDIDATE,
-                f"{swap_latency_ms:.0f}",
-                f"{real_latency_ms:.0f}",
-                counselor_message[:60],
-            )
-        except Exception as e:
-            logger.debug(
-                f"[GUARDRAIL_MODEL_SWAP_SHADOW] failed for {self.event_id}: {e}"
-            )
+        return await self._classify(last.content, context)
 
     async def _log_shadow_prefilter(self, counselor_message: str, context: str) -> None:
         """Best-effort: compute and log the shadow pre-filter's verdict.
@@ -341,18 +173,14 @@ class GuardrailEvent(BaseEvent):
             logger.debug(f"[GUARDRAIL_SHADOW] failed for {self.event_id}: {e}")
 
     @classmethod
-    def _format_context(
-        cls, history: List[ChatMessage], turns: Optional[int] = None
-    ) -> str:
+    def _format_context(cls, history: List[ChatMessage]) -> str:
         """Render the most recent turns as 'Role: content' lines for the
         classifier. Used so guardrails whose boundary concerns relevance /
         coherence (e.g. the STT Coherence Guard) can tell an off-topic
-        mistranscription apart from a legitimate topic change.
-
-        `turns` defaults to _CONTEXT_TURNS; the Phase 1b lean shadow call
-        passes COHERENCE_LEAN_CONTEXT_TURNS to test a shorter window."""
-        n = turns if turns is not None else cls._CONTEXT_TURNS
-        recent = [m for m in history[-n:] if m.content and m.content.strip()]
+        mistranscription apart from a legitimate topic change."""
+        recent = [
+            m for m in history[-cls._CONTEXT_TURNS :] if m.content and m.content.strip()
+        ]
         if not recent:
             return "(no prior conversation)"
         return "\n".join(f"{m.role}: {m.content}" for m in recent)
