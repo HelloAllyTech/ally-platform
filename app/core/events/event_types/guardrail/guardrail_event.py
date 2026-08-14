@@ -13,6 +13,7 @@ When triggered, actorDialogue is used as branching instruction to guide
 the agent's response.
 """
 
+import asyncio
 from typing import ClassVar, List, Optional
 
 from openai import AsyncOpenAI
@@ -28,6 +29,7 @@ from app.core.events.base import BaseEvent, ChatMessage
 from app.core.events.event_types.binary_classifier.schemas import (
     ClassificationResultStrOp,
 )
+from app.core.events.event_types.guardrail.coherence_prefilter import CoherencePrefilter
 from app.core.events.event_types.guardrail.schemas import GuardrailData
 from app.core.logger import get_logger
 from app.prompts.resolver import load_and_format
@@ -125,7 +127,50 @@ class GuardrailEvent(BaseEvent):
         if last.role.lower() != "counselor":
             return False
         context = self._format_context(conversations[:-1])
+
+        # Shadow-mode instrumentation only (COHERENCE guards specifically —
+        # the pre-filter's signals are designed for mis-transcription, not
+        # the CATEGORY guards' content-boundary checks). Runs concurrently
+        # with the real call so it never adds latency, and its result is
+        # only ever logged, never returned. See CoherencePrefilter's module
+        # docstring for why this doesn't gate anything yet.
+        if (
+            self.detector_type == "COHERENCE"
+            and settings.COHERENCE_PREFILTER_SHADOW_ENABLED
+        ):
+            real_result, _ = await asyncio.gather(
+                self._classify(last.content, context),
+                self._log_shadow_prefilter(last.content, context),
+            )
+            return real_result
+
         return await self._classify(last.content, context)
+
+    async def _log_shadow_prefilter(self, counselor_message: str, context: str) -> None:
+        """Best-effort: compute and log the shadow pre-filter's verdict.
+
+        Never raises — a failure here must never affect the real guard.
+        """
+        try:
+            # Deferred: app.core.graph (which owns get_room_id) imports this
+            # module transitively via app.core.scenario.base, so a top-level
+            # import here would be circular.
+            from app.core.graph.instrumentation import get_room_id
+
+            would_flag, drift_score = await CoherencePrefilter.would_flag(
+                counselor_message, context
+            )
+            logger.info(
+                "[GUARDRAIL_SHADOW] event=%s | room=%s | "
+                "prefilter_would_flag=%s | drift_score=%s | counselor='%s...'",
+                self.event_id,
+                get_room_id(),
+                would_flag,
+                f"{drift_score:.3f}" if drift_score is not None else "n/a",
+                counselor_message[:60],
+            )
+        except Exception as e:
+            logger.debug(f"[GUARDRAIL_SHADOW] failed for {self.event_id}: {e}")
 
     @classmethod
     def _format_context(cls, history: List[ChatMessage]) -> str:
@@ -141,6 +186,9 @@ class GuardrailEvent(BaseEvent):
         return "\n".join(f"{m.role}: {m.content}" for m in recent)
 
     async def _classify(self, text: str, conversation_context: str = "") -> bool:
+        # Deferred: see the matching comment in _log_shadow_prefilter.
+        from app.core.graph.instrumentation import get_room_id
+
         if not text.strip():
             return False
         try:
@@ -184,9 +232,10 @@ class GuardrailEvent(BaseEvent):
             result = completion.choices[0].message.parsed
 
             logger.info(
-                "Guardrail classification | event=%s | "
+                "Guardrail classification | event=%s | room=%s | "
                 "is_violation=%s | counselor='%s...' | boundary='%s...'",
                 self.event_id,
+                get_room_id(),
                 result.is_class,
                 text[:60],
                 self.data.helper_dialogue[:60],

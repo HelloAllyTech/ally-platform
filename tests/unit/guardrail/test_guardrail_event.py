@@ -237,3 +237,149 @@ class TestGuardrailDetectorTypeRouting:
         assert "events/guardrail_system" in templates
         assert "events/guardrail_user" in templates
         assert "events/coherence_guardrail_system" not in templates
+
+
+class TestCoherenceShadowPrefilter:
+    """Shadow mode must never change detect_event()'s real return value —
+    it only logs. See CoherencePrefilter for the actual heuristic tests."""
+
+    _PREFILTER = (
+        "app.core.events.event_types.guardrail.guardrail_event."
+        "CoherencePrefilter.would_flag"
+    )
+    _SHADOW_SETTING = (
+        "app.core.events.event_types.guardrail.guardrail_event."
+        "settings.COHERENCE_PREFILTER_SHADOW_ENABLED"
+    )
+
+    def _make_coherence_event(self) -> GuardrailEvent:
+        return GuardrailEvent.create(
+            event_id="guardrail-coherence",
+            data=GuardrailData(
+                helper_dialogue="gibberish or mistranscription boundary",
+                actor_dialogue="ask to repeat",
+            ),
+            detector_type="COHERENCE",
+            score=0,
+            visibility_type=VisibilityType.PASSIVE,
+            emoji=None,
+            emoji_message=None,
+        )
+
+    @pytest.mark.asyncio
+    async def test_shadow_prefilter_runs_but_never_changes_the_real_result(self):
+        event = self._make_coherence_event()
+        mock_completion = make_mock_completion(is_class=False)
+
+        with (
+            patch.object(GuardrailEvent, "_get_client") as mock_get_client,
+            patch(
+                self._PREFILTER,
+                new=AsyncMock(return_value=(True, 0.1)),
+            ) as mock_would_flag,
+        ):
+            mock_client = MagicMock()
+            mock_client.beta.chat.completions.parse = AsyncMock(
+                return_value=mock_completion
+            )
+            mock_get_client.return_value = mock_client
+
+            result = await event.detect_event(
+                [make_message("counselor", "some garbled text")]
+            )
+
+        # Shadow ran and disagreed with the real verdict — result is still
+        # the REAL classifier's answer, not the shadow's.
+        assert result is False
+        mock_would_flag.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_shadow_prefilter_does_not_run_for_category_detector(self):
+        event = make_guardrail_event()  # default detector_type == "CATEGORY"
+        mock_completion = make_mock_completion(is_class=False)
+
+        with (
+            patch.object(GuardrailEvent, "_get_client") as mock_get_client,
+            patch(
+                self._PREFILTER,
+                new=AsyncMock(return_value=(True, 0.1)),
+            ) as mock_would_flag,
+        ):
+            mock_client = MagicMock()
+            mock_client.beta.chat.completions.parse = AsyncMock(
+                return_value=mock_completion
+            )
+            mock_get_client.return_value = mock_client
+
+            await event.detect_event([make_message("counselor", "hello there")])
+
+        mock_would_flag.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_shadow_prefilter_does_not_run_when_setting_is_disabled(self):
+        event = self._make_coherence_event()
+        mock_completion = make_mock_completion(is_class=False)
+
+        with (
+            patch.object(GuardrailEvent, "_get_client") as mock_get_client,
+            patch(self._SHADOW_SETTING, False),
+            patch(
+                self._PREFILTER,
+                new=AsyncMock(return_value=(True, 0.1)),
+            ) as mock_would_flag,
+        ):
+            mock_client = MagicMock()
+            mock_client.beta.chat.completions.parse = AsyncMock(
+                return_value=mock_completion
+            )
+            mock_get_client.return_value = mock_client
+
+            await event.detect_event([make_message("counselor", "hello there")])
+
+        mock_would_flag.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_real_classifier_failure_is_unaffected_by_shadow_mode(self):
+        """The exact existing failure-mode test, but on a COHERENCE detector
+        with shadow mode active — a shadow-side bug must never leak into the
+        real guard's error handling."""
+        event = self._make_coherence_event()
+
+        with (
+            patch.object(GuardrailEvent, "_get_client") as mock_get_client,
+            patch(
+                self._PREFILTER,
+                new=AsyncMock(return_value=(False, None)),
+            ),
+        ):
+            mock_client = MagicMock()
+            mock_client.beta.chat.completions.parse = AsyncMock(
+                side_effect=Exception("OpenAI error")
+            )
+            mock_get_client.return_value = mock_client
+
+            result = await event.detect_event([make_message("counselor", "some text")])
+
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_a_failing_shadow_prefilter_never_breaks_the_real_result(self):
+        event = self._make_coherence_event()
+        mock_completion = make_mock_completion(is_class=True)
+
+        with (
+            patch.object(GuardrailEvent, "_get_client") as mock_get_client,
+            patch(
+                self._PREFILTER,
+                new=AsyncMock(side_effect=Exception("prefilter blew up")),
+            ),
+        ):
+            mock_client = MagicMock()
+            mock_client.beta.chat.completions.parse = AsyncMock(
+                return_value=mock_completion
+            )
+            mock_get_client.return_value = mock_client
+
+            result = await event.detect_event([make_message("counselor", "some text")])
+
+        assert result is True
