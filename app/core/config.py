@@ -873,6 +873,61 @@ class Settings(BaseSettings):
             "to silence the [GUARDRAIL_SHADOW] log line entirely."
         ),
     )
+    COHERENCE_LEAN_PROMPT_SHADOW_ENABLED: bool = Field(
+        default=True,
+        description=(
+            "Latency investigation, phase 1b: makes a SECOND real classification "
+            "call to the STT Coherence Guard's LLM, using a leaner prompt (fewer "
+            "few-shot examples, less conversation context — see "
+            "COHERENCE_LEAN_CONTEXT_TURNS), purely to LOG its verdict and latency "
+            "against the real call's. Unlike COHERENCE_PREFILTER_SHADOW_ENABLED "
+            "this is NOT free — it doubles the LLM spend on every COHERENCE-guard "
+            "call while enabled, since both the real and lean calls are real LLM "
+            "requests. Never changes detect_event()'s return value. Intended as a "
+            "temporary measurement window, not a permanent setting — turn off "
+            "once [GUARDRAIL_LEAN_SHADOW] logs have enough data to decide whether "
+            "the lean prompt is worth switching to."
+        ),
+    )
+    COHERENCE_LEAN_CONTEXT_TURNS: int = Field(
+        default=2,
+        description=(
+            "Conversation-history turns sent to the lean shadow classification "
+            "call (see COHERENCE_LEAN_PROMPT_SHADOW_ENABLED), vs. the real "
+            "guard's GuardrailEvent._CONTEXT_TURNS (6). Smaller by design — this "
+            "is exactly the input-size trim being measured."
+        ),
+    )
+    COHERENCE_MODEL_SWAP_SHADOW_ENABLED: bool = Field(
+        default=True,
+        description=(
+            "Latency investigation, phase 1c: makes a THIRD real classification "
+            "call to the STT Coherence Guard's LLM, using the exact same prompt "
+            "and context as the real call but a different model (see "
+            "COHERENCE_MODEL_SWAP_CANDIDATE), purely to LOG its verdict and "
+            "latency against the real call's. Isolates the model itself as a "
+            "variable, independent of the prompt-size trim measured by "
+            "COHERENCE_LEAN_PROMPT_SHADOW_ENABLED. Like that flag, this is NOT "
+            "free — it adds a second real LLM request on every COHERENCE-guard "
+            "call while enabled. Never changes detect_event()'s return value. "
+            "Temporary measurement window — turn off once "
+            "[GUARDRAIL_MODEL_SWAP_SHADOW] logs have enough data to decide "
+            "whether the candidate model is worth switching to."
+        ),
+    )
+    COHERENCE_MODEL_SWAP_CANDIDATE: str = Field(
+        default="gpt-4.1-nano",
+        description=(
+            "Candidate model for the phase 1c model-swap shadow call (see "
+            "COHERENCE_MODEL_SWAP_SHADOW_ENABLED), vs. the real guard's "
+            "GuardrailEvent.model (gpt-4o-mini). Chosen as a same-shape, "
+            "non-reasoning chat-completions model expected to be a low-risk "
+            "drop-in for the existing .beta.chat.completions.parse() call — "
+            "unlike the gpt-5 reasoning family, which this codebase already "
+            "special-cases elsewhere for temperature restrictions (see "
+            "app/llms/factory.py)."
+        ),
+    )
     KNOWLEDGE_RETRIEVAL_CACHE_SIZE: int = Field(
         default=256,
         description=(
