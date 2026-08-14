@@ -374,14 +374,6 @@ class AgentWorker:
 
         SemanticSimilarityEvent._EMBEDDING_CLIENT = self.embedding_client
 
-        # Shares the same embedding client for the STT Coherence Guard's
-        # shadow-mode pre-filter (drift check) — see CoherencePrefilter.
-        from app.core.events.event_types.guardrail.coherence_prefilter import (
-            CoherencePrefilter,
-        )
-
-        CoherencePrefilter._EMBEDDING_CLIENT = self.embedding_client
-
         # Resolve then parse metadata. Slim dispatches (metadataFetch pointer)
         # are fetched from ally-be here — after assignment, off LiveKit's 3s
         # dispatch window; inline payloads pass through untouched.

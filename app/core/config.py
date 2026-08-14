@@ -858,21 +858,6 @@ class Settings(BaseSettings):
             "spiking tail latency under heavy scenarios."
         ),
     )
-    COHERENCE_PREFILTER_SHADOW_ENABLED: bool = Field(
-        default=True,
-        description=(
-            "Latency investigation: runs a cheap, local, LLM-free pre-filter "
-            "(CoherencePrefilter) alongside the mandatory STT Coherence Guard's "
-            "real classification call, purely to LOG whether the pre-filter's "
-            "verdict would have agreed with the real one. Never changes the "
-            "guard's actual behavior or return value — this is instrumentation "
-            "only, gathering a real false-negative rate before any decision to "
-            "actually skip the real call on a pre-filter pass. Runs concurrently "
-            "with the real call (asyncio.gather), so it adds zero latency even "
-            "when enabled. Default True since it's side-effect-free; set False "
-            "to silence the [GUARDRAIL_SHADOW] log line entirely."
-        ),
-    )
     KNOWLEDGE_RETRIEVAL_CACHE_SIZE: int = Field(
         default=256,
         description=(
