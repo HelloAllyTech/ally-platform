@@ -11,17 +11,55 @@ the report evaluator so the two judges behave identically.
 
 from typing import Any, Dict, List
 
+from pydantic import BaseModel, Field, model_validator
+
 from app.core.logger import get_logger
-from app.core.scenario_report.evaluator import (
-    EvaluationResult,
-    _build_evaluator_llm,
-)
+from app.core.scenario_report.evaluator import _build_evaluator_llm
 from app.core.scenario_session_evaluation.schemas import (
     ActorEvaluationGoal,
     ActorEvaluationTurn,
 )
 
 logger = get_logger(__name__)
+
+
+class ActorGoalEvaluationResult(BaseModel):
+    """Structured response from the actor-goal judge.
+
+    Deliberately NOT the scenario-report judge's ``EvaluationResult``: the two
+    share LLM tuning, but this one carries ``not_applicable``, and the field
+    descriptions of a structured-output model are shown to the model. Adding a
+    goal-applicability field to the shared model would put it in front of the
+    report judge, which has no such concept.
+    """
+
+    metrics: Dict[str, int] = Field(
+        ...,
+        description=(
+            "Dictionary of goal title (verbatim) to score (0-100). "
+            "Include EVERY goal, including ones listed in not_applicable."
+        ),
+    )
+    not_applicable: List[str] = Field(
+        default_factory=list,
+        description=(
+            "Titles of goals the conversation gave no occasion to demonstrate. "
+            "Empty when every goal was genuinely exercised."
+        ),
+    )
+    report_markdown: str = Field(
+        default="",
+        description=(
+            "A full markdown evaluation report for a training supervisor. "
+            "Must include a summary, per-goal analysis with reasoning, "
+            "strengths, and areas for improvement."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def clamp_scores(self) -> "ActorGoalEvaluationResult":
+        self.metrics = {k: max(0, min(100, v)) for k, v in self.metrics.items()}
+        return self
 
 
 def build_actor_goal_system_prompt(goals: List[ActorEvaluationGoal]) -> str:
@@ -46,13 +84,26 @@ def build_actor_goal_system_prompt(goals: List[ActorEvaluationGoal]) -> str:
         f"Agent test cases:\n{goals_block}\n\n"
         "Scoring guidance: 50-59 below average, 60-69 average, 70-79 good, "
         "80-89 very good, 90-100 exceptional.\n\n"
-        "Respond ONLY as JSON with two keys:\n"
+        "APPLICABILITY. These test cases are configured globally, so some may "
+        "have nothing to do with this particular conversation. A goal is NOT "
+        "APPLICABLE when the conversation gave the actor no occasion to "
+        "demonstrate it — the situation it describes never arose. Judge this "
+        "on the situation, not on the actor's performance: a goal the actor "
+        "had a clear opportunity to meet and handled badly IS applicable and "
+        "must be scored low. Only the absence of any opportunity makes a goal "
+        "not applicable. When in doubt, treat the goal as applicable.\n\n"
+        "Respond ONLY as JSON with three keys:\n"
         '- "metrics": an object mapping each goal\'s EXACT title (verbatim, as '
-        "given above) to its integer 0-100 score. Include every goal.\n"
+        "given above) to its integer 0-100 score. Include every goal, "
+        "including any you mark not applicable.\n"
+        '- "not_applicable": an array of the EXACT titles (verbatim) of goals '
+        "the conversation gave no occasion to demonstrate. Use an empty array "
+        "when every goal was genuinely exercised.\n"
         '- "report_markdown": a markdown report for a training supervisor — a '
         "short overall summary, then one section per goal with its score and "
-        "1-3 sentences of reasoning citing the transcript, then overall "
-        "strengths and areas for improvement."
+        "1-3 sentences of reasoning citing the transcript (say explicitly when "
+        "a goal was not applicable and why), then overall strengths and areas "
+        "for improvement."
     )
 
 
@@ -70,23 +121,45 @@ async def evaluate_actor_goals(
     transcript: List[ActorEvaluationTurn],
     goals: List[ActorEvaluationGoal],
 ) -> Dict[str, Any]:
-    """Run the LLM judge; returns {'metrics': {...}, 'report_markdown': str}.
+    """Run the LLM judge.
+
+    Returns {'metrics': {...}, 'not_applicable': [...], 'report_markdown': str}.
 
     Raises on LLM failure so the caller can ship a FAILED webhook (we want the
     superadmin to see *that* an evaluation failed, not a silent empty result).
     """
     if not transcript:
-        return {"metrics": {}, "report_markdown": ""}
+        return {"metrics": {}, "not_applicable": [], "report_markdown": ""}
     if not goals:
-        return {"metrics": {}, "report_markdown": ""}
+        return {"metrics": {}, "not_applicable": [], "report_markdown": ""}
 
     llm = _build_evaluator_llm().with_structured_output(
-        EvaluationResult, method="json_mode"
+        ActorGoalEvaluationResult, method="json_mode"
     )
-    result: EvaluationResult = await llm.ainvoke(
+    result: ActorGoalEvaluationResult = await llm.ainvoke(
         [
             {"role": "system", "content": build_actor_goal_system_prompt(goals)},
             {"role": "user", "content": _build_user_message(transcript)},
         ]
     )
-    return {"metrics": result.metrics, "report_markdown": result.report_markdown}
+
+    # Only echo back titles that actually match a configured goal. The judge
+    # keys applicability by verbatim title, so a paraphrase or typo would
+    # otherwise silently drop a goal from the composite. Unmatched titles fail
+    # toward "applicable", i.e. the pre-existing behaviour.
+    goal_titles = {g.title for g in goals}
+    not_applicable = [t for t in result.not_applicable if t in goal_titles]
+    dropped = [t for t in result.not_applicable if t not in goal_titles]
+    if dropped:
+        logger.warning(
+            "Actor judge returned %d not_applicable title(s) matching no "
+            "configured goal; treating them as applicable: %s",
+            len(dropped),
+            dropped,
+        )
+
+    return {
+        "metrics": result.metrics,
+        "not_applicable": not_applicable,
+        "report_markdown": result.report_markdown,
+    }

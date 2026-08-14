@@ -42,5 +42,9 @@ class ActorEvaluationWebhookPayload(BaseModel):
 
     status: str  # COMPLETED | FAILED
     metrics: Dict[str, int] = Field(default_factory=dict)
+    # Titles of goals the conversation gave no occasion to demonstrate. Still
+    # present in `metrics` (so every goal stays visible in Roleplay Logs), but
+    # excluded from the composite so an inapplicable goal can't drag the score.
+    not_applicable: List[str] = Field(default_factory=list)
     report_markdown: str = ""
     error_message: Optional[str] = None

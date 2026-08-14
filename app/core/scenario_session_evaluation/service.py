@@ -68,14 +68,13 @@ async def run_actor_evaluation(request: ActorEvaluationRequest) -> None:
         payload = ActorEvaluationWebhookPayload(
             status="COMPLETED",
             metrics=result["metrics"],
+            not_applicable=result["not_applicable"],
             report_markdown=result["report_markdown"],
         )
     except Exception as e:  # noqa: BLE001 — report the failure to ally-be
         logger.exception(
             "Actor evaluation failed for session=%s", request.scenario_session_id
         )
-        payload = ActorEvaluationWebhookPayload(
-            status="FAILED", error_message=str(e)
-        )
+        payload = ActorEvaluationWebhookPayload(status="FAILED", error_message=str(e))
 
     await _send_webhook(request.scenario_session_id, payload)
