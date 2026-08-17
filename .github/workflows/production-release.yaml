@@ -361,7 +361,13 @@ jobs:
   deploy-to-ecs-service:
     name: Deploy to ECS Service
     runs-on: ubuntu-22.04
-    timeout-minutes: 20
+    # Must stay above deploy-ecs's wait-for-minutes (25) so the ECS waiter is
+    # what times out, not the runner. At 20 this job cancelled itself while the
+    # rollout was still being watched: v1.29.0 reached COMPLETED (12/12) at
+    # 11:00:02Z and the job was cancelled at 11:05:20Z, reporting `cancelled`
+    # for a deploy that had already succeeded. Four of the five releases before
+    # it reported the same thing.
+    timeout-minutes: 35
     permissions:
       id-token: write
       pull-requests: write

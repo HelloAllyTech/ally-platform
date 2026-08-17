@@ -54,3 +54,9 @@ runs:
         service: ${{ inputs.ecs-service }}
         cluster: ${{ inputs.ecs-cluster }}
         wait-for-service-stability: true
+        # Explicit, and deliberately below the calling job's timeout-minutes so
+        # the waiter is the thing that gives up, not the runner. When a rollout
+        # genuinely stalls we want "service did not stabilize" in the log; a job
+        # cancelled mid-wait reports `cancelled` with no diagnosis and looks
+        # identical to a successful deploy the waiter simply didn't see in time.
+        wait-for-minutes: 25

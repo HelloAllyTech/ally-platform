@@ -218,7 +218,9 @@ jobs:
   deploy-to-ecs-service:
     name: Deploy to ECS service
     runs-on: ubuntu-22.04
-    timeout-minutes: 20
+    # Keep above deploy-ecs's wait-for-minutes (25) — same reasoning as the
+    # production release workflow, which shares this action.
+    timeout-minutes: 35
     permissions:
       id-token: write
       pull-requests: write
