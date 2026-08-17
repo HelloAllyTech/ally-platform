@@ -15,6 +15,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from langchain_core.messages import HumanMessage
 
+from app.core.config import settings
 from app.core.graph.nodes import detect_behaviors
 from app.core.graph.state import SimulationState
 from app.core.scenario.simulation_instructions import SimulationBehaviorCategory
@@ -96,6 +97,16 @@ def _make_behavior_instruction(bi_id: str, score: int):
 
 
 class TestDetectBehaviorsScoreKeeperIntegration:
+    """Exercises detect_behaviors' synchronous ScoreKeeper wiring directly —
+    that logic is unchanged, but BEHAVIORS_DEFER_DETECTION (default True as
+    of 2026-08-17) now gates it behind a background task instead, so these
+    tests opt into the synchronous path explicitly rather than testing the
+    default."""
+
+    @pytest.fixture(autouse=True)
+    def _sync_behavior_detection(self, monkeypatch):
+        monkeypatch.setattr(settings, "BEHAVIORS_DEFER_DETECTION", False)
+
     @pytest.mark.asyncio
     async def test_detected_behaviors_are_added_to_score_keeper(self):
         """ScoreKeeper must accumulate scores for every detected behavior."""

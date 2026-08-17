@@ -796,6 +796,33 @@ class Settings(BaseSettings):
             "A/B behaviorsMs / responseLatencyMs and confirm scoring unchanged."
         ),
     )
+    BEHAVIORS_DEFER_DETECTION: bool = Field(
+        default=True,
+        description=(
+            "Latency lever (Phase 3 for behaviors, same pattern as "
+            "EVENTS_OFF_GATE_DEFER_DETECTION): BEHAVIORS_OFF_GATE already keeps "
+            "detect_behaviors off the spoken reply's critical path, but "
+            "send_event_feedback still has two incoming edges (detect_behaviors "
+            "+ resolve_branching_instruction) and a LangGraph node with multiple "
+            "incoming edges waits for ALL of them — so the turn's UI/score push "
+            "was still held up by however long behavior classification took. "
+            "When True, detect_behaviors spawns detection + its own independent "
+            "UI/BE feedback delivery as a genuinely detached asyncio task (via "
+            "EventOrchestrator._spawn_background, outside LangGraph's scheduler "
+            "entirely — a graph 'parallel' edge is NOT enough, see the "
+            "superstep-barrier history on EVENTS_OFF_GATE_DEFER_DETECTION) and "
+            "returns empty immediately, so send_event_feedback's fan-in no "
+            "longer waits on it either. Trade-off: behaviors_ms (captured via "
+            "@instrumented_node wrapping detect_behaviors) reads near-zero once "
+            "deferred — the real duration moves to a [BEHAVIOR_TIMING] debug log "
+            "instead of the structured per-turn metric, same visibility trade "
+            "already accepted for deferred event detection. Behavior scores "
+            "still accumulate every turn via ScoreKeeper, unchanged. Default "
+            "True as of 2026-08-17 (explicit product decision to ship this "
+            "immediately, not gate behind a later flip) — set False to "
+            "restore synchronous, graph-node behavior detection."
+        ),
+    )
     EVENTS_OFF_GATE: bool = Field(
         default=False,
         description=(

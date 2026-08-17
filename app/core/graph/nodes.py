@@ -1078,6 +1078,27 @@ async def detect_behaviors(
             logger.info("[PAUSE] detect_behaviors skipped — session paused")
             return {"behavior_feedback_data": []}
 
+    if settings.BEHAVIORS_DEFER_DETECTION:
+        # BEHAVIORS_OFF_GATE already keeps this node off the reply's critical
+        # path, but send_event_feedback (or sync_events_and_behaviors_node)
+        # still waits for THIS node to return — a graph "parallel" edge is
+        # not the same as actually detached (see the superstep-barrier
+        # history on EVENTS_OFF_GATE_DEFER_DETECTION). Spawning the real work
+        # as a genuinely detached task and returning empty immediately means
+        # whichever node this feeds into waits on a near-instant node
+        # instead. See _run_deferred_behaviors and BEHAVIORS_DEFER_DETECTION.
+        orchestrator = (
+            config["configurable"].get("event_orchestrator")
+            if config and "configurable" in config
+            else None
+        )
+        if orchestrator is not None:
+            orchestrator._spawn_background(
+                _run_deferred_behaviors(state, config, orchestrator),
+                label="process_deferred_behaviors",
+            )
+        return {"behavior_feedback_data": []}
+
     # Get scenario and score_keeper from config
     scenario = None
     score_keeper: Optional[ScoreKeeper] = None
@@ -1132,6 +1153,148 @@ async def detect_behaviors(
         )
 
     return {"behavior_feedback_data": behavior_feedback}
+
+
+async def _send_behavior_feedback_to_be(behavior_feedback_data: list, room) -> None:
+    """Send detected behavior feedback to Core over SQS (backend only — UI
+    is handled separately by the caller).
+
+    Pure extraction of send_event_feedback's original inline loop, unchanged
+    logic — callable from both the synchronous path (send_event_feedback)
+    and the BEHAVIORS_DEFER_DETECTION background-task path
+    (_run_deferred_behaviors) without duplicating it.
+    """
+    if not behavior_feedback_data:
+        return
+    if room is None:
+        logger.warning("No room available, skipping behavior feedback sending")
+        return
+
+    logger.info(
+        f"Sending {len(behavior_feedback_data)} behavior feedback entries to BE"
+    )
+    log_side_effect(
+        "sqs_behavior_feedback_send",
+        count=len(behavior_feedback_data),
+    )
+    for bf_data in behavior_feedback_data:
+        behavior_data = {
+            "behaviorInstructionId": bf_data.behavior_instruction_id,
+            "score": bf_data.score,
+            "category": bf_data.category.value,
+        }
+        core_behavior_message = CoreEventMessageType.create_behavior_instruction(
+            room_id=room.name,
+            behavior_instruction_data=behavior_data,
+        )
+        await msg_event_queue.send_message(
+            message_body=core_behavior_message.model_dump_json()
+        )
+
+    logger.info("Behavior feedback sent to BE successfully")
+
+
+async def _send_deferred_behavior_ui_feedback(
+    behavior_feedback_data: list, room
+) -> None:
+    """Send a standalone UI score update for deferred (off-gate) behaviors.
+
+    Mirrors _send_deferred_ui_feedback's pattern, but behaviors have no
+    message/emoji of their own — send_event_feedback's synchronous path
+    already treats this as "no feedback selected, but still send the
+    score" (see its own fallback branch); this is the same shape, just
+    scoped to behaviors and delivered independently. See
+    BEHAVIORS_DEFER_DETECTION.
+    """
+    if room is None or not behavior_feedback_data:
+        return
+    cumulative_score = sum(bf.score for bf in behavior_feedback_data)
+    detected_event_ids = [bf.behavior_instruction_id for bf in behavior_feedback_data]
+    ui_message = CustomUIEventMessageType.create(
+        score=cumulative_score,
+        emoji=None,
+        message="",
+        timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+        show_feedback=True,
+        detected_event_ids=detected_event_ids,
+    )
+    log_side_effect(
+        "ui_publish_score_deferred_behaviors",
+        cumulative_score=cumulative_score,
+        behavior_count=len(behavior_feedback_data),
+    )
+    await send_event_to_ui(ui_message, room)
+
+
+async def _run_deferred_behaviors(
+    state: SimulationState, config: Optional[RunnableConfig], orchestrator
+) -> None:
+    """Off-gate detection + delivery for behavior instructions.
+
+    Spawned as a genuinely DETACHED background task from detect_behaviors
+    (via orchestrator._spawn_background), not a graph node — mirrors
+    _run_deferred_events exactly and for the same reason: send_event_feedback
+    has two incoming edges and LangGraph waits for both before firing it, so
+    a "parallel" graph edge alone does not stop it from being held up by
+    however long this takes. Being outside the graph entirely means it
+    cannot participate in any superstep. See BEHAVIORS_DEFER_DETECTION.
+    """
+    # Pause gate (mirror detect_behaviors): the background task can outlive
+    # a pause-state change that happens mid-flight.
+    if config and "configurable" in config:
+        _clock = config["configurable"].get("session_clock")
+        if _clock is not None and _clock.is_paused:
+            return
+
+    scenario = None
+    score_keeper: Optional[ScoreKeeper] = None
+    room = None
+    if config and "configurable" in config:
+        scenario = config["configurable"].get("scenario")
+        score_keeper = config["configurable"].get("score_keeper")
+        room = config["configurable"].get("room")
+
+    if not scenario or not getattr(scenario, "behavior_instructions", None):
+        return
+
+    chat_messages = convert_messages_to_chat_messages(state.messages)
+    if not chat_messages:
+        return
+
+    _start = datetime.now(timezone.utc)
+    try:
+        behavior_feedback = await asyncio.wait_for(
+            _detect_behavior_instructions(
+                scenario.behavior_instructions,
+                chat_messages,
+                prompt_data=scenario.prompt_data,
+            ),
+            timeout=15.0,
+        )
+    except asyncio.TimeoutError:
+        logger.warning(
+            "[BEHAVIORS_DEFER_DETECTION] deferred behavior detection timed "
+            "out after 15s"
+        )
+        return
+    finally:
+        _ms = (datetime.now(timezone.utc) - _start).total_seconds() * 1000
+        logger.debug("[BEHAVIOR_TIMING] deferred node latency_ms=%.1f", _ms)
+
+    if not behavior_feedback:
+        return
+
+    if score_keeper:
+        for feedback in behavior_feedback:
+            await score_keeper.add_behavior_score(feedback.score)
+        logger.info(
+            f"ScoreKeeper: accumulated {len(behavior_feedback)} deferred "
+            f"behavior score(s), total behavior score = "
+            f"{score_keeper.behavior_score}"
+        )
+
+    await _send_behavior_feedback_to_be(behavior_feedback, room)
+    await _send_deferred_behavior_ui_feedback(behavior_feedback, room)
 
 
 def _trim_history_to_last_dialogues(messages: list, max_dialogues: int) -> list:
@@ -1746,35 +1909,7 @@ async def send_event_feedback(
         room = None
         if config and "configurable" in config:
             room = config["configurable"].get("room")
-
-        if room is not None:
-            logger.info(
-                f"Sending {len(state.behavior_feedback_data)} "
-                f"behavior feedback entries to BE"
-            )
-            log_side_effect(
-                "sqs_behavior_feedback_send",
-                count=len(state.behavior_feedback_data),
-            )
-            for bf_data in state.behavior_feedback_data:
-                behavior_data = {
-                    "behaviorInstructionId": bf_data.behavior_instruction_id,
-                    "score": bf_data.score,
-                    "category": bf_data.category.value,
-                }
-                core_behavior_message = (
-                    CoreEventMessageType.create_behavior_instruction(
-                        room_id=room.name,
-                        behavior_instruction_data=behavior_data,
-                    )
-                )
-                await msg_event_queue.send_message(
-                    message_body=core_behavior_message.model_dump_json()
-                )
-
-            logger.info("Behavior feedback sent to BE successfully")
-        else:
-            logger.warning("No room available, skipping behavior feedback sending")
+        await _send_behavior_feedback_to_be(state.behavior_feedback_data, room)
 
     return {
         "branching_and_feedback_data": None,
