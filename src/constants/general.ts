@@ -235,6 +235,8 @@ export const API_ROUTES = {
     JOURNAL_DRAFT: (itemId: string) => `/learn/tracks/items/${itemId}/journal`,
     JOURNAL_SUBMIT: (itemId: string) =>
       `/learn/tracks/items/${itemId}/journal/submit`,
+    LANGUAGES: (trackId: string) => `/learn/tracks/${trackId}/languages`,
+    SET_LANGUAGE: (trackId: string) => `/learn/tracks/${trackId}/language`,
   },
   SIMULATION_REVIEWS: {
     REVIEWS: '/scenario-session-reviews',

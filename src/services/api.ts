@@ -186,6 +186,7 @@ export const api = createApi({
     'LearnTracks',
     'LearnTrackDetail',
     'LearnTrackNext',
+    'LearnTrackLanguages',
   ],
   endpoints: () => ({}),
 });

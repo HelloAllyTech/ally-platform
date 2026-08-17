@@ -780,6 +780,17 @@
         "next": "Next",
         "attemptsUsed": "Attempt {{used}} of {{max}}"
       }
+    },
+    "language": {
+      "title": "Course language",
+      "subtitle": "Changes this course only — your app language stays as it is.",
+      "readingIn": "Reading in {{language}}",
+      "change": "Change",
+      "fallback": {
+        "VIDEO_NOT_LOCALISED": "This video is in English",
+        "SCENARIO_NOT_TRANSLATED": "This role play runs in English",
+        "CASE_NOT_TRANSLATED": "This case is in English"
+      }
     }
   },
   "nav": {

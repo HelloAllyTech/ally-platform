@@ -6,6 +6,7 @@ import {
   QuizAnswerInput,
   QuizAttemptResult,
   StartTrackItemResponse,
+  GetTrackLanguagesResponse,
   TrackDetail,
   TrackItemCompletionResult,
   TrackListItem,
@@ -171,6 +172,34 @@ export const coursesApi = api.injectEndpoints({
       }),
       invalidatesTags: ALL_TRACK_TAGS,
     }),
+
+    getTrackLanguages: builder.query<
+      GetTrackLanguagesResponse,
+      {trackId: string}
+    >({
+      query: ({trackId}) => ({
+        url: API_ROUTES.TRACKS.LANGUAGES(trackId),
+        method: API_METHODS.GET,
+      }),
+      providesTags: ['LearnTrackLanguages'],
+    }),
+
+    /**
+     * Persists the learner's language for this course. Invalidates the whole
+     * track cache: every title, prompt and option in the detail and next-item
+     * payloads changes with it.
+     */
+    setTrackLanguage: builder.mutation<
+      {languageCode: string},
+      {trackId: string; languageCode: string}
+    >({
+      query: ({trackId, languageCode}) => ({
+        url: API_ROUTES.TRACKS.SET_LANGUAGE(trackId),
+        method: API_METHODS.PUT,
+        body: {languageCode},
+      }),
+      invalidatesTags: [...ALL_TRACK_TAGS, 'LearnTrackLanguages'],
+    }),
   }),
 });
 
@@ -187,4 +216,6 @@ export const {
   useRegradeQuizAttemptMutation,
   useSaveJournalDraftMutation,
   useSubmitJournalMutation,
+  useGetTrackLanguagesQuery,
+  useSetTrackLanguageMutation,
 } = coursesApi;
