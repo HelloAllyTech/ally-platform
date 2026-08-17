@@ -248,24 +248,31 @@ describe('SimulationFeedbackScreen', () => {
     mockLanguage = 'en';
   });
 
-  it('renders summary tab when data exists', () => {
+  it('renders summary tab when data exists', async () => {
     const {getByTestId} = renderWithProviders(
       <SimulationFeedbackScreen
         navigation={{} as any}
         route={{params: {scenarioSessionId: '1'}} as any}
       />,
     );
-    expect(getByTestId('summary-tab')).toBeTruthy();
+    // Skills Demonstrated is the landing tab now, so select Session Review.
+    fireEvent.press(getByTestId('tab-0'));
+    await waitFor(() => {
+      expect(getByTestId('summary-tab')).toBeTruthy();
+    });
   });
 
-  it('renders try another button in summary tab', () => {
+  it('renders try another button in summary tab', async () => {
     const {getByTestId} = renderWithProviders(
       <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1'}} as any} />,
     );
-    expect(getByTestId('try-another-button')).toBeTruthy();
+    fireEvent.press(getByTestId('tab-0'));
+    await waitFor(() => {
+      expect(getByTestId('try-another-button')).toBeTruthy();
+    });
   });
 
-  it('renders summary tab even when details are missing', () => {
+  it('renders summary tab even when details are missing', async () => {
     const services = require('@/services');
     (services.useLazyGetSimulationDetailsQuery as jest.Mock).mockReturnValue([
       jest.fn().mockResolvedValue({data: {details: null}}),
@@ -275,15 +282,19 @@ describe('SimulationFeedbackScreen', () => {
     const {getByTestId} = renderWithProviders(
       <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1'}} as any} />,
     );
-    // Screen always renders SummaryTab; loading state is handled internally by SummaryTab
-    expect(getByTestId('summary-tab')).toBeTruthy();
+    // SummaryTab always renders once selected; its loading state is internal.
+    fireEvent.press(getByTestId('tab-0'));
+    await waitFor(() => {
+      expect(getByTestId('summary-tab')).toBeTruthy();
+    });
   });
 
   it('switches to transcript tab', async () => {
     const {getByTestId} = renderWithProviders(
       <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1', fromLogs: true}} as any} />,
     );
-    // Tab index 2 is TRANSCRIPTION (SUMMARY=0, ASK_AI=1, TRANSCRIPTION=2, SKILLS=3)
+    // testIDs are fixed per tab, not per position: 'tab-2' is TRANSCRIPTION
+    // (SUMMARY=0, ASK_AI=1, TRANSCRIPTION=2, SKILLS=3) whatever order they sit in.
     fireEvent.press(getByTestId('tab-2'));
     await waitFor(() => {
       expect(getByTestId('transcript-tab')).toBeTruthy();
@@ -360,7 +371,8 @@ describe('SimulationFeedbackScreen', () => {
     const {getByTestId, queryByTestId} = renderWithProviders(
       <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1'}} as any} />,
     );
-    // Without pathId/caseId: SUMMARY (0), ASK_AI (1), TRANSCRIPTION (2), SKILLS (3)
+    // Without pathId/caseId all four render. testIDs are per tab, not per
+    // position: SUMMARY (0), ASK_AI (1), TRANSCRIPTION (2), SKILLS (3).
     // Reflection is hidden (no tab-4) and UP_NEXT is absent (no tab-5).
     expect(getByTestId('tab-0')).toBeTruthy();
     expect(getByTestId('tab-1')).toBeTruthy();
