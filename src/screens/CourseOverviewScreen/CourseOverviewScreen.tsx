@@ -1,5 +1,12 @@
 import {useCallback, useState} from 'react';
-import {ActivityIndicator, FlatList, RefreshControl, View} from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  RefreshControl,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
@@ -9,6 +16,7 @@ import {
   LearningPathHeader,
   LearningPathListHeader,
 } from '@/components';
+import {getLabelFromCode} from '@/components/LanguageSelectorSheet';
 import {SCREEN_NAMES} from '@/constants';
 import {useHardwareBackPressHandler, useTranslate} from '@/hooks';
 import type {RootStackScreenProps} from '@/navigation/types';
@@ -17,10 +25,11 @@ import {
   useGetLearnTrackDetailQuery,
   useLazyGetNextTrackItemQuery,
 } from '@/services';
-import {colors} from '@/theme';
+import {colors, fontFamily, typography} from '@/theme';
 import {TrackDetailItem, TrackItemStatus, TrackSection} from '@/types';
 import {findNextItemId, navigateToLearnTab} from '@/utils';
 
+import {CourseLanguageSheet} from './components/CourseLanguageSheet';
 import {CourseSectionBlock} from './components/CourseSectionBlock';
 
 export const CourseOverviewScreen: React.FC<
@@ -41,6 +50,7 @@ export const CourseOverviewScreen: React.FC<
   const [getNextItem] = useLazyGetNextTrackItemQuery();
   const [isStarting, setIsStarting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [isLanguageSheetVisible, setIsLanguageSheetVisible] = useState(false);
 
   const handleBack = () => {
     if (navigation.canGoBack()) {
@@ -103,6 +113,40 @@ export const CourseOverviewScreen: React.FC<
     (a, b) => a.order - b.order,
   );
 
+  /**
+   * Language row. Shown only when the course is actually published in more than
+   * one language — a single-language course should not carry a control whose
+   * only option is the one already selected.
+   */
+  const renderLanguageRow = () => {
+    const options = track?.availableLanguages ?? [];
+    if (options.length < 2) return null;
+    const current = options.find(
+      option => option.languageCode === track?.languageCode,
+    );
+    const label = current?.isSource
+      ? current.label
+      : (getLabelFromCode(track?.languageCode ?? 'en') ??
+        current?.label ??
+        'English');
+
+    return (
+      <View style={styles.languageRow}>
+        <Text style={styles.languageRowText}>
+          {t('courses.language.readingIn', {language: label})}
+        </Text>
+        <TouchableOpacity
+          onPress={() => setIsLanguageSheetVisible(true)}
+          accessibilityRole="button"
+          testID="course-language-change">
+          <Text style={styles.languageRowAction}>
+            {t('courses.language.change')}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
   const renderListHeaderComponent = () => {
     if (!track) return null;
     return (
@@ -162,14 +206,29 @@ export const CourseOverviewScreen: React.FC<
       ) : (
         <FlatList
           data={sortedSections}
+          ListHeaderComponentStyle={styles.listHeader}
           keyExtractor={section => section.id}
           renderItem={renderSection}
-          ListHeaderComponent={renderListHeaderComponent}
+          ListHeaderComponent={
+            <>
+              {renderLanguageRow()}
+              {renderListHeaderComponent()}
+            </>
+          }
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
+        />
+      )}
+      {!!track && (
+        <CourseLanguageSheet
+          visible={isLanguageSheetVisible}
+          onClose={() => setIsLanguageSheetVisible(false)}
+          trackId={trackId}
+          options={track.availableLanguages ?? []}
+          currentLanguageCode={track.languageCode ?? 'en'}
         />
       )}
     </View>
@@ -189,5 +248,24 @@ const styles = ScaledSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  listHeader: {
+    paddingTop: '4@mvs',
+  },
+  languageRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: '10@mvs',
+  },
+  languageRowText: {
+    ...typography.body.small,
+    ...fontFamily.ROBOTO.REGULAR,
+    color: colors.ds.typography.mediumEmphasis,
+  },
+  languageRowAction: {
+    ...typography.body.small,
+    ...fontFamily.ROBOTO.REGULAR,
+    color: colors.ds.theme.primary,
   },
 });

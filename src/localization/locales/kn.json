@@ -1687,6 +1687,17 @@
         "next": "ಮುಂದೆ",
         "attemptsUsed": "ಪ್ರಯತ್ನ {{used}} / {{max}}"
       }
+    },
+    "language": {
+      "title": "ಕೋರ್ಸ್ ಭಾಷೆ",
+      "subtitle": "ಇದು ಈ ಕೋರ್ಸ್ ಅನ್ನು ಮಾತ್ರ ಬದಲಿಸುತ್ತದೆ — ಆ್ಯಪ್ ಭಾಷೆ ಹಾಗೆಯೇ ಇರುತ್ತದೆ.",
+      "readingIn": "{{language}} ನಲ್ಲಿ ಓದುತ್ತಿದ್ದೀರಿ",
+      "change": "ಬದಲಿಸಿ",
+      "fallback": {
+        "VIDEO_NOT_LOCALISED": "ಈ ವೀಡಿಯೊ ಇಂಗ್ಲಿಷ್‌ನಲ್ಲಿದೆ",
+        "SCENARIO_NOT_TRANSLATED": "ಈ ರೋಲ್ ಪ್ಲೇ ಇಂಗ್ಲಿಷ್‌ನಲ್ಲಿ ನಡೆಯುತ್ತದೆ",
+        "CASE_NOT_TRANSLATED": "ಈ ಕೇಸ್ ಇಂಗ್ಲಿಷ್‌ನಲ್ಲಿದೆ"
+      }
     }
   }
 }

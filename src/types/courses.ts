@@ -61,12 +61,45 @@ export interface TrackItemContentMeta {
   promptCount?: number;
 }
 
+/**
+ * Why a component reads in English even though the learner picked another
+ * language. Null when it reads in their language.
+ */
+export enum TrackLanguageFallbackReason {
+  /** No dubbed cut of this video for the chosen language. */
+  VIDEO_NOT_LOCALISED = 'VIDEO_NOT_LOCALISED',
+  /** The linked simulation has no translation in the chosen language. */
+  SCENARIO_NOT_TRANSLATED = 'SCENARIO_NOT_TRANSLATED',
+  /** Cases carry no translations of their own yet. */
+  CASE_NOT_TRANSLATED = 'CASE_NOT_TRANSLATED',
+}
+
+/** A language this course is published in. */
+export interface TrackLanguageOption {
+  languageId: number;
+  languageCode: string;
+  label: string;
+  isSource: boolean;
+}
+
+export interface GetTrackLanguagesResponse {
+  languages: TrackLanguageOption[];
+  /** The learner's saved choice for this course, if they have made one. */
+  selectedLanguageCode: string | null;
+}
+
 export interface TrackDetailItem {
   id: string;
   type: TrackItemType;
   order: number;
   title: string;
   description: string | null;
+  /**
+   * Optional on purpose: a released build must keep parsing a payload from a
+   * backend that predates this field, and an unknown reason should read as
+   * "no notice" rather than breaking the card.
+   */
+  languageFallbackReason?: TrackLanguageFallbackReason | null;
   scenarioId: number | null;
   caseId: string | null;
   completionCriteria: TrackCompletionCriteria | null;
@@ -100,6 +133,14 @@ export interface TrackDetail {
   completedItems: number;
   completedAt: string | null;
   sections: TrackSection[];
+  /**
+   * What the learner is reading this course in right now, and what else they
+   * can switch to. Both optional for the same released-build reason as
+   * `TrackDetailItem.languageFallbackReason` — an older backend omits them, and
+   * the screen then simply shows no language row.
+   */
+  languageCode?: string;
+  availableLanguages?: TrackLanguageOption[];
 }
 
 export interface EnrollTrackResponse {

@@ -1687,6 +1687,17 @@
         "next": "पुढे",
         "attemptsUsed": "प्रयत्न {{used}} / {{max}}"
       }
+    },
+    "language": {
+      "title": "कोर्सची भाषा",
+      "subtitle": "यामुळे फक्त हा कोर्स बदलेल — अ‍ॅपची भाषा तशीच राहील.",
+      "readingIn": "{{language}} मध्ये वाचत आहात",
+      "change": "बदला",
+      "fallback": {
+        "VIDEO_NOT_LOCALISED": "हा व्हिडिओ इंग्रजीत आहे",
+        "SCENARIO_NOT_TRANSLATED": "हा रोल प्ले इंग्रजीत चालेल",
+        "CASE_NOT_TRANSLATED": "हे केस इंग्रजीत आहे"
+      }
     }
   }
 }
