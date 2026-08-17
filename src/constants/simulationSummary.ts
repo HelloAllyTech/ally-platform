@@ -19,12 +19,10 @@ export const getSimulationSummaryTabs = (
     pathId,
     caseId,
     shortSession,
-    skillsFirst,
   }: {
     pathId?: string;
     caseId?: string;
     shortSession?: boolean;
-    skillsFirst?: boolean;
   },
 ) => {
   const summaryTab = {
@@ -53,13 +51,12 @@ export const getSimulationSummaryTabs = (
     testID: 'tab-3',
   };
 
-  // Reviewers (opened from call logs) land on Skills Demonstrated first so the
-  // substance of the feedback is one tap closer; learners keep Session Review.
+  // One order everywhere — web and mobile, reviewer and learner alike — so the
+  // tabs never move depending on how the session was opened. Skills Demonstrated
+  // leads, putting the substance of the feedback one tap closer.
   // Deeper Reflection is hidden for now (SimulationSummaryTabKey.REFLECTION /
   // Reflection component still exist, just not linked into this tab list).
-  const tabs = skillsFirst
-    ? [skillsTab, summaryTab, askAiTab, transcriptionTab]
-    : [summaryTab, askAiTab, transcriptionTab, skillsTab];
+  const tabs = [skillsTab, transcriptionTab, askAiTab, summaryTab];
 
   if (pathId || caseId) {
     tabs.push({
