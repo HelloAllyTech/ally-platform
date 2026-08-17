@@ -77,8 +77,11 @@ export const SimulationFeedbackScreen: React.FC<
   const activeLanguageCode = i18n.resolvedLanguage ?? i18n.language ?? 'en';
   const insets = useSafeAreaInsets();
 
+  // Every surface opens on the first tab of the shared order (Skills
+  // Demonstrated), so the screen looks the same whether it was reached from the
+  // logs or straight off a session. Short sessions only get Session Review.
   const [activeTabKey, setActiveTabKey] = useState<string>(
-    fromLogs ? SimulationSummaryTabKey.SKILLS : SimulationSummaryTabKey.SUMMARY,
+    SimulationSummaryTabKey.SKILLS,
   );
   const [isFeedbackPopupVisible, setIsFeedbackPopupVisible] =
     useState<boolean>(false);
@@ -444,9 +447,8 @@ export const SimulationFeedbackScreen: React.FC<
         pathId,
         caseId,
         shortSession,
-        skillsFirst: fromLogs,
       }),
-    [t, pathId, caseId, shortSession, fromLogs],
+    [t, pathId, caseId, shortSession],
   );
 
   const tabIndex = useMemo(() => {
