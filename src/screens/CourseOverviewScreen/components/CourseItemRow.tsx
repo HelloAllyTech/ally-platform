@@ -91,6 +91,13 @@ export const CourseItemRow: React.FC<CourseItemRowProps> = ({
           )}
         </View>
         <Text style={styles.meta}>{getTrackItemMeta(item, tVariable)}</Text>
+        {/* A component the trainer could not localise — say so on the card
+            rather than surprising the learner once it opens. */}
+        {!!item.languageFallbackReason && (
+          <Text style={styles.languageCaption}>
+            {t(`courses.language.fallback.${item.languageFallbackReason}`)}
+          </Text>
+        )}
         {isLocked && (
           <Text style={styles.lockedCaption}>{t('courses.lockedTooltip')}</Text>
         )}
@@ -183,5 +190,11 @@ const styles = ScaledSheet.create({
     ...typography.body.tiny,
     fontWeight: fontWeights.regular,
     color: colors.ds.typography.lowEmphasis,
+  },
+  languageCaption: {
+    ...fontFamily.ROBOTO.REGULAR,
+    ...typography.body.tiny,
+    fontWeight: fontWeights.regular,
+    color: colors.ds.typography.mediumEmphasis,
   },
 });
