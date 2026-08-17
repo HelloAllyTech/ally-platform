@@ -112,8 +112,7 @@ git clone --depth=1 https://github.com/helloallytech/helloallytech.github.io .wi
 
 The [Ally Developer Wiki](https://tech.helloally.ai) is the source of truth for platform
 architecture and SDLC rules (product practice now comes from Stacks) —
-[this repo's page](https://tech.helloally.ai/#/wiki/repos/ally-ai-learn.md) ·
-[architecture](https://tech.helloally.ai/#/wiki/platform/architecture.md) ·
+[this repo's page](https://tech.helloally.ai/#/wiki/repos/ally-ai-learn.md) · [architecture](https://tech.helloally.ai/#/wiki/platform/architecture.md) ·
 [contributing](https://tech.helloally.ai/#/wiki/contributing/guide.md) ·
 [how the docs system works](https://tech.helloally.ai/#/wiki/contributing/docs-system.md).
 
