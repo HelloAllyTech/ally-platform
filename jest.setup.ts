@@ -83,6 +83,12 @@ jest.mock('react-native-reanimated', () =>
   require('react-native-reanimated/mock'),
 );
 
+// react-native-gesture-handler calls TurboModuleRegistry.getEnforcing() at import
+// time, so any suite that transitively pulls it in (every @gorhom/bottom-sheet
+// consumer) fails to even load without its shipped mock. This registers that mock
+// for every suite; a suite is still free to jest.mock the module itself, which wins.
+require('react-native-gesture-handler/jestSetup');
+
 // Mock react-native-svg
 /* eslint-disable @typescript-eslint/no-explicit-any */
 jest.mock('react-native-svg', () => {

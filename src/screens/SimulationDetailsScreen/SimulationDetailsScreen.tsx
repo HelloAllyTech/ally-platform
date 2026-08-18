@@ -11,12 +11,7 @@ import {
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {
-  LeftArrowIcon,
-  NoCreditsIcon,
-  ShareIcon,
-  TickRoundIcon,
-} from '@/assets';
+import {LeftArrowIcon, NoCreditsIcon, ShareIcon, TickRoundIcon} from '@/assets';
 import {
   Button,
   CustomDropdown,
