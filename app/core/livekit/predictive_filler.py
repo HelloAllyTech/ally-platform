@@ -64,6 +64,19 @@ def _build_scenario_context(scenario) -> str:
     return "\n".join(parts)
 
 
+def _format_recent_fillers(recent_fillers: List[str] | None) -> str:
+    """Render recently-*played* fillers for the anti-repeat instruction.
+
+    Sourced from the caller's ``_recent_filler_phrases`` (what was actually
+    spoken), not the last generated batch (which includes phrases that were
+    generated but never played) — that's the right thing to avoid repeating.
+    """
+    cleaned = [p.strip() for p in (recent_fillers or []) if p and p.strip()]
+    if not cleaned:
+        return "(none yet)"
+    return "; ".join(cleaned)
+
+
 def _format_history(messages: List[BaseMessage], window: int = _HISTORY_WINDOW) -> str:
     """Render the last ``window`` turns as a readable script.
 
@@ -89,6 +102,7 @@ async def generate_predictive_fillers(
     scenario,
     messages: List[BaseMessage],
     count: int = 5,
+    recent_fillers: List[str] | None = None,
 ) -> List[str]:
     """Ask the LLM for short, context-aware filler phrases for ``scenario``.
 
@@ -119,6 +133,7 @@ async def generate_predictive_fillers(
             language_label=language_label,
             language_code=language_code,
             count=count,
+            recent_fillers=_format_recent_fillers(recent_fillers),
         )
         if not system_prompt or not system_prompt.strip():
             logger.warning("[FILLER] predictive: prompt template empty; skipping")
