@@ -974,7 +974,11 @@ class NaturalnessController:
                     continue
 
                 phrases = await generate_predictive_fillers(
-                    self.llm_client, self.scenario, messages, count
+                    self.llm_client,
+                    self.scenario,
+                    messages,
+                    count,
+                    recent_fillers=self._recent_filler_phrases,
                 )
                 if not phrases:
                     continue
