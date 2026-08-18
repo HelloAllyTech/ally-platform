@@ -10,6 +10,27 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: jest.fn(() => ({top: 0, bottom: 0, left: 0, right: 0})),
 }));
 
+// The screen pulls in `getLabelFromCode` from LanguageSelectorSheet, which also
+// imports the store — and `api.ts` <-> `store.ts` is circular, so entering the
+// cycle from `api.ts` leaves `api` undefined while store.ts evaluates. Stub both
+// so the real helper still runs. Same approach as LanguageSelectorSheet's own test.
+jest.mock('@/services/api', () => ({
+  api: {util: {resetApiState: () => ({type: 'api/resetApiState'})}},
+}));
+
+jest.mock('@/store/store', () => ({store: {dispatch: jest.fn()}}));
+
+// The real @gorhom/bottom-sheet cannot render against the reanimated mock in
+// jest.setup.ts (useAnimatedDetents needs live shared values), so stub the
+// wrapper — the same boundary every other bottom-sheet suite here stubs.
+jest.mock('@/components/BottomSheet', () => {
+  const RN = require('react-native');
+  return {
+    BottomSheet: ({visible, children}: any) =>
+      visible ? <RN.View testID="bottom-sheet">{children}</RN.View> : null,
+  };
+});
+
 jest.mock('@/hooks', () => ({
   useTranslate: jest.fn(() => ({
     t: (key: string, params?: Record<string, unknown>) => {
@@ -70,11 +91,19 @@ const mockEnrollTrack = jest.fn(() => ({unwrap: jest.fn().mockResolvedValue({})}
 const mockGetNextItem = jest.fn(() => ({
   unwrap: jest.fn().mockResolvedValue({trackCompleted: false, nextItem: {id: 'item-2'}}),
 }));
+const mockSetTrackLanguage = jest.fn(() => ({
+  unwrap: jest.fn().mockResolvedValue({}),
+}));
 
 jest.mock('@/services', () => ({
   useGetLearnTrackDetailQuery: jest.fn(),
   useEnrollTrackMutation: jest.fn(() => [mockEnrollTrack, {isLoading: false}]),
   useLazyGetNextTrackItemQuery: jest.fn(() => [mockGetNextItem]),
+  // Used by CourseLanguageSheet, which the screen always renders.
+  useSetTrackLanguageMutation: jest.fn(() => [
+    mockSetTrackLanguage,
+    {isLoading: false},
+  ]),
 }));
 
 const {useGetLearnTrackDetailQuery} = require('@/services');
