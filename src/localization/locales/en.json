@@ -687,7 +687,8 @@
       "prompts_other": "{{count}} prompts",
       "roleplay": "Role play",
       "minScore": "min score {{score}}%",
-      "case": "Case"
+      "case": "Case",
+      "game": "Game · just for fun"
     },
     "player": {
       "exit": "Exit",
@@ -696,7 +697,10 @@
       "finish": "Finish",
       "overallProgress": "{{pct}}% complete",
       "loadFailed": "Couldn't load this item.",
-      "retry": "Retry"
+      "retry": "Retry",
+      "unsupportedTitle": "Not available in the app yet",
+      "unsupportedBody": "This part of the course needs the web version. Everything else in the course works here as usual.",
+      "backToCourse": "Back to course"
     },
     "celebration": {
       "sectionCompleteTitle": "Section complete!",
@@ -791,6 +795,12 @@
         "SCENARIO_NOT_TRANSLATED": "This role play runs in English",
         "CASE_NOT_TRANSLATED": "This case is in English"
       }
+    },
+    "game": {
+      "controlsTouch": "Tap to jump. Nothing here is scored.",
+      "lastScore": "This run: {{score}}",
+      "bestScore": "Your best: {{score}}",
+      "optional": "Play as long as you like, or skip straight on — either way you're good to continue."
     }
   },
   "nav": {
