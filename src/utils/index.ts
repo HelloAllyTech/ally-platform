@@ -14,6 +14,7 @@ export * from './validation';
 export * from './version';
 export * from './simulation';
 export * from './activeTrackContext';
+export * from './bugReportContext';
 export * from './trackCompletion';
 export * from './trackNavigation';
 export * from './trackItemMeta';

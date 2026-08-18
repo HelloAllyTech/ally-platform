@@ -1665,7 +1665,8 @@
     "audioSession": "Failed to configure audio session",
     "reflectionPromptSaveFailed": "Failed to save reflection prompt",
     "endSimulation": "Failed to end simulation",
-    "permission": "Microphone permission required"
+    "permission": "Microphone permission required",
+    "submitBugReport": "Failed to submit report"
   },
   "threadsBottomSheet": {
     "title": "Comments",
@@ -1699,5 +1700,14 @@
   },
   "accessibility": {
     "openMenu": "Open menu"
+  },
+  "bugReport": {
+    "menuLabel": "Report a problem",
+    "title": "Report a problem",
+    "prompt": "What were you trying to do?",
+    "placeholder": "Tell us what you were doing when the issue happened...",
+    "submit": "Submit",
+    "successMessage": "Thanks — your report has been submitted.",
+    "rateLimitMessage": "You've submitted a few reports recently — please try again in a bit."
   }
 }

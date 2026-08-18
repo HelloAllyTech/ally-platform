@@ -20,6 +20,7 @@ export {SimulationFeedbackScreen} from './SimulationFeedbackScreen';
 export {LeaderboardScreen} from './LeaderboardScreen';
 export {AchievementsScreen} from './AchievementsScreen';
 export {ProfileSettingsScreen} from './ProfileSettingsScreen';
+export {BugReportScreen} from './BugReportScreen';
 export {ReviewScreen} from './ReviewScreen';
 export {SimulationReviewDetailsScreen as ReviewDetailsScreen} from './ReviewDetailsScreen/SimulationReviewDetailsScreen';
 export {ScribeReviewDetailsScreen} from './ReviewDetailsScreen/ScribeReviewDetailsScreen';
