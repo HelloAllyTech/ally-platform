@@ -5,13 +5,14 @@ import {DrawerContentComponentProps} from '@react-navigation/drawer';
 import {DrawerContent} from '../CustomDrawerContent';
 
 // Mock hooks and utils
+const mockNavigate = jest.fn();
 jest.mock('@/hooks', () => ({
   __esModule: true,
   useTranslate: () => ({ t: (k: string) => k }),
   useUser: () => ({ userData: { name: 'John Doe', email: 'john.very.long.email.address@example.com' } }),
   useSimulationCredits: () => ({ credits: null, getCreditsInfo: null }),
   useAppNavigation: () => ({
-    navigate: jest.fn(),
+    navigate: mockNavigate,
     goBack: jest.fn(),
   }),
 }));
@@ -68,6 +69,7 @@ jest.mock('@/assets', () => {
     LogoutIcon: () => <View testID="logout-icon" />,
     ProfileIcon: () => <View testID="profile-icon" />,
     ProfileSettingsIcon: () => <View testID="profile-settings-icon" />,
+    HelpIcon: () => <View testID="help-icon" />,
     BoltIcon: () => <View testID="bolt-icon" />,
     AllyLogoIcon: () => <View testID="ally-logo-icon" />,
   };
@@ -230,6 +232,10 @@ describe('CustomDrawerContent', () => {
     expect(getByTestId('profile-settings-icon')).toBeTruthy();
     expect(getByText('profile.settings.title')).toBeTruthy();
 
+    // report a problem menu item
+    expect(getByTestId('help-icon')).toBeTruthy();
+    expect(getByText('bugReport.menuLabel')).toBeTruthy();
+
     // version
     expect(getByText(/common.version/)).toBeTruthy();
     expect(getByText(/1.2.3/)).toBeTruthy();
@@ -244,6 +250,17 @@ describe('CustomDrawerContent', () => {
 
     fireEvent.press(getByText('user.logout'));
     expect(openLogoutModal).toHaveBeenCalled();
+  });
+
+  it('navigates to BugReport and closes the drawer when "Report a problem" is pressed', () => {
+    const openLogoutModal = jest.fn();
+    const {getByText} = render(
+      <DrawerContent {...mockDrawerProps} openLogoutModal={openLogoutModal} />,
+    );
+
+    fireEvent.press(getByText('bugReport.menuLabel'));
+    expect(mockDrawerProps.navigation.closeDrawer).toHaveBeenCalled();
+    expect(mockNavigate).toHaveBeenCalledWith('BugReport');
   });
 
   // Test removed as isAppFeatureEnabled function no longer exists

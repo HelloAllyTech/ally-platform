@@ -27,6 +27,7 @@ export const DEFAULT_OTP_EXPIRY_MINUTES = 10;
 export const RESEND_COUNTDOWN_SECONDS = 1 * MINUTES_IN_SECONDS;
 export const MB_IN_BYTES = 1024 * 1024;
 export const MAX_PROFILE_IMAGE_SIZE = 2 * MB_IN_BYTES;
+export const MAX_BUG_REPORT_DESCRIPTION_LENGTH = 1000;
 
 export const isIOS = Platform.OS === 'ios';
 
@@ -345,6 +346,9 @@ export const API_ROUTES = {
   APP_VERSION: {
     ANDROID: '/app-version/android',
     IOS: '/app-version/ios',
+  },
+  PRODUCT_ROADMAP: {
+    BUG_REPORTS: '/product-roadmap/bug-reports',
   },
 } as const;
 

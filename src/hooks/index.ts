@@ -1,5 +1,6 @@
 export * from './useAppNavigation';
 export * from './useAppleLogin';
+export * from './useBugReport';
 export * from './useCallSummaryActions';
 export * from './useCallSummaryForm';
 export * from './useCallTranscriptDetails';
