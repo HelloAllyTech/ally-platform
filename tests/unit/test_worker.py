@@ -335,9 +335,7 @@ class TestWorker:
         # it the executor is never built and turn detection silently degrades to VAD.
         from livekit.agents.inference_runner import _InferenceRunner
 
-        assert (
-            "lk_end_of_utterance_multilingual" in _InferenceRunner.registered_runners
-        )
+        assert "lk_end_of_utterance_multilingual" in _InferenceRunner.registered_runners
 
     # -------------------- entrypoint --------------------
     class DummyRoom:
@@ -522,7 +520,9 @@ class TestWorker:
             lambda *a, **k: lambda event: None,
         )
         monkeypatch.setattr(
-            event_handler, "setup_interruption_detection", lambda session: None
+            event_handler,
+            "setup_interruption_detection",
+            lambda session, room_id=None: None,
         )
         monkeypatch.setattr(
             agent_utils, "should_say_opening_statement", lambda *a, **k: True
@@ -538,7 +538,9 @@ class TestWorker:
         # Mock AgentSession to return our dummy session
         dummy_session = self.DummySession()
         monkeypatch.setattr(
-            worker, "AgentSession", lambda stt, tts, vad, turn_detection, **kwargs: dummy_session
+            worker,
+            "AgentSession",
+            lambda stt, tts, vad, turn_detection, **kwargs: dummy_session,
         )
 
         # Conversation handler factory (just return passthrough fn)
@@ -727,7 +729,9 @@ class TestWorker:
             lambda *a, **k: lambda event: None,
         )
         monkeypatch.setattr(
-            event_handler, "setup_interruption_detection", lambda session: None
+            event_handler,
+            "setup_interruption_detection",
+            lambda session, room_id=None: None,
         )
         monkeypatch.setattr(
             agent_utils, "should_say_opening_statement", lambda *a, **k: False
@@ -735,7 +739,9 @@ class TestWorker:
 
         dummy_session = self.DummySession()
         monkeypatch.setattr(
-            worker, "AgentSession", lambda stt, tts, vad, turn_detection, **kwargs: dummy_session
+            worker,
+            "AgentSession",
+            lambda stt, tts, vad, turn_detection, **kwargs: dummy_session,
         )
         monkeypatch.setattr(worker, "Agent", self.DummyAgent)
         monkeypatch.setattr(agent_graph, "update_state", lambda *a, **k: None)
@@ -1018,7 +1024,9 @@ class TestWorker:
             lambda *a, **k: lambda event: None,
         )
         monkeypatch.setattr(
-            event_handler, "setup_interruption_detection", lambda session: None
+            event_handler,
+            "setup_interruption_detection",
+            lambda session, room_id=None: None,
         )
         monkeypatch.setattr(
             agent_utils, "should_say_opening_statement", lambda *a, **k: False
@@ -1026,7 +1034,9 @@ class TestWorker:
 
         dummy_session = self.DummySession()
         monkeypatch.setattr(
-            worker, "AgentSession", lambda stt, tts, vad, turn_detection, **kwargs: dummy_session
+            worker,
+            "AgentSession",
+            lambda stt, tts, vad, turn_detection, **kwargs: dummy_session,
         )
         monkeypatch.setattr(worker, "Agent", self.DummyAgent)
         monkeypatch.setattr(agent_graph, "update_state", lambda *a, **k: None)
@@ -1148,7 +1158,9 @@ class TestWorker:
 
         dummy_session = self.DummySession()
         monkeypatch.setattr(
-            worker, "AgentSession", lambda stt, tts, vad, turn_detection, **kwargs: dummy_session
+            worker,
+            "AgentSession",
+            lambda stt, tts, vad, turn_detection, **kwargs: dummy_session,
         )
         monkeypatch.setattr(worker, "Agent", self.DummyAgent)
         monkeypatch.setattr(agent_graph, "update_state", lambda *a, **k: None)
@@ -1192,7 +1204,9 @@ class TestWorker:
             lambda *a, **k: lambda event: None,
         )
         monkeypatch.setattr(
-            event_handler, "setup_interruption_detection", lambda session: None
+            event_handler,
+            "setup_interruption_detection",
+            lambda session, room_id=None: None,
         )
         monkeypatch.setattr(
             agent_utils, "should_say_opening_statement", lambda *a, **k: False
@@ -1284,7 +1298,9 @@ class TestWorker:
 
         dummy_session = self.DummySession()
         monkeypatch.setattr(
-            worker, "AgentSession", lambda stt, tts, vad, turn_detection, **kwargs: dummy_session
+            worker,
+            "AgentSession",
+            lambda stt, tts, vad, turn_detection, **kwargs: dummy_session,
         )
         monkeypatch.setattr(worker, "Agent", self.DummyAgent)
         monkeypatch.setattr(agent_graph, "update_state", lambda *a, **k: None)
@@ -1328,7 +1344,9 @@ class TestWorker:
             lambda *a, **k: lambda event: None,
         )
         monkeypatch.setattr(
-            event_handler, "setup_interruption_detection", lambda session: None
+            event_handler,
+            "setup_interruption_detection",
+            lambda session, room_id=None: None,
         )
         monkeypatch.setattr(
             agent_utils, "should_say_opening_statement", lambda *a, **k: False
@@ -1479,7 +1497,9 @@ class TestWorker:
 
         dummy_session = MockSessionWithSay()
         monkeypatch.setattr(
-            worker, "AgentSession", lambda stt, tts, vad, turn_detection, **kwargs: dummy_session
+            worker,
+            "AgentSession",
+            lambda stt, tts, vad, turn_detection, **kwargs: dummy_session,
         )
         monkeypatch.setattr(worker, "Agent", self.DummyAgent)
         monkeypatch.setattr(agent_graph, "update_state", lambda *a, **k: None)
@@ -1518,7 +1538,9 @@ class TestWorker:
             event_handler, "create_shutdown_handler", lambda *a, **k: lambda: None
         )
         monkeypatch.setattr(
-            event_handler, "setup_interruption_detection", lambda session: None
+            event_handler,
+            "setup_interruption_detection",
+            lambda session, room_id=None: None,
         )
         monkeypatch.setattr(
             agent_utils, "should_say_opening_statement", lambda *a, **k: False
@@ -1686,7 +1708,9 @@ class TestWorker:
 
         dummy_session = self.DummySession()
         monkeypatch.setattr(
-            worker, "AgentSession", lambda stt, tts, vad, turn_detection, **kwargs: dummy_session
+            worker,
+            "AgentSession",
+            lambda stt, tts, vad, turn_detection, **kwargs: dummy_session,
         )
         monkeypatch.setattr(worker, "Agent", self.DummyAgent)
         monkeypatch.setattr(agent_graph, "update_state", lambda *a, **k: None)
@@ -1730,7 +1754,9 @@ class TestWorker:
             lambda *a, **k: lambda event: None,
         )
         monkeypatch.setattr(
-            event_handler, "setup_interruption_detection", lambda session: None
+            event_handler,
+            "setup_interruption_detection",
+            lambda session, room_id=None: None,
         )
         monkeypatch.setattr(
             agent_utils, "should_say_opening_statement", lambda *a, **k: False
@@ -1953,7 +1979,7 @@ class TestStartUsesPrewarmedBVC:
         # If the prewarmed instance were ignored, this fallback marker would show.
         monkeypatch.setattr(worker.noise_cancellation, "BVC", lambda: "FRESH_BVC")
         monkeypatch.setattr(
-            worker, "setup_interruption_detection", lambda session: None
+            worker, "setup_interruption_detection", lambda session, room_id=None: None
         )
         monkeypatch.setattr(
             worker,

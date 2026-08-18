@@ -1460,6 +1460,54 @@ async def generate_response(
             "branching" if next_instruction else "behavior",
         )
 
+        # ---- per-turn simulation state, for the progression metrics ----------
+        #
+        # States are score-windowed: `_resolve_current_state` picks the state
+        # whose (scoreLower, scoreUpper) window contains the cumulative score,
+        # so the state a turn ran in is a function of the score at that turn.
+        # Stamping it on the turn record makes progression derivable in SQL
+        # without a second event stream:
+        #
+        #   - state advanced      -> state differs from the previous turn's
+        #   - time-in-state       -> consecutive turns sharing a state
+        #   - stuck               -> no change across N turns
+        #   - resolution reached  -> final turn sat in the terminal state
+        #
+        # `stateIndex` / `stateCount` are carried too, because "state 3 of 3"
+        # is what distinguishes arriving at the end from merely moving: the
+        # ids are author-defined strings and their order is not inferable
+        # downstream.
+        try:
+            _states = list(getattr(scenario, "state_instructions", None) or [])
+            if _states:
+                _state_meta: dict = {
+                    "stateCount": len(_states),
+                    "stateScore": (
+                        score_keeper.get_total_score() if score_keeper else None
+                    ),
+                }
+                if current_state is not None:
+                    _state_meta["stateId"] = current_state.state_id
+                    _state_meta["stateIndex"] = next(
+                        (
+                            i
+                            for i, si in enumerate(_states)
+                            if si.state_id == current_state.state_id
+                        ),
+                        None,
+                    )
+                    _state_meta["stateIsTerminal"] = (
+                        _state_meta["stateIndex"] == len(_states) - 1
+                    )
+                else:
+                    # Branching mode resolves no scored state; recorded as an
+                    # explicit null rather than omitted, so "no state this turn"
+                    # is distinguishable from "this build did not report state".
+                    _state_meta["stateId"] = None
+                turn_metrics.record(get_room_id(), metadata=_state_meta)
+        except Exception:  # noqa: BLE001 - metrics must never break a turn
+            logger.exception("[turn-metrics] failed to record simulation state")
+
     # Get LLM client from config (pre-configured in AgentSetup) or create dynamically
     llm_client = None
     if config and "configurable" in config:

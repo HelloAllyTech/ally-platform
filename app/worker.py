@@ -2314,7 +2314,7 @@ class AgentWorker:
         _prep_t0 = time.monotonic()
 
         # Setup interruption detection
-        setup_interruption_detection(self.session)
+        setup_interruption_detection(self.session, self.ctx.room.name)
 
         # Initialize event orchestrator (only after session is connected)
         await self.event_orchestrator.initialize()

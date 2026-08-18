@@ -105,6 +105,36 @@ This node generates the AI client response. Steps:
 
 **Note:** UI feedback (score, emoji) is sent by `send_event_feedback`, not by this node. This separation allows the core nodes to be reused by the report graph without UI concerns.
 
+### Per-turn simulation state (turn metrics)
+
+After the system prompt is built, `generate_response` stamps the resolved
+simulation state onto the turn-metrics record via
+`turn_metrics.record(room, metadata={...})`:
+
+| Key | Meaning |
+|---|---|
+| `stateId` | The resolved state's id, or `null` in branching mode where no scored state applies |
+| `stateIndex` | Its position in `scenario.state_instructions` |
+| `stateCount` | How many states the scenario defines |
+| `stateIsTerminal` | True when the resolved state is the last one |
+| `stateScore` | The cumulative score the resolution was made against |
+
+States are score-windowed — `_resolve_current_state` picks the state whose
+(`scoreLower`, `scoreUpper`) window contains the cumulative score — so the state
+a turn ran in is a function of the score at that turn. Recording it per turn
+makes conversational progression derivable downstream in SQL without a second
+event stream: a state that differs from the previous turn's is an advance,
+consecutive turns sharing one give time-in-state, no change across N turns is
+"stuck", and a final turn sitting in the terminal state is a resolved session.
+
+`stateIndex`/`stateCount` are carried because state ids are author-defined
+strings whose order is not inferable downstream; "state 3 of 3" is what
+separates arriving at the end from merely moving.
+
+The write is wrapped in a `try/except` and shares `metadata` with the retrieval
+and generation call sites — `turn_metrics.record` merges dicts rather than
+last-writer-wins, so these keys cannot erase the glossary/retrieval ones.
+
 ### System Prompt Modes
 
 The system prompt has two modes:

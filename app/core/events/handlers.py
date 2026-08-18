@@ -392,12 +392,33 @@ def create_connection_state_handler(
     return on_connection_state_changed
 
 
-def setup_interruption_detection(session) -> None:
+def setup_interruption_detection(session, room_id: Optional[str] = None) -> None:
     """
     Setup LiveKit interruption detection listener.
 
+    Besides arming the scenario-event flag, this records the barge-in onto the
+    turn-metrics record so interruption rate is measurable platform-wide rather
+    than only in scenarios that happen to configure a HELPER_INTERRUPTED event.
+
+    SEMANTICS OF ``interrupted``, which are easy to get wrong:
+
+    A turn's metrics record is finalized and shipped when the agent STARTS
+    speaking, but LiveKit only reports the interruption when playback FINISHES —
+    by which time that turn's record is already gone. So ``interrupted`` cannot
+    mean "the agent's reply on this row was cut short".
+
+    What it does mean: **this turn was produced by the learner cutting the agent
+    off**. The barge-in utterance is the start of the next turn, so ``record``
+    lands on the in-flight turn — the one the learner's interrupting speech goes
+    on to produce. That is a coherent barge-in rate and needs no change to the
+    emit path; it is simply not the same statement as "this reply was truncated".
+
     Args:
         session: AgentSession instance
+        room_id: room to attribute the barge-in to. Omitted in tests and older
+            call sites, in which case only the scenario-event flag is set —
+            never guessed, because attributing a barge-in to the wrong room
+            would corrupt another session's metrics.
     """
     if PlaybackFinishedEvent is None:
         logger.warning(
@@ -424,6 +445,17 @@ def setup_interruption_detection(session) -> None:
                     "Interruption flag set to True - "
                     "InterruptionEvent will detect this in next process_events cycle"
                 )
+                # Attribute the barge-in to the turn the learner is currently
+                # producing. `record` lazily creates the in-flight turn, so this
+                # works whether or not endpointing has fired yet.
+                if room_id:
+                    try:
+                        turn_metrics.record(room_id, interrupted=True)
+                    except Exception:  # noqa: BLE001 - metrics never break a turn
+                        logger.exception(
+                            "[turn-metrics] failed to record barge-in room=%s",
+                            room_id,
+                        )
             else:
                 # Reset flag when playback finishes normally
                 logger.debug(
