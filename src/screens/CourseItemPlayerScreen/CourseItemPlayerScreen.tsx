@@ -27,11 +27,13 @@ import {
 import {CelebrationKind, CelebrationModal} from './components/CelebrationModal';
 import {PlayerBottomNav} from './components/PlayerBottomNav';
 import {ArticlePlayer} from './components/players/ArticlePlayer';
+import {GamePlayer} from './components/players/GamePlayer';
 import {JournalPlayer} from './components/players/JournalPlayer';
 import {QuizItemPlayer} from './components/players/quiz/QuizItemPlayer';
 import {RoleplayCasePlayer} from './components/players/RoleplayCasePlayer';
 import {VideoItemPlayer} from './components/players/VideoItemPlayer';
 import {PlayerTopBar} from './components/PlayerTopBar';
+import {UnsupportedItemCard} from './components/UnsupportedItemCard';
 
 export const CourseItemPlayerScreen: React.FC<
   RootStackScreenProps<typeof SCREEN_NAMES.COURSE_ITEM_PLAYER>
@@ -187,6 +189,14 @@ export const CourseItemPlayerScreen: React.FC<
             onRequestNext={goNextOrOverview}
           />
         );
+      case TrackItemType.GAME:
+        return (
+          <GamePlayer
+            payload={payload}
+            itemId={nav.currentItemId}
+            onCompleted={handleCompletion}
+          />
+        );
       case TrackItemType.ROLEPLAY:
       case TrackItemType.CASE:
         return (
@@ -198,7 +208,9 @@ export const CourseItemPlayerScreen: React.FC<
           />
         );
       default:
-        return null;
+        // The web builder can ship a component type before this binary has a
+        // player for it; say so rather than rendering an empty screen.
+        return <UnsupportedItemCard onBackToCourse={handleBackToOverview} />;
     }
   };
 

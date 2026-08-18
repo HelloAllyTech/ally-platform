@@ -57,6 +57,10 @@ jest.mock('../components/players/VideoItemPlayer', () => ({
 jest.mock('../components/players/JournalPlayer', () => ({
   JournalPlayer: () => null,
 }));
+jest.mock('../components/players/GamePlayer', () => ({
+  GamePlayer: () => null,
+}));
+
 jest.mock('../components/players/RoleplayCasePlayer', () => ({
   RoleplayCasePlayer: () => null,
 }));
@@ -245,6 +249,23 @@ describe('CourseItemPlayerScreen', () => {
     expect(mockNavigation.navigate).toHaveBeenCalledWith(
       SCREEN_NAMES.COURSE_OVERVIEW,
       {trackId: 'track-1'},
+    );
+  });
+
+  it('shows the unsupported-component card for a type this build cannot play', async () => {
+    // A course authored on the web can carry a component type older app
+    // binaries have no player for. Before the fallback this rendered nothing:
+    // an empty body under a live top bar, with no explanation.
+    mockStartTrackItem.mockReturnValue({
+      unwrap: jest.fn().mockResolvedValue({
+        type: 'SOME_FUTURE_TYPE',
+        trackItemProgressId: 'progress-1',
+      }),
+    } as any);
+
+    const {getByTestId} = renderScreen('item-1');
+    await waitFor(() =>
+      expect(getByTestId('unsupported-item-card')).toBeTruthy(),
     );
   });
 
