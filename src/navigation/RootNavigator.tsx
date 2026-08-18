@@ -23,6 +23,7 @@ import {
 import {
   AchievementsScreen,
   BreathingScreen,
+  BugReportScreen,
   CallSummaryScreen,
   CaseDetailsScreen,
   CompleteProfileScreen,
@@ -358,6 +359,10 @@ const NavigationContent = ({
           <Stack.Screen
             name={SCREEN_NAMES.PROFILE_SETTINGS}
             component={ProfileSettingsScreen}
+          />
+          <Stack.Screen
+            name={SCREEN_NAMES.BUG_REPORT}
+            component={BugReportScreen}
           />
           <Stack.Screen
             name={SCREEN_NAMES.REACTIONS}
