@@ -10,6 +10,12 @@ export enum TrackItemType {
   ARTICLE = 'ARTICLE',
   VIDEO = 'VIDEO',
   JOURNAL = 'JOURNAL',
+  GAME = 'GAME',
+}
+
+/** Games the app can render; each maps to a bundle under `players/games/`. */
+export enum TrackGameKey {
+  TREX_RUNNER = 'TREX_RUNNER',
 }
 
 // There is no IN_PROGRESS status server-side — "in progress" is derived as
@@ -59,6 +65,8 @@ export interface TrackItemContentMeta {
   source?: TrackVideoSource;
   // JOURNAL
   promptCount?: number;
+  // GAME
+  gameKey?: TrackGameKey;
 }
 
 /**
@@ -312,13 +320,29 @@ export interface StartJournalItemPayload extends StartTrackItemBase {
   savedResponses: JournalSavedResponse[];
 }
 
+/**
+ * A game completes the moment it is opened, so the payload carries the
+ * completion result the other players get back from a submit — the player
+ * reports it on mount and Next is live immediately.
+ */
+export interface StartGameItemPayload extends StartTrackItemBase {
+  type: TrackItemType.GAME;
+  gameKey: TrackGameKey;
+  intro: string | null;
+  /** Personal best across every run so far, or null before the first. */
+  bestScore: number | null;
+  playCount: number;
+  completion: TrackItemCompletionResult;
+}
+
 export type StartTrackItemResponse =
   | StartRoleplayItemPayload
   | StartCaseItemPayload
   | StartQuizItemPayload
   | StartArticleItemPayload
   | StartVideoItemPayload
-  | StartJournalItemPayload;
+  | StartJournalItemPayload
+  | StartGameItemPayload;
 
 // ---------------------------------------------------------------------------
 // Completion results

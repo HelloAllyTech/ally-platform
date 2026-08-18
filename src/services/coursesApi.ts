@@ -3,10 +3,10 @@ import {
   EnrollTrackResponse,
   GetLearnTracksResponse,
   GetNextTrackItemResponse,
+  GetTrackLanguagesResponse,
   QuizAnswerInput,
   QuizAttemptResult,
   StartTrackItemResponse,
-  GetTrackLanguagesResponse,
   TrackDetail,
   TrackItemCompletionResult,
   TrackListItem,
@@ -151,6 +151,22 @@ export const coursesApi = api.injectEndpoints({
       invalidatesTags: ALL_TRACK_TAGS,
     }),
 
+    /**
+     * Personal best for a game run. A game item is already complete by the
+     * time this fires, so it unlocks nothing and invalidates nothing — the
+     * player treats a failure as a non-event.
+     */
+    recordGameResult: builder.mutation<
+      {bestScore: number; playCount: number; score: number},
+      {itemId: string; score: number}
+    >({
+      query: ({itemId, score}) => ({
+        url: API_ROUTES.TRACKS.GAME_RESULT(itemId),
+        method: API_METHODS.POST,
+        body: {score},
+      }),
+    }),
+
     saveJournalDraft: builder.mutation<
       {success: boolean},
       {itemId: string; responses: {promptId: string; response: string}[]}
@@ -216,6 +232,7 @@ export const {
   useRegradeQuizAttemptMutation,
   useSaveJournalDraftMutation,
   useSubmitJournalMutation,
+  useRecordGameResultMutation,
   useGetTrackLanguagesQuery,
   useSetTrackLanguageMutation,
 } = coursesApi;
