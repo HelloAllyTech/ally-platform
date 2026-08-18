@@ -366,7 +366,7 @@ class TestPromptInjection:
             role_instructions="You are a client.",
             language_glossary="GLOSSARY CARD",
         )
-        msg = generate_system_message(
+        msg, _ = generate_system_message(
             prompt_data=prompt_data,
             behavior_instructions=[],
             rolling_summary="SUMMARY TAIL",

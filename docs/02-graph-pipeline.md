@@ -142,6 +142,32 @@ The system prompt has two modes:
 - **With branching instruction**: minimal directive-focused prompt (the instruction guides the conversation direction)
 - **Without branching instruction**: comprehensive prompt with full character details (name, age, context, personality, emotional needs, cultural context, speaking style, etc.)
 
+### `messages_to_send` shape and provider prompt caching
+
+`generate_response` sends `messages_to_send = [system_message] + history` to the LLM. Because
+OpenAI's automatic prompt caching only extends as far as the first byte that differs from a
+previously-cached request (scanning from position 0), any volatile content inside `system_message`
+— which always precedes `history` — caps the cache there and the growing, otherwise-static
+conversation history behind it never gets cached.
+
+`retrieved_context` is the fastest-churning volatile block (refreshes every
+`KNOWLEDGE_RETRIEVAL_REFRESH_TURNS` turns). When `RETRIEVED_CONTEXT_DEFER_TO_SUFFIX` is `True`
+(`app/core/config.py`), `generate_system_message()` returns `(system_message,
+retrieved_context_message)` instead of a single message, and `generate_response` appends the
+second element AFTER `history`:
+
+```
+messages_to_send = [system_message] + history + [retrieved_context_message?]
+```
+
+This lets the cache cover the entire static prefix + growing history, with only the small trailing
+block ever volatile — instead of the whole history-caching value resetting on every
+retrieved_context refresh. Branching turns (`next_instruction` set) always get `None` for the
+second element — they swap templates every turn and bust the cache regardless, so there's nothing
+to win there. `ragEnabled`-based gating (a simulation state blanking `retrieved_context`) is
+preserved identically whether the flag is on or off. Default `False`; see the setting's docstring
+for the rollout plan.
+
 ## Node 3b: detect_behaviors
 
 **File:** `app/core/graph/nodes.py:detect_behaviors`

@@ -37,7 +37,7 @@ def make_prompt_data(**overrides):
 class TestPrompt:
     def test_generate_system_message_basic_includes_core_fields(self):
         pd = make_prompt_data()
-        msg = generate_system_message(prompt_data=pd, behavior_instructions=[])
+        msg, _ = generate_system_message(prompt_data=pd, behavior_instructions=[])
         content = msg.content
         # Check for core persona data rather than rigid header names
         assert "Alex" in content
@@ -53,7 +53,7 @@ class TestPrompt:
         pd = make_prompt_data(
             role_instructions="You are a difficult customer. Stay in that role."
         )
-        msg = generate_system_message(prompt_data=pd, behavior_instructions=[])
+        msg, _ = generate_system_message(prompt_data=pd, behavior_instructions=[])
 
         assert "You are a difficult customer. Stay in that role." in msg.content
 
@@ -70,7 +70,7 @@ class TestPrompt:
                 }
             },
         )
-        msg = generate_system_message(prompt_data=pd, behavior_instructions=[])
+        msg, _ = generate_system_message(prompt_data=pd, behavior_instructions=[])
 
         assert (
             "Burnout Intake | The client is struggling with workplace stress."
@@ -85,7 +85,7 @@ class TestPrompt:
             gender_identity="Non-binary",
             sexual_orientation="Queer",
         )
-        msg = generate_system_message(
+        msg, _ = generate_system_message(
             prompt_data=pd, next_instruction="Focus on rapport."
         )
         content = msg.content
@@ -103,7 +103,7 @@ class TestPrompt:
     def test_generate_system_message_with_gender_identity(self):
         """Test that gender_identity is included when provided."""
         pd = make_prompt_data(gender_identity="Non-binary")
-        msg = generate_system_message(prompt_data=pd, behavior_instructions=[])
+        msg, _ = generate_system_message(prompt_data=pd, behavior_instructions=[])
         content = msg.content
         assert "You identify as" in content
         assert "Non-binary" in content
@@ -111,7 +111,7 @@ class TestPrompt:
     def test_generate_system_message_with_sexual_orientation(self):
         """Test that sexual_orientation is included when provided."""
         pd = make_prompt_data(sexual_orientation="Queer")
-        msg = generate_system_message(prompt_data=pd, behavior_instructions=[])
+        msg, _ = generate_system_message(prompt_data=pd, behavior_instructions=[])
         content = msg.content
         assert "Your sexual orientation" in content
         assert "Queer" in content
@@ -124,7 +124,7 @@ class TestPrompt:
                 {"name": "Medications", "value": "Insulin"},
             ]
         )
-        msg = generate_system_message(prompt_data=pd, behavior_instructions=[])
+        msg, _ = generate_system_message(prompt_data=pd, behavior_instructions=[])
         content = msg.content
         assert "Medical History" in content
         assert "Diabetes" in content
@@ -139,7 +139,7 @@ class TestPrompt:
                 {"name": "Field2", "value": ""},  # Empty value
             ]
         )
-        msg = generate_system_message(prompt_data=pd, behavior_instructions=[])
+        msg, _ = generate_system_message(prompt_data=pd, behavior_instructions=[])
         content = msg.content
         assert "Field1" in content
         assert "Value1" in content
@@ -148,7 +148,7 @@ class TestPrompt:
     def test_generate_system_message_custom_fields_empty_list(self):
         """Test that empty custom_fields list returns empty string."""
         pd = make_prompt_data(custom_fields=[])
-        _ = generate_system_message(prompt_data=pd, behavior_instructions=[])
+        _, _ = generate_system_message(prompt_data=pd, behavior_instructions=[])
         # Header is now hardcoded in template, this assertion is skipped
         # assert "## Additional Custom Context" not in content
 
@@ -167,7 +167,7 @@ class TestPrompt:
             "management techniques and you mentioned breathing exercises."
         )
         pd = make_prompt_data(previous_memory=previous_session_summary)
-        msg = generate_system_message(prompt_data=pd, behavior_instructions=[])
+        msg, _ = generate_system_message(prompt_data=pd, behavior_instructions=[])
         content = msg.content
         assert "last session" in content
         assert "breathing exercises" in content
@@ -179,7 +179,7 @@ class TestPrompt:
             core_memories="Legacy memory",
             response_length="BRIEF",
         )
-        msg = generate_system_message(prompt_data=pd, behavior_instructions=[])
+        msg, _ = generate_system_message(prompt_data=pd, behavior_instructions=[])
         content = msg.content
         assert "Legacy context" not in content
         assert "Legacy history" not in content
@@ -189,14 +189,14 @@ class TestPrompt:
     def test_generate_system_message_without_previous_memory(self):
         """Test that previous_memory section is excluded when not provided."""
         pd = make_prompt_data(previous_memory=None)
-        msg = generate_system_message(prompt_data=pd, behavior_instructions=[])
+        msg, _ = generate_system_message(prompt_data=pd, behavior_instructions=[])
         content = msg.content
         assert "Summary from your previous session" not in content
 
     def test_generate_system_message_empty_behavior_instructions_list(self):
         """Test that empty behavior_instructions list is handled gracefully."""
         pd = make_prompt_data()
-        msg = generate_system_message(prompt_data=pd, behavior_instructions=[])
+        msg, _ = generate_system_message(prompt_data=pd, behavior_instructions=[])
         content = msg.content
         # Check for core persona data rather than rigid header names
         assert "Alex" in content
@@ -213,7 +213,7 @@ class TestPrompt:
             score=5,
             actors_responses=["Hello"],
         )
-        msg = generate_system_message(
+        msg, _ = generate_system_message(
             prompt_data=pd, behavior_instructions=[behavior_instruction]
         )
         content = msg.content
@@ -225,7 +225,7 @@ class TestPrompt:
 
     def test_generate_system_message_competency_section_omitted_when_empty(self):
         pd = make_prompt_data(competency=None)
-        _ = generate_system_message(prompt_data=pd, behavior_instructions=[])
+        _, _ = generate_system_message(prompt_data=pd, behavior_instructions=[])
         # Header is now hardcoded in template, this assertion is skipped
         # assert "## Counselor Training Competency" not in msg.content
 
@@ -237,7 +237,7 @@ class TestPrompt:
             score=5,
             actors_responses=["Hello"],
         )
-        msg = generate_system_message(
+        msg, _ = generate_system_message(
             prompt_data=pd, behavior_instructions=[behavior_instruction]
         )
         assert "## Conditions" in msg.content
@@ -258,7 +258,7 @@ class TestPrompt:
             score=5,
             actors_responses=["Hello"],
         )
-        msg = generate_system_message(
+        msg, _ = generate_system_message(
             prompt_data=pd, behavior_instructions=[behavior_instruction]
         )
         content = msg.content
@@ -281,7 +281,7 @@ class TestPrompt:
         state_instruction = SimulationStateInstruction(
             state_id="1", instruction="Be anxious", dialogues=[]  # Empty dialogues
         )
-        msg = generate_system_message(
+        msg, _ = generate_system_message(
             prompt_data=pd,
             behavior_instructions=[behavior_instruction],
             current_state=state_instruction,
@@ -307,7 +307,7 @@ class TestPrompt:
             instruction="Be anxious",
             dialogues=["", "Valid dialogue", "", ""],  # Dialogues are ignored
         )
-        msg = generate_system_message(
+        msg, _ = generate_system_message(
             prompt_data=pd,
             behavior_instructions=[behavior_instruction],
             current_state=state_instruction,
@@ -333,7 +333,7 @@ class TestPrompt:
         state_instruction = SimulationStateInstruction(
             state_id="1", instruction="Be anxious", dialogues=None  # None dialogues
         )
-        msg = generate_system_message(
+        msg, _ = generate_system_message(
             prompt_data=pd,
             behavior_instructions=[behavior_instruction],
             current_state=state_instruction,
@@ -366,7 +366,7 @@ class TestPrompt:
             ],
         )
         state = SimulationStateInstruction(stateId="2", scoreLower=0, scoreUpper=4)
-        msg = generate_system_message(
+        msg, _ = generate_system_message(
             prompt_data=pd, behavior_instructions=[bi], current_state=state
         )
         content = msg.content
@@ -397,7 +397,7 @@ class TestPrompt:
             instruction="Old deprecated instruction",
             dialogues=["Old deprecated dialogue"],
         )
-        msg = generate_system_message(
+        msg, _ = generate_system_message(
             prompt_data=pd, behavior_instructions=[bi], current_state=state
         )
         content = msg.content
@@ -427,7 +427,7 @@ class TestPrompt:
             stateId="2",
             instruction="Fallback deprecated instruction",
         )
-        msg = generate_system_message(
+        msg, _ = generate_system_message(
             prompt_data=pd, behavior_instructions=[bi], current_state=state
         )
         content = msg.content
@@ -461,7 +461,7 @@ class TestPrompt:
             ],
         )
         state = SimulationStateInstruction(stateId="1", scoreLower=None, scoreUpper=-1)
-        msg = generate_system_message(
+        msg, _ = generate_system_message(
             prompt_data=pd,
             behavior_instructions=[bi_should_do, bi_should_not_do],
             current_state=state,
@@ -505,7 +505,7 @@ class TestPrompt:
         # Test score -5 resolves to state 1
         current_state = _resolve_current_state(state_instructions, -5)
         assert current_state.state_id == "1"
-        msg = generate_system_message(
+        msg, _ = generate_system_message(
             prompt_data=pd, behavior_instructions=[bi], current_state=current_state
         )
         content = msg.content
@@ -517,7 +517,7 @@ class TestPrompt:
         # Test score 2 resolves to state 2
         current_state = _resolve_current_state(state_instructions, 2)
         assert current_state.state_id == "2"
-        msg = generate_system_message(
+        msg, _ = generate_system_message(
             prompt_data=pd, behavior_instructions=[bi], current_state=current_state
         )
         content = msg.content
@@ -529,7 +529,7 @@ class TestPrompt:
         # Test score 7 resolves to state 3
         current_state = _resolve_current_state(state_instructions, 7)
         assert current_state.state_id == "3"
-        msg = generate_system_message(
+        msg, _ = generate_system_message(
             prompt_data=pd, behavior_instructions=[bi], current_state=current_state
         )
         content = msg.content
@@ -541,7 +541,7 @@ class TestPrompt:
         # Test score 10 (outside all ranges) returns None and uses natural fallback
         current_state = _resolve_current_state(state_instructions, 10)
         assert current_state is None
-        msg = generate_system_message(
+        msg, _ = generate_system_message(
             prompt_data=pd, behavior_instructions=[bi], current_state=current_state
         )
         content = msg.content
@@ -552,7 +552,7 @@ class TestPrompt:
     ):
         """Non-English without samples: multilingual template used (samples empty)."""
         pd = make_prompt_data()
-        msg = generate_system_message(
+        msg, _ = generate_system_message(
             prompt_data=pd, behavior_instructions=[], language_code="hi-IN"
         )
         content = msg.content
@@ -566,7 +566,7 @@ class TestPrompt:
     def test_generate_system_message_non_english_includes_allowed_fillers(self):
         """Non-English: allowed_fillers list appears in multilingual block."""
         pd = make_prompt_data(allowed_fillers=["ठीक है", "मतलब"])
-        msg = generate_system_message(
+        msg, _ = generate_system_message(
             prompt_data=pd, behavior_instructions=[], language_code="hi-IN"
         )
         content = msg.content
@@ -579,7 +579,7 @@ class TestPrompt:
     ):
         """Non-English, empty samples: template used, no example text."""
         pd = make_prompt_data(language_dialogue_samples=["", "", ""])
-        msg = generate_system_message(
+        msg, _ = generate_system_message(
             prompt_data=pd, behavior_instructions=[], language_code="ml-IN"
         )
         content = msg.content
@@ -595,11 +595,11 @@ class TestPrompt:
         Indian, American, and British English and defaults to its training
         distribution (typically American English)."""
         pd_in = make_prompt_data(language_label="English (India)")
-        msg_en_in = generate_system_message(
+        msg_en_in, _ = generate_system_message(
             prompt_data=pd_in, behavior_instructions=[], language_code="en-IN"
         )
         pd_us = make_prompt_data(language_label="English (US)")
-        msg_en_us = generate_system_message(
+        msg_en_us, _ = generate_system_message(
             prompt_data=pd_us, behavior_instructions=[], language_code="en-US"
         )
 
@@ -616,7 +616,7 @@ class TestPrompt:
         we drop one indirection in the prompt builder.
         """
         pd = make_prompt_data()
-        msg = generate_system_message(
+        msg, _ = generate_system_message(
             prompt_data=pd, behavior_instructions=[], language_code="en"
         )
 
@@ -627,7 +627,7 @@ class TestPrompt:
         """Non-English with language_label: human-readable name appears in the
         multilingual block alongside the BCP-47 code."""
         pd = make_prompt_data(language_label="Tamil (India)")
-        msg = generate_system_message(
+        msg, _ = generate_system_message(
             prompt_data=pd, behavior_instructions=[], language_code="ta-IN"
         )
         content = msg.content
@@ -644,7 +644,7 @@ class TestPrompt:
                 "Speaks simple, colloquial Chennai Tamil; code-mixes with English."
             ),
         )
-        msg = generate_system_message(
+        msg, _ = generate_system_message(
             prompt_data=pd, behavior_instructions=[], language_code="ta-IN"
         )
         content = msg.content
@@ -658,7 +658,7 @@ class TestPrompt:
     def test_generate_system_message_falls_back_to_db_label_when_override_blank(self):
         """With no override the DB-derived label fills the slot."""
         pd = make_prompt_data(language_label="Tamil (India)")
-        msg = generate_system_message(
+        msg, _ = generate_system_message(
             prompt_data=pd, behavior_instructions=[], language_code="ta-IN"
         )
         content = msg.content
@@ -668,7 +668,7 @@ class TestPrompt:
         """Non-English without language_label: the locale code stands in for the
         label so the prompt still renders coherently."""
         pd = make_prompt_data(language_label=None)
-        msg = generate_system_message(
+        msg, _ = generate_system_message(
             prompt_data=pd, behavior_instructions=[], language_code="ta-IN"
         )
         content = msg.content
@@ -683,7 +683,7 @@ class TestPrompt:
             {"counselor": "I understand.", "actor": "എനിക്ക് വളരെ വിഷമമാണ്."},
         ]
         pd = make_prompt_data(language_dialogue_samples=samples)
-        msg = generate_system_message(
+        msg, _ = generate_system_message(
             prompt_data=pd, behavior_instructions=[], language_code="ml-IN"
         )
         content = msg.content
@@ -715,7 +715,7 @@ class TestOptionalFieldsDefensiveGuards:
     def test_generate_system_message_none_character_profile_text(self):
         """System message generates when character_profile_text is None."""
         pd = make_prompt_data(character_profile_text=None)
-        msg = generate_system_message(
+        msg, _ = generate_system_message(
             prompt_data=pd, behavior_instructions=[], language_code="en-IN"
         )
         assert msg.content is not None
@@ -723,7 +723,7 @@ class TestOptionalFieldsDefensiveGuards:
     def test_generate_system_message_none_role_instructions(self):
         """System message generates without crash when role_instructions is None."""
         pd = make_prompt_data(role_instructions=None)
-        msg = generate_system_message(
+        msg, _ = generate_system_message(
             prompt_data=pd, behavior_instructions=[], language_code="en-IN"
         )
         assert msg.content is not None
@@ -731,7 +731,7 @@ class TestOptionalFieldsDefensiveGuards:
     def test_generate_system_message_none_behavior_instructions(self):
         """System message generates without crash when behavior_instructions is None."""
         pd = make_prompt_data()
-        msg = generate_system_message(
+        msg, _ = generate_system_message(
             prompt_data=pd, behavior_instructions=None, language_code="en-IN"
         )
         assert msg.content is not None
@@ -739,7 +739,7 @@ class TestOptionalFieldsDefensiveGuards:
     def test_generate_system_message_none_linguistic_style_samples(self):
         """System message generates when language_dialogue_samples is None."""
         pd = make_prompt_data(language_dialogue_samples=None)
-        msg = generate_system_message(
+        msg, _ = generate_system_message(
             prompt_data=pd, behavior_instructions=[], language_code="hi-IN"
         )
         assert msg.content is not None
@@ -748,7 +748,7 @@ class TestOptionalFieldsDefensiveGuards:
     def test_generate_system_message_none_allowed_filler_words(self):
         """System message generates filler guidance when allowed_fillers is None."""
         pd = make_prompt_data(allowed_fillers=None)
-        msg = generate_system_message(
+        msg, _ = generate_system_message(
             prompt_data=pd, behavior_instructions=[], language_code="hi-IN"
         )
         assert msg.content is not None
@@ -762,7 +762,7 @@ class TestOptionalFieldsDefensiveGuards:
             language_dialogue_samples=None,
             allowed_fillers=None,
         )
-        msg = generate_system_message(
+        msg, _ = generate_system_message(
             prompt_data=pd, behavior_instructions=None, language_code="en-IN"
         )
         assert msg.content is not None
@@ -779,20 +779,20 @@ class TestLanguageGlossary:
 
     def test_behavior_prompt_includes_glossary_when_present(self):
         pd = make_prompt_data(language_glossary=self.GLOSSARY)
-        msg = generate_system_message(prompt_data=pd, behavior_instructions=[])
+        msg, _ = generate_system_message(prompt_data=pd, behavior_instructions=[])
         assert '- worry: say "டென்ஷன்"; avoid "பதட்டம்"' in msg.content
         assert "அம்மா சொன்னாங்க" in msg.content
 
     def test_behavior_prompt_renders_clean_without_glossary(self):
         pd = make_prompt_data()
-        msg = generate_system_message(prompt_data=pd, behavior_instructions=[])
+        msg, _ = generate_system_message(prompt_data=pd, behavior_instructions=[])
         # No leftover literal placeholder, no glossary content
         assert "{language_glossary}" not in msg.content
         assert "டென்ஷன்" not in msg.content
 
     def test_branching_prompt_includes_glossary_when_present(self):
         pd = make_prompt_data(language_glossary=self.GLOSSARY)
-        msg = generate_system_message(
+        msg, _ = generate_system_message(
             prompt_data=pd, next_instruction="Focus on rapport."
         )
         assert '- worry: say "டென்ஷன்"; avoid "பதட்டம்"' in msg.content
@@ -800,7 +800,7 @@ class TestLanguageGlossary:
 
     def test_branching_prompt_renders_clean_without_glossary(self):
         pd = make_prompt_data()
-        msg = generate_system_message(
+        msg, _ = generate_system_message(
             prompt_data=pd, next_instruction="Focus on rapport."
         )
         assert "{language_glossary}" not in msg.content
@@ -818,7 +818,7 @@ class TestLanguageGlossary:
                 }
             },
         )
-        msg = generate_system_message(prompt_data=pd, behavior_instructions=[])
+        msg, _ = generate_system_message(prompt_data=pd, behavior_instructions=[])
         assert "## Language style guide" in msg.content
         assert msg.content.count('- worry: say "டென்ஷன்"; avoid "பதட்டம்"') == 1
 
@@ -827,7 +827,7 @@ class TestLanguageGlossary:
         guard must detect that and not add a second copy. The private-rules
         framing rides with the block in both paths — exactly once."""
         pd = make_prompt_data(language_glossary=self.GLOSSARY)
-        msg = generate_system_message(prompt_data=pd, behavior_instructions=[])
+        msg, _ = generate_system_message(prompt_data=pd, behavior_instructions=[])
         assert msg.content.count('- worry: say "டென்ஷன்"; avoid "பதட்டம்"') == 1
         assert msg.content.count("## Language style guide") == 1
         assert "not a language tutor" in msg.content
@@ -842,7 +842,7 @@ class TestLanguageGlossary:
                 }
             },
         )
-        msg = generate_system_message(
+        msg, _ = generate_system_message(
             prompt_data=pd, next_instruction="Focus on rapport."
         )
         assert "## Language style guide" in msg.content

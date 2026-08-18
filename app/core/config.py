@@ -915,6 +915,26 @@ class Settings(BaseSettings):
             "(falls back to running every turn, same as REFRESH_ENABLED=False)."
         ),
     )
+    RETRIEVED_CONTEXT_DEFER_TO_SUFFIX: bool = Field(
+        default=True,
+        description=(
+            "Latency lever: move retrieved_context out of the system message and "
+            "into a new trailing SystemMessage appended AFTER history in "
+            "messages_to_send, so OpenAI prompt caching can extend across the "
+            "entire growing conversation history instead of capping at the "
+            "system message's volatile suffix (retrieved_context refreshes every "
+            "KNOWLEDGE_RETRIEVAL_REFRESH_TURNS turns, and today it sits inside "
+            "the system message, which always precedes history — every refresh "
+            "wipes the WHOLE accumulated history cache, not just its own "
+            "tokens). Only affects non-branching turns (branching swaps templates "
+            "and busts the cache regardless — no change there). ragEnabled-gated "
+            "blanking of retrieved_context is preserved identically in the "
+            "deferred path. Default True as of 2026-08-18 (explicit product "
+            "decision to ship this immediately) — set False to restore the old "
+            "inline-in-system-message placement. Validate via [PROMPT_CACHE] "
+            "hit_rate and Metabase llm_ttft_ms p95 after deploy."
+        ),
+    )
     KNOWLEDGE_RETRIEVAL_ASYNC: bool = Field(
         default=True,
         description=(

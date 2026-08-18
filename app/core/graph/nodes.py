@@ -1413,6 +1413,7 @@ async def generate_response(
         logger.info(f"Using default language code '{language_code}'")
 
     system_message = None
+    retrieved_context_message = None
     current_state = None
     if scenario is not None:
         # Log prompt mode for observability
@@ -1436,7 +1437,7 @@ async def generate_response(
         turn_score: Optional[int] = (
             score_keeper.get_total_score() if score_keeper else None
         )
-        system_message = generate_system_message(
+        system_message, retrieved_context_message = generate_system_message(
             prompt_data=scenario.prompt_data,
             next_instruction=next_instruction,
             language_code=language_code,
@@ -1446,6 +1447,7 @@ async def generate_response(
             current_score=turn_score,
             audio_tag_instructions=audio_tag_instructions,
             rolling_summary=_rs_summary,
+            defer_retrieved_context=settings.RETRIEVED_CONTEXT_DEFER_TO_SUFFIX,
         )
 
         room_name = ""
@@ -1619,6 +1621,8 @@ async def generate_response(
     if system_message is not None:
         messages_to_send.append(system_message)
     messages_to_send.extend(history)
+    if retrieved_context_message is not None:
+        messages_to_send.append(retrieved_context_message)
 
     # Get LLM instance
     llm_instance = llm_client.llm_instance
@@ -1650,10 +1654,17 @@ async def generate_response(
     # cache hits) and llm_call_complete latency_s for the full picture.
     _system_chars = len(system_message.content) if system_message is not None else 0
     _history_chars = sum(len(str(getattr(m, "content", "") or "")) for m in history)
+    _trailing_chars = (
+        len(retrieved_context_message.content)
+        if retrieved_context_message is not None
+        else 0
+    )
     _summary_active = bool(_rs_summary)
     logger.info(
-        "[PROMPT_SIZE] mode=%s summary_active=%s summary_chars=%d "
-        "system_chars=%d history_msgs=%d/%d history_chars=%d total_chars=%d",
+        "[PROMPT_SIZE] room=%s mode=%s summary_active=%s summary_chars=%d "
+        "system_chars=%d history_msgs=%d/%d history_chars=%d trailing_chars=%d "
+        "total_chars=%d",
+        get_room_id(),
         "branching" if next_instruction else "behavior",
         _summary_active,
         len(_rs_summary or ""),
@@ -1661,7 +1672,8 @@ async def generate_response(
         len(history),
         len(state.messages),
         _history_chars,
-        _system_chars + _history_chars,
+        _trailing_chars,
+        _system_chars + _history_chars + _trailing_chars,
     )
     _llm_start = datetime.now(timezone.utc)
     logger.info(
@@ -1716,8 +1728,9 @@ async def generate_response(
                 prompt_tokens, _, _, cached_tokens = usage
                 hit_rate = (cached_tokens / prompt_tokens) if prompt_tokens else 0.0
                 logger.info(
-                    "[PROMPT_CACHE] model=%s prompt_tokens=%d cached_tokens=%d "
-                    "hit_rate=%.0f%%",
+                    "[PROMPT_CACHE] room=%s model=%s prompt_tokens=%d "
+                    "cached_tokens=%d hit_rate=%.0f%%",
+                    get_room_id(),
                     llm_model_name,
                     prompt_tokens,
                     cached_tokens,

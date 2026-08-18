@@ -1,6 +1,6 @@
 import json
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from langchain_core.messages import SystemMessage
 
@@ -355,7 +355,18 @@ def _build_behavior_prompt(
     language_code: Optional[str] = None,
     retrieved_context: Optional[str] = None,
     current_score: Optional[int] = None,
-) -> SystemMessage:
+    embed_retrieved_context: bool = True,
+) -> Tuple[SystemMessage, Optional[str]]:
+    """Returns (system_message, effective_retrieved_context).
+
+    `effective_retrieved_context` is the ragEnabled-gated value computed below
+    — exposed so a caller deferring retrieved_context to a trailing message
+    (RETRIEVED_CONTEXT_DEFER_TO_SUFFIX) can reuse the SAME gating decision
+    instead of re-resolving simulation state itself. When
+    `embed_retrieved_context` is False, the template's own {retrieved_context}
+    placeholder (if any) renders blank — the caller is responsible for
+    delivering the returned value some other way.
+    """
     # Resolve the active simulation state (separate from behavior-rules
     # state guidance) when the selected main-agent prompt opts in via
     # `hasStates: true`. The matched state's guidelines go into
@@ -458,7 +469,11 @@ def _build_behavior_prompt(
         character_profile_text=_coerce_block_value(
             getattr(prompt_data, "character_profile_text", None)
         ),
-        retrieved_context=_get_retrieved_context_text(effective_retrieved_context),
+        retrieved_context=(
+            _get_retrieved_context_text(effective_retrieved_context)
+            if embed_retrieved_context
+            else ""
+        ),
         custom_fields_text=_format_custom_fields_text(
             getattr(prompt_data, "custom_fields", []) or []
         ),
@@ -560,7 +575,8 @@ def _build_behavior_prompt(
             **template_kwargs,
         )
 
-    return SystemMessage(content=(behavior_prompt or "").strip())
+    msg = SystemMessage(content=(behavior_prompt or "").strip())
+    return msg, effective_retrieved_context
 
 
 # Header framing the provider audio-tag instructions for INLINE generation.
@@ -682,6 +698,24 @@ def _append_retrieved_context(
     return SystemMessage(content=combined.strip())
 
 
+def _build_retrieved_context_message(
+    retrieved_context: Optional[str],
+) -> Optional[SystemMessage]:
+    """Build retrieved context as its OWN trailing message, not a system-message
+    suffix (see RETRIEVED_CONTEXT_DEFER_TO_SUFFIX in app/core/config.py).
+
+    Appended AFTER conversation history by the caller, so the (byte-stable)
+    system message + history prefix stays cacheable across a retrieved_context
+    refresh instead of the whole prefix invalidating every refresh. Same header
+    as `_append_retrieved_context` — only the position changes, not the text
+    shown to the model.
+    """
+    text = _coerce_block_value(retrieved_context)
+    if not text:
+        return None
+    return SystemMessage(content=f"{_RETRIEVED_CONTEXT_HEADER}{text}".strip())
+
+
 # Framing for the rolling conversation summary (episodic memory). Appended in
 # the volatile suffix of the system message — after the static persona /
 # glossary / audio-tag content — so the static prefix stays byte-stable for
@@ -729,10 +763,21 @@ def generate_system_message(
     current_score: Optional[int] = None,
     audio_tag_instructions: Optional[str] = None,
     rolling_summary: Optional[str] = None,
-) -> SystemMessage:
+    defer_retrieved_context: bool = False,
+) -> Tuple[SystemMessage, Optional[SystemMessage]]:
     """
     Generates a SystemMessage prompt for an AI roleplay assistant
     based on the structured PromptData.
+
+    Returns (system_message, retrieved_context_message). The second element
+    is normally None; it carries retrieved_context as its own trailing
+    message ONLY when `defer_retrieved_context` is True on a non-branching
+    turn (RETRIEVED_CONTEXT_DEFER_TO_SUFFIX) — the caller must append it to
+    `messages_to_send` AFTER conversation history so provider prompt caching
+    can extend across history instead of capping at this system message's
+    volatile content. Branching turns ignore the flag entirely (swap
+    templates and bust the cache regardless — nothing to win there), always
+    returning None for the second element.
 
     `current_score` is required only when the selected main-agent prompt
     has `hasStates: true`; the score selects the active simulation state.
@@ -757,20 +802,21 @@ def generate_system_message(
         msg = _ensure_language_glossary(msg, prompt_data)
         msg = _append_audio_tag_guidance(msg, audio_tag_instructions)
         msg = _append_rolling_summary(msg, rolling_summary)
-        return _append_retrieved_context(msg, retrieved_context)
+        return _append_retrieved_context(msg, retrieved_context), None
 
     if behavior_instructions is not None:
         if not behavior_instructions:
             logger.warning(
                 "Empty behavior_instructions provided, using default behavior prompt"
             )
-        msg = _build_behavior_prompt(
+        msg, effective_retrieved_context = _build_behavior_prompt(
             prompt_data,
             behavior_instructions,
             current_state,
             language_code,
             retrieved_context,
             current_score=current_score,
+            embed_retrieved_context=not defer_retrieved_context,
         )
         logger.info(
             "%s BUILT behavior prompt: language_code=%s",
@@ -780,19 +826,22 @@ def generate_system_message(
         msg = _ensure_language_glossary(msg, prompt_data)
         msg = _append_audio_tag_guidance(msg, audio_tag_instructions)
         msg = _append_rolling_summary(msg, rolling_summary)
-        return _append_retrieved_context(msg, retrieved_context)
+        if defer_retrieved_context:
+            return msg, _build_retrieved_context_message(effective_retrieved_context)
+        return _append_retrieved_context(msg, retrieved_context), None
 
     logger.warning(
         "No behavior_instructions provided, "
         "defaulting to behavior prompt with empty conditions"
     )
-    msg = _build_behavior_prompt(
+    msg, effective_retrieved_context = _build_behavior_prompt(
         prompt_data,
         [],
         current_state,
         language_code,
         retrieved_context,
         current_score=current_score,
+        embed_retrieved_context=not defer_retrieved_context,
     )
     logger.info(
         "%s BUILT behavior prompt: language_code=%s",
@@ -802,7 +851,9 @@ def generate_system_message(
     msg = _ensure_language_glossary(msg, prompt_data)
     msg = _append_audio_tag_guidance(msg, audio_tag_instructions)
     msg = _append_rolling_summary(msg, rolling_summary)
-    return _append_retrieved_context(msg, retrieved_context)
+    if defer_retrieved_context:
+        return msg, _build_retrieved_context_message(effective_retrieved_context)
+    return _append_retrieved_context(msg, retrieved_context), None
 
 
 def generate_prompt_content(
@@ -813,7 +864,7 @@ def generate_prompt_content(
     current_state: Optional[SimulationStateInstruction] = None,
     retrieved_context: Optional[str] = None,
 ) -> str:
-    system_message = generate_system_message(
+    system_message, _ = generate_system_message(
         prompt_data,
         next_instruction,
         language_code,

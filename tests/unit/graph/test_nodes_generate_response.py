@@ -822,3 +822,183 @@ class TestGenerateResponse:
 
         assert isinstance(result, dict)
         assert result["next_instruction"] is None
+
+
+class CapturingFakeLLM(FakeLLM):
+    """Same as FakeLLM but records the exact messages array it received, so
+    tests can assert on message ORDER (system, history, trailing context)."""
+
+    def __init__(self, content: str = "OK"):
+        super().__init__(content)
+        self.captured_messages = None
+
+    async def ainvoke(self, messages):
+        self.captured_messages = list(messages)
+        return await super().ainvoke(messages)
+
+
+class CapturingFakeLLMClient(FakeLLMClient):
+    def __init__(self, content: str = "OK"):
+        self._llm_instance = CapturingFakeLLM(content)
+
+
+class TestGenerateResponseRetrievedContextDeferredToSuffix:
+    """RETRIEVED_CONTEXT_DEFER_TO_SUFFIX: retrieved_context must land as the
+    LAST message in messages_to_send (after history), not inside the system
+    message — see app/core/config.py and prompt.py's
+    _build_retrieved_context_message."""
+
+    @pytest.mark.asyncio
+    async def test_flag_on_appends_context_after_history(self, monkeypatch):
+        from app.core.config import settings
+
+        monkeypatch.setattr(settings, "RETRIEVED_CONTEXT_DEFER_TO_SUFFIX", True)
+
+        llm_client = CapturingFakeLLMClient(content="hello")
+        msgs = [HumanMessage(content="hi"), HumanMessage(content="tell me more")]
+        state = SimulationState(
+            messages=msgs,
+            permitted_events=[],
+            events_accumulator=[],
+            new_events=[],
+            current_score=0,
+            branching_and_feedback_data=[],
+            retrieved_context="**topic:** anxiety coping",
+        )
+
+        prompt_data = type(
+            "PD",
+            (),
+            {
+                "name": "Alex",
+                "age": "30",
+                "gender": "Male",
+                "gender_identity": None,
+                "sexual_orientation": None,
+                "current_location": "NYC",
+                "profession": None,
+                "context": "Context",
+                "session_behavior_guidelines": None,
+                "life_history_summary": "History",
+                "core_memories": None,
+                "personality": None,
+                "starting_state": None,
+                "emotional_needs": None,
+                "tone": None,
+                "opening_statements": ["Hi"],
+                "agent_goal": None,
+                "custom_fields": None,
+                "response_length": None,
+                "agent_dialogues": None,
+                "prompt": None,
+                "previous_memory": None,
+                "competency": None,
+                "language_dialogue_samples": None,
+            },
+        )()
+
+        language_config = type(
+            "LanguageConfig",
+            (),
+            {"language_code": "en-IN", "llm_config": None, "stt_config": None},
+        )()
+        scenario = type(
+            "Scenario",
+            (),
+            {
+                "prompt_data": prompt_data,
+                "language_config": language_config,
+                "behavior_instructions": [],
+                "state_instructions": None,
+            },
+        )()
+        config = {"configurable": {"scenario": scenario, "llm_client": llm_client}}
+
+        await generate_response(state, config=config)
+
+        captured = llm_client.llm_instance.captured_messages
+        assert captured is not None
+        # System message (first) must NOT contain the retrieved context.
+        assert "anxiety coping" not in captured[0].content
+        # The two original history messages appear, in order, before the tail.
+        assert captured[1].content == "hi"
+        assert captured[2].content == "tell me more"
+        # The trailing message (last) carries the retrieved context.
+        assert len(captured) == 4
+        assert "anxiety coping" in captured[-1].content
+        assert "## Additional Context" in captured[-1].content
+
+    @pytest.mark.asyncio
+    async def test_flag_off_keeps_context_inside_system_message(self, monkeypatch):
+        from app.core.config import settings
+
+        monkeypatch.setattr(settings, "RETRIEVED_CONTEXT_DEFER_TO_SUFFIX", False)
+
+        llm_client = CapturingFakeLLMClient(content="hello")
+        msgs = [HumanMessage(content="hi")]
+        state = SimulationState(
+            messages=msgs,
+            permitted_events=[],
+            events_accumulator=[],
+            new_events=[],
+            current_score=0,
+            branching_and_feedback_data=[],
+            retrieved_context="**topic:** anxiety coping",
+        )
+
+        prompt_data = type(
+            "PD",
+            (),
+            {
+                "name": "Alex",
+                "age": "30",
+                "gender": "Male",
+                "gender_identity": None,
+                "sexual_orientation": None,
+                "current_location": "NYC",
+                "profession": None,
+                "context": "Context",
+                "session_behavior_guidelines": None,
+                "life_history_summary": "History",
+                "core_memories": None,
+                "personality": None,
+                "starting_state": None,
+                "emotional_needs": None,
+                "tone": None,
+                "opening_statements": ["Hi"],
+                "agent_goal": None,
+                "custom_fields": None,
+                "response_length": None,
+                "agent_dialogues": None,
+                "prompt": None,
+                "previous_memory": None,
+                "competency": None,
+                "language_dialogue_samples": None,
+            },
+        )()
+
+        language_config = type(
+            "LanguageConfig",
+            (),
+            {"language_code": "en-IN", "llm_config": None, "stt_config": None},
+        )()
+        scenario = type(
+            "Scenario",
+            (),
+            {
+                "prompt_data": prompt_data,
+                "language_config": language_config,
+                "behavior_instructions": [],
+                "state_instructions": None,
+            },
+        )()
+        config = {"configurable": {"scenario": scenario, "llm_client": llm_client}}
+
+        await generate_response(state, config=config)
+
+        captured = llm_client.llm_instance.captured_messages
+        assert captured is not None
+        # No trailing context message — same message count as history + system.
+        assert len(captured) == 2
+        # Retrieved context lands inside the system message, as before.
+        assert "anxiety coping" in captured[0].content
