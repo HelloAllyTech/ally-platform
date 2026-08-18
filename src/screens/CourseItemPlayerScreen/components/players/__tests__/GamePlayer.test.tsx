@@ -96,7 +96,7 @@ describe('GamePlayer', () => {
         score: 140,
       }),
     );
-    expect(getByText('courses.game.bestScore:{"score":140}')).toBeTruthy();
+    expect(getByText('courses.game.bestScore.TREX_RUNNER:{"score":140}')).toBeTruthy();
   });
 
   it('keeps the better score when a later run is worse', async () => {
@@ -111,9 +111,9 @@ describe('GamePlayer', () => {
     postFromGame(getByTestId, {source: 'ally-game', type: 'over', score: 90});
 
     await waitFor(() =>
-      expect(getByText('courses.game.lastScore:{"score":90}')).toBeTruthy(),
+      expect(getByText('courses.game.lastScore.TREX_RUNNER:{"score":90}')).toBeTruthy(),
     );
-    expect(getByText('courses.game.bestScore:{"score":300}')).toBeTruthy();
+    expect(getByText('courses.game.bestScore.TREX_RUNNER:{"score":300}')).toBeTruthy();
   });
 
   it('ignores messages that are not from a game bundle', () => {
@@ -149,7 +149,7 @@ describe('GamePlayer', () => {
 
     // Still shown locally even though the server never heard about it.
     await waitFor(() =>
-      expect(getByText('courses.game.bestScore:{"score":55}')).toBeTruthy(),
+      expect(getByText('courses.game.bestScore.TREX_RUNNER:{"score":55}')).toBeTruthy(),
     );
   });
 });
