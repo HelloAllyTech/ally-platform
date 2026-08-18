@@ -16,6 +16,9 @@ export enum TrackItemType {
 /** Games the app can render; each maps to a bundle under `players/games/`. */
 export enum TrackGameKey {
   TREX_RUNNER = 'TREX_RUNNER',
+  TIC_TAC_TOE = 'TIC_TAC_TOE',
+  MEMORY_MATCH = 'MEMORY_MATCH',
+  CUB_N_PUP = 'CUB_N_PUP',
 }
 
 // There is no IN_PROGRESS status server-side — "in progress" is derived as

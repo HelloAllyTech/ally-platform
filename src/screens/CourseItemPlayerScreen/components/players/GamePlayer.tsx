@@ -1,9 +1,10 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {ScrollView, Text, View} from 'react-native';
-import {ScaledSheet} from 'react-native-size-matters';
+import {ms, ScaledSheet} from 'react-native-size-matters';
 import WebView, {WebViewMessageEvent} from 'react-native-webview';
 
 import {useTranslate} from '@/hooks';
+import type {TranslationType} from '@/localization/locales/type';
 import {useRecordGameResultMutation} from '@/services';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
 import {
@@ -12,6 +13,9 @@ import {
   TrackItemCompletionResult,
 } from '@/types';
 
+import {CUB_N_PUP_HTML} from './games/cubNPupHtml';
+import {MEMORY_MATCH_HTML} from './games/memoryMatchHtml';
+import {TIC_TAC_TOE_HTML} from './games/ticTacToeHtml';
 import {TREX_RUNNER_HTML} from './games/trexRunnerHtml';
 
 export interface GamePlayerProps {
@@ -23,6 +27,59 @@ export interface GamePlayerProps {
 /** Every game bundle the app can render, by key. */
 const GAME_HTML: Record<TrackGameKey, string> = {
   [TrackGameKey.TREX_RUNNER]: TREX_RUNNER_HTML,
+  [TrackGameKey.TIC_TAC_TOE]: TIC_TAC_TOE_HTML,
+  [TrackGameKey.MEMORY_MATCH]: MEMORY_MATCH_HTML,
+  [TrackGameKey.CUB_N_PUP]: CUB_N_PUP_HTML,
+};
+
+/**
+ * How tall a WebView each game needs. A bundle sizes itself to whatever
+ * viewport it is given, so this is the one thing about a game the host has to
+ * know: the runner is a 150px canvas, a board game needs room for a board.
+ */
+const GAME_HEIGHT: Record<TrackGameKey, number> = {
+  [TrackGameKey.TREX_RUNNER]: 200,
+  [TrackGameKey.TIC_TAC_TOE]: 400,
+  [TrackGameKey.MEMORY_MATCH]: 380,
+  // Taller than the rest: the puzzle spins, so the board needs the room its
+  // corners sweep through, and the level list opens into the same view.
+  [TrackGameKey.CUB_N_PUP]: 440,
+};
+
+/**
+ * Words a bundle draws inside its own WebView, by game.
+ *
+ * A bundle is a static document with no reach into the app, so it cannot read
+ * the learner's language for itself — anything it renders in words has to be
+ * handed to it. The runner and the tic-tac-toe board are pure canvas and need
+ * nothing; the memory deck has a move counter and an end-of-round card, and the
+ * puzzle has a level list, a solved count and the lines that teach it, so those
+ * two get these. A bundle falls back to its own baked-in English if the host
+ * sends nothing, which is what keeps this list optional.
+ */
+const FRAME_STRING_KEYS: Partial<
+  Record<TrackGameKey, Readonly<Record<string, TranslationType>>>
+> = {
+  [TrackGameKey.MEMORY_MATCH]: {
+    moves: 'courses.game.frameStrings.MEMORY_MATCH.moves',
+    restart: 'courses.game.frameStrings.MEMORY_MATCH.restart',
+    wonTitle: 'courses.game.frameStrings.MEMORY_MATCH.wonTitle',
+    wonDetail: 'courses.game.frameStrings.MEMORY_MATCH.wonDetail',
+    playAgain: 'courses.game.frameStrings.MEMORY_MATCH.playAgain',
+    cardLabel: 'courses.game.frameStrings.MEMORY_MATCH.cardLabel',
+  },
+  [TrackGameKey.CUB_N_PUP]: {
+    levels: 'courses.game.frameStrings.CUB_N_PUP.levels',
+    close: 'courses.game.frameStrings.CUB_N_PUP.close',
+    nextLevel: 'courses.game.frameStrings.CUB_N_PUP.nextLevel',
+    solved: 'courses.game.frameStrings.CUB_N_PUP.solved',
+    tutorial: 'courses.game.frameStrings.CUB_N_PUP.tutorial',
+    hintDragToStar: 'courses.game.frameStrings.CUB_N_PUP.hintDragToStar',
+    hintRotate: 'courses.game.frameStrings.CUB_N_PUP.hintRotate',
+    hintFree: 'courses.game.frameStrings.CUB_N_PUP.hintFree',
+    hintPivot: 'courses.game.frameStrings.CUB_N_PUP.hintPivot',
+    hintRotateLink: 'courses.game.frameStrings.CUB_N_PUP.hintRotateLink',
+  },
 };
 
 /** What a game bundle posts to us. Mirrors the bridge inside each bundle. */
@@ -89,6 +146,31 @@ export const GamePlayer: React.FC<GamePlayerProps> = ({
 
   const html = GAME_HTML[payload.gameKey];
 
+  /**
+   * Handed over before the document runs rather than posted in afterwards, so
+   * the first paint is already in the learner's language.
+   *
+   * `skipInterpolation` because these are templates for the bundle to fill in,
+   * not finished sentences — without it i18next would resolve `{{moves}}` here
+   * against nothing and hand the frame a string with the number cut out. The
+   * whole object goes through JSON.stringify, so a quote or a newline in a
+   * translation cannot break out of the statement.
+   */
+  const gameKey = payload.gameKey;
+  const injectedStrings = useMemo(() => {
+    const keys = FRAME_STRING_KEYS[gameKey];
+    if (!keys) {
+      return undefined;
+    }
+    const strings = Object.fromEntries(
+      Object.entries(keys).map(([name, key]) => [
+        name,
+        t(key, {skipInterpolation: true}),
+      ]),
+    );
+    return `window.__allyGameStrings = ${JSON.stringify(strings)}; true;`;
+  }, [gameKey, t]);
+
   return (
     <ScrollView
       contentContainerStyle={styles.content}
@@ -97,10 +179,11 @@ export const GamePlayer: React.FC<GamePlayerProps> = ({
       scrollEnabled>
       {payload.intro ? <Text style={styles.intro}>{payload.intro}</Text> : null}
 
-      <View style={styles.frame}>
+      <View style={[styles.frame, {height: ms(GAME_HEIGHT[payload.gameKey])}]}>
         <WebView
           source={{html}}
           onMessage={handleMessage}
+          injectedJavaScriptBeforeContentLoaded={injectedStrings}
           // Required for `source={{html}}` — the document has an opaque origin.
           originWhitelist={['*']}
           javaScriptEnabled
@@ -115,17 +198,21 @@ export const GamePlayer: React.FC<GamePlayerProps> = ({
         />
       </View>
 
-      <Text style={styles.hint}>{t('courses.game.controlsTouch')}</Text>
+      <Text style={styles.hint}>
+        {t(`courses.game.controlsTouch.${payload.gameKey}`)}
+      </Text>
 
       <View style={styles.scores}>
         {lastScore !== null ? (
           <Text style={styles.score}>
-            {t('courses.game.lastScore', {score: lastScore})}
+            {t(`courses.game.lastScore.${payload.gameKey}`, {score: lastScore})}
           </Text>
         ) : null}
         {bestScore !== null ? (
           <Text style={styles.best}>
-            {t('courses.game.bestScore', {score: bestScore})}
+            {t(`courses.game.bestScore.${payload.gameKey}`, {
+              score: bestScore,
+            })}
           </Text>
         ) : null}
       </View>
@@ -152,8 +239,8 @@ const styles = ScaledSheet.create({
     textAlign: 'center',
   },
   frame: {
+    // height is per game — see GAME_HEIGHT.
     width: '100%',
-    height: '200@ms',
     borderRadius: '12@ms',
     overflow: 'hidden',
     backgroundColor: colors.ds.neutral.white,
