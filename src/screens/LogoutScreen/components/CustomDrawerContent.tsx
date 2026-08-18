@@ -6,6 +6,7 @@ import {ms, ScaledSheet} from 'react-native-size-matters';
 import {
   AllyLogoIcon,
   BoltIcon,
+  HelpIcon,
   LogoutIcon,
   ProfileSettingsIcon,
 } from '@/assets';
@@ -43,6 +44,11 @@ export const DrawerContent = ({
   const handleProfileSettingsPress = () => {
     drawerNavigation.closeDrawer();
     navigation.navigate(SCREEN_NAMES.PROFILE_SETTINGS);
+  };
+
+  const handleReportProblemPress = () => {
+    drawerNavigation.closeDrawer();
+    navigation.navigate(SCREEN_NAMES.BUG_REPORT);
   };
 
   return (
@@ -142,6 +148,12 @@ export const DrawerContent = ({
           icon={<ProfileSettingsIcon width={24} height={24} />}
           text={t('profile.settings.title')}
           onPress={handleProfileSettingsPress}
+          gap={8}
+        />
+        <MenuOption
+          icon={<HelpIcon width={24} height={24} />}
+          text={t('bugReport.menuLabel')}
+          onPress={handleReportProblemPress}
           gap={8}
         />
         <MenuOption

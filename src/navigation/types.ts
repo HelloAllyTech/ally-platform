@@ -36,6 +36,7 @@ export type RootStackParamList = {
   };
   Achievements: undefined;
   ProfileSettings: undefined;
+  BugReport: undefined;
   Reactions: {reviewId: string | number; reviewType?: ReviewType};
   ReviewDetails: {reviewId: string; isPrivate?: boolean};
   ScribeReviewDetails: {reviewId: string; isPrivate?: boolean};

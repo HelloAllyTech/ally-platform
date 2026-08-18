@@ -19,6 +19,7 @@ export const SCREEN_NAMES = {
   SIMULATION_FEEDBACK: 'SimulationFeedback',
   ACHIEVEMENTS: 'Achievements',
   PROFILE_SETTINGS: 'ProfileSettings',
+  BUG_REPORT: 'BugReport',
   REVIEW_DETAILS: 'ReviewDetails',
   SCRIBE_REVIEW_DETAILS: 'ScribeReviewDetails',
   REACTIONS: 'Reactions',
