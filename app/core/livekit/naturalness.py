@@ -192,7 +192,10 @@ class NaturalnessController:
             if self._interim_gen_task is not None and not self._interim_gen_task.done():
                 self._interim_gen_task.cancel()
             self._interim_gen_task = None
-            if self._interim_play_task is not None and not self._interim_play_task.done():
+            if (
+                self._interim_play_task is not None
+                and not self._interim_play_task.done()
+            ):
                 self._interim_play_task.cancel()
             self._interim_play_task = None
             if self._bg_audio is not None:
@@ -290,7 +293,8 @@ class NaturalnessController:
                     )
                 except Exception as e:  # noqa: BLE001 - fall back on any failure
                     logger.warning(
-                        "[COMFORT] uploaded track unavailable, falling back to tone: %s",
+                        "[COMFORT] uploaded track unavailable, "
+                        "falling back to tone: %s",
                         e,
                     )
                     source = None
@@ -311,7 +315,8 @@ class NaturalnessController:
             )
             volume = max(0.0, min(1.0, volume))
             logger.info(
-                "[COMFORT] room tone enabled (volume=%.2f, in-memory loop, uploaded=%s)",
+                "[COMFORT] room tone enabled "
+                "(volume=%.2f, in-memory loop, uploaded=%s)",
                 volume,
                 used_upload,
             )
@@ -848,8 +853,7 @@ class NaturalnessController:
                 if self._bg_audio is None or self._user_speaking:
                     return
                 filler_playing = (
-                    self._filler_handle is not None
-                    and not self._filler_handle.done()
+                    self._filler_handle is not None and not self._filler_handle.done()
                 )
                 if self._interim_state == "ready" and not filler_playing:
                     break
@@ -862,9 +866,7 @@ class NaturalnessController:
                 return
             text, path = clip
             volume = float(getattr(settings, "INTERIM_REPLY_VOLUME", 0.9))
-            self._interim_handle = self._bg_audio.play(
-                AudioConfig(path, volume=volume)
-            )
+            self._interim_handle = self._bg_audio.play(AudioConfig(path, volume=volume))
             self._interim_state = "playing"
 
             waited = time.monotonic() - start_wait

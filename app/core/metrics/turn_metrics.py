@@ -101,7 +101,9 @@ def record(room_id: str, **fields: Any) -> None:
         # one site's keys can't silently erase another's.
         if key == "metadata" and isinstance(value, dict):
             existing = turn.get("metadata")
-            turn["metadata"] = {**existing, **value} if isinstance(existing, dict) else dict(value)
+            turn["metadata"] = (
+                {**existing, **value} if isinstance(existing, dict) else dict(value)
+            )
             continue
         turn[key] = value
 

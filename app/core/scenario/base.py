@@ -751,14 +751,16 @@ class Scenario(BaseModel):
             label = mapped_data.get("language_label")
             if tier0 or tier1:
                 logger.info(
-                    "[GLOSSARY] prompt data language=%s tier0_chars=%d tier1_sections=%d",
+                    "[GLOSSARY] prompt data language=%s "
+                    "tier0_chars=%d tier1_sections=%d",
                     label,
                     len(tier0) if isinstance(tier0, str) else 0,
                     len(tier1) if isinstance(tier1, list) else 0,
                 )
             elif label and not str(label).startswith("English"):
                 logger.info(
-                    "[GLOSSARY] prompt data language=%s has no glossary (nothing published?)",
+                    "[GLOSSARY] prompt data language=%s has no glossary "
+                    "(nothing published?)",
                     label,
                 )
             return prompt_data_obj

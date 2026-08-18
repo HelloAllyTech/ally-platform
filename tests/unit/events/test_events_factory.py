@@ -179,7 +179,9 @@ class TestSimilarityDetectionKillSwitches:
         }
         evs = build_events_from_metadata(metadata, on_unknown="warn", logger=logger)
         assert evs == []
-        assert any("skipped" in w.lower() and "disabled" in w.lower() for w in logger.warnings)
+        assert any(
+            "skipped" in w.lower() and "disabled" in w.lower() for w in logger.warnings
+        )
 
     def test_sentence_similarity_legacy_schema_also_skipped_when_flag_disabled(
         self, monkeypatch
@@ -208,7 +210,9 @@ class TestSimilarityDetectionKillSwitches:
         # SemanticSimilarityEvent.create() would ever need one.
         evs = build_events_from_metadata(metadata, on_unknown="warn", logger=logger)
         assert evs == []
-        assert any("skipped" in w.lower() and "disabled" in w.lower() for w in logger.warnings)
+        assert any(
+            "skipped" in w.lower() and "disabled" in w.lower() for w in logger.warnings
+        )
 
     def test_combination_depending_on_disabled_similarity_leaf_is_unsatisfied_not_error(
         self, monkeypatch
@@ -219,7 +223,11 @@ class TestSimilarityDetectionKillSwitches:
         monkeypatch.setattr(settings, "SENTENCE_SIMILARITY_DETECTION_ENABLED", False)
         metadata = {
             "events": [
-                {"id": "S1", "detectionType": "SENTENCE_SIMILARITY", "data": {"sentences": ["hi"]}},
+                {
+                    "id": "S1",
+                    "detectionType": "SENTENCE_SIMILARITY",
+                    "data": {"sentences": ["hi"]},
+                },
                 {
                     "id": "C1",
                     "detectionType": "COMBINATION",

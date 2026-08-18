@@ -52,7 +52,10 @@ class TestGenerateEndpointAuth:
         )
         assert resp.status_code == 401
 
-    @patch("app.core.scenario_report.service.ScenarioReportService.run", new_callable=AsyncMock)
+    @patch(
+        "app.core.scenario_report.service.ScenarioReportService.run",
+        new_callable=AsyncMock,
+    )
     def test_valid_api_key_passes(self, mock_run, client, valid_body, valid_headers):
         resp = client.post(
             "/api/v1/scenario-report/generate",
@@ -96,8 +99,13 @@ class TestGenerateEndpointValidation:
 class TestGenerateEndpointResponse:
     """Tests for the 202 response."""
 
-    @patch("app.core.scenario_report.service.ScenarioReportService.run", new_callable=AsyncMock)
-    def test_returns_202_with_processing_status(self, mock_run, client, valid_body, valid_headers):
+    @patch(
+        "app.core.scenario_report.service.ScenarioReportService.run",
+        new_callable=AsyncMock,
+    )
+    def test_returns_202_with_processing_status(
+        self, mock_run, client, valid_body, valid_headers
+    ):
         resp = client.post(
             "/api/v1/scenario-report/generate",
             json=valid_body,
@@ -108,5 +116,3 @@ class TestGenerateEndpointResponse:
         assert body["status"] == "PROCESSING"
         assert body["scenario_id"] == valid_body["scenario_id"]
         assert body["report_id"] == valid_body["report_id"]
-
-

@@ -98,7 +98,9 @@ class TestEmitAiUsage:
             "app.core.llm_usage.emitter.CoreEventMessageType.create_llm_usage",
             fake_create_llm_usage,
         )
-        monkeypatch.setattr("app.core.llm_usage.emitter.asyncio.create_task", lambda c: c.close())
+        monkeypatch.setattr(
+            "app.core.llm_usage.emitter.asyncio.create_task", lambda c: c.close()
+        )
 
         emit_ai_usage(
             "room-1",

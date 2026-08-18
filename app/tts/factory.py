@@ -55,7 +55,7 @@ def _get_default_tts_client(
         else:
             model = settings.DEFAULT_NON_BINARY_VOICE_MODEL
 
-        from app.tts.deepgram import DeepgramTTSClient
+        from app.tts.deepgram import DeepgramTTSClient  # noqa: F811
 
         return DeepgramTTSClient(
             model=model,
@@ -149,7 +149,7 @@ def create_tts_client(
         # fetches the cached module from sys.modules instead of loading it.
         if provider == TTSProvider.DEEPGRAM:
             logger.debug("[TTS Factory] Creating Deepgram TTS client")
-            from app.tts.deepgram import DeepgramTTSClient
+            from app.tts.deepgram import DeepgramTTSClient  # noqa: F811
 
             return DeepgramTTSClient.from_config(
                 config=config_dict,
@@ -161,7 +161,7 @@ def create_tts_client(
                 f"[TTS Factory] Creating ElevenLabs TTS client with config: "
                 f"{config_dict}"
             )
-            from app.tts.elevenlabs import ElevenLabsTTSClient
+            from app.tts.elevenlabs import ElevenLabsTTSClient  # noqa: F811
 
             return ElevenLabsTTSClient.from_config(
                 config=config_dict,
@@ -169,7 +169,7 @@ def create_tts_client(
             )
 
         elif provider == TTSProvider.SARVAM:
-            from app.tts.sarvam import SarvamTTSClient
+            from app.tts.sarvam import SarvamTTSClient  # noqa: F811
 
             return SarvamTTSClient.from_config(
                 config=config_dict,
@@ -177,7 +177,7 @@ def create_tts_client(
             )
 
         elif provider == TTSProvider.GOOGLE:
-            from app.tts.google import GoogleTTSClient
+            from app.tts.google import GoogleTTSClient  # noqa: F811
 
             return GoogleTTSClient.from_config(
                 config=config_dict,
@@ -185,7 +185,7 @@ def create_tts_client(
             )
 
         elif provider == TTSProvider.HUME:
-            from app.tts.hume import HumeTTSClient
+            from app.tts.hume import HumeTTSClient  # noqa: F811
 
             return HumeTTSClient.from_config(
                 config=config_dict,

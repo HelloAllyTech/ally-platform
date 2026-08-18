@@ -45,7 +45,9 @@ def emit_ai_usage(
             return
         if service == "tts" and not characters:
             return
-        if service == "llm" and not (prompt_tokens or completion_tokens or total_tokens):
+        if service == "llm" and not (
+            prompt_tokens or completion_tokens or total_tokens
+        ):
             return
 
         env = None

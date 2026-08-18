@@ -71,28 +71,28 @@ def create_stt_client(
     # False, its module was already eagerly imported above, so this just fetches
     # the cached module from sys.modules instead of actually loading anything.
     if provider == STTProvider.DEEPGRAM:
-        from app.stt.deepgram import DeepgramSTTClient
+        from app.stt.deepgram import DeepgramSTTClient  # noqa: F811
 
         return DeepgramSTTClient.from_config(
             config=config_dict,
             language_code=language_code,
         )
     elif provider == STTProvider.GOOGLE:
-        from app.stt.google import GoogleSTTClient
+        from app.stt.google import GoogleSTTClient  # noqa: F811
 
         return GoogleSTTClient.from_config(
             config=config_dict,
             language_code=language_code,
         )
     elif provider == STTProvider.SARVAM:
-        from app.stt.sarvam import SarvamSTTClient
+        from app.stt.sarvam import SarvamSTTClient  # noqa: F811
 
         return SarvamSTTClient.from_config(
             config=config_dict,
             language_code=language_code,
         )
     elif provider == STTProvider.ELEVENLABS:
-        from app.stt.elevenlabs import ElevenLabsSTTClient
+        from app.stt.elevenlabs import ElevenLabsSTTClient  # noqa: F811
 
         return ElevenLabsSTTClient.from_config(
             config=config_dict,

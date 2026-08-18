@@ -17,7 +17,7 @@ silently keeps using the static fallback. It must never raise into the session.
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import List
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from pydantic import BaseModel
@@ -106,9 +106,7 @@ async def generate_predictive_fillers(
 
     try:
         language_code = (
-            getattr(
-                getattr(scenario, "language_config", None), "language_code", None
-            )
+            getattr(getattr(scenario, "language_config", None), "language_code", None)
             or "en-US"
         )
         pd = getattr(scenario, "prompt_data", None)
@@ -127,7 +125,9 @@ async def generate_predictive_fillers(
             return []
 
         llm_instance = llm_client.llm_instance
-        response = await llm_instance.with_structured_output(_PredictiveFillers).ainvoke(
+        response = await llm_instance.with_structured_output(
+            _PredictiveFillers
+        ).ainvoke(
             [
                 SystemMessage(content=system_prompt),
                 HumanMessage(

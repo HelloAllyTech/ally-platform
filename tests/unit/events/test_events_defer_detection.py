@@ -40,7 +40,9 @@ def test_compute_deferrable_partition():
     events = [
         _ev("A", DetectionType.BINARY_CLASSIFIER),  # referenced by C -> gate
         _ev("B", DetectionType.BINARY_CLASSIFIER),  # referenced by C -> gate
-        _ev("C", DetectionType.COMBINATION, data=combo_data),  # derived -> not deferrable
+        _ev(
+            "C", DetectionType.COMBINATION, data=combo_data
+        ),  # derived -> not deferrable
         _ev("D", DetectionType.BINARY_CLASSIFIER),  # independent non-branching -> DEFER
         _ev("E", DetectionType.BINARY_CLASSIFIER, branching=True),  # branching -> gate
         _ev("T", DetectionType.BINARY_CLASSIFIER),  # termination -> gate
@@ -90,7 +92,9 @@ async def test_orchestrate_deferred_sends_and_scores_without_core_pass():
 
     orch._mark_deferred_leaf_detections.assert_called_once()
     orch._send_events_to_core.assert_awaited_once()
-    assert [e.event_id for e in orch._send_events_to_core.await_args.args[0]] == ["nb-1"]
+    assert [e.event_id for e in orch._send_events_to_core.await_args.args[0]] == [
+        "nb-1"
+    ]
     orch._update_event_score.assert_awaited_once()
     assert feedback == ["fb"]
 

@@ -11,21 +11,22 @@ Scope:
 """
 
 import json
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
 from app.core.graph.nodes import (
-    process_events,
     generate_response,
+    process_events,
     publish_done_thinking,
 )
 from app.core.graph.state import SimulationState
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 class FakeLLM:
     def __init__(self, content="OK", should_fail=False):
@@ -90,6 +91,7 @@ def _make_scenario():
 # process_events — thinking signal
 # ---------------------------------------------------------------------------
 
+
 class TestProcessEventsThinkingSignal:
 
     @pytest.mark.asyncio
@@ -97,12 +99,15 @@ class TestProcessEventsThinkingSignal:
         """thinking must be sent at the very start of process_events."""
         room = _make_room()
         config = {"configurable": {"room": room}}
-        
+
         # Mocking internal helpers to isolate the signal logic
-        with patch("app.core.graph.nodes._prepare_event_context", 
-                   return_value=([], 0, 0, None, room)), \
-             patch("app.core.graph.nodes._detect_events", 
-                   return_value=([], [])):
+        with (
+            patch(
+                "app.core.graph.nodes._prepare_event_context",
+                return_value=([], 0, 0, None, room),
+            ),
+            patch("app.core.graph.nodes._detect_events", return_value=([], [])),
+        ):
             await process_events(_make_state(), config=config)
 
         calls = room.local_participant.publish_data.call_args_list
@@ -115,11 +120,14 @@ class TestProcessEventsThinkingSignal:
         """Verify the payload is byte-encoded JSON for the thinking signal."""
         room = _make_room()
         config = {"configurable": {"room": room}}
-        
-        with patch("app.core.graph.nodes._prepare_event_context", 
-                   return_value=([], 0, 0, None, room)), \
-             patch("app.core.graph.nodes._detect_events", 
-                   return_value=([], [])):
+
+        with (
+            patch(
+                "app.core.graph.nodes._prepare_event_context",
+                return_value=([], 0, 0, None, room),
+            ),
+            patch("app.core.graph.nodes._detect_events", return_value=([], [])),
+        ):
             await process_events(_make_state(), config=config)
 
         raw = room.local_participant.publish_data.call_args[0][0]
@@ -131,6 +139,7 @@ class TestProcessEventsThinkingSignal:
 # ---------------------------------------------------------------------------
 # generate_response — signal removal verification
 # ---------------------------------------------------------------------------
+
 
 class TestGenerateResponseNoSignals:
 
@@ -204,9 +213,9 @@ class TestApplyVoiceExpressionsDoneThinkingSignal:
         room = _make_room()
         # Only a room in config — no tts_client/llm_client needed by this node
         config = {"configurable": {"room": room}}
-        
+
         await publish_done_thinking(_make_state(), config=config)
-        
+
         assert room.local_participant.publish_data.called
         # Access positional arguments of the last call safely
         args, kwargs = room.local_participant.publish_data.call_args
@@ -220,7 +229,7 @@ class TestApplyVoiceExpressionsDoneThinkingSignal:
         """
         room = _make_room()
         room.local_participant.publish_data.side_effect = RuntimeError("Network error")
-        
+
         config = {"configurable": {"room": room}}
         # result should be returned normally even if the background publish fails
         result = await publish_done_thinking(_make_state(), config=config)
