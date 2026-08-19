@@ -25,11 +25,12 @@
 # production stays an explicitly human click in the admin tab.
 #
 #
-# ally-mobile is SWEEP-ONLY. It has no bug-fix-session.yml and releases through
-# App Store / Play Store builds, so there is nothing for a merged change to land
-# into. ally-be's sweep prompt knows this (BUG_HUNT_REPOS.fixable=false) and tells
-# the agent to record findings for a human and stop — it will not branch, write
-# code or open a PR here.
+# ally-mobile is fixable — it carries a bug-fix-session.yml and this sweep may
+# write code and open a PR here — but it never auto-merges, guarded path or
+# not. This pipeline only runs Jest, which cannot verify the native/on-device
+# behaviour that actually ships, and ally-mobile releases through App Store /
+# Play Store builds rather than this button anyway. ally-be's sweep prompt
+# knows this and always leaves a PR here for a human to merge.
 #
 # Required repository secrets:
 #   ANTHROPIC_API_KEY   — for Claude Code
