@@ -57,6 +57,7 @@ import {
   SessionProgress,
   SessionScoreMeter,
   SimulationControls,
+  SimulationCountdown,
   SimulationTimer,
 } from './components';
 import {ParticipantTile} from './components/ParticipantTile/ParticipantTile';
@@ -75,6 +76,13 @@ const STRICT_MODE_GUARD_MS = 100;
 // scenarios), transition out of ringing after this grace window so the UI
 // isn't stuck on ringing forever.
 const AGENT_SILENT_GRACE_MS = 1500;
+
+// Visual 3-2-1 countdown shown the moment this screen mounts, synchronized
+// with the start-simulation sound (also fired unconditionally on mount,
+// below). One second per number, fixed length regardless of how long the
+// room actually takes to connect.
+const COUNTDOWN_STEPS = [3, 2, 1] as const;
+const COUNTDOWN_STEP_MS = 1000;
 
 // Pause/resume control-channel message types (single source to avoid typo
 // drift against the agent). Client → agent: PAUSE/RESUME. Agent → client: rest.
@@ -197,6 +205,29 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
   const isSimulationInProgress =
     roomStatus === RoomStatus.AGENT_JOINED ||
     roomStatus === RoomStatus.CONNECTED;
+
+  // `null` once the countdown has finished. Runs once on mount, unconditional
+  // of connection state — same trigger as the audio cue below — and gates the
+  // switch into the live call UI so the learner is never shown it before the
+  // countdown completes, even if the room connects/agent joins faster than
+  // 3 seconds.
+  const [countdownStep, setCountdownStep] = useState<
+    (typeof COUNTDOWN_STEPS)[number] | null
+  >(COUNTDOWN_STEPS[0]);
+  const isCountingDown = countdownStep !== null;
+
+  useEffect(() => {
+    const timers = COUNTDOWN_STEPS.slice(1).map((step, index) =>
+      setTimeout(() => setCountdownStep(step), (index + 1) * COUNTDOWN_STEP_MS),
+    );
+    timers.push(
+      setTimeout(
+        () => setCountdownStep(null),
+        COUNTDOWN_STEPS.length * COUNTDOWN_STEP_MS,
+      ),
+    );
+    return () => timers.forEach(clearTimeout);
+  }, []);
 
   const clamp = useCallback((val: number, min: number, max: number) => {
     return Math.min(Math.max(val, min), max);
@@ -857,7 +888,9 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
               />
             </View>
           )}
-          {!isSimulationInProgress ? renderLoader() : renderParticipants()}
+          {!isSimulationInProgress || isCountingDown
+            ? renderLoader()
+            : renderParticipants()}
           {hasTabs && (
             <View style={styles.infoTabBar} testID="simulation-info-tab-bar">
               {infoTabs.map(tab => {
@@ -953,6 +986,15 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
             onPauseToggle={
               scenario?.pauseEnabled === true ? handleTogglePause : undefined
             }
+          />
+        )}
+        {/* Full-screen and rendered last so it stacks above the loader,
+            call UI, and controls alike — covers and blocks touches to all of
+            them for the fixed 3s window, whatever roomStatus is doing. */}
+        {countdownStep !== null && (
+          <SimulationCountdown
+            step={countdownStep}
+            label={t('simulationPage.simulationCountdownLabel')}
           />
         )}
       </RoomContext.Provider>
