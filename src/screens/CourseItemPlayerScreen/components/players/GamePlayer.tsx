@@ -16,6 +16,7 @@ import {
 import {CUB_N_PUP_HTML} from './games/cubNPupHtml';
 import {MEMORY_MATCH_HTML} from './games/memoryMatchHtml';
 import {SNAKE_HTML} from './games/snakeHtml';
+import {SPROUT_HTML} from './games/sproutHtml';
 import {TIC_TAC_TOE_HTML} from './games/ticTacToeHtml';
 import {TREX_RUNNER_HTML} from './games/trexRunnerHtml';
 
@@ -32,6 +33,7 @@ const GAME_HTML: Record<TrackGameKey, string> = {
   [TrackGameKey.MEMORY_MATCH]: MEMORY_MATCH_HTML,
   [TrackGameKey.CUB_N_PUP]: CUB_N_PUP_HTML,
   [TrackGameKey.SNAKE]: SNAKE_HTML,
+  [TrackGameKey.SPROUT]: SPROUT_HTML,
 };
 
 /**
@@ -47,6 +49,9 @@ const GAME_HEIGHT: Record<TrackGameKey, number> = {
   // corners sweep through, and the level list opens into the same view.
   [TrackGameKey.CUB_N_PUP]: 440,
   [TrackGameKey.SNAKE]: 400,
+  // The plant grows upwards and the moisture meter runs the full height, so
+  // this one wants height more than width.
+  [TrackGameKey.SPROUT]: 420,
 };
 
 /**
@@ -55,10 +60,11 @@ const GAME_HEIGHT: Record<TrackGameKey, number> = {
  * A bundle is a static document with no reach into the app, so it cannot read
  * the learner's language for itself — anything it renders in words has to be
  * handed to it. The runner and the tic-tac-toe board are pure canvas and need
- * nothing; the memory deck has a move counter and an end-of-round card, and the
- * puzzle has a level list, a solved count and the lines that teach it, so those
- * two get these. A bundle falls back to its own baked-in English if the host
- * sends nothing, which is what keeps this list optional.
+ * nothing; the memory deck has a move counter and an end-of-round card, the
+ * puzzle has a level list, a solved count and the lines that teach it, and the
+ * plant has a picker, a running commentary and the whole of its screen-reader
+ * narration, so those three get these. A bundle falls back to its own baked-in
+ * English if the host sends nothing, which is what keeps this list optional.
  */
 const FRAME_STRING_KEYS: Partial<
   Record<TrackGameKey, Readonly<Record<string, TranslationType>>>
@@ -82,6 +88,40 @@ const FRAME_STRING_KEYS: Partial<
     hintFree: 'courses.game.frameStrings.CUB_N_PUP.hintFree',
     hintPivot: 'courses.game.frameStrings.CUB_N_PUP.hintPivot',
     hintRotateLink: 'courses.game.frameStrings.CUB_N_PUP.hintRotateLink',
+  },
+  /*
+   * The longest list here by some way, and deliberately so: the plant's scene
+   * is aria-hidden, which makes the live region the entire game for a screen
+   * reader. Every one of these is read aloud to somebody.
+   */
+  [TrackGameKey.SPROUT]: {
+    pickerLabel: 'courses.game.frameStrings.SPROUT.pickerLabel',
+    plantSUCCULENT: 'courses.game.frameStrings.SPROUT.plantSUCCULENT',
+    plantMARIGOLD: 'courses.game.frameStrings.SPROUT.plantMARIGOLD',
+    plantFERN: 'courses.game.frameStrings.SPROUT.plantFERN',
+    plantTOMATO: 'courses.game.frameStrings.SPROUT.plantTOMATO',
+    visitorsLabel: 'courses.game.frameStrings.SPROUT.visitorsLabel',
+    hintStart: 'courses.game.frameStrings.SPROUT.hintStart',
+    aimSoil: 'courses.game.frameStrings.SPROUT.aimSoil',
+    aimLeaves: 'courses.game.frameStrings.SPROUT.aimLeaves',
+    aimAway: 'courses.game.frameStrings.SPROUT.aimAway',
+    stateDry: 'courses.game.frameStrings.SPROUT.stateDry',
+    stateGood: 'courses.game.frameStrings.SPROUT.stateGood',
+    stateWet: 'courses.game.frameStrings.SPROUT.stateWet',
+    stage0: 'courses.game.frameStrings.SPROUT.stage0',
+    stage1: 'courses.game.frameStrings.SPROUT.stage1',
+    stage2: 'courses.game.frameStrings.SPROUT.stage2',
+    stage3: 'courses.game.frameStrings.SPROUT.stage3',
+    stage4: 'courses.game.frameStrings.SPROUT.stage4',
+    stage5: 'courses.game.frameStrings.SPROUT.stage5',
+    leafDropped: 'courses.game.frameStrings.SPROUT.leafDropped',
+    leafScorched: 'courses.game.frameStrings.SPROUT.leafScorched',
+    bloomed: 'courses.game.frameStrings.SPROUT.bloomed',
+    plantAnother: 'courses.game.frameStrings.SPROUT.plantAnother',
+    visitorArrived: 'courses.game.frameStrings.SPROUT.visitorArrived',
+    visitorBEE: 'courses.game.frameStrings.SPROUT.visitorBEE',
+    visitorBUTTERFLY: 'courses.game.frameStrings.SPROUT.visitorBUTTERFLY',
+    visitorLADYBIRD: 'courses.game.frameStrings.SPROUT.visitorLADYBIRD',
   },
 };
 
