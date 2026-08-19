@@ -58,6 +58,8 @@ _RECORD_FIELDS = {
     "llm_timed_out",
     "interrupted",
     "metadata",
+    "prompt_tokens",
+    "cached_tokens",
 }
 
 

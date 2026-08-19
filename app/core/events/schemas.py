@@ -74,6 +74,12 @@ class TurnMetricsData(BaseModel):
     stt_finalize_ms: Optional[int] = None
     llm_ttft_ms: Optional[int] = None
     tts_ttfb_ms: Optional[int] = None
+    # Raw provider prompt-cache counts for generate_response's LLM call — same
+    # fields/semantics as LLMUsageData.prompt_tokens/cached_tokens above, kept
+    # as separate columns here (not just a rate) so the hit-rate aggregation
+    # method stays a query-time decision, not baked into ingestion.
+    prompt_tokens: Optional[int] = None
+    cached_tokens: Optional[int] = None
 
     # App-stage timings (graph nodes)
     orchestration_ms: Optional[int] = None

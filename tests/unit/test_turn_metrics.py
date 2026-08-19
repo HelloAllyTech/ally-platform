@@ -27,6 +27,16 @@ def test_normal_turn_builds_record():
     assert rec["llm_model"] == "gpt-4o"
 
 
+def test_prompt_cache_fields_are_carried_verbatim():
+    tm.note_user_speech_end("room-1", 100.0)
+    tm.record("room-1", prompt_tokens=3234, cached_tokens=2176)
+    rec = tm.finalize("room-1", 101.0)
+
+    assert rec is not None
+    assert rec["prompt_tokens"] == 3234
+    assert rec["cached_tokens"] == 2176
+
+
 def test_turn_index_increments_per_room():
     tm.note_user_speech_end("room-1", 10.0)
     assert tm.finalize("room-1", 10.5)["turn_index"] == 0

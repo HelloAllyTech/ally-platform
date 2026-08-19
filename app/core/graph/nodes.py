@@ -1736,6 +1736,14 @@ async def generate_response(
                     cached_tokens,
                     hit_rate * 100,
                 )
+                # Persisted alongside the log line so cache-hit-rate can be
+                # charted platform-wide (Latency & Reliability tab) instead of
+                # only ever being visible via a one-room-at-a-time log query.
+                turn_metrics.record(
+                    get_room_id(),
+                    prompt_tokens=prompt_tokens,
+                    cached_tokens=cached_tokens,
+                )
         except Exception:
             pass
     except asyncio.TimeoutError:
