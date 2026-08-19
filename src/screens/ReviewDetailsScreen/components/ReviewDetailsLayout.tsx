@@ -2,6 +2,7 @@ import React, {useCallback, useMemo, useState} from 'react';
 import {
   ActivityIndicator,
   SafeAreaView,
+  Text,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -21,7 +22,7 @@ import {
 } from '@/components';
 import {useAppNavigation, useTranslate, useUser} from '@/hooks';
 import {SimulationAudioPlayer} from '@/screens/SimulationFeedbackScreen/components/SimulationAudioPlayer/SimulationAudioPlayer';
-import {colors} from '@/theme';
+import {colors, fontFamily} from '@/theme';
 
 import {useReviewDetailsLogic} from '../hooks/useReviewDetailsLogic';
 import {ReviewMetadata} from '../types';
@@ -188,6 +189,11 @@ export const ReviewDetailsLayout: React.FC<ReviewDetailsLayoutProps> = ({
         </TouchableOpacity>
         {renderHeader()}
       </View>
+      {!isScribeReview && (
+        <Text style={styles.transcriptDisclaimer}>
+          {t('transcription.accuracyDisclaimer')}
+        </Text>
+      )}
       <Conversation
         isScribeReview={isScribeReview}
         messages={conversationMessages}
@@ -305,6 +311,13 @@ const styles = ScaledSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  transcriptDisclaimer: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '11@ms',
+    color: colors.ds.typography.mediumEmphasis,
+    paddingHorizontal: '20@ms',
+    paddingTop: '6@s',
   },
   interactionsBarContainer: {
     position: 'absolute',
