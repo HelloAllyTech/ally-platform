@@ -15,6 +15,7 @@ import {
 
 import {CUB_N_PUP_HTML} from './games/cubNPupHtml';
 import {MEMORY_MATCH_HTML} from './games/memoryMatchHtml';
+import {SNAKE_HTML} from './games/snakeHtml';
 import {TIC_TAC_TOE_HTML} from './games/ticTacToeHtml';
 import {TREX_RUNNER_HTML} from './games/trexRunnerHtml';
 
@@ -30,6 +31,7 @@ const GAME_HTML: Record<TrackGameKey, string> = {
   [TrackGameKey.TIC_TAC_TOE]: TIC_TAC_TOE_HTML,
   [TrackGameKey.MEMORY_MATCH]: MEMORY_MATCH_HTML,
   [TrackGameKey.CUB_N_PUP]: CUB_N_PUP_HTML,
+  [TrackGameKey.SNAKE]: SNAKE_HTML,
 };
 
 /**
@@ -44,6 +46,7 @@ const GAME_HEIGHT: Record<TrackGameKey, number> = {
   // Taller than the rest: the puzzle spins, so the board needs the room its
   // corners sweep through, and the level list opens into the same view.
   [TrackGameKey.CUB_N_PUP]: 440,
+  [TrackGameKey.SNAKE]: 400,
 };
 
 /**
