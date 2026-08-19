@@ -7,4 +7,5 @@ export enum AsyncStorageKeys {
   ACTIVE_TRACK_CONTEXT = 'ACTIVE_TRACK_CONTEXT',
   UI_LANGUAGE = 'ally:ui:language',
   I18N_VERSION = 'ally:i18n:version',
+  AUDIO_PLAYBACK_RATE = 'ally:audio:playback-rate',
 }
