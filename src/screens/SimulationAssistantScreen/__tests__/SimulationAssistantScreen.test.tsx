@@ -171,6 +171,11 @@ jest.mock('../components', () => {
       />
     ),
     SimulationTimer: () => <Text testID="timer">timer</Text>,
+    SimulationCountdown: ({step, label}: any) => (
+      <View testID="simulation-countdown" data-step={String(step)}>
+        <Text>{label}</Text>
+      </View>
+    ),
     SimulationControls: ({
       isMicEnabled,
       onMicToggle,
@@ -288,6 +293,10 @@ const baseRouteParams = {
 
 // Just needs to be > STRICT_MODE_GUARD_MS (100ms) so the deferred connect fires.
 const CONNECT_TIMER_ADVANCE_MS = 500;
+// Clears the screen's fixed 3-2-1 start countdown (COUNTDOWN_STEPS in
+// SimulationAssistantScreen.tsx) so these tests' existing assertions about
+// the live call UI aren't blocked behind it.
+const COUNTDOWN_ADVANCE_MS = 3000;
 
 const renderWithProviders = async (ui: React.ReactElement) => {
   const result = render(
@@ -302,6 +311,9 @@ const renderWithProviders = async (ui: React.ReactElement) => {
   // Advance past the connect timer so the room connection is triggered.
   await act(async () => {
     jest.advanceTimersByTime(CONNECT_TIMER_ADVANCE_MS);
+  });
+  await act(async () => {
+    jest.advanceTimersByTime(COUNTDOWN_ADVANCE_MS);
   });
   return result;
 };
