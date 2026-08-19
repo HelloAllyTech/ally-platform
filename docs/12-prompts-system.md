@@ -86,7 +86,7 @@ poetry run python scripts/sync_prompts.py --dry-run
 |---------|-------------|
 | `CORE_SERVICE_BASE_URL` | ally-be base URL (for sync and webhook) |
 | `CORE_SERVICE_API_KEY` | API key for x-api-key header when calling ally-be |
-| `RETRIEVED_CONTEXT_DEFER_TO_SUFFIX` | When `True`, `generate_system_message()` returns `retrieved_context` as its own trailing message instead of embedding it in the system message, so provider prompt caching can extend across conversation history (see `docs/02-graph-pipeline.md`'s "`messages_to_send` shape and provider prompt caching"). Default `False`. |
+| `RETRIEVED_CONTEXT_DEFER_TO_SUFFIX` | When `True`, `generate_system_message()` returns `retrieved_context` as its own trailing message instead of embedding it in the system message, so provider prompt caching can extend across conversation history (see `docs/02-graph-pipeline.md`'s "`messages_to_send` shape and provider prompt caching"). Default `True`. |
 
 ---
 

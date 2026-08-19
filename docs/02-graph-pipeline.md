@@ -165,8 +165,10 @@ block ever volatile — instead of the whole history-caching value resetting on 
 retrieved_context refresh. Branching turns (`next_instruction` set) always get `None` for the
 second element — they swap templates every turn and bust the cache regardless, so there's nothing
 to win there. `ragEnabled`-based gating (a simulation state blanking `retrieved_context`) is
-preserved identically whether the flag is on or off. Default `False`; see the setting's docstring
-for the rollout plan.
+preserved identically whether the flag is on or off — both paths deliver the gated
+`effective_retrieved_context` that `_build_behavior_prompt` computes, never the raw parameter, and
+`tests/unit/graph/test_prompt_with_retrieved_context.py` pins that in each mode. Default `True`;
+see the setting's docstring for the rollout plan.
 
 ## Node 3b: detect_behaviors
 

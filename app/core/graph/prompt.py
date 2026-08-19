@@ -828,7 +828,7 @@ def generate_system_message(
         msg = _append_rolling_summary(msg, rolling_summary)
         if defer_retrieved_context:
             return msg, _build_retrieved_context_message(effective_retrieved_context)
-        return _append_retrieved_context(msg, retrieved_context), None
+        return _append_retrieved_context(msg, effective_retrieved_context), None
 
     logger.warning(
         "No behavior_instructions provided, "
@@ -853,7 +853,7 @@ def generate_system_message(
     msg = _append_rolling_summary(msg, rolling_summary)
     if defer_retrieved_context:
         return msg, _build_retrieved_context_message(effective_retrieved_context)
-    return _append_retrieved_context(msg, retrieved_context), None
+    return _append_retrieved_context(msg, effective_retrieved_context), None
 
 
 def generate_prompt_content(

@@ -100,6 +100,77 @@ class TestPromptWithRetrievedContext:
         # Header is now hardcoded in template, this assertion is skipped
         # assert "## Additional Context" not in msg.content
 
+    def test_inline_mode_respects_rag_gate_from_active_state(self):
+        """A state with ragEnabled=False must blank retrieved_context in
+        INLINE mode too (RETRIEVED_CONTEXT_DEFER_TO_SUFFIX turned off — the
+        documented rollback switch): the volatile suffix must be built from
+        the gated `effective_retrieved_context`, not the raw parameter."""
+        states = [
+            {
+                "id": "state_a",
+                "name": "A",
+                "guidelines": "A guidelines",
+                "isStarting": True,
+                "scoreLower": None,
+                "scoreUpper": None,
+                "ragEnabled": False,
+            }
+        ]
+        pd = _pd(
+            selected_main_prompt_code="v1",
+            prompts={
+                "v1": {
+                    "prompt": "{state_x_guidelines}\n{retrieved_context}",
+                    "availableVariables": ["state_x_guidelines", "retrieved_context"],
+                }
+            },
+            states=states,
+        )
+        msg, trailing = generate_system_message(
+            prompt_data=pd,
+            behavior_instructions=[],
+            retrieved_context="should be gated off",
+            current_score=0,
+            defer_retrieved_context=False,
+        )
+        assert "should be gated off" not in msg.content
+        assert "## Additional Context" not in msg.content
+        assert trailing is None
+
+    def test_inline_mode_fallback_respects_rag_gate_from_active_state(self):
+        """Same gate on the no-behavior_instructions fallback branch, which
+        builds its own prompt and appends the suffix separately."""
+        states = [
+            {
+                "id": "state_a",
+                "name": "A",
+                "guidelines": "A guidelines",
+                "isStarting": True,
+                "scoreLower": None,
+                "scoreUpper": None,
+                "ragEnabled": False,
+            }
+        ]
+        pd = _pd(
+            selected_main_prompt_code="v1",
+            prompts={
+                "v1": {
+                    "prompt": "{state_x_guidelines}\n{retrieved_context}",
+                    "availableVariables": ["state_x_guidelines", "retrieved_context"],
+                }
+            },
+            states=states,
+        )
+        msg, trailing = generate_system_message(
+            prompt_data=pd,
+            retrieved_context="should be gated off",
+            current_score=0,
+            defer_retrieved_context=False,
+        )
+        assert "should be gated off" not in msg.content
+        assert "## Additional Context" not in msg.content
+        assert trailing is None
+
     def test_context_placement_after_persona(self):
         msg, _ = generate_system_message(
             prompt_data=_pd(),
