@@ -165,6 +165,23 @@ def create_conversation_handler(room_id: str, joined_iso: str):
         if event.new_state == "speaking":
             _user_speaking_start[0] = event.created_at
             logger.debug(f"User started speaking at {event.created_at}")
+        elif getattr(event, "old_state", "speaking") != "speaking":
+            # NOT a speech end. UserState is speaking|listening|away, so this
+            # branch also catches listening->away (LiveKit's user_away_timeout,
+            # 15s by default and unset by us) and away->listening when the
+            # learner comes back. Treating those as "the learner just stopped
+            # talking" restarted the latency window mid-turn and understated
+            # response_latency_ms by up to that timeout — worst on exactly the
+            # turns where the agent never reached "thinking" (a dropped turn, or
+            # the silently-deaf STT failure), which are the slow turns the
+            # latency analytics exist to find.
+            logger.debug(
+                "[LATENCY] ignoring non-speech-end user_state transition "
+                "%s->%s room=%s",
+                getattr(event, "old_state", None),
+                event.new_state,
+                room_id,
+            )
         else:
             # User left "speaking" — endpointing fired (or interim ended).
             # Stash this as the start of the latency measurement window.

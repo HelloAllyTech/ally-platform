@@ -32,6 +32,9 @@ from typing import Any, Dict, Optional
 _turns: Dict[str, Dict[str, Any]] = {}
 # room_id -> monotonically increasing turn counter.
 _turn_counters: Dict[str, int] = {}
+# room_id -> True once finalize() has closed a turn and no new one has begun.
+# See _POST_FINALIZE_FIELDS.
+_closed: Dict[str, bool] = {}
 
 # Fields carried verbatim into the finalized record.
 _RECORD_FIELDS = {
@@ -62,9 +65,20 @@ _RECORD_FIELDS = {
     "cached_tokens",
 }
 
+# Framework timings that LiveKit emits only once the LLM / TTS stream has
+# COMPLETED — i.e. strictly after the agent began speaking, which is the moment
+# finalize() closes the turn. They must never lazily create a turn: the dict
+# they created was adopted by the NEXT note_user_speech_end (setdefault returns
+# it), so turn N's time-to-first-token was reported as turn N+1's. Every other
+# field still creates lazily, because a graph node genuinely can run before
+# endpointing (preemptive generation) and those timings belong to the turn that
+# is about to begin.
+_POST_FINALIZE_FIELDS = {"llm_ttft_ms", "tts_ttfb_ms"}
+
 
 def note_user_speech_end(room_id: str, user_speech_end_ts: float) -> None:
     """Mark the start of a new turn's latency window for ``room_id``."""
+    _closed.pop(room_id, None)
     turn = _turns.setdefault(room_id, {})
     turn["user_speech_end_ts"] = user_speech_end_ts
     if "turn_index" not in turn:
@@ -90,14 +104,23 @@ def record(room_id: str, **fields: Any) -> None:
     """Merge component/framework timings into the in-flight turn.
 
     Unknown keys and ``None`` values are ignored. Lazily creates the turn so a
-    node that runs before endpointing (preemptive generation) isn't dropped.
+    node that runs before endpointing (preemptive generation) isn't dropped —
+    except for ``_POST_FINALIZE_FIELDS`` arriving after a finalize, which belong
+    to the turn that just closed and are dropped rather than misattributed to
+    the next one.
     """
     if not room_id:
         return
-    turn = _turns.setdefault(room_id, {})
+    turn = _turns.get(room_id)
     for key, value in fields.items():
         if value is None or key not in _RECORD_FIELDS:
             continue
+        if key in _POST_FINALIZE_FIELDS and _closed.get(room_id):
+            # Its turn is already reported; attributing it here would shift it
+            # one turn forward.
+            continue
+        if turn is None:
+            turn = _turns.setdefault(room_id, {})
         # ``metadata`` is a grab-bag dict written by independent call sites
         # (retrieval, generation, …) — merge instead of last-writer-wins so
         # one site's keys can't silently erase another's.
@@ -118,6 +141,7 @@ def finalize(room_id: str, agent_speech_start_ts: float) -> Optional[Dict[str, A
     preceding user turn) — nothing meaningful to report.
     """
     turn = _turns.pop(room_id, None)
+    _closed[room_id] = True
     if not turn or "user_speech_end_ts" not in turn:
         return None
 
@@ -149,6 +173,7 @@ def discard(room_id: str) -> None:
     """Drop any in-flight turn for a room (e.g. on session shutdown)."""
     _turns.pop(room_id, None)
     _turn_counters.pop(room_id, None)
+    _closed.pop(room_id, None)
 
 
 def discard_inflight(room_id: str) -> None:

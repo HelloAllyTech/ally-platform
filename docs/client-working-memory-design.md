@@ -56,9 +56,37 @@ The mechanism is visible in the code. `nodes.py` drops verbatim history once the
 | 2,200–2,999 | 601 | 71% | 2,801ms | 4,034ms |
 | 3,000+ | 404 | 66% | 3,726ms | 5,446ms |
 
-+1,650ms across the range. Turns slower than 8.7s carry a fault **49.8%** of the time, against 31.5% in the 5.3–8.7s band and 16.7% below. Our p50 is 5.8s and p75 is 9.2s, so a large share of turns sit at the edge of the worst band.
++1,650ms across the range.
+
+**Slow turns fault more, and the gradient is steeper than we first measured.** Recomputed
+2026-08-20 over 90 days of judged turns, counting only live `source = 'pipeline'` rows —
+a third of that table is transcript-backfilled, whose "latency" is reconstructed from
+message timestamps rather than measured voice-to-voice, and pooling the two diluted this
+result:
+
+| Response latency | Turns | Any fault |
+|---|---|---|
+| under 5.3s | 5,499 | 16.2% |
+| 5.3–8.7s | 3,173 | 20.1% |
+| over 8.7s | 2,147 | **33.5%** |
+
+A 2.1× gradient from the fastest band to the slowest. Pooled with the backfilled rows the
+same three bands read 15.1 / 17.1 / 23.6 — a 1.56× gradient — so the contamination was
+hiding roughly half the effect.
+
+Quartiles tell the same story with the boundary in a different place: the slowest quarter
+of live turns starts at **7.9s**, not the 8.7s a pooled read gave, and faults at 31.5%
+against 19.7% in the fastest quarter. Live p50 is 5.3s and p75 is 7.9s.
+
+One caveat on shape: the relationship is **not** monotonic. The fastest quartile faults
+more than the second (19.7% against 12.8%), which is its own finding — very fast replies
+are disproportionately short or degenerate — and it means "reduce latency" is the right
+goal only from the middle of the distribution upward.
 
 Note what caching does *not* buy: the 3,000+ bucket is the slowest despite 66% cached. Caching is reducing cost, not latency.
+
+The prompt-token table above still mixes both row sources and has not been recomputed;
+treat its absolute latencies as approximate and its ordering as the claim.
 
 The static prompt is the majority of the context. First-turn prompt tokens vary **710 to 2,041** across scenarios while conversation growth is only **340 to 1,140** — so roughly 1,300 tokens of spread is authoring difference, not necessity.
 
