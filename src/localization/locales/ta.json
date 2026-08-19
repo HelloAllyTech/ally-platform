@@ -1314,7 +1314,8 @@
     "clientLabel": "வாடிக்கையாளர்",
     "counsellorLabel": "ஆலோசகர்",
     "aiAgentName": "AI ஏஜென்ட்",
-    "aiClientSuffix": "AI வாடிக்கையாளர்"
+    "aiClientSuffix": "AI வாடிக்கையாளர்",
+    "accuracyDisclaimer": "இந்த உரையாடல் பதிவு எப்போதும் முழுமையாக துல்லியமாக இருக்காது."
   },
   "user": {
     "creditUsage": "கிரெடிட் பயன்பாடு",

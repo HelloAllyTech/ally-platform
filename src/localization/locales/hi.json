@@ -1314,7 +1314,8 @@
     "clientLabel": "क्लाइंट",
     "counsellorLabel": "काउंसलर",
     "aiAgentName": "AI एजेंट",
-    "aiClientSuffix": "AI क्लाइंट"
+    "aiClientSuffix": "AI क्लाइंट",
+    "accuracyDisclaimer": "ट्रांसक्रिप्शन हमेशा पूरी तरह सटीक नहीं होता।"
   },
   "user": {
     "creditUsage": "क्रेडिट उपयोग",
