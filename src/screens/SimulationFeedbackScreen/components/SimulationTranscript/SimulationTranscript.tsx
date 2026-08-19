@@ -258,6 +258,9 @@ export const SimulationTranscript: React.FC<{
           {t('postSim.noSessionRecording')}
         </Text>
       )}
+      <Text style={styles.transcriptDisclaimer}>
+        {t('transcription.accuracyDisclaimer')}
+      </Text>
       <FlatList
         contentContainerStyle={styles.contentContainer}
         ref={listRef}
@@ -314,6 +317,13 @@ const styles = ScaledSheet.create({
     marginHorizontal: 0,
     marginBottom: '12@ms',
     paddingVertical: '8@ms',
+  },
+  transcriptDisclaimer: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    fontSize: '11@ms',
+    color: colors.ds.typography.mediumEmphasis,
+    marginHorizontal: 0,
+    marginBottom: '8@ms',
   },
   contentContainer: {
     paddingBottom: '100@mvs',
