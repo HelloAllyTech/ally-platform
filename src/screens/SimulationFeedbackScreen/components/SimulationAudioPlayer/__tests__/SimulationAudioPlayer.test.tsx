@@ -8,14 +8,22 @@ jest.mock('react-native-audio-api', () => {
     sampleRate = 44100;
     state = 'running';
     destination = {};
-    createBufferSource() {
-      return {
+    createBufferSource(options?: {pitchCorrection?: boolean}) {
+      const src = {
         connect: jest.fn(),
         start: jest.fn(),
         stop: jest.fn(),
         onEnded: null as any,
         buffer: null as any,
+        // Mirrors the real AudioParam closely enough for the rate tests: a
+        // plain settable `value`.
+        playbackRate: {value: 1},
+        // Not on the real node — recorded here so tests can assert which mode
+        // the node was constructed in.
+        pitchCorrection: options?.pitchCorrection ?? false,
       };
+      ((global as any).__createdSources ??= []).push(src);
+      return src;
     }
     resume() {
       return Promise.resolve();
@@ -67,7 +75,12 @@ jest.mock('@/theme', () => ({
       stroke: {primary: '#ccc'},
     },
   },
-  fontFamily: {IBM_PLEX_SERIF: {REGULAR: {}}},
+  fontFamily: {IBM_PLEX_SERIF: {REGULAR: {}, MEDIUM: {}}},
+}));
+
+jest.mock('@/utils/asyncStorage', () => ({
+  getItem: jest.fn().mockResolvedValue(null),
+  setItem: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock('@/utils', () => ({
@@ -91,8 +104,12 @@ describe('SimulationAudioPlayer', () => {
     onProgress: jest.fn(),
   };
 
+  /** Source nodes the component built, in construction order. */
+  const sources = () => (global as any).__createdSources as any[];
+
   beforeEach(() => {
     jest.clearAllMocks();
+    (global as any).__createdSources = [];
     (global as any).fetch = jest.fn().mockResolvedValue({
       ok: true,
       arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)),
@@ -132,6 +149,102 @@ describe('SimulationAudioPlayer', () => {
     );
     const timeTexts = getAllByText('0:00');
     expect(timeTexts.length).toBe(2);
+  });
+
+  it('defaults the speed control to 1x and cycles through the rates', async () => {
+    const {getByText, getByTestId, UNSAFE_getAllByType} = render(
+      <SimulationAudioPlayer {...defaultProps} />,
+    );
+    await waitFor(() => expect(getByTestId('play-icon')).toBeTruthy());
+
+    const speedBtn = UNSAFE_getAllByType(TouchableOpacity)[1];
+    expect(getByText('1x')).toBeTruthy();
+
+    fireEvent.press(speedBtn);
+    expect(getByText('1.5x')).toBeTruthy();
+
+    fireEvent.press(speedBtn);
+    expect(getByText('2x')).toBeTruthy();
+
+    fireEvent.press(speedBtn);
+    expect(getByText('2.5x')).toBeTruthy();
+
+    // wraps back around
+    fireEvent.press(speedBtn);
+    expect(getByText('1x')).toBeTruthy();
+  });
+
+  it('persists the picked speed', async () => {
+    const {setItem} = require('@/utils/asyncStorage');
+    const {getByTestId, UNSAFE_getAllByType} = render(
+      <SimulationAudioPlayer {...defaultProps} />,
+    );
+    await waitFor(() => expect(getByTestId('play-icon')).toBeTruthy());
+
+    fireEvent.press(UNSAFE_getAllByType(TouchableOpacity)[1]);
+
+    expect(setItem).toHaveBeenCalledWith('ally:audio:playback-rate', 1.5);
+  });
+
+  it('restores a persisted speed on mount', async () => {
+    const {getItem} = require('@/utils/asyncStorage');
+    getItem.mockResolvedValueOnce(2);
+
+    const {getByText} = render(<SimulationAudioPlayer {...defaultProps} />);
+
+    await waitFor(() => expect(getByText('2x')).toBeTruthy());
+  });
+
+  it('ignores a persisted speed that is not an offered rate', async () => {
+    const {getItem} = require('@/utils/asyncStorage');
+    getItem.mockResolvedValueOnce(1.75);
+
+    const {getByText, getByTestId} = render(
+      <SimulationAudioPlayer {...defaultProps} />,
+    );
+    await waitFor(() => expect(getByTestId('play-icon')).toBeTruthy());
+
+    expect(getByText('1x')).toBeTruthy();
+  });
+
+  it('retunes the live source node when the rate stays pitch-corrected', async () => {
+    const {getByTestId, UNSAFE_getAllByType} = render(
+      <SimulationAudioPlayer {...defaultProps} />,
+    );
+    await waitFor(() => expect(getByTestId('play-icon')).toBeTruthy());
+
+    const [playBtn, speedBtn] = UNSAFE_getAllByType(TouchableOpacity);
+
+    // 1x -> 1.5x while paused, so playback starts already pitch-corrected.
+    fireEvent.press(speedBtn);
+    fireEvent.press(playBtn);
+    expect(sources()).toHaveLength(1);
+    expect(sources()[0].pitchCorrection).toBe(true);
+    expect(sources()[0].playbackRate.value).toBe(1.5);
+
+    // 1.5x -> 2x keeps the same mode, so the node is retuned, not rebuilt.
+    fireEvent.press(speedBtn);
+    expect(sources()).toHaveLength(1);
+    expect(sources()[0].playbackRate.value).toBe(2);
+  });
+
+  it('rebuilds the source node when a rate change crosses the 1x boundary', async () => {
+    const {getByTestId, UNSAFE_getAllByType} = render(
+      <SimulationAudioPlayer {...defaultProps} />,
+    );
+    await waitFor(() => expect(getByTestId('play-icon')).toBeTruthy());
+
+    const [playBtn, speedBtn] = UNSAFE_getAllByType(TouchableOpacity);
+
+    fireEvent.press(playBtn);
+    expect(sources()).toHaveLength(1);
+    expect(sources()[0].pitchCorrection).toBe(false);
+
+    // 1x -> 1.5x turns pitch correction on, which is fixed at construction.
+    fireEvent.press(speedBtn);
+    expect(sources()).toHaveLength(2);
+    expect(sources()[1].pitchCorrection).toBe(true);
+    expect(sources()[1].playbackRate.value).toBe(1.5);
   });
 
   it('calls onPlaybackLoadError when audio fails to load', async () => {
