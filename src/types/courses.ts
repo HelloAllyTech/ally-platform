@@ -19,6 +19,7 @@ export enum TrackGameKey {
   TIC_TAC_TOE = 'TIC_TAC_TOE',
   MEMORY_MATCH = 'MEMORY_MATCH',
   CUB_N_PUP = 'CUB_N_PUP',
+  SNAKE = 'SNAKE',
 }
 
 // There is no IN_PROGRESS status server-side — "in progress" is derived as
