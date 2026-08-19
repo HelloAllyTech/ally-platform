@@ -1197,7 +1197,7 @@ the reply gate. Which in turn means `knowledgeRetrievalMs` is most likely timing
 *detached* task, so the +1,099ms latency correlation drawn from it is not evidence of
 blocking cost either.
 
-**The Tamil population is confounded.** ta-IN runs entirely on gpt-4.1-mini from 2026-07-14; every other language runs gpt-4o-mini. So "Tamil is harder" and "that model is worse" are one population. The April–May Tamil cohort — 171 sessions from before the pin — is the only thing that separates them, and it is still unjudged. Any Tamil-derived number here is provisional.
+**The Tamil population is confounded.** ta-IN runs entirely on gpt-4.1-mini from 2026-07-14; every other language runs gpt-4o-mini. So "Tamil is harder" and "that model is worse" are one population. The April–May Tamil cohort — **161 sessions** from before the pin, 154 of them with AI turns and therefore judgeable — is the only thing that separates them, and as of 2026-08-20 00:25 IST **none of it is judged yet**. The backfill runs newest-first and has reached 2026-07-05; that cohort is scheduled to land later the same day. Any Tamil-derived number here stays provisional until it does.
 
 **English is underpowered on contingency.** The 65.51/65.52 null is solid at 2,427 versus 583 turns, but the depth-controlled English cells hold only 11–57 skilled turns each. A dramatic depth effect visible across all languages — repetition rising to 27.7% after skilled moves at turns 16+ — **does not reproduce in en-IN**, where the same figures are 0.0–4.3%. That effect is probably the gpt-4.1-mini population and must not be quoted as product-wide.
 
