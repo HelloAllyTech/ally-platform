@@ -47,16 +47,32 @@ This is not only a quality defect. A client who declares insight at turn 14 hand
 
 The mechanism is visible in the code. `nodes.py` drops verbatim history once the summary covers it, and `rolling_summary.txt` carries situation, disclosures, counsellor_actions, emotional_arc and unresolved — **no voice**. We removed the actor's own prior turns, which were its only in-context style exemplars, and kept only its facts.
 
-**Prompt size drives latency, and latency drives faults.**
+**Prompt size drives latency, and latency drives faults.** Recomputed 2026-08-20. Token
+counts come from `llm_usage` where `task = 'agent_turn'` — the worker's own per-turn
+record, 2,333 rows — matched to the nearest turn-metrics row in the same session within
+5 seconds:
 
-| Prompt tokens | Turns | Cached | TTFT | Total latency |
-|---|---|---|---|---|
-| under 1,500 | 711 | 17% | 2,256ms | 3,796ms |
-| 1,500–2,199 | 617 | 47% | 3,231ms | 4,391ms |
-| 2,200–2,999 | 601 | 71% | 2,801ms | 4,034ms |
-| 3,000+ | 404 | 66% | 3,726ms | 5,446ms |
+| Prompt tokens | Turns | Cached | Matched | TTFT | Total latency | p50 latency |
+|---|---|---|---|---|---|---|
+| under 1,500 | 711 | 17% | 601 | 2,298ms | 3,780ms | 3,118ms |
+| 1,500–2,199 | 617 | 47% | 496 | 3,187ms | 4,394ms | 3,340ms |
+| 2,200–2,999 | 601 | 71% | 445 | 3,066ms | 4,157ms | 3,349ms |
+| 3,000+ | 404 | 66% | 295 | 4,116ms | 5,907ms | 4,963ms |
 
-+1,650ms across the range.
+**+2,127ms across the range**, and the p50 column shows the same shape as the mean, so it
+is not a tail artefact.
+
+Two caveats on this table specifically, both of which leave the ordering intact and the
+absolute values approximate. **79% of turns match** (1,837 of 2,333); the rest have no
+turn-metrics row inside the join window, since `llm_usage` and turn metrics are written by
+different paths. And the **TTFT column is the least trustworthy**: until 2026-08-20 a
+time-to-first-token arriving after the reply began could be attributed to the following
+turn, so historical TTFT carries an intermittent one-turn shift that the total-latency
+column does not.
+
+Unlike the fault bands below, this table needed **no** `source` correction. It is anchored
+on `llm_usage`, which only exists for live agent turns, so transcript-backfilled rows
+cannot enter it — filtering for them changes every figure here by zero.
 
 **Slow turns fault more, and the gradient is steeper than we first measured.** Recomputed
 2026-08-20 over 90 days of judged turns, counting only live `source = 'pipeline'` rows —
@@ -83,10 +99,9 @@ more than the second (19.7% against 12.8%), which is its own finding — very fa
 are disproportionately short or degenerate — and it means "reduce latency" is the right
 goal only from the middle of the distribution upward.
 
-Note what caching does *not* buy: the 3,000+ bucket is the slowest despite 66% cached. Caching is reducing cost, not latency.
-
-The prompt-token table above still mixes both row sources and has not been recomputed;
-treat its absolute latencies as approximate and its ordering as the claim.
+Note what caching does *not* buy: the 3,000+ bucket is the slowest despite 66% cached, and
+the 2,200–2,999 bucket is the best-cached of the four at 71% while still slower than the
+smallest. Caching is reducing cost, not latency.
 
 The static prompt is the majority of the context. First-turn prompt tokens vary **710 to 2,041** across scenarios while conversation growth is only **340 to 1,140** — so roughly 1,300 tokens of spread is authoring difference, not necessity.
 
