@@ -14,10 +14,12 @@
 # it is being fixed. Mark "test" and "lint" as required checks once they are
 # green.
 
-# ally-mobile has 358 spec files and, until now, no CI of any kind — its only
-# workflows are the four App Store / Play Store builds. It is also the one repo
-# Bug Hunter can sweep but never fix, so a human reads everything found here;
-# a green suite on a PR is the cheapest signal that gives them.
+# ally-mobile has 358 spec files and, until recently, no CI of any kind — its
+# only workflows were the four App Store / Play Store builds. Bug Hunter can
+# fix bugs here too, but never merges its own PR — this suite going green is
+# the cheapest signal the human who does merge gets, alongside the manual
+# checks a native app still needs (see this repo's CLAUDE.md gotchas: no
+# on-device test runs here).
 #
 
 name: Tests
