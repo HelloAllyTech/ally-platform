@@ -2335,20 +2335,36 @@ async def compact_history(
         settings.ROLLING_SUMMARY_TAIL_MAX_CHARS,
     )
     already_covered = max(0, store.covered_count)
-    if boundary <= already_covered:
-        return {}
-
-    delta = messages[already_covered:boundary]
+    delta = messages[already_covered:boundary] if boundary > already_covered else []
     delta_turns = count_learner_turns(delta)
-    if delta_turns < 1:
-        return {}
     delta_size = message_chars(delta)
     turns_due = delta_turns >= max(1, settings.ROLLING_SUMMARY_EVERY_TURNS)
     chars_due = (
         settings.ROLLING_SUMMARY_DELTA_TRIGGER_CHARS > 0
         and delta_size >= settings.ROLLING_SUMMARY_DELTA_TRIGGER_CHARS
     )
-    if not (turns_due or chars_due):
+    due = delta_turns >= 1 and (turns_due or chars_due)
+    # Every other branch in this function that skips (store missing, paused,
+    # in-flight, no llm_client) already logs why. This was the one silent
+    # gap: "not due yet" is the overwhelmingly common case, so with no trace
+    # here there was no way to tell "compaction never fired because it's
+    # genuinely early" apart from "compaction is stuck/never firing at all"
+    # (see [PROMPT_CACHE] investigation — a session that never compacts once
+    # never gets rolling summary's cache-friendly slicing either). INFO, not
+    # DEBUG — prod runs at INFO and a debug-level gate log is invisible there.
+    logger.info(
+        "[ROLLING_SUMMARY_GATE] room=%s boundary=%d already_covered=%d "
+        "delta_turns=%d delta_chars=%d turns_due=%s chars_due=%s due=%s",
+        get_room_id(),
+        boundary,
+        already_covered,
+        delta_turns,
+        delta_size,
+        turns_due,
+        chars_due,
+        due,
+    )
+    if not due:
         return {}
 
     llm_client = configurable.get("llm_client")
