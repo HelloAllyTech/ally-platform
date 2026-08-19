@@ -19,8 +19,13 @@ import {
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {PausePlayerIcon, PlayWhiteIcon} from '@/assets';
+import {AsyncStorageKeys} from '@/constants/asyncStorage';
 import {colors, fontFamily} from '@/theme';
 import {formatTimeToMMSS} from '@/utils';
+import {
+  getItem as getStoredItem,
+  setItem as setStoredItem,
+} from '@/utils/asyncStorage';
 import {logger} from '@/utils/logger';
 
 const REMOTE_AUDIO_FETCH_INIT: RequestInit = {
@@ -29,6 +34,29 @@ const REMOTE_AUDIO_FETCH_INIT: RequestInit = {
     Accept: 'application/ogg,audio/ogg,audio/*,*/*',
   },
 };
+
+/**
+ * Selectable review speeds. Kept at or below 3x: the native pitch-corrected
+ * path clamps `playbackRate` to [0, 3] and sizes its stretch bus for 3x, so
+ * anything faster would be silently clamped.
+ */
+const PLAYBACK_RATES = [1, 1.5, 2, 2.5] as const;
+type PlaybackRate = (typeof PLAYBACK_RATES)[number];
+const DEFAULT_PLAYBACK_RATE: PlaybackRate = 1;
+
+const isPlaybackRate = (value: unknown): value is PlaybackRate =>
+  PLAYBACK_RATES.includes(value as PlaybackRate);
+
+const formatPlaybackRate = (rate: PlaybackRate) => `${rate}x`;
+
+/**
+ * Pitch correction (time-stretching) keeps sped-up speech intelligible instead
+ * of chipmunked, but it routes audio through the stretcher and adds latency —
+ * so 1x deliberately stays on the untouched resampling path. The flag is fixed
+ * when the source node is built, which is why crossing this boundary is the one
+ * rate change that has to rebuild the node rather than retune it live.
+ */
+const needsPitchCorrection = (rate: PlaybackRate) => rate !== 1;
 
 export type ExternalSeekRequest = {key: number; seconds: number};
 
@@ -57,14 +85,27 @@ export const SimulationAudioPlayer: React.FC<SimulationAudioPlayerProps> = ({
   const [decodeError, setDecodeError] = useState(false);
   const [decodedVersion, setDecodedVersion] = useState(0);
   const [playbackGeneration, setPlaybackGeneration] = useState(0);
+  const [playbackRate, setPlaybackRate] = useState<PlaybackRate>(
+    DEFAULT_PLAYBACK_RATE,
+  );
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const decodedBufferRef = useRef<AudioBuffer | null>(null);
   const sourceRef = useRef<ReturnType<
     AudioContext['createBufferSource']
   > | null>(null);
+  // Anchor for the position math: buffer offset that was playing at
+  // `playStartCtxTimeRef`, plus the rate in force since that instant. Every
+  // rate change re-anchors all three together (see `applyPlaybackRate`).
   const playStartCtxTimeRef = useRef(0);
   const offsetAtPlayStartRef = useRef(0);
+  const playbackRateRef = useRef<PlaybackRate>(DEFAULT_PLAYBACK_RATE);
+  // Rate the live source node was constructed with, so we can tell whether a
+  // new rate keeps the same pitch-correction mode.
+  const sourceRateRef = useRef<PlaybackRate>(DEFAULT_PLAYBACK_RATE);
+  // Set once the rate is settled, so a slow AsyncStorage read can never
+  // overwrite a speed the user already tapped.
+  const rateSettledRef = useRef(false);
   const pausePositionRef = useRef(0);
   const isPlayingRef = useRef(isPlaying);
   const onProgressRef = useRef(onProgress);
@@ -95,6 +136,31 @@ export const SimulationAudioPlayer: React.FC<SimulationAudioPlayerProps> = ({
       }
       sourceRef.current = null;
     }
+  }, []);
+
+  /**
+   * Where in the buffer we are, in buffer seconds.
+   *
+   * The context clock runs in wall time, so elapsed wall time has to be scaled
+   * by the playback rate to become buffer time. This is only ever the rate since
+   * the last anchor, because `applyPlaybackRate` re-anchors on every change.
+   */
+  const currentPosition = useCallback(() => {
+    const ctx = audioContextRef.current;
+    if (!ctx || !isPlayingRef.current || !sourceRef.current) {
+      return pausePositionRef.current;
+    }
+    const elapsedWallTime = ctx.currentTime - playStartCtxTimeRef.current;
+    return (
+      offsetAtPlayStartRef.current + elapsedWallTime * playbackRateRef.current
+    );
+  }, []);
+
+  /** Re-base the position math on `position` as of right now. */
+  const anchorAt = useCallback((position: number) => {
+    const ctx = audioContextRef.current;
+    playStartCtxTimeRef.current = ctx ? ctx.currentTime : 0;
+    offsetAtPlayStartRef.current = position;
   }, []);
 
   // Fetch + decode remote OGG via Web Audio API
@@ -177,13 +243,19 @@ export const SimulationAudioPlayer: React.FC<SimulationAudioPlayerProps> = ({
     AudioManager.setAudioSessionActivity(true).catch(() => {});
     ctx.resume().catch(() => {});
 
-    const src = ctx.createBufferSource();
+    // Read the rate from the ref, not state: `applyPlaybackRate` updates the ref
+    // synchronously before triggering this effect, so there is no stale closure.
+    const rate = playbackRateRef.current;
+    const src = ctx.createBufferSource({
+      pitchCorrection: needsPitchCorrection(rate),
+    });
     src.buffer = buffer;
+    src.playbackRate.value = rate;
     src.connect(ctx.destination);
+    sourceRateRef.current = rate;
 
     const offset = pausePositionRef.current;
-    playStartCtxTimeRef.current = ctx.currentTime;
-    offsetAtPlayStartRef.current = offset;
+    anchorAt(offset);
 
     src.onEnded = () => {
       sourceRef.current = null;
@@ -199,7 +271,7 @@ export const SimulationAudioPlayer: React.FC<SimulationAudioPlayerProps> = ({
     return () => {
       stopSource();
     };
-  }, [isPlaying, decodedVersion, playbackGeneration, stopSource]);
+  }, [isPlaying, decodedVersion, playbackGeneration, stopSource, anchorAt]);
 
   // Progress ticks
   useEffect(() => {
@@ -211,14 +283,13 @@ export const SimulationAudioPlayer: React.FC<SimulationAudioPlayerProps> = ({
       if (!ctx || !sourceRef.current) {
         return;
       }
-      const elapsed = ctx.currentTime - playStartCtxTimeRef.current;
-      const t = Math.min(duration, offsetAtPlayStartRef.current + elapsed);
+      const t = Math.min(duration, currentPosition());
       setCurrentTime(t);
       pausePositionRef.current = t;
       onProgressRef.current(t);
     }, 200);
     return () => clearInterval(id);
-  }, [isPlaying, duration]);
+  }, [isPlaying, duration, currentPosition]);
 
   // External seek (transcript tap): seek then start playback
   useEffect(() => {
@@ -266,6 +337,97 @@ export const SimulationAudioPlayer: React.FC<SimulationAudioPlayerProps> = ({
     [clampToAllowedRange, stopSource],
   );
 
+  const applyPlaybackRate = useCallback(
+    (nextRate: PlaybackRate, persist = true) => {
+      const previousRate = playbackRateRef.current;
+      rateSettledRef.current = true;
+      if (nextRate === previousRate) {
+        return;
+      }
+
+      // 1. Freeze the position reached under the OLD rate, before the rate ref
+      //    moves. Everything downstream resumes from exactly this point.
+      const position = clampToAllowedRange(currentPosition());
+      pausePositionRef.current = position;
+      setCurrentTime(position);
+
+      // 2. Swap the rate. The ref moves first and synchronously, so the tick and
+      //    the playback effect both see the new rate immediately.
+      playbackRateRef.current = nextRate;
+      setPlaybackRate(nextRate);
+      if (persist) {
+        // Fire-and-forget: setStoredItem logs and swallows its own failures, and
+        // a preference that fails to save must not block playback.
+        setStoredItem(AsyncStorageKeys.AUDIO_PLAYBACK_RATE, nextRate);
+      }
+
+      // 3. While paused there is nothing to retune — the next `start()` reads
+      //    the ref and picks up both the rate and the pitch-correction mode.
+      if (!isPlayingRef.current) {
+        return;
+      }
+
+      if (
+        needsPitchCorrection(nextRate) !==
+        needsPitchCorrection(sourceRateRef.current)
+      ) {
+        // Pitch correction is fixed at construction, so this crossing needs a
+        // fresh node. The playback effect rebuilds from `pausePositionRef` and
+        // re-anchors, same path a seek already takes.
+        setPlaybackGeneration(g => g + 1);
+        return;
+      }
+
+      // Same pitch-correction mode: retune the live node. `playbackRate` is a
+      // k-rate AudioParam re-read every render quantum, so this takes effect
+      // without restarting. Re-anchor so elapsed wall time is scaled by the new
+      // rate only from this instant forward.
+      anchorAt(position);
+      const src = sourceRef.current;
+      if (src) {
+        src.playbackRate.value = nextRate;
+      }
+    },
+    [anchorAt, clampToAllowedRange, currentPosition],
+  );
+
+  const handleCyclePlaybackRate = useCallback(() => {
+    const nextIndex =
+      (PLAYBACK_RATES.indexOf(playbackRateRef.current) + 1) %
+      PLAYBACK_RATES.length;
+    applyPlaybackRate(PLAYBACK_RATES[nextIndex]);
+  }, [applyPlaybackRate]);
+
+  const applyPlaybackRateRef = useRef(applyPlaybackRate);
+  useEffect(() => {
+    applyPlaybackRateRef.current = applyPlaybackRate;
+  }, [applyPlaybackRate]);
+
+  // Restore the last speed the user picked. Runs exactly once per player
+  // instance — it reads the callback through a ref so that re-identifying
+  // `applyPlaybackRate` (it closes over `duration`) cannot re-trigger the read.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const stored = await getStoredItem<unknown>(
+        AsyncStorageKeys.AUDIO_PLAYBACK_RATE,
+      );
+      if (cancelled || rateSettledRef.current) {
+        return;
+      }
+      if (isPlaybackRate(stored)) {
+        // Route through applyPlaybackRate so a hydration that lands after
+        // playback started still retunes the live node instead of only moving
+        // the label. Not persisted — this value came from storage.
+        applyPlaybackRateRef.current(stored, false);
+      }
+      rateSettledRef.current = true;
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const handleProgressBarPress = (e: GestureResponderEvent) => {
     if (progressBarWidth > 0 && duration > 0) {
       const x = e.nativeEvent.locationX;
@@ -299,6 +461,16 @@ export const SimulationAudioPlayer: React.FC<SimulationAudioPlayerProps> = ({
             color={colors.ds.theme.primary}
           />
         )}
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        onPress={handleCyclePlaybackRate}
+        disabled={decodeError}
+        accessibilityRole="button"
+        style={styles.speedButton}>
+        <Text style={styles.speedButtonText}>
+          {formatPlaybackRate(playbackRate)}
+        </Text>
       </TouchableOpacity>
 
       <View style={styles.progressGroup}>
@@ -347,11 +519,26 @@ const styles = ScaledSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  speedButton: {
+    minWidth: '34@ms',
+    height: '24@ms',
+    paddingHorizontal: '6@ms',
+    borderRadius: '12@ms',
+    backgroundColor: colors.ds.blue[50],
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: '8@ms',
+  },
+  speedButtonText: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    fontSize: '10@ms',
+    color: colors.ds.theme.primary,
+  },
   progressGroup: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    marginLeft: '14@ms',
+    marginLeft: '10@ms',
     gap: '6@ms',
   },
   timeText: {
