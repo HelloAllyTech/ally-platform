@@ -96,13 +96,20 @@ have versions, all DRAFT, none published, **zero secrets and zero states between
 (§9.1). A design that requires content per scenario has to be authored 58 times before
 one learner benefits; a design that derives it ships once.
 
-Retrieved knowledge is **inside** it, not beside it. Today `{retrieved_context}` is
-its own block, computed independently of any notion of the client's state. But it
-draws on the same source its own `salient_backstory` draws on
+**Topically retrieved** knowledge is **inside** it, not beside it. Today
+`{retrieved_context}` is its own block, computed independently of any notion of the
+client's state. But it draws on the same source its own `salient_backstory` draws on
 (`scenario_characters.knowledge_sources`), so two blocks means two headers, two
 framings, and duplicated content — against the whole point of trimming. It also
 makes mood-congruent recall (§7) decorative rather than operative: a separately
 computed block cannot be weighted by a stance it does not know about.
+
+The qualifier matters. Only knowledge that is *topically* retrieved belongs in working
+memory. Content that applies on every turn regardless of subject — how to speak this
+language, global safety rails — is not something the client recalls; it is how they
+speak. It stays in the static prefix, where it costs nothing per turn. §9.2 draws that
+line, and it is the line that resolves the overlap with the retrieval-policies
+proposal.
 
 
 It is appended **last** in the system prompt by default, nearest the reply — §2.2 shows where and why, and §2.3 makes that position authorable so it can be tested.
@@ -294,7 +301,7 @@ So the block keeps the same discipline internally, and the updater has two paths
 | Path | Cadence | Writes | Cost |
 |---|---|---|---|
 | **State update** | client-side event, or summary cadence | `stance`, `affect`, `appraisal`, `register`, `speech_fragments`, `unresolved`, `withheld` | structured output on an existing call |
-| **Recall refresh** | ~every 2 turns, as retrieval does today | `salient_backstory`, `glossary_slice` — cue-matched **and stance-weighted** | the existing retrieval call |
+| **Recall refresh** | ~every 2 turns, as retrieval does today | `salient_backstory` — cue-matched **and stance-weighted** | the existing retrieval call, scoped to semantic sources (§9.2) |
 
 The recall refresh is the existing `retrieve_knowledge` subgraph, given the current
 stance and cue set as input and writing into working memory instead of into its own
@@ -327,8 +334,7 @@ class ClientWorkingMemory(BaseModel):
     withheld: list[WithheldTopic]  # topic + deflection ONLY — never the content
 
     # ── retrieved, not dumped ────────────────────────────────────
-    salient_backstory: list[Fact]  # THE retrieval output — replaces {retrieved_context}
-    glossary_slice: list[Term]     # only terms live in this stance/topic
+    salient_backstory: list[Fact]  # semantic-bucket retrieval output (§9.2)
 
     # ── bookkeeping ──────────────────────────────────────────────
     revision: str                  # SHA-256, optimistic lock
@@ -339,7 +345,11 @@ class ClientWorkingMemory(BaseModel):
 
 `speech_fragments` is the direct repair for what we broke on 6 August: verbatim examples of the character's own voice, carried across every compaction boundary.
 
-`glossary_slice` replaces the whole `{language_glossary}` block with the terms actually live right now. Part of the trimming budget.
+An earlier version of this schema also carried a `glossary_slice` — the Tier 0 language
+glossary narrowed to the terms live in the current stance and topic. It is **dropped**,
+for reasons §9.2 sets out: a client does not forget how to speak their language, so
+running vocabulary through a decay function is the one place the memory analogy breaks;
+and §11's own evidence says glossary volume is not the lever on register anyway.
 
 `withheld` follows `roleplay_v2`'s ledger contract verbatim. A withheld item renders
 its **topic and its deflection, never its content** — so the actor knows a subject exists and how to move away from it
@@ -634,7 +644,9 @@ itself, so the template keeps control of placement when it wants it. Confirmed i
 production: a Hindi dispatch carried **1,130 characters** of glossary; the 19 English
 dispatches carried none, which is correct because English has no published glossary.
 
-So `glossary_slice` is a **scoping** change, not a delivery fix. All four non-English
+So any change here would be a **scoping** change, not a delivery fix — and §9.2 argues
+against making it at all. The figures are worth keeping on the record regardless, because
+they size the always-on block. All four non-English
 languages have a published glossary, each with ~1,100–1,300 characters injected on
 **every turn**:
 
@@ -646,9 +658,11 @@ languages have a published glossary, each with ~1,100–1,300 characters injecte
 | ta-IN | 2 sections, 1,181 chars | 3 sections, 1,594 chars |
 
 Against a static prompt of 710–2,041 tokens, an unconditional ~1,200 characters is a
-real share of the budget, and it is the same content every turn regardless of what is
-being discussed. Narrowing it to the terms live in the current stance and topic is
-worth doing on the §6 arithmetic alone.
+real share of the budget. But it is *the same content every turn*, which is precisely
+what makes it cheap: it sits in the cache-stable region and is paid for once. Moving it
+into a per-turn scoped block would trade a cached 300 tokens for volatile ones and a new
+way to drop a term the actor needed. The ~1,300-token authoring spread worth attacking is
+`character_profile_text`, not the glossary.
 
 **And it sharpens §11 rather than softening it.** Kannada and Tamil have published
 glossaries — 1,206 and 1,181 always-injected characters — and still carry the worst
@@ -831,7 +845,7 @@ scenarios. Detail is deliberately lost; regularities are kept.
 | Layer | Here | Status |
 |---|---|---|
 | Episodic | the rolling summary, plus the client-side event log, phase summaries, `disclosed`, `unresolved` | rolling summary **shipped** 2026-08-06; the rest is new |
-| Semantic | `salient_backstory` from `knowledge_sources`; `glossary_slice`; the session-end write-out into `previous_memory` | the slot exists; the write side is new (§10) |
+| Semantic | `salient_backstory` from the semantic bucket of `knowledge_sources` (§9.2); the session-end write-out into `previous_memory` | the slot exists; the write side is new (§10) |
 | Working | **this block** — last in the prompt, capped at 4±1 salient items | new; this is the missing layer |
 | Procedural | stance transition rules; the salience function | new |
 | Scratchpad | `appraisal`, filtered out of the rendered block | new |
@@ -979,13 +993,88 @@ the replacement is proven leaves neither. Its one live liability is the hardcode
 language fields above, which deserve a comment so a future revival does not quietly
 ship the regression.
 
+### 9.2 Relationship to the retrieval-policies proposal
+
+[`knowledge-source-retrieval-policies.md`](knowledge-source-retrieval-policies.md)
+proposes giving each knowledge source a `retrieval` descriptor — `always`, `attribute`,
+`state` or `semantic` — so a source declares *when* it enters the prompt instead of every
+source sharing one trigger. Both documents currently say they own
+`state.retrieved_context`. That reads as a conflict and is not one: the two proposals
+operate at different layers, and both are right about their own.
+
+**Policy answers eligibility. Salience answers ranking.** A policy is authored,
+deterministic and per-source: *may this content enter the prompt this turn at all*.
+Salience (§7.4) is derived, psychological and per-turn: *of the content that is eligible,
+what does this client currently have in mind*. Ranking without eligibility gates has no
+way to express "language guidance applies unconditionally"; eligibility without ranking
+is the flat, everything-equally-present state §1 is about.
+
+So the four policies route to four different places, and only one of them reaches working
+memory:
+
+| Policy | Destination | Resolved | In working memory? |
+|---|---|---|---|
+| `always` | static prefix | once per session | no |
+| `attribute` (language, region) | static prefix — the language block | once per session | no |
+| `state` | with `{state_x_guidelines}` | on state transition | no |
+| `semantic` | the candidate pool the salience function ranks into `salient_backstory` | ~every 2 turns | **yes** |
+
+**This resolves the field collision by removing the field from both designs.** The
+policies doc proposes `state.retrieved_context` become a bucketed struct; this doc retires
+the field. Neither is necessary once the routing above is explicit:
+
+- `always` and `attribute` are **session-invariant** — language does not change mid-session
+  and `always` is unconditional. They are resolved once at session start and rendered into
+  the static prefix. They never become per-turn work and never touch graph state, which is
+  strictly better than the struct: it takes content off the per-turn path entirely.
+- `state` already has a home in the state guidance block.
+- `semantic` goes to the worker-owned `ClientWorkingMemoryStore`, for the reasons in §5.
+
+The composer's bucketed output is therefore a **return value**, not a state channel.
+`retrieved_context` and `turns_until_knowledge_refresh` leave `SimulationState` under both
+designs, and the struct is never added.
+
+**Sequencing: the policies proposal ships first, and it is a prerequisite rather than a
+competitor.** Three reasons.
+
+1. **It is behaviour-safe by construction.** A source with no `retrieval` field is treated
+   as `semantic`, so existing scenarios render byte-for-byte identically. It can deploy
+   before any authoring happens — the opposite of the `roleplay_v2` trap in §9.1.
+2. **It delivers phase 1 of §14.** The `attribute` policy is a plausible mechanism for the
+   `targetVariety` fix — the item in this document with the largest measured gap (49.4
+   register errors per 100 turns in Kannada against 0.0 in Hindi, §11), and the one that
+   should ship regardless of anything here.
+3. **Phase 5 depends on it.** Folding retrieval into `salient_backstory` needs a clean
+   `semantic` bucket to point at. Without policies, the candidate pool arrives as one
+   undifferentiated blob of domain knowledge, language guidance and force-fed
+   `role_instructions` content, and the salience function would be ranking things that
+   should never have been ranked.
+
+**What this costs the policies proposal: its §7 "Preferred" placement gets simpler.** That
+option has the composer return sectioned output and the template grow policy-aware slots.
+Under the routing above only `semantic` is volatile, so the sectioning it needs is smaller
+than it thought — and the placement mechanism already exists as the
+`availableVariables` + placeholder contract in §2.3, which both proposals should use
+rather than inventing separate ones.
+
+**What it costs this document: `glossary_slice` is dropped.** The Tier 0 glossary is
+`attribute`-policy content keyed by language, and the policy framing makes clear why
+scoping it per turn was wrong. Three reasons, in ascending order of importance: it would
+move ~300 cache-stable tokens into the volatile region; §11's evidence says glossary
+volume is not the lever on register, so narrowing it cannot fix what it was pointed at;
+and a client does not forget how to speak their own language. Running vocabulary through
+a decay function is the one place the memory analogy in §7 breaks down, and a design
+should not ship the place it knows its own metaphor fails. Tier 1 glossary — already
+topic-retrieved — rides the `semantic` bucket and is ranked like any other recalled
+content.
+
 ### Summary
 
 | Current pattern | Fate under this design |
 |---|---|
 | Persona surface duplicated across main + branching templates | **Replaced** — one appended block, one source of truth |
-| `{retrieved_context}` as an independent block | **Replaced** — becomes `salient_backstory`, stance-weighted (§2) |
-| Always-injected Tier 0 glossary, ~1,200 chars every turn | **Scoped** — becomes `glossary_slice` (§6) |
+| `{retrieved_context}` as an independent block | **Replaced** — its `semantic` bucket becomes `salient_backstory`, stance-weighted (§2, §9.2). The state field is retired, not restructured |
+| Always-injected Tier 0 glossary, ~1,200 chars every turn | **Left alone** — it is session-invariant and cache-stable; `glossary_slice` is dropped (§9.2) |
 | `character_profile_text` full backstory dump | **Replaced** — becomes the selected 4±1 (§7.4) |
 | `rolling_summary` | **Kept**, and given the `voice` field it lacks (§1) |
 | Authored branching instructions, `stateInstructions`, guardrails | **Kept unchanged** — inputs, not derived state |
@@ -1116,14 +1205,14 @@ blocking cost either.
 
 ## 14. Phasing
 
-1. **Ship the Language realism fix first.** Inject `targetVariety`; add per-language exemplars. Unrelated to this design, one config path, addresses a 100× gap between diglossic and non-diglossic languages.
+1. **Ship the Language realism fix first.** Inject `targetVariety`; add per-language exemplars. Independent of this design, addresses a 100× gap between diglossic and non-diglossic languages. The `attribute` policy from the retrieval-policies proposal (§9.2) is the natural delivery mechanism, and that proposal is behaviour-safe on its own, so it can land here.
 2. **`stance` + `register` + `speech_fragments` + `withheld`, no retrieval.** Repairs the 6.5× role-slip regression and adds earned transitions. Detached updater behind `CLIENT_WORKING_MEMORY_ENABLED`, cadence fallback, v2's ledger contract and framing (§3), guardrail precedence and the rest of §5.1. No new retrieval. Read against clienthood at turns 8+.
 3. **Test position.** With the placeholder registered (§2.3), move
    `{client_working_memory}` and read clienthood, the latency distribution and guardrail
    adherence together. Cheap, reversible in the studio, and it settles a hypothesis phase
    2 otherwise just assumes.
 4. **Move `{retrieved_context}` to the cache-friendly suffix on #2**, matching what the default `main_agent_prompt` already does. Small, independent of this design, and the direction the design goes anyway. Read against the refresh-versus-reuse gap in §13.
-5. **Fold retrieval in.** Point `retrieve_knowledge` at `salient_backstory` instead of its own prompt block, pass it the stance to weight against, and retire `{retrieved_context}` and `character_profile_text`. `glossary_slice` scopes the always-injected Tier 0 block in the same step. Read against the latency distribution as much as against quality — this is the phase with the measured effect size, ≈1,000–1,500ms.
+5. **Fold retrieval in.** Point the composer's `semantic` bucket at `salient_backstory` instead of its own prompt block, pass it the stance to weight against, and retire `{retrieved_context}` and `character_profile_text`. Requires phase 1's policy work to have landed, so the bucket exists (§9.2). Read against the latency distribution as much as against quality — this is the phase with the measured effect size, ≈1,000–1,500ms.
 6. **Session-end write-out**, episodic and semantic, plus the groundedness cross-check.
 
 Phase 2 is the one with a mechanism confirmed in both the data and the code. Phase 5 has the larger measured effect size. Phases 3 and 4 sit between them because they are the cheapest things on the list and they test the prompt-position hypothesis on its own, before phase 5 changes the same block for different reasons.

@@ -3,6 +3,10 @@
 **Status:** Proposal
 **Scope:** `ally-ai-learn` (context assembly / prompt building)
 **Author:** (draft)
+**Reconciled with:** [`client-working-memory-design.md`](client-working-memory-design.md)
+§9.2 — that document retires `state.retrieved_context`; this one proposed restructuring
+it. §5 step 5 and §9 below carry the agreed resolution, which is that neither happens:
+the composer returns buckets as a return value and the state field goes away.
 
 ## 1. Problem
 
@@ -143,7 +147,12 @@ Per turn:
    Keeps the 8s timeout and cache. If none are `semantic`, skip the LLM
    call entirely (removes a per-turn LLM call from language-only
    scenarios — a latency win).
-5. **Merge + budget** (§6) → write `state.retrieved_context`.
+5. **Merge + budget** (§6) → **return** the resolved buckets. Not a write to
+   `state.retrieved_context`: `always` and `attribute` are session-invariant and are
+   resolved once at session start into the static prefix, `state` renders with
+   `{state_x_guidelines}`, and only the `semantic` bucket is per-turn — it goes to the
+   worker-owned store the working-memory design uses. The state field is retired rather
+   than restructured (that doc's §9.2).
 
 Determinism is preserved where it matters: language/persona/state never
 depend on the LLM selector.
@@ -182,6 +191,17 @@ Two options:
 Recommend shipping Minimal first (behavior-safe), then moving to
 Preferred as part of retiring the language fields.
 
+**Reconciliation note.** Preferred is smaller than it looks here. Once `always` and
+`attribute` are resolved once per session into the static prefix, only the `semantic`
+bucket is volatile, so the sectioning required is one slot rather than four. And the
+placement mechanism already exists: register the slot in the prompt's
+`availableVariables` and render it at a placeholder, falling back to a cache-friendly
+append — the contract `_ensure_language_glossary` and `_append_retrieved_context` already
+implement, described in the working-memory design's §2.3. Both proposals should use it
+rather than inventing separate plumbing. Note also that this document's line references
+point at `main_agent_prompt.txt`, while production runs `main_agent_prompt_full` v6 as a
+dashboard override — the file map needs re-pointing before implementation.
+
 ## 8. Backward compatibility & migration
 
 - **Existing sources:** no `retrieval` field → treated as `semantic`.
@@ -207,7 +227,7 @@ Preferred as part of retiring the language fields.
 | `app/core/graph/nodes.py:1630` | `retrieve_knowledge` → composer: partition sources, build attribute bag from `scenario.language_config.language_code`, run resolvers, merge. Reuse `_resolve_state_for_retrieval` for `state` policy. |
 | `app/core/graph/prompt.py:347/246` | (Preferred option) accept sectioned context; route policy buckets to slots; begin retiring `languageCharacteristics`/`languageDialogueSamples` handling. |
 | `app/prompts/system/main_agent_prompt.txt` | (Preferred) policy-aware slots; language `attribute` content into the language block. |
-| `app/core/graph/state.py:273` | `retrieved_context` may become a small struct (buckets) instead of `str`; reducer updated. |
+| `app/core/graph/state.py` | `retrieved_context` and `turns_until_knowledge_refresh` are **removed**, not restructured. Session-invariant buckets never enter state; the `semantic` bucket lives in the worker-owned store. Safe because the checkpointer is in-process and per-session. |
 
 ## 10. Risks / open questions
 
@@ -221,6 +241,10 @@ Preferred as part of retiring the language fields.
   could crowd out `semantic`. Priority tiers + logging, not silent drops.
 - **State-policy vs `ragEnabled` overlap** during transition — keep both,
   document precedence (gate wins → skip semantic; attribute still fires).
+- **Ranking within the `semantic` bucket** is deliberately out of scope here. This
+  document decides *eligibility*; what a client currently has in mind among the eligible
+  set is the salience function in the working-memory design (§7.4). Policy gates, salience
+  ranks — the two compose and neither subsumes the other.
 - **Scale:** `semantic` still ships all semantic titles to an LLM each
   turn. Fine for tens of sources; swap to embedding retrieval when the
   library grows. Isolated to the `semantic` resolver by this design.
