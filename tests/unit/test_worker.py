@@ -2017,6 +2017,82 @@ class TestStartUsesPrewarmedBVC:
         assert captured["noise_cancellation"] is prewarmed_bvc
 
 
+class TestNoiseCancellationRequiresCloud:
+    """Krisp BVC only runs on LiveKit Cloud.
+
+    Against the self-hosted SFU the Rust SDK rejects the filter ("audio filter
+    cannot be enabled: LiveKit Cloud is required" + "failed to initialize the
+    audio filter") and the session runs without noise cancellation anyway, so
+    the worker must not ask for it there.
+    """
+
+    def _prepare(self, monkeypatch, captured):
+        class DummyRIO:
+            def __init__(self, **kwargs):
+                captured["noise_cancellation"] = kwargs.get("noise_cancellation")
+
+        class DummySession:
+            async def start(self, room, agent, room_input_options):
+                self.started = True
+
+        monkeypatch.setattr(worker, "RoomInputOptions", DummyRIO)
+        monkeypatch.setattr(worker.noise_cancellation, "BVC", lambda: "FRESH_BVC")
+        monkeypatch.setattr(
+            worker, "setup_interruption_detection", lambda session, room_id=None: None
+        )
+        monkeypatch.setattr(
+            worker,
+            "should_say_opening_statement",
+            lambda scenario, event_orchestrator: False,
+        )
+        monkeypatch.setattr(
+            worker,
+            "should_auto_start_conversation",
+            lambda scenario, event_orchestrator: False,
+        )
+
+        async def _connect():
+            return None
+
+        ctx = types.SimpleNamespace(
+            room=types.SimpleNamespace(name="room-1"),
+            proc=types.SimpleNamespace(userdata={"bvc": "PREWARMED_BVC"}),
+            connect=_connect,
+        )
+
+        w = worker.AgentWorker(ctx)
+        w.session = DummySession()
+        w.agent = object()
+        w.scenario = types.SimpleNamespace(
+            prompt_data=types.SimpleNamespace(opening_statements=[])
+        )
+        w.event_orchestrator = types.SimpleNamespace(initialize=AsyncMock())
+        monkeypatch.setattr(w, "_arm_orphan_deadline", AsyncMock())
+        monkeypatch.setattr(w, "_arm_max_duration_enforcer", AsyncMock())
+        monkeypatch.setattr(w, "_setup_background_audio", AsyncMock())
+        return w
+
+    @pytest.mark.asyncio
+    async def test_self_hosted_deployment_gets_no_filter(self, monkeypatch):
+        captured = {}
+        monkeypatch.setattr(worker.settings, "LIVEKIT_URL", "wss://livekit.internal")
+        w = self._prepare(monkeypatch, captured)
+
+        await w.start()
+
+        assert captured["noise_cancellation"] is None
+
+    @pytest.mark.asyncio
+    async def test_cloud_deployment_still_gets_the_filter(self, monkeypatch):
+        captured = {}
+        monkeypatch.setattr(worker.settings, "LIVEKIT_URL", "wss://ally.livekit.cloud")
+        w = self._prepare(monkeypatch, captured)
+
+        await w.start()
+
+        assert captured["noise_cancellation"] == "PREWARMED_BVC"
+
+
 class TestEmitStartMetrics:
     """The per-session start-latency ("time to first word") emit to Core."""
 

@@ -110,6 +110,85 @@ class TestConfigure:
         assert kwargs == {}
 
 
+class TestNoiseCancellationRequiresCloud:
+    """Krisp BVC only runs on LiveKit Cloud (mirrors the v1 worker test).
+
+    On the self-hosted SFU the Rust SDK rejects the filter ("audio filter
+    cannot be enabled: LiveKit Cloud is required") and the session runs with
+    noise cancellation off regardless, so v2 must not pass one there.
+    """
+
+    def _prepare(self, monkeypatch, captured):
+        import app.worker_v2 as worker_v2
+        from app.worker_v2 import AgentWorkerV2
+
+        class DummyRIO:
+            def __init__(self, **kwargs):
+                captured["noise_cancellation"] = kwargs.get("noise_cancellation")
+
+        class DummySession:
+            async def start(self, room, agent, room_input_options):
+                self.started = True
+
+            def generate_reply(self):
+                return None
+
+        monkeypatch.setattr(worker_v2, "RoomInputOptions", DummyRIO)
+        monkeypatch.setattr(worker_v2.noise_cancellation, "BVC", lambda: "FRESH_BVC")
+
+        async def _connect():
+            return None
+
+        ctx = SimpleNamespace(
+            room=SimpleNamespace(name="room-1", remote_participants={}),
+            proc=SimpleNamespace(userdata={"bvc": "PREWARMED_BVC"}),
+            connect=_connect,
+        )
+
+        class DummyNaturalness:
+            def __init__(self, **kwargs):
+                pass
+
+            async def start(self):
+                return None
+
+        w = AgentWorkerV2(ctx)
+        w.session = DummySession()
+        w.agent = object()
+        w.spec = SimpleNamespace(opening_statement=None)
+        w.director = SimpleNamespace(start_time_events=lambda: None)
+        # Orphan deadline, naturalness and start metrics are side paths; the
+        # assertion is only about what session.start() was handed.
+
+        async def _noop_orphan(timeout):
+            return None
+
+        monkeypatch.setattr(w, "_arm_orphan_deadline", _noop_orphan)
+        monkeypatch.setattr(w, "_emit_start_metrics", lambda: None)
+        monkeypatch.setattr(
+            "app.core.livekit.naturalness.NaturalnessController", DummyNaturalness
+        )
+        return w
+
+    async def test_self_hosted_deployment_gets_no_filter(self, monkeypatch):
+        captured = {}
+        monkeypatch.setattr(settings, "LIVEKIT_URL", "wss://livekit.internal")
+        w = self._prepare(monkeypatch, captured)
+
+        await w.start()
+
+        assert captured["noise_cancellation"] is None
+
+    async def test_cloud_deployment_still_gets_the_filter(self, monkeypatch):
+        captured = {}
+        monkeypatch.setattr(settings, "LIVEKIT_URL", "wss://ally.livekit.cloud")
+        w = self._prepare(monkeypatch, captured)
+
+        await w.start()
+
+        assert captured["noise_cancellation"] == "PREWARMED_BVC"
+
+
 class TestConfigDefaults:
     def test_v2_settings_present(self):
         # AGENT_NAME_V2 is derived as f"{AGENT_NAME}V2" when not set explicitly,

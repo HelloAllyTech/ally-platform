@@ -56,7 +56,7 @@ After this phase, `worker.scenario`, `worker.tts_client`, `worker.stt_client`, `
 `AgentWorker.start()` performs:
 
 1. **Initialize events** -- create `asyncio.Event` objects for termination and room disconnect signaling
-2. **Start session** -- `session.start()` with noise cancellation
+2. **Start session** -- `session.start()`, with Krisp BVC noise cancellation only when the LiveKit deployment can run it (`supports_noise_cancellation()` in `app/core/livekit/audio_filters.py`): the filter is a LiveKit Cloud feature, and a self-hosted SFU rejects it and runs the session unfiltered
 3. **Connect to room** -- `ctx.connect()`
 4. **Setup interruption detection** -- monitors for user interruptions during agent speech
 5. **Initialize orchestrator** -- `event_orchestrator.initialize()` sends initial score events and starts TIME event timers

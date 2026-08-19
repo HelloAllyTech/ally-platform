@@ -34,6 +34,7 @@ from app.core.agent.factory import (
 )
 from app.core.config import settings
 from app.core.constants import DEFAULT_VAD_ACTIVATION_THRESHOLD, Environment
+from app.core.livekit.audio_filters import supports_noise_cancellation
 from app.core.logger import (
     get_logger,
     make_child_logging_forward_only,
@@ -530,9 +531,18 @@ class AgentWorkerV2:
         self._room_disconnected_event = asyncio.Event()
 
         _connect_t0 = time.monotonic()
-        # Prefer the process-prewarmed BVC instance (see prewarm()).
+        # Prefer the process-prewarmed BVC instance (see prewarm()). Krisp BVC
+        # is Cloud-only: on a self-hosted SFU the SDK rejects the filter and
+        # the session runs unfiltered anyway (mirrors v1).
         userdata = getattr(getattr(self.ctx, "proc", None), "userdata", {}) or {}
-        bvc = userdata.get("bvc") or noise_cancellation.BVC()
+        if supports_noise_cancellation(settings.LIVEKIT_URL):
+            bvc = userdata.get("bvc") or noise_cancellation.BVC()
+        else:
+            bvc = None
+            logger.info(
+                "[AgentWorkerV2] noise cancellation off — this LiveKit "
+                "deployment is not Cloud, which Krisp BVC requires"
+            )
         await self.session.start(
             room=self.ctx.room,
             agent=self.agent,
