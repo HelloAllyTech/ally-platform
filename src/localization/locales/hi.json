@@ -1313,7 +1313,8 @@
     "clientLabel": "क्लाइंट",
     "counsellorLabel": "काउंसलर",
     "aiAgentName": "AI एजेंट",
-    "aiClientSuffix": "AI क्लाइंट"
+    "aiClientSuffix": "AI क्लाइंट",
+    "accuracyDisclaimer": "Transcription may not always be fully accurate."
   },
   "user": {
     "creditUsage": "क्रेडिट उपयोग",
