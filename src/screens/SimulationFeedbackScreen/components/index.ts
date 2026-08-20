@@ -9,7 +9,7 @@ export {AskAI} from './AskAI/AskAI';
 export {SessionSkills} from './SessionSkills/SessionSkills';
 export {SummaryCard} from './SummaryCard';
 export type {SessionSkillsProps} from './SessionSkills/SessionSkills';
-export {Reflection} from './Reflection/Reflection';
+export {DebriefTab} from './Debrief';
 export {UpNext} from './UpNext';
 export {SessionGlimpse} from './SessionGlimpse';
 export {SummaryTab} from './SummaryTab';
