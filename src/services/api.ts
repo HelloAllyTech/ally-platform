@@ -181,7 +181,6 @@ export const api = createApi({
     'ReviewDetails',
     'ReviewThreads',
     'GeneralComments',
-    'ReflectionPrompts',
     'UnreadReviewCount',
     'LearnTracks',
     'LearnTrackDetail',

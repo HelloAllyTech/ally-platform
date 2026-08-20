@@ -39,6 +39,19 @@ export interface ScenarioMetadata {
   sessionBehaviorGuidelines?: string;
   experienceMode?: string;
   enableFeedback?: boolean;
+  /**
+   * Which post-session tabs this roleplay shows, as sub-toggles of the
+   * `enableFeedback` master switch. The backend always sends this RESOLVED,
+   * so the client never has to re-implement the "absent means all on"
+   * default — but it stays optional here because a cached or older response
+   * may predate it, in which case treat every tab as on (see
+   * DEFAULT_FEEDBACK_TABS in constants/simulationSummary).
+   */
+  feedbackTabs?: {
+    debrief: boolean;
+    skills: boolean;
+    transcript: boolean;
+  };
 }
 
 export interface Scenario {
@@ -262,6 +275,12 @@ export interface SimulationDetails {
       positives?: string[];
       improvements?: string[];
       areasOfGrowth?: AreaOfGrowth[];
+      /**
+       * Ally's post-session debrief note, written in a supervisor's voice.
+       * Anchors specific transcript moments as `[[msg:<scenarioSessionMessageId>]]`
+       * — see SupervisorNote, which turns those into tappable chips.
+       */
+      supervisorNote?: string;
     };
     errorMessage?: string;
   };

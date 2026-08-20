@@ -211,13 +211,6 @@ export const API_ROUTES = {
       `/learn/scenario-sessions/${scenarioSessionId}/chat/history`,
     EVENT_CHECKLIST: (scenarioSessionId: string) =>
       `/learn/scenario-session/${scenarioSessionId}/event-checklist`,
-    REFLECTION_PROMPTS: (scenarioSessionId: string) =>
-      `/learn/scenario-session/${scenarioSessionId}/reflection-prompts`,
-    REFLECTION_PROMPT_BY_ID: (
-      scenarioSessionId: string,
-      reflectionPromptId: string,
-    ) =>
-      `/learn/scenario-session/${scenarioSessionId}/reflection-prompts/${reflectionPromptId}`,
   },
   TRACKS: {
     LIST: '/learn/tracks',

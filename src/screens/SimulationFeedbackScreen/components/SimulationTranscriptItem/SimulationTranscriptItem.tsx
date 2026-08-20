@@ -11,6 +11,8 @@ export type SimulationTranscriptItemProps = {
   message: string;
   speakerLabel?: string;
   isActive?: boolean;
+  /** Briefly marks the moment a debrief chip jumped to. */
+  isFocused?: boolean;
   isLearner?: boolean;
   tags?: SimulationMessageTag[];
   onPress?: () => void;
@@ -24,6 +26,7 @@ export const SimulationTranscriptItem: React.FC<
   speakerLabel,
   isLearner = false,
   isActive = false,
+  isFocused = false,
   tags,
   onPress,
 }) => {
@@ -54,6 +57,9 @@ export const SimulationTranscriptItem: React.FC<
     styles.messageContainer,
     {backgroundColor, borderColor},
     isActive && styles.messageContainerActive,
+    // Sits after the playback-active style so a row that is both still reads
+    // as the moment the learner just asked to see.
+    isFocused && styles.messageContainerFocused,
   ];
 
   return (
@@ -93,6 +99,10 @@ const styles = ScaledSheet.create({
   },
   messageContainerActive: {
     borderWidth: '1.5@ms',
+  },
+  messageContainerFocused: {
+    borderWidth: '2@ms',
+    borderColor: colors.ds.theme.primary,
   },
   messageContainerPressed: {
     opacity: 0.92,

@@ -724,13 +724,26 @@
       "transcriptTranslationFailed": "ट्रांसक्रिप्ट लोड करने में विफल। कृपया पुनः प्रयास करें।",
       "upNext": "अगला",
       "askAi": "AI से पूछें",
-      "deeperReflection": "गहन चिंतन",
+      "debrief": "डीब्रीफ़",
       "skillsDemonstrated": "प्रदर्शित कौशल",
       "sessionReview": "सत्र समीक्षा"
     },
     "shortSession": {
       "title": "सत्र बहुत जल्दी समाप्त हो गया",
       "description": "सार्थक प्रतिक्रिया प्रदान करने के लिए हमें और अधिक इंटरैक्शन डेटा की आवश्यकता है।"
+    },
+    "debrief": {
+      "header": "आपकी डीब्रीफ़",
+      "from": "Ally की ओर से",
+      "aiLabel": "AI-जनित",
+      "aiTooltip": "Ally एक AI सुपरवाइज़र है। यह डीब्रीफ़ आपके सेशन ट्रांसक्रिप्ट से AI द्वारा लिखी गई है, किसी व्यक्ति द्वारा नहीं।",
+      "generating": "Ally आपकी डीब्रीफ़ लिख रहा है…",
+      "generatingHint": "इसमें आमतौर पर कुछ पल लगते हैं।",
+      "failed": "Ally इस सेशन के लिए डीब्रीफ़ नहीं लिख सका।",
+      "momentLabel": "यह पल देखें",
+      "momentNotFound": "हम उस पल तक नहीं पहुँच सके — इसके बजाय पूरा ट्रांसक्रिप्ट यहाँ है।",
+      "replyPlaceholder": "इस सेशन के बारे में Ally को जवाब दें… (0/{{max}})",
+      "replyPrompt": "इसके बारे में कोई सवाल है? नीचे जवाब दें।"
     },
     "feedback": {
       "generating": "आपका फ़ीडबैक तैयार किया जा रहा है…",
@@ -819,15 +832,6 @@
       "language": "भाषा",
       "leaderboardNotification": "लीडरबोर्ड सूचना"
     }
-  },
-  "reflection": {
-    "sectionTitle": "आत्म-चिंतन प्रॉम्प्ट्स",
-    "autosaving": "ऑटो-सेव हो रहा है",
-    "saveFailed": "सहेजने में विफल",
-    "saved": "सहेजा गया",
-    "autoSaveFailed": "प्रतिक्रिया को ऑटो-सेव करने में विफल",
-    "writeThoughts": "अपने विचार यहां लिखें...",
-    "noPrompts": "कोई प्रॉम्प्ट उपलब्ध नहीं है"
   },
   "review": {
     "title": "समीक्षा",
@@ -1536,7 +1540,6 @@
     "uploadProfileImage": "प्रोफ़ाइल छवि अपलोड करने में विफल",
     "removeProfileImage": "प्रोफ़ाइल छवि हटाने में विफल",
     "audioSession": "ऑडियो सत्र कॉन्फ़िगर करने में विफल",
-    "reflectionPromptSaveFailed": "रिफ्लेक्शन प्रॉम्प्ट सहेजने में विफल",
     "endSimulation": "सिमुलेशन समाप्त करने में विफल",
     "permission": "माइक्रोफ़ोन अनुमति आवश्यक है",
     "submitBugReport": "रिपोर्ट सबमिट करने में विफल"

@@ -206,17 +206,38 @@ jest.mock('../components', () => {
   const React = require('react');
   const {TouchableOpacity, Text, View} = require('react-native');
   return {
-    SummaryTab: ({onTryAnother}: any) => (
-      <View testID="summary-tab">
-        <TouchableOpacity testID="try-another-button" onPress={onTryAnother}>
-          <Text>Try Another</Text>
-        </TouchableOpacity>
+    SummaryTab: () => <View testID="summary-tab" />,
+    TranscriptTab: ({focusMessage}: any) => (
+      <View testID="transcript-tab">
+        <Text testID="transcript-focus-message-id">
+          {focusMessage?.messageId ?? ''}
+        </Text>
+        <Text testID="transcript-focus-request-id">
+          {String(focusMessage?.requestId ?? '')}
+        </Text>
       </View>
     ),
-    TranscriptTab: () => <View testID="transcript-tab" />,
-    AskAI: () => <View testID="ask-ai-tab" />,
+    DebriefTab: ({onOpenMoment}: any) => (
+      <View testID="debrief-tab">
+        {onOpenMoment && (
+          <>
+            <TouchableOpacity
+              testID="debrief-open-moment"
+              onPress={() => onOpenMoment('msg-1')}>
+              <Text>open moment</Text>
+            </TouchableOpacity>
+            {/* A second anchor so the tests can tell "the id travelled" apart
+                from "some id travelled". */}
+            <TouchableOpacity
+              testID="debrief-open-moment-2"
+              onPress={() => onOpenMoment('msg-2')}>
+              <Text>open other moment</Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
+    ),
     SessionSkills: () => <View testID="session-skills-tab" />,
-    Reflection: () => <View testID="reflection-tab" />,
     UpNext: ({onFinish, onBack}: any) => (
       <View testID="up-next-tab">
         <TouchableOpacity testID="finish-button" onPress={onFinish}>
@@ -248,31 +269,33 @@ describe('SimulationFeedbackScreen', () => {
     mockLanguage = 'en';
   });
 
-  it('renders summary tab when data exists', async () => {
+  it('renders debrief tab when data exists', async () => {
     const {getByTestId} = renderWithProviders(
       <SimulationFeedbackScreen
         navigation={{} as any}
         route={{params: {scenarioSessionId: '1'}} as any}
       />,
     );
-    // Skills Demonstrated is the landing tab now, so select Session Review.
+    // Debrief is the landing tab now.
     fireEvent.press(getByTestId('tab-0'));
     await waitFor(() => {
-      expect(getByTestId('summary-tab')).toBeTruthy();
+      expect(getByTestId('debrief-tab')).toBeTruthy();
     });
   });
 
-  it('renders try another button in summary tab', async () => {
+  it('renders try another button on the skills tab', async () => {
     const {getByTestId} = renderWithProviders(
       <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1'}} as any} />,
     );
-    fireEvent.press(getByTestId('tab-0'));
+    // The floating "try another" button is hidden on Debrief (it has its own
+    // bottom-pinned reply composer, same reason Ask AI used to hide it).
+    fireEvent.press(getByTestId('tab-1'));
     await waitFor(() => {
-      expect(getByTestId('try-another-button')).toBeTruthy();
+      expect(getByTestId('primary-button')).toBeTruthy();
     });
   });
 
-  it('renders summary tab even when details are missing', async () => {
+  it('renders debrief tab even when details are missing', async () => {
     const services = require('@/services');
     (services.useLazyGetSimulationDetailsQuery as jest.Mock).mockReturnValue([
       jest.fn().mockResolvedValue({data: {details: null}}),
@@ -282,10 +305,10 @@ describe('SimulationFeedbackScreen', () => {
     const {getByTestId} = renderWithProviders(
       <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1'}} as any} />,
     );
-    // SummaryTab always renders once selected; its loading state is internal.
+    // DebriefTab always renders once selected; its loading/failed state is internal.
     fireEvent.press(getByTestId('tab-0'));
     await waitFor(() => {
-      expect(getByTestId('summary-tab')).toBeTruthy();
+      expect(getByTestId('debrief-tab')).toBeTruthy();
     });
   });
 
@@ -294,7 +317,7 @@ describe('SimulationFeedbackScreen', () => {
       <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1', fromLogs: true}} as any} />,
     );
     // testIDs are fixed per tab, not per position: 'tab-2' is TRANSCRIPTION
-    // (SUMMARY=0, ASK_AI=1, TRANSCRIPTION=2, SKILLS=3) whatever order they sit in.
+    // (DEBRIEF=0, SKILLS=1, TRANSCRIPTION=2) whatever order they sit in.
     fireEvent.press(getByTestId('tab-2'));
     await waitFor(() => {
       expect(getByTestId('transcript-tab')).toBeTruthy();
@@ -305,12 +328,45 @@ describe('SimulationFeedbackScreen', () => {
     const {getByTestId} = renderWithProviders(
       <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1', pathId: 'path-1'}} as any} />,
     );
-    // UP_NEXT always gets testID 'tab-5', regardless of how many tabs precede it
-    // (SUMMARY=0, ASK_AI=1, TRANSCRIPTION=2, SKILLS=3, UP_NEXT=5 — Reflection is hidden)
-    fireEvent.press(getByTestId('tab-5'));
+    // UP_NEXT always gets testID 'tab-3', regardless of how many tabs precede
+    // it (DEBRIEF=0, SKILLS=1, TRANSCRIPTION=2, UP_NEXT=3).
+    fireEvent.press(getByTestId('tab-3'));
     await waitFor(() => {
       expect(getByTestId('up-next-tab')).toBeTruthy();
     });
+  });
+
+  it('falls back to the first visible tab when debrief is turned off', async () => {
+    const services = require('@/services');
+    (services.useLazyGetSimulationDetailsQuery as jest.Mock).mockReturnValue([
+      mockSimulationDetailsTrigger,
+      {
+        data: {
+          details: {summary: {}},
+          score: 10,
+          startedAt: '2024-01-01T00:00:00Z',
+          endedAt: '2024-01-01T00:00:30Z',
+          scenario: {
+            title: 'Test',
+            metadata: {
+              feedbackTabs: {debrief: false, skills: true, transcript: true},
+            },
+          },
+          events: [],
+        },
+        isLoading: false,
+      },
+    ]);
+
+    const {getByTestId, queryByTestId} = renderWithProviders(
+      <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1'}} as any} />,
+    );
+    // Debrief starts as the default activeTabKey, but it isn't in the visible
+    // set here, so the screen falls through to Skills without a tap.
+    await waitFor(() => {
+      expect(getByTestId('session-skills-tab')).toBeTruthy();
+    });
+    expect(queryByTestId('debrief-tab')).toBeNull();
   });
 
   it('navigates back when fromLogs back button is pressed', () => {
@@ -371,14 +427,107 @@ describe('SimulationFeedbackScreen', () => {
     const {getByTestId, queryByTestId} = renderWithProviders(
       <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1'}} as any} />,
     );
-    // Without pathId/caseId all four render. testIDs are per tab, not per
-    // position: SUMMARY (0), ASK_AI (1), TRANSCRIPTION (2), SKILLS (3).
-    // Reflection is hidden (no tab-4) and UP_NEXT is absent (no tab-5).
+    // Without pathId/caseId, Debrief/Skills/Transcript render but Up Next
+    // doesn't. testIDs are per tab, not per position: DEBRIEF (0), SKILLS (1),
+    // TRANSCRIPTION (2), UP_NEXT (3).
     expect(getByTestId('tab-0')).toBeTruthy();
     expect(getByTestId('tab-1')).toBeTruthy();
     expect(getByTestId('tab-2')).toBeTruthy();
-    expect(getByTestId('tab-3')).toBeTruthy();
-    expect(queryByTestId('tab-4')).toBeNull();
-    expect(queryByTestId('tab-5')).toBeNull();
+    expect(queryByTestId('tab-3')).toBeNull();
+  });
+
+  describe('debrief moment anchors', () => {
+    // "See this moment" chips in the debrief note both switch to the
+    // Transcript tab and ask it to scroll to that message (web parity).
+
+    it('hands the anchored message id to the transcript tab', async () => {
+      const {getByTestId} = renderWithProviders(
+        <SimulationFeedbackScreen
+          navigation={{} as any}
+          route={{params: {scenarioSessionId: '1'}} as any}
+        />,
+      );
+
+      fireEvent.press(getByTestId('tab-0'));
+      fireEvent.press(getByTestId('debrief-open-moment-2'));
+
+      await waitFor(() => {
+        expect(getByTestId('transcript-tab')).toBeTruthy();
+      });
+      // The chip lands on the moment, not merely on the tab.
+      expect(getByTestId('transcript-focus-message-id').props.children).toBe(
+        'msg-2',
+      );
+      expect(getByTestId('transcript-focus-request-id').props.children).toBe(
+        '1',
+      );
+    });
+
+    it('raises a fresh request each time a moment is opened', async () => {
+      const {getByTestId} = renderWithProviders(
+        <SimulationFeedbackScreen
+          navigation={{} as any}
+          route={{params: {scenarioSessionId: '1'}} as any}
+        />,
+      );
+
+      fireEvent.press(getByTestId('tab-0'));
+      fireEvent.press(getByTestId('debrief-open-moment'));
+      await waitFor(() => {
+        expect(getByTestId('transcript-focus-request-id').props.children).toBe(
+          '1',
+        );
+      });
+
+      // Back to Debrief, then the same chip again: a learner who has scrolled
+      // away should be taken back to the moment rather than ignored because
+      // the id has not changed.
+      fireEvent.press(getByTestId('tab-0'));
+      fireEvent.press(getByTestId('debrief-open-moment'));
+
+      await waitFor(() => {
+        expect(getByTestId('transcript-focus-message-id').props.children).toBe(
+          'msg-1',
+        );
+        expect(getByTestId('transcript-focus-request-id').props.children).toBe(
+          '2',
+        );
+      });
+    });
+
+    it('does not wire onOpenMoment when the transcript tab is off', async () => {
+      const services = require('@/services');
+      (services.useLazyGetSimulationDetailsQuery as jest.Mock).mockReturnValue([
+        mockSimulationDetailsTrigger,
+        {
+          data: {
+            details: {summary: {}},
+            score: 10,
+            startedAt: '2024-01-01T00:00:00Z',
+            endedAt: '2024-01-01T00:00:30Z',
+            scenario: {
+              title: 'Test',
+              metadata: {
+                feedbackTabs: {debrief: true, skills: true, transcript: false},
+              },
+            },
+            events: [],
+          },
+          isLoading: false,
+        },
+      ]);
+
+      const {getByTestId, queryByTestId} = renderWithProviders(
+        <SimulationFeedbackScreen
+          navigation={{} as any}
+          route={{params: {scenarioSessionId: '1'}} as any}
+        />,
+      );
+
+      fireEvent.press(getByTestId('tab-0'));
+      // No transcript tab exists to jump to, so the moment-open control is
+      // never rendered.
+      expect(queryByTestId('debrief-open-moment')).toBeNull();
+    });
   });
 });
