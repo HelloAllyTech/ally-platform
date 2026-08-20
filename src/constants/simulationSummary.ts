@@ -6,12 +6,30 @@ import {SkillCoverage} from '@/types';
 
 export enum SimulationSummaryTabKey {
   SUMMARY = 'SUMMARY',
-  ASK_AI = 'ASK_AI',
+  DEBRIEF = 'DEBRIEF',
   TRANSCRIPTION = 'TRANSCRIPTION',
   SKILLS = 'SKILLS',
-  REFLECTION = 'REFLECTION',
   UP_NEXT = 'UP_NEXT',
 }
+
+export interface FeedbackTabsConfig {
+  debrief: boolean;
+  skills: boolean;
+  transcript: boolean;
+}
+
+/**
+ * Which post-session tabs a roleplay shows, when the backend response
+ * predates the `feedbackTabs` sub-toggle (or a cached one is in memory) —
+ * every tab defaults on, matching ally-web's PostSimulationSummary fallback.
+ * A stable module-level constant so it doesn't churn the `tabs` useMemo on
+ * every render.
+ */
+export const DEFAULT_FEEDBACK_TABS: FeedbackTabsConfig = {
+  debrief: true,
+  skills: true,
+  transcript: true,
+};
 
 export const getSimulationSummaryTabs = (
   t: TFunction,
@@ -19,25 +37,35 @@ export const getSimulationSummaryTabs = (
     pathId,
     caseId,
     shortSession,
+    feedbackTabs = DEFAULT_FEEDBACK_TABS,
   }: {
     pathId?: string;
     caseId?: string;
     shortSession?: boolean;
+    feedbackTabs?: FeedbackTabsConfig;
   },
 ) => {
-  const summaryTab = {
-    key: SimulationSummaryTabKey.SUMMARY,
-    title: t('postSim.tabs.sessionReview'),
-    testID: 'tab-0',
-  };
-
+  // Short sessions keep their own single-tab surface (Session Review, which
+  // falls straight through to ShortSessionUI) — untouched by the Debrief
+  // rework below.
   if (shortSession) {
-    return [summaryTab];
+    return [
+      {
+        key: SimulationSummaryTabKey.SUMMARY,
+        title: t('postSim.tabs.sessionReview'),
+        testID: 'tab-0',
+      },
+    ];
   }
 
-  const askAiTab = {
-    key: SimulationSummaryTabKey.ASK_AI,
-    title: t('postSim.tabs.askAi'),
+  const debriefTab = {
+    key: SimulationSummaryTabKey.DEBRIEF,
+    title: t('postSim.tabs.debrief'),
+    testID: 'tab-0',
+  };
+  const skillsTab = {
+    key: SimulationSummaryTabKey.SKILLS,
+    title: t('postSim.tabs.skillsDemonstrated'),
     testID: 'tab-1',
   };
   const transcriptionTab = {
@@ -45,24 +73,21 @@ export const getSimulationSummaryTabs = (
     title: t('postSim.tabs.annotatedTranscript'),
     testID: 'tab-2',
   };
-  const skillsTab = {
-    key: SimulationSummaryTabKey.SKILLS,
-    title: t('postSim.tabs.skillsDemonstrated'),
-    testID: 'tab-3',
-  };
 
-  // One order everywhere — web and mobile, reviewer and learner alike — so the
-  // tabs never move depending on how the session was opened. Skills Demonstrated
-  // leads, putting the substance of the feedback one tap closer.
-  // Deeper Reflection is hidden for now (SimulationSummaryTabKey.REFLECTION /
-  // Reflection component still exist, just not linked into this tab list).
-  const tabs = [skillsTab, transcriptionTab, askAiTab, summaryTab];
+  // Debrief → Skills → Transcript → Up Next, matching ally-web: the note is
+  // what the learner came back for, so it leads. Each sub-toggle can
+  // independently hide its own tab.
+  const tabs = [
+    ...(feedbackTabs.debrief ? [debriefTab] : []),
+    ...(feedbackTabs.skills ? [skillsTab] : []),
+    ...(feedbackTabs.transcript ? [transcriptionTab] : []),
+  ];
 
   if (pathId || caseId) {
     tabs.push({
       key: SimulationSummaryTabKey.UP_NEXT,
       title: t('postSim.tabs.upNext'),
-      testID: 'tab-5',
+      testID: 'tab-3',
     });
   }
 

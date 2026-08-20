@@ -22,6 +22,7 @@ import {
 } from '@/components';
 import {FeedbackSubmission, FeedbackValue} from '@/components/FeedbackPopup';
 import {
+  DEFAULT_FEEDBACK_TABS,
   getSimulationSummaryTabs,
   SCREEN_NAMES,
   SimulationSummaryTabKey,
@@ -43,7 +44,7 @@ import {useGetReviewByIdQuery} from '@/services/reviewsApi';
 import {useLazyGetThreadsQuery} from '@/services/reviewThreadsApi';
 import {useAppSelector} from '@/store/hooks';
 import {colors, globalStyles} from '@/theme';
-import {ReviewStatus} from '@/types';
+import {ReviewStatus, TranscriptFocusRequest} from '@/types';
 import {
   formatDurationAsMMSS,
   isMinutesPassed,
@@ -52,8 +53,7 @@ import {
 } from '@/utils';
 
 import {
-  AskAI,
-  Reflection,
+  DebriefTab,
   SessionSkills,
   SummaryTab,
   TranscriptTab,
@@ -77,11 +77,11 @@ export const SimulationFeedbackScreen: React.FC<
   const activeLanguageCode = i18n.resolvedLanguage ?? i18n.language ?? 'en';
   const insets = useSafeAreaInsets();
 
-  // Every surface opens on the first tab of the shared order (Skills
-  // Demonstrated), so the screen looks the same whether it was reached from the
+  // Every surface opens on Debrief — Ally's note is what the learner came
+  // back for — so the screen looks the same whether it was reached from the
   // logs or straight off a session. Short sessions only get Session Review.
   const [activeTabKey, setActiveTabKey] = useState<string>(
-    SimulationSummaryTabKey.SKILLS,
+    SimulationSummaryTabKey.DEBRIEF,
   );
   const [isFeedbackPopupVisible, setIsFeedbackPopupVisible] =
     useState<boolean>(false);
@@ -90,6 +90,13 @@ export const SimulationFeedbackScreen: React.FC<
     tags: [],
     comment: '',
   });
+  // A "See this moment" chip both switches to the transcript and asks it to
+  // scroll to that message. The counter makes each tap a distinct request, so
+  // tapping the same chip again scrolls back to the moment after the learner
+  // has scrolled away from it (web parity).
+  const [momentRequest, setMomentRequest] =
+    useState<TranscriptFocusRequest | null>(null);
+  const momentRequestCountRef = useRef(0);
   const feedbackPopupSource = useRef<'auto' | 'leave' | 'manual'>('auto');
   const hasFeedbackSubmitted = useRef(false);
   const [reviewId, setReviewId] = useState<string>();
@@ -116,11 +123,21 @@ export const SimulationFeedbackScreen: React.FC<
   const shortSession = isShortSession(simulationDetails?.details?.callDuration);
   const isPrivate = reviewData?.reviewStatus === ReviewStatus.HIDDEN;
 
+  // Which post-session tabs this roleplay shows. The backend sends this
+  // already resolved; the fallback here only covers a response cached from
+  // before the sub-toggles existed, where every tab was on (web parity).
+  const feedbackTabs =
+    simulationDetails?.scenario?.metadata?.feedbackTabs ??
+    DEFAULT_FEEDBACK_TABS;
+
   // When the trainer has disabled the AI feedback summary for this scenario,
   // skip the evaluation surface and only collect the star rating. Default to
-  // enabled when the flag is missing (legacy scenarios).
+  // enabled when the flag is missing (legacy scenarios). Switching every
+  // sub-toggle off is the same thing said a longer way, so it lands in the
+  // same branch — there is nothing left to show but the star rating.
   const feedbackEnabled =
-    simulationDetails?.scenario?.metadata?.enableFeedback !== false;
+    simulationDetails?.scenario?.metadata?.enableFeedback !== false &&
+    (feedbackTabs.debrief || feedbackTabs.skills || feedbackTabs.transcript);
 
   const {hideReviewDetails} = useHideReviewDetails({
     reviewId,
@@ -447,8 +464,9 @@ export const SimulationFeedbackScreen: React.FC<
         pathId,
         caseId,
         shortSession,
+        feedbackTabs,
       }),
-    [t, pathId, caseId, shortSession],
+    [t, pathId, caseId, shortSession, feedbackTabs],
   );
 
   const tabIndex = useMemo(() => {
@@ -456,12 +474,30 @@ export const SimulationFeedbackScreen: React.FC<
     return idx >= 0 ? idx : 0;
   }, [tabs, activeTabKey]);
 
+  // Debrief is the default landing tab, but a roleplay can switch it off (or
+  // any other currently-selected tab) — in which case fall through to
+  // whichever tab is actually first (web parity).
+  useEffect(() => {
+    if (!tabs.length) {
+      return;
+    }
+    if (!tabs.some(tab => tab.key === activeTabKey)) {
+      setActiveTabKey(tabs[0].key);
+    }
+  }, [tabs, activeTabKey]);
+
   const handleTabChange = useCallback(
     (index: number) => {
-      setActiveTabKey(tabs[index]?.key ?? SimulationSummaryTabKey.SUMMARY);
+      setActiveTabKey(tabs[index]?.key ?? SimulationSummaryTabKey.DEBRIEF);
     },
     [tabs],
   );
+
+  const handleOpenMoment = useCallback((messageId: string) => {
+    momentRequestCountRef.current += 1;
+    setMomentRequest({messageId, requestId: momentRequestCountRef.current});
+    setActiveTabKey(SimulationSummaryTabKey.TRANSCRIPTION);
+  }, []);
 
   const renderScene = useCallback(
     ({route: sceneRoute}: {route: {key: string}}) => {
@@ -476,11 +512,17 @@ export const SimulationFeedbackScreen: React.FC<
               retryLimitReached={retryLimitReached}
             />
           );
-        case SimulationSummaryTabKey.ASK_AI:
+        case SimulationSummaryTabKey.DEBRIEF:
           return (
-            <AskAI
+            <DebriefTab
               scenarioSessionId={scenarioSessionId || ''}
-              clientName={simulationDetails?.scenario?.metadata?.name ?? ''}
+              simulationDetails={simulationDetails ?? null}
+              retryLimitReached={retryLimitReached}
+              // Anchors only become chips when there is a transcript tab to
+              // switch to; otherwise they render as plain prose.
+              onOpenMoment={
+                feedbackTabs.transcript ? handleOpenMoment : undefined
+              }
             />
           );
         case SimulationSummaryTabKey.TRANSCRIPTION:
@@ -489,6 +531,7 @@ export const SimulationFeedbackScreen: React.FC<
               scenarioSessionId={scenarioSessionId}
               startedAt={simulationDetails?.startedAt}
               agentName={simulationDetails?.scenario?.metadata?.name}
+              focusMessage={momentRequest}
             />
           );
         case SimulationSummaryTabKey.SKILLS:
@@ -500,8 +543,6 @@ export const SimulationFeedbackScreen: React.FC<
               retryLimitReached={retryLimitReached}
             />
           );
-        case SimulationSummaryTabKey.REFLECTION:
-          return <Reflection scenarioSessionId={scenarioSessionId} />;
         case SimulationSummaryTabKey.UP_NEXT:
           return (
             <UpNext
@@ -527,6 +568,9 @@ export const SimulationFeedbackScreen: React.FC<
       handleFeedbackAndNavigate,
       languageId,
       activeTabKey,
+      feedbackTabs,
+      handleOpenMoment,
+      momentRequest,
     ],
   );
 
@@ -587,7 +631,7 @@ export const SimulationFeedbackScreen: React.FC<
       )}
       {feedbackEnabled &&
         !!reviewId &&
-        activeTabKey !== SimulationSummaryTabKey.ASK_AI &&
+        activeTabKey !== SimulationSummaryTabKey.DEBRIEF &&
         !hideReviewDetails &&
         hasSimulationReviewPermission && (
           <TouchableOpacity
@@ -598,7 +642,7 @@ export const SimulationFeedbackScreen: React.FC<
           </TouchableOpacity>
         )}
       {feedbackEnabled &&
-        activeTabKey !== SimulationSummaryTabKey.ASK_AI &&
+        activeTabKey !== SimulationSummaryTabKey.DEBRIEF &&
         !fromLogs &&
         !pathId &&
         !caseId &&
