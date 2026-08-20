@@ -53,8 +53,14 @@ one in this document.
 
 Two things that table also settles. `too_formal_diglossia` is **flat** across depth, which
 confirms register failure is a "never told the target variety" problem rather than a memory
-one, and so is untouched by anything here (§11). And `truncation` rises faster than
-anything else measured — see §11.1, because it is not this design's problem either.
+one (§11) — though whether the cause is the *content* or its *position* in the prompt is
+open, see §9.2.
+
+**Do not read the truncation column as a quality signal.** Just over half of `truncation`
+is the learner cutting the actor off, and barge-in frequency plausibly rises with depth on
+its own, so that 3.24% → 17.29% is partly interruption becoming more common in longer
+sessions. §11.1 has the measurement. It also means the `persona_break` column is an upper
+bound, since a half-sentence can read to a judge as a character failure.
 
 **The actor does not respond to counsellor skill.** Turns preceded by a scored event — the system's own judgement that the learner made a skilled intervention — introduce new information at **65.52%**. Turns with no scored event: **65.51%**. That is 583 versus 2,427 turns, and the difference is 0.01 points.
 
@@ -422,10 +428,11 @@ class ClientWorkingMemory(BaseModel):
 `speech_fragments` is the direct repair for what we broke on 6 August: verbatim examples of the character's own voice, carried across every compaction boundary.
 
 An earlier version of this schema also carried a `glossary_slice` — the Tier 0 language
-glossary narrowed to the terms live in the current stance and topic. It is **dropped**,
-for reasons §9.2 sets out: a client does not forget how to speak their language, so
-running vocabulary through a decay function is the one place the memory analogy breaks;
-and §11's own evidence says glossary volume is not the lever on register anyway.
+glossary narrowed to the terms live in the current stance and topic. It is **not a field
+here**, because vocabulary must not decay: a client does not forget how to speak their own
+language, and that is the one place §7's memory analogy breaks. But the glossary is still
+this design's business — it is currently the appended block furthest from generation, and
+whether that is why register guidance fails to land is untested. §9.2 has the argument.
 
 `withheld` follows `roleplay_v2`'s ledger contract verbatim. A withheld item renders
 its **topic and its deflection, never its content** — so the actor knows a subject exists and how to move away from it
@@ -1133,16 +1140,34 @@ than it thought — and the placement mechanism already exists as the
 `availableVariables` + placeholder contract in §2.3, which both proposals should use
 rather than inventing separate ones.
 
-**What it costs this document: `glossary_slice` is dropped.** The Tier 0 glossary is
-`attribute`-policy content keyed by language, and the policy framing makes clear why
-scoping it per turn was wrong. Three reasons, in ascending order of importance: it would
-move ~300 cache-stable tokens into the volatile region; §11's evidence says glossary
-volume is not the lever on register, so narrowing it cannot fix what it was pointed at;
-and a client does not forget how to speak their own language. Running vocabulary through
-a decay function is the one place the memory analogy in §7 breaks down, and a design
-should not ship the place it knows its own metaphor fails. Tier 1 glossary — already
-topic-retrieved — rides the `semantic` bucket and is ranked like any other recalled
-content.
+**What it costs this document: `glossary_slice` narrows to a placement question, not a
+decay one.** An earlier version of this section dropped the field outright. That went too
+far, and the reason is worth keeping because it is the general case this design is for.
+
+What survives unchanged: **vocabulary must not decay**. A client does not forget how to
+speak their own language, and running a term list through a recency curve is the one place
+the memory analogy in §7 breaks down. So the glossary is not a `salient_backstory` item and
+never gets a salience score.
+
+What does **not** survive: the claim that the glossary therefore has nothing to do with
+this design. `generate_system_message` appends in this order —
+
+```
+[template] → glossary → audio tags → rolling summary → retrieved context
+```
+
+— which makes the glossary the **first** appended block and therefore the one **furthest
+from generation** of everything appended. Meanwhile §2.2's own argument, from Stacks, is
+that relevant context belongs near the prompt end to raise the likelihood of use. So
+"Kannada carries 1,206 always-injected characters of glossary and still runs 49.4 register
+errors per 100 turns" has two readings the data does not separate: the content is wrong, or
+the content is present and positioned worst. The flat depth curve is consistent with both.
+
+That is a placement question, and placement is exactly what this design owns. The §2.3
+placeholder makes it a one-line experiment: move the block, read register errors. Until that
+runs, whether the glossary is scoped, moved, or left alone is **open** — and asserting it
+was settled was the error. Tier 1 glossary, already topic-retrieved, rides the `semantic`
+bucket regardless.
 
 ### Summary
 
@@ -1150,7 +1175,7 @@ content.
 |---|---|
 | Persona surface duplicated across main + branching templates | **Replaced** — one appended block, one source of truth |
 | `{retrieved_context}` as an independent block | **Replaced** — its `semantic` bucket becomes `salient_backstory`, stance-weighted (§2, §9.2). The state field is retired, not restructured |
-| Always-injected Tier 0 glossary, ~1,200 chars every turn | **Left alone** — it is session-invariant and cache-stable; `glossary_slice` is dropped (§9.2) |
+| Always-injected Tier 0 glossary, ~1,200 chars every turn | **Open** — it never decays, but it is currently the appended block furthest from generation, and whether moving or scoping it fixes register is untested (§9.2) |
 | `character_profile_text` full backstory dump | **Replaced** — becomes the selected 4±1 (§7.4) |
 | `rolling_summary` | **Kept**, and given the `voice` field it lacks (§1) |
 | Authored branching instructions, `stateInstructions`, guardrails | **Kept unchanged** — inputs, not derived state |
@@ -1212,12 +1237,12 @@ No memory architecture fixes never being told what variety to speak. That is a s
 
 ---
 
-### 11.1 Truncation — the second-largest category, and a different subsystem
+### 11.1 Truncation — half of it is normal conversation
 
-`truncation` is **1,109 annotations**, second only to `persona_break`, and it has the
-steepest depth curve of anything measured: 3.24% → **17.29%**. It is worth naming here
-precisely because a reader scanning the depth tables will reach for this design to fix it,
-and it will not.
+`truncation` is **1,109 annotations**, second only to `persona_break`, and it appeared to
+have the steepest depth curve of anything measured. It is worth the space because a reader
+scanning the depth tables will reach for this design to fix it, and it will not — but the
+bigger finding is that **just over half of it is not a defect at all**.
 
 Twenty annotated turns were read against their transcripts on 2026-08-20. They are real
 cut-offs, not a rubric flagging in-character terseness:
@@ -1227,29 +1252,56 @@ cut-offs, not a rubric flagging in-character terseness:
 > ACTOR: `Even when I put in a lot of effort, it feels like`
 > ACTOR: `मुझे डर है कि` — judge: *cut off mid-clause, leaving the client's fear unstated*
 
-Three candidate causes were tested and two are dead. **Not barge-in**: truncated turns are
-`interrupted` 1.9% of the time against 0.9% for the rest. **Not a token ceiling**: their
-length distribution is indistinguishable from non-truncated turns (p50 167 vs 168 chars,
-p95 359 vs 339) and they spread from 6 to 493 characters with no pile-up at a limit; no
-turn in either group had `llmTimedOut`. Nor a timeout of any kind.
+**It is mostly barge-in — the learner cutting the actor off.** Measured on the only window
+where the `interrupted` flag is actually written (week of 2026-08-17, 390 judged turns,
+100% language-judged):
 
-What the judge's own notes point at is the third cause: *"an incomplete thought that is only
-finished in the subsequent turn"*, *"a fragment is delivered before the full response"*.
-That is **one utterance split across two transcript rows**. Measured: **8.9%** of AI
-messages are immediately preceded by another AI message with no learner turn between, rising
-5.8% → 11.0% with conversation position — the same shape as the truncation curve, though
-smaller than its 17.3% peak, so splitting is a substantial part of it and not all of it.
+| | Turns | Truncated | Rate |
+|---|---|---|---|
+| not interrupted | 294 | 13 | **4.42%** |
+| interrupted | 96 | 15 | **15.63%** |
 
-Either way it is the streaming and segmentation path — interim replies, sentence splitting
-for TTS — and not memory, persona or prompt assembly. It should be investigated on its own,
-and it may be cheaper than anything in this document. Two consequences for reading the rest
-of these numbers:
+Barge-in raises truncation **3.5×**, and barge-in is 24.6% of turns in that window. **15 of
+28 truncated turns — 54% — sit on interrupted turns.** A learner interrupting is normal
+conversation, so that share should be **conditioned out**, not counted against actor
+quality. The mechanism already exists: annotations carry `conditionedOut` and
+`inputGarbled`, so barge-in should condition out `truncation` the way garbled input
+conditions out other categories. Doing that removes roughly half of the second-largest
+category and de-noises every rate on the tab.
 
-- Fragments inflate other categories too. A half-sentence can read to a judge as a
-  non-sequitur, a misinterpreted intent or a persona break, so the `persona_break` curve
-  above is an upper bound until this is fixed.
-- Whatever share is pure transcript artefact was never heard by the learner as a defect,
-  so it should not be counted against actor quality at all.
+**A correction, because the method matters more than the number.** An earlier version of
+this section reported "not barge-in: truncated turns are `interrupted` 1.9% against 0.9%".
+That was computed across all history, and `interrupted` is **exactly zero for every week
+before 2026-08-17** — the column existed and went unwritten until the barge-in
+instrumentation shipped. The hypothesis was tested against a flag that was always false and
+the null reported as a rule-out. Any comparison on this table must first check that the
+column was being written over the window it covers.
+
+The two rule-outs that **do** hold, because they do not depend on new instrumentation:
+**not a token ceiling** — truncated turns' length distribution is indistinguishable from
+the rest (p50 167 vs 168 chars, p95 359 vs 339), spreading 6 to 493 characters with no
+pile-up at any limit; and **not a timeout** — no turn in either group had `llmTimedOut`.
+
+**The predictive interim reply would explain it perfectly, and is not running.**
+`app/core/livekit/interim_reply.py` says the interim "IS recorded as a CLIENT transcript
+line" and "is cut the instant the real reply's TTS begins" — a truncated client turn by
+construction. But `INTERIM_REPLY_GLOBALLY_ENABLED` defaults to `False` and prod carries no
+override, so it is off. Recorded here so nobody re-derives it, and as a warning for whenever
+it is switched on: it will manufacture truncation annotations unless they are conditioned
+out first.
+
+**What is left is smaller and still open.** The residual **4.42%** on uninterrupted turns is
+genuine mid-sentence stopping with no known cause. Worth its own investigation, but it is a
+fraction of the 1,109 headline.
+
+Two consequences for the rest of this document:
+
+- **The truncation depth curve in §1 is not trustworthy as a quality signal.** Barge-in
+  frequency almost certainly rises with depth, so part of 3.24% → 17.29% is learners
+  interrupting more in longer sessions, not the actor degrading.
+- **The `persona_break` curve is an upper bound.** A half-sentence can read to a judge as a
+  non-sequitur, a misinterpreted intent or a persona break, so some share of that 2.7× rise
+  is fragments being judged as character failures.
 
 ---
 
