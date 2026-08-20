@@ -11,17 +11,50 @@
 
 Every number here is from production, queried 2026-08-19. They are the reason for the design; if they change, revisit it.
 
-**Quality degrades with conversation depth, in every language and on both models.** Share of judged AI turns carrying any fault:
+**Quality degrades with conversation depth, then plateaus.** Recomputed 2026-08-20 on
+16,668 judged turns, test organisations excluded — roughly six times the sample the first
+version of this table used. Share of judged AI turns carrying any fault:
 
-| Depth | All languages | en-IN (gpt-4o-mini, n=1,764) | ta-IN (gpt-4.1-mini) |
+| Depth | All languages | en-IN | ta-IN |
 |---|---|---|---|
-| turns 0–3 | 4.63% | 3.72% | 7.37% |
-| turns 4–7 | 6.01% | 2.54% | 15.34% |
-| turns 8–11 | 11.20% | 4.93% | 29.51% |
-| turns 12–19 | 12.20% | 8.06% | 31.03% |
-| turns 20+ | 14.77% | 9.28% | 39.66% |
+| turns 0–3 | 6.07% | 4.74% | 8.44% |
+| turns 4–7 | 8.43% | 3.93% | 16.90% |
+| turns 8–11 | **12.68%** | 5.46% | **30.95%** |
+| turns 12–19 | 12.04% | 6.48% | 29.37% |
+| turns 20+ | 11.33% | 6.58% | 35.25% |
+| *turns* | *16,668* | *10,327* | *3,792* |
 
-Broken out, across all languages: repetition rises 1.10% → 7.67% (7×), role slip 0.73% → 3.00% (4×), context lock-in 0.00% → 1.31%, persona/social errors 5.37% → 9.38%. The inflection sits at turns 8–11.
+**The plateau is the correction that matters.** An earlier read of this table had the curve
+climbing to 14.77% at turns 20+ and en-IN reaching 9.28%. On the full sample it **flattens
+after the 8–11 inflection** and en-IN reaches only 6.58% — a 1.4× rise end to end, not the
+2.5× first reported, and not even monotonic (en-IN dips at 4–7). Broken out by mode across
+all languages, the same shape: repetition 1.02% → 5.04% then flat near 4.4%, role slip
+1.68% → 3.30% then flat, context lock-in 0.23% → 1.39% → 0.64%.
+
+So "degrades with depth" is real, and the inflection at 8–11 is real, but the damage is
+done by turn 12 and does not compound after it. A design justified on runaway degradation
+at turn 30 would be justified on something that is not happening.
+
+**What does keep climbing is the persona failure specifically.** From the language judge's
+own annotations, per judged turn:
+
+| Depth | persona_break | truncation | too_formal_diglossia |
+|---|---|---|---|
+| turns 0–3 | 4.70% | 3.24% | 4.20% |
+| turns 4–7 | 6.13% | 5.15% | 3.99% |
+| turns 8–11 | 8.29% | 5.64% | 5.18% |
+| turns 12–19 | 9.20% | 8.78% | 3.86% |
+| turns 20+ | **12.67%** | **17.29%** | 3.92% |
+
+`persona_break` is the **largest annotation category** (1,223) and the only quality signal
+that rises monotonically all the way to 20+ turns, 2.7× end to end. That — not the
+aggregate curve above — is the measurement this design rests on, and it is the strongest
+one in this document.
+
+Two things that table also settles. `too_formal_diglossia` is **flat** across depth, which
+confirms register failure is a "never told the target variety" problem rather than a memory
+one, and so is untouched by anything here (§11). And `truncation` rises faster than
+anything else measured — see §11.1, because it is not this design's problem either.
 
 **The actor does not respond to counsellor skill.** Turns preceded by a scored event — the system's own judgement that the learner made a skilled intervention — introduce new information at **65.52%**. Turns with no scored event: **65.51%**. That is 583 versus 2,427 turns, and the difference is 0.01 points.
 
@@ -1176,6 +1209,47 @@ while Hindi, which also has one, runs at 0.0. A term list is not a substitute fo
 naming the variety, and only the two diglossic languages fail. Separately, fluency is worse in mr-IN (74.7) and hi-IN (59.4) than en-IN (46.4) on the *same model*, and `linguistic_style_samples` lives on `scenario_characters` — per character, not per language.
 
 No memory architecture fixes never being told what variety to speak. That is a separate, much cheaper change, and it should ship first regardless of this design.
+
+---
+
+### 11.1 Truncation — the second-largest category, and a different subsystem
+
+`truncation` is **1,109 annotations**, second only to `persona_break`, and it has the
+steepest depth curve of anything measured: 3.24% → **17.29%**. It is worth naming here
+precisely because a reader scanning the depth tables will reach for this design to fix it,
+and it will not.
+
+Twenty annotated turns were read against their transcripts on 2026-08-20. They are real
+cut-offs, not a rubric flagging in-character terseness:
+
+> ACTOR: `Yes, exactly. I'm not sure what` — judge: *unusable fragment, ending abruptly mid-thought*
+> ACTOR: `"Honestly,` — judge: *consists of a single word*
+> ACTOR: `Even when I put in a lot of effort, it feels like`
+> ACTOR: `मुझे डर है कि` — judge: *cut off mid-clause, leaving the client's fear unstated*
+
+Three candidate causes were tested and two are dead. **Not barge-in**: truncated turns are
+`interrupted` 1.9% of the time against 0.9% for the rest. **Not a token ceiling**: their
+length distribution is indistinguishable from non-truncated turns (p50 167 vs 168 chars,
+p95 359 vs 339) and they spread from 6 to 493 characters with no pile-up at a limit; no
+turn in either group had `llmTimedOut`. Nor a timeout of any kind.
+
+What the judge's own notes point at is the third cause: *"an incomplete thought that is only
+finished in the subsequent turn"*, *"a fragment is delivered before the full response"*.
+That is **one utterance split across two transcript rows**. Measured: **8.9%** of AI
+messages are immediately preceded by another AI message with no learner turn between, rising
+5.8% → 11.0% with conversation position — the same shape as the truncation curve, though
+smaller than its 17.3% peak, so splitting is a substantial part of it and not all of it.
+
+Either way it is the streaming and segmentation path — interim replies, sentence splitting
+for TTS — and not memory, persona or prompt assembly. It should be investigated on its own,
+and it may be cheaper than anything in this document. Two consequences for reading the rest
+of these numbers:
+
+- Fragments inflate other categories too. A half-sentence can read to a judge as a
+  non-sequitur, a misinterpreted intent or a persona break, so the `persona_break` curve
+  above is an upper bound until this is fixed.
+- Whatever share is pure transcript artefact was never heard by the learner as a defect,
+  so it should not be counted against actor quality at all.
 
 ---
 
