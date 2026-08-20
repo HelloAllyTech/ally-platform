@@ -33,7 +33,10 @@ export * from './simulations';
 
 // Transcript types
 export type {CallTranscriptMessage} from './callTranscript';
-export type {SimulationTranscriptMessage} from './simulationTranscript';
+export type {
+  SimulationTranscriptMessage,
+  TranscriptFocusRequest,
+} from './simulationTranscript';
 
 // Credits types
 export * from './credits';

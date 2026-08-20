@@ -16,18 +16,6 @@ jest.mock('../../EventChecklist', () => {
   };
 });
 
-jest.mock('../../ExpandableFeedbackSection', () => {
-  const React = require('react');
-  const {View, Text} = require('react-native');
-  return {
-    ExpandableFeedbackSection: ({title}: any) => (
-      <View testID="expandable-feedback-section">
-        <Text>{title}</Text>
-      </View>
-    ),
-  };
-});
-
 jest.mock('@/assets', () => {
   const React = require('react');
   const {View} = require('react-native');
@@ -87,7 +75,7 @@ describe('SimulationSummary', () => {
     expect(getByText(/Min/)).toBeTruthy();
   });
 
-  it('hides EventChecklist and feedback sections when experienceMode is NONE', () => {
+  it('hides EventChecklist when experienceMode is NONE', () => {
     const noneData = {
       ...baseData,
       scenario: {
@@ -96,15 +84,24 @@ describe('SimulationSummary', () => {
       },
     };
     const {getByText, queryByTestId} = render(
-      <SimulationSummary
-        data={noneData as any}
-        positives={['p1']}
-        improvements={['i1']}
-      />,
+      <SimulationSummary data={noneData as any} />,
     );
     expect(getByText('Scenario Title')).toBeTruthy();
     expect(getByText('ID: test-id-123')).toBeTruthy();
     expect(queryByTestId('event-checklist')).toBeNull();
-    expect(queryByTestId('expandable-feedback-section')).toBeNull();
+  });
+
+  it('renders EventChecklist for a non-short CHECKLIST-mode session', () => {
+    const checklistData = {
+      ...baseData,
+      scenario: {
+        ...baseData.scenario,
+        metadata: {experienceMode: 'CHECKLIST'},
+      },
+    };
+    const {getByTestId} = render(
+      <SimulationSummary data={checklistData as any} />,
+    );
+    expect(getByTestId('event-checklist')).toBeTruthy();
   });
 });

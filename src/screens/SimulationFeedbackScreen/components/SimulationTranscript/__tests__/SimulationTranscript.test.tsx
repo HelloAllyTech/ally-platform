@@ -21,6 +21,7 @@ jest.mock('@/components', () => {
   const {View} = require('react-native');
   return {
     useErrorToast: () => ({showErrorToast: jest.fn()}),
+    useToast: () => ({showToast: jest.fn()}),
     CustomDropdown: () => <View testID="language-dropdown" />,
   };
 });

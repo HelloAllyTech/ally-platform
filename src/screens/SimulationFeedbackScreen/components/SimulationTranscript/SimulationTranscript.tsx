@@ -2,13 +2,13 @@ import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {ActivityIndicator, FlatList, Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {CustomDropdown, useErrorToast} from '@/components';
+import {CustomDropdown, useErrorToast, useToast} from '@/components';
 import {EmptyTranscript} from '@/components/EmptyTranscript/EmptyTranscript';
 import {TRANSCRIPT_LANGUAGE_OPTIONS} from '@/constants';
 import {useSimulationTranscriptDetails} from '@/hooks/useSimulationTranscriptDetails';
 import {useTranslate} from '@/hooks/useTranslate';
 import {colors, fontFamily} from '@/theme';
-import {SimulationTranscriptMessage} from '@/types';
+import {SimulationTranscriptMessage, TranscriptFocusRequest} from '@/types';
 import {logger} from '@/utils/logger';
 
 import {
@@ -18,6 +18,13 @@ import {
 import {SimulationTranscriptItem} from '../SimulationTranscriptItem';
 import {SummaryCard} from '../SummaryCard';
 
+/**
+ * How long a jumped-to moment stays visibly marked. Long enough to catch the
+ * eye once the scroll settles, short enough that it reads as "here it is"
+ * rather than as a selection the reader now has to dismiss (web parity).
+ */
+const FOCUS_HIGHLIGHT_MS = 2500;
+
 export const SimulationTranscript: React.FC<{
   sessionId: string;
   startedAt?: string;
@@ -25,6 +32,13 @@ export const SimulationTranscript: React.FC<{
   audioUrl?: string;
   recordingUrlLoading?: boolean;
   onRecordingPlaybackFailed?: () => void;
+  /**
+   * A moment to scroll to and mark — raised by the "See this moment" chips in
+   * Ally's debrief note. The transcript pages in, so a moment further down the
+   * session may not be loaded yet: this chases pages until it turns up or the
+   * transcript runs out.
+   */
+  focusMessage?: TranscriptFocusRequest | null;
 }> = ({
   sessionId,
   startedAt,
@@ -32,9 +46,11 @@ export const SimulationTranscript: React.FC<{
   audioUrl,
   recordingUrlLoading = false,
   onRecordingPlaybackFailed,
+  focusMessage,
 }) => {
   const {t} = useTranslate();
   const {showErrorToast} = useErrorToast();
+  const {showToast} = useToast();
   const [transcriptLanguage, setTranscriptLanguage] = useState('en');
   const [isLanguageDropdownOpen, setIsLanguageDropdownOpen] = useState(false);
   const {
@@ -179,6 +195,83 @@ export const SimulationTranscript: React.FC<{
     }
   }, [playbackSeconds, formattedMessages, activeIndex, listRef]);
 
+  const [focusedMessageId, setFocusedMessageId] = useState<string | null>(null);
+  const handledFocusRequestRef = useRef<number | null>(null);
+  const focusHighlightTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Moment chase: the requested message may sit on a page that hasn't loaded
+  // yet, so page forward until it turns up — mirrors the seek chase above,
+  // where each new page re-triggers this effect.
+  useEffect(() => {
+    if (!focusMessage) {
+      return;
+    }
+    if (handledFocusRequestRef.current === focusMessage.requestId) {
+      return;
+    }
+
+    const targetId = String(focusMessage.messageId);
+    const index = formattedMessages.findIndex(
+      message => String(message.id) === targetId,
+    );
+
+    if (index !== -1) {
+      handledFocusRequestRef.current = focusMessage.requestId;
+      setFocusedMessageId(targetId);
+      try {
+        listRef.current?.scrollToIndex({
+          index,
+          animated: true,
+          viewPosition: 0.3,
+        });
+      } catch {
+        // onScrollToIndexFailed below retries once layout catches up.
+        logger.error('SimulationTranscript: scrollToIndex failed for moment');
+      }
+      return;
+    }
+
+    if (hasMore) {
+      if (!isLoading && !isFetching) {
+        handleEndReached();
+      }
+      return;
+    }
+
+    // Every page is loaded and the moment is in none of them. Ally only
+    // anchors moments it could resolve, so this is the rare edge (e.g. a
+    // translated transcript that dropped a turn) — say the jump didn't land
+    // rather than leaving the learner at the top of the transcript wondering.
+    handledFocusRequestRef.current = focusMessage.requestId;
+    showToast(t('postSim.debrief.momentNotFound'), 'error');
+  }, [
+    focusMessage,
+    formattedMessages,
+    hasMore,
+    isLoading,
+    isFetching,
+    handleEndReached,
+    listRef,
+    showToast,
+    t,
+  ]);
+
+  // Let the highlight expire on its own once the scroll has landed.
+  useEffect(() => {
+    if (!focusedMessageId) {
+      return;
+    }
+    focusHighlightTimerRef.current = setTimeout(
+      () => setFocusedMessageId(null),
+      FOCUS_HIGHLIGHT_MS,
+    );
+    return () => {
+      if (focusHighlightTimerRef.current) {
+        clearTimeout(focusHighlightTimerRef.current);
+      }
+    };
+  }, [focusedMessageId]);
+
   const renderItem = ({
     item,
     index,
@@ -186,7 +279,7 @@ export const SimulationTranscript: React.FC<{
     item: SimulationTranscriptMessage;
     index: number;
   }) => {
-    const {time, message, isLearner, startSeconds, tags} = item;
+    const {id, time, message, isLearner, startSeconds, tags} = item;
     const speakerLabel = isLearner
       ? t('transcription.youLabel')
       : agentName
@@ -199,6 +292,7 @@ export const SimulationTranscript: React.FC<{
         message={message}
         speakerLabel={speakerLabel}
         isActive={index === activeIndex}
+        isFocused={focusedMessageId !== null && String(id) === focusedMessageId}
         onPress={() => queueSeekToSeconds(startSeconds)}
         isLearner={isLearner}
         tags={tags}

@@ -935,13 +935,26 @@
       "transcriptTranslationFailed": "Failed to load transcript. Please retry.",
       "upNext": "Up next",
       "askAi": "Ask AI",
-      "deeperReflection": "Deeper Reflection",
+      "debrief": "Debrief",
       "skillsDemonstrated": "Skills  Demonstrated",
       "sessionReview": "Session Review"
     },
     "shortSession": {
       "title": "Session ended too soon",
       "description": "We need more interaction data to provide meaningful feedback."
+    },
+    "debrief": {
+      "header": "Your debrief",
+      "from": "from Ally",
+      "aiLabel": "AI-generated",
+      "aiTooltip": "Ally is an AI supervisor. This debrief was written by AI from your session transcript, not by a person.",
+      "generating": "Ally is writing your debrief…",
+      "generatingHint": "This usually takes a few moments.",
+      "failed": "Ally couldn't write your debrief for this session.",
+      "momentLabel": "See this moment",
+      "momentNotFound": "We couldn't jump to that moment — here's the full transcript instead.",
+      "replyPlaceholder": "Reply to Ally about this session… (0/{{max}})",
+      "replyPrompt": "Have a question about any of this? Reply below."
     },
     "feedback": {
       "generating": "Generating your feedback…",
@@ -1030,15 +1043,6 @@
       "language": "Language",
       "leaderboardNotification": "Leaderboard Notification"
     }
-  },
-  "reflection": {
-    "sectionTitle": "Self-Reflection Prompts",
-    "autosaving": "Autosaving",
-    "saveFailed": "Failed to save",
-    "saved": "Saved",
-    "autoSaveFailed": "Failed to auto-save the response",
-    "writeThoughts": "Write your thoughts here...",
-    "noPrompts": "No prompts available"
   },
   "review": {
     "title": "Review",
@@ -1747,7 +1751,6 @@
     "uploadProfileImage": "Failed to upload profile image",
     "removeProfileImage": "Failed to remove profile image",
     "audioSession": "Failed to configure audio session",
-    "reflectionPromptSaveFailed": "Failed to save reflection prompt",
     "endSimulation": "Failed to end simulation",
     "permission": "Microphone permission required",
     "submitBugReport": "Failed to submit report"

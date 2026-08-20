@@ -6,28 +6,26 @@ import {HelpIcon} from '@/assets';
 import {useTranslate} from '@/hooks';
 import {SimulationDetailsModal} from '@/screens/SimulationPathDetailsScreen/components/SimulationDetailsModal';
 import {colors, fontFamily} from '@/theme';
-import {ExperienceMode, FeedbackItem, SimulationSummaryData} from '@/types';
+import {ExperienceMode, SimulationSummaryData} from '@/types';
 import {formatDateTime, isShortSession} from '@/utils';
 
 import {EventChecklist} from '../EventChecklist';
-import {ExpandableFeedbackSection} from '../ExpandableFeedbackSection';
 import {ShortSessionUI} from '../ShortSessionUI';
 import {SummaryCard} from '../SummaryCard';
 
 interface SimulationSummaryProps {
   data: SimulationSummaryData | null;
-  positives?: string[];
-  improvements?: (string | FeedbackItem)[];
-  /** True while the summary/translation for the active language is still generating. */
-  isFeedbackGenerating?: boolean;
 }
 
-export const SimulationSummary: React.FC<SimulationSummaryProps> = ({
-  data,
-  positives = [],
-  improvements = [],
-  isFeedbackGenerating = false,
-}) => {
+// This component now only renders for short sessions (see
+// getSimulationSummaryTabs) — the "strengths / areas for growth" lists it
+// used to show for the full-length case were retired in favour of Ally's
+// debrief note (see components/Debrief/DebriefTab, which now renders
+// EventChecklist for CHECKLIST-mode roleplays that AREN'T short). The
+// EventChecklist branch just below is left exactly as it was: unreachable
+// whenever isShortSession is true (as it always has been), so untouched
+// rather than deleted.
+export const SimulationSummary: React.FC<SimulationSummaryProps> = ({data}) => {
   const {t} = useTranslate();
 
   const [showSimulationDetailsModal, setShowSimulationDetailsModal] =
@@ -48,7 +46,6 @@ export const SimulationSummary: React.FC<SimulationSummaryProps> = ({
 
   const experienceMode = data?.scenario?.metadata?.experienceMode;
   const isChecklistMode = experienceMode === ExperienceMode.CHECKLIST;
-  const isNoneMode = experienceMode === ExperienceMode.NONE;
 
   // Note: coverImageUrl may be available in extended scenario data
   const coverImageUrl =
@@ -103,25 +100,8 @@ export const SimulationSummary: React.FC<SimulationSummaryProps> = ({
       {isShortSession(data?.details?.callDuration) ? (
         <ShortSessionUI />
       ) : (
-        <>
-          {isChecklistMode && data?.id && (
-            <EventChecklist scenarioSessionId={data.id} />
-          )}
-          {!isChecklistMode && !isNoneMode && (
-            <>
-              <ExpandableFeedbackSection
-                title={t('postSim.skills.strengths')}
-                items={positives}
-                isGenerating={isFeedbackGenerating}
-              />
-              <ExpandableFeedbackSection
-                title={t('postSim.skills.areasForGrowth')}
-                items={improvements}
-                isGenerating={isFeedbackGenerating}
-              />
-            </>
-          )}
-        </>
+        isChecklistMode &&
+        data?.id && <EventChecklist scenarioSessionId={data.id} />
       )}
       <SimulationDetailsModal
         visible={showSimulationDetailsModal}
