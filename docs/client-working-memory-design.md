@@ -443,7 +443,7 @@ class ClientWorkingMemory(BaseModel):
     salient_backstory: list[Fact]  # semantic-bucket retrieval output (§9.2)
 
     # ── bookkeeping ──────────────────────────────────────────────
-    revision: str                  # SHA-256, optimistic lock
+    updated_by_turn: int           # monotonic commit key — see §9.1
     updated_at_turn: int
 ```
 
@@ -980,7 +980,7 @@ implements human memory. Three specific cautions:
 | `KEEP_RECENT_FRACTION = 0.25` | OpenWorker | Reserve budget for recent **verbatim** turns — the direct fix for dropping history entirely |
 | Branch summarisation on transition | Pi | On stance transition, summarise the span of the outgoing stance; each phase produces its own episode |
 | `foldCapture` | QM | Write path for `disclosed`: normalise → dedup by key → cap → periodic `UPDATE`/`DELETE`/`ADD` consolidation |
-| `replaceIfRevision` (SHA-256) | QM | The `revision` field. The detached updater and the live turn will race |
+| `replaceIfRevision` (SHA-256) | QM | **Superseded** — the updater and the live turn do race, but these writes have a natural order, so `RuntimeStateStore`'s monotonic turn-index commit expresses the same guarantee without hashing content (§9.1) |
 | No-summary trim fallback (`_TRIM_FRACTION`) | OpenWorker | A failed update keeps the previous model and retries; a turn never blocks on it |
 | Dual-view / never mutate raw transcripts | OpenWorker | Working memory is derived. Transcripts stay authoritative |
 | Head/tail protection | Hermes | Protect the persona (head) and recent verbatim turns (tail) |
@@ -1039,25 +1039,17 @@ That is a real possibility and an unproven one. It needs its own investigation, 
 should not be bundled into this design's phasing — but it is the largest latency prize
 visible anywhere in the pipeline, so it belongs on the record.
 
-### 9.1 Relationship to `roleplay_v2` — build on v1
+### 9.1 Salvaging `roleplay_v2` — decommission decided, so this is a parts list
 
-`roleplay_v2` already contains a per-turn structured card that is most of this design.
-`app/prompts/actor/turn_card.txt`:
+**The decision is made and it is not this document's to make.** Sandeep, who owns that
+path: `roleplay_v2` was an experiment, and it is decommissioned once we have taken whatever
+we can reuse. An earlier version of this section left the question open on the grounds that
+sixty-six spec versions is real effort and a traffic count is not a decision. It was right
+to leave it open and it is now answered, so what follows is a salvage list rather than a
+recommendation.
 
-```
-# TURN CARD (directors' note for your next reply only)
-## Your current state: {state_name}
-## Disclosure ledger
-   NEVER reveal locked items — if the counselor probes one, use its deflection instead.
-## Background memories (yours; draw on them when relevant)
-## Stage direction for this reply
-```
-
-Backed by `spec.state_machine`, `spec.disclosure_ledger.secrets` with per-secret
-`locked_deflection`, and `RuntimeSessionState.ledger` tracking LOCKED/UNLOCKED per
-secret at runtime. As a design it covers much of what §3 specifies.
-
-**As an asset it is empty.** Production, as of 2026-08-19:
+**What was measured before that decision** (production, 2026-08-19), because it explains
+why the experiment stalled and what this design must therefore do differently:
 
 | | |
 |---|---|
@@ -1067,131 +1059,88 @@ secret at runtime. As a design it covers much of what §3 specifies.
 | Spec status | **all DRAFT, none published**, `roleplay_spec_tenants` empty |
 | Authored `disclosure_ledger.secrets` | **0** across every spec |
 | Authored `state_machine.states` | **0** across every spec |
-| Last spec edit | 2026-07-24 |
 
 The five specs are one prototype character iterated 22 times. So `_render_ledger_section`
-renders *"(nothing is being withheld in this scenario)"* for all of them, and the state
-machine falls back to its initial state.
+renders *"(nothing is being withheld in this scenario)"* for all of them and the state
+machine never leaves its initial state. **v2's design was sound and its content was never
+written** — which is precisely why this design derives stance, disclosures and threads from
+the conversation instead of requiring them per scenario (§2).
 
-**Decision: build on v1.** Three reasons.
+#### It is live, tested code — 143 tests, all passing
 
-1. **The authoring never happened, and that is the finding.** v2's value is contingent
-   on per-scenario secrets, deflections and states being written. Six weeks produced
-   none. Reviving it means a content programme across the 58 scenarios that actually run
-   before any learner sees a difference. This design derives the same fields from the
-   conversation, which is why it can ship without that programme.
-2. **The evidence is all v1.** Every number in §1 — the depth curve, the contingency
-   null, the role-slip regression, the latency bands — is measured on v1. Justifying a
-   design on one runtime and building it on another leaves it unevaluable.
-3. **v2 would currently regress the language metrics.** Its compiler calls
-   `_format_language_samples([])` and `_format_allowed_fillers_for_prompt(None)` —
-   hardcoded empty. Against register and fluency, our worst measures, that is a step
-   backwards.
+4,807 lines of implementation against 2,904 lines of tests, and the whole
+`tests/roleplay_v2` suite passes as of 2026-08-20. This is not a rotted branch to read for
+ideas; it is working machinery to move. **Most of this design's runtime plumbing already
+exists there.** What v2 never had is the thing this design adds — deriving the state rather
+than being handed it.
 
-**Take three things from it**, all in §3 and §4: the ledger contract (topic and
-deflection, never content), the *"directors' note for your next reply only"* framing,
-and its named empty states.
+#### Take wholesale
 
-**Do not delete v2, and not on this doc's recommendation.** Sixty-six spec versions is
-real effort, and whether the path is paused, abandoned or planned is a question for
-whoever built it — not something to infer from a traffic count. Keep it as reference
-until the working-memory layer has shipped and been measured; retiring the alternative before
-the replacement is proven leaves neither. Its one live liability is the hardcoded
-language fields above, which deserve a comment so a future revival does not quietly
-ship the regression.
+**`spec/runtime_state.py` — `RuntimeStateStore` / `RuntimeSessionState`.** The store §5
+argues for, with the concurrency problem already solved and solved better than proposed
+here. Mutation serialises under an `asyncio.Lock`; readers get deep-copied snapshots so they
+never see a torn write; and commits are **monotonic on turn index** — a verdict for a turn
+at or before the last committed one is rejected outright, so *"a slow Director can only ever
+miss a turn, never rewind the session."*
 
-### 9.2 Relationship to the retrieval-policies proposal
+**This replaces the `revision` field in §3.** SHA-256 optimistic locking was borrowed from
+QM's `replaceIfRevision`, which is the right tool when writes have no natural order. These
+do: the turn index *is* the ordering key, monotonic commits express the same guarantee
+without hashing content, and `test_runtime_state.py` already pins the behaviour.
 
-[`knowledge-source-retrieval-policies.md`](knowledge-source-retrieval-policies.md)
-proposes giving each knowledge source a `retrieval` descriptor — `always`, `attribute`,
-`state` or `semantic` — so a source declares *when* it enters the prompt instead of every
-source sharing one trigger. Both documents currently say they own
-`state.retrieved_context`. That reads as a conflict and is not one: the two proposals
-operate at different layers, and both are right about their own.
+**`actor/prompt_compiler.py`.** §2.2's design, built. Two system messages around the
+history — a byte-stable static prefix compiled once per session so provider caching hits
+every turn, and a per-turn card. It already reuses the v1 helpers, resolves through
+`load_and_format` so dashboard overrides work, and passes data blocks as `format_map` kwargs
+so braces in authored text can never break formatting. That last detail is a trap this
+design would have walked into, since the block carries client-authored speech verbatim.
 
-**Policy answers eligibility. Salience answers ranking.** A policy is authored,
-deterministic and per-source: *may this content enter the prompt this turn at all*.
-Salience (§7.4) is derived, psychological and per-turn: *of the content that is eligible,
-what does this client currently have in mind*. Ranking without eligibility gates has no
-way to express "language guidance applies unconditionally"; eligibility without ranking
-is the flat, everything-equally-present state §1 is about.
+**`actor/retrieval/persona_bible.py`.** `salient_backstory` selection, built, with a
+three-tier fallback: Director-nominated topics first, then keyword match against the
+learner's last utterance, then spec order so the actor always has *some* grounding. A
+cumulative character cap bounds the budget, and `_DIRECTOR_TOPIC_BOOST = 0.5` is an additive
+term in exactly the shape §7.4's salience function uses.
 
-So the four policies route to four different places, and only one of them reaches working
-memory:
+**`DirectorService.on_turn_committed`.** The off-path updater shape §5 lands on:
+fire-and-forget into a tracked task set, hard timeout, and on timeout it records a *miss*
+rather than delaying the actor.
 
-| Policy | Destination | Resolved | In working memory? |
-|---|---|---|---|
-| `always` | static prefix | once per session | no |
-| `attribute` (language, region) | static prefix — the language block | once per session | no |
-| `state` | with `{state_x_guidelines}` | on state transition | no |
-| `semantic` | the candidate pool the salience function ranks into `salient_backstory` | ~every 2 turns | **yes** |
+#### Take the principle
 
-**This resolves the field collision by removing the field from both designs.** The
-policies doc proposes `state.retrieved_context` become a bucketed struct; this doc retires
-the field. Neither is necessary once the routing above is explicit:
+**`DirectorService._apply` is the discipline this design needs most, and currently lacks.**
+The LLM verdict is **advisory** and re-validated in code before anything commits: scores
+come from rubric weights, never from the model; a transition is accepted only through a
+satisfied guard on the *current* state with `minTurnsInState` and `minCumulativeScore`
+passing; stage directions are truncated to one sentence; time-based events never come from
+the LLM at all.
 
-- `always` and `attribute` are **session-invariant** — language does not change mid-session
-  and `always` is unconditional. They are resolved once at session start and rendered into
-  the static prefix. They never become per-turn work and never touch graph state, which is
-  strictly better than the struct: it takes content off the per-turn path entirely.
-- `state` already has a home in the state guidance block.
-- `semantic` goes to the worker-owned `ClientWorkingMemoryStore`, for the reasons in §5.
+§3 says stance transitions must be **earned** but does not say who enforces that. v2
+answers it: code enforces, the LLM only proposes. Adopt that division wholesale — it is the
+difference between a state machine and a suggestion.
 
-The composer's bucketed output is therefore a **return value**, not a state channel.
-`retrieved_context` and `turns_until_knowledge_refresh` leave `SimulationState` under both
-designs, and the struct is never added.
+**Three things §7 treats as new that already exist.** `state_path` (ordered visited states)
+is `phase_diversity` for the spacing effect. `retrieve_topics` is the off-path component
+nominating next turn's retrieval cues. `direction_staleness_turns` with
+`director_commits` / `director_misses` is the freshness observability §5.1 asks for.
 
-**Sequencing: the policies proposal ships first, and it is a prerequisite rather than a
-competitor.** Three reasons.
+#### Do not take
 
-1. **It is behaviour-safe by construction.** A source with no `retrieval` field is treated
-   as `semantic`, so existing scenarios render byte-for-byte identically. It can deploy
-   before any authoring happens — the opposite of the `roleplay_v2` trap in §9.1.
-2. **It delivers phase 1 of §14.** The `attribute` policy is a plausible mechanism for the
-   `targetVariety` fix — the item in this document with the largest measured gap (49.4
-   register errors per 100 turns in Kannada against 0.0 in Hindi, §11), and the one that
-   should ship regardless of anything here.
-3. **Phase 5 depends on it.** Folding retrieval into `salient_backstory` needs a clean
-   `semantic` bucket to point at. Without policies, the candidate pool arrives as one
-   undifferentiated blob of domain knowledge, language guidance and force-fed
-   `role_instructions` content, and the salience function would be ranking things that
-   should never have been ranked.
+| | Why |
+|---|---|
+| `spec/models.py`, the `roleplay_specs` authoring surface | Zero authored states or secrets across 66 spec versions. Deriving instead is this design's premise |
+| `worker_v2.py`, `session/` | Alternative worker entry point; v1 stays the runtime (the evidence in §1 is all v1) |
+| `rehearsal/` (~2,000 lines with its own trainee bot and judge) | Overlaps the v2v tester. Probably duplicate — worth one comparison pass before discarding, not assumed |
 
-**What this costs the policies proposal: its §7 "Preferred" placement gets simpler.** That
-option has the composer return sectioned output and the template grow policy-aware slots.
-Under the routing above only `semantic` is volatile, so the sectioning it needs is smaller
-than it thought — and the placement mechanism already exists as the
-`availableVariables` + placeholder contract in §2.3, which both proposals should use
-rather than inventing separate ones.
+**One liability to kill rather than inherit.** v2's compiler calls
+`_format_language_samples([])` and `_format_allowed_fillers_for_prompt(None)` — hardcoded
+empty. Against register and fluency, our worst measures, carrying that across would ship a
+regression. Whatever is salvaged must take the v1 call sites, not v2's.
 
-**What it costs this document: `glossary_slice` narrows to a placement question, not a
-decay one.** An earlier version of this section dropped the field outright. That went too
-far, and the reason is worth keeping because it is the general case this design is for.
+#### What survives from the original three
 
-What survives unchanged: **vocabulary must not decay**. A client does not forget how to
-speak their own language, and running a term list through a recency curve is the one place
-the memory analogy in §7 breaks down. So the glossary is not a `salient_backstory` item and
-never gets a salience score.
-
-What does **not** survive: the claim that the glossary therefore has nothing to do with
-this design. `generate_system_message` appends in this order —
-
-```
-[template] → glossary → audio tags → rolling summary → retrieved context
-```
-
-— which makes the glossary the **first** appended block and therefore the one **furthest
-from generation** of everything appended. Meanwhile §2.2's own argument, from Stacks, is
-that relevant context belongs near the prompt end to raise the likelihood of use. So
-"Kannada carries 1,206 always-injected characters of glossary and still runs 49.4 register
-errors per 100 turns" has two readings the data does not separate: the content is wrong, or
-the content is present and positioned worst. The flat depth curve is consistent with both.
-
-That is a placement question, and placement is exactly what this design owns. The §2.3
-placeholder makes it a one-line experiment: move the block, read register errors. Until that
-runs, whether the glossary is scoped, moved, or left alone is **open** — and asserting it
-was settled was the error. Tier 1 glossary, already topic-retrieved, rides the `semantic`
-bucket regardless.
+The ledger contract (topic and deflection, never content), the *"directors' note for your
+next reply only"* framing, and the named empty states — all still taken, all in §3. They
+were just a fraction of what is there.
 
 ### Summary
 
@@ -1205,8 +1154,8 @@ bucket regardless.
 | Authored branching instructions, `stateInstructions`, guardrails | **Kept unchanged** — inputs, not derived state |
 | `resolve_branching_instruction` LLM call on the hot path | **Open** — possibly reducible to a deterministic match over client-side events. Unproven; separate investigation |
 | Simulation states (`hasStates`, `state_x_guidelines`) | **Kept.** The stance layer sits beside them, not instead of them — authored states say what the scenario wants, stance says where the client actually is |
-| `roleplay_v2` turn card | **Borrowed from, not built on** — ledger contract, framing and empty states move into §3; the runtime stays v1 (§9.1) |
-| `roleplay_v2` runtime | **Left alone.** Not revived, not deleted, pending its owner's input |
+| `roleplay_v2` turn card + runtime plumbing | **Salvaged** — the state store, prompt compiler, retrieval selector and advisory-verdict discipline move across; the runtime stays v1 (§9.1) |
+| `roleplay_v2` as a path | **Decommissioned** once salvage lands — its owner's decision, not this document's (§9.1) |
 
 ---
 
@@ -1414,16 +1363,64 @@ blocking cost either.
 
 ## 14. Phasing
 
-1. **Ship the Language realism fix first.** Inject `targetVariety`; add per-language exemplars. Independent of this design, addresses a 100× gap between diglossic and non-diglossic languages. The `attribute` policy from the retrieval-policies proposal (§9.2) is the natural delivery mechanism, and that proposal is behaviour-safe on its own, so it can land here.
-2. **`stance` + `register` + `speech_fragments` + `withheld`, no retrieval.** Repairs the 6.5× role-slip regression and adds earned transitions. Detached updater behind `CLIENT_WORKING_MEMORY_ENABLED`, cadence fallback, v2's ledger contract and framing (§3), guardrail precedence and the rest of §5.1. No new retrieval. Read against clienthood at turns 8+.
-3. **Test position.** With the placeholder registered (§2.3), move
-   `{client_working_memory}` and read clienthood, the latency distribution and guardrail
-   adherence together. Cheap, reversible in the studio, and it settles a hypothesis phase
-   2 otherwise just assumes.
-4. **Move `{retrieved_context}` to the cache-friendly suffix on #2**, matching what the default `main_agent_prompt` already does. Small, independent of this design, and the direction the design goes anyway. Read against the refresh-versus-reuse gap in §13.
-5. **Fold retrieval in.** Point the composer's `semantic` bucket at `salient_backstory` instead of its own prompt block, pass it the stance to weight against, and retire `{retrieved_context}` and `character_profile_text`. Requires phase 1's policy work to have landed, so the bucket exists (§9.2). Read against the latency distribution as much as against quality — this is the phase with the measured effect size, ≈1,000–1,500ms.
-6. **Session-end write-out**, episodic and semantic, plus the groundedness cross-check.
+Re-scoped 2026-08-20 after auditing `roleplay_v2` (§9.1). Most of phase 2's plumbing already
+exists there, tested and passing, so the estimates below are smaller than a reading of §3
+and §5 alone suggests — what remains is deriving the state, not building the machinery.
 
-Phase 2 is the one with a mechanism confirmed in both the data and the code. Phase 5 has the larger measured effect size. Phases 3 and 4 sit between them because they are the cheapest things on the list and they test the prompt-position hypothesis on its own, before phase 5 changes the same block for different reasons.
+**0. Get the measurements trustworthy first.** Not a phase of this design, but everything
+below is read through them. Truncation is conditioned on barge-in (shipped), and the glossary
+adherence backlog is draining (shipped) so the register signal is readable on 675 sessions
+rather than 10. Until adherence has a baseline, phase 3 has nothing to compare against.
 
-The order is not arbitrary: phases 2 and 5 both touch the same prompt block, so doing them together would leave a regression in either one indistinguishable from a regression in the other.
+**1. Language realism, independent of this design.** Source the register instruction from
+`languages.evalConfig.targetVariety` so grading and instruction cannot drift, delivered
+through the existing always-injected `core_style` section — the path is proven and needs no
+worker change. Also resolve the Kannada conflict, where `core_style` says be colloquial and
+`pronouns_kinship` says *always* use honorific plural, with nothing saying which wins.
+**That one needs a Kannada speaker, not more data** — it is a linguistic judgement about a
+script this document's author cannot read, inferred from error counts.
+
+**2. Salvage from v2 before writing anything new.** Move `RuntimeStateStore`, the two-message
+`prompt_compiler`, `persona_bible` selection, and the advisory-verdict validation discipline
+out of `roleplay_v2` and into the v1 path, dropping the `spec`/authoring surface and taking
+v1's language call sites rather than v2's hardcoded-empty ones (§9.1). Behaviour-neutral:
+nothing reads the store yet. This is what makes phase 3 small.
+
+**3. `stance` + `register` + `speech_fragments` + `withheld`, no retrieval.** The derivation
+layer — the part v2 never had. Off-path updater behind `CLIENT_WORKING_MEMORY_ENABLED` on the
+salvaged store, cadence fallback, ledger contract and framing (§3), guardrail precedence and
+the rest of §5.1. Read against `persona_break` **on clean turns** at turns 8+, baseline
+**14.0%** (§12).
+
+**4. Test position.** Move `{client_working_memory}` with the §2.3 placeholder and read
+clienthood, the latency distribution, guardrail adherence *and* glossary-adherence violations
+together. That last one is the point: if violations fall when the block moves, placement —
+not content — is why register guidance fails to land, and this design owns placement (§9.2).
+
+**5. Move `{retrieved_context}` to the cache-friendly suffix on #2**, matching what the
+default `main_agent_prompt` already does. Small, independent, and the direction this design
+goes anyway. Read against the refresh-versus-reuse gap in §13.
+
+**6. Fold retrieval in.** Point the composer's `semantic` bucket at `salient_backstory`,
+pass it the stance to weight against, and retire `{retrieved_context}` and
+`character_profile_text`. Needs phase 1's policy work landed so the bucket exists (§9.2), and
+inherits `persona_bible`'s selector from phase 2. Read against the latency distribution as
+much as against quality — the phase with the measured effect size, ≈1,000–1,500ms.
+
+**7. Session-end write-out**, episodic and semantic, plus the groundedness cross-check. Then
+`roleplay_v2` is deleted: by this point everything reusable has moved.
+
+**Why this order.** Phase 3 is the only phase with a mechanism confirmed in both the data and
+the code, and phase 2 exists purely to make it small. Phase 6 has the larger measured effect
+size but depends on 1 and 2. Phases 4 and 5 sit between because they are the cheapest things
+on the list and each tests one hypothesis alone.
+
+The sequencing constraint has not changed: **phases 3 and 6 touch the same prompt block**, so
+doing them together would make a regression in either indistinguishable from a regression in
+the other. Phase 4 has to come after 3 and before 6 for the same reason — it moves that block
+and nothing else.
+
+**What this design is no longer sized as.** With v2's store, compiler, retrieval selector and
+validation discipline salvaged rather than rebuilt, the genuinely new code is the derivation
+layer in phase 3: the client-side event triggers (§4), the stance machine, and the salience
+function over traces that `persona_bible` already knows how to select from.
