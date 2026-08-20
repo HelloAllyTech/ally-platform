@@ -35,32 +35,56 @@ So "degrades with depth" is real, and the inflection at 8–11 is real, but the 
 done by turn 12 and does not compound after it. A design justified on runaway degradation
 at turn 30 would be justified on something that is not happening.
 
-**What does keep climbing is the persona failure specifically.** From the language judge's
-own annotations, per judged turn:
+**The persona failure is the exception in size, not in shape.** From the language judge's
+annotations, measured on **clean turns only** — turns where the transcript kept at least 70%
+of what the model generated, which excludes the cut turns §11.1 is about:
 
-| Depth | persona_break | truncation | too_formal_diglossia |
+| Depth | Clean turns | persona_break | *same depth, cut turns* |
 |---|---|---|---|
-| turns 0–3 | 4.70% | 3.24% | 4.20% |
-| turns 4–7 | 6.13% | 5.15% | 3.99% |
-| turns 8–11 | 8.29% | 5.64% | 5.18% |
-| turns 12–19 | 9.20% | 8.78% | 3.86% |
-| turns 20+ | **12.67%** | **17.29%** | 3.92% |
+| turns 0–3 | 942 | **7.54%** | *3.77%* |
+| turns 4–7 | 944 | **11.65%** | *5.24%* |
+| turns 8–11 | 752 | **13.96%** | *8.13%* |
+| turns 12–19 | 729 | **13.99%** | *5.74%* |
+| turns 20+ | 574 | **12.89%** | *10.49%* |
 
-`persona_break` is the **largest annotation category** (1,223) and the only quality signal
-that rises monotonically all the way to 20+ turns, 2.7× end to end. That — not the
-aggregate curve above — is the measurement this design rests on, and it is the strongest
-one in this document.
+`persona_break` is the **largest annotation category** (1,223) and it **nearly doubles by
+turns 8–11 — 7.54% → 14.0% — then holds**. That is the measurement this design rests on.
 
-Two things that table also settles. `too_formal_diglossia` is **flat** across depth, which
-confirms register failure is a "never told the target variety" problem rather than a memory
-one (§11) — though whether the cause is the *content* or its *position* in the prompt is
-open, see §9.2.
+Three things about that table are worth stating explicitly, because two earlier readings of
+it were wrong.
 
-**Do not read the truncation column as a quality signal.** Just over half of `truncation`
-is the learner cutting the actor off, and barge-in frequency plausibly rises with depth on
-its own, so that 3.24% → 17.29% is partly interruption becoming more common in longer
-sessions. §11.1 has the measurement. It also means the `persona_break` column is an upper
-bound, since a half-sentence can read to a judge as a character failure.
+**It is real, and larger than first reported.** On clean turns it reaches 14%, above the
+12.67% a mixed population gave. This is not a transcript artefact.
+
+**Cut turns DILUTE it — the earlier "upper bound" warning had the sign backwards.** A
+54-character fragment gives a judge less material in which to find the client acting like an
+assistant, so cut turns show *fewer* persona breaks at every depth. Mixing them in was
+understating this metric, not inflating it.
+
+**It plateaus, and the earlier "rises monotonically to 20+, 2.7×" claim was itself the
+artefact.** On clean turns it peaks at 12–19 and falls at 20+, a 1.9× rise rather than 2.7×.
+The apparent monotonic climb came from the cut share being U-shaped by depth — 34.9% of turns
+cut at 0–3, ~22% in the middle, 31.7% at 20+ — so the mix, not the metric, was changing.
+
+So every signal measured now tells one story: **the damage is done by turns 8–12 and then
+holds.** Any-fault plateaus, repetition plateaus, role slip plateaus, persona_break
+plateaus. There is no runaway degradation, and this design must not be justified on one.
+Its case is the *height* of the plateau — 14% of turns at depth showing the client collapse
+into an assistant against 7.5% early — not its slope.
+
+That also narrows what to build first. If the damage is done by turn 8–12, the mechanisms
+that matter are the ones acting early: `speech_fragments` carrying voice across the first
+compaction, and earned stance transitions blocking premature insight. A decay curve tuned
+for turn 40 is tuned for something that is not happening.
+
+One more thing the table settles: `too_formal_diglossia` is **flat** across depth (4.20 /
+3.99 / 5.18 / 3.86 / 3.92 on the mixed population), which confirms register failure is a
+"never told the target variety" problem rather than a memory one (§11) — though whether the
+cause is the *content* or its *position* in the prompt is open, see §9.2.
+
+**Do not read `truncation` as a quality signal at all.** §11.1 has the measurement: it is
+overwhelmingly the transcript recording only the part of a reply that reached TTS before the
+learner talked over it.
 
 **The actor does not respond to counsellor skill.** Turns preceded by a scored event — the system's own judgement that the learner made a skilled intervention — introduce new information at **65.52%**. Turns with no scored event: **65.51%**. That is 583 versus 2,427 turns, and the difference is 0.01 points.
 
@@ -1307,13 +1331,29 @@ Two consequences for the rest of this document:
 
 ## 12. Expected effect, and how we would know
 
+**Read every baseline here on clean turns only.** 27.8% of judged turns kept less than 70%
+of the reply the model generated (§11.1), and cut turns move metrics in *both* directions —
+they dilute `persona_break` and they manufacture `truncation`. Any before/after comparison
+that mixes them measures the interruption rate, not the change. This is the single most
+important condition on everything in this table.
+
 | Metric group | Expected | Measured by |
 |---|---|---|
-| **Actor clienthood** | Largest. Earned stance transitions attack over-compliance structurally; Zeigarnik resists premature closure; `speech_fragments` repairs role slip | role_inversion / over-compliance / role_slip at turns 8+. Baseline en-IN 1.16% / 2.32% / 0.96%; mr-IN 5.13% / 6.54% / 4.49% |
-| **Progression & resolution** | Strong. `disclosed` is an anti-repetition index; `unresolved` supplies forward motion | repetition at turns 8+ (3.0% post-summary); stuck and circling series |
+| **Actor clienthood** | **Largest, and it is the plateau height that should fall, not a slope.** `persona_break` runs 7.54% at turns 0–3 and 14.0% from turn 8 onward on clean turns. The target is that 14% — earned stance transitions attack over-compliance structurally, Zeigarnik resists premature closure, `speech_fragments` repairs role slip | `persona_break` at turns 8+ on clean turns (baseline **14.0%**); role_inversion / over-compliance / role_slip at turns 8+, baseline en-IN 1.16% / 2.32% / 0.96%, mr-IN 5.13% / 6.54% / 4.49% |
+| **Progression & resolution** | Strong. `disclosed` is an anti-repetition index; `unresolved` supplies forward motion | repetition, which itself plateaus (1.02% → 5.04% then flat near 4.4%) — so the target is again the plateau, not the slope |
 | **Feedback groundedness** | Moderate, via the event log as a second grounding source | contradicted improvement claims (33%) |
-| **Actor responsiveness** | Indirect, via trimming → latency | latency distribution; share of turns above 8.7s |
-| **Language realism** | **None** | — |
+| **Actor responsiveness** | Indirect, via trimming → latency. Note the relationship is **not** monotonic: the fastest quartile faults more than the second, so this only pays from the middle of the distribution upward | latency distribution; share of turns above 8.7s (20.05% on live rows, faulting 33.5%) |
+| **Language realism** | **None directly** — but §9.2 leaves open whether the glossary failing to land is a *placement* problem, which this design does own | register errors per 100 turns, segmented by `diglossia` |
+
+**What would falsify this.** If `persona_break` on clean turns at turns 8+ does not fall
+below ~14%, the design did not do the thing it was built for, regardless of what else moves.
+Stating it this way round matters: the earlier version of this section led with "largest"
+and named no number that could disappoint.
+
+**What this design is no longer claimed to fix.** Runaway degradation over long sessions —
+because §1 now shows there is none. Every signal plateaus by turns 8–12. A reader who
+approved this on the strength of a curve climbing to turn 30 was approving something that is
+not happening.
 
 **Guard rail.** The latency distribution must not move. If any of this leaks onto the critical path it will show in the >8.7s band before it shows anywhere else. The turn-conditions panel reads this directly. The position experiment in §2.3 is the most likely way to trip this, because moving the block above the static half invalidates the prompt cache on every turn — so read that experiment against latency and guardrail adherence, never against quality alone.
 
