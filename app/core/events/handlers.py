@@ -255,11 +255,27 @@ def create_conversation_handler(room_id: str, joined_iso: str):
             )
             start_time = end_time
 
+        # LiveKit sets `interrupted` on the assistant ChatMessage it emits, and
+        # `content` is the text that actually reached TTS before the utterance
+        # stopped — so on an interrupted turn the transcript is a PREFIX of what
+        # the model generated. Carrying the flag lets the judge stop reading that
+        # prefix as the actor failing to finish a sentence: measured, a cut turn
+        # keeps ~36% of the generated characters against ~107% on an uncut one,
+        # and `truncation` is the second-largest annotation category because of
+        # it. Read defensively — the attribute is absent on older LiveKit
+        # versions and meaningless on a COUNSELOR turn.
+        interrupted = (
+            bool(getattr(event.item, "interrupted", False))
+            if event.item.role == "assistant"
+            else None
+        )
+
         chat_message = ChatMessage(
             role=role,
             content=content,
             start_time=start_time,
             end_time=end_time,
+            interrupted=interrupted,
         )
 
         logger.debug(

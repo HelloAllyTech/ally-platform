@@ -18,6 +18,17 @@ class ChatMessage(BaseModel):
     end_time: Optional[float] = Field(
         None, description="End time of the message in seconds (relative position)"
     )
+    interrupted: Optional[bool] = Field(
+        None,
+        description=(
+            "For a CLIENT turn: the learner talked over it, so `content` is only "
+            "the part of the reply that reached TTS before it stopped — not what "
+            "the model produced. Measured across judged turns, a cut turn keeps "
+            "about 36% of the generated characters against 107% on an uncut one. "
+            "None means unknown (an older worker, or a COUNSELOR turn), which is "
+            "deliberately distinct from False."
+        ),
+    )
 
     class Config:
         json_schema_extra = {
@@ -26,6 +37,7 @@ class ChatMessage(BaseModel):
                 "content": "Hello, how are you?",
                 "start_time": 0.5,
                 "end_time": 5.7,
+                "interrupted": False,
             }
         }
 
