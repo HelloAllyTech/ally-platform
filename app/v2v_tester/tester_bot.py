@@ -228,13 +228,25 @@ class V2VTesterBot:
         @room.on("track_subscribed")
         def _on_track_subscribed(
             track: rtc.Track,
-            _pub: rtc.RemoteTrackPublication,
+            pub: rtc.RemoteTrackPublication,
             participant: rtc.RemoteParticipant,
         ) -> None:
             if track.kind != rtc.TrackKind.KIND_AUDIO:
                 return
-            # ONE STT pipeline per run: the agent publishes more than one
-            # audio track (observed live), and transcribing each one ran a
+            # The agent publishes TWO audio tracks: its voice (AgentSession
+            # room output) and the comfort/filler "background_audio" track
+            # (BackgroundAudioPlayer). Publish ORDER is not stable across
+            # agent versions — a 2026-08 release flipped it and the tester
+            # spent whole runs transcribing comfort noise (utterances_heard=0,
+            # idle_timeout). Select by publication NAME, never by order.
+            if pub.name == "background_audio":
+                logger.info(
+                    "[V2V] skipping background_audio track %s from %s",
+                    track.sid,
+                    participant.identity,
+                )
+                return
+            # ONE STT pipeline per run: transcribing every audio track ran a
             # duplicate Google streaming recognizer for the whole session —
             # double memory/cost and occasional duplicate utterances.
             if self._stt_track_sid is not None:
