@@ -34,6 +34,34 @@ class BaseTTSClient(ABC):
         self._current_params: Dict[str, Any] = {}
         self._default_params: Dict[str, Any] = {}
 
+    def create_clip_tts(self):
+        """A SEPARATE underlying TTS instance for offline clip rendering
+        (thinking fillers, backchannels, interim replies).
+
+        Clip synthesis must never run on the AgentSession's own TTS instance:
+        the session subscribes to that instance's "error" events and CLOSES
+        THE WHOLE SESSION after a few unrecoverable ones
+        (agent_session._on_error). Observed in prod 2026-08-20: Sarvam
+        one-shot clip failures emitted TTSErrors on the shared instance and
+        killed live Marathi sessions mid-reply, leaving zombie rooms.
+
+        Every provider client here builds ``tts_instance`` lazily from stored
+        params, so a shallow clone with the cached instance cleared rebuilds a
+        fresh, isolated instance. Returns ``None`` when isolation isn't
+        possible — callers must then SKIP clip synthesis, never fall back to
+        the shared instance.
+        """
+        import copy
+
+        try:
+            clone = copy.copy(self)
+            if not hasattr(clone, "_tts_instance"):
+                return None
+            clone._tts_instance = None
+            return clone.tts_instance
+        except Exception:  # noqa: BLE001 - isolation is best-effort
+            return None
+
     @property
     @abstractmethod
     def tts_instance(self):

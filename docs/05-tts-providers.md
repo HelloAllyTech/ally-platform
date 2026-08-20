@@ -106,6 +106,26 @@ When no TTS config is provided, the factory selects a Deepgram voice based on th
 
 ---
 
+## Clip synthesis isolation (`create_clip_tts`)
+
+Offline clip rendering (thinking fillers, backchannels, interim replies) must
+NEVER run on the AgentSession's own TTS instance: the session subscribes to
+that instance's error events and closes the whole session after a few
+unrecoverable ones. In production (2026-08-20) Sarvam's broken one-shot
+`synthesize()` (libav `InvalidDataError`, zero frames) emitted enough TTSErrors
+during clip rendering to kill live Marathi sessions mid-reply.
+
+`BaseTTSClient.create_clip_tts()` returns a SEPARATE underlying instance for
+clip work (a shallow clone with the lazily-cached instance cleared — every
+provider client builds `tts_instance` lazily, so the clone rebuilds fresh). If
+isolation is impossible it returns `None` and callers skip clip synthesis
+entirely — silence is strictly better than a dead session. `filler_audio`
+additionally falls back from `synthesize()` to the websocket `stream()` path
+per phrase, which is the route the live agent speaks through and works where
+Sarvam's one-shot endpoint is broken.
+
+---
+
 ## Key Source Files
 
 - `app/tts/base.py` -- `BaseTTSClient`

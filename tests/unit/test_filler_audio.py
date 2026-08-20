@@ -51,11 +51,32 @@ class _FakeStream:
         self.closed = True
 
 
+class _FakeInputStream(_FakeStream):
+    """stream()-style input: accepts pushed text, then yields frames."""
+
+    def __init__(self, frames):
+        super().__init__(frames)
+        self.pushed = []
+
+    def push_text(self, text):
+        self.pushed.append(text)
+
+    def flush(self):
+        pass
+
+    def end_input(self):
+        pass
+
+
 class _FakeTTS:
-    def __init__(self, fail_phrases=(), empty_phrases=()):
+    def __init__(self, fail_phrases=(), empty_phrases=(), stream_rescues=False):
         self.fail_phrases = set(fail_phrases)
         self.empty_phrases = set(empty_phrases)
+        # When True, the websocket-style stream() path produces audio even for
+        # phrases whose one-shot synthesize() failed — the Sarvam shape.
+        self.stream_rescues = stream_rescues
         self.calls = []
+        self.stream_calls = 0
 
     def synthesize(self, phrase):
         self.calls.append(phrase)
@@ -65,24 +86,50 @@ class _FakeTTS:
             return _FakeStream([])  # yields no frames -> skipped
         return _FakeStream([_FakeFrame(b"\x01\x00\x02\x00")])
 
+    def stream(self):
+        self.stream_calls += 1
+        frames = [_FakeFrame(b"\x03\x00\x04\x00")] if self.stream_rescues else []
+        return _FakeInputStream(frames)
+
+
+def _client(tts):
+    """A client exposing the isolated-clip-TTS contract."""
+    return SimpleNamespace(create_clip_tts=lambda: tts)
+
 
 class TestSynthesizeFillerClips:
     @pytest.mark.unit
-    async def test_returns_empty_without_tts_instance(self):
-        client = SimpleNamespace(tts_instance=None)
-        assert await synthesize_filler_clips(client, ["a", "b"]) == []
+    async def test_returns_empty_without_isolated_instance(self):
+        # No create_clip_tts, or one that yields None: clips are SKIPPED —
+        # never synthesized on the session's shared instance, whose error
+        # budget closes the whole AgentSession (prod Marathi outage).
+        legacy_client = SimpleNamespace(tts_instance=_FakeTTS())
+        assert await synthesize_filler_clips(legacy_client, ["a", "b"]) == []
+        none_client = SimpleNamespace(create_clip_tts=lambda: None)
+        assert await synthesize_filler_clips(none_client, ["a", "b"]) == []
 
     @pytest.mark.unit
     async def test_returns_empty_for_no_phrases(self):
-        client = SimpleNamespace(tts_instance=_FakeTTS())
-        assert await synthesize_filler_clips(client, []) == []
+        assert await synthesize_filler_clips(_client(_FakeTTS()), []) == []
+
+    @pytest.mark.unit
+    async def test_stream_fallback_rescues_broken_oneshot(self):
+        # Sarvam shape: one-shot synthesize() is broken (raises/empty) but the
+        # websocket stream() path works — the clip must come from stream().
+        tts = _FakeTTS(fail_phrases={"a"}, empty_phrases={"b"}, stream_rescues=True)
+        clips = await synthesize_filler_clips(_client(tts), ["a", "b"])
+        try:
+            assert [phrase for phrase, _ in clips] == ["a", "b"]
+            assert tts.stream_calls == 2
+        finally:
+            cleanup_clips([path for _, path in clips])
 
     @pytest.mark.unit
     async def test_preserves_order_and_skips_failures(self):
         # "   " is empty (skipped), "bad" raises mid-synth (skipped), "quiet"
         # yields no audio (skipped); the survivors keep their input order.
         tts = _FakeTTS(fail_phrases={"bad"}, empty_phrases={"quiet"})
-        client = SimpleNamespace(tts_instance=tts)
+        client = _client(tts)
         phrases = ["a", "   ", "bad", "b", "quiet", "c"]
 
         clips = await synthesize_filler_clips(client, phrases)
@@ -96,7 +143,7 @@ class TestSynthesizeFillerClips:
     @pytest.mark.unit
     async def test_all_success_returns_all_in_order(self):
         tts = _FakeTTS()
-        client = SimpleNamespace(tts_instance=tts)
+        client = _client(tts)
         phrases = ["one", "two", "three"]
 
         clips = await synthesize_filler_clips(client, phrases)

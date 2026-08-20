@@ -685,6 +685,29 @@ class AgentWorker:
 
     def _register_callbacks(self):
         """Register room, session, and shutdown callbacks."""
+
+        # Zombie-room safety net: AgentSession CLOSES ITSELF after a few
+        # unrecoverable LLM/STT/TTS errors (agent_session._on_error) — but the
+        # job and room live on, leaving the learner (or v2v tester) talking to
+        # a corpse until they give up. Observed in prod 2026-08-20 (Marathi:
+        # Sarvam clip-synthesis failures closed the session mid-reply; the
+        # room sat silent ~100s to idle timeout). On an error-close, shut the
+        # job down so the session ends visibly instead of silently.
+        @self.session.on("close")
+        def _on_session_close(ev):
+            try:
+                reason = getattr(ev, "reason", None)
+                error = getattr(ev, "error", None)
+                if str(getattr(reason, "value", reason)) == "error" or error:
+                    logger.error(
+                        "[SESSION] AgentSession closed with error (%s) — "
+                        "shutting down job so the room doesn't zombie",
+                        error,
+                    )
+                    self.ctx.shutdown("agent_session_error")
+            except Exception:  # noqa: BLE001 - never break close handling
+                logger.exception("[SESSION] close handler failed")
+
         # Conversation handler (register on session)
         conversation_handler, state_handlers, cleanup_conversation_handler = (
             create_conversation_handler(self.ctx.room.name, self.joined_iso)
