@@ -126,6 +126,7 @@ def test_metadata_merges_across_call_sites():
     assert rec["metadata"] == {
         "glossary_selected": ["emotions"],
         "llm_provider": "openai",
+        "firstAudioSource": "reply",
     }
 
 
@@ -136,4 +137,78 @@ def test_metadata_same_key_last_writer_wins():
     rec = tm.finalize("room-1", 101.0)
 
     assert rec is not None
-    assert rec["metadata"] == {"a": 2}
+    assert rec["metadata"] == {"a": 2, "firstAudioSource": "reply"}
+
+
+def test_filler_counts_as_first_audio():
+    # The filler is the agent's first words: the metric measures to it, and the
+    # unmasked time to the real reply is kept alongside.
+    tm.note_user_speech_end("room-1", 100.0)
+    tm.note_filler_started("room-1", 100.4)
+    rec = tm.finalize("room-1", 102.5)
+
+    assert rec is not None
+    assert rec["response_latency_ms"] == 400
+    assert rec["metadata"]["firstAudioSource"] == "filler"
+    assert rec["metadata"]["replyLatencyMs"] == 2500
+
+
+def test_interim_reply_counts_as_first_audio():
+    tm.note_user_speech_end("room-1", 100.0)
+    tm.note_filler_started("room-1", 100.9, kind="interim")
+    rec = tm.finalize("room-1", 103.0)
+
+    assert rec is not None
+    assert rec["response_latency_ms"] == 900
+    assert rec["metadata"]["firstAudioSource"] == "interim"
+    assert rec["metadata"]["replyLatencyMs"] == 3000
+
+
+def test_earliest_masking_audio_wins_and_keeps_its_kind():
+    # Filler plays first, interim follows before the real reply: the filler is
+    # what the learner heard first, so it owns both the time and the label.
+    tm.note_user_speech_end("room-1", 100.0)
+    tm.note_filler_started("room-1", 100.3)
+    tm.note_filler_started("room-1", 100.8, kind="interim")
+    rec = tm.finalize("room-1", 102.0)
+
+    assert rec is not None
+    assert rec["response_latency_ms"] == 300
+    assert rec["metadata"]["firstAudioSource"] == "filler"
+
+
+def test_unmasked_turn_is_labelled_reply_with_no_reply_latency():
+    tm.note_user_speech_end("room-1", 100.0)
+    rec = tm.finalize("room-1", 101.2)
+
+    assert rec is not None
+    assert rec["response_latency_ms"] == 1200
+    assert rec["metadata"]["firstAudioSource"] == "reply"
+    assert "replyLatencyMs" not in rec["metadata"]
+
+
+def test_backchannel_during_user_speech_is_not_first_audio():
+    # Audio before the user finished (a back-channel "mm-hmm") is not a
+    # response to the turn; crediting it would report a negative-ish latency.
+    tm.note_user_speech_end("room-1", 100.0)
+    tm._turns["room-1"]["filler_start_ts"] = 99.5
+    tm._turns["room-1"]["first_audio_kind"] = "filler"
+    rec = tm.finalize("room-1", 101.0)
+
+    assert rec is not None
+    assert rec["response_latency_ms"] == 1000
+    assert rec["metadata"]["firstAudioSource"] == "reply"
+
+
+def test_filler_provenance_merges_with_node_metadata():
+    tm.note_user_speech_end("room-1", 100.0)
+    tm.record("room-1", metadata={"knowledgeRetrievalReused": True})
+    tm.note_filler_started("room-1", 100.5)
+    rec = tm.finalize("room-1", 102.0)
+
+    assert rec is not None
+    assert rec["metadata"] == {
+        "knowledgeRetrievalReused": True,
+        "firstAudioSource": "filler",
+        "replyLatencyMs": 2000,
+    }

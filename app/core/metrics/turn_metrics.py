@@ -12,6 +12,12 @@ time per room). It is deliberately pure and side-effect free — no network, no
 config — so it is trivially unit-testable; the handler layer reads the finalized
 record and ships it to Core over SQS.
 
+``response_latency_ms`` is time-to-FIRST-AUDIO: a thinking-filler or predictive
+interim reply is the agent's real first words, so whichever the learner heard
+first is what the metric measures. ``metadata.firstAudioSource`` records which
+('filler' | 'interim' | 'reply') and, when it was masking speech,
+``metadata.replyLatencyMs`` keeps the unmasked time to the real reply.
+
 Lifecycle for a normal turn:
     note_user_speech_end(room)   # user stopped → a turn begins (sets ts + index)
     record(room, orchestration_ms=…, llm_response_ms=…, …)   # graph nodes
@@ -86,18 +92,26 @@ def note_user_speech_end(room_id: str, user_speech_end_ts: float) -> None:
     _turn_counters[room_id] = turn["turn_index"] + 1
 
 
-def note_filler_started(room_id: str, filler_start_ts: float) -> None:
-    """Record when the thinking-filler first became audible this turn.
+def note_filler_started(
+    room_id: str, filler_start_ts: float, kind: str = "filler"
+) -> None:
+    """Record when masking speech first became audible this turn.
 
     ``response_latency_ms`` is measured to the FIRST audio the learner hears, so
-    when a filler plays (on the agent's "thinking" state, before the real reply)
-    its start time — not the reply's — is the response time. Only the earliest
-    filler in a turn is kept. No-op if there's no in-flight turn yet.
+    when the agent speaks a thinking-filler or a predictive interim reply (both
+    on the agent's "thinking" state, before the real reply) that start time —
+    not the reply's — is the response time. Only the EARLIEST such audio in a
+    turn is kept, along with ``kind`` ('filler' | 'interim') so finalize can
+    report which one the learner actually heard first. No-op if there's no
+    in-flight turn yet.
     """
     if not room_id:
         return
     turn = _turns.setdefault(room_id, {})
-    turn.setdefault("filler_start_ts", filler_start_ts)
+    if "filler_start_ts" in turn:
+        return
+    turn["filler_start_ts"] = filler_start_ts
+    turn["first_audio_kind"] = kind
 
 
 def record(room_id: str, **fields: Any) -> None:
@@ -151,9 +165,11 @@ def finalize(room_id: str, agent_speech_start_ts: float) -> Optional[Dict[str, A
     # reply, so its start is the response time; otherwise use the reply's. Guard
     # the filler ts to the turn window so a stale/out-of-order value can't skew.
     first_audio_ts = agent_speech_start_ts
+    masked = False
     filler_start_ts = turn.get("filler_start_ts")
     if filler_start_ts is not None and user_end <= filler_start_ts < first_audio_ts:
         first_audio_ts = filler_start_ts
+        masked = True
 
     latency_ms = (first_audio_ts - user_end) * 1000.0
     # Clock skew / out-of-order events can yield a small negative; clamp to 0.
@@ -166,6 +182,26 @@ def finalize(room_id: str, agent_speech_start_ts: float) -> Optional[Dict[str, A
     for key in _RECORD_FIELDS:
         if key in turn:
             record_out[key] = turn[key]
+
+    # Provenance for the headline metric. Crediting a filler/interim is what
+    # the learner actually experienced, but on its own it makes a turn where
+    # the real reply took 4s indistinguishable from a genuinely fast one — so
+    # a dashboard could read "latency improved" when only filler coverage went
+    # up. Record WHICH audio was counted, and keep the unmasked
+    # user_speech_end -> real-reply time alongside it, so the two are always
+    # separable at query time.
+    first_audio_source = turn.get("first_audio_kind", "filler") if masked else "reply"
+    provenance: Dict[str, Any] = {"firstAudioSource": first_audio_source}
+    if masked:
+        provenance["replyLatencyMs"] = max(
+            0, round((agent_speech_start_ts - user_end) * 1000.0)
+        )
+    existing_meta = record_out.get("metadata")
+    record_out["metadata"] = (
+        {**existing_meta, **provenance}
+        if isinstance(existing_meta, dict)
+        else provenance
+    )
     return record_out
 
 

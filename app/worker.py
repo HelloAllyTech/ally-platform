@@ -2106,7 +2106,9 @@ class AgentWorker:
             # played before keeps priority).
             self._emit_interim_transcript(text, play_ts)
             if play_ts is not None:
-                turn_metrics.note_filler_started(self.ctx.room.name, play_ts)
+                turn_metrics.note_filler_started(
+                    self.ctx.room.name, play_ts, kind="interim"
+                )
             logger.info("[INTERIM] playing %r", text)
         except asyncio.CancelledError:
             pass

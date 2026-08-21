@@ -873,7 +873,9 @@ class NaturalnessController:
             play_ts = (thinking_ts + waited) if thinking_ts is not None else None
             self._emit_interim_transcript(text, play_ts)
             if play_ts is not None:
-                turn_metrics.note_filler_started(self.room_name, play_ts)
+                turn_metrics.note_filler_started(
+                    self.room_name, play_ts, kind="interim"
+                )
             logger.info("[INTERIM] playing %r", text)
         except asyncio.CancelledError:
             pass
