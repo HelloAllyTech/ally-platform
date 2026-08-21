@@ -24,6 +24,7 @@ class CoreMessageType(str, Enum):
     START_METRICS = "start_metrics"
     LLM_USAGE = "llm_usage"
     SESSION_MEMORY = "session_memory"
+    SUPERVISOR_NOTE = "supervisor_note"
 
 
 class LLMUsageData(BaseModel):
@@ -245,6 +246,23 @@ class CoreBehaviorInstructionType(BaseModel):
         )
 
 
+class SupervisorNoteData(BaseModel):
+    """One live supervisor note shipped to Core as it is sent to the learner.
+
+    The learner already has the note — it went out over the LiveKit data channel
+    first — so this message is the durable copy Core persists and hands to the
+    post-session debrief as context. ``seq`` is 1-based per session and is both
+    the read order and Core's idempotency key, so an SQS redelivery collides
+    instead of showing a duplicated hint. ``note`` is written in the session
+    language, so ``language`` records which."""
+
+    note: str
+    seq: int
+    turn_index: Optional[int] = None
+    language: Optional[str] = None
+    env: Optional[str] = None
+
+
 class CoreEventMessageTypeData(BaseModel):
     """Data payload for core event messages."""
 
@@ -268,6 +286,9 @@ class CoreEventMessageTypeData(BaseModel):
     )
     session_memory: Optional[SessionMemoryData] = Field(
         default=None, description="End-of-session episodic memory summary"
+    )
+    supervisor_note: Optional[SupervisorNoteData] = Field(
+        default=None, description="One live supervisor note sent mid-session"
     )
 
 
@@ -375,6 +396,22 @@ class CoreEventMessageType(BaseModel):
         return cls(
             message_type=CoreMessageType.SESSION_MEMORY,
             data=CoreEventMessageTypeData(session_memory=session_memory),
+            room_id=room_id,
+            timestamp=int(time.time()),
+        )
+
+    @classmethod
+    def create_supervisor_note(
+        cls,
+        room_id: str,
+        supervisor_note: SupervisorNoteData,
+    ) -> "CoreEventMessageType":
+        """Create a live-supervisor-note message for Core. Wire shape mirrors
+        turn_metrics: data.supervisor_note = {...}. One per note, not per
+        session."""
+        return cls(
+            message_type=CoreMessageType.SUPERVISOR_NOTE,
+            data=CoreEventMessageTypeData(supervisor_note=supervisor_note),
             room_id=room_id,
             timestamp=int(time.time()),
         )

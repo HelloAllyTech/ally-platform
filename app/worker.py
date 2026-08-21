@@ -714,6 +714,12 @@ class AgentWorker:
         )
         self.session.on("conversation_item_added")(conversation_handler)
 
+        # Live supervisor notes: a second, cheap LLM watching the same committed
+        # turns, which occasionally sends the learner a coaching hint shown in
+        # the session sidebar. Opt-in per simulation and entirely off the voice
+        # path — see app/core/supervisor/service.py.
+        self._setup_supervisor_notes()
+
         # Register state-change handlers to track when audio starts playing
         # These capture speaking start times used by conversation_handler
         self.session.on("agent_state_changed")(state_handlers["agent_state"])
@@ -890,6 +896,14 @@ class AgentWorker:
             ):
                 self._interim_play_task.cancel()
             self._interim_play_task = None
+            # Cancel any supervisor note still being generated — the learner is
+            # gone, so it has nowhere to land. Notes already sent are persisted.
+            if getattr(self, "_supervisor_notes", None) is not None:
+                try:
+                    await self._supervisor_notes.aclose()
+                except Exception as e:  # noqa: BLE001
+                    logger.debug(f"Error closing supervisor notes: {e}")
+                self._supervisor_notes = None
             # Tear down the background-audio track (comfort tone + filler +
             # back-channel) and delete its temp clips.
             if self._bg_audio is not None:
@@ -1413,6 +1427,106 @@ class AgentWorker:
         deferred_task = asyncio.create_task(self._setup_deferred_naturalness())
         self._background_tasks.add(deferred_task)
         deferred_task.add_done_callback(self._background_tasks.discard)
+
+    def _setup_supervisor_notes(self) -> None:
+        """Wire the live-supervisor LLM to committed learner turns.
+
+        Opt-in per simulation (Studio: supervisorNotesEnabled) behind a global
+        kill-switch, so this is a no-op for almost every session. Cheap enough
+        to build inline — one LLM client, no network — and the handler it
+        registers only ever schedules detached work, so nothing here or
+        downstream can add latency to a reply. Best-effort: a failure leaves the
+        session running without notes rather than not running.
+        """
+        self._supervisor_notes = None
+        try:
+            from app.core.constants import DEFAULT_LANGUAGE_CODE
+            from app.core.events.handlers import extract_content
+            from app.core.supervisor import (
+                SupervisorNotesService,
+                is_supervisor_notes_enabled,
+            )
+            from app.llms.factory import create_llm_client
+
+            if not is_supervisor_notes_enabled(self.scenario):
+                return
+
+            prompt_data = getattr(self.scenario, "prompt_data", None)
+            language_code = (
+                self.scenario.language_config.language_code
+                if getattr(self.scenario, "language_config", None)
+                else None
+            )
+            # The human-readable name ("Tamil (India)") is a far stronger signal
+            # to the model than the bare BCP-47 code; fall back to the code, and
+            # then to a description, so the note is never written in the wrong
+            # language just because the label is missing.
+            language_label = (
+                getattr(prompt_data, "language_label", None)
+                or language_code
+                or "the language the learner is speaking"
+            )
+
+            supervisor_llm = create_llm_client(
+                llm_config={
+                    "provider": settings.SUPERVISOR_NOTES_PROVIDER,
+                    "config": {
+                        "model": settings.SUPERVISOR_NOTES_MODEL,
+                        "temperature": 0,
+                    },
+                },
+                language_code=language_code or DEFAULT_LANGUAGE_CODE,
+            )
+
+            self._supervisor_notes = SupervisorNotesService(
+                self.ctx.room,
+                supervisor_llm,
+                room_id=self.ctx.room.name,
+                language_label=language_label,
+                language_code=language_code,
+                scenario_id=getattr(self.scenario, "id", None),
+                prompt_data=prompt_data,
+                # The clock is the single source of truth for paused-ness, and
+                # it is what the pause control channel flips.
+                is_paused=lambda: bool(
+                    getattr(self.session_clock, "is_paused", False)
+                ),
+            )
+
+            supervisor = self._supervisor_notes
+            # Learner turns only. Counted here rather than reusing the metrics
+            # turn index so the min-gap between notes is measured in the thing it
+            # is about — how many times the learner has spoken.
+            learner_turns = [0]
+
+            @self.session.on("conversation_item_added")
+            def _on_item_for_supervisor(event):
+                try:
+                    role = getattr(getattr(event, "item", None), "role", None)
+                    text = extract_content(event.item)
+                    if role == "assistant":
+                        supervisor.record_turn("client", text)
+                        return
+                    supervisor.record_turn("learner", text)
+                    if not (text or "").strip():
+                        return
+                    learner_turns[0] += 1
+                    supervisor.on_learner_turn_committed(learner_turns[0])
+                except Exception:  # noqa: BLE001 - never break a turn
+                    logger.exception("[supervisor] item handler failed")
+
+            logger.info(
+                "[supervisor] live notes enabled (model=%s, max=%d, min_gap=%d, "
+                "timeout=%.1fs, language=%s)",
+                settings.SUPERVISOR_NOTES_MODEL,
+                settings.SUPERVISOR_NOTES_MAX_PER_SESSION,
+                settings.SUPERVISOR_NOTES_MIN_TURN_GAP,
+                settings.SUPERVISOR_NOTES_TIMEOUT_S,
+                language_label,
+            )
+        except Exception:  # noqa: BLE001 - a session must start without notes
+            self._supervisor_notes = None
+            logger.exception("[supervisor] setup failed — session continues silently")
 
     async def _setup_deferred_naturalness(self) -> None:
         """Synthesize the filler/back-channel clips and wire their handlers.
