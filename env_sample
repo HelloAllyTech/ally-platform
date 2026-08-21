@@ -89,3 +89,20 @@ PAUSE_WARNING_LEAD_SECONDS=30
 MAX_TOTAL_PAUSE_SECONDS=1800
 # Seconds past the scenario time limit before the agent authoritatively ends (default 2)
 MAX_DURATION_GRACE_SECONDS=2
+
+# ---- Live supervisor notes (optional; defaults applied if unset) ----
+# In-session coaching hints shown in the learner's "Supervisor" sidebar tab.
+# This is only the GLOBAL kill-switch: notes also need the per-simulation
+# supervisorNotesEnabled toggle (Studio, default off), so leaving this at true
+# changes nothing for existing scenarios.
+SUPERVISOR_NOTES_ENABLED=true
+# Provider/model for the supervisor LLM. Runs once per learner turn in parallel
+# with the conversation, so keep it fast and cheap.
+SUPERVISOR_NOTES_PROVIDER=openai
+SUPERVISOR_NOTES_MODEL=gpt-4o-mini
+# Give-up time for one note (seconds; default 6). A timeout is a skipped note,
+# never a delayed reply.
+SUPERVISOR_NOTES_TIMEOUT_S=6
+# Sparsity caps, enforced in code rather than left to the prompt.
+SUPERVISOR_NOTES_MAX_PER_SESSION=10
+SUPERVISOR_NOTES_MIN_TURN_GAP=2

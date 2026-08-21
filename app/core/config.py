@@ -386,6 +386,70 @@ class Settings(BaseSettings):
         ),
     )
 
+    # ---- Live supervisor notes (in-session coaching hints) ----
+    # A second, cheap LLM reads each committed learner turn alongside the actor
+    # and occasionally sends the learner a one-line coaching hint, which the
+    # client shows in a "Supervisor" tab in the session sidebar. Same persona as
+    # the post-session debrief. Entirely off the voice critical path: the call is
+    # a tracked fire-and-forget task with a hard timeout, so a slow or failing
+    # supervisor can only MISS a note, never delay a reply. This GLOBAL flag
+    # (default on) is a kill-switch GATING a per-simulation opt-in
+    # (PromptData.supervisor_notes_enabled, Studio: supervisorNotesEnabled,
+    # default off): both must be on, so live notes are off for every scenario
+    # until an author turns them on.
+    SUPERVISOR_NOTES_ENABLED: bool = Field(
+        default=True,
+        description=(
+            "Global kill-switch for live supervisor notes. Default True: notes "
+            "are generated for a session only when this is on AND that "
+            "simulation has supervisorNotesEnabled set (per-sim opt-in, default "
+            "off). Set False to disable everywhere regardless of the per-sim "
+            "toggle."
+        ),
+    )
+    SUPERVISOR_NOTES_PROVIDER: str = Field(
+        default="openai",
+        description=(
+            "Inference provider for the live-supervisor LLM. Deliberately "
+            "separate from the actor's provider: this runs once per learner turn "
+            "in parallel with the conversation, so it is sized for cost and "
+            "speed rather than persona quality."
+        ),
+    )
+    SUPERVISOR_NOTES_MODEL: str = Field(
+        default="gpt-4o-mini",
+        description=(
+            "Model for the live-supervisor LLM. Should be a fast, cheap model — "
+            "it decides on most turns that no note is warranted, so the common "
+            "case must be near-free."
+        ),
+    )
+    SUPERVISOR_NOTES_TIMEOUT_S: float = Field(
+        default=6.0,
+        description=(
+            "Max seconds to wait for one live supervisor note before giving up "
+            "on that turn. A timeout is a silently skipped note, never a delayed "
+            "reply — the learner's conversation is never blocked on this."
+        ),
+    )
+    SUPERVISOR_NOTES_MAX_PER_SESSION: int = Field(
+        default=10,
+        description=(
+            "Hard cap on live notes per session, enforced in code rather than "
+            "left to the prompt. The learner is mid-conversation and can only "
+            "read so much: past roughly ten hints the tab becomes noise that "
+            "competes with the roleplay for their attention."
+        ),
+    )
+    SUPERVISOR_NOTES_MIN_TURN_GAP: int = Field(
+        default=2,
+        description=(
+            "Minimum learner turns between two live notes. Stops the supervisor "
+            "from commenting on consecutive turns, which reads as nagging and "
+            "leaves the learner no room to act on the previous hint."
+        ),
+    )
+
     # ---- Continuous back-channeling (listener affirmations) ----
     # Naturalness lever: while the LEARNER is still speaking on a long turn, emit
     # brief listener affirmations ("mm-hmm", a soft "yeah") on the background
