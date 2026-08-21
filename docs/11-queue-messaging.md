@@ -74,11 +74,44 @@ Sent to SQS for each triggered event:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `message_type` | `"message"` or `"event"` | Discriminator |
+| `message_type` | `CoreMessageType` | Discriminator -- see [Message Types](#message-types) |
 | `data.event.event_data` | `dict` | Serialized event fields |
 | `data.event.timestamp` | `str` | ISO timestamp |
 | `room_id` | `str` | LiveKit room name |
 | `timestamp` | `int` | Unix timestamp |
+
+### Message Types
+
+Every message shares the envelope above (`message_type`, `data`, `room_id`, `timestamp`); only
+`message_type` and the one populated key under `data` differ. The other `data` keys are `null`.
+
+`message_type` is a **contract with ally-be**: the consumer
+(`src/learn/consumer/learn-message-and-event.consumer.ts`) reads the string and dispatches through
+`ProcessorRegistry` to the processor registered under that name. An unrecognized value falls through
+to `UnknownEventProcessor` and is dropped -- adding a type here means adding a processor there.
+
+**Enum:** `CoreMessageType` (`app/core/events/schemas.py`)
+
+| `message_type` | `data` key | Purpose |
+|----------------|------------|---------|
+| `message` | `chat_message` | One transcript line (learner or agent turn), persisted as a session message |
+| `event` | `event` | A triggered scenario event -- score, emoji, feedback, termination info |
+| `behavior_instruction` | `behavior_instruction` | One behavior-instruction detection result (`behaviorInstructionId`, `score`, `category`); one message per detected behavior |
+| `turn_metrics` | `turn_metrics` | Per-turn latency breakdown for the latency dashboards; headline is `response_latency_ms` |
+| `start_metrics` | `start_metrics` | Once per session: simulation start latency ("time to first word") plus the segment breakdown that stacks where startup time went |
+| `llm_usage` | `llm_usage` | Per-AI-call billable usage for the AI-cost dashboard; `service` (`llm` / `stt` / `tts`) selects the unit -- tokens, `audio_ms`, or `characters` |
+| `session_memory` | `session_memory` | Once per session at shutdown: the final rolling summary, which Core persists case-scoped and hands to the next session as `previousMemory` |
+| `supervisor_note` | `supervisor_note` | One live supervisor note as it goes to the learner; the durable copy the post-session debrief reads back. `seq` is 1-based per session and is Core's idempotency key, so an SQS redelivery collides instead of duplicating |
+
+Each type has its own factory on `CoreEventMessageType` -- `create()` (which picks `message` vs
+`event` from whether `chat_message` was passed), `create_behavior_instruction()`,
+`create_turn_metrics()`, `create_start_metrics()`, `create_llm_usage()`,
+`create_session_memory()`, `create_supervisor_note()`.
+
+Two things about `llm_usage` are unlike the rest: `room_id` can be an empty string, because usage is
+also emitted for AI calls with no room (and ally-ai publishes to the same queue for autofill,
+translation and embeddings); and it is skipped entirely for `preview-*` rooms, which have no
+persisted session in Core.
 
 ### UI Event Message
 
@@ -167,8 +200,20 @@ When running inside Docker Compose, the app reaches LocalStack at `http://locals
 ## Key Source Files
 
 - `app/core/queue/sqs.py` -- `SQSQueue`
-- `app/core/events/schemas.py` -- `CoreEventMessageType`, `CustomUIEventMessageType`
+- `app/core/events/schemas.py` -- `CoreMessageType`, `CoreEventMessageType`, `CustomUIEventMessageType`
 - `app/core/events/event_orchestrator/event_sender.py` -- `EventSender._send_events_to_core()`
 - `app/core/graph/utils.py` -- `serialize_event()`
-- `app/core/events/handlers.py` -- `send_event_to_ui()`
+- `app/core/events/handlers.py` -- `send_event_to_ui()`, and where `turn_metrics` is emitted
+- `app/core/graph/nodes.py` -- where `behavior_instruction` is emitted
+- `app/worker.py` / `app/worker_v2.py` -- `_emit_start_metrics()` (`start_metrics`)
+- `app/core/llm_usage/emitter.py` -- `llm_usage`
+- `app/core/queue/utils.py` -- `session_memory`
+- `app/core/supervisor/service.py` -- `supervisor_note`
 - `docker-compose.yml` -- LocalStack configuration
+
+Consuming side in ally-be:
+
+- `src/learn/interface/learn-message.interface.ts` -- the envelope and per-type payload interfaces
+- `src/ai/constants/processor.constants.ts` -- `PROCESSOR_EVENT_TYPES`, which must match `CoreMessageType`
+- `src/ai/processors/processor-registry.ts` -- dispatch by `message_type`
+- `src/learn/processor/*.processor.ts` -- one processor per type
