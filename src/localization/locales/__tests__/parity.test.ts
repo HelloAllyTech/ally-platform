@@ -20,6 +20,7 @@ const ALLOWED_IDENTICAL = new Set([
   'review.details.callTitle', // "CALL-{{id}}" — record identifier
   'review.feedCard.reviewType', // "{{reviewType}}" — bare interpolation
   'drawer.dev', // "(Dev)" — dev-build marker
+  'TermsAndAgreement.sections.generalTerms.bullets.crisisLink', // "https://findahelpline.com/"
 ]);
 
 const flatten = (node: Json, prefix = '', out: Record<string, Json> = {}) => {
