@@ -48,6 +48,7 @@ taking a whole task description and returning full chunk bodies. Setup, citation
 | Prompts | [`docs/12-prompts-system.md`](docs/12-prompts-system.md) |
 | Queues and cross-service messaging | [`docs/11-queue-messaging.md`](docs/11-queue-messaging.md) |
 | Running it locally | [`docs/LOCAL_DEV.md`](docs/LOCAL_DEV.md) — and read the first gotcha below |
+| Your change outdates a doc | [`docs/docs-guard.md`](docs/docs-guard.md) — `.docs-map.yml`, the CI gate and its line budget, escape hatches, wiki PRs |
 | Anything else | [`WIKI-ROUTING.md`](WIKI-ROUTING.md) — one line per wiki page, tells you which to fetch |
 
 ## Repo shape
@@ -90,25 +91,6 @@ make test                                           # pytest
 make lint                                           # ruff
 make fix                                            # format, then lint --fix
 docker compose -f docker-compose.local.yml up       # local stack
-```
-
-## When your change outdates a doc
-
-[`.docs-map.yml`](.docs-map.yml) declares which docs cover which code, and CI enforces it.
-Touching `app/tts/**` without updating `docs/05-tts-providers.md` fails the build — either
-update it, or apply the `docs:skip` label with a reason.
-
-Pushing straight to `master`? The same check runs pre-push, with the escape hatches in the commit
-message instead: `Wiki-PR: <url>`, `Wiki-PR: none — <reason>`, or `Docs-Skip: <reason>`. Install
-the hook once; wiki edits need no hand-rolled second PR — `.wiki-tmp/` is gitignored and the wiki
-PR merges when this change lands:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/HelloAllyTech/.github/main/hooks/install.sh | bash
-
-git clone --depth=1 https://github.com/helloallytech/helloallytech.github.io .wiki-tmp
-# edit .wiki-tmp/wiki/**
-.wiki-tmp/scripts/wiki-pr.sh "<url of this PR>"     # or: .wiki-tmp/scripts/wiki-pr.sh HEAD
 ```
 
 ## Canonical docs
