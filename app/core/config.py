@@ -273,9 +273,10 @@ class Settings(BaseSettings):
 
     # Perceived-latency lever: play a short thinking back-channel ("Mm-hmm.",
     # "Right...") the instant the user stops speaking, while the real reply is
-    # still generating. Masks the voice-to-voice gap without changing the
-    # measured response_latency_ms (the filler is excluded from that metric and
-    # from the transcript). This is the GLOBAL kill-switch; the feature is also
+    # still generating. It counts as the turn's first audio for
+    # response_latency_ms (it is what the learner hears first) and is emitted as
+    # a transcript line; metadata.replyLatencyMs keeps the unmasked time to the
+    # real reply. This is the GLOBAL kill-switch; the feature is also
     # gated per-scenario by prompt_data.filler_enabled (Studio toggle, default
     # off), so platform-wide it stays off until a scenario opts in. Set False to
     # disable everywhere regardless of scenario config.
