@@ -13,3 +13,7 @@ class LLMTask(str, Enum):
     # whether to send a coaching hint. Kept separate from AGENT_TURN because it
     # runs at the same frequency on a deliberately cheaper model.
     SUPERVISOR_NOTE = "supervisor_note"
+    # Client working memory: one detached call per learner turn deriving the
+    # actor's inner state. Same cadence as AGENT_TURN but off the reply path,
+    # so it must be separable from turn cost when arguing the feature's worth.
+    CLIENT_WORKING_MEMORY = "client_working_memory"

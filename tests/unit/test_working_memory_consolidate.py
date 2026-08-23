@@ -1,0 +1,299 @@
+"""Tests for the consolidation call — the working memory's write path.
+
+The invariants worth defending here are not "does it call the LLM". They are:
+
+- a miss keeps the previous memory and does NOT block the next update;
+- the update commits under the turn the actor's prompt was built from;
+- the updater never sees withheld CONTENT, because it never exists;
+- a proposal that would fake progress is refused even when the LLM insists.
+"""
+
+import asyncio
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+from langchain_core.messages import AIMessage, HumanMessage
+
+from app.core.working_memory import consolidate as mod
+from app.core.working_memory.proposal import ObservedEvent, ProposedUpdate
+from app.core.working_memory.state import ClientWorkingMemory, WithheldTopic
+from app.core.working_memory.store import ClientWorkingMemoryStore
+
+pytestmark = pytest.mark.unit
+
+
+def _turns():
+    return [HumanMessage(content="what happened?"), AIMessage(content="not much")]
+
+
+def _llm(proposal, *, raw=None):
+    """An llm_client whose structured call returns ``proposal``."""
+    structured = AsyncMock()
+    structured.ainvoke = AsyncMock(return_value={"parsed": proposal, "raw": raw})
+    llm_instance = MagicMock()
+    llm_instance.with_structured_output = MagicMock(return_value=structured)
+    return SimpleNamespace(llm_instance=llm_instance, provider="openai")
+
+
+class TestDigest:
+    def test_lists_withheld_topics_without_content(self):
+        memory = ClientWorkingMemory(
+            withheld=[
+                WithheldTopic(
+                    topic="the hospital visit",
+                    deflection="changes the subject to work",
+                )
+            ]
+        )
+        digest = mod._digest(memory)
+        assert "the hospital visit" in digest
+        # The deflection is an ACTOR instruction; the updater has no use for it
+        # and giving it one invites it to answer as the client.
+        assert "changes the subject" not in digest
+
+    def test_omits_unlocked_topics(self):
+        memory = ClientWorkingMemory(
+            withheld=[
+                WithheldTopic(topic="locked one", deflection="d"),
+                WithheldTopic(topic="open one", deflection="d", status="unlocked"),
+            ]
+        )
+        digest = mod._digest(memory)
+        assert "locked one" in digest
+        assert "open one" not in digest
+
+    def test_reports_turns_in_stance(self):
+        memory = ClientWorkingMemory(stance="testing", turns_in_stance=3)
+        assert "testing (for 3 turn(s))" in mod._digest(memory)
+
+
+class TestConsolidate:
+    async def test_no_turns_is_not_a_call(self):
+        llm = _llm(ProposedUpdate())
+        out = await mod.consolidate(
+            memory=ClientWorkingMemory(), new_messages=[], llm_client=llm
+        )
+        assert out is None
+        llm.llm_instance.with_structured_output.assert_not_called()
+
+    async def test_empty_template_skips_rather_than_calling(self, monkeypatch):
+        monkeypatch.setattr(mod, "load_template", lambda *a, **k: "")
+        llm = _llm(ProposedUpdate())
+        out = await mod.consolidate(
+            memory=ClientWorkingMemory(), new_messages=_turns(), llm_client=llm
+        )
+        assert out is None
+        llm.llm_instance.with_structured_output.assert_not_called()
+
+    async def test_returns_validated_not_proposed(self, monkeypatch):
+        monkeypatch.setattr(mod, "load_template", lambda *a, **k: "SYS")
+        # The LLM asserts a two-rung jump with no advancing event: exactly the
+        # fake-success failure. Validation must strip it.
+        llm = _llm(ProposedUpdate(stance="opening", affect="calmer"))
+        out = await mod.consolidate(
+            memory=ClientWorkingMemory(stance="guarded", turns_in_stance=9),
+            new_messages=_turns(),
+            llm_client=llm,
+        )
+        assert out.stance is None
+        assert out.stance_rejected_reason
+        assert out.affect == "calmer"
+
+    async def test_earned_advance_survives(self, monkeypatch):
+        monkeypatch.setattr(mod, "load_template", lambda *a, **k: "SYS")
+        llm = _llm(
+            ProposedUpdate(
+                stance="testing",
+                events=[ObservedEvent(kind="repair", evidence="sorry, I misread")],
+            )
+        )
+        out = await mod.consolidate(
+            memory=ClientWorkingMemory(stance="guarded", turns_in_stance=4),
+            new_messages=_turns(),
+            llm_client=llm,
+        )
+        assert out.stance == "testing"
+
+    async def test_parse_failure_raises(self, monkeypatch):
+        monkeypatch.setattr(mod, "load_template", lambda *a, **k: "SYS")
+        structured = AsyncMock()
+        structured.ainvoke = AsyncMock(
+            return_value={"parsed": None, "raw": None, "parsing_error": "bad json"}
+        )
+        llm_instance = MagicMock()
+        llm_instance.with_structured_output = MagicMock(return_value=structured)
+        with pytest.raises(ValueError, match="bad json"):
+            await mod.consolidate(
+                memory=ClientWorkingMemory(),
+                new_messages=_turns(),
+                llm_client=SimpleNamespace(llm_instance=llm_instance),
+            )
+
+    async def test_tolerates_provider_ignoring_include_raw(self, monkeypatch):
+        monkeypatch.setattr(mod, "load_template", lambda *a, **k: "SYS")
+        structured = AsyncMock()
+        structured.ainvoke = AsyncMock(return_value=ProposedUpdate(affect="tired"))
+        llm_instance = MagicMock()
+        llm_instance.with_structured_output = MagicMock(return_value=structured)
+        out = await mod.consolidate(
+            memory=ClientWorkingMemory(),
+            new_messages=_turns(),
+            llm_client=SimpleNamespace(llm_instance=llm_instance),
+        )
+        assert out.affect == "tired"
+
+
+class TestApplyUpdate:
+    async def test_stamps_the_commit_turn_on_facts_and_threads(self):
+        store = ClientWorkingMemoryStore()
+        update = mod.ValidatedUpdate(
+            disclosed=["lost the job in March"],
+            opened_threads=["the argument"],
+        )
+        assert await mod.apply_update(store, update, 7)
+        state = await store.snapshot()
+        assert state.disclosed[0].first_seen_turn == 7
+        assert state.unresolved[0].opened_turn == 7
+
+    async def test_empty_lists_do_not_blank_the_other_path(self):
+        store = ClientWorkingMemoryStore()
+        await mod.apply_update(store, mod.ValidatedUpdate(disclosed=["a fact"]), 1)
+        # A later update carrying no disclosures must not erase the first.
+        await mod.apply_update(store, mod.ValidatedUpdate(affect="flat"), 2)
+        state = await store.snapshot()
+        assert [f.text for f in state.disclosed] == ["a fact"]
+        assert state.affect == "flat"
+
+    async def test_withheld_pairs_become_records(self):
+        store = ClientWorkingMemoryStore()
+        update = mod.ValidatedUpdate(withheld=[("the visit", "asks about work")])
+        await mod.apply_update(store, update, 3)
+        state = await store.snapshot()
+        assert state.withheld[0].topic == "the visit"
+        assert state.withheld[0].deflection == "asks about work"
+        assert state.withheld[0].status == "locked"
+
+
+class TestScheduleUpdate:
+    def _args(self, llm):
+        return dict(
+            memory=ClientWorkingMemory(turn_index=4),
+            new_messages=_turns(),
+            llm_client=llm,
+            timeout=5.0,
+        )
+
+    async def test_commits_under_the_snapshot_turn(self, monkeypatch):
+        monkeypatch.setattr(mod, "load_template", lambda *a, **k: "SYS")
+        store = ClientWorkingMemoryStore()
+        llm = _llm(ProposedUpdate(affect="wary", disclosed=["a thing"]))
+        assert mod.schedule_update(store, **self._args(llm))
+        await store._task
+        # The turn the actor's prompt was built from — not a fresh read.
+        assert store.last_committed_turn == 4
+        state = await store.snapshot()
+        assert state.affect == "wary"
+        assert state.disclosed[0].first_seen_turn == 4
+
+    async def test_skips_when_already_in_flight(self, monkeypatch):
+        monkeypatch.setattr(mod, "load_template", lambda *a, **k: "SYS")
+        store = ClientWorkingMemoryStore()
+
+        async def _slow():
+            await asyncio.sleep(0.2)
+
+        store._task = asyncio.create_task(_slow())
+        llm = _llm(ProposedUpdate())
+        assert mod.schedule_update(store, **self._args(llm)) is False
+        llm.llm_instance.with_structured_output.assert_not_called()
+        await store._task
+
+    async def test_timeout_is_a_miss_that_leaves_the_next_turn_free(self, monkeypatch):
+        monkeypatch.setattr(mod, "load_template", lambda *a, **k: "SYS")
+        store = ClientWorkingMemoryStore()
+
+        async def _hang(*a, **k):
+            await asyncio.sleep(10)
+
+        structured = AsyncMock()
+        structured.ainvoke = _hang
+        llm_instance = MagicMock()
+        llm_instance.with_structured_output = MagicMock(return_value=structured)
+        llm = SimpleNamespace(llm_instance=llm_instance)
+
+        args = self._args(llm)
+        args["timeout"] = 0.01
+        assert mod.schedule_update(store, **args)
+        await store._task
+        state = await store.snapshot()
+        assert state.updates_missed == 1
+        # The critical part: a miss must NOT advance the monotonic counter, or
+        # the next update would be rejected as stale for the same turn.
+        assert store.last_committed_turn == -1
+
+    async def test_llm_failure_is_a_miss_not_a_crash(self, monkeypatch):
+        monkeypatch.setattr(mod, "load_template", lambda *a, **k: "SYS")
+        store = ClientWorkingMemoryStore()
+        structured = AsyncMock()
+        structured.ainvoke = AsyncMock(side_effect=RuntimeError("provider down"))
+        llm_instance = MagicMock()
+        llm_instance.with_structured_output = MagicMock(return_value=structured)
+        assert mod.schedule_update(
+            store, **self._args(SimpleNamespace(llm_instance=llm_instance))
+        )
+        await store._task
+        state = await store.snapshot()
+        assert state.updates_missed == 1
+        assert state.affect == ""
+
+    async def test_a_miss_then_a_later_success_commits(self, monkeypatch):
+        monkeypatch.setattr(mod, "load_template", lambda *a, **k: "SYS")
+        store = ClientWorkingMemoryStore()
+        structured = AsyncMock()
+        structured.ainvoke = AsyncMock(side_effect=RuntimeError("boom"))
+        llm_instance = MagicMock()
+        llm_instance.with_structured_output = MagicMock(return_value=structured)
+        mod.schedule_update(
+            store, **self._args(SimpleNamespace(llm_instance=llm_instance))
+        )
+        await store._task
+
+        llm = _llm(ProposedUpdate(affect="steadier"))
+        args = self._args(llm)
+        args["memory"] = ClientWorkingMemory(turn_index=5)
+        assert mod.schedule_update(store, **args)
+        await store._task
+        assert store.last_committed_turn == 5
+        assert (await store.snapshot()).affect == "steadier"
+
+    async def test_discard_cancels_without_counting_a_miss(self, monkeypatch):
+        monkeypatch.setattr(mod, "load_template", lambda *a, **k: "SYS")
+        store = ClientWorkingMemoryStore()
+
+        async def _hang(*a, **k):
+            await asyncio.sleep(10)
+
+        structured = AsyncMock()
+        structured.ainvoke = _hang
+        llm_instance = MagicMock()
+        llm_instance.with_structured_output = MagicMock(return_value=structured)
+        mod.schedule_update(
+            store, **self._args(SimpleNamespace(llm_instance=llm_instance))
+        )
+        task = store._task
+        store.discard()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        # Teardown is not a failure to measure.
+        assert (await store.snapshot()).updates_missed == 0
+
+    async def test_nothing_to_summarize_commits_nothing(self, monkeypatch):
+        monkeypatch.setattr(mod, "load_template", lambda *a, **k: "SYS")
+        store = ClientWorkingMemoryStore()
+        args = self._args(_llm(ProposedUpdate()))
+        args["new_messages"] = []
+        assert mod.schedule_update(store, **args)
+        await store._task
+        assert store.last_committed_turn == -1
+        assert (await store.snapshot()).updates_missed == 0
