@@ -79,9 +79,7 @@ def get_batch_binary_classifier_prompt(
         examples_block = _build_examples_block(
             data.positive_examples, data.negative_examples
         )
-        blocks.append(
-            f'- id="{event_id}" class="{data.class_name}"{examples_block}'
-        )
+        blocks.append(f'- id="{event_id}" class="{data.class_name}"{examples_block}')
     classes_block = "\n".join(blocks)
 
     system_prompt = load_and_format(

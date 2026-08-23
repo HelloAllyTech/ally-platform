@@ -284,9 +284,7 @@ async def fetch_and_decode_comfort_source(
         )
         return _loop()
     except Exception as e:  # noqa: BLE001 - comfort audio must never break a session
-        logger.warning(
-            "[COMFORT] failed to fetch/decode uploaded track %s: %s", url, e
-        )
+        logger.warning("[COMFORT] failed to fetch/decode uploaded track %s: %s", url, e)
         return None
 
 

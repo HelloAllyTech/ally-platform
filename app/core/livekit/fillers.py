@@ -38,9 +38,7 @@ logger = get_logger(__name__)
 
 def _scenario_language_code(scenario) -> Optional[str]:
     """Best-effort extract of the scenario's BCP-47 language code."""
-    return getattr(
-        getattr(scenario, "language_config", None), "language_code", None
-    )
+    return getattr(getattr(scenario, "language_config", None), "language_code", None)
 
 
 def is_filler_enabled(scenario) -> bool:

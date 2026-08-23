@@ -259,7 +259,10 @@ async def test_staleness_grows_when_updates_stop_landing(store):
     # Without this a reader cannot tell a current memory from one whose updater
     # has been failing silently.
     await store.begin_turn()
-    await store.commit(1, stance="testing")
+    # Turn 0: begin_turn pre-increments from -1, so the first turn is 0 and an
+    # update for it commits under 0. Committing under 1 here would be an update
+    # for a turn that has not opened yet.
+    await store.commit(0, stance="testing")
     assert (await store.snapshot()).staleness_turns == 0
 
     await store.begin_turn()

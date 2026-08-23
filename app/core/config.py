@@ -743,6 +743,55 @@ class Settings(BaseSettings):
             "<=0 disables the safety bound."
         ),
     )
+    # ---- Client working memory (docs/client-working-memory-design.md) ----
+    # A derived record of the CLIENT's inner state — stance, affect, voice, and
+    # the disclosure/thread ledgers — updated by one detached LLM call per turn
+    # and rendered as the last block of the prompt. Where the rolling summary
+    # answers "what has been said", this answers "who is saying it, and where
+    # are they now".
+    CLIENT_WORKING_MEMORY_ENABLED: bool = Field(
+        default=False,
+        description=(
+            "Global switch for the client working memory. OFF by default: "
+            "unlike the rolling summary this has no live A/B behind it yet, and "
+            "it spends one structured LLM call per turn, so it must be opted "
+            "into deliberately rather than arriving with a deploy. This is the "
+            "outer gate only — even when true, the block is rendered solely for "
+            "scenarios whose selected main-agent prompt contains the "
+            "{client_working_memory} placeholder (design §6.1), so turning it "
+            "on affects no existing simulation. Set false as the kill switch: "
+            "no consolidation runs and prompts are unchanged."
+        ),
+    )
+    CLIENT_WORKING_MEMORY_TIMEOUT: float = Field(
+        default=8.0,
+        description=(
+            "Seconds to wait for one consolidation call. On timeout the "
+            "previous memory is kept, the miss is counted, and the next turn's "
+            "update is free to commit — a miss costs staleness, not "
+            "correctness."
+        ),
+    )
+    CLIENT_WORKING_MEMORY_EVERY_TURNS: int = Field(
+        default=1,
+        description=(
+            "Consolidate every N learner turns. Default 1 — every turn — "
+            "because what the update looks for is a client-side EVENT (a "
+            "repair, a rupture, a disclosure) and only the call itself can see "
+            "one, so a wider cadence does not save a call so much as miss the "
+            "turn the event happened on. Raise it to trade freshness for cost."
+        ),
+    )
+    CLIENT_WORKING_MEMORY_WINDOW_TURNS: int = Field(
+        default=6,
+        description=(
+            "How many recent messages the updater reads. Narrow on purpose: "
+            "the rolling summary already carries everything older, and a wider "
+            "window makes the updater re-derive state it has already "
+            "committed, which is how a stance starts drifting on re-reads."
+        ),
+    )
+
     ROLLING_SUMMARY_COMPACT_ON_PAUSE: bool = Field(
         default=True,
         description=(

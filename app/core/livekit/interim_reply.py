@@ -130,9 +130,7 @@ async def generate_interim_reply(
 
     try:
         language_code = (
-            getattr(
-                getattr(scenario, "language_config", None), "language_code", None
-            )
+            getattr(getattr(scenario, "language_config", None), "language_code", None)
             or "en-US"
         )
         pd = getattr(scenario, "prompt_data", None)

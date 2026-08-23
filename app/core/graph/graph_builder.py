@@ -15,6 +15,7 @@ from app.core.graph.nodes import (
     retrieve_knowledge,
     send_event_feedback,
     sync_events_and_behaviors_node,
+    update_working_memory,
 )
 from app.core.graph.state import SimulationState
 
@@ -86,6 +87,26 @@ def build_compact_history_subgraph() -> CompiledStateGraph[SimulationState]:
     subgraph.add_node("compact_history", compact_history)
     subgraph.add_edge(START, "compact_history")
     subgraph.add_edge("compact_history", END)
+    return subgraph.compile()
+
+
+def build_update_working_memory_subgraph() -> CompiledStateGraph[SimulationState]:
+    """
+    Build a subgraph for the client working memory's consolidation trigger.
+
+    Subgraph-wrapped for the same reason as compact_history even though this
+    node only SCHEDULES its call: the detached task is created inside the node,
+    so it inherits the run's streaming context, and the isolation is what keeps
+    the updater's structured output from reaching TTS (LiveKit issue #2836).
+    Cheap insurance against a leak that would be heard rather than logged.
+
+    Returns:
+        Compiled subgraph that fires the working-memory consolidation
+    """
+    subgraph = StateGraph(SimulationState)
+    subgraph.add_node("update_working_memory", update_working_memory)
+    subgraph.add_edge(START, "update_working_memory")
+    subgraph.add_edge("update_working_memory", END)
     return subgraph.compile()
 
 
@@ -204,6 +225,22 @@ def build_simulation_graph() -> StateGraph[SimulationState]:
     graph.add_edge("resolve_branching_instruction", "send_event_feedback")
 
     graph.add_edge("generate_response", "publish_done_thinking")
+
+    if settings.CLIENT_WORKING_MEMORY_ENABLED:
+        # Client working memory: also strictly AFTER publish_done_thinking, and
+        # PARALLEL to compact_history rather than chained behind it. The two are
+        # independent — one records what was said, the other who said it — and
+        # chaining would make this wait on the summarizer's gate for no reason.
+        # Both only schedule detached work, so neither extends the run
+        # measurably.
+        #
+        # Read at BUILD time, and the graph is compiled once at import: turning
+        # this on needs a restart. Turning it OFF does not — the node re-checks
+        # the flag every turn, which is what makes it a kill switch.
+        working_memory_subgraph = build_update_working_memory_subgraph()
+        graph.add_node("update_working_memory", working_memory_subgraph)
+        graph.add_edge("publish_done_thinking", "update_working_memory")
+        graph.add_edge("update_working_memory", END)
 
     if settings.ROLLING_SUMMARY_ENABLED:
         # Rolling-summary compactor: strictly AFTER publish_done_thinking (the

@@ -1356,6 +1356,34 @@ async def generate_response(
             _rs_summary = _rs_store.summary
             _rs_covered = max(0, _rs_store.covered_count)
 
+    # Client working memory: open the turn BEFORE the reply is generated.
+    #
+    # This is a store mutation, not a state write, for the reason recorded on
+    # SimulationState about the rolling summary and the retrieval countdown: a
+    # barge-in-cancelled superstep discards state writes that never survived a
+    # checkpoint commit, and a turn counter that silently un-increments would
+    # make the monotonic commit check meaningless.
+    #
+    # It belongs here rather than in a node of its own because "before the
+    # reply" is the whole contract — putting it in a separate superstep buys a
+    # barrier on the voice-to-voice path and an ordering that a later edge could
+    # get wrong. begin_turn is a lock, an increment and a deepcopy; it does no
+    # I/O.
+    #
+    # If the reply is then cancelled mid-stream the increment still stands, and
+    # that is correct: the turn happened. The update for it may never run, which
+    # costs one turn of observations and is why the updater reads a WINDOW of
+    # recent messages rather than a strict delta.
+    # The returned snapshot is deliberately discarded here: its consumer is the
+    # prompt append, which only exists for scenarios selecting the new
+    # main-agent prompt (design §6.1) and is not built yet. Holding it in an
+    # unused local to look finished would be worse than dropping it — the read
+    # path will take its own snapshot when it arrives.
+    if settings.CLIENT_WORKING_MEMORY_ENABLED and config and "configurable" in config:
+        _cwm_store = config["configurable"].get("client_working_memory_store")
+        if _cwm_store is not None:
+            await _cwm_store.begin_turn()
+
     # Use resolved branching instruction from state
     next_instruction = state.next_instruction
 
@@ -2395,6 +2423,75 @@ async def compact_history(
         prompt_data=prompt_data,
         timeout=settings.ROLLING_SUMMARY_TIMEOUT,
         reason="chars" if (chars_due and not turns_due) else "cadence",
+        room_id=getattr(_room, "name", None),
+    )
+    return {}
+
+
+@instrumented_node("update_working_memory")
+async def update_working_memory(
+    state: SimulationState, config: Optional[RunnableConfig] = None
+) -> dict:
+    """Fire the client working memory's consolidation call.
+
+    Terminal node on the reply path, strictly after publish_done_thinking for
+    the same reason as compact_history: the consolidation LLM call must not sit
+    between the learner finishing a sentence and hearing a reply. It is DETACHED
+    on top of that, so the graph run does not wait for it either — p50 turn
+    latency is already 3.1s and the weak metrics live in the 5.4s+ band, so a
+    serialized call here would move every turn into the worst band we measure.
+
+    Fires every CLIENT_WORKING_MEMORY_EVERY_TURNS learner turns, default every
+    turn: the update exists to catch a client-side EVENT (a repair, a rupture, a
+    disclosure) and only the call can see one, so a wider cadence misses the
+    turn the event happened on rather than saving a call.
+
+    On any failure the previous memory is kept and the miss is counted without
+    advancing the store's monotonic turn, so the next update is free to commit.
+    Never writes graph state — the store is the single source of truth, for the
+    reason recorded on SimulationState.
+    """
+    if not settings.CLIENT_WORKING_MEMORY_ENABLED:
+        return {}
+
+    configurable = (config or {}).get("configurable", {})
+    store = configurable.get("client_working_memory_store")
+    if store is None:
+        return {}
+    if store.in_flight:
+        logger.debug("[working-memory] update already in flight; skipping")
+        return {}
+
+    # A paused session is frozen, including its clock. Consolidating through a
+    # pause would date observations to a turn the learner has not taken.
+    _clock = configurable.get("session_clock")
+    if _clock is not None and getattr(_clock, "is_paused", False):
+        return {}
+
+    memory = await store.snapshot()
+    every = max(1, settings.CLIENT_WORKING_MEMORY_EVERY_TURNS)
+    if memory.turn_index < 0 or memory.turn_index % every != 0:
+        return {}
+
+    llm_client = configurable.get("llm_client")
+    if llm_client is None:
+        logger.warning("[working-memory] no llm_client in config; skipping")
+        return {}
+
+    from app.core.working_memory.consolidate import schedule_update
+
+    window = max(2, settings.CLIENT_WORKING_MEMORY_WINDOW_TURNS)
+    scenario = cast(Scenario, configurable.get("scenario")) if configurable else None
+    prompt_data = getattr(scenario, "prompt_data", None) if scenario else None
+    _room = configurable.get("room")
+
+    schedule_update(
+        store,
+        memory=memory,
+        new_messages=list(state.messages)[-window:],
+        llm_client=llm_client,
+        timeout=settings.CLIENT_WORKING_MEMORY_TIMEOUT,
+        prompt_data=prompt_data,
         room_id=getattr(_room, "name", None),
     )
     return {}

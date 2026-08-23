@@ -125,7 +125,12 @@ class ClientWorkingMemory:
     retrieve_cues: List[str] = field(default_factory=list)
 
     # ---- bookkeeping ----
-    turn_index: int = 0
+    #: -1 until the first turn opens, matching `updated_by_turn` and the store's
+    #: `last_committed_turn`. Not 0: `begin_turn` pre-increments, so a 0 default
+    #: makes "no turn has opened" indistinguishable from "turn 0 is in
+    #: progress", and the update node cannot then refuse to consolidate a turn
+    #: that never happened.
+    turn_index: int = -1
     #: Highest turn whose update has been committed. The monotonic key that
     #: replaces the design's original SHA-256 `revision` field: these writes
     #: have a natural order, so content hashing buys nothing (§9.1).
@@ -152,7 +157,11 @@ class ClientWorkingMemory:
         silently. 0 when nothing has ever committed and no turn has run.
         """
         if self.updated_by_turn < 0:
-            return self.turn_index
+            # Nothing has ever committed, so staleness is every turn so far.
+            # turn_index is 0-based, so that is index+1 — returning the index
+            # itself would undercount by one and report a one-turn-old memory
+            # as fresh.
+            return max(0, self.turn_index + 1)
         return max(0, self.turn_index - self.updated_by_turn)
 
     @property

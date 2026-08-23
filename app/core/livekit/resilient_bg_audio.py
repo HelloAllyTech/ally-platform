@@ -49,9 +49,7 @@ class ResilientBackgroundAudioPlayer(BackgroundAudioPlayer):
             try:
                 await self._audio_source.capture_frame(frame)
             except Exception as e:  # noqa: BLE001 - must never break the bg track
-                logger.warning(
-                    "[BG_AUDIO] capture_frame failed, continuing: %s", e
-                )
+                logger.warning("[BG_AUDIO] capture_frame failed, continuing: %s", e)
                 continue
 
     def flush(self) -> None:
