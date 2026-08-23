@@ -2098,6 +2098,12 @@ async def retrieve_knowledge(
             active_state.get("ragEnabled") if active_state else None,
         )
 
+    # Fetched once and reused by all three branches below. The refresh
+    # countdown lives here (not in checkpointed graph state) so a barge-in
+    # cancelling an in-flight superstep can't silently discard a decrement
+    # that already happened — see RetrievedContextStore's docstring.
+    _rc_store = (config or {}).get("configurable", {}).get("retrieved_context_store")
+
     # Refresh-cadence cache: the exact-content-hash cache inside
     # retrieve_relevant_knowledge rarely hits during live conversation
     # (content is novel every turn), so without this the title-selection
@@ -2105,16 +2111,19 @@ async def retrieve_knowledge(
     # recompute every KNOWLEDGE_RETRIEVAL_REFRESH_TURNS turns and reuse the
     # previous retrieved_context in between — bounded staleness (retrieved
     # knowledge can lag the live topic by up to that many turns) in exchange
-    # for skipping the call on most turns.
+    # for skipping the call on most turns. Requires a store to reuse from —
+    # without one there's nowhere to keep the countdown, so this turn just
+    # computes fresh (same as REFRESH_ENABLED=False).
     if (
         settings.KNOWLEDGE_RETRIEVAL_REFRESH_ENABLED
         and settings.KNOWLEDGE_RETRIEVAL_REFRESH_TURNS > 0
-        and state.turns_until_knowledge_refresh > 0
+        and _rc_store is not None
+        and _rc_store.turns_until_refresh > 0
     ):
         logger.debug(
             "[RAG_REFRESH] retrieve_knowledge: reusing cached context "
             "(%d turn(s) until refresh)",
-            state.turns_until_knowledge_refresh,
+            _rc_store.turns_until_refresh,
         )
         # Cheap hit/skip signal for dashboards — merges into the same
         # metadata jsonb the glossary analytics below already use, no
@@ -2123,20 +2132,13 @@ async def retrieve_knowledge(
         # Prefer a background-refreshed context the moment it lands
         # (KNOWLEDGE_RETRIEVAL_ASYNC) instead of waiting for the next
         # refresh-due turn.
-        _rc_store = (
-            (config or {}).get("configurable", {}).get("retrieved_context_store")
-        )
         _reused = (
             _rc_store.context
-            if settings.KNOWLEDGE_RETRIEVAL_ASYNC
-            and _rc_store is not None
-            and _rc_store.context is not None
+            if settings.KNOWLEDGE_RETRIEVAL_ASYNC and _rc_store.context is not None
             else state.retrieved_context
         )
-        return {
-            "retrieved_context": _reused,
-            "turns_until_knowledge_refresh": state.turns_until_knowledge_refresh - 1,
-        }
+        _rc_store.turns_until_refresh -= 1
+        return {"retrieved_context": _reused}
 
     knowledge_summary = ", ".join(
         [f"{k}: {v[:20]}..." for k, v in knowledge_map.items()]
@@ -2155,7 +2157,6 @@ async def retrieve_knowledge(
     # episodic-memory compactor). Staleness bound: one refresh cycle. The
     # first computation of a session falls through to the synchronous path
     # below so turn 1 keeps its context.
-    _rc_store = (config or {}).get("configurable", {}).get("retrieved_context_store")
     if (
         settings.KNOWLEDGE_RETRIEVAL_ASYNC
         and _rc_store is not None
@@ -2205,15 +2206,12 @@ async def retrieve_knowledge(
                 "knowledgeRetrievalAsync": True,
             },
         )
-        next_refresh_countdown = (
+        _rc_store.turns_until_refresh = (
             max(settings.KNOWLEDGE_RETRIEVAL_REFRESH_TURNS - 1, 0)
             if settings.KNOWLEDGE_RETRIEVAL_REFRESH_ENABLED
             else 0
         )
-        return {
-            "retrieved_context": _rc_store.context,
-            "turns_until_knowledge_refresh": next_refresh_countdown,
-        }
+        return {"retrieved_context": _rc_store.context}
 
     # Wrap in asyncio.wait_for so a hanging upstream LLM doesn't keep this
     # parallel branch (and therefore the graph join) waiting forever, which
@@ -2258,17 +2256,20 @@ async def retrieve_knowledge(
                 ),
             },
         )
+    # "" (computed, nothing relevant) is a valid result — keep it distinct
+    # from None (never computed) so the async/cadence branches' `is not
+    # None` checks above correctly recognize this as already-computed on
+    # later turns, instead of re-running the ~1s selection call in-gate
+    # every refresh turn for the life of the session. Mirrors the async
+    # branch's `fresh or ""` above.
     if _rc_store is not None:
-        _rc_store.context = retrieved_context or None
-    next_refresh_countdown = (
-        max(settings.KNOWLEDGE_RETRIEVAL_REFRESH_TURNS - 1, 0)
-        if settings.KNOWLEDGE_RETRIEVAL_REFRESH_ENABLED
-        else 0
-    )
-    return {
-        "retrieved_context": retrieved_context or None,
-        "turns_until_knowledge_refresh": next_refresh_countdown,
-    }
+        _rc_store.context = retrieved_context or ""
+        _rc_store.turns_until_refresh = (
+            max(settings.KNOWLEDGE_RETRIEVAL_REFRESH_TURNS - 1, 0)
+            if settings.KNOWLEDGE_RETRIEVAL_REFRESH_ENABLED
+            else 0
+        )
+    return {"retrieved_context": retrieved_context or ""}
 
 
 @instrumented_node("sync_events_and_behaviors_node")

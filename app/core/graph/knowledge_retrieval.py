@@ -21,10 +21,20 @@ class RetrievedContextStore:
     context instantly instead of paying ~1s inside the reply gate
     (KNOWLEDGE_RETRIEVAL_ASYNC). Graph state still carries the value the
     prompt consumed each turn; this store is the freshness handoff.
+
+    ``turns_until_refresh`` lives here rather than in checkpointed graph
+    state for the same reason RollingSummaryStore keeps its bookkeeping
+    off-checkpoint: a barge-in cancels the whole in-flight graph invocation,
+    and LangGraph only commits a checkpoint after a full superstep
+    completes, so a cancelled superstep can silently discard a countdown
+    decrement that already happened. A plain attribute mutated as a side
+    effect during node execution survives that — a discarded checkpoint
+    can't undo it.
     """
 
     def __init__(self) -> None:
         self.context = None
+        self.turns_until_refresh = 0
         self._task = None
 
     @property

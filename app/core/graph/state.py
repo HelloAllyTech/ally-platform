@@ -233,15 +233,6 @@ def replace_feedback_to_send(
     return right
 
 
-def replace_turns_until_knowledge_refresh(_: int, right: int) -> int:
-    """
-    Reducer to replace turns_until_knowledge_refresh.
-
-    Always replaces with the new value (right).
-    """
-    return right
-
-
 class SimulationState(BaseModel):
     """
     State model for the LangGraph simulation workflow.
@@ -282,14 +273,11 @@ class SimulationState(BaseModel):
     retrieved_context: Annotated[Optional[str], replace_retrieved_context] = (
         None  # Retrieved knowledge context for prompt enrichment
     )
-    turns_until_knowledge_refresh: Annotated[
-        int, replace_turns_until_knowledge_refresh
-    ] = (
-        0  # Countdown of turns to reuse retrieved_context before recomputing.
-        # 0 (default) forces a fresh computation on the first eligible turn.
-    )
     # NOTE: the rolling summary (episodic memory) deliberately does NOT live in
     # graph state — it is held in the worker-owned RollingSummaryStore (see
     # app/core/graph/rolling_summary.py) and passed via config, so background
     # compaction never touches checkpoints and the summary survives a cancelled
-    # final graph run.
+    # final graph run. The knowledge-retrieval refresh countdown was moved to
+    # RetrievedContextStore.turns_until_refresh (app/core/graph/knowledge_retrieval.py)
+    # for the same reason — a barge-in-cancelled superstep could silently
+    # discard a decrement here before it ever survived a checkpoint commit.

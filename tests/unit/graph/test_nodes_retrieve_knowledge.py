@@ -3,7 +3,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 
 from app.core.config import settings
 from app.core.graph import knowledge_retrieval as knowledge_retrieval_module
-from app.core.graph.knowledge_retrieval import RelevantKeys
+from app.core.graph.knowledge_retrieval import RelevantKeys, RetrievedContextStore
 from app.core.graph.nodes import retrieve_knowledge
 from app.core.graph.state import SimulationState
 
@@ -112,7 +112,10 @@ class TestRetrieveKnowledgeNode:
         assert "family dynamics" not in ctx
 
     @pytest.mark.asyncio
-    async def test_no_relevant_keys_returns_none(self):
+    async def test_no_relevant_keys_returns_empty_string(self):
+        # "" (computed, nothing relevant), not None (never computed) — the
+        # distinction matters for RetrievedContextStore's is-not-None gating
+        # on later turns. See test_empty_result_preserved_as_empty_string_not_none.
         kb = [{"title": "school memories", "content": "Bullied in 8th grade"}]
         pd = type("PD", (), {"knowledge_sources": kb})()
         scenario = type("S", (), {"prompt_data": pd})()
@@ -126,7 +129,7 @@ class TestRetrieveKnowledgeNode:
                 }
             },
         )
-        assert result["retrieved_context"] is None
+        assert result["retrieved_context"] == ""
 
 
 class FakeFailingLLM:
@@ -145,7 +148,10 @@ class FakeFailingClient:
 
 class TestRetrieveKnowledgeNodeErrorHandling:
     @pytest.mark.asyncio
-    async def test_llm_failure_returns_none(self):
+    async def test_llm_failure_returns_empty_string(self):
+        # retrieve_relevant_knowledge catches the LLM error internally and
+        # returns "" ("nothing relevant or an error" per its own docstring) —
+        # the node must not collapse that back to None.
         kb = [{"title": "k", "content": "d"}]
         pd = type("PD", (), {"knowledge_sources": kb})()
         scenario = type("S", (), {"prompt_data": pd})()
@@ -159,7 +165,7 @@ class TestRetrieveKnowledgeNodeErrorHandling:
                 }
             },
         )
-        assert result["retrieved_context"] is None
+        assert result["retrieved_context"] == ""
 
 
 class CountingStructuredLLM:
@@ -213,40 +219,84 @@ class TestKnowledgeRetrievalRefreshCadence:
 
     @pytest.mark.asyncio
     async def test_fresh_state_always_computes(self):
+        # turns_until_refresh now lives on RetrievedContextStore, not graph
+        # state — see RetrievedContextStore's docstring for why (a
+        # barge-in-cancelled superstep can't discard a store mutation the
+        # way it can discard an uncommitted checkpoint value).
         client = CountingLLMClient(["school memories"])
+        store = RetrievedContextStore()
         result = await retrieve_knowledge(
             _make_state(messages=[HumanMessage(content="Tell me about school")]),
-            {"configurable": {"scenario": self._scenario(), "llm_client": client}},
+            {
+                "configurable": {
+                    "scenario": self._scenario(),
+                    "llm_client": client,
+                    "retrieved_context_store": store,
+                }
+            },
         )
         assert client.counter["calls"] == 1
         assert result["retrieved_context"] is not None
         # KNOWLEDGE_RETRIEVAL_REFRESH_TURNS default is 2 -> reuse for 1 more
         # turn after this fresh compute.
-        assert result["turns_until_knowledge_refresh"] == 1
+        assert store.turns_until_refresh == 1
 
     @pytest.mark.asyncio
     async def test_reuses_cached_context_without_calling_llm(self):
         client = CountingLLMClient(["school memories"])
+        store = RetrievedContextStore()
+        store.turns_until_refresh = 1
         state = _make_state(
             messages=[HumanMessage(content="Tell me about school")],
             retrieved_context="**school memories:**\nBullied in 8th grade",
-            turns_until_knowledge_refresh=1,
         )
         result = await retrieve_knowledge(
             state,
-            {"configurable": {"scenario": self._scenario(), "llm_client": client}},
+            {
+                "configurable": {
+                    "scenario": self._scenario(),
+                    "llm_client": client,
+                    "retrieved_context_store": store,
+                }
+            },
         )
         assert client.counter["calls"] == 0
         assert result["retrieved_context"] == state.retrieved_context
-        assert result["turns_until_knowledge_refresh"] == 0
+        assert store.turns_until_refresh == 0
 
     @pytest.mark.asyncio
     async def test_recomputes_once_countdown_reaches_zero(self):
+        # A store that exists (e.g. created at worker init) but has never
+        # computed anything yet — countdown 0, both context sources still
+        # None — is the real turn-1 shape: neither the reuse nor the
+        # async-detach branch has anything to reuse, so it must recompute
+        # synchronously rather than accidentally taking the async path.
+        client = CountingLLMClient(["school memories"])
+        store = RetrievedContextStore()
+        store.turns_until_refresh = 0
+        state = _make_state(messages=[HumanMessage(content="Tell me about school")])
+        result = await retrieve_knowledge(
+            state,
+            {
+                "configurable": {
+                    "scenario": self._scenario(),
+                    "llm_client": client,
+                    "retrieved_context_store": store,
+                }
+            },
+        )
+        assert client.counter["calls"] == 1
+        assert "school memories" in result["retrieved_context"]
+
+    @pytest.mark.asyncio
+    async def test_no_store_always_recomputes(self):
+        # No retrieved_context_store in config at all — there's nowhere to
+        # keep a countdown, so the cadence-reuse branch is skipped entirely
+        # rather than erroring; this computes fresh every call.
         client = CountingLLMClient(["school memories"])
         state = _make_state(
             messages=[HumanMessage(content="Tell me about school")],
             retrieved_context="stale context from a much earlier turn",
-            turns_until_knowledge_refresh=0,
         )
         result = await retrieve_knowledge(
             state,
@@ -259,31 +309,96 @@ class TestKnowledgeRetrievalRefreshCadence:
     async def test_global_kill_switch_disables_reuse(self, monkeypatch):
         monkeypatch.setattr(settings, "KNOWLEDGE_RETRIEVAL_REFRESH_ENABLED", False)
         client = CountingLLMClient(["school memories"])
-        state = _make_state(
-            messages=[HumanMessage(content="Tell me about school")],
-            turns_until_knowledge_refresh=5,  # would otherwise reuse
-        )
+        store = RetrievedContextStore()
+        store.turns_until_refresh = 5  # would otherwise reuse
+        state = _make_state(messages=[HumanMessage(content="Tell me about school")])
         result = await retrieve_knowledge(
             state,
-            {"configurable": {"scenario": self._scenario(), "llm_client": client}},
+            {
+                "configurable": {
+                    "scenario": self._scenario(),
+                    "llm_client": client,
+                    "retrieved_context_store": store,
+                }
+            },
         )
         assert client.counter["calls"] == 1
-        assert result["turns_until_knowledge_refresh"] == 0
+        assert "school memories" in result["retrieved_context"]
+        assert store.turns_until_refresh == 0
 
     @pytest.mark.asyncio
     async def test_non_positive_refresh_turns_disables_reuse(self, monkeypatch):
         monkeypatch.setattr(settings, "KNOWLEDGE_RETRIEVAL_REFRESH_TURNS", 0)
         client = CountingLLMClient(["school memories"])
-        state = _make_state(
-            messages=[HumanMessage(content="Tell me about school")],
-            turns_until_knowledge_refresh=5,  # would otherwise reuse
-        )
+        store = RetrievedContextStore()
+        store.turns_until_refresh = 5  # would otherwise reuse
+        state = _make_state(messages=[HumanMessage(content="Tell me about school")])
         result = await retrieve_knowledge(
             state,
-            {"configurable": {"scenario": self._scenario(), "llm_client": client}},
+            {
+                "configurable": {
+                    "scenario": self._scenario(),
+                    "llm_client": client,
+                    "retrieved_context_store": store,
+                }
+            },
         )
         assert client.counter["calls"] == 1
-        assert result["turns_until_knowledge_refresh"] == 0
+        assert "school memories" in result["retrieved_context"]
+        assert store.turns_until_refresh == 0
+
+    @pytest.mark.asyncio
+    async def test_empty_result_preserved_as_empty_string_not_none(self):
+        # Regression test: the sync-fallback branch used to collapse "" into
+        # None (retrieved_context or None), which made a legitimately-empty
+        # first result indistinguishable from "never computed" — forcing
+        # every future refresh-due turn back into the expensive synchronous
+        # path instead of the async-detach branch. Both branches must now
+        # agree on "" for "computed, nothing relevant".
+        client = CountingLLMClient([])  # LLM finds nothing relevant
+        store = RetrievedContextStore()
+        result = await retrieve_knowledge(
+            _make_state(messages=[HumanMessage(content="How are you?")]),
+            {
+                "configurable": {
+                    "scenario": self._scenario(),
+                    "llm_client": client,
+                    "retrieved_context_store": store,
+                }
+            },
+        )
+        assert result["retrieved_context"] == ""
+        assert store.context == ""
+        assert store.context is not None
+
+    @pytest.mark.asyncio
+    async def test_empty_stored_context_takes_async_path_not_sync(self, monkeypatch):
+        # With the fix, a store holding "" (not None) from a prior empty
+        # result must satisfy the async-detach gate's `is not None` check on
+        # the next refresh-due turn — proving it no longer falls back to a
+        # blocking synchronous recompute for the rest of the session.
+        monkeypatch.setattr(settings, "KNOWLEDGE_RETRIEVAL_ASYNC", True)
+        client = CountingLLMClient(["school memories"])
+        store = RetrievedContextStore()
+        store.context = ""
+        store.turns_until_refresh = 0  # refresh due
+        result = await retrieve_knowledge(
+            _make_state(messages=[HumanMessage(content="Tell me about school")]),
+            {
+                "configurable": {
+                    "scenario": self._scenario(),
+                    "llm_client": client,
+                    "retrieved_context_store": store,
+                }
+            },
+        )
+        # Returned immediately without awaiting the LLM call in-gate.
+        assert result["retrieved_context"] == ""
+        assert client.counter["calls"] == 0
+        assert store.in_flight
+        await store._task
+        assert client.counter["calls"] == 1
+        assert "school memories" in store.context
 
 
 class TestGlossarySectionsInNode:
