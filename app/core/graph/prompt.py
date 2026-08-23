@@ -304,22 +304,18 @@ def _build_branching_prompt(
     return SystemMessage(content=(branching_prompt or "").strip())
 
 
-def _get_selected_prompt_has_states(prompt_data: PromptData) -> bool:
-    """Decide whether to compute state guidance for the selected variant.
+def _prompt_declares_variable(prompt_data: PromptData, variable: str) -> bool:
+    """Does the selected main-agent variant reference `{variable}`?
 
-    Strictly body-driven: the variant's auto-reconciled
-    `availableVariables` is the single source of truth. We return True
-    iff that list references `{state_x_guidelines}`.
+    Strictly body-driven: the variant's auto-reconciled `availableVariables`
+    is the single source of truth. ally-be recomputes that list from the
+    prompt text on every save (`reconcileAvailableVariables` against
+    `parseVariablesFromPrompt`, which matches any `{identifier}` with no
+    allow-list), so a placeholder appearing in the body is enough to declare
+    it — no registry to update, no per-simulation flag.
 
-    The backend's BackfillAvailableVariables1780150000000 migration
-    populates `availableVariables` for every existing row from its
-    latest body, so we no longer fall back to the legacy `hasStates`
-    boolean. Empty / missing list now means "no states" — same as a
-    row whose reconciled list simply doesn't include the placeholder.
-
-    Returns False when no variant is selected, the prompts dict is
-    missing, the entry is malformed, or the list doesn't reference
-    `state_x_guidelines`.
+    Returns False when no variant is selected, the prompts dict is missing,
+    the entry is malformed, or the list doesn't reference `variable`.
     """
     selected_code = getattr(prompt_data, "selected_main_prompt_code", None)
     if not selected_code:
@@ -343,9 +339,49 @@ def _get_selected_prompt_has_states(prompt_data: PromptData) -> bool:
             if isinstance(var, str)
             else (var.get("name") if isinstance(var, dict) else None)
         )
-        if name == "state_x_guidelines":
+        if name == variable:
             return True
     return False
+
+
+def prompt_declares_client_working_memory(prompt_data: PromptData) -> bool:
+    """Is this simulation opted into the client working memory?
+
+    The opt-in IS the placeholder. A scenario joins by selecting a main-agent
+    prompt whose body contains `{client_working_memory}` — one field on the
+    scenario, no migration, and nothing to undo but re-selecting the old
+    prompt (design §6.1).
+
+    Read by the graph as well as the prompt builder: a simulation that has not
+    opted in must not pay for a consolidation call whose output nothing would
+    render.
+    """
+    return _prompt_declares_variable(prompt_data, "client_working_memory")
+
+
+def _get_selected_prompt_has_states(prompt_data: PromptData) -> bool:
+    """Decide whether to resolve the active simulation state.
+
+    True when the variant declares `{state_x_guidelines}` — the original
+    mechanism, unchanged — OR `{client_working_memory}`.
+
+    The second case is not a special case: the working-memory block RENDERS the
+    active state's guidelines as its authored half (§3.1), so a prompt that
+    declares the block is asking for state resolution just as surely as one
+    that declares the placeholder directly. Without this, a variant that drops
+    `{state_x_guidelines}` in favour of the block would silently lose its state
+    guidance AND its per-state RAG gating — the state machine would resolve
+    nothing, which is exactly the failure the [STATE] warning below exists to
+    make visible.
+
+    The backend's BackfillAvailableVariables1780150000000 migration populates
+    `availableVariables` for every existing row from its latest body, so we no
+    longer fall back to the legacy `hasStates` boolean. Empty / missing list
+    means "no states".
+    """
+    return _prompt_declares_variable(
+        prompt_data, "state_x_guidelines"
+    ) or _prompt_declares_variable(prompt_data, "client_working_memory")
 
 
 def _build_behavior_prompt(
@@ -356,6 +392,7 @@ def _build_behavior_prompt(
     retrieved_context: Optional[str] = None,
     current_score: Optional[int] = None,
     embed_retrieved_context: bool = True,
+    client_working_memory: Any = None,
 ) -> Tuple[SystemMessage, Optional[str]]:
     """Returns (system_message, effective_retrieved_context).
 
@@ -387,6 +424,40 @@ def _build_behavior_prompt(
         if active_sim_state
         else ""
     )
+
+    # Client working memory. Rendered here rather than appended as a suffix
+    # because its POSITION is a variable we intend to test: the author moves
+    # `{client_working_memory}` in the body and the block moves with it (§2.3).
+    # That is the one thing a suffix append cannot offer.
+    #
+    # This is also where the two provenances meet (§3.1) and the only place they
+    # do — derived state from the store, authored guidance from the state the
+    # score just resolved. Passing `state_x_guidelines` in rather than storing it
+    # keeps a designer's instruction verbatim: the consolidation call rewrites
+    # what lives in the store, and an authored instruction must never be
+    # paraphrased into an approximation of itself.
+    client_working_memory_block = ""
+    if client_working_memory is not None and _prompt_declares_variable(
+        prompt_data, "client_working_memory"
+    ):
+        from app.core.working_memory.render import render_block
+
+        client_working_memory_block = render_block(
+            client_working_memory,
+            state_guidance=state_x_guidelines,
+            prompt_data=prompt_data,
+        )
+        # The block carries the guidance now, so blank the standalone kwarg. A
+        # variant mid-migration may still declare BOTH placeholders, and the
+        # same instruction rendered twice reads to the model as emphasis rather
+        # than as duplication.
+        if client_working_memory_block and state_x_guidelines:
+            logger.debug(
+                "%s [CWM] state guidance folded into the working-memory block; "
+                "{state_x_guidelines} blanked to avoid a double render",
+                LOG_PREFIX,
+            )
+            state_x_guidelines = ""
     # Observability: surface variant + state + RAG decisions every turn so
     # we can verify behaviour from session logs alone. These fire on every
     # conversation turn — emitted at DEBUG to keep production INFO logs
@@ -539,6 +610,9 @@ def _build_behavior_prompt(
         # prompt did not opt in). Variants without {state_x_guidelines} in
         # their text simply ignore this kwarg via SafeFormatter.
         state_x_guidelines=state_x_guidelines,
+        # The client working-memory block. Empty string for every variant that
+        # does not declare the placeholder, which is every variant today.
+        client_working_memory=client_working_memory_block,
         behavior_instructions_json=_build_behavior_instructions_json(
             behavior_instructions, current_state
         ),
@@ -764,6 +838,7 @@ def generate_system_message(
     audio_tag_instructions: Optional[str] = None,
     rolling_summary: Optional[str] = None,
     defer_retrieved_context: bool = False,
+    client_working_memory: Any = None,
 ) -> Tuple[SystemMessage, Optional[SystemMessage]]:
     """
     Generates a SystemMessage prompt for an AI roleplay assistant
@@ -789,6 +864,13 @@ def generate_system_message(
 
     `rolling_summary`, when provided (ROLLING_SUMMARY_ENABLED), is appended as
     the final block — see `_append_rolling_summary` for why it must stay last.
+
+    `client_working_memory`, when provided, is a ClientWorkingMemory snapshot
+    substituted into the variant's `{client_working_memory}` placeholder. Only
+    the behaviour path takes it: a branching turn swaps in a different template
+    entirely to deliver a guardrail, and that instruction outranks the persona's
+    inner state for exactly that turn — handing the actor its full working
+    memory alongside a guardrail invites it to negotiate with the guardrail.
     """
     if next_instruction:
         msg = _build_branching_prompt(
@@ -817,6 +899,7 @@ def generate_system_message(
             retrieved_context,
             current_score=current_score,
             embed_retrieved_context=not defer_retrieved_context,
+            client_working_memory=client_working_memory,
         )
         logger.info(
             "%s BUILT behavior prompt: language_code=%s",
@@ -842,6 +925,7 @@ def generate_system_message(
         retrieved_context,
         current_score=current_score,
         embed_retrieved_context=not defer_retrieved_context,
+        client_working_memory=client_working_memory,
     )
     logger.info(
         "%s BUILT behavior prompt: language_code=%s",

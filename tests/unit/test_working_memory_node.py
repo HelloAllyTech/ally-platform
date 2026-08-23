@@ -36,10 +36,27 @@ def _state(turns: int = 8) -> SimulationState:
     )
 
 
-def _config(store, **extra):
+def _prompt_data(*variables: str):
+    """A prompt_data whose selected variant declares `variables`.
+
+    The opt-in is body-driven: ally-be reconciles `availableVariables` from the
+    prompt text on save, so this is the shape the runtime actually sees.
+    """
+    return SimpleNamespace(
+        selected_main_prompt_code="code_x",
+        prompts={"code_x": {"availableVariables": list(variables)}},
+    )
+
+
+def _scenario(*variables: str):
+    return SimpleNamespace(prompt_data=_prompt_data(*variables))
+
+
+def _config(store, opted_in=True, **extra):
     configurable = {
         "client_working_memory_store": store,
         "llm_client": SimpleNamespace(llm_instance=MagicMock()),
+        "scenario": _scenario("client_working_memory") if opted_in else _scenario(),
     }
     configurable.update(extra)
     return {"configurable": configurable}
@@ -113,6 +130,26 @@ class TestGates:
         store = ClientWorkingMemoryStore()
         await store.begin_turn()
         config = {"configurable": {"client_working_memory_store": store}}
+        with patch("app.core.working_memory.consolidate.schedule_update") as sched:
+            await update_working_memory(_state(), config)
+        sched.assert_not_called()
+
+    async def test_scenario_not_opted_in_does_not_consolidate(self):
+        # The whole safety claim for the flag: turning it on must cost nothing
+        # for a simulation that has not selected a prompt declaring the block.
+        store = ClientWorkingMemoryStore()
+        await store.begin_turn()
+        with patch("app.core.working_memory.consolidate.schedule_update") as sched:
+            await update_working_memory(_state(), _config(store, opted_in=False))
+        sched.assert_not_called()
+
+    async def test_states_only_prompt_is_not_opted_in(self):
+        # A variant declaring {state_x_guidelines} is the existing mechanism and
+        # must be left alone — it is not an implicit opt-in to the new one.
+        store = ClientWorkingMemoryStore()
+        await store.begin_turn()
+        config = _config(store)
+        config["configurable"]["scenario"] = _scenario("state_x_guidelines")
         with patch("app.core.working_memory.consolidate.schedule_update") as sched:
             await update_working_memory(_state(), config)
         sched.assert_not_called()
@@ -208,6 +245,15 @@ class TestTurnOpener:
         with suppress(Exception):
             await generate_response(_state(), _config(store))
         assert (await store.snapshot()).turn_index == 0
+
+    async def test_opener_skips_a_scenario_that_has_not_opted_in(self, monkeypatch):
+        monkeypatch.setattr(settings, "CLIENT_WORKING_MEMORY_ENABLED", True)
+        from app.core.graph.nodes import generate_response
+
+        store = ClientWorkingMemoryStore()
+        with suppress(Exception):
+            await generate_response(_state(), _config(store, opted_in=False))
+        assert (await store.snapshot()).turn_index == -1
 
     async def test_opener_respects_the_kill_switch(self, monkeypatch):
         monkeypatch.setattr(settings, "CLIENT_WORKING_MEMORY_ENABLED", False)

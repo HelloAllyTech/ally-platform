@@ -31,7 +31,10 @@ from app.core.graph.prompt import (
 from app.core.graph.prompt import (
     _resolve_simulation_state_by_score as _resolve_state_for_retrieval,
 )
-from app.core.graph.prompt import generate_system_message
+from app.core.graph.prompt import (
+    generate_system_message,
+    prompt_declares_client_working_memory,
+)
 from app.core.graph.state import (
     BehaviorInstructionFeedbackData,
     BranchingAndFeedbackData,
@@ -1374,15 +1377,24 @@ async def generate_response(
     # that is correct: the turn happened. The update for it may never run, which
     # costs one turn of observations and is why the updater reads a WINDOW of
     # recent messages rather than a strict delta.
-    # The returned snapshot is deliberately discarded here: its consumer is the
-    # prompt append, which only exists for scenarios selecting the new
-    # main-agent prompt (design §6.1) and is not built yet. Holding it in an
-    # unused local to look finished would be worse than dropping it — the read
-    # path will take its own snapshot when it arrives.
+    # Gated on the scenario's OPT-IN as well as the global flag: the opt-in is
+    # the `{client_working_memory}` placeholder in the selected main-agent
+    # prompt's body (design §6.1). A simulation that has not opted in must not
+    # pay for a consolidation call whose output nothing would render, so the
+    # turn is not even opened for it — which is what makes enabling the flag
+    # safe for every existing simulation.
+    _cwm_memory = None
     if settings.CLIENT_WORKING_MEMORY_ENABLED and config and "configurable" in config:
         _cwm_store = config["configurable"].get("client_working_memory_store")
-        if _cwm_store is not None:
-            await _cwm_store.begin_turn()
+        _cwm_scenario = config["configurable"].get("scenario")
+        _cwm_prompt_data = (
+            getattr(_cwm_scenario, "prompt_data", None) if _cwm_scenario else None
+        )
+        if _cwm_store is not None and (
+            _cwm_prompt_data is not None
+            and prompt_declares_client_working_memory(_cwm_prompt_data)
+        ):
+            _cwm_memory = await _cwm_store.begin_turn()
 
     # Use resolved branching instruction from state
     next_instruction = state.next_instruction
@@ -1476,6 +1488,7 @@ async def generate_response(
             audio_tag_instructions=audio_tag_instructions,
             rolling_summary=_rs_summary,
             defer_retrieved_context=settings.RETRIEVED_CONTEXT_DEFER_TO_SUFFIX,
+            client_working_memory=_cwm_memory,
         )
 
         room_name = ""
@@ -2468,6 +2481,16 @@ async def update_working_memory(
     if _clock is not None and getattr(_clock, "is_paused", False):
         return {}
 
+    # Same opt-in as the read path, and for the same reason: without it every
+    # simulation in the fleet would pay a call per turn the moment the flag went
+    # on. `turn_index < 0` below would already catch this, since generate_response
+    # only opens a turn for an opted-in scenario — but relying on that would make
+    # the cost of a mistake in one gate an invisible LLM bill in the other.
+    scenario = cast(Scenario, configurable.get("scenario")) if configurable else None
+    prompt_data = getattr(scenario, "prompt_data", None) if scenario else None
+    if prompt_data is None or not prompt_declares_client_working_memory(prompt_data):
+        return {}
+
     memory = await store.snapshot()
     every = max(1, settings.CLIENT_WORKING_MEMORY_EVERY_TURNS)
     if memory.turn_index < 0 or memory.turn_index % every != 0:
@@ -2481,8 +2504,6 @@ async def update_working_memory(
     from app.core.working_memory.consolidate import schedule_update
 
     window = max(2, settings.CLIENT_WORKING_MEMORY_WINDOW_TURNS)
-    scenario = cast(Scenario, configurable.get("scenario")) if configurable else None
-    prompt_data = getattr(scenario, "prompt_data", None) if scenario else None
     _room = configurable.get("room")
 
     schedule_update(
