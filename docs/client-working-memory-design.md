@@ -442,10 +442,58 @@ class ClientWorkingMemory(BaseModel):
     # ── retrieved, not dumped ────────────────────────────────────
     salient_backstory: list[Fact]  # semantic-bucket retrieval output (§9.2)
 
+    # ── AUTHORED. Not in the store. Merged at render time. See §3.1 ──
+    state_id: str                  # active simulation state, by score band
+    state_guidance: str            # its {state_x_guidelines}, VERBATIM
+
     # ── bookkeeping ──────────────────────────────────────────────
     updated_by_turn: int           # monotonic commit key — see §9.1
     updated_at_turn: int
 ```
+
+### 3.1 Two provenances in one block: derived and authored
+
+The block is assembled from **two sources that must never be confused**, and separating them
+is what keeps the existing state mechanism intact.
+
+**Derived fields come from the store.** Stance, affect, register, speech fragments, the
+ledgers and the recalled backstory are inferred from the conversation and written by the
+off-path updater.
+
+**Authored fields come from the resolver, at render time.** `state_id` and `state_guidance`
+are resolved exactly as they are today — `_resolve_simulation_state_by_score` picks the
+active state from the cumulative score, `scoreLower` inclusive and `scoreUpper` exclusive,
+with the opening state emergent from a score of 0. That resolution does not move.
+
+Three consequences, and each one answers a question this design would otherwise leave open.
+
+**The authored guidance never enters the store, so the updater can never paraphrase it.**
+The consolidation call rewrites derived state; if the scenario designer's instruction lived
+in the same record it would eventually be summarised, and a designer's *"do not offer
+solutions in this state"* would decay into an approximation of itself. Same rule as
+guardrails in §5.1, for the same reason. It also means a stale store cannot serve stale
+scenario guidance — the resolver is read fresh every turn.
+
+**`state_x_guidelines` stops being its own mid-template block and moves inside this one.**
+That is the point of the design, applied consistently: two blocks means two framings and the
+more action-guiding of the two — what the scenario wants from *this* turn — currently sits
+mid-template, far from generation, for exactly the reasons §2.2 argues against. Inside the
+block it renders **first**, before the derived fields, because it churns slowest: state
+guidance changes only when the score crosses a band, less often than the rolling summary or
+retrieval. Slow fields first is the same ascending-churn discipline `prompt.py` already
+applies to the volatile suffix.
+
+**The authored state becomes a retrieval cue, which is how `ragEnabled` survives.** Today a
+state with `ragEnabled: false` blanks `{retrieved_context}` for that turn. Under §9.2's
+routing the same control expresses itself as the state contributing no cue and suppressing
+the `semantic` bucket, so an authored decision that "this state should not draw on domain
+knowledge" keeps working without a second mechanism.
+
+**Stance and simulation state are not the same thing and must not be merged.** One is
+authored and score-driven — the designer saying *"once the learner has earned twenty points,
+open up"*. The other is derived and conversation-driven — where the client actually is.
+Collapsing them would either make scenario design unpredictable or make fidelity a function
+of scoring. They sit side by side in one block, from two sources.
 
 `stance` does the real work. Transitions must be **earned** — `reflecting` is unreachable until the unresolved threads that justify it have actually been worked. That is a structural block on the *"Thank you for today"* failure, which prose instructions have not stopped.
 
@@ -778,6 +826,67 @@ for Marathi, which also have them). So register failure is **not** glossary abse
 It tracks `diglossia` exactly, and the input that is genuinely missing is
 `targetVariety`. The glossary being present and not fixing it is evidence that a
 term list is not a substitute for naming the variety.
+
+---
+
+### 6.1 A new prompt, not an edit to #2
+
+**This ships as its own main-agent prompt that inherits #2's body**, rather than as
+placeholders added to #2. That is a change from an earlier version of this document, and it
+is a better design for three reasons — the third of which removes machinery §5.1 invented.
+
+**It scopes the experiment to consenting simulations.** Only sessions whose scenario selects
+the new prompt get the working memory. Everything else keeps running #2 untouched, so the
+comparison is between two populations of real sessions rather than before-and-after across a
+deploy boundary — and after a day of finding that half our metric movements were measurement
+artefacts, that distinction is the whole ballgame.
+
+**The template genuinely differs, so it should be a different template.** This is not one
+placeholder added; it is `character_profile_text` gone, `{retrieved_context}` gone,
+`{state_x_guidelines}` moved inside the block, and the block appended last. Editing #2 into
+that shape leaves no way back for the simulations already on it.
+
+**Capability is already body-driven, so the prompt IS the switch.**
+`_get_selected_prompt_has_states` decides whether to compute state guidance by asking whether
+the selected variant's auto-reconciled `availableVariables` references
+`{state_x_guidelines}` — *"strictly body-driven: the variant's `availableVariables` is the
+single source of truth"*. The legacy `hasStates` boolean was deliberately retired in favour
+of exactly that. So the presence of `{client_working_memory}` in the body is what turns this
+on, by the mechanism the repo already uses.
+
+That **supersedes the rollout lever in §5.1.** That section proposed a deploy-time topology
+flag plus store-presence in the per-session config, because a topology flag cannot express
+per-cohort rollout. The prompt code can: it is per-simulation, visible in the studio,
+reversible, and needs no new plumbing. `CLIENT_WORKING_MEMORY_ENABLED` survives only as a
+global kill-switch — the thing you reach for when it is misbehaving in production, not the
+thing that decides who gets it.
+
+#### The migration path, and why it is one field
+
+**A simulation moves by pointing `scenario.metadata.selectedMainPromptCode` at the new
+prompt. That is the whole migration.** It moves back the same way.
+
+That is only true because of a constraint the new template must hold to: **it consumes the
+same `PromptData` fields the old one does.** `character_profile_text` still arrives and is
+selected from rather than dumped; `knowledge_sources` still arrives and is ranked rather than
+concatenated; `states` still arrives and is resolved by the same score-band resolver. Nothing
+about the scenario is re-authored, which is the same premise §2 rests on — a design requiring
+per-scenario authoring has to be authored 58 times before one learner benefits.
+
+So the migration checklist per simulation is: switch the code, run a session, compare. And
+the A/B is available without touching anything live — duplicate a simulation, point the copy
+at the new prompt, and run both.
+
+**Two things that make the reversal real rather than theoretical.** The working memory lives
+in a worker-owned store, so pointing back leaves no residue in the scenario. And because the
+authored fields are merged at render time from the resolver rather than held in the store
+(§3.1), a simulation that moves back gets its `{state_x_guidelines}` block rendered exactly
+as before.
+
+**What would make migration hard, and is therefore forbidden.** Any new required field on the
+scenario; any change to how states resolve; any dependency on content that only exists once
+someone has authored it. All three are the failure that killed `roleplay_v2` (§9.1), which
+had a sound design and zero authored content.
 
 ---
 
