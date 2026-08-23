@@ -2,7 +2,7 @@
 
 **Status**: design proposal, not built
 **Scope**: `ally-ai-learn` actor prompt assembly, memory, and the session-end write-out
-**Target template**: **Main Agent Prompt #2** — `ally_ai_learn_system_main_agent_prompt_full`, live at **version 6** with `useDashboardOverride: true`, so the authoritative text is in `prompts_versions`, **not** the file of the same name. Not the original `ally_ai_learn_system_main_agent_prompt` (v17).
+**Target template**: a **new main-agent prompt inheriting Main Agent Prompt #2** — see §6.1. #2 is `ally_ai_learn_system_main_agent_prompt_full`, live at **version 6** with `useDashboardOverride: true`, so its authoritative text is in `prompts_versions`, **not** the file of the same name. The new prompt is what carries `{client_working_memory}`, which is also what scopes this design to the simulations that opt in; #2 itself is left untouched so it stays the control arm.
 **Related**: [`02-graph-pipeline.md`](02-graph-pipeline.md) · [`03-event-system.md`](03-event-system.md) · [`12-prompts-system.md`](12-prompts-system.md) · [`knowledge-source-retrieval-policies.md`](knowledge-source-retrieval-policies.md) · [`events-off-gate-design.md`](events-off-gate-design.md)
 
 ---
@@ -642,12 +642,21 @@ defaulting off, exactly as `ROLLING_SUMMARY_ENABLED`, `EVENTS_OFF_GATE`,
 kill-switch.
 
 That flag is read while the graph topology is built, at import, so it is a
-**deploy-time** switch: one topology per worker process. The phasing in §14 wants
-per-language and per-cohort comparison, which a topology flag cannot express. The lever
-that can is the one `compact_history` already uses — `store =
-configurable.get("client_working_memory_store")`, and `if store is None: return {}`. Presence of
-the store handle in the per-session config is the per-session switch. Ship both: the
-flag decides whether the machinery exists, the store handle decides who gets it.
+**deploy-time** switch: one topology per worker process, and it cannot express per-cohort
+rollout.
+
+**§6.1 supersedes this as the rollout lever.** The scoping mechanism is the prompt itself: a
+new main-agent prompt carrying `{client_working_memory}`, selected per simulation via
+`scenario.metadata.selectedMainPromptCode`. Capability is already body-driven — the repo
+retired the `hasStates` boolean in favour of reading `availableVariables` from the prompt
+body — so presence of the placeholder is what turns this on, per simulation, reversibly, with
+no new plumbing.
+
+`CLIENT_WORKING_MEMORY_ENABLED` therefore survives only as a **global kill-switch**: the
+thing to reach for when it misbehaves in production, not the thing that decides who gets it.
+The store handle in the per-session config remains the graph-node no-op guard (`store =
+configurable.get("client_working_memory_store")`, `if store is None: return {}`), which is
+how the report graph degrades — see below.
 
 **Guardrail precedence — the safety-relevant one.** Guardrails are not prompt text;
 they are `GuardrailEvent`s that reach the reply through `next_instruction`. Because the
