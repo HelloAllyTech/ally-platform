@@ -165,6 +165,23 @@ class ClientWorkingMemoryStore:
             st.updates_committed += 1
             return True
 
+    def discard(self) -> None:
+        """Cancel any in-flight update. Called on session shutdown.
+
+        The record itself needs no teardown — it is an instance attribute of the
+        worker, like RollingSummaryStore, and dies with the session rather than
+        living in a module-level dict keyed by room. What does need cancelling is
+        a detached update still running when the session ends: it would write
+        into a store nobody will read and hold a reference to the LLM client past
+        teardown.
+
+        Synchronous on purpose, so it can be called from the shutdown path
+        alongside the other cleanups without awaiting anything.
+        """
+        if self._task is not None and not self._task.done():
+            self._task.cancel()
+        self._task = None
+
     async def mark_miss(self) -> None:
         """Count an update that timed out or failed.
 

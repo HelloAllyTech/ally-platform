@@ -463,6 +463,7 @@ def create_agent_with_adapter(
     session_clock=None,
     rolling_summary_store=None,
     retrieved_context_store=None,
+    client_working_memory_store=None,
 ) -> Agent:
     """
     Create LLM adapter and agent instance.
@@ -514,6 +515,12 @@ def create_agent_with_adapter(
     # holder for stale-while-revalidate refreshes (KNOWLEDGE_RETRIEVAL_ASYNC).
     if retrieved_context_store is not None:
         configurable["retrieved_context_store"] = retrieved_context_store
+
+    # The client's working memory. Presence in the config is what lets a graph
+    # node no-op cleanly when it is absent — which is how the report graph
+    # degrades, since it has no worker and therefore no store.
+    if client_working_memory_store is not None:
+        configurable["client_working_memory_store"] = client_working_memory_store
 
     # Lazy import to avoid circular dependency
     from app.core.graph import agent_graph

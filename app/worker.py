@@ -456,6 +456,19 @@ class AgentWorker:
         self.rolling_summary_store = RollingSummaryStore()
         # Async knowledge retrieval (stale-while-revalidate) handoff.
         self.retrieved_context_store = RetrievedContextStore()
+        # The client's working memory (docs/client-working-memory-design.md).
+        # Worker-owned for the same reason as the two above: agent_graph is
+        # compiled once at import and shared by every concurrent session in this
+        # process, so the per-session run config is the only place per-session
+        # identity exists.
+        #
+        # Constructed unconditionally and read by nothing yet. The block is only
+        # appended for scenarios selecting the new main-agent prompt (design
+        # §6.1), and the updater that fills it is phase 3 — so on every session
+        # today this is an empty record nobody looks at.
+        from app.core.working_memory import ClientWorkingMemoryStore
+
+        self.client_working_memory_store = ClientWorkingMemoryStore()
 
         # Setup orchestrator (receives the ScoreKeeper)
         self._setup_event_orchestrator(self.score_keeper)
@@ -474,6 +487,7 @@ class AgentWorker:
             session_clock=self.session_clock,
             rolling_summary_store=self.rolling_summary_store,
             retrieved_context_store=self.retrieved_context_store,
+            client_working_memory_store=self.client_working_memory_store,
         )
 
         # Register callbacks
@@ -877,6 +891,12 @@ class AgentWorker:
                 logger.debug(f"Error cleaning up conversation handler: {e}")
             # Drop any in-flight turn-metrics state for this room.
             turn_metrics.discard(self.ctx.room.name)
+            # Cancel any in-flight working-memory update. The record dies with
+            # this worker instance; a detached update would not.
+            try:
+                self.client_working_memory_store.discard()
+            except Exception as e:  # noqa: BLE001 - teardown must not raise
+                logger.debug(f"Error discarding working-memory store: {e}")
             # Stop the predictive-filler job before deleting clips so it can't
             # swap in a new generation after cleanup (it's still awaited by
             # cleanup_background_tasks in the wrapped shutdown handler).
@@ -1488,9 +1508,7 @@ class AgentWorker:
                 prompt_data=prompt_data,
                 # The clock is the single source of truth for paused-ness, and
                 # it is what the pause control channel flips.
-                is_paused=lambda: bool(
-                    getattr(self.session_clock, "is_paused", False)
-                ),
+                is_paused=lambda: bool(getattr(self.session_clock, "is_paused", False)),
             )
 
             supervisor = self._supervisor_notes

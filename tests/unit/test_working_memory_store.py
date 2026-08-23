@@ -275,3 +275,43 @@ async def test_staleness_before_any_commit_is_the_turn_count(store):
 
 def test_a_fresh_record_seeds_its_own_stance_path():
     assert ClientWorkingMemory().stance_path == ["guarded"]
+
+
+# ---------------------------------------------------------------------------
+# Teardown
+# ---------------------------------------------------------------------------
+
+
+async def test_discard_cancels_an_in_flight_update(store):
+    # A detached update still running at session end would write into a store
+    # nobody will read, and hold a reference to the LLM client past teardown.
+    started = asyncio.Event()
+
+    async def slow_update():
+        started.set()
+        await asyncio.sleep(30)
+
+    store._task = asyncio.create_task(slow_update())
+    await started.wait()
+    assert store.in_flight is True
+
+    store.discard()
+    await asyncio.sleep(0)
+    assert store.in_flight is False
+
+
+def test_discard_is_safe_when_nothing_is_running():
+    # Shutdown runs on every session, including ones where no update ever
+    # started, so this has to be a no-op rather than an AttributeError.
+    ClientWorkingMemoryStore().discard()
+
+
+async def test_discard_does_not_wipe_the_record(store):
+    # The record dies with the worker instance; discard is about the task. If it
+    # cleared state too, a shutdown racing finalize would lose the session's
+    # memory before it could be written out.
+    await store.begin_turn()
+    await store.commit(1, stance="opening")
+    store.discard()
+
+    assert (await store.snapshot()).stance == "opening"
