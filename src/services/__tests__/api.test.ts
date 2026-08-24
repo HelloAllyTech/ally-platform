@@ -17,6 +17,32 @@ describe('api baseQueryWithReauth', () => {
     // Simply ensure the API object is defined and has reducerPath
     expect(api.reducerPath).toBe('api');
   });
+
+  it('does not log request/response bodies (bearer tokens, PII) to the console in production', async () => {
+    const globalAny = global as unknown as {__DEV__: boolean};
+    const originalDev = globalAny.__DEV__;
+    globalAny.__DEV__ = false;
+    const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+    try {
+      const store = configureStore({
+        reducer: {[api.reducerPath]: api.reducer},
+        middleware: gDM => gDM().concat(api.middleware),
+      });
+
+      const {callsAPI} = require('../callsApi');
+      const action = callsAPI.endpoints.getCallLogs.initiate({
+        limit: 1,
+        offset: 0,
+      });
+      await store.dispatch(action as unknown as AnyAction);
+
+      expect(consoleSpy).not.toHaveBeenCalled();
+    } finally {
+      consoleSpy.mockRestore();
+      globalAny.__DEV__ = originalDev;
+    }
+  });
 });
 
 // Mock store used internally by api.ts for token actions
