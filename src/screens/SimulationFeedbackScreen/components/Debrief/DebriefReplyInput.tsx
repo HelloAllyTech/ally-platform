@@ -47,9 +47,7 @@ export const DebriefReplyInput: React.FC<DebriefReplyInputProps> = ({
         ]}>
         <TextInput
           style={styles.input}
-          placeholder={t('postSim.debrief.replyPlaceholder', {
-            max: MAX_MESSAGE_LENGTH,
-          })}
+          placeholder={t('postSim.debrief.replyPlaceholder')}
           placeholderTextColor={colors.ds.typography.lowEmphasis}
           value={inputText}
           onChangeText={setInputText}
