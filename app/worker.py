@@ -1034,6 +1034,7 @@ class AgentWorker:
                 thread_id=self.ctx.room.name,
                 score_keeper=self.score_keeper,
                 rolling_summary_store=self.rolling_summary_store,
+                client_working_memory_store=self.client_working_memory_store,
                 language_code=_memory_language_code,
             )
         except Exception:  # noqa: BLE001 - never break session setup over this

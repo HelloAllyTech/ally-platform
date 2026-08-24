@@ -84,6 +84,7 @@ class EmergencyFinalizer:
         thread_id: str,
         score_keeper=None,
         rolling_summary_store=None,
+        client_working_memory_store=None,
         language_code: Optional[str] = None,
         queue=None,
     ) -> None:
@@ -91,6 +92,13 @@ class EmergencyFinalizer:
         self._thread_id = thread_id
         self._score_keeper = score_keeper
         self._rolling_summary_store = rolling_summary_store
+        # The working memory's semantic record. This path was missed when the
+        # write-out was wired: the two normal shutdown handlers got the store and
+        # this third one did not, so a session that finalized HERE produced no
+        # record at all. Observed on the post-fix Hindi v2v run — no sessionMemory
+        # row, which read as "the language fix failed" when the write-out had
+        # simply never run.
+        self._client_working_memory_store = client_working_memory_store
         self._language_code = language_code
         # Injected for tests; defaults to the process-wide SQS queue.
         self._queue = queue
@@ -123,6 +131,37 @@ class EmergencyFinalizer:
             return True
 
     # ---- the flush -------------------------------------------------------
+
+    def _build_working_memory_record(self):
+        """The semantic record, read WITHOUT the event loop.
+
+        This path exists precisely because the loop did not run, so it cannot
+        await `store.snapshot()`. It reads the private state directly — safe
+        here and nowhere else: by the time an emergency finalize fires, no
+        detached update can still be committing, and a torn read is strictly
+        better than no record.
+
+        The transcript is unavailable here, and `check_grounding` treats an
+        empty transcript as missing evidence rather than proof of invention, so
+        the ledger survives ungrounded rather than being discarded wholesale.
+        """
+        store = self._client_working_memory_store
+        if store is None:
+            return None
+        try:
+            from app.core.working_memory.writeout import build_writeout
+
+            state = getattr(store, "_state", None)
+            if state is None:
+                return None
+            return build_writeout(state, [])
+        except Exception as exc:  # noqa: BLE001 - never block the emergency path
+            logger.error(
+                "[EMERGENCY-FINALIZE] working-memory record skipped room=%s: %s",
+                self._room_id,
+                exc,
+            )
+            return None
 
     def _get_queue(self):
         if self._queue is not None:
@@ -189,9 +228,7 @@ class EmergencyFinalizer:
                 )
 
             message = create_session_end_message(self._room_id, final_score)
-            ok = bool(
-                self._get_queue().send_message_sync(message.model_dump_json())
-            )
+            ok = bool(self._get_queue().send_message_sync(message.model_dump_json()))
             logger.error(
                 "[EMERGENCY-FINALIZE] end_of_session sent=%s room=%s score=%s "
                 "score_resolved=%s reason=%s",
@@ -227,12 +264,18 @@ class EmergencyFinalizer:
 
         covered = max(0, int(getattr(store, "covered_count", 0) or 0))
         total = max(covered, int(getattr(store, "total_count", 0) or 0))
+        structured = getattr(store, "structured", None)
+        wm_record = self._build_working_memory_record()
+        if wm_record is not None:
+            structured = dict(structured or {})
+            structured["client_working_memory"] = wm_record
+
         memory = SessionMemoryData(
             summary=summary,
             language=self._language_code,
             message_count=total,
             summarized_message_count=covered,
-            structured=getattr(store, "structured", None),
+            structured=structured,
         )
         message = CoreEventMessageType.create_session_memory(
             room_id=self._room_id, session_memory=memory

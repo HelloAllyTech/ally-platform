@@ -184,9 +184,11 @@ class WorkerHealthMonitor:
                 "registered_ever": self._registered_ever,
                 "last_registered_at": self._last_registered_at,
                 "connection_failed": self._connection_failed,
-                "active_jobs": len(getattr(self._server, "active_jobs", []) or [])
-                if self._server is not None
-                else 0,
+                "active_jobs": (
+                    len(getattr(self._server, "active_jobs", []) or [])
+                    if self._server is not None
+                    else 0
+                ),
             }
 
     # ---- heartbeat + exit loop ----

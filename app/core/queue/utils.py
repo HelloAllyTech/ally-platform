@@ -339,10 +339,34 @@ async def _emit_session_memory(
                 structured=upgraded_structured,
             )
     elif not maintained:
-        logger.info(
-            "No rolling summary available for room=%s; skipping session_memory",
-            room_id,
-        )
+        # No episodic summary — but the SEMANTIC record does not depend on one,
+        # and gating it on the summary silently threw it away for exactly the
+        # sessions most likely to need it. Measured: an 8-exchange Hindi run had
+        # boundary=0 on every turn, so compaction never fired and the write-out
+        # was dropped even though the memory itself was fully populated.
+        #
+        # ally-be requires a non-empty summary to accept the message, so the
+        # record travels with a short factual line naming what it is. That line
+        # is not a fabricated narrative — it states the stance path and nothing
+        # more, so nothing downstream can mistake it for a real summary.
+        if working_memory_record is not None:
+            path = " -> ".join(working_memory_record.get("stance_path") or [])
+            await _send(
+                f"(no conversation summary was produced for this session; "
+                f"client stance path: {path or 'unknown'})",
+                0,
+                0,
+            )
+            logger.info(
+                "No rolling summary for room=%s; shipped the working-memory "
+                "record on its own",
+                room_id,
+            )
+        else:
+            logger.info(
+                "No rolling summary available for room=%s; skipping " "session_memory",
+                room_id,
+            )
 
 
 async def finalize_session(
@@ -454,9 +478,7 @@ async def finalize_session(
             f"Sending end-of-session message {core_message} with final "
             f"score {final_score} to backend"
         )
-        outcome.score_sent = await send_message_to_queue(
-            core_message.model_dump_json()
-        )
+        outcome.score_sent = await send_message_to_queue(core_message.model_dump_json())
         if not outcome.score_sent:
             # One retry: the score send is a single small SQS call and losing
             # it costs the learner the whole session's score.

@@ -1,0 +1,141 @@
+"""The semantic record must survive EVERY way a session can end.
+
+Two defects, both found by asking why one v2v run produced no record at all —
+and both silent, because "no row" is indistinguishable from "the feature had
+nothing to say".
+
+1. The emergency finalize path never had the store. The two normal shutdown
+   handlers were wired and this third one was missed, so a session that
+   finalized there produced no record.
+2. The record rode inside the session_memory message, which is only sent when a
+   rolling summary exists. An 8-exchange run had boundary=0 on every turn, so
+   compaction never fired and the record was dropped — for exactly the short
+   sessions where a stance path is most of what there is to keep.
+"""
+
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
+
+import pytest
+
+# app.core.queue.utils imports the graph package, which imports back into
+# queue.utils. Loading the graph side FIRST leaves queue.utils fully initialised
+# by the time the tests import it, which is why this looks like an odd import.
+import app.core.graph  # noqa: F401
+from app.core.emergency_finalize import EmergencyFinalizer
+from app.core.working_memory.state import ClientWorkingMemory, Fact
+from app.core.working_memory.store import ClientWorkingMemoryStore
+
+pytestmark = pytest.mark.unit
+
+
+def _store_with_content():
+    store = ClientWorkingMemoryStore()
+    store._state = ClientWorkingMemory(
+        stance="disclosing",
+        stance_path=["guarded", "testing", "opening", "disclosing"],
+        disclosed=[Fact(text="lost the job in March")],
+        updates_committed=6,
+    )
+    return store
+
+
+class TestEmergencyPath:
+    def _finalizer(self, wm_store, summary="a maintained summary"):
+        sent = []
+        queue = SimpleNamespace(
+            send_message_sync=lambda payload: sent.append(payload) or True
+        )
+        rs = SimpleNamespace(
+            summary=summary, covered_count=4, total_count=8, structured={"a": 1}
+        )
+        f = EmergencyFinalizer(
+            room_id="ss_x",
+            thread_id="ss_x",
+            score_keeper=None,
+            rolling_summary_store=rs,
+            client_working_memory_store=wm_store,
+            language_code="hi-IN",
+            queue=queue,
+        )
+        return f, sent
+
+    def test_the_record_rides_the_emergency_message(self):
+        f, sent = self._finalizer(_store_with_content())
+        assert f._send_memory_sync() is True
+        assert "client_working_memory" in sent[0]
+        assert "disclosing" in sent[0]
+
+    def test_the_existing_structured_payload_is_preserved(self):
+        # The rolling summary's own structured data must not be clobbered.
+        f, sent = self._finalizer(_store_with_content())
+        f._send_memory_sync()
+        assert '"a": 1' in sent[0] or '"a":1' in sent[0]
+
+    def test_no_store_is_not_an_error(self):
+        f, sent = self._finalizer(None)
+        assert f._send_memory_sync() is True
+        assert "client_working_memory" not in sent[0]
+
+    def test_an_empty_memory_adds_nothing(self):
+        f, sent = self._finalizer(ClientWorkingMemoryStore())
+        f._send_memory_sync()
+        assert "client_working_memory" not in sent[0]
+
+    def test_a_broken_store_never_blocks_the_emergency_path(self):
+        # This path exists because the loop is already gone; it must not raise.
+        broken = SimpleNamespace()  # no _state attribute at all
+        f, sent = self._finalizer(broken)
+        assert f._send_memory_sync() is True
+
+    def test_it_reads_state_without_the_event_loop(self):
+        # No await: the whole point is that the loop is not running.
+        f, _ = self._finalizer(_store_with_content())
+        record = f._build_working_memory_record()
+        assert record["final_stance"] == "disclosing"
+
+
+class TestNoRollingSummary:
+    async def _emit(self, wm_store, monkeypatch):
+        # Imported here, not at module scope: app.core.queue.utils pulls in the
+        # graph package, which imports back into queue.utils — the same reason
+        # tests/unit/scoring/test_score_keeper.py imports it inside the test.
+        from app.core.queue import utils as qu
+
+        sent = []
+        monkeypatch.setattr(
+            qu, "send_message_to_queue", AsyncMock(side_effect=lambda p: sent.append(p))
+        )
+        # No maintained summary, and no llm_client to upgrade one.
+        rs = SimpleNamespace(
+            summary="", covered_count=0, total_count=0, structured=None
+        )
+        monkeypatch.setattr(qu, "_tail_messages_for_grounding", lambda thread_id: [])
+        await qu._emit_session_memory(
+            room_id="ss_y",
+            thread_id="ss_y",
+            llm_client=None,
+            language_code="hi-IN",
+            prompt_data=None,
+            rolling_summary_store=rs,
+            client_working_memory_store=wm_store,
+        )
+        return sent
+
+    async def test_the_record_ships_without_an_episodic_summary(self, monkeypatch):
+        sent = await self._emit(_store_with_content(), monkeypatch)
+        assert sent, "the record was dropped because no rolling summary existed"
+        assert "client_working_memory" in sent[0]
+
+    async def test_the_placeholder_summary_does_not_pretend_to_be_one(
+        self, monkeypatch
+    ):
+        # ally-be requires a non-empty summary, so one travels with the record —
+        # but it must state only the stance path, never a fabricated narrative.
+        sent = await self._emit(_store_with_content(), monkeypatch)
+        assert "no conversation summary was produced" in sent[0]
+        assert "guarded -> testing" in sent[0]
+
+    async def test_nothing_is_sent_when_there_is_nothing_at_all(self, monkeypatch):
+        sent = await self._emit(ClientWorkingMemoryStore(), monkeypatch)
+        assert sent == []

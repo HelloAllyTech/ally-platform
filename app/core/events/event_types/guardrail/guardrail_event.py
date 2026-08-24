@@ -253,9 +253,7 @@ class GuardrailEvent(BaseEvent):
     def _install_escalation_instruction(self) -> None:
         """Swap the repeat-request instruction for the escalation one."""
         from app.core.branching_instructions.base import BranchingInstruction
-        from app.core.events.coherence_guard import (
-            COHERENCE_ESCALATION_ACTOR_DIALOGUE,
-        )
+        from app.core.events.coherence_guard import COHERENCE_ESCALATION_ACTOR_DIALOGUE
 
         if self.coherence_normal_instruction is None:
             self.coherence_normal_instruction = self.branching_instruction
