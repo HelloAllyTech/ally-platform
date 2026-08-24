@@ -41,9 +41,13 @@ export const CourseItemPlayerScreen: React.FC<
   const {t} = useTranslate();
   const {trackId, itemId} = route.params;
 
-  const {data: track, refetch: refetchTrack} = useGetLearnTrackDetailQuery({
-    trackId,
-  });
+  const {
+    data: track,
+    isLoading: isTrackLoading,
+    isFetching: isTrackFetching,
+    isError: isTrackError,
+    refetch: refetchTrack,
+  } = useGetLearnTrackDetailQuery({trackId});
   const [startTrackItem] = useStartTrackItemMutation();
 
   // Items completed in this player session (drives Next gating optimistically).
@@ -135,7 +139,28 @@ export const CourseItemPlayerScreen: React.FC<
       justCompleted.has(f.item.id),
   ).length;
 
+  // No cached track to fall back on: either the very first fetch is still
+  // in flight, or a retry after a failure is (isTrackFetching with no
+  // `track` yet). A background refetch that already has cached track data
+  // (e.g. the on-focus refetch after a roleplay) should NOT re-trigger this
+  // — the screen keeps rendering the cached track while it updates.
+  const isTrackLoadPending = isTrackLoading || (isTrackFetching && !track);
+
   const renderItem = () => {
+    // The track itself (sections/items/progress) failed to load — nothing
+    // below this can resolve without it (nav.current stays undefined
+    // forever), so surface this before the per-item states and give the
+    // learner a way out instead of a permanent spinner.
+    if (isTrackError && !isTrackLoadPending) {
+      return (
+        <View style={styles.centeredContent}>
+          <Text style={styles.errorText}>
+            {t('courses.player.trackLoadFailed')}
+          </Text>
+          <Button label={t('courses.player.retry')} onPress={refetchTrack} />
+        </View>
+      );
+    }
     if (loadError) {
       return (
         <View style={styles.centeredContent}>
@@ -144,7 +169,7 @@ export const CourseItemPlayerScreen: React.FC<
         </View>
       );
     }
-    if (isLoadingItem || !payload || !nav.current) {
+    if (isTrackLoadPending || isLoadingItem || !payload || !nav.current) {
       return (
         <View style={styles.centeredContent}>
           <ActivityIndicator size="large" color={colors.ds.theme.primary} />

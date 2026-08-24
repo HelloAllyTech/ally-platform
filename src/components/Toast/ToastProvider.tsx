@@ -12,17 +12,21 @@ import {TranslationType} from '@/localization/locales/type';
 import {getErrorDetails} from '@/utils/error';
 
 import {Toast} from './Toast';
+import {
+  hideToast,
+  registerToastHandlers,
+  showToast,
+  ShowToastOptions,
+  ToastPosition,
+  ToastType,
+} from './toastBridge';
 
-export type ToastType = 'success' | 'error';
-export type ToastPosition = 'top' | 'bottom';
-
-export interface ShowToastOptions {
-  message: string;
-  type?: ToastType;
-  duration?: number;
-  position?: ToastPosition;
-  onHide?: () => void;
-}
+// Re-exported for existing call sites (`@/components/Toast/ToastProvider`,
+// and the `@/components` barrel) — the actual imperative implementation now
+// lives in `./toastBridge`, which has no heavy dependencies so it can be
+// imported safely from `@/services/api.ts` (see that file's comment).
+export type {ToastType, ToastPosition, ShowToastOptions};
+export {showToast, hideToast};
 
 interface ToastContextValue {
   showToast: (options: ShowToastOptions | string, type?: ToastType) => void;
@@ -40,18 +44,13 @@ interface ToastState {
   onHide?: () => void;
 }
 
-let externalShowRef:
-  | ((options: ShowToastOptions | string, type?: ToastType) => void)
-  | null = null;
-let externalHideRef: (() => void) | null = null;
-
 export const ToastProvider: React.FC<React.PropsWithChildren> = ({
   children,
 }) => {
   const onHideCallbackRef = useRef<(() => void) | undefined>(undefined);
   const [toastState, setToastState] = useState<ToastState | null>(null);
 
-  const showToast = useCallback(
+  const showToastImpl = useCallback(
     (
       options: ShowToastOptions | string,
       fallbackType: ToastType = 'success',
@@ -75,17 +74,18 @@ export const ToastProvider: React.FC<React.PropsWithChildren> = ({
     [],
   );
 
-  const hideToast = useCallback(() => {
+  const hideToastImpl = useCallback(() => {
     setToastState(prev => (prev ? {...prev, visible: false} : prev));
   }, []);
 
-  // Expose imperative API
-  externalShowRef = showToast;
-  externalHideRef = hideToast;
+  // Wire the module-level imperative bridge to this instance's real
+  // implementation, so `showToast`/`hideToast` work from anywhere —
+  // component, hook, or plain module (e.g. `@/services/api.ts`).
+  registerToastHandlers(showToastImpl, hideToastImpl);
 
   const value = useMemo<ToastContextValue>(
-    () => ({showToast, hideToast}),
-    [showToast, hideToast],
+    () => ({showToast: showToastImpl, hideToast: hideToastImpl}),
+    [showToastImpl, hideToastImpl],
   );
 
   return (
@@ -114,17 +114,6 @@ export const useToast = (): ToastContextValue => {
     throw new Error('useToast must be used within a ToastProvider');
   }
   return context;
-};
-
-export const showToast = (
-  options: ShowToastOptions | string,
-  type?: ToastType,
-) => {
-  externalShowRef?.(options, type);
-};
-
-export const hideToast = () => {
-  externalHideRef?.();
 };
 
 export const useErrorToast = () => {

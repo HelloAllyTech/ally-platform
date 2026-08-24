@@ -6,6 +6,12 @@ import {
   FetchBaseQueryError,
 } from '@reduxjs/toolkit/query/react';
 
+// Import the imperative bridge module directly (not `ToastProvider`, and
+// not the `@/components` barrel): those pull in `@/hooks`/`@/utils/error`,
+// which transitively import components that call RTK Query hooks from
+// `@/services`, creating a circular import back to this very file. See
+// `toastBridge.ts` for the full rationale.
+import {showToast} from '@/components/Toast/toastBridge';
 import {env} from '@/config/env';
 import {
   API_METHODS,
@@ -92,6 +98,13 @@ const baseQuery: BaseQueryFn<
 const handleUserLogout = async () => {
   await store.dispatch(handleLogout());
   store.dispatch({type: 'api/resetApiState'});
+  // The navigator swaps to the auth stack the moment `isAuthenticated` flips
+  // (see RootNavigator), which silently drops whatever screen-local state
+  // the learner/counsellor had. Without this, landing back on the login
+  // screen looks like the app just lost their place — say why, honestly,
+  // rather than leaving it unexplained. `ToastProvider` is mounted above
+  // the navigator in App.tsx, so the toast survives the stack swap.
+  showToast(i18n.t('auth.sessionExpired'), 'error');
 };
 
 const baseQueryWithReauth: BaseQueryFn<

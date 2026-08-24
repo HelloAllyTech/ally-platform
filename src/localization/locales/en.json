@@ -164,7 +164,8 @@
         "agreeTerms": "Failed to agree to terms and conditions",
         "sendOtpFailed": "Failed to Send OTP"
       }
-    }
+    },
+    "sessionExpired": "Your session has expired. Please sign in again."
   },
   "completeProfile": {
     "title": "Complete your profile",
@@ -697,6 +698,7 @@
       "finish": "Finish",
       "overallProgress": "{{pct}}% complete",
       "loadFailed": "Couldn't load this item.",
+      "trackLoadFailed": "Couldn't load this course.",
       "retry": "Retry",
       "unsupportedTitle": "Not available in the app yet",
       "unsupportedBody": "This part of the course needs the web version. Everything else in the course works here as usual.",
