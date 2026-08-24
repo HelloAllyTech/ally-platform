@@ -75,7 +75,9 @@ def min_gap_s() -> float:
 
 def escalation_cooldown_s() -> float:
     """Seconds the guard stays silent after escalating."""
-    return max(0.0, float(getattr(settings, "STT_COHERENCE_ESCALATION_COOLDOWN_S", 90.0)))
+    return max(
+        0.0, float(getattr(settings, "STT_COHERENCE_ESCALATION_COOLDOWN_S", 90.0))
+    )
 
 
 def max_escalations() -> int:
