@@ -51,7 +51,7 @@ export const getTrackItemMeta = (
       // advertising "min score 0" would read as a hurdle that isn't there.
       if ((criteria?.minScore ?? 0) > 0) {
         return `${t('courses.meta.roleplay')} · ${t('courses.meta.minScore', {
-          score: criteria.minScore,
+          score: criteria?.minScore,
         })}`;
       }
       return t('courses.meta.roleplay');
