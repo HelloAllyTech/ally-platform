@@ -12,27 +12,16 @@ jest.mock('@/config/env', () => ({
   env: {API_BASE_URL: 'https://example.com', API_VERSION: 'v1'},
 }));
 
-import {configureStore} from '@reduxjs/toolkit';
-
 import {ViewedStatus} from '@/constants/badges';
 
-import {api} from '../api';
 import {badgesApi} from '../badgesApi';
+import {createApiTestStore} from '../testUtils/createApiTestStore';
 import {getFirstFetchFromMock} from '../testUtils/getFirstFetchFromMock';
 import {mockOkJsonResponse} from '../testUtils/mockOkJsonResponse';
 
 const setupFetchMock = () => {
   global.fetch = jest.fn(() => Promise.resolve(mockOkJsonResponse({})));
 };
-
-const createTestStore = () =>
-  configureStore({
-    reducer: {[api.reducerPath]: api.reducer},
-    middleware: getDefaultMiddleware =>
-      getDefaultMiddleware({immutableCheck: false, serializableCheck: false}).concat(
-        api.middleware,
-      ),
-  });
 
 const noSubscribe = {subscribe: false} as const;
 const noTrack = {track: false} as const;
@@ -65,7 +54,7 @@ describe('badgesApi', () => {
   });
 
   it('getAvailableBadges GETs /badges/me/available', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       badgesApi.endpoints.getAvailableBadges.initiate(undefined, noSubscribe),
     );
@@ -75,7 +64,7 @@ describe('badgesApi', () => {
   });
 
   it('getBadges GETs with viewedStatus param', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       badgesApi.endpoints.getBadges.initiate(
         {viewedStatus: ViewedStatus.UNVIEWED},
@@ -89,7 +78,7 @@ describe('badgesApi', () => {
   });
 
   it('getBadgeCount GETs count with viewedStatus', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       badgesApi.endpoints.getBadgeCount.initiate(
         {viewedStatus: ViewedStatus.VIEWED},
@@ -102,7 +91,7 @@ describe('badgesApi', () => {
   });
 
   it('markBadgeAsViewed PATCHes badge viewed route', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       badgesApi.endpoints.markBadgeAsViewed.initiate('badge-xyz', noTrack),
     );

@@ -12,10 +12,8 @@ jest.mock('@/config/env', () => ({
   env: {API_BASE_URL: 'https://example.com', API_VERSION: 'v1'},
 }));
 
-import {configureStore} from '@reduxjs/toolkit';
-
-import {api} from '../api';
 import {generalCommentsApi} from '../generalCommentsApi';
+import {createApiTestStore} from '../testUtils/createApiTestStore';
 import {getFirstFetchFromMock} from '../testUtils/getFirstFetchFromMock';
 import {mockOkJsonResponse} from '../testUtils/mockOkJsonResponse';
 
@@ -24,15 +22,6 @@ const setupFetchMock = () => {
     Promise.resolve(mockOkJsonResponse({data: [], count: 0})),
   );
 };
-
-const createTestStore = () =>
-  configureStore({
-    reducer: {[api.reducerPath]: api.reducer},
-    middleware: getDefaultMiddleware =>
-      getDefaultMiddleware({immutableCheck: false, serializableCheck: false}).concat(
-        api.middleware,
-      ),
-  });
 
 const noSubscribe = {subscribe: false} as const;
 const noTrack = {track: false} as const;
@@ -71,7 +60,7 @@ describe('generalCommentsApi', () => {
   });
 
   it('getGeneralComments GETs without params when offset/limit omitted', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       generalCommentsApi.endpoints.getGeneralComments.initiate(
         {reviewId: 'rev-1'},
@@ -84,7 +73,7 @@ describe('generalCommentsApi', () => {
   });
 
   it('getGeneralComments GETs with offset and limit when both provided', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       generalCommentsApi.endpoints.getGeneralComments.initiate(
         {reviewId: 'rev-2', offset: 10, limit: 5},
@@ -97,7 +86,7 @@ describe('generalCommentsApi', () => {
   });
 
   it('getGeneralCommentsOverview GETs with default sort params', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       generalCommentsApi.endpoints.getGeneralCommentsOverview.initiate(
         {reviewId: 'rev-3'},
@@ -113,7 +102,7 @@ describe('generalCommentsApi', () => {
   });
 
   it('addGeneralComment POSTs content', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       generalCommentsApi.endpoints.addGeneralComment.initiate(
         {reviewId: 'rev-4', content: 'Hello'},
@@ -126,7 +115,7 @@ describe('generalCommentsApi', () => {
   });
 
   it('deleteGeneralComment DELETEs by comment id', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       generalCommentsApi.endpoints.deleteGeneralComment.initiate(
         {commentId: 'c-99'},
@@ -139,7 +128,7 @@ describe('generalCommentsApi', () => {
   });
 
   it('updateGeneralComment PATCHes content', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       generalCommentsApi.endpoints.updateGeneralComment.initiate(
         {commentId: 'c-1', content: 'Updated'},
@@ -152,7 +141,7 @@ describe('generalCommentsApi', () => {
   });
 
   it('updateGeneralCommentVisibility PATCHes hidden', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       generalCommentsApi.endpoints.updateGeneralCommentVisibility.initiate(
         {commentId: 'c-2', hidden: true},

@@ -12,10 +12,8 @@ jest.mock('@/config/env', () => ({
   env: {API_BASE_URL: 'https://example.com', API_VERSION: 'v1'},
 }));
 
-import {configureStore} from '@reduxjs/toolkit';
-
-import {api} from '../api';
 import {scribeGeneralCommentsApi} from '../scribeGeneralCommentsApi';
+import {createApiTestStore} from '../testUtils/createApiTestStore';
 import {getFirstFetchFromMock} from '../testUtils/getFirstFetchFromMock';
 import {mockOkJsonResponse} from '../testUtils/mockOkJsonResponse';
 
@@ -24,15 +22,6 @@ const setupFetchMock = () => {
     Promise.resolve(mockOkJsonResponse({data: [], count: 0})),
   );
 };
-
-const createTestStore = () =>
-  configureStore({
-    reducer: {[api.reducerPath]: api.reducer},
-    middleware: getDefaultMiddleware =>
-      getDefaultMiddleware({immutableCheck: false, serializableCheck: false}).concat(
-        api.middleware,
-      ),
-  });
 
 const noSubscribe = {subscribe: false} as const;
 const noTrack = {track: false} as const;
@@ -71,7 +60,7 @@ describe('scribeGeneralCommentsApi', () => {
   });
 
   it('getScribeGeneralComments uses scribe-session-reviews path', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       scribeGeneralCommentsApi.endpoints.getScribeGeneralComments.initiate(
         {reviewId: 'sr-1'},
@@ -83,7 +72,7 @@ describe('scribeGeneralCommentsApi', () => {
   });
 
   it('getScribeGeneralCommentsOverview uses scribe comments-overview', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       scribeGeneralCommentsApi.endpoints.getScribeGeneralCommentsOverview.initiate(
         {reviewId: 'sr-2'},
@@ -95,7 +84,7 @@ describe('scribeGeneralCommentsApi', () => {
   });
 
   it('addScribeGeneralComment POSTs to scribe general-comments', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       scribeGeneralCommentsApi.endpoints.addScribeGeneralComment.initiate(
         {reviewId: 'sr-3', content: 'Note'},
@@ -108,7 +97,7 @@ describe('scribeGeneralCommentsApi', () => {
   });
 
   it('deleteScribeGeneralComment DELETEs scribe general-comment', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       scribeGeneralCommentsApi.endpoints.deleteScribeGeneralComment.initiate(
         {commentId: 'sc-1'},
@@ -121,7 +110,7 @@ describe('scribeGeneralCommentsApi', () => {
   });
 
   it('updateScribeGeneralComment PATCHes scribe general-comment', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       scribeGeneralCommentsApi.endpoints.updateScribeGeneralComment.initiate(
         {commentId: 'sc-2', content: 'Edit'},
@@ -134,7 +123,7 @@ describe('scribeGeneralCommentsApi', () => {
   });
 
   it('updateScribeGeneralCommentVisibility PATCHes visibility', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       scribeGeneralCommentsApi.endpoints.updateScribeGeneralCommentVisibility.initiate(
         {commentId: 'sc-3', hidden: false},
