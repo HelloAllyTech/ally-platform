@@ -54,6 +54,13 @@ class ClientWorkingMemoryStore:
         #: Set when an update is in flight, so a second one is not started for
         #: the same turn. Mirrors RollingSummaryStore.in_flight.
         self._task: Optional[asyncio.Task] = None
+        #: The pool `salient_backstory` is recalled from (see corpus.py).
+        #: Immutable for the session and held HERE rather than on the state
+        #: record, which is deep-copied on every snapshot — copying an unchanging
+        #: pool of up to 120 facts on every turn would be pure waste. Assigned
+        #: once at session setup; None until then, and None for a scenario with
+        #: no profile text, in which case recall simply has nothing to do.
+        self.corpus = None
 
     @property
     def in_flight(self) -> bool:

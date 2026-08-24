@@ -188,6 +188,7 @@ async def apply_update(
     store: ClientWorkingMemoryStore,
     update: ValidatedUpdate,
     turn_index: int,
+    salient_backstory: Optional[List[Fact]] = None,
 ) -> bool:
     """Commit a validated update, converting flat fields into stored records.
 
@@ -195,6 +196,11 @@ async def apply_update(
     first seen, which is what the salience function decays against. Stamping
     them at commit time rather than at observation time would make everything
     look equally fresh, and the recall order would collapse to insertion order.
+
+    `salient_backstory` rides along in the SAME commit rather than in a second
+    one, and it has to: `commit` rejects any turn index at or below the last
+    committed, so a follow-up write for the same turn would be discarded as
+    stale. One turn, one write.
     """
     return await store.commit(
         turn_index,
@@ -220,7 +226,64 @@ async def apply_update(
             else None
         ),
         retrieve_cues=update.retrieve_cues or None,
+        salient_backstory=salient_backstory,
     )
+
+
+def _last_learner_text(messages: List[BaseMessage]) -> Optional[str]:
+    """The learner's most recent utterance, for recall's tier-2 cue fallback."""
+    for message in reversed(messages):
+        if isinstance(message, HumanMessage):
+            content = getattr(message, "content", None)
+            if isinstance(content, str) and content.strip():
+                return content
+    return None
+
+
+def _select_salient(
+    corpus,
+    *,
+    update: ValidatedUpdate,
+    memory: ClientWorkingMemory,
+    new_messages: List[BaseMessage],
+    query_vec=None,
+) -> Optional[List[Fact]]:
+    """Pick what the client has in mind, or None when there is no pool.
+
+    None rather than [] on purpose: `commit` treats None as "not part of this
+    update" and an empty list as "the client is thinking about nothing". A
+    scenario with no character profile should leave the field untouched, not
+    assert an emptiness it cannot know.
+    """
+    if not corpus or not corpus.facts:
+        return None
+
+    from app.core.working_memory.recall import select
+
+    # The stance the update just decided, not the one it started from — recall
+    # should be congruent with where the client now IS.
+    stance = update.stance or memory.stance
+    selected, _scored = select(
+        corpus.facts,
+        turn_index=memory.turn_index,
+        stance=stance,
+        cues=update.retrieve_cues,
+        last_learner_text=_last_learner_text(new_messages),
+        vectors=corpus.vectors or None,
+        query_vec=query_vec,
+    )
+
+    # Recalling a memory re-encodes it (§7.4): the spacing effect counts
+    # DISTINCT phases, so a fact recalled again in the same stance must not
+    # accumulate credit for it. Mutating the pool's Facts is deliberate — the
+    # pool is where a session's recall history lives, and state snapshots are
+    # deep-copied so no reader sees a torn write.
+    for fact in selected:
+        fact.last_recalled_turn = memory.turn_index
+        if stance not in fact.stances_seen:
+            fact.stances_seen.append(stance)
+
+    return selected
 
 
 def schedule_update(
@@ -283,7 +346,20 @@ def schedule_update(
 
         if update is None:
             return
-        committed = await apply_update(store, update, turn_index)
+
+        # Recall runs HERE — off the reply path, after the update that produced
+        # the cues, and before the single commit. Two consequences worth having:
+        # this turn's nominated cues drive this turn's selection rather than the
+        # next one's, and the selection costs the actor nothing because nobody
+        # is waiting on it.
+        salient = _select_salient(
+            store.corpus,
+            update=update,
+            memory=memory,
+            new_messages=new_messages,
+            query_vec=None,
+        )
+        committed = await apply_update(store, update, turn_index, salient)
         if committed:
             logger.info(
                 "[working-memory] turn %d committed (%s): stance=%s events=%s",

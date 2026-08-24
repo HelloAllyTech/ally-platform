@@ -6,6 +6,7 @@ the runtime plumbing lifted out of ``app/roleplay_v2`` and generalised away from
 is phase 3.
 """
 
+from app.core.working_memory.corpus import BackstoryCorpus, build_corpus
 from app.core.working_memory.state import (
     STANCES,
     ClientWorkingMemory,
@@ -24,4 +25,6 @@ __all__ = [
     "WithheldTopic",
     "Stance",
     "STANCES",
+    "BackstoryCorpus",
+    "build_corpus",
 ]

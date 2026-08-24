@@ -30,9 +30,10 @@ Two things deliberately NOT selected here:
 
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import dataclass
-from typing import Iterable, List, Optional, Sequence
+from typing import Dict, Iterable, List, Optional, Sequence
 
 from app.core.logger import get_logger
 from app.core.working_memory.state import SALIENT_BACKSTORY_CAP, Fact
@@ -94,6 +95,19 @@ _MOOD_CONGRUENT_BONUS = 0.5
 #: after a first pass so it can only promote — never demote a cued fact.
 _SPREADING_ACTIVATION = 0.4
 
+#: Weight on semantic similarity, salvaged as a TERM rather than as a separate
+#: ranking pass. persona_bible ran cosine as the whole score with a keyword
+#: fallback; here it multiplies alongside decay, phase diversity and cue match,
+#: because a fact can be semantically near the current topic and still be the
+#: wrong thing to remember — stale, off-mood, or already said. Similarity is
+#: evidence, not a verdict.
+#:
+#: 1.5 makes a perfectly-similar fact worth slightly less than a literal cue
+#: match (_CUE_MATCH_WEIGHT 2.5): the learner's actual words outrank a vector's
+#: opinion about them, which is the right order when the STT that produced those
+#: words is itself unreliable for Indian languages.
+_SEMANTIC_WEIGHT = 1.5
+
 
 @dataclass
 class ScoredFact:
@@ -104,6 +118,10 @@ class ScoredFact:
     cue_hits: int
     mood_congruent: bool
     spread: bool = False
+    #: Cosine against the turn's query, 0 when the pool is not embedded. Kept
+    #: on the record for the same reason as the other terms: the weights are
+    #: meant to be tuned from production, not from argument.
+    similarity: float = 0.0
 
 
 def _keywords(text: Optional[str]) -> set[str]:
@@ -142,6 +160,23 @@ def _stem_match_count(candidate_words: set[str], cues: set[str]) -> int:
     return hits
 
 
+def _cosine(a: Sequence[float], b: Sequence[float]) -> float:
+    """Cosine similarity; 0 for a zero-length or mismatched vector.
+
+    Salvaged from ``roleplay_v2/actor/retrieval/persona_bible.py`` (§9.1).
+    Pure and network-free by design: the pool's vectors are computed once at
+    session setup (see corpus.attach_vectors), so per-turn cost is arithmetic.
+    """
+    if not a or not b or len(a) != len(b):
+        return 0.0
+    dot = sum(x * y for x, y in zip(a, b))
+    na = math.sqrt(sum(x * x for x in a))
+    nb = math.sqrt(sum(y * y for y in b))
+    if na == 0.0 or nb == 0.0:
+        return 0.0
+    return dot / (na * nb)
+
+
 def _recency_decay(fact: Fact, turn_index: int) -> float:
     """Ebbinghaus decay on turns since last recall, floored.
 
@@ -161,8 +196,14 @@ def score_fact(
     turn_index: int,
     cues: set[str],
     stance: str,
+    similarity: float = 0.0,
 ) -> ScoredFact:
-    """Salience of one fact, with the terms kept separable for tuning."""
+    """Salience of one fact, with the terms kept separable for tuning.
+
+    `similarity` is cosine against the turn's query when the pool is embedded,
+    and 0 when it is not — so the lexical path is the semantic path with one
+    term switched off, rather than a different code path to keep in step.
+    """
     words = _tokens(fact.text)
     cue_hits = _stem_match_count(words, cues) if cues else 0
     mood_congruent = stance in fact.stances_seen
@@ -173,10 +214,15 @@ def score_fact(
         * _recency_decay(fact, turn_index)
         * (1.0 + _PHASE_BONUS_PER_STANCE * distinct_stances)
         * (1.0 + _CUE_MATCH_WEIGHT * cue_hits)
+        * (1.0 + _SEMANTIC_WEIGHT * max(similarity, 0.0))
         * (1.0 + (_MOOD_CONGRUENT_BONUS if mood_congruent else 0.0))
     )
     return ScoredFact(
-        fact=fact, score=score, cue_hits=cue_hits, mood_congruent=mood_congruent
+        fact=fact,
+        score=score,
+        cue_hits=cue_hits,
+        mood_congruent=mood_congruent,
+        similarity=similarity,
     )
 
 
@@ -188,6 +234,8 @@ def select(
     cues: Iterable[str] = (),
     last_learner_text: Optional[str] = None,
     cap: int = SALIENT_BACKSTORY_CAP,
+    vectors: Optional[Dict[str, Sequence[float]]] = None,
+    query_vec: Optional[Sequence[float]] = None,
 ) -> tuple[List[Fact], List[ScoredFact]]:
     """Pick what the client has in mind, and report every score considered.
 
@@ -211,8 +259,20 @@ def select(
         # Tier 2 — no nomination, so read the learner's own words as the cue.
         cue_set = _keywords(last_learner_text)
 
+    sims: Dict[str, float] = {}
+    if vectors and query_vec:
+        sims = {
+            f.text: _cosine(query_vec, vectors.get(f.text) or ()) for f in candidates
+        }
+
     scored = [
-        score_fact(f, turn_index=turn_index, cues=cue_set, stance=stance)
+        score_fact(
+            f,
+            turn_index=turn_index,
+            cues=cue_set,
+            stance=stance,
+            similarity=sims.get(f.text, 0.0),
+        )
         for f in candidates
     ]
 

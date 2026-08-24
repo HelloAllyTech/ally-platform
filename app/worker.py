@@ -462,13 +462,37 @@ class AgentWorker:
         # process, so the per-session run config is the only place per-session
         # identity exists.
         #
-        # Constructed unconditionally and read by nothing yet. The block is only
-        # appended for scenarios selecting the new main-agent prompt (design
-        # §6.1), and the updater that fills it is phase 3 — so on every session
-        # today this is an empty record nobody looks at.
-        from app.core.working_memory import ClientWorkingMemoryStore
+        # Constructed unconditionally; whether anything READS it is decided per
+        # scenario by the `{client_working_memory}` placeholder in the selected
+        # main-agent prompt (design §6.1), so a scenario that has not opted in
+        # neither renders the block nor pays for the call that fills it.
+        from app.core.working_memory import ClientWorkingMemoryStore, build_corpus
 
         self.client_working_memory_store = ClientWorkingMemoryStore()
+
+        # The pool `salient_backstory` is recalled FROM (phase 6). Built once,
+        # here, because it never changes during a session and because chunking
+        # on the reply path would be latency spent on an unchanging answer.
+        #
+        # This is what replaces dumping `character_profile_text` into every
+        # turn's prompt: the same material, ranked per turn against what the
+        # learner just said, five facts instead of the whole biography. Scenario
+        # knowledge folds into the same pool so a personal memory and a case-file
+        # detail compete on relevance rather than occupying separate blocks.
+        try:
+            _cwm_prompt_data = getattr(self.scenario, "prompt_data", None)
+            self.client_working_memory_store.corpus = build_corpus(
+                character_profile_text=getattr(
+                    _cwm_prompt_data, "character_profile_text", None
+                ),
+                retrieved_context=None,
+            )
+        except Exception as _corpus_error:  # noqa: BLE001
+            # Recall having nothing to draw on is a quiet degradation; failing
+            # session setup over it would not be.
+            logger.warning(
+                "[working-memory] backstory pool build failed: %s", _corpus_error
+            )
 
         # Setup orchestrator (receives the ScoreKeeper)
         self._setup_event_orchestrator(self.score_keeper)

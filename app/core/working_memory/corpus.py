@@ -1,0 +1,166 @@
+"""The pool `salient_backstory` is recalled FROM, built once per session.
+
+§7.1's claim is that a persona should be *recalled* rather than *dumped*, and
+until now this package had the recall function (`recall.select`) with nothing to
+recall from — `salient_backstory` was populated by no caller, so the block
+rendered its named absence every turn. This module is the missing half.
+
+Two sources fold into one pool, which is the whole point of phase 6 (§14):
+
+- **`character_profile_text`** — the client's own life. Today it is dumped into
+  the prompt whole, every turn, whether or not any of it bears on what was just
+  said. That is the §7.1 failure in its purest form: a person does not recite
+  their biography, they remember the part that the moment touched.
+- **retrieved scenario knowledge** — what the old `{retrieved_context}` block
+  carried. Folding it in here rather than retiring it means the same salience
+  function ranks both, so a fact about the client and a fact from the case file
+  compete on relevance instead of occupying separate fixed-size blocks.
+
+The pool is immutable for the session and deliberately NOT part of
+`ClientWorkingMemory`: it would be deep-copied on every snapshot, every turn,
+for content that never changes. `roleplay_v2` made the same split — chunks live
+on the spec, selection output lives in state.
+
+Embedding vectors, when an embedding client is available, are computed once here
+and never again. That is `persona_bible`'s discipline and the reason its semantic
+tier was affordable: per-turn cost is cosine arithmetic over precomputed
+vectors, not a network call.
+"""
+
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Sequence
+
+from app.core.logger import get_logger
+from app.core.working_memory.state import Fact
+
+logger = get_logger(__name__)
+
+#: Upper bound on pooled facts. A profile long enough to exceed this is being
+#: used as a document store, and ranking 400 candidates per turn to render five
+#: is waste rather than thoroughness.
+MAX_POOL_FACTS = 120
+
+#: A chunk shorter than this is a heading or a stray bullet marker, not a fact.
+_MIN_FACT_CHARS = 12
+
+#: Splits on blank lines and on markdown list markers, so an authored profile
+#: written as prose OR as bullets chunks the same way.
+_SPLIT_RE = re.compile(r"\n\s*\n|\n\s*[-*•]\s+|\n\s*\d+[.)]\s+")
+
+#: Markdown heading / emphasis noise to strip from a chunk's edges.
+_TRIM_RE = re.compile(r"^[#>\s*_`-]+|[\s*_`]+$")
+
+
+@dataclass
+class BackstoryCorpus:
+    """Immutable per-session pool of recallable facts."""
+
+    facts: List[Fact] = field(default_factory=list)
+    #: chunk text -> embedding. Keyed by text because a Fact has no id; the
+    #: text IS the identity here, the same way `_fold_facts` treats it.
+    vectors: Dict[str, Sequence[float]] = field(default_factory=dict)
+
+    def __bool__(self) -> bool:
+        return bool(self.facts)
+
+
+def chunk_text(text: Optional[str]) -> List[str]:
+    """Split authored prose into atomic, self-contained facts.
+
+    Deliberately dumb. A profile is written by a human for a human, so the
+    paragraph and the bullet already mark where one fact ends — inferring
+    finer boundaries would invent claims the author did not make.
+    """
+    if not text or not text.strip():
+        return []
+    out: List[str] = []
+    seen: set[str] = set()
+    for raw in _SPLIT_RE.split(text):
+        chunk = _TRIM_RE.sub("", (raw or "").strip())
+        chunk = " ".join(chunk.split())
+        if len(chunk) < _MIN_FACT_CHARS:
+            continue
+        key = chunk.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(chunk)
+    return out
+
+
+def build_corpus(
+    *,
+    character_profile_text: Optional[str] = None,
+    retrieved_context: Optional[str] = None,
+    encoding_strength_profile: float = 1.0,
+    encoding_strength_retrieved: float = 0.8,
+) -> BackstoryCorpus:
+    """Pool both sources into one ranked-together candidate set.
+
+    Retrieved knowledge is seeded slightly weaker than the client's own life,
+    and the asymmetry is the point rather than a tuning knob: when a case-file
+    detail and a personal memory are equally relevant, the person remembers
+    their own life first. Ties should not break toward the document.
+    """
+    facts: List[Fact] = []
+    seen: set[str] = set()
+
+    for text, strength in (
+        (character_profile_text, encoding_strength_profile),
+        (retrieved_context, encoding_strength_retrieved),
+    ):
+        for chunk in chunk_text(text):
+            key = chunk.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            facts.append(Fact(text=chunk, encoding_strength=strength))
+            if len(facts) >= MAX_POOL_FACTS:
+                break
+        if len(facts) >= MAX_POOL_FACTS:
+            logger.info(
+                "[working-memory] backstory pool hit the %d-fact cap; "
+                "later material is not recallable",
+                MAX_POOL_FACTS,
+            )
+            break
+
+    logger.info("[working-memory] backstory pool built: %d fact(s)", len(facts))
+    return BackstoryCorpus(facts=facts)
+
+
+async def attach_vectors(
+    corpus: BackstoryCorpus,
+    embed_many,
+) -> BackstoryCorpus:
+    """Embed the pool ONCE, at session setup. Never raises.
+
+    `embed_many` takes a list of strings and returns a list of vectors. On any
+    failure the corpus is returned unchanged and recall stays lexical — which is
+    `persona_bible`'s fallback exactly, and a degradation nobody hears.
+    """
+    if not corpus.facts:
+        return corpus
+    texts = [f.text for f in corpus.facts]
+    try:
+        vectors = await embed_many(texts)
+    except Exception as exc:  # noqa: BLE001 - lexical recall is a fine fallback
+        logger.warning(
+            "[working-memory] pool embedding failed (%s); recall stays lexical",
+            exc,
+        )
+        return corpus
+    if not vectors or len(vectors) != len(texts):
+        logger.warning(
+            "[working-memory] pool embedding returned %s vectors for %d facts; "
+            "recall stays lexical",
+            len(vectors) if vectors else 0,
+            len(texts),
+        )
+        return corpus
+    corpus.vectors = {t: v for t, v in zip(texts, vectors) if v}
+    logger.info("[working-memory] pool embedded: %d vector(s)", len(corpus.vectors))
+    return corpus
