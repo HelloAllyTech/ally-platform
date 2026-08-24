@@ -268,6 +268,65 @@ class TestPromptData:
         assert result.temperature == expected_temperature
 
     @pytest.mark.unit
+    @pytest.mark.parametrize(
+        "payload_keys",
+        [
+            ("turnMinEndpointingDelay", "turnMaxEndpointingDelay"),  # from ally-be
+            ("turn_min_endpointing_delay", "turn_max_endpointing_delay"),  # direct
+        ],
+    )
+    def test_prompt_data_endpointing_pair_reaches_prompt_data(self, payload_keys):
+        """EXPERIMENT(turn-endpointing): the per-sim pair must survive
+        _build_prompt_data.
+
+        This is the guard the first attempt lacked. PromptData is assembled from
+        a hand-maintained mapped_data dict — a field defined on the model but
+        missing there is silently always None, so the whole feature ships inert
+        with every other layer (admin, DTO, metadata, promptData) looking right.
+        """
+        min_key, max_key = payload_keys
+        result = Scenario._build_prompt_data(
+            {
+                "promptData": {
+                    "name": "Endpointing Test",
+                    "age": "30",
+                    "gender": "female",
+                    "currentLocation": "Chennai",
+                    "context": "Session",
+                    "lifeHistory": "Background.",
+                    "openingStatements": ["Hi"],
+                    min_key: 0.3,
+                    max_key: 1.8,
+                }
+            }
+        )
+
+        assert result is not None
+        assert result.turn_min_endpointing_delay == 0.3
+        assert result.turn_max_endpointing_delay == 1.8
+
+    @pytest.mark.unit
+    def test_prompt_data_endpointing_pair_defaults_to_none(self):
+        """Absent per-sim bounds leave both None so the worker uses globals."""
+        result = Scenario._build_prompt_data(
+            {
+                "promptData": {
+                    "name": "No Endpointing Override",
+                    "age": "30",
+                    "gender": "female",
+                    "currentLocation": "Chennai",
+                    "context": "Session",
+                    "lifeHistory": "Background.",
+                    "openingStatements": ["Hi"],
+                }
+            }
+        )
+
+        assert result is not None
+        assert result.turn_min_endpointing_delay is None
+        assert result.turn_max_endpointing_delay is None
+
+    @pytest.mark.unit
     def test_prompt_data_temperature_defaults_to_none(self):
         """Absent `temperature` leaves PromptData.temperature None."""
         result = Scenario._build_prompt_data(

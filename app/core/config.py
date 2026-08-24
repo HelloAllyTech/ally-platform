@@ -624,24 +624,18 @@ class Settings(BaseSettings):
         default=0.5,
         description=(
             "Minimum endpointing delay (s) — the fast path used when the EOU "
-            "model is confident the learner finished. LiveKit default 0.5."
+            "model is confident the learner finished. LiveKit default 0.5. "
+            "Platform baseline; a simulation may override it while the "
+            "EXPERIMENT(turn-endpointing) per-sim controls are in place."
         ),
     )
     TURN_MAX_ENDPOINTING_DELAY: float = Field(
         default=3.0,
         description=(
             "Maximum endpointing delay (s) — the ceiling the agent waits when the "
-            "learner is likely mid-thought. LiveKit default 3.0."
-        ),
-    )
-    TURN_ENDPOINTING_SCENARIO_OVERRIDE_ENABLED: bool = Field(
-        default=True,
-        description=(
-            "Global kill-switch for prompt_data.turn_max_endpointing_delay "
-            "(per-scenario override of TURN_MAX_ENDPOINTING_DELAY). When False, "
-            "every scenario uses the global TURN_MAX_ENDPOINTING_DELAY "
-            "regardless of its own setting — an instant way to force one "
-            "platform-wide value without touching scenario config."
+            "learner is likely mid-thought. LiveKit default 3.0. Platform "
+            "baseline; a simulation may override it while the "
+            "EXPERIMENT(turn-endpointing) per-sim controls are in place."
         ),
     )
 

@@ -636,12 +636,17 @@ class AgentWorker:
         (e.g. weights weren't baked into the image), we fall back to the plain
         "vad" timeout so a session never fails to start over turn detection.
 
-        max_delay honors a per-scenario override (prompt_data.
-        turn_max_endpointing_delay) when settings.
-        TURN_ENDPOINTING_SCENARIO_OVERRIDE_ENABLED is True — lets individual
-        scenarios pick their own speed-vs-interruption trade-off instead of
-        sharing one platform-wide ceiling. Falls back to the global setting
-        when unset, disabled, or no scenario is available.
+        EXPERIMENT(turn-endpointing) — TEMPORARY: a simulation may override BOTH
+        bounds (Studio Basic Settings → prompt_data.turn_min/max_endpointing_delay)
+        so we can find a good pair by trying them on real scenarios. Once found,
+        promote it to the globals and strip the per-sim controls; grep the marker
+        for every touchpoint. The admin form and the ally-be DTO both reject
+        max <= min, but stored data is never trusted here: the pair is applied
+        only when both are present and 0 < min < max, otherwise the session
+        falls back to the globals and logs why. A previous attempt at this
+        shipped inert because PromptData is built from a hand-maintained
+        mapped_data dict in Scenario._build_prompt_data and the mapping line was
+        missing — that line now exists and is covered by a test.
 
         Returns ``(turn_detection, endpointing_kwargs)``.
         """
@@ -653,17 +658,10 @@ class AgentWorker:
             from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
             min_delay = float(getattr(settings, "TURN_MIN_ENDPOINTING_DELAY", 0.5))
-            scenario_max_delay = None
-            if getattr(settings, "TURN_ENDPOINTING_SCENARIO_OVERRIDE_ENABLED", True):
-                scenario_max_delay = getattr(
-                    getattr(self.scenario, "prompt_data", None),
-                    "turn_max_endpointing_delay",
-                    None,
-                )
-            max_delay = float(
-                scenario_max_delay
-                if scenario_max_delay is not None
-                else getattr(settings, "TURN_MAX_ENDPOINTING_DELAY", 3.0)
+            max_delay = float(getattr(settings, "TURN_MAX_ENDPOINTING_DELAY", 3.0))
+            # EXPERIMENT(turn-endpointing): per-sim pair, all-or-nothing.
+            min_delay, max_delay = self._apply_scenario_endpointing(
+                min_delay, max_delay
             )
             # The EOU model weights are loaded once per WORKER by the inference
             # executor (registered at module import — see the top-of-file note),
@@ -692,6 +690,57 @@ class AgentWorker:
                 e,
             )
             return "vad", {}
+
+    def _apply_scenario_endpointing(
+        self, min_delay: float, max_delay: float
+    ) -> tuple[float, float]:
+        """EXPERIMENT(turn-endpointing) — TEMPORARY, remove with the per-sim UI.
+
+        Overlay this simulation's endpointing pair on the platform globals.
+        Applied all-or-nothing: a half-configured or nonsensical pair (either
+        bound missing, non-numeric, <= 0, or min >= max) leaves BOTH globals in
+        place rather than mixing a tuned bound with a default one, which would
+        be near-impossible to reason about from a log line. The admin form and
+        the ally-be DTO already reject max <= min; this guard is for stored data
+        that predates them, or anything written straight through the API.
+        """
+        prompt_data = getattr(self.scenario, "prompt_data", None)
+        raw_min = getattr(prompt_data, "turn_min_endpointing_delay", None)
+        raw_max = getattr(prompt_data, "turn_max_endpointing_delay", None)
+        if raw_min is None and raw_max is None:
+            return min_delay, max_delay
+        try:
+            sim_min = float(raw_min)
+            sim_max = float(raw_max)
+        except (TypeError, ValueError):
+            logger.warning(
+                "[TURN] per-sim endpointing ignored (non-numeric min=%r max=%r); "
+                "using globals %.2fs/%.2fs",
+                raw_min,
+                raw_max,
+                min_delay,
+                max_delay,
+            )
+            return min_delay, max_delay
+        if not (0 < sim_min < sim_max):
+            logger.warning(
+                "[TURN] per-sim endpointing ignored (invalid pair min=%.2fs "
+                "max=%.2fs; need 0 < min < max); using globals %.2fs/%.2fs",
+                sim_min,
+                sim_max,
+                min_delay,
+                max_delay,
+            )
+            return min_delay, max_delay
+        logger.info(
+            "[TURN] per-sim endpointing applied: min=%.2fs max=%.2fs "
+            "(globals were %.2fs/%.2fs)",
+            sim_min,
+            sim_max,
+            min_delay,
+            max_delay,
+        )
+        return sim_min, sim_max
 
     def _setup_event_orchestrator(self, score_keeper=None):
         """Initialize event orchestrator with callbacks."""
