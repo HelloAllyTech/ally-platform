@@ -310,26 +310,28 @@ class PromptData(BaseModel):
             "settings.HISTORY_TRIM_* and app/core/graph/nodes.py."
         ),
     )
-    # EXPERIMENT(turn-endpointing) — TEMPORARY, remove once a good global pair
-    # is found and promoted to settings.TURN_MIN/MAX_ENDPOINTING_DELAY. Grep the
-    # marker to find every touchpoint across ally-web / ally-be / ally-ai-learn.
+    # Populated by ally-be on every v1 session from its global admin-configured
+    # Settings-page value (not a per-sim override) — see app/worker.py's
+    # _apply_configured_endpointing for how it's applied and validated.
     turn_min_endpointing_delay: Optional[float] = Field(
         default=None,
         description=(
-            "Per-simulation override (seconds) for settings."
-            "TURN_MIN_ENDPOINTING_DELAY — the fast path taken when the EOU model "
-            "is confident the learner finished. None uses the global. Only "
-            "applied when SEMANTIC_TURN_DETECTION_ENABLED and the pair is valid "
-            "(0 < min < max); see app/worker.py:_resolve_turn_detection."
+            "ally-be's globally admin-configured value (seconds) for the fast "
+            "path taken when the EOU model is confident the learner finished, "
+            "mirroring settings.TURN_MIN_ENDPOINTING_DELAY. None falls back to "
+            "the local default. Only applied when SEMANTIC_TURN_DETECTION_ENABLED "
+            "and the pair is valid (0 < min < max); see "
+            "app/worker.py:_resolve_turn_detection."
         ),
     )
     turn_max_endpointing_delay: Optional[float] = Field(
         default=None,
         description=(
-            "Per-simulation override (seconds) for settings."
-            "TURN_MAX_ENDPOINTING_DELAY — how long turn detection waits for a "
-            "learner who seems mid-thought before replying anyway. None uses the "
-            "global. Same gating as turn_min_endpointing_delay."
+            "ally-be's globally admin-configured value (seconds) for how long "
+            "turn detection waits for a learner who seems mid-thought before "
+            "replying anyway, mirroring settings.TURN_MAX_ENDPOINTING_DELAY. "
+            "None falls back to the local default. Same gating as "
+            "turn_min_endpointing_delay."
         ),
     )
     selected_main_prompt_code: Optional[str] = Field(
@@ -763,10 +765,11 @@ class Scenario(BaseModel):
                 "history_trim_enabled": bool(
                     prompt_data_dict.get("historyTrimEnabled") or False
                 ),
-                # EXPERIMENT(turn-endpointing) — PromptData is built from this
-                # hand-maintained dict, NOT a generic camelCase->snake_case
-                # conversion. Omitting these two lines is exactly how the
-                # previous attempt shipped inert; tests/unit/scenario guards it.
+                # PromptData is built from this hand-maintained dict, NOT a
+                # generic camelCase->snake_case conversion, so these two lines
+                # are what actually gets ally-be's globally configured
+                # endpointing pair onto every session; tests/unit/scenario
+                # guards the mapping.
                 "turn_min_endpointing_delay": (
                     prompt_data_dict.get("turnMinEndpointingDelay")
                     if prompt_data_dict.get("turnMinEndpointingDelay") is not None

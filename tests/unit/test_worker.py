@@ -254,7 +254,7 @@ class TestWorker:
         assert isinstance(td, FakeMultilingualModel)
         assert "eou_load_ms" in w._timing
 
-    # ---- EXPERIMENT(turn-endpointing): per-sim pair, remove with the feature ----
+    # ---- Configured endpointing pair (ally-be's global admin setting) ----
 
     def _eou_worker(self, monkeypatch, scenario=None):
         """Bare worker with a faked EOU model and known globals (0.5 / 3.0)."""

@@ -309,11 +309,13 @@ class AgentWorkerV2:
         universal fallback so a session never fails to start over turn
         detection.
 
-        Always uses the global settings.TURN_MIN/MAX_ENDPOINTING_DELAY. v1's
-        EXPERIMENT(turn-endpointing) per-sim override is deliberately NOT
-        mirrored here: v2 has no Scenario/PromptData object (it runs on the
-        roleplay_v2 Persona/spec model), so there is no equivalent field to
-        read, and the experiment is scoped to v1 sims.
+        Always uses the static settings.TURN_MIN/MAX_ENDPOINTING_DELAY env-var
+        config. v1 now receives its endpointing pair from ally-be's global
+        admin-configured Settings-page value via room metadata (PromptData);
+        that is deliberately NOT mirrored here: v2 has no Scenario/PromptData
+        object (it runs on the roleplay_v2 Persona/spec model), so there is no
+        equivalent field to read. v2 continues to use its own static env-var
+        config by design — out of scope for the v1 change.
         """
         if not vad:
             return None, {}
