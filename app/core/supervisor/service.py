@@ -275,7 +275,10 @@ class SupervisorNotesService:
         except asyncio.TimeoutError:
             self._misses += 1
             logger.warning(
-                "[supervisor] timed out after %.1fs on turn %s — no note (miss %d)",
+                "[supervisor] room=%s scenario=%s timed out after %.1fs on turn "
+                "%s — no note (miss %d)",
+                self._room_id,
+                self._scenario_id,
                 self._timeout_s,
                 turn_index,
                 self._misses,
@@ -286,7 +289,10 @@ class SupervisorNotesService:
         except Exception:
             self._misses += 1
             logger.exception(
-                "[supervisor] failed on turn %s — no note (miss %d)",
+                "[supervisor] room=%s scenario=%s failed on turn %s — no note "
+                "(miss %d)",
+                self._room_id,
+                self._scenario_id,
                 turn_index,
                 self._misses,
             )
@@ -476,8 +482,27 @@ class SupervisorNotesService:
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
         self._tasks.clear()
-        logger.info(
-            "[supervisor] closed — %d note(s) sent, %d miss(es)",
-            self._notes_sent,
-            self._misses,
-        )
+        if self._notes_sent == 0 and self._misses > 0:
+            # Every attempt this session failed or timed out — from the
+            # learner's side this looks identical to a quiet, well-behaved
+            # session (the tab just never got a hint), so nothing else would
+            # ever surface it. This is the one signal that distinguishes "the
+            # supervisor had nothing worth saying" from "the supervisor was
+            # broken the whole time" — worth a WARNING (Slack-alerted when
+            # SLACK_ALERTS_ENABLED) rather than burying it in per-turn logs.
+            logger.warning(
+                "[supervisor] room=%s scenario=%s closed with ZERO notes sent "
+                "despite %d attempt(s) — every attempt failed or timed out",
+                self._room_id,
+                self._scenario_id,
+                self._misses,
+            )
+        else:
+            logger.info(
+                "[supervisor] room=%s scenario=%s closed — %d note(s) sent, "
+                "%d miss(es)",
+                self._room_id,
+                self._scenario_id,
+                self._notes_sent,
+                self._misses,
+            )

@@ -1647,7 +1647,16 @@ class AgentWorker:
             )
         except Exception:  # noqa: BLE001 - a session must start without notes
             self._supervisor_notes = None
-            logger.exception("[supervisor] setup failed — session continues silently")
+            # Enabled-but-inert: the toggle was on, the tab renders, and nothing
+            # else distinguishes this from a healthy quiet session — without
+            # room/scenario context here, finding this in logs means already
+            # knowing which worker process to look at.
+            logger.exception(
+                "[supervisor] room=%s scenario=%s setup failed — session "
+                "continues silently, no live notes this session",
+                self.ctx.room.name,
+                getattr(self.scenario, "id", None),
+            )
 
     async def _setup_deferred_naturalness(self) -> None:
         """Synthesize the filler/back-channel clips and wire their handlers.
