@@ -347,6 +347,24 @@ export const destroySession = (sessionId: string) => {
   snapshotCache.delete(sessionId);
 };
 
+/**
+ * On a mid-stream interruption (network drop, timeout), move whatever the
+ * assistant had already streamed from `streamingMessage` into the committed
+ * `messages` list, instead of discarding it. A partial answer plus an
+ * honest "connection lost" error is strictly more useful than silently
+ * replacing a real (if incomplete) reply with nothing but an error banner.
+ * No-op when nothing had streamed in yet (empty content).
+ */
+const commitPartialStreamingMessage = (session: InternalSession): void => {
+  if (session.streamingMessage && session.streamingMessage.content) {
+    session.messages = [
+      ...session.messages,
+      {...session.streamingMessage, isStreaming: false},
+    ];
+  }
+  session.streamingMessage = null;
+};
+
 // ── XHR Stream (internal) ───────────────────────────────────────
 
 const startStream = async (
@@ -530,7 +548,13 @@ const startStream = async (
     if (streamComplete) {
       return;
     }
-    session.streamingMessage = null;
+    // A network drop mid-stream still means the assistant already streamed
+    // some real content into `streamingMessage` (via onprogress TOKEN
+    // events). Losing that entirely and showing only an error would throw
+    // away a genuine partial answer — commit what came in before the drop,
+    // same as a normal completion, and surface the error alongside it
+    // rather than in its place.
+    commitPartialStreamingMessage(session);
     session.error =
       'Network error. Please check your connection and try again.';
     session.isStreaming = false;
@@ -543,7 +567,9 @@ const startStream = async (
     if (streamComplete) {
       return;
     }
-    session.streamingMessage = null;
+    // Same reasoning as onerror above: a timeout is still a mid-stream
+    // interruption, not a signal that nothing was received.
+    commitPartialStreamingMessage(session);
     session.error = 'Request timed out. Please try again.';
     session.isStreaming = false;
     notifyListeners(sessionId);
