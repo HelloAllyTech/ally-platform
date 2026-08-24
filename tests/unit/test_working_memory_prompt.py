@@ -196,3 +196,48 @@ class TestBlockRendering:
             _pd("client_working_memory"), ClientWorkingMemory(), states=states
         )
         assert "STAY GUARDED AND BRIEF" in content
+
+
+class TestStateWarningScope:
+    """The misconfiguration warning must not fire for a valid configuration."""
+
+    def _build(self, prompt_data, states):
+        from app.core.graph.prompt import _build_behavior_prompt
+
+        prompt_data.states = states
+        for attr in (
+            "title",
+            "description",
+            "role_instructions",
+            "name",
+            "age",
+            "gender",
+        ):
+            if not hasattr(prompt_data, attr):
+                setattr(prompt_data, attr, "")
+        return _build_behavior_prompt(
+            prompt_data,
+            [],
+            None,
+            None,
+            None,
+            current_score=0,
+            client_working_memory=ClientWorkingMemory(affect="wary"),
+        )
+
+    def test_no_warning_when_only_the_block_is_declared(self, caplog):
+        # Generalising the states gate made this fire every turn for a valid
+        # setup: the block names the absence, so no states is not an error.
+        import logging
+
+        with caplog.at_level(logging.WARNING):
+            self._build(_pd("client_working_memory"), [])
+        assert "no active state resolved" not in caplog.text
+
+    def test_warning_still_fires_for_a_states_prompt_with_no_states(self, caplog):
+        # The real misconfiguration must still be visible.
+        import logging
+
+        with caplog.at_level(logging.WARNING):
+            self._build(_pd("state_x_guidelines"), [])
+        assert "no active state resolved" in caplog.text

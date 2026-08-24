@@ -495,7 +495,18 @@ def _build_behavior_prompt(
     # rendered {state_x_guidelines} will be empty silently. Warn so this
     # misconfiguration is visible rather than only manifesting as "the LLM
     # ignores state guidance".
-    if prompt_has_states and active_sim_state is None:
+    # Only a variant that actually declares {state_x_guidelines} can be
+    # MISconfigured this way. Generalising the states gate to fire for
+    # {client_working_memory} was right for resolution but made this warning
+    # cry wolf: a working-memory prompt with no states is a legitimate setup —
+    # the block renders a NAMED absence ("no particular direction for this
+    # stage") rather than an empty placeholder — and prod runs at INFO, so this
+    # fired every turn of every such session and devalued a real signal.
+    if (
+        prompt_has_states
+        and active_sim_state is None
+        and _prompt_declares_variable(prompt_data, "state_x_guidelines")
+    ):
         logger.warning(
             "%s [STATE] hasStates=true but no active state resolved for "
             "current_score=%s; {state_x_guidelines} will render empty. "

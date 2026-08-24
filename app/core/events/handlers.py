@@ -138,9 +138,7 @@ def create_conversation_handler(
             message = CoreEventMessageType.create_turn_metrics(
                 room, TurnMetricsData(**rec)
             )
-            task = asyncio.create_task(
-                send_event_to_queue(message.model_dump_json())
-            )
+            task = asyncio.create_task(send_event_to_queue(message.model_dump_json()))
             if background_tasks is not None:
                 background_tasks.add(task)
                 task.add_done_callback(background_tasks.discard)
