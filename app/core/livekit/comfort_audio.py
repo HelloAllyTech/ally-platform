@@ -13,10 +13,23 @@ This does NOT reduce the measured ``response_latency_ms`` — it only masks the
 *perceived* gap so the line never sounds dead.
 
 Two gates, both required: ``settings.COMFORT_AUDIO_ENABLED`` is the global
-kill-switch (default on) and the per-simulation ``comfort_audio_enabled`` toggle
-(Studio: comfortAudioEnabled, default off) is the opt-in — so the tone is off
-for every scenario unless an author turns it on. ``settings.COMFORT_AUDIO_VOLUME``
-tunes how faint it is.
+kill-switch (default on) and the per-simulation ``comfort_audio_enabled``
+toggle (Studio: comfortAudioEnabled) is the per-scenario setting.
+``settings.COMFORT_AUDIO_VOLUME`` tunes how faint it is.
+
+The per-simulation toggle now defaults ON when the simulation has expressed no
+preference at all (``settings.COMFORT_AUDIO_DEFAULT_ON``) — dead silence is not
+a good default for something users read as a dropped call. An explicit ``false``
+is always respected, so no existing scenario changes behaviour. See
+``Scenario._resolve_comfort_audio_enabled``.
+
+That default is INERT in production today: ally-be migration
+``1798000000000-DisableComfortAudio`` stamped ``comfortAudioEnabled: false``
+into every scenario's metadata (deliberately reverting the earlier
+platform-wide enable in ``1797000000000``), and Studio re-stamps an explicit
+``false`` on every save. Making comfort audio actually on-by-default therefore
+needs the ally-be/ally-web half as well, and — given 1798 was a deliberate
+rollback — a product decision, not just a code change.
 
 Everything here is best-effort: any failure yields no comfort audio and the
 session continues normally — it must never break the agent.
@@ -43,16 +56,25 @@ def is_comfort_audio_enabled(scenario=None) -> bool:
 
     Two gates, both required (same shape as the thinking-filler):
     ``settings.COMFORT_AUDIO_ENABLED`` is the global kill-switch (default on),
-    and ``prompt_data.comfort_audio_enabled`` is the per-simulation opt-in
-    (default off, set in Studio). The tone plays only when both are true, so
-    comfort audio is off for every scenario unless an author turns it on.
+    and ``prompt_data.comfort_audio_enabled`` is the per-simulation setting,
+    which now defaults ON when the simulation expressed no preference (see the
+    module docstring). The tone plays only when both are true.
     """
     if not getattr(settings, "COMFORT_AUDIO_ENABLED", True):
         return False
     prompt_data = getattr(scenario, "prompt_data", None)
     if prompt_data is None:
+        # No prompt data at all is a broken/degenerate scenario, not a
+        # preference. Stay off rather than layering audio onto something we
+        # cannot reason about.
         return False
-    return bool(getattr(prompt_data, "comfort_audio_enabled", False))
+    return bool(
+        getattr(
+            prompt_data,
+            "comfort_audio_enabled",
+            getattr(settings, "COMFORT_AUDIO_DEFAULT_ON", True),
+        )
+    )
 
 
 def _synthesize_comfort_pcm(duration_s: float, sample_rate: int) -> bytes:

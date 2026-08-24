@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, List, Optional, Tuple
 
 if TYPE_CHECKING:
     from app.core.events.event_orchestrator.event_orchestrator import EventOrchestrator
@@ -16,17 +17,70 @@ from app.core.queue import msg_event_queue
 logger = get_logger(__name__)
 
 
-async def send_message_to_queue(message_data: str) -> None:
+@dataclass
+class FinalizeOutcome:
+    """Per-step result of ``finalize_session``.
+
+    Exists because the previous single ``except Exception: logger.error(...)``
+    made every failure mode look the same — and look the same as "finalize
+    hasn't happened yet". Each step now records its own outcome, so a caller
+    (and a log reader) can tell "the score was sent but memory failed" from
+    "nothing was sent at all".
+    """
+
+    room_id: str
+    final_score: Optional[int] = None
+    #: True only when the queue accepted the end-of-session message.
+    score_sent: bool = False
+    #: True when the score had to be substituted with 0 because it could not
+    #: be resolved. The 0 in ``final_score`` is then NOT a real score.
+    score_unavailable: bool = False
+    memory_emitted: bool = False
+    checkpoints_cleaned: bool = False
+    #: (step name, error repr) for every step that failed.
+    failures: List[Tuple[str, str]] = field(default_factory=list)
+
+    def add_failure(self, step: str, error: object) -> None:
+        self.failures.append((step, repr(error)))
+
+    @property
+    def ok(self) -> bool:
+        """True when the learner-visible outcome is intact: the score was
+        delivered, it was a real score, and nothing else failed."""
+        return self.score_sent and not self.score_unavailable and not self.failures
+
+    def describe(self) -> str:
+        return (
+            f"room={self.room_id} score={self.final_score} "
+            f"score_sent={self.score_sent} score_unavailable={self.score_unavailable} "
+            f"memory_emitted={self.memory_emitted} "
+            f"checkpoints_cleaned={self.checkpoints_cleaned} "
+            f"failed_steps={[s for s, _ in self.failures] or 'none'}"
+        )
+
+
+async def send_message_to_queue(message_data: str) -> bool:
     """
     Safely send message to message queue.
 
+    Returns True only when the queue accepted the message (SQS returned a
+    MessageId). Previously this returned None and swallowed the queue's own
+    boolean, so a send that FAILED was indistinguishable from one that
+    succeeded — the caller logged "Sending ..." and moved on either way. The
+    return value matters most for the end-of-session score: a dropped send
+    leaves the session looking ACTIVE forever on the backend.
+
     Args:
         message_data: JSON string message to send
+
+    Returns:
+        True if the queue accepted the message, False otherwise.
     """
     try:
-        await msg_event_queue.send_message(message_data)
+        return bool(await msg_event_queue.send_message(message_data))
     except Exception as e:
         logger.error(f"Failed to send message to queue: {e}")
+        return False
 
 
 def create_session_end_message(room_id: str, final_score: int) -> CoreEventMessageType:
@@ -301,7 +355,7 @@ async def finalize_session(
     prompt_data=None,
     rolling_summary_store=None,
     client_working_memory_store=None,
-) -> None:
+) -> FinalizeOutcome:
     """
     Finalize a session by sending final score and cleaning up resources.
 
@@ -309,6 +363,13 @@ async def finalize_session(
     1. Sends final score to backend queue
     2. Ships the episodic-memory summary (session_memory) to backend
     3. Cleans up checkpoint data to prevent memory leaks
+
+    Each step is independently guarded and recorded on the returned
+    ``FinalizeOutcome`` — a failure in one step never skips a later one, and
+    in particular a failure resolving the score never skips the score SEND
+    (the message that takes the session out of ACTIVE on the backend). Never
+    raises: callers run it from shutdown callbacks where an exception would
+    lose the rest of teardown.
 
     ScoreKeeper is the single source of truth: it holds both event scores
     (committed by EventOrchestrator) and behavior scores (committed by
@@ -333,56 +394,137 @@ async def finalize_session(
             maintained summary (source of truth for the session_memory
             message). Optional.
     """
-    try:
-        if score_keeper is not None:
+    outcome = FinalizeOutcome(room_id=room_id)
+
+    # ---- STEP 1: resolve the final score ----------------------------------
+    # Isolated from the send. Previously one outer `except Exception` wrapped
+    # the score computation, the score send, the memory emission AND the
+    # checkpoint cleanup, so a failure resolving the score silently skipped
+    # the SEND too — and the only trace was one generic line that was
+    # indistinguishable from "finalize hasn't run yet".
+    final_score: int | None = None
+    if score_keeper is not None:
+        try:
             final_score = score_keeper.get_total_score()
             logger.info(
                 f"Final score from ScoreKeeper — events: {score_keeper.event_score}, "
                 f"behaviors: {score_keeper.behavior_score}, total: {final_score}"
             )
-        else:
+        except Exception as score_error:  # noqa: BLE001
+            outcome.add_failure("score_from_score_keeper", score_error)
+            logger.exception(
+                "[FINALIZE] score_from_score_keeper FAILED room=%s (%r) — "
+                "falling back to graph state",
+                room_id,
+                score_error,
+            )
+    if final_score is None:
+        try:
             final_score = get_current_score_from_graph(thread_id)
-            logger.warning(
-                "ScoreKeeper not provided, falling back to graph state score"
+            if score_keeper is None:
+                logger.warning(
+                    "ScoreKeeper not provided, falling back to graph state score"
+                )
+        except Exception as graph_error:  # noqa: BLE001
+            outcome.add_failure("score_from_graph", graph_error)
+            logger.exception(
+                "[FINALIZE] score_from_graph FAILED room=%s (%r)", room_id, graph_error
             )
 
-        # Create the session end message
-        core_message = create_session_end_message(room_id, final_score)
+    # ---- STEP 2: send the end-of-session message --------------------------
+    # This is the message that takes the session out of ACTIVE on the backend,
+    # so it is sent even when the score could not be resolved: a session
+    # closed with a possibly-wrong score is recoverable, one stuck ACTIVE
+    # forever is not. The substitution is logged at ERROR so it is never
+    # mistaken for a real zero.
+    if final_score is None:
+        final_score = 0
+        outcome.score_unavailable = True
+        logger.error(
+            "[FINALIZE] score UNAVAILABLE room=%s — sending end-of-session with "
+            "totalScore=0 so the session does not stay ACTIVE. This 0 is NOT a "
+            "real score.",
+            room_id,
+        )
+    outcome.final_score = final_score
 
+    try:
+        core_message = create_session_end_message(room_id, final_score)
         logger.info(
             f"Sending end-of-session message {core_message} with final "
             f"score {final_score} to backend"
         )
-        await send_message_to_queue(core_message.model_dump_json())
-
-        # Episodic memory: must run BEFORE checkpoint cleanup below — the
-        # rolling summary lives in the LangGraph checkpoint. Never blocks
-        # finalize on failure.
-        try:
-            await _emit_session_memory(
-                room_id=room_id,
-                thread_id=thread_id,
-                llm_client=llm_client,
-                language_code=language_code,
-                prompt_data=prompt_data,
-                rolling_summary_store=rolling_summary_store,
-                client_working_memory_store=client_working_memory_store,
+        outcome.score_sent = await send_message_to_queue(
+            core_message.model_dump_json()
+        )
+        if not outcome.score_sent:
+            # One retry: the score send is a single small SQS call and losing
+            # it costs the learner the whole session's score.
+            logger.error(
+                "[FINALIZE] end_of_session send REJECTED room=%s — retrying once",
+                room_id,
             )
-        except Exception as memory_error:
-            logger.error(f"Failed to emit session memory: {memory_error}")
-
-        # Clean up checkpoint data for this session
-        try:
-            from app.core.graph import cleanup_simulation_checkpoints
-
-            cleanup_simulation_checkpoints(thread_id)
-        except Exception as cleanup_error:
-            logger.warning(
-                f"Failed to cleanup checkpoints for thread {thread_id}: {cleanup_error}"
+            outcome.score_sent = await send_message_to_queue(
+                core_message.model_dump_json()
             )
+        if not outcome.score_sent:
+            outcome.add_failure("end_of_session_send", "queue did not accept message")
+            logger.error(
+                "[FINALIZE] end_of_session send FAILED room=%s score=%s — the "
+                "backend will not see this session as scored",
+                room_id,
+                final_score,
+            )
+    except Exception as send_error:  # noqa: BLE001
+        outcome.add_failure("end_of_session_send", send_error)
+        logger.exception(
+            "[FINALIZE] end_of_session send FAILED room=%s (%r)", room_id, send_error
+        )
 
-    except Exception as e:
-        logger.error(f"Failed to finalize session: {e}")
+    # ---- STEP 3: episodic memory -----------------------------------------
+    # Must run BEFORE checkpoint cleanup below — the rolling summary lives in
+    # the LangGraph checkpoint. Never blocks finalize on failure.
+    try:
+        await _emit_session_memory(
+            room_id=room_id,
+            thread_id=thread_id,
+            llm_client=llm_client,
+            language_code=language_code,
+            prompt_data=prompt_data,
+            rolling_summary_store=rolling_summary_store,
+            client_working_memory_store=client_working_memory_store,
+        )
+        outcome.memory_emitted = True
+    except Exception as memory_error:  # noqa: BLE001
+        outcome.add_failure("session_memory", memory_error)
+        logger.exception(
+            "[FINALIZE] session_memory FAILED room=%s (%r) — the next session "
+            "loses continuity, the score is unaffected",
+            room_id,
+            memory_error,
+        )
+
+    # ---- STEP 4: checkpoint cleanup --------------------------------------
+    try:
+        from app.core.graph import cleanup_simulation_checkpoints
+
+        cleanup_simulation_checkpoints(thread_id)
+        outcome.checkpoints_cleaned = True
+    except Exception as cleanup_error:  # noqa: BLE001
+        outcome.add_failure("checkpoint_cleanup", cleanup_error)
+        logger.warning(
+            f"[FINALIZE] checkpoint_cleanup FAILED for thread {thread_id}: "
+            f"{cleanup_error}"
+        )
+
+    # One greppable summary line per session, so "did finalize run, and what
+    # part of it worked?" is answerable from the logs without correlating four
+    # separate messages.
+    if outcome.ok:
+        logger.info("[FINALIZE] complete %s", outcome.describe())
+    else:
+        logger.error("[FINALIZE] PARTIAL %s", outcome.describe())
+    return outcome
 
 
 async def send_deferred_termination_event(

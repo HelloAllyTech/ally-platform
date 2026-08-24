@@ -316,6 +316,18 @@ No additional data is required. The event uses the embedding client to measure s
 
 ---
 
+## COHERENCE
+
+**Class:** `GuardrailEvent` (`app/core/events/event_types/guardrail/guardrail_event.py`), `detector_type: "COHERENCE"`
+
+**Detection:** Not a new event class — a `detector_type` on the existing `GuardrailEvent`, which otherwise resends its `actorDialogue` as a branching instruction on every classified violation. COHERENCE adds an escalation policy on top of that classifier so a learner the STT keeps mismeaning is not asked to repeat the same line forever: see [`app/core/events/coherence_guard.py`](../app/core/events/coherence_guard.py) for the escalate-after-N / cooldown / hard-cap policy and the actor/helper dialogue it swaps in. Off by default behind `STT_COHERENCE_GUARD_DEFAULT_ENABLED`.
+
+State (`coherence_consecutive_misses`, `coherence_escalations`, `coherence_quiet_until`, `coherence_normal_instruction`, `coherence_escalation_instruction`) lives on the event instance as ordinary fields, not pydantic private attrs, because these events are built with `model_construct` — never serialized onto the wire, since `serialize_event` builds an explicit dict.
+
+`GuardrailEvent` itself (its config-time `branching_instruction`, its default `detector_type: "CATEGORY"`, and how it differs from the score/feedback detection types documented above) is not otherwise covered by this reference — see [`docs/events-off-gate-design.md`](events-off-gate-design.md) and [`app/core/events/event_types/guardrail/guardrail_event.py`](../app/core/events/event_types/guardrail/guardrail_event.py) directly. COHERENCE only changes whether a classified violation actually fires, not how the classification itself works.
+
+---
+
 ## Key Source Files
 
 - `app/core/events/event_types/similarity_based/` -- SENTENCE_SIMILARITY

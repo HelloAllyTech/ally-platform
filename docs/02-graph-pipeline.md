@@ -135,6 +135,19 @@ The write is wrapped in a `try/except` and shares `metadata` with the retrieval
 and generation call sites — `turn_metrics.record` merges dicts rather than
 last-writer-wins, so these keys cannot erase the glossary/retrieval ones.
 
+### LLM timeout fallback
+
+If the main LLM call in step 4 does not return inside `LLM_RESPONSE_TIMEOUT`
+(30s), the turn still has to say something. The fallback line is resolved from
+the session's language via `llm_timeout_fallback_line()`
+(`app/core/fallback_lines.py`) rather than a hardcoded English sentence — a
+non-English session hearing English at the exact moment something is already
+going wrong was the single most jarring failure the graceful-failure audit
+found, made worse by Indic TTS voices spelling untranslated Latin script out
+letter-by-letter. Every non-English entry in that table is currently still the
+English string pending a human translation; an unknown/absent language code
+resolves to English, unchanged from the pre-existing behavior.
+
 ### System Prompt Modes
 
 The system prompt has two modes:

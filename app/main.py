@@ -44,5 +44,46 @@ app.include_router(api_router)
 async def health():
     """
     Health check endpoint.
+
+    This used to return a hardcoded ``{"status": "ok"}``, which proved only
+    that uvicorn was running. The thing that actually matters — whether the
+    LiveKit worker is registered and able to take jobs — lives in a SEPARATE
+    process in the same container (see start.sh), and it can be permanently
+    dead while this process is perfectly healthy. That is precisely the
+    2026-08-09 failure: workers registered with nobody for 19 hours while every
+    signal, this one included, read green. A health check that cannot fail is
+    worse than none.
+
+    So the response now reflects the worker's real registration state, read
+    from the heartbeat the worker process writes (app/core/worker_health.py).
+    It returns 503 for exactly two conditions — the SDK permanently gave up on
+    LiveKit, or the worker heartbeat is missing/stale past the startup grace —
+    and NOT for a transient reconnect, which must not cull a whole fleet during
+    a LiveKit blip.
+
+    ``status`` keeps its "ok" value on success so existing probes that match on
+    it are unaffected; the ``livekit`` field carries the detail.
     """
-    return {"status": "ok"}
+    from app.core.worker_health import registration_health
+
+    try:
+        state = registration_health()
+    except Exception:  # noqa: BLE001
+        # A bug in the health check must not itself take the service down.
+        # Report ok-with-unknown rather than a false 503.
+        logger.exception("Health check failed to read worker state")
+        return {"status": "ok", "livekit": "unknown"}
+
+    body = {
+        "status": "ok" if state["healthy"] else "unhealthy",
+        "livekit": state["livekit"],
+        "detail": state["detail"],
+    }
+    if not state["healthy"]:
+        logger.error(
+            "Health check UNHEALTHY: livekit=%s (%s)",
+            state["livekit"],
+            state["detail"],
+        )
+        return JSONResponse(status_code=503, content=body)
+    return body

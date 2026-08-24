@@ -225,6 +225,119 @@ class Settings(BaseSettings):
         "last resort (kill-switch for the escalation).",
     )
 
+    # ---- Worker health / LiveKit registration ----
+    # The agents SDK stops retrying a lost LiveKit connection once max_retry is
+    # exhausted and does NOT exit — leaving a resident worker registered with
+    # nobody (19h in the 2026-08-09 incident, while four signals read green).
+    # See app/core/worker_health.py.
+    WORKER_HEALTH_MONITOR_ENABLED: bool = Field(
+        default=True,
+        description=(
+            "Track LiveKit registration state in the worker process and write a "
+            "heartbeat the API process's /api/health can read."
+        ),
+    )
+    WORKER_HEALTH_EXIT_ON_CONNECTION_LOST: bool = Field(
+        default=True,
+        description=(
+            "Exit the worker process when the agents SDK permanently gives up "
+            "on LiveKit, so start.sh's `wait -n` tears the container down and "
+            "the orchestrator replaces the task. Set False to keep the process "
+            "up (/api/health still reports unhealthy)."
+        ),
+    )
+    WORKER_HEALTH_FILE: str = Field(
+        default="",
+        description=(
+            "Path of the worker heartbeat file shared between the worker and "
+            "API processes. Empty means a file in the system temp dir."
+        ),
+    )
+    WORKER_HEALTH_HEARTBEAT_S: float = Field(
+        default=5.0, description="Worker heartbeat write interval (seconds)."
+    )
+    WORKER_HEALTH_STALE_AFTER_S: float = Field(
+        default=45.0,
+        description=(
+            "How old the worker heartbeat may get before /api/health reports the "
+            "worker unreachable. Well above the write interval so a loaded host "
+            "cannot produce a false unhealthy."
+        ),
+    )
+    WORKER_HEALTH_STARTUP_GRACE_S: float = Field(
+        default=180.0,
+        description=(
+            "Grace after API-process start during which a missing worker "
+            "heartbeat is reported as 'starting' rather than unhealthy. Must "
+            "exceed worker boot (model load + registration) or every deploy "
+            "crash-loops."
+        ),
+    )
+
+    # ---- Opening statement ----
+    OPENING_STATEMENT_PLAYOUT_TIMEOUT_S: float = Field(
+        default=30.0,
+        description=(
+            "Upper bound on waiting for the scripted opening statement to finish "
+            "playing. Unbounded, a stalled opener TTS parked session startup "
+            "forever and the stall watchdog could not help (it only arms after a "
+            "LEARNER turn). The timeout does NOT interrupt the speech — it only "
+            "stops the worker waiting — so overshooting a long opener is free."
+        ),
+    )
+
+    # ---- STT coherence guard (mis-transcription mitigation) ----
+    # STT confidence is unusable for Indian languages, so a live guardrail that
+    # asks the learner to repeat is the only mitigation. Without limits it can
+    # loop forever; these bound it. See app/core/events/coherence_guard.py.
+    STT_COHERENCE_ESCALATE_AFTER: int = Field(
+        default=3,
+        description=(
+            "Consecutive coherence-guard hits before the persona escalates "
+            "(acknowledges the difficulty and offers a way forward) instead of "
+            "asking the learner to repeat again."
+        ),
+    )
+    STT_COHERENCE_MIN_GAP_S: float = Field(
+        default=8.0,
+        description=(
+            "Minimum seconds between two ordinary repeat requests, so one "
+            "garbled stretch producing two STT finalizations cannot produce two "
+            "identical requests back to back."
+        ),
+    )
+    STT_COHERENCE_ESCALATION_COOLDOWN_S: float = Field(
+        default=90.0,
+        description=(
+            "Seconds the coherence guard stays silent after escalating, so the "
+            "conversation can continue on best-effort transcripts instead of "
+            "deadlocking on the guard."
+        ),
+    )
+    STT_COHERENCE_MAX_ESCALATIONS: int = Field(
+        default=2,
+        description=(
+            "Escalations allowed per session before the coherence guard stops "
+            "firing entirely. Past this the guard has demonstrably not helped "
+            "and further interjections are nagging."
+        ),
+    )
+    STT_COHERENCE_GUARD_DEFAULT_ENABLED: bool = Field(
+        default=False,
+        description=(
+            "Synthesize a platform-default COHERENCE guardrail for scenarios "
+            "that declare none, so mis-transcription has a mitigation "
+            "everywhere rather than only where an author configured one. OFF by "
+            "default because a guardrail is a reply-shaping event: it runs in "
+            "process_gating_events, a hard barrier before generate_response, so "
+            "this adds an LLM classification to the reply path of every "
+            "session. Near-free for scenarios that already run gating "
+            "classifiers (detection is parallel); a full extra round-trip per "
+            "turn for scenarios with no events. Flip to true to enable "
+            "platform-wide."
+        ),
+    )
+
     # ---- Pause / resume tuning (overridable via env; defaults shown) ----
     PAUSE_CAP_SECONDS: float = Field(
         default=600.0,
@@ -346,19 +459,31 @@ class Settings(BaseSettings):
     # a reply never sounds "muted"/"disconnected" (telephony comfort noise). Like
     # the filler this does NOT change the measured response_latency_ms — it only
     # masks the perceived gap. This GLOBAL flag (default on) is a kill-switch
-    # that GATES a per-simulation opt-in (PromptData.comfort_audio_enabled,
-    # Studio: comfortAudioEnabled, default off): both must be on for the tone to
-    # play, so comfort audio is off for every scenario unless an author enables
-    # it. Set this False to force it off everywhere regardless of the per-sim
-    # toggle.
+    # that GATES the per-simulation setting (PromptData.comfort_audio_enabled,
+    # Studio: comfortAudioEnabled): both must be on for the tone to play. Set
+    # this False to force it off everywhere regardless of the per-sim toggle.
     COMFORT_AUDIO_ENABLED: bool = Field(
         default=True,
         description=(
             "Global kill-switch for the comfort-audio room tone. Default True: "
             "the tone plays for a session only when this is on AND that "
-            "simulation has comfortAudioEnabled set (per-sim opt-in, default "
-            "off). Set False to disable everywhere regardless of the per-sim "
-            "toggle."
+            "simulation's comfortAudioEnabled resolves true. Set False to "
+            "disable everywhere regardless of the per-sim toggle."
+        ),
+    )
+    COMFORT_AUDIO_DEFAULT_ON: bool = Field(
+        default=True,
+        description=(
+            "What comfortAudioEnabled means when a simulation's metadata does "
+            "not carry the key AT ALL. Default True: dead silence between turns "
+            "reads to users as 'muted'/'disconnected', which is a poor default "
+            "for something they experience as a dropped call. An explicit false "
+            "in the metadata is always respected, so no existing scenario "
+            "changes behaviour. NOTE: inert in production today — ally-be "
+            "migration 1798000000000-DisableComfortAudio stamped an explicit "
+            "false into every scenario's metadata and Studio re-stamps it on "
+            "every save, so the key is never absent. Making comfort audio "
+            "genuinely on-by-default needs the ally-be/ally-web half too."
         ),
     )
     COMFORT_AUDIO_VOLUME: float = Field(

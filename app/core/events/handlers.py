@@ -420,6 +420,22 @@ def create_connection_state_handler(
         """Handle connection state changes."""
         logger.info(f"LiveKit Event: Connection state changed: {state}")
 
+        # A transient drop the SDK is actively retrying. Explicitly NOT treated
+        # as the end of the session: finalizing here would ship a final score
+        # for a session that is about to resume. It is called out at WARNING so
+        # "the learner heard nothing for 20s" is attributable in the logs
+        # instead of being invisible. The learner-facing signal and the
+        # stall-watchdog suspension live in the worker, which owns both — see
+        # AgentWorker._handle_reconnection_state.
+        _reconnecting = getattr(rtc.ConnectionState, "CONN_RECONNECTING", None)
+        if _reconnecting is not None and state == _reconnecting:
+            logger.warning(
+                "LiveKit connection RECONNECTING (room=%s) — SDK is retrying; "
+                "not finalizing, the session may still recover",
+                room_name,
+            )
+            return
+
         if state == rtc.ConnectionState.CONN_DISCONNECTED:
             if final_score_sent_ref():
                 logger.info("Final score already sent, skipping duplicate send")
