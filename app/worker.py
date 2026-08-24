@@ -117,6 +117,25 @@ CTRL_PAUSED = "paused"
 CTRL_RESUMED = "resumed"
 CTRL_CAP_WARNING = "cap-warning"
 CTRL_CAP_ENDED = "cap-ended"
+# Agent's own LiveKit connection state, so the client can show a "reconnecting"
+# state rather than presenting a live-looking but mute call. The client's SDK
+# sees its OWN connection; this reports the AGENT's, which can drop
+# independently. State is one of CONN_STATE_RECONNECTING / CONN_STATE_CONNECTED.
+#
+# Note the inherent limitation: a "reconnecting" packet published while the
+# agent's own transport is down will usually NOT arrive. The reliable edge is
+# the "connected" one, published after recovery — that is what lets a client
+# clear a reconnecting state it inferred itself. Both are best-effort by
+# nature, never load-bearing for correctness.
+CTRL_CONNECTION_STATE = "connection-state"
+CONN_STATE_RECONNECTING = "reconnecting"
+CONN_STATE_CONNECTED = "connected"
+# A technical fault the learner would otherwise only experience as silence.
+# ``fatal: true`` means the session is being torn down now (nothing the learner
+# can do); ``fatal: false`` means the session is still live but degraded.
+# ``reason`` is the same string passed to ctx.shutdown, for support/debugging —
+# it is NOT user-facing copy and must not be rendered verbatim.
+CTRL_SESSION_FAULT = "session-fault"
 
 
 # The agent is the AUTHORITATIVE enforcer of the scenario time limit: it ends
@@ -356,6 +375,14 @@ class AgentWorker:
         self._stall_watchdog = None
         self._loop = None
 
+        # Loop-free score/memory delivery for the watchdog's force-exit path
+        # (built in _register_callbacks). See app/core/emergency_finalize.py.
+        self._emergency_finalizer = None
+
+        # True between CONN_RECONNECTING and the next CONN_CONNECTED, so the
+        # recovery signal is only sent when a problem was actually reported.
+        self._connection_recovering = False
+
     async def configure(self):
         """
         - Parse metadata and extract scenario
@@ -557,6 +584,12 @@ class AgentWorker:
         hang is locatable, ends the session cleanly, and — if the event loop is
         truly blocked — force-exits this (per-job) process so the room frees.
         Fully guarded: any failure leaves the session running without it.
+
+        Before that force-exit it runs the EmergencyFinalizer synchronously on
+        the watchdog thread, so the learner's score and session memory are
+        still delivered. os._exit runs no shutdown callback, so without this
+        the wedged session was never scored at all — see
+        app/core/emergency_finalize.py.
         """
         if not getattr(settings, "SESSION_STALL_WATCHDOG_ENABLED", True):
             return
@@ -576,8 +609,39 @@ class AgentWorker:
                 except Exception:  # noqa: BLE001
                     logger.exception("[WATCHDOG] failed to schedule shutdown")
 
+            def _on_force_exit() -> None:
+                """Deliver score + memory without the event loop (see module
+                docstring). Guarded again here so a missing finalizer can never
+                stop the force-exit."""
+                finalizer = getattr(self, "_emergency_finalizer", None)
+                if finalizer is None:
+                    logger.error(
+                        "[WATCHDOG] no EmergencyFinalizer for room=%s — the "
+                        "final score cannot be delivered on the force-exit path",
+                        room,
+                    )
+                    return
+                # `final_score_sent` is set when the connection-state handler
+                # SPAWNS the finalize task, not when it finishes — so on a
+                # blocked loop it can be True while nothing was actually sent.
+                # Only treat it as delivered when no finalize task is still
+                # pending. Erring toward a duplicate end-of-session message is
+                # deliberate: Core re-applies the same score, whereas a missed
+                # send loses the session.
+                _pending = getattr(self, "_finalize_task_ref", None) or []
+                _finalize_incomplete = bool(_pending) and not _pending[0].done()
+                if self.final_score_sent and not _finalize_incomplete:
+                    logger.info(
+                        "[WATCHDOG] score already sent for room=%s; skipping "
+                        "emergency finalize",
+                        room,
+                    )
+                    return
+                finalizer.flush_sync(reason="watchdog_force_exit")
+
             wd = SessionStallWatchdog(
                 on_stall=_on_stall,
+                on_force_exit=_on_force_exit,
                 threshold_s=getattr(settings, "SESSION_STALL_THRESHOLD_S", 75.0),
                 poll_s=getattr(settings, "SESSION_STALL_POLL_S", 5.0),
                 force_exit_grace_s=getattr(
@@ -819,9 +883,31 @@ class AgentWorker:
                         "shutting down job so the room doesn't zombie",
                         error,
                     )
-                    self.ctx.shutdown("agent_session_error")
+                    # Tell the client WHY before tearing down, so the learner
+                    # sees "something broke" instead of a call that just stops.
+                    # A spoken apology is NOT possible here: the AgentSession
+                    # is already closed, so session.say() raises "AgentSession
+                    # is closing, cannot use say()" — and the failure that got
+                    # us here is usually TTS itself. The structured signal is
+                    # the only channel left. Scheduled as a task because this
+                    # handler is sync (LiveKit contract); the shutdown happens
+                    # inside it, AFTER the publish, so the packet is not raced
+                    # by room teardown.
+                    task = asyncio.create_task(
+                        self._fault_then_shutdown("agent_session_error")
+                    )
+                    self._background_tasks.add(task)
+                    task.add_done_callback(self._background_tasks.discard)
             except Exception:  # noqa: BLE001 - never break close handling
                 logger.exception("[SESSION] close handler failed")
+                # The teardown matters more than the notification: if
+                # scheduling the announce failed, still end the job so the
+                # room cannot zombie (the behaviour this handler was added
+                # for in the first place).
+                try:
+                    self.ctx.shutdown("agent_session_error")
+                except Exception:  # noqa: BLE001
+                    logger.exception("[SESSION] fallback shutdown failed")
 
         # Conversation handler (register on session)
         conversation_handler, state_handlers, cleanup_conversation_handler = (
@@ -923,6 +1009,27 @@ class AgentWorker:
         )
         _memory_prompt_data = getattr(self.scenario, "prompt_data", None)
 
+        # Loop-free fallback delivery of the SAME payload, for the one path
+        # that cannot use finalize_session: the stall watchdog's os._exit.
+        # Built here (not in the watchdog) so it shares the exact sources
+        # finalize_session reads — ScoreKeeper and the RollingSummaryStore.
+        try:
+            from app.core.emergency_finalize import EmergencyFinalizer
+
+            self._emergency_finalizer = EmergencyFinalizer(
+                room_id=self.ctx.room.name,
+                thread_id=self.ctx.room.name,
+                score_keeper=self.score_keeper,
+                rolling_summary_store=self.rolling_summary_store,
+                language_code=_memory_language_code,
+            )
+        except Exception:  # noqa: BLE001 - never break session setup over this
+            logger.exception(
+                "[EMERGENCY-FINALIZE] could not build finalizer; a wedged "
+                "session would lose its score"
+            )
+            self._emergency_finalizer = None
+
         # Shared single-slot ref so the shutdown handler can DRAIN the
         # finalize task the connection-state handler spawns on disconnect
         # (instead of cleanup cancelling it mid-LLM-call — which silently
@@ -948,6 +1055,7 @@ class AgentWorker:
         @self.ctx.room.on("connection_state_changed")
         def on_connection_state_changed(state: rtc.ConnectionState):
             connection_handler(state)
+            self._handle_reconnection_state(state)
             # Signal room disconnection to entrypoint to allow graceful exit
             if state == rtc.ConnectionState.CONN_DISCONNECTED:
                 if self._room_disconnected_event:
@@ -1290,6 +1398,100 @@ class AgentWorker:
             )
         except Exception as e:  # noqa: BLE001
             logger.warning("[CONTROL] Failed to publish %s: %s", payload, e)
+
+    def _handle_reconnection_state(self, state: "rtc.ConnectionState") -> None:
+        """App-level handling for a transient LiveKit reconnect (CONN_RECONNECTING).
+
+        Previously only CONN_DISCONNECTED was handled, so a blip the SDK was
+        actively retrying got no handling at all. Two things happen here:
+
+        1. **The stall watchdog is suspended.** This is the substantive fix. The
+           watchdog arms on a finalized learner turn and force-exits the job if
+           no agent response follows within SESSION_STALL_THRESHOLD_S. During a
+           reconnect the agent legitimately cannot respond, so a reconnect
+           lasting longer than the threshold would have killed a session that
+           was about to recover — turning a recoverable blip into a lost
+           session. Suspending only clears the "response owed" debt; the next
+           learner turn re-arms it, so the watchdog is not weakened.
+        2. **The client is told**, so it can show a recovering state instead of
+           a live-looking mute call. Best-effort — see CTRL_CONNECTION_STATE for
+           why the "reconnecting" edge may not arrive and the "connected" one is
+           the reliable signal.
+        """
+        try:
+            reconnecting = getattr(rtc.ConnectionState, "CONN_RECONNECTING", None)
+            connected = getattr(rtc.ConnectionState, "CONN_CONNECTED", None)
+            if reconnecting is not None and state == reconnecting:
+                logger.warning(
+                    "[CONN] LiveKit connection RECONNECTING (room=%s) — the SDK "
+                    "is retrying; suspending the stall watchdog so a recoverable "
+                    "blip is not treated as a wedged session",
+                    self.ctx.room.name,
+                )
+                self._connection_recovering = True
+                if self._stall_watchdog is not None:
+                    self._stall_watchdog.suspend()
+                self._schedule_connection_state_signal(CONN_STATE_RECONNECTING)
+            elif connected is not None and state == connected:
+                # Only announce recovery if we actually reported a problem, so
+                # the initial connect does not emit a spurious "recovered".
+                if getattr(self, "_connection_recovering", False):
+                    logger.info(
+                        "[CONN] LiveKit connection RECOVERED (room=%s)",
+                        self.ctx.room.name,
+                    )
+                    self._connection_recovering = False
+                    self._schedule_connection_state_signal(CONN_STATE_CONNECTED)
+        except Exception:  # noqa: BLE001 - a state hook must never break a session
+            logger.exception("[CONN] reconnection-state handling failed")
+
+    def _schedule_connection_state_signal(self, conn_state: str) -> None:
+        """Publish a connection-state packet from a sync LiveKit handler."""
+        try:
+            task = asyncio.create_task(
+                self._publish_control(
+                    {"type": CTRL_CONNECTION_STATE, "state": conn_state}
+                )
+            )
+            self._background_tasks.add(task)
+            task.add_done_callback(self._background_tasks.discard)
+        except Exception:  # noqa: BLE001
+            logger.debug("[CONN] could not schedule %s signal", conn_state)
+
+    async def _publish_session_fault(self, reason: str, *, fatal: bool) -> None:
+        """Tell the client a technical fault happened (see CTRL_SESSION_FAULT).
+
+        Best-effort by design: the faults this covers are exactly the ones that
+        may also have broken the transport. A failed publish must never stop the
+        teardown that follows it.
+        """
+        await self._publish_control(
+            {"type": CTRL_SESSION_FAULT, "reason": reason, "fatal": bool(fatal)}
+        )
+
+    async def _fault_then_shutdown(self, reason: str) -> None:
+        """Announce a fatal fault to the client, then shut the job down.
+
+        Ordering matters: ctx.shutdown tears the room down, so a packet
+        published after it never reaches the learner (the pre-existing
+        `cap-ended` path has this same race). Publishing first, under a short
+        timeout, gives the signal a chance to land without letting a wedged
+        transport delay the teardown.
+        """
+        try:
+            await asyncio.wait_for(
+                self._publish_session_fault(reason, fatal=True), timeout=2.0
+            )
+        except Exception:  # noqa: BLE001 - includes TimeoutError
+            logger.warning(
+                "[SESSION] could not deliver session-fault signal (%s) before "
+                "shutdown",
+                reason,
+            )
+        try:
+            self.ctx.shutdown(reason)
+        except Exception:  # noqa: BLE001
+            logger.exception("[SESSION] shutdown(%s) failed", reason)
 
     def _arm_pause_cap_timer(self) -> None:
         """(Re)arm the pause cap for this pause.
@@ -2657,9 +2859,48 @@ class AgentWorker:
                 _open_t0 = time.monotonic()
                 handler = self.session.say(statement)
                 logger.info("[AgentWorker] Waiting for opening statement playout...")
-                await handler.wait_for_playout()
-                self._timing["opening_ms"] = (time.monotonic() - _open_t0) * 1000
-                logger.info("[AgentWorker] Opening statement playout complete.")
+                # BOUNDED wait. An unbounded one parked session startup forever
+                # on a stalled opener TTS, and the stall watchdog cannot help:
+                # it only arms after a LEARNER turn, and the learner has not
+                # spoken yet. The result was a live-looking call with permanent
+                # silence and no error anywhere.
+                #
+                # The timeout deliberately does NOT interrupt the speech — it
+                # only stops US waiting. So overshooting a legitimately long
+                # opener costs nothing (the audio keeps playing), which is why
+                # the bound can be well under the worst plausible opener.
+                _open_timeout = float(
+                    getattr(settings, "OPENING_STATEMENT_PLAYOUT_TIMEOUT_S", 30.0)
+                )
+                try:
+                    await asyncio.wait_for(
+                        handler.wait_for_playout(), timeout=_open_timeout
+                    )
+                    self._timing["opening_ms"] = (time.monotonic() - _open_t0) * 1000
+                    logger.info("[AgentWorker] Opening statement playout complete.")
+                except asyncio.TimeoutError:
+                    logger.error(
+                        "[AgentWorker] Opening statement playout did not complete "
+                        "within %.0fs (room=%s) — continuing session startup. The "
+                        "learner may have heard nothing; the session is live and "
+                        "listening, so a learner turn still gets a reply if the "
+                        "pipeline recovers.",
+                        _open_timeout,
+                        self.ctx.room.name,
+                    )
+                    # Non-fatal fault: the session continues, but the client is
+                    # told so it need not present a silent call as healthy.
+                    try:
+                        await asyncio.wait_for(
+                            self._publish_session_fault(
+                                "opening_statement_playout_timeout", fatal=False
+                            ),
+                            timeout=2.0,
+                        )
+                    except Exception:  # noqa: BLE001
+                        logger.debug(
+                            "[AgentWorker] could not signal opener stall to client"
+                        )
             except Exception as e:
                 logger.warning(
                     f"[AgentWorker] Skipped opening statement (session not "
@@ -3105,7 +3346,34 @@ if __name__ == "__main__":
     from app.core.worker_metrics import make_load_fnc
 
     _load_fnc = make_load_fnc()
+
+    # Registration health. The SDK stops retrying a lost LiveKit connection
+    # once max_retry is exhausted and does NOT exit the process, so the worker
+    # sits resident and registered with nobody while every external signal
+    # reads green (2026-08-09: 12 tasks dark for 19h). The monitor watches for
+    # that, writes a heartbeat the API process's /api/health reads, and exits
+    # the process on permanent loss so start.sh's `wait -n` self-heal fires.
+    # See app/core/worker_health.py.
+    from app.core.worker_health import start_health_monitor, wrap_load_fnc
+
+    start_health_monitor()
+    # Wrapped rather than replaced: load_fnc is the only WorkerOptions hook
+    # that hands us the AgentServer, and it keeps returning the exact value the
+    # wrapped function produced, so dispatch behaviour is unchanged.
+    _load_fnc = wrap_load_fnc(_load_fnc)
     _load_kwargs = {"load_fnc": _load_fnc} if _load_fnc is not None else {}
+    if _load_fnc is None:
+        # No load_fnc means no handle on the AgentServer, so permanent
+        # connection loss cannot be detected and the process will not
+        # self-terminate. The heartbeat still catches a dead worker process.
+        # Deliberately NOT substituting a stand-in load_fnc: a wrong load value
+        # would corrupt dispatch, which is worse than losing this signal.
+        logger.error(
+            "[worker-health] no load_fnc available (unexpected livekit-agents "
+            "version) — LiveKit connection-loss detection is DISABLED for this "
+            "worker; /api/health can only report whether the worker process is "
+            "alive"
+        )
 
     agents.cli.run_app(
         agents.WorkerOptions(

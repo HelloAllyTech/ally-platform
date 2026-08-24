@@ -13,7 +13,7 @@ from app.core.constants import (
     normalize_language_code_for_providers,
 )
 from app.core.embeddings import BaseEmbeddingClient
-from app.core.events.base import BaseEvent
+from app.core.events.base import BaseEvent, DetectionConfig
 from app.core.events.event_types.guardrail.guardrail_event import GuardrailEvent
 from app.core.events.event_types.guardrail.schemas import GuardrailData
 from app.core.events.factory import build_events_from_metadata
@@ -24,6 +24,28 @@ from app.core.scenario.simulation_instructions import (
 )
 
 logger = get_logger(__name__)
+
+
+def _resolve_comfort_audio_enabled(prompt_data_dict: Mapping[str, Any]) -> bool:
+    """Per-simulation comfort-audio setting, defaulting ON when unspecified.
+
+    Three cases, and the middle one is the point of this function:
+
+    * key present and truthy  -> True  (author turned it on)
+    * key present and falsy   -> False (author turned it OFF; always respected,
+      so no existing scenario config changes behaviour)
+    * key ABSENT              -> settings.COMFORT_AUDIO_DEFAULT_ON (True)
+
+    The old expression was ``bool(d.get("comfortAudioEnabled") or False)``,
+    which collapsed "absent" and "off" into off, making an opt-in-only feature
+    out of one whose absence the learner experiences as a dead line.
+    """
+    raw = prompt_data_dict.get("comfortAudioEnabled")
+    if raw is None:
+        raw = prompt_data_dict.get("comfort_audio_enabled")
+    if raw is None:
+        return bool(getattr(settings, "COMFORT_AUDIO_DEFAULT_ON", True))
+    return bool(raw)
 
 
 class TerminationEvent(BaseModel):
@@ -552,6 +574,23 @@ class Scenario(BaseModel):
                     else:
                         guardrail_model = "gpt-4o-mini"
 
+                    # COHERENCE guardrails get a detection cooldown. They were
+                    # built with DetectionConfig() defaults (no min_gap_time, no
+                    # max_occurrences) while GUARDRAIL is in the orchestrator's
+                    # always-resend set, so a learner the STT keeps mismatching
+                    # could be asked to repeat with no gap and no end. The
+                    # consecutive-miss counting and the escalation live in
+                    # GuardrailEvent._apply_coherence_policy; this is just the
+                    # belt-and-braces gap enforced by is_event_eligible.
+                    # CATEGORY guardrails are left exactly as they were.
+                    guard_detection_config = None
+                    if guard_detector_type == "COHERENCE":
+                        from app.core.events.coherence_guard import min_gap_s
+
+                        guard_detection_config = DetectionConfig(
+                            min_gap_time=min_gap_s()
+                        )
+
                     # Then in GuardrailEvent.create():
                     g_event = GuardrailEvent.create(
                         event_id=f"guardrail-{i}",
@@ -569,18 +608,60 @@ class Scenario(BaseModel):
                         visibility_type=VisibilityType.PASSIVE,
                         emoji=None,
                         emoji_message=None,
+                        **(
+                            {"detection_config": guard_detection_config}
+                            if guard_detection_config is not None
+                            else {}
+                        ),
                     )
                     guardrail_events.append(g_event)
 
                 except Exception as e:
                     logger.warning(f"Failed to build guardrail event at index {i}: {e}")
 
-            if guardrail_events:
-                logger.info(f"Built {len(guardrail_events)} guardrail events")
-                built_events = built_events + guardrail_events
-                trigger_events = list(trigger_events) + [
-                    e.event_id for e in guardrail_events
-                ]
+        # Platform-level default: a scenario with no COHERENCE guardrail has NO
+        # mitigation for mis-transcription at all (STT confidence is unusable
+        # for Indian languages), so the learner can only be misheard silently.
+        # Synthesized only when the author declared none, so every existing
+        # scenario config is preserved verbatim. Gated by
+        # STT_COHERENCE_GUARD_DEFAULT_ENABLED — see default_guard_enabled() for
+        # why that currently defaults to off.
+        try:
+            from app.core.events.coherence_guard import (
+                build_default_coherence_guardrail,
+                default_guard_enabled,
+            )
+
+            has_coherence_guard = any(
+                getattr(e, "detector_type", None) == "COHERENCE"
+                for e in guardrail_events
+            )
+            if default_guard_enabled() and not has_coherence_guard:
+                # Match the provider selection used for authored guardrails.
+                if settings.OLLAMA_BASE_URL and settings.LOCAL_LLM_MODEL:
+                    _def_url = settings.OLLAMA_BASE_URL
+                    _def_model = settings.LOCAL_LLM_MODEL
+                else:
+                    _def_url = None
+                    _def_model = "gpt-4o-mini"
+                default_guard = build_default_coherence_guardrail(
+                    model=_def_model, llm_base_url=_def_url
+                )
+                if default_guard is not None:
+                    guardrail_events.append(default_guard)
+                    logger.info(
+                        "Added platform-default STT coherence guardrail "
+                        "(scenario declared none)"
+                    )
+        except Exception as e:  # noqa: BLE001 - never fail scenario load over this
+            logger.warning(f"Could not add default coherence guardrail: {e}")
+
+        if guardrail_events:
+            logger.info(f"Built {len(guardrail_events)} guardrail events")
+            built_events = built_events + guardrail_events
+            trigger_events = list(trigger_events) + [
+                e.event_id for e in guardrail_events
+            ]
 
         return cls(
             scenarioName=normalized["scenarioName"],
@@ -739,8 +820,23 @@ class Scenario(BaseModel):
                 or prompt_data_dict.get("glossary_meta"),
                 "knowledge_sources": prompt_data_dict.get("knowledgeSources"),
                 "filler_enabled": bool(prompt_data_dict.get("fillerEnabled") or False),
-                "comfort_audio_enabled": bool(
-                    prompt_data_dict.get("comfortAudioEnabled") or False
+                # Comfort audio: ABSENT and EXPLICITLY FALSE are now different
+                # things. Silence between turns reads to users as
+                # "muted"/"disconnected" (see app/core/livekit/comfort_audio.py),
+                # so the platform default for a simulation that has never
+                # expressed a preference is ON, while an author who deliberately
+                # switched it off keeps it off.
+                #
+                # NOTE this is currently INERT in production: ally-be migration
+                # 1798000000000-DisableComfortAudio writes
+                # {"comfortAudioEnabled": false} into every scenario's metadata,
+                # and Studio re-stamps an explicit false on every save. So the
+                # key is never absent for an existing simulation and the branch
+                # below only affects scenarios created outside Studio (or with
+                # NULL metadata). Flipping the effective default needs the
+                # ally-be/ally-web half too — deliberately not done from here.
+                "comfort_audio_enabled": _resolve_comfort_audio_enabled(
+                    prompt_data_dict
                 ),
                 "supervisor_notes_enabled": bool(
                     prompt_data_dict.get("supervisorNotesEnabled")

@@ -1806,7 +1806,21 @@ async def generate_response(
             invocation_id=get_invocation_id(),
             **_gen_config,
         )
-        response = AIMessage(content="Sorry, can you say that again?")
+        # Resolve the fallback line from the session's language rather than
+        # always speaking English at a Hindi/Tamil/Telugu/Marathi learner (the
+        # Indic voices also spell Latin script out letter-by-letter). English
+        # is the default for any language without a translation yet, so this is
+        # never worse than the previous hardcoded line. See
+        # app/core/fallback_lines.py for the table and the TODO(i18n) list.
+        from app.core.fallback_lines import llm_timeout_fallback_line
+
+        _fallback_line = llm_timeout_fallback_line(language_code)
+        logger.info(
+            "[generate_response] llm_timeout_fallback room=%s language=%s",
+            get_room_id(),
+            language_code or DEFAULT_LANGUAGE_CODE,
+        )
+        response = AIMessage(content=_fallback_line)
     except Exception as e:
         _llm_latency = (datetime.now(timezone.utc) - _llm_start).total_seconds()
         logger.exception(
