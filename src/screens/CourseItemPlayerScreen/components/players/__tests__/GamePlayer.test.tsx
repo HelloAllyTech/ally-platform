@@ -153,6 +153,23 @@ describe('GamePlayer', () => {
     );
   });
 
+  it('injects the SNAKE frame strings so the bundle draws in the learner language', () => {
+    const {getByTestId} = render(
+      <GamePlayer
+        payload={buildPayload({gameKey: TrackGameKey.SNAKE})}
+        itemId="item-1"
+        onCompleted={jest.fn()}
+      />,
+    );
+
+    const injected = getByTestId('webview').props
+      .injectedJavaScriptBeforeContentLoaded as string;
+    expect(injected).toContain('courses.game.frameStrings.SNAKE.score');
+    expect(injected).toContain('courses.game.frameStrings.SNAKE.best');
+    expect(injected).toContain('courses.game.frameStrings.SNAKE.restart');
+    expect(injected).toContain('courses.game.frameStrings.SNAKE.gameOver');
+  });
+
   it('shows a friendly message instead of a blank screen for a gameKey this build does not know', () => {
     const unknownGameKey = 'FUTURE_GAME' as TrackGameKey;
     const {getByText, queryByTestId} = render(

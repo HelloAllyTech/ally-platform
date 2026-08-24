@@ -843,6 +843,12 @@
           "hintPivot": "Green links swing round with the grid but keep pointing the same way.",
           "hintRotateLink": "Red links stay where they are but spin with the grid."
         },
+        "SNAKE": {
+          "score": "Score",
+          "best": "Best",
+          "restart": "Start over",
+          "gameOver": "Game over — {{score}}"
+        },
         "SPROUT": {
           "pickerLabel": "Choose a plant",
           "plantSUCCULENT": "Succulent",
