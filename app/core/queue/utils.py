@@ -93,6 +93,26 @@ async def send_session_resumed_message(
     await send_message_to_queue(message.model_dump_json())
 
 
+def _tail_messages_for_grounding(thread_id: str) -> list:
+    """Best-effort transcript for the groundedness cross-check.
+
+    Best-effort on purpose, and the failure is safe in the right direction:
+    graph state is legitimately unreadable at session end (ending mid-turn
+    cancels the in-flight run), and `check_grounding` treats an empty transcript
+    as missing evidence rather than as proof of invention. So an unreadable
+    checkpoint costs the check, not the ledger.
+    """
+    try:
+        from app.core.graph import agent_graph
+
+        state = agent_graph.get_state({"configurable": {"thread_id": thread_id}})
+        if state and state.values:
+            return list(state.values.get("messages") or [])
+        return []
+    except Exception:  # noqa: BLE001 - the check is a bonus, not a gate
+        return []
+
+
 async def _emit_session_memory(
     room_id: str,
     thread_id: str,
@@ -100,6 +120,7 @@ async def _emit_session_memory(
     language_code: str | None = None,
     prompt_data=None,
     rolling_summary_store=None,
+    client_working_memory_store=None,
 ) -> None:
     """Ship the session's episodic memory (rolling summary) to Core.
 
@@ -121,12 +142,37 @@ async def _emit_session_memory(
         logger.debug("session_memory skipped: ROLLING_SUMMARY_ENABLED is off")
         return
 
+    # Phase 7: the semantic half of the write-out. Folded into `structured`
+    # under one namespaced key rather than sent as its own message — ally-be
+    # already stores `structured` whole and reads the keys it recognises, so
+    # this needs no wire change and no new consumer to be durable.
+    #
+    # Built ONCE here rather than inside _send, which has three call sites: the
+    # groundedness check reads the transcript, and doing it per call site would
+    # either duplicate the work or quietly skip it on one path.
+    working_memory_record = None
+    if client_working_memory_store is not None:
+        try:
+            from app.core.working_memory.writeout import build_writeout
+
+            snapshot = await client_working_memory_store.snapshot()
+            working_memory_record = build_writeout(
+                snapshot, _tail_messages_for_grounding(thread_id)
+            )
+        except Exception as writeout_error:  # noqa: BLE001
+            # A missing semantic record costs the next session its continuity.
+            # A failed finalize costs this session its score.
+            logger.warning("[working-memory] write-out skipped: %s", writeout_error)
+
     async def _send(
         summary_text: str,
         message_count: int,
         covered: int,
         structured: dict | None = None,
     ) -> None:
+        if working_memory_record is not None:
+            structured = dict(structured or {})
+            structured["client_working_memory"] = working_memory_record
         memory = SessionMemoryData(
             summary=summary_text,
             language=language_code,
@@ -254,6 +300,7 @@ async def finalize_session(
     language_code: str | None = None,
     prompt_data=None,
     rolling_summary_store=None,
+    client_working_memory_store=None,
 ) -> None:
     """
     Finalize a session by sending final score and cleaning up resources.
@@ -319,6 +366,7 @@ async def finalize_session(
                 language_code=language_code,
                 prompt_data=prompt_data,
                 rolling_summary_store=rolling_summary_store,
+                client_working_memory_store=client_working_memory_store,
             )
         except Exception as memory_error:
             logger.error(f"Failed to emit session memory: {memory_error}")

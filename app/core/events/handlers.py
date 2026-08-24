@@ -360,6 +360,7 @@ def create_connection_state_handler(
     language_code=None,
     prompt_data=None,
     rolling_summary_store=None,
+    client_working_memory_store=None,
     finalize_task_ref: Optional[list] = None,
 ) -> Callable[[rtc.ConnectionState], None]:
     """
@@ -412,6 +413,7 @@ def create_connection_state_handler(
                         language_code=language_code,
                         prompt_data=prompt_data,
                         rolling_summary_store=rolling_summary_store,
+                        client_working_memory_store=client_working_memory_store,
                     )
                 )
                 background_tasks.add(task)
@@ -514,6 +516,7 @@ def create_shutdown_handler(
     language_code=None,
     prompt_data=None,
     rolling_summary_store=None,
+    client_working_memory_store=None,
     finalize_task_ref: Optional[list] = None,
 ) -> Callable[[], None]:
     """
@@ -596,6 +599,7 @@ def create_shutdown_handler(
                     language_code=language_code,
                     prompt_data=prompt_data,
                     rolling_summary_store=rolling_summary_store,
+                    client_working_memory_store=client_working_memory_store,
                 )
                 set_final_score_sent(True)
                 logger.info("Session finalized successfully")

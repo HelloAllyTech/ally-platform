@@ -864,6 +864,7 @@ class AgentWorker:
             language_code=_memory_language_code,
             prompt_data=_memory_prompt_data,
             rolling_summary_store=self.rolling_summary_store,
+            client_working_memory_store=self.client_working_memory_store,
             finalize_task_ref=self._finalize_task_ref,
         )
 
@@ -897,6 +898,7 @@ class AgentWorker:
             language_code=_memory_language_code,
             prompt_data=_memory_prompt_data,
             rolling_summary_store=self.rolling_summary_store,
+            client_working_memory_store=self.client_working_memory_store,
             finalize_task_ref=self._finalize_task_ref,
         )
 
