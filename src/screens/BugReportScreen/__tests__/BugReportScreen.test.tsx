@@ -23,12 +23,14 @@ jest.mock('@/hooks', () => ({
 
 let mockUseBugReportOptions: {screen?: string; onSuccess?: () => void} = {};
 
+let mockNavigationState: unknown = {
+  routes: [{name: 'CallLog'}, {name: 'BugReport'}],
+  index: 1,
+};
+
 jest.mock('@react-navigation/native', () => ({
   useNavigationState: (selector: (state: unknown) => unknown) =>
-    selector({
-      routes: [{name: 'CallLog'}, {name: 'BugReport'}],
-      index: 1,
-    }),
+    selector(mockNavigationState),
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -96,6 +98,10 @@ describe('BugReportScreen', () => {
       maxLength: 1000,
       handleSubmit: mockHandleSubmit,
     };
+    mockNavigationState = {
+      routes: [{name: 'CallLog'}, {name: 'BugReport'}],
+      index: 1,
+    };
   });
 
   it('renders the title and guided prompt', () => {
@@ -116,6 +122,36 @@ describe('BugReportScreen', () => {
     render(<BugReportScreen />);
 
     expect(mockUseBugReportOptions.screen).toBe('CallLog');
+  });
+
+  it('resolves the actual screen name when the previous route is nested inside the Drawer/BottomTabs subtree', () => {
+    // Mirrors RootNavigator: the root Stack's "CallLog" route hosts the
+    // Drawer, which hosts the BottomTabs, which hosts the real screen.
+    mockNavigationState = {
+      routes: [
+        {
+          name: 'CallLog',
+          state: {
+            index: 0,
+            routes: [
+              {
+                name: 'BottomTabs',
+                state: {
+                  index: 1,
+                  routes: [{name: 'CallLog'}, {name: 'Simulations'}],
+                },
+              },
+            ],
+          },
+        },
+        {name: 'BugReport'},
+      ],
+      index: 1,
+    };
+
+    render(<BugReportScreen />);
+
+    expect(mockUseBugReportOptions.screen).toBe('Simulations');
   });
 
   it('navigates back on back button press', () => {
