@@ -887,12 +887,21 @@ class Settings(BaseSettings):
         ),
     )
     CLIENT_WORKING_MEMORY_TIMEOUT: float = Field(
-        default=8.0,
+        default=25.0,
         description=(
             "Seconds to wait for one consolidation call. On timeout the "
             "previous memory is kept, the miss is counted, and the next turn's "
             "update is free to commit — a miss costs staleness, not "
-            "correctness."
+            "correctness. "
+            "Raised from 8s after the multilingual v2v sweep: nine calls timed "
+            "out, four consecutively, so those turns produced no update at all "
+            "and the memory silently stopped tracking the conversation. "
+            "Measured in isolation the same call takes 2.4-3.1s across English, "
+            "Hindi, Kannada and Tamil — so 8s was not too tight for the WORK, "
+            "it was too tight for live CONTENTION, where the updater competes "
+            "with the agent's own streaming turn calls. The asymmetry decides "
+            "the number: the call is detached, so waiting longer costs only "
+            "staleness, while giving up costs the whole turn's update."
         ),
     )
     CLIENT_WORKING_MEMORY_EVERY_TURNS: int = Field(
