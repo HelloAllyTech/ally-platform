@@ -44,7 +44,7 @@ import {useGetReviewByIdQuery} from '@/services/reviewsApi';
 import {useLazyGetThreadsQuery} from '@/services/reviewThreadsApi';
 import {useAppSelector} from '@/store/hooks';
 import {colors, globalStyles} from '@/theme';
-import {ReviewStatus, TranscriptFocusRequest} from '@/types';
+import {ExperienceMode, ReviewStatus, TranscriptFocusRequest} from '@/types';
 import {
   formatDurationAsMMSS,
   isMinutesPassed,
@@ -54,6 +54,7 @@ import {
 
 import {
   DebriefTab,
+  EventChecklist,
   SessionSkills,
   SummaryTab,
   TranscriptTab,
@@ -138,6 +139,14 @@ export const SimulationFeedbackScreen: React.FC<
   const feedbackEnabled =
     simulationDetails?.scenario?.metadata?.enableFeedback !== false &&
     (feedbackTabs.debrief || feedbackTabs.skills || feedbackTabs.transcript);
+
+  // CHECKLIST-mode roleplays show this regardless of which sub-tabs are on —
+  // it used to live in a tab that always existed (Session Review) and lost
+  // that guarantee when Debrief/Skills/Transcript became independently
+  // toggleable, so it renders here rather than inside any one of them.
+  const isChecklistMode =
+    simulationDetails?.scenario?.metadata?.experienceMode ===
+    ExperienceMode.CHECKLIST;
 
   const {hideReviewDetails} = useHideReviewDetails({
     reviewId,
@@ -607,6 +616,15 @@ export const SimulationFeedbackScreen: React.FC<
           </View>
         </View>
       </View>
+      {feedbackEnabled &&
+        hasScenarioMessagesPermission &&
+        isChecklistMode &&
+        !shortSession &&
+        !!scenarioSessionId && (
+          <View style={styles.eventChecklistContainer}>
+            <EventChecklist scenarioSessionId={scenarioSessionId} />
+          </View>
+        )}
       {feedbackEnabled && hasScenarioMessagesPermission && (
         <View style={[styles.tabsContainer, styles.tabViewWrapper]}>
           <TabView
