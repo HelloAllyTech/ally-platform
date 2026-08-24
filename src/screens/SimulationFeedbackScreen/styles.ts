@@ -147,6 +147,10 @@ export const styles = ScaledSheet.create({
     flex: 1,
     padding: '10@ms',
   },
+  eventChecklistContainer: {
+    marginHorizontal: '10@ms',
+    marginBottom: '8@vs',
+  },
   lazyPlaceholder: {
     flex: 1,
     justifyContent: 'center',

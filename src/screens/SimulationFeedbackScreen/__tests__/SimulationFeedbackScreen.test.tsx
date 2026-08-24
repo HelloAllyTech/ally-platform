@@ -238,6 +238,7 @@ jest.mock('../components', () => {
       </View>
     ),
     SessionSkills: () => <View testID="session-skills-tab" />,
+    EventChecklist: () => <View testID="event-checklist" />,
     UpNext: ({onFinish, onBack}: any) => (
       <View testID="up-next-tab">
         <TouchableOpacity testID="finish-button" onPress={onFinish}>
@@ -367,6 +368,43 @@ describe('SimulationFeedbackScreen', () => {
       expect(getByTestId('session-skills-tab')).toBeTruthy();
     });
     expect(queryByTestId('debrief-tab')).toBeNull();
+  });
+
+  it('still shows the event checklist when only the debrief sub-tab is turned off', async () => {
+    const services = require('@/services');
+    (services.useLazyGetSimulationDetailsQuery as jest.Mock).mockReturnValue([
+      mockSimulationDetailsTrigger,
+      {
+        data: {
+          details: {summary: {}},
+          score: 10,
+          startedAt: '2024-01-01T00:00:00Z',
+          endedAt: '2024-01-01T00:00:30Z',
+          scenario: {
+            title: 'Test',
+            metadata: {
+              experienceMode: 'CHECKLIST',
+              feedbackTabs: {debrief: false, skills: true, transcript: true},
+            },
+          },
+          events: [],
+        },
+        isLoading: false,
+      },
+    ]);
+
+    const {getByTestId} = renderWithProviders(
+      <SimulationFeedbackScreen
+        navigation={{} as any}
+        route={{params: {scenarioSessionId: '1'}} as any}
+      />,
+    );
+    // The checklist used to only ever render inside the Debrief tab, so
+    // turning that sub-tab off alone made it vanish even though Skills and
+    // Transcript were still on — it must render independent of any one tab.
+    await waitFor(() => {
+      expect(getByTestId('event-checklist')).toBeTruthy();
+    });
   });
 
   it('navigates back when fromLogs back button is pressed', () => {
