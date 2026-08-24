@@ -354,7 +354,11 @@ class AgentWorkerV2:
         # transcript rows over SQS and drives per-turn latency metrics —
         # the v1 processors keep persisting v2 sessions unchanged.
         conversation_handler, state_handlers, cleanup_conversation = (
-            create_conversation_handler(room_name, self.joined_iso)
+            create_conversation_handler(
+                room_name,
+                self.joined_iso,
+                background_tasks=self._background_tasks,
+            )
         )
         self.session.on("conversation_item_added")(conversation_handler)
         self.session.on("agent_state_changed")(state_handlers["agent_state"])

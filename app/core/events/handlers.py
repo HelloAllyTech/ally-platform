@@ -67,7 +67,11 @@ async def send_event_to_queue(event_data: str) -> None:
         logger.error(f"Failed to send event to queue: {e}")
 
 
-def create_conversation_handler(room_id: str, joined_iso: str):
+def create_conversation_handler(
+    room_id: str,
+    joined_iso: str,
+    background_tasks: Optional[Set[asyncio.Task]] = None,
+):
     """
     Factory function to create conversation event handler with deduplication.
 
@@ -78,6 +82,14 @@ def create_conversation_handler(room_id: str, joined_iso: str):
     Args:
         room_id: LiveKit room identifier
         joined_iso: ISO timestamp when agent joined
+        background_tasks: Optional set to hold strong references to the
+            fire-and-forget transcript/metrics send tasks scheduled below.
+            asyncio only holds a weak reference to a task, so an untracked
+            task can be garbage-collected mid-send — dropping the message
+            with an unawaited "Task was destroyed but it is pending!"
+            warning instead of an error. Same convention as the worker's own
+            `self._background_tasks` (app/worker.py) and
+            `EventOrchestrator._background_tasks`.
 
     Returns:
         Tuple of (conversation_handler, state_handlers, cleanup_function):
@@ -126,7 +138,12 @@ def create_conversation_handler(room_id: str, joined_iso: str):
             message = CoreEventMessageType.create_turn_metrics(
                 room, TurnMetricsData(**rec)
             )
-            asyncio.create_task(send_event_to_queue(message.model_dump_json()))
+            task = asyncio.create_task(
+                send_event_to_queue(message.model_dump_json())
+            )
+            if background_tasks is not None:
+                background_tasks.add(task)
+                task.add_done_callback(background_tasks.discard)
         except Exception:  # noqa: BLE001 - metrics must never break a turn
             logger.exception("[turn-metrics] emit failed for room=%s", room)
 
@@ -292,12 +309,17 @@ def create_conversation_handler(room_id: str, joined_iso: str):
 
         # Schedule async send without blocking
         try:
-            asyncio.create_task(send_event_to_queue(core_event.model_dump_json()))
-        except RuntimeError:
-            # Fallback for contexts without running loop
-            asyncio.get_event_loop().create_task(
+            task = asyncio.create_task(
                 send_event_to_queue(core_event.model_dump_json())
             )
+        except RuntimeError:
+            # Fallback for contexts without running loop
+            task = asyncio.get_event_loop().create_task(
+                send_event_to_queue(core_event.model_dump_json())
+            )
+        if background_tasks is not None:
+            background_tasks.add(task)
+            task.add_done_callback(background_tasks.discard)
 
     def cleanup():
         """Clean up the seen_utterances set."""

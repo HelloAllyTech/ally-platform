@@ -163,6 +163,83 @@ class TestEventHandler:
         assert args["chat_message"].role == "CLIENT"
 
     @pytest.mark.asyncio
+    async def test_create_conversation_handler_tracks_task_against_gc(
+        self, monkeypatch
+    ):
+        """
+        Regression test: asyncio only keeps a *weak* reference to a task once
+        it's created. With nothing else holding it, the scheduled transcript
+        send can be garbage-collected while still pending — surfacing at
+        teardown as "Task was destroyed but it is pending!" and, worse,
+        silently dropping that transcript message. `create_conversation_handler`
+        must accept a `background_tasks` set and register the scheduled task
+        there so a GC pass can't take it out from under the send.
+        """
+        import gc
+
+        release = asyncio.Event()
+        sent = []
+
+        class SlowQueue:
+            async def send_message(self, m):
+                await release.wait()
+                sent.append(m)
+
+        monkeypatch.setattr(eh, "msg_event_queue", SlowQueue())
+
+        class DummyCoreEvent:
+            def __init__(self, payload):
+                self._payload = payload
+
+            def model_dump_json(self):
+                return json.dumps(self._payload)
+
+        monkeypatch.setattr(
+            eh,
+            "CoreEventMessageType",
+            types.SimpleNamespace(
+                create=lambda room_id, chat_message=None, event_id=None: (
+                    DummyCoreEvent(
+                        {
+                            "room_id": room_id,
+                            "role": chat_message.role,
+                            "content": chat_message.content,
+                        }
+                    )
+                )
+            ),
+        )
+
+        background_tasks: set = set()
+        handler, _state_handlers, _cleanup = eh.create_conversation_handler(
+            room_id="room-123",
+            joined_iso="2024-01-01T00:00:00+00:00",
+            background_tasks=background_tasks,
+        )
+
+        handler(
+            DummyEvent(
+                DummyItem(role="assistant", content="hi there"),
+                created_at=1704067205.0,
+            )
+        )
+
+        # Let the scheduled task start running (up to its `release.wait()`).
+        await asyncio.sleep(0)
+        assert background_tasks, "scheduled send task must be tracked while pending"
+
+        # Force a GC pass with no local strong reference to the task left —
+        # only `background_tasks` (and asyncio's own weak ref) point at it.
+        gc.collect()
+        await asyncio.sleep(0)
+
+        release.set()
+        await asyncio.wait_for(asyncio.gather(*background_tasks), timeout=1)
+
+        assert sent, "transcript message was dropped by a garbage-collected task"
+        assert not background_tasks, "done task should be discarded from the set"
+
+    @pytest.mark.asyncio
     async def test_create_conversation_handler_fallback_loop(self, monkeypatch):
         # Force RuntimeError on asyncio.create_task to hit fallback path
         def boom_create_task(_):
