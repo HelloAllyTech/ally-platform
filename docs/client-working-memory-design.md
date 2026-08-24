@@ -1206,7 +1206,11 @@ QM's `replaceIfRevision`, which is the right tool when writes have no natural or
 do: the turn index *is* the ordering key, monotonic commits express the same guarantee
 without hashing content, and `test_runtime_state.py` already pins the behaviour.
 
-**`actor/prompt_compiler.py`.** §2.2's design, built. Two system messages around the
+**`actor/prompt_compiler.py`.** *(Reconsidered 2026-08-21 and deliberately not taken — see
+phase 2. Its static/volatile discipline is already in `prompt.py`, and its two-message shape
+would deliver the block as a suffix, forfeiting the movable position phase 4 tests. Kept here
+because the reasoning for wanting it was sound and the reasoning against it is specific.)*
+§2.2's design, built. Two system messages around the
 history — a byte-stable static prefix compiled once per session so provider caching hits
 every turn, and a per-turn card. It already reuses the v1 helpers, resolves through
 `load_and_format` so dashboard overrides work, and passes data blocks as `format_map` kwargs
@@ -1218,6 +1222,11 @@ three-tier fallback: Director-nominated topics first, then keyword match against
 learner's last utterance, then spec order so the actor always has *some* grounding. A
 cumulative character cap bounds the budget, and `_DIRECTOR_TOPIC_BOOST = 0.5` is an additive
 term in exactly the shape §7.4's salience function uses.
+
+> **Taken in part, as of 2026-08-21.** The keyword layer is in `recall.py`; the **embedding
+> tier is not** — `rank_chunks_semantic`, `build_semantic_retriever` and `_cosine` remain only
+> here. That tier is phase 6's input, which makes this file the one thing standing between v2
+> and deletion. See phase 7.
 
 **`DirectorService.on_turn_committed`.** The off-path updater shape §5 lands on:
 fire-and-forget into a tracked task set, hard timeout, and on timeout it records a *miss*
@@ -1485,10 +1494,18 @@ Re-scoped 2026-08-20 after auditing `roleplay_v2` (§9.1). Most of phase 2's plu
 exists there, tested and passing, so the estimates below are smaller than a reading of §3
 and §5 alone suggests — what remains is deriving the state, not building the machinery.
 
-**0. Get the measurements trustworthy first.** Not a phase of this design, but everything
-below is read through them. Truncation is conditioned on barge-in (shipped), and the glossary
-adherence backlog is draining (shipped) so the register signal is readable on 675 sessions
-rather than 10. Until adherence has a baseline, phase 3 has nothing to compare against.
+**Status, 2026-08-24.** Phases 0 and 2 are done; phase 3's code is complete and merged but
+its measurement is not taken. Phases 1, 4, 5, 6 and 7 are not started, and **phase 1 is the
+one that blocks the phase with the largest measured effect size.** Nothing is deployed and
+nothing is enabled: `CLIENT_WORKING_MEMORY_ENABLED` defaults off and no prompt declares the
+placeholder, so the code is inert in production by construction rather than by luck.
+
+**0. Get the measurements trustworthy first. — DONE.** Not a phase of this design, but
+everything below is read through them. Truncation is conditioned on barge-in (shipped), and
+the glossary adherence backlog has **fully drained** — 612 reports from 10, nothing left
+unscanned — so the register signal is readable across the corpus rather than on a sample of
+ten. That was the stated precondition on phase 3: adherence now has a baseline to compare
+against.
 
 **1. Language realism, independent of this design.** Source the register instruction from
 `languages.evalConfig.targetVariety` so grading and instruction cannot drift, delivered
@@ -1498,17 +1515,67 @@ worker change. Also resolve the Kannada conflict, where `core_style` says be col
 **That one needs a Kannada speaker, not more data** — it is a linguistic judgement about a
 script this document's author cannot read, inferred from error counts.
 
-**2. Salvage from v2 before writing anything new.** Move `RuntimeStateStore`, the two-message
-`prompt_compiler`, `persona_bible` selection, and the advisory-verdict validation discipline
-out of `roleplay_v2` and into the v1 path, dropping the `spec`/authoring surface and taking
-v1's language call sites rather than v2's hardcoded-empty ones (§9.1). Behaviour-neutral:
-nothing reads the store yet. This is what makes phase 3 small.
+**2. Salvage from v2 before writing anything new. — DONE (2026-08-21).** Take
+`RuntimeStateStore`, `persona_bible` selection, and the advisory-verdict validation
+discipline out of `roleplay_v2` and into the v1 path, dropping the `spec`/authoring surface
+and taking v1's language call sites rather than v2's hardcoded-empty ones (§9.1).
+Behaviour-neutral: nothing reads the store yet. This is what makes phase 3 small.
 
-**3. `stance` + `register` + `speech_fragments` + `withheld`, no retrieval.** The derivation
-layer — the part v2 never had. Off-path updater behind `CLIENT_WORKING_MEMORY_ENABLED` on the
-salvaged store, cadence fallback, ledger contract and framing (§3), guardrail precedence and
-the rest of §5.1. Read against `persona_break` **on clean turns** at turns 8+, baseline
-**14.0%** (§12).
+*What shipped, and where it departed from the plan.* The word above was "move"; what landed
+is a **copy-and-adapt** — `app/core/working_memory/` is a second, independent copy and v2's
+originals are untouched on disk. With v2 already disabled in production and slated for
+decommission, that duplication is temporary by construction and costs nothing meanwhile, but
+it does change the precondition on phase 7, below.
+
+- **The store came over close to verbatim, names included.** `snapshot`, `begin_turn`,
+  `commit`, `mark_miss`, `last_committed_turn`, the `asyncio.Lock`, the deep-copied snapshots
+  and the monotonic turn check are all as v2 had them. Dropped as planned: the `spec` surface,
+  and `apply_stage_direction` / `mark_revealed`, which became arguments to `commit`. Added:
+  `in_flight` / `discard` for detached-task ownership, and `_fold_facts` for reconsolidation.
+- **The state schema could not come over, and this was never a naming problem.** v2's state
+  was *authored* from a scenario spec; this one is *derived* each turn. That is the §3.1
+  two-provenances distinction, i.e. the design itself, so no literal move was ever available
+  here.
+- **`prompt_compiler`'s two-message split was deliberately NOT taken**, which is why it has
+  been struck from the list above. Its static-prefix / turn-card structure is the same
+  discipline `prompt.py` already applies to v1's static prefix and volatile suffix, so there
+  was nothing to gain — and adopting it would have meant delivering the block as a suffix,
+  forfeiting the author-movable position that phase 4 exists to test (§2.3). Its one genuinely
+  load-bearing detail, passing authored text as `format_map` kwargs so braces cannot break
+  formatting, v1's resolver already does.
+- **`persona_bible` came over in part.** The keyword layer — `_WORD_RE`, `_keywords`, the
+  minimum-keyword-length gate, `_stem_matches` — is in `recall.py`, along with a fix to a bug
+  that copy introduced (filtering short tokens on the candidate side as well as the cue side
+  made short cues unmatchable). The **embedding tier did not**: `rank_chunks_semantic`,
+  `build_semantic_retriever` and `_cosine` are still only in `roleplay_v2`, and they are what
+  phase 6 wants. See phase 7.
+
+**3. `stance` + `register` + `speech_fragments` + `withheld`, no retrieval. — CODE COMPLETE
+(2026-08-24), NOT MEASURED.** The derivation layer — the part v2 never had. Off-path updater
+behind `CLIENT_WORKING_MEMORY_ENABLED` on the salvaged store, cadence fallback, ledger
+contract and framing (§3), guardrail precedence and the rest of §5.1. Read against
+`persona_break` **on clean turns** at turns 8+, baseline **14.0%** (§12).
+
+*Shipped:* the stance machine with the advisory-verdict discipline (a transition is refused
+unless an advancing event earned it, one rung at a time, and `reflecting` is unreachable while
+a thread is open); the detached, timeboxed consolidation call with its own cost label; the
+graph wiring, with the turn opened inside `generate_response` and the update fired after the
+reply has streamed; and the read path, where the opt-in **is** the `{client_working_memory}`
+placeholder in the selected prompt's body — so enabling the flag changes nothing for any
+existing simulation.
+
+*Not done, and phase 3 is not finished without them:*
+
+1. **The measurement.** The baseline exists (14.0%); the comparison does not. Nothing has run
+   in production, because nothing is deployed and no prompt declares the placeholder.
+2. **A human step gates the first session:** the new main-agent prompt has to be authored in
+   prompt management, inheriting #2, with the placeholder positioned. It cannot be written
+   from the repo — variants live in backend metadata, not as local files.
+3. **`recall.py` is built but wired to nothing.** 255 lines, no importers, and
+   `salient_backstory` is populated by no caller, so the block renders its named absence every
+   turn. This is correct for a phase whose title says *no retrieval* — it is phase 6's input,
+   written early — but it is not to be mistaken for working. The same is true of
+   `retrieve_cues`: the consolidation call writes them and nothing reads them yet.
 
 **4. Test position.** Move `{client_working_memory}` with the §2.3 placeholder and read
 clienthood, the latency distribution, guardrail adherence *and* glossary-adherence violations
@@ -1525,8 +1592,20 @@ pass it the stance to weight against, and retire `{retrieved_context}` and
 inherits `persona_bible`'s selector from phase 2. Read against the latency distribution as
 much as against quality — the phase with the measured effect size, ≈1,000–1,500ms.
 
-**7. Session-end write-out**, episodic and semantic, plus the groundedness cross-check. Then
-`roleplay_v2` is deleted: by this point everything reusable has moved.
+**7. Session-end write-out**, episodic and semantic, plus the groundedness cross-check.
+
+**Then `roleplay_v2` is deleted — but the precondition is a fact about the code, not a
+position in this list.** The original wording assumed that reaching phase 7 meant everything
+reusable had moved. Phase 2 shipped as a copy rather than a move (see above), so v2's files
+still hold the only copy of anything not yet taken — and one thing has not been taken:
+`persona_bible`'s embedding tier (`rank_chunks_semantic`, `build_semantic_retriever`,
+`_cosine`), which is exactly what phase 6's semantic bucket needs.
+
+So the gate is: **delete `roleplay_v2` only after phase 6 has taken the embedding tier, or
+salvage that one file ahead of it.** Deleting on schedule instead would mean rewriting a
+working retriever later, which is the one outcome phase 2 existed to prevent. Everything else
+in v2 is either already copied, or `spec`-surface code this design deliberately does not
+want.
 
 **Why this order.** Phase 3 is the only phase with a mechanism confirmed in both the data and
 the code, and phase 2 exists purely to make it small. Phase 6 has the larger measured effect
@@ -1538,7 +1617,10 @@ doing them together would make a regression in either indistinguishable from a r
 the other. Phase 4 has to come after 3 and before 6 for the same reason — it moves that block
 and nothing else.
 
-**What this design is no longer sized as.** With v2's store, compiler, retrieval selector and
-validation discipline salvaged rather than rebuilt, the genuinely new code is the derivation
-layer in phase 3: the client-side event triggers (§4), the stance machine, and the salience
-function over traces that `persona_bible` already knows how to select from.
+**What this design is no longer sized as.** With v2's store, its retrieval selector's keyword
+layer and its validation discipline salvaged rather than rebuilt — and its prompt compiler
+deliberately left behind — the genuinely new code was the derivation layer in phase 3: the
+client-side event triggers (§4), the stance machine, and the salience function over traces
+that `persona_bible` already knows how to select from. That is now written. What remains
+genuinely new is smaller still: phase 6's retrieval fold, on top of an embedding tier that
+already exists and has not yet moved.
