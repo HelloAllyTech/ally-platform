@@ -36,6 +36,12 @@ const buildStore = () => {
   const store = configureStore({
     reducer: {[api.reducerPath]: api.reducer},
     middleware: gDM => gDM().concat(api.middleware),
+    // autoBatch (on by default) defers subscriber notification to
+    // requestAnimationFrame, which react-native's jest setup polyfills as a
+    // setTimeout. If one is still queued when the test env tears down, its
+    // callback throws "You are trying to access a property or method of the
+    // Jest environment after it has been torn down".
+    enhancers: getDefaultEnhancers => getDefaultEnhancers({autoBatch: false}),
   });
   return {api, store};
 };

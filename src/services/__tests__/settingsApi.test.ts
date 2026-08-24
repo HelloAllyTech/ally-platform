@@ -12,13 +12,11 @@ jest.mock('@/config/env', () => ({
   env: {API_BASE_URL: 'https://example.com', API_VERSION: 'v1'},
 }));
 
-import {configureStore} from '@reduxjs/toolkit';
-
 import {SUMMARY_FIELDS} from '@/constants/summary';
 import summaryReducer from '@/store/slices/summarySlice';
 
-import {api} from '../api';
 import {settingsApi} from '../settingsApi';
+import {createApiTestStore} from '../testUtils/createApiTestStore';
 import {getFirstFetchFromMock} from '../testUtils/getFirstFetchFromMock';
 import {mockOkJsonResponse} from '../testUtils/mockOkJsonResponse';
 
@@ -26,17 +24,7 @@ const setupFetchMock = () => {
   global.fetch = jest.fn(() => Promise.resolve(mockOkJsonResponse([])));
 };
 
-const createTestStore = () =>
-  configureStore({
-    reducer: {
-      [api.reducerPath]: api.reducer,
-      summary: summaryReducer,
-    },
-    middleware: getDefaultMiddleware =>
-      getDefaultMiddleware({immutableCheck: false, serializableCheck: false}).concat(
-        api.middleware,
-      ),
-  });
+const createTestStore = () => createApiTestStore({summary: summaryReducer});
 
 const noSubscribe = {subscribe: false} as const;
 

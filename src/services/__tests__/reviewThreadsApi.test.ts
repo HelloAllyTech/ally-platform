@@ -12,10 +12,8 @@ jest.mock('@/config/env', () => ({
   env: {API_BASE_URL: 'https://example.com', API_VERSION: 'v1'},
 }));
 
-import {configureStore} from '@reduxjs/toolkit';
-
-import {api} from '../api';
 import {reviewThreadsApi} from '../reviewThreadsApi';
+import {createApiTestStore} from '../testUtils/createApiTestStore';
 import {getFirstFetchFromMock} from '../testUtils/getFirstFetchFromMock';
 import {mockOkJsonResponse} from '../testUtils/mockOkJsonResponse';
 
@@ -24,15 +22,6 @@ const setupFetchMock = () => {
     Promise.resolve(mockOkJsonResponse({data: [], count: 0})),
   );
 };
-
-const createTestStore = () =>
-  configureStore({
-    reducer: {[api.reducerPath]: api.reducer},
-    middleware: getDefaultMiddleware =>
-      getDefaultMiddleware({immutableCheck: false, serializableCheck: false}).concat(
-        api.middleware,
-      ),
-  });
 
 const noSubscribe = {subscribe: false} as const;
 
@@ -56,7 +45,7 @@ describe('reviewThreadsApi', () => {
   });
 
   it('getThreads GETs without pagination when offset/limit omitted', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       reviewThreadsApi.endpoints.getThreads.initiate(
         {reviewId: 'rev-a'},
@@ -71,7 +60,7 @@ describe('reviewThreadsApi', () => {
   });
 
   it('getThreads GETs with offset, limit, includeMessage', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       reviewThreadsApi.endpoints.getThreads.initiate(
         {reviewId: 'rev-b', offset: 2, limit: 10},
@@ -85,7 +74,7 @@ describe('reviewThreadsApi', () => {
   });
 
   it('getCommentReplies GETs without pagination when offset/limit omitted', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       reviewThreadsApi.endpoints.getCommentReplies.initiate(
         {commentId: 'c-1'},
@@ -101,7 +90,7 @@ describe('reviewThreadsApi', () => {
   });
 
   it('getCommentReplies GETs with offset and limit', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       reviewThreadsApi.endpoints.getCommentReplies.initiate(
         {commentId: 'c-2', offset: 1, limit: 5},

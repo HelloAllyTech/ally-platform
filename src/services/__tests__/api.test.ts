@@ -1,4 +1,5 @@
 import {AnyAction, configureStore} from '@reduxjs/toolkit';
+
 import {api} from '../api';
 
 // Mocks for tokens + store dispatch used by api.ts
@@ -28,6 +29,12 @@ describe('api baseQueryWithReauth', () => {
       const store = configureStore({
         reducer: {[api.reducerPath]: api.reducer},
         middleware: gDM => gDM().concat(api.middleware),
+        // autoBatch (on by default) defers subscriber notification to
+        // requestAnimationFrame, which react-native's jest setup polyfills as a
+        // setTimeout. If one is still queued when the test env tears down, its
+        // callback throws "You are trying to access a property or method of the
+        // Jest environment after it has been torn down".
+        enhancers: getDefaultEnhancers => getDefaultEnhancers({autoBatch: false}),
       });
 
       const {callsAPI} = require('../callsApi');
@@ -88,6 +95,8 @@ describe('api reauth flow', () => {
     const store = configureStore({
       reducer: {[apiReauth.reducerPath]: apiReauth.reducer},
       middleware: gDM => gDM().concat(apiReauth.middleware),
+      // See the autoBatch note in the store above.
+      enhancers: getDefaultEnhancers => getDefaultEnhancers({autoBatch: false}),
     });
 
     const action = callsAPI.endpoints.getCallLogs.initiate({limit: 1, offset: 0});

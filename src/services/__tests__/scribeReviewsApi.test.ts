@@ -12,28 +12,17 @@ jest.mock('@/config/env', () => ({
   env: {API_BASE_URL: 'https://example.com', API_VERSION: 'v1'},
 }));
 
-import {configureStore} from '@reduxjs/toolkit';
-
 import {SortOrder} from '@/constants';
 import {ReviewStatus} from '@/types/reviews';
 
-import {api} from '../api';
 import {scribeReviewsApi} from '../scribeReviewsApi';
+import {createApiTestStore} from '../testUtils/createApiTestStore';
 import {getFirstFetchFromMock} from '../testUtils/getFirstFetchFromMock';
 import {mockOkJsonResponse} from '../testUtils/mockOkJsonResponse';
 
 const setupFetchMock = () => {
   global.fetch = jest.fn(() => Promise.resolve(mockOkJsonResponse({})));
 };
-
-const createTestStore = () =>
-  configureStore({
-    reducer: {[api.reducerPath]: api.reducer},
-    middleware: getDefaultMiddleware =>
-      getDefaultMiddleware({immutableCheck: false, serializableCheck: false}).concat(
-        api.middleware,
-      ),
-  });
 
 const noSubscribe = {subscribe: false} as const;
 const noTrack = {track: false} as const;
@@ -77,7 +66,7 @@ describe('scribeReviewsApi', () => {
   });
 
   it('getScribeReviews GETs with order DESC and list params', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       scribeReviewsApi.endpoints.getScribeReviews.initiate(
         {sortBy: 'createdAt', limit: 5, offset: 0},
@@ -93,7 +82,7 @@ describe('scribeReviewsApi', () => {
   });
 
   it('createScribeReview POSTs scribeSessionId and note', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     const body = {scribeSessionId: 99, note: 'hello'};
     await store.dispatch(
       scribeReviewsApi.endpoints.createScribeReview.initiate(body, noTrack),
@@ -107,7 +96,7 @@ describe('scribeReviewsApi', () => {
   });
 
   it('updateScribeReviewStatus PATCHes status body', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       scribeReviewsApi.endpoints.updateScribeReviewStatus.initiate(
         {reviewId: 'r-1', body: {status: ReviewStatus.IN_REVIEW}},
@@ -120,7 +109,7 @@ describe('scribeReviewsApi', () => {
   });
 
   it('getScribeReviewById GETs by id', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       scribeReviewsApi.endpoints.getScribeReviewById.initiate(
         {reviewId: 'r-2'},
@@ -133,7 +122,7 @@ describe('scribeReviewsApi', () => {
   });
 
   it('getScribeMessages GETs with optional sort params', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       scribeReviewsApi.endpoints.getScribeMessages.initiate(
         {
@@ -153,7 +142,7 @@ describe('scribeReviewsApi', () => {
   });
 
   it('addScribeReviewComment POSTs thread fields', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       scribeReviewsApi.endpoints.addScribeReviewComment.initiate(
         {
@@ -182,7 +171,7 @@ describe('scribeReviewsApi', () => {
   });
 
   it('getScribeThreadComments GETs without pagination when omitted', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       scribeReviewsApi.endpoints.getScribeThreadComments.initiate(
         {threadId: 'th-1'},
@@ -195,7 +184,7 @@ describe('scribeReviewsApi', () => {
   });
 
   it('getScribeThreadComments GETs with offset and limit', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       scribeReviewsApi.endpoints.getScribeThreadComments.initiate(
         {threadId: 'th-2', offset: 4, limit: 8},
@@ -208,7 +197,7 @@ describe('scribeReviewsApi', () => {
   });
 
   it('updateScribeCommentVisibility PATCHes hidden', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       scribeReviewsApi.endpoints.updateScribeCommentVisibility.initiate(
         {commentId: 'cm-1', hidden: true},
@@ -221,7 +210,7 @@ describe('scribeReviewsApi', () => {
   });
 
   it('updateScribeComment PATCHes content', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       scribeReviewsApi.endpoints.updateScribeComment.initiate(
         {commentId: 'cm-2', content: 'edited'},
@@ -234,7 +223,7 @@ describe('scribeReviewsApi', () => {
   });
 
   it('deleteScribeComment DELETEs', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       scribeReviewsApi.endpoints.deleteScribeComment.initiate(
         {commentId: 'cm-3'},
@@ -247,7 +236,7 @@ describe('scribeReviewsApi', () => {
   });
 
   it('getScribeGeneralReviewComments GETs without pagination when omitted', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       scribeReviewsApi.endpoints.getScribeGeneralReviewComments.initiate(
         {reviewId: 'r-5'},
@@ -260,7 +249,7 @@ describe('scribeReviewsApi', () => {
   });
 
   it('getScribeGeneralReviewComments GETs with offset and limit', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       scribeReviewsApi.endpoints.getScribeGeneralReviewComments.initiate(
         {reviewId: 'r-6', offset: 2, limit: 3},
