@@ -101,12 +101,15 @@ const baseQueryWithReauth: BaseQueryFn<
 > = async (args, _store, extraOptions) => {
   try {
     let result = await baseQuery(args, _store, extraOptions);
-    console.log(
-      ':rocket: ~ baseQueryWithReauth ~ result:',
-      (args as FetchArgs)?.url,
-      args,
-      result,
-    );
+    if (__DEV__) {
+      // eslint-disable-next-line no-console
+      console.log(
+        ':rocket: ~ baseQueryWithReauth ~ result:',
+        (args as FetchArgs)?.url,
+        args,
+        result,
+      );
+    }
     if (result.error && result.error.status === 401) {
       // Try to get a new token
       const accessToken = await getItem<string>(AsyncStorageKeys.ACCESS_TOKEN);
