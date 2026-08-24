@@ -12,28 +12,17 @@ jest.mock('@/config/env', () => ({
   env: {API_BASE_URL: 'https://example.com', API_VERSION: 'v1'},
 }));
 
-import {configureStore} from '@reduxjs/toolkit';
-
 import {SortOrder} from '@/constants';
 import {ReviewStatus} from '@/types/reviews';
 
-import {api} from '../api';
 import {reviewsApi} from '../reviewsApi';
+import {createApiTestStore} from '../testUtils/createApiTestStore';
 import {getFirstFetchFromMock} from '../testUtils/getFirstFetchFromMock';
 import {mockOkJsonResponse} from '../testUtils/mockOkJsonResponse';
 
 const setupFetchMock = () => {
   global.fetch = jest.fn(() => Promise.resolve(mockOkJsonResponse({})));
 };
-
-const createTestStore = () =>
-  configureStore({
-    reducer: {[api.reducerPath]: api.reducer},
-    middleware: getDefaultMiddleware =>
-      getDefaultMiddleware({immutableCheck: false, serializableCheck: false}).concat(
-        api.middleware,
-      ),
-  });
 
 const noSubscribe = {subscribe: false} as const;
 const noTrack = {track: false} as const;
@@ -80,7 +69,7 @@ describe('reviewsApi', () => {
   });
 
   it('createReview POSTs body', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     const body = {
       scenarioSessionId: 's1',
       note: 'note',
@@ -97,7 +86,7 @@ describe('reviewsApi', () => {
   });
 
   it('getReview GETs by reviewId', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       reviewsApi.endpoints.getReview.initiate({reviewId: 'r-1'}, noSubscribe),
     );
@@ -107,7 +96,7 @@ describe('reviewsApi', () => {
   });
 
   it('updateReviewStatus PATCHes body', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       reviewsApi.endpoints.updateReviewStatus.initiate(
         {reviewId: 'r-2', body: {status: ReviewStatus.IN_REVIEW}},
@@ -120,7 +109,7 @@ describe('reviewsApi', () => {
   });
 
   it('addReviewComment POSTs thread and content fields', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       reviewsApi.endpoints.addReviewComment.initiate(
         {
@@ -149,7 +138,7 @@ describe('reviewsApi', () => {
   });
 
   it('getMessages GETs with optional sortOrder and sortBy', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       reviewsApi.endpoints.getMessages.initiate(
         {
@@ -169,7 +158,7 @@ describe('reviewsApi', () => {
   });
 
   it('getThreadComments GETs without params when offset/limit omitted', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       reviewsApi.endpoints.getThreadComments.initiate(
         {threadId: 'th-1'},
@@ -182,7 +171,7 @@ describe('reviewsApi', () => {
   });
 
   it('getThreadComments GETs with offset and limit', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       reviewsApi.endpoints.getThreadComments.initiate(
         {threadId: 'th-2', offset: 5, limit: 10},
@@ -195,7 +184,7 @@ describe('reviewsApi', () => {
   });
 
   it('getReviews GETs with sortBy limit offset and DESC order', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       reviewsApi.endpoints.getReviews.initiate(
         {sortBy: 'createdAt', limit: 10, offset: 0},
@@ -209,7 +198,7 @@ describe('reviewsApi', () => {
   });
 
   it('getReviewById GETs review', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       reviewsApi.endpoints.getReviewById.initiate(
         {reviewId: 'r-5'},
@@ -221,7 +210,7 @@ describe('reviewsApi', () => {
   });
 
   it('updateCommentVisibility PATCHes hidden', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       reviewsApi.endpoints.updateCommentVisibility.initiate(
         {commentId: 'cm-1', hidden: true},
@@ -234,7 +223,7 @@ describe('reviewsApi', () => {
   });
 
   it('updateComment PATCHes content', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       reviewsApi.endpoints.updateComment.initiate(
         {commentId: 'cm-2', content: 'new'},
@@ -247,7 +236,7 @@ describe('reviewsApi', () => {
   });
 
   it('deleteComment DELETEs', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       reviewsApi.endpoints.deleteComment.initiate(
         {commentId: 'cm-3'},
@@ -259,7 +248,7 @@ describe('reviewsApi', () => {
   });
 
   it('getGeneralReviewComments GETs without pagination when offset/limit omitted', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       reviewsApi.endpoints.getGeneralReviewComments.initiate(
         {reviewId: 'r-6'},
@@ -272,7 +261,7 @@ describe('reviewsApi', () => {
   });
 
   it('getGeneralReviewComments GETs with offset and limit', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       reviewsApi.endpoints.getGeneralReviewComments.initiate(
         {reviewId: 'r-7', offset: 1, limit: 3},

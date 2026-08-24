@@ -12,24 +12,12 @@ jest.mock('@/config/env', () => ({
   env: {API_BASE_URL: 'https://example.com', API_VERSION: 'v1'},
 }));
 
-import {configureStore} from '@reduxjs/toolkit';
-
 import {TrackDetail, TrackItemStatus, TrackItemType} from '@/types';
 
-import {api} from '../api';
 import {coursesApi} from '../coursesApi';
+import {createApiTestStore} from '../testUtils/createApiTestStore';
 import {getFirstFetchFromMock} from '../testUtils/getFirstFetchFromMock';
 import {mockOkJsonResponse} from '../testUtils/mockOkJsonResponse';
-
-const createTestStore = () =>
-  configureStore({
-    reducer: {[api.reducerPath]: api.reducer},
-    middleware: getDefaultMiddleware =>
-      getDefaultMiddleware({
-        immutableCheck: false,
-        serializableCheck: false,
-      }).concat(api.middleware),
-  });
 
 const noSubscribe = {subscribe: false} as const;
 
@@ -98,7 +86,7 @@ describe('coursesApi', () => {
     global.fetch = jest.fn(() =>
       Promise.resolve(mockOkJsonResponse({data: [{id: 't1'}], count: 1})),
     );
-    const store = createTestStore();
+    const store = createApiTestStore();
     const result = await store.dispatch(
       coursesApi.endpoints.getLearnTracks.initiate(undefined, noSubscribe),
     );
@@ -129,7 +117,7 @@ describe('coursesApi', () => {
           }),
       );
 
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       coursesApi.endpoints.getLearnTrackDetail.initiate({trackId: 'track-1'}),
     );
@@ -181,7 +169,7 @@ describe('coursesApi', () => {
       )
       .mockResolvedValueOnce(mockOkJsonResponse(buildTrackDetail()));
 
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       coursesApi.endpoints.getLearnTrackDetail.initiate({trackId: 'track-1'}),
     );
@@ -205,7 +193,7 @@ describe('coursesApi', () => {
       .mockResolvedValueOnce(mockOkJsonResponse(buildTrackDetail()))
       .mockResolvedValueOnce(mockOkJsonResponse({success: true}));
 
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       coursesApi.endpoints.getLearnTrackDetail.initiate({trackId: 'track-1'}),
     );

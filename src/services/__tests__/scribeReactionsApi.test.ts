@@ -12,26 +12,15 @@ jest.mock('@/config/env', () => ({
   env: {API_BASE_URL: 'https://example.com', API_VERSION: 'v1'},
 }));
 
-import {configureStore} from '@reduxjs/toolkit';
-
-import {api} from '../api';
 import {ReactionAction} from '../reactionsApi';
 import {scribeReactionsApi} from '../scribeReactionsApi';
+import {createApiTestStore} from '../testUtils/createApiTestStore';
 import {getFirstFetchFromMock} from '../testUtils/getFirstFetchFromMock';
 import {mockOkJsonResponse} from '../testUtils/mockOkJsonResponse';
 
 const setupFetchMock = () => {
   global.fetch = jest.fn(() => Promise.resolve(mockOkJsonResponse({})));
 };
-
-const createTestStore = () =>
-  configureStore({
-    reducer: {[api.reducerPath]: api.reducer},
-    middleware: getDefaultMiddleware =>
-      getDefaultMiddleware({immutableCheck: false, serializableCheck: false}).concat(
-        api.middleware,
-      ),
-  });
 
 const noSubscribe = {subscribe: false} as const;
 const noTrack = {track: false} as const;
@@ -64,7 +53,7 @@ describe('scribeReactionsApi', () => {
   });
 
   it('getScribeReactions GETs scribe reactions with offset limit', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       scribeReactionsApi.endpoints.getScribeReactions.initiate(
         {reviewId: 'sr-1', offset: 0, limit: 20},
@@ -78,7 +67,7 @@ describe('scribeReactionsApi', () => {
   });
 
   it('getScribeReactions omits reaction param when not provided', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       scribeReactionsApi.endpoints.getScribeReactions.initiate(
         {reviewId: 'sr-2', offset: 0, limit: 10},
@@ -90,7 +79,7 @@ describe('scribeReactionsApi', () => {
   });
 
   it('getScribeReactions includes reaction when provided', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       scribeReactionsApi.endpoints.getScribeReactions.initiate(
         {reviewId: 'sr-3', reaction: '1f44d', offset: 0, limit: 10},
@@ -102,7 +91,7 @@ describe('scribeReactionsApi', () => {
   });
 
   it('getScribeReactionsCount GETs count for numeric reviewId', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       scribeReactionsApi.endpoints.getScribeReactionsCount.initiate(42, noSubscribe),
     );
@@ -111,7 +100,7 @@ describe('scribeReactionsApi', () => {
   });
 
   it('addScribeReactionToComment POSTs reaction and action', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       scribeReactionsApi.endpoints.addScribeReactionToComment.initiate(
         {id: 'comment-1', reaction: '1f44d', action: ReactionAction.ADD},
@@ -130,7 +119,7 @@ describe('scribeReactionsApi', () => {
   });
 
   it('addScribeReactionToReview POSTs to review reactions', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       scribeReactionsApi.endpoints.addScribeReactionToReview.initiate(
         {id: 'rev-9', reaction: '2764-fe0f', action: ReactionAction.REMOVE},

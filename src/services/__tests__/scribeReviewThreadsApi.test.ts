@@ -12,10 +12,8 @@ jest.mock('@/config/env', () => ({
   env: {API_BASE_URL: 'https://example.com', API_VERSION: 'v1'},
 }));
 
-import {configureStore} from '@reduxjs/toolkit';
-
-import {api} from '../api';
 import {scribeReviewThreadsApi} from '../scribeReviewThreadsApi';
+import {createApiTestStore} from '../testUtils/createApiTestStore';
 import {getFirstFetchFromMock} from '../testUtils/getFirstFetchFromMock';
 import {mockOkJsonResponse} from '../testUtils/mockOkJsonResponse';
 
@@ -24,15 +22,6 @@ const setupFetchMock = () => {
     Promise.resolve(mockOkJsonResponse({data: [], count: 0})),
   );
 };
-
-const createTestStore = () =>
-  configureStore({
-    reducer: {[api.reducerPath]: api.reducer},
-    middleware: getDefaultMiddleware =>
-      getDefaultMiddleware({immutableCheck: false, serializableCheck: false}).concat(
-        api.middleware,
-      ),
-  });
 
 const noSubscribe = {subscribe: false} as const;
 
@@ -56,7 +45,7 @@ describe('scribeReviewThreadsApi', () => {
   });
 
   it('getScribeThreads GETs scribe threads path without pagination', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       scribeReviewThreadsApi.endpoints.getScribeThreads.initiate(
         {reviewId: 'sr-1'},
@@ -70,7 +59,7 @@ describe('scribeReviewThreadsApi', () => {
   });
 
   it('getScribeThreads GETs with offset, limit, includeMessage', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       scribeReviewThreadsApi.endpoints.getScribeThreads.initiate(
         {reviewId: 'sr-2', offset: 0, limit: 20},
@@ -84,7 +73,7 @@ describe('scribeReviewThreadsApi', () => {
   });
 
   it('getScribeCommentReplies GETs scribe replies path', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       scribeReviewThreadsApi.endpoints.getScribeCommentReplies.initiate(
         {commentId: 'rep-1'},
@@ -98,7 +87,7 @@ describe('scribeReviewThreadsApi', () => {
   });
 
   it('getScribeCommentReplies GETs with pagination params', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       scribeReviewThreadsApi.endpoints.getScribeCommentReplies.initiate(
         {commentId: 'rep-2', offset: 3, limit: 7},
