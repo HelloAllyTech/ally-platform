@@ -94,6 +94,24 @@ Config structure from metadata:
 }
 ```
 
+### Constructor validation is structural only
+
+`DeepgramTTSClient`, `ElevenLabsTTSClient`, and `SarvamTTSClient.__init__` only
+check that required fields (`model`, `voice_id`/`speaker`) are non-empty. They
+do **not** make a live API call to confirm the value is genuinely valid — an
+earlier version did, via each provider's own `validate_voice()` (still present
+as a static method, still unit-tested, just no longer called from `__init__`).
+
+That live check was removed because it ran on every single session start —
+including Sarvam's via the same one-shot `text_to_speech.convert()` endpoint
+called out as flaky below — and any transient failure (network blip, rate
+limit, timeout) was silently swallowed by `create_tts_client`'s fallback,
+which produced a session speaking a hardcoded English Deepgram voice instead
+of the requested (often non-English) one, with only a log warning. A
+genuinely invalid `model`/`voice_id`/`speaker` now fails at actual synthesis
+time instead, where the existing timeout/retry handling already applies.
+Google's and Hume's clients already validated structurally only.
+
 ## Default Voice Selection
 
 When no TTS config is provided, the factory selects a Deepgram voice based on the persona's gender:
