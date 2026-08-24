@@ -86,16 +86,6 @@ class ElevenLabsTTSClient(BaseTTSClient):
             logger.error("[ElevenLabs] __init__: model is required")
             raise ValueError("ElevenLabs TTS requires 'model'")
 
-        # Validate configuration
-        logger.debug(f"[ElevenLabs] Validating voice_id: {voice_id}")
-        if not self.validate_voice(voice_id=voice_id, api_key=api_key):
-            logger.error(
-                f"[ElevenLabs] Voice validation failed for voice_id: {voice_id}"
-            )
-            raise ValueError(f"Invalid ElevenLabs voice_id: {voice_id}")
-
-        logger.debug("[ElevenLabs] Voice validation successful, initializing client")
-
         self._model = model
         self._voice_id = voice_id
         self._language_code = language_code
