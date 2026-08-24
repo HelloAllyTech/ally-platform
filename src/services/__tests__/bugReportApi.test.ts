@@ -12,10 +12,8 @@ jest.mock('@/config/env', () => ({
   env: {API_BASE_URL: 'https://example.com', API_VERSION: 'v1'},
 }));
 
-import {configureStore} from '@reduxjs/toolkit';
-
-import {api} from '../api';
 import {bugReportApi} from '../bugReportApi';
+import {createApiTestStore} from '../testUtils/createApiTestStore';
 import {getFirstFetchFromMock} from '../testUtils/getFirstFetchFromMock';
 import {mockOkJsonResponse} from '../testUtils/mockOkJsonResponse';
 
@@ -24,15 +22,6 @@ const setupFetchMock = () => {
     Promise.resolve(mockOkJsonResponse({id: 'bug-1', stage: 'new'})),
   );
 };
-
-const createTestStore = () =>
-  configureStore({
-    reducer: {[api.reducerPath]: api.reducer},
-    middleware: getDefaultMiddleware =>
-      getDefaultMiddleware({immutableCheck: false, serializableCheck: false}).concat(
-        api.middleware,
-      ),
-  });
 
 const noTrack = {track: false} as const;
 
@@ -53,7 +42,7 @@ describe('bugReportApi', () => {
   });
 
   it('POSTs the description and context to /product-roadmap/bug-reports', async () => {
-    const store = createTestStore();
+    const store = createApiTestStore();
     await store.dispatch(
       bugReportApi.endpoints.createBugReport.initiate(
         {
