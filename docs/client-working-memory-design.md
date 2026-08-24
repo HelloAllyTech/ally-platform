@@ -1577,9 +1577,35 @@ existing simulation.
    written early — but it is not to be mistaken for working. The same is true of
    `retrieve_cues`: the consolidation call writes them and nothing reads them yet.
 
-**4. Test position.** Move `{client_working_memory}` with the §2.3 placeholder and read
-clienthood, the latency distribution, guardrail adherence *and* glossary-adherence violations
-together. That last one is the point: if violations fall when the block moves, placement —
+**4. Test position — and it is now a COST experiment as much as a quality one.**
+Move `{client_working_memory}` with the §2.3 placeholder and read clienthood, the latency
+distribution, guardrail adherence *and* glossary-adherence violations together.
+
+> **Measured 2026-08-24, and it changes what this phase is for.** In-body substitution
+> **disables prompt caching for the whole session.** `agent_turn` cache hits were **57.7%**
+> on the legacy prompt and **15–19%** on the working-memory prompt, and the per-turn detail
+> is unambiguous: `cachedTokens` was **0 on eleven of twelve turns**, including turns of
+> 1,300–2,000 tokens.
+>
+> The mechanism is not gradual. A volatile block mid-body means the cacheable prefix is only
+> the text *before* it, which fell under the provider's 1,024-token minimum — so nothing
+> cached at all. Cached input is half price, and a miss costs TTFT on the latency-critical
+> path, so this makes the feature materially more expensive than its token count suggests
+> (§12's 0.88×-of-`agent_turn` figure counts tokens, not cache state).
+>
+> The fix is precedented and already in this codebase: `RETRIEVED_CONTEXT_DEFER_TO_SUFFIX`
+> delivers volatile content as a trailing message *after* history for exactly this reason,
+> and its config description spells out the same failure. A
+> `CLIENT_WORKING_MEMORY_DEFER_TO_SUFFIX` mirroring it would keep the system message
+> byte-stable, and landing last also satisfies `prompt.py`'s slowest-churn-first ordering,
+> since this block is the fastest-changing thing in the prompt.
+>
+> **Not implemented, deliberately.** It is a behavioural change to where the actor reads its
+> own state — which is the very thing this phase exists to test — so it belongs in the
+> experiment rather than in a default. It also changes `generate_system_message`'s return
+> arity, which 71 tests unpack. Phase 4 should therefore compare three positions (early
+> in-body, late in-body, deferred-after-history) with **cache hit rate as a first-class
+> outcome**, not just clienthood. That last one is the point: if violations fall when the block moves, placement —
 not content — is why register guidance fails to land, and this design owns placement (§9.2).
 
 **5. Move `{retrieved_context}` to the cache-friendly suffix on #2**, matching what the
