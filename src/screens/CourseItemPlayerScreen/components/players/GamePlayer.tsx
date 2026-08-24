@@ -214,6 +214,24 @@ export const GamePlayer: React.FC<GamePlayerProps> = ({
     return `window.__allyGameStrings = ${JSON.stringify(strings)}; true;`;
   }, [gameKey, t]);
 
+  // The backend is the source of truth for which games exist; a released
+  // build only knows the games shipped as of its build date. Rather than
+  // hand an unrecognised key to the lookups below — a blank WebView sized to
+  // NaN — say so plainly, the same way UnsupportedItemCard does for an
+  // unrecognised item type.
+  if (!html) {
+    return (
+      <View style={styles.unsupported} testID="game-unsupported">
+        <Text style={styles.unsupportedTitle}>
+          {t('courses.player.unsupportedTitle')}
+        </Text>
+        <Text style={styles.unsupportedBody}>
+          {t('courses.player.unsupportedBody')}
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <ScrollView
       contentContainerStyle={styles.content}
@@ -273,6 +291,27 @@ const styles = ScaledSheet.create({
     gap: '12@ms',
     paddingHorizontal: '16@ms',
     paddingVertical: '16@ms',
+  },
+  unsupported: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '12@ms',
+    paddingHorizontal: '24@ms',
+  },
+  unsupportedTitle: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...typography.body.large,
+    fontWeight: fontWeights.medium,
+    color: colors.ds.typography.highEmphasis,
+    textAlign: 'center',
+  },
+  unsupportedBody: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...typography.body.medium,
+    fontWeight: fontWeights.regular,
+    color: colors.ds.typography.mediumEmphasis,
+    textAlign: 'center',
   },
   intro: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
