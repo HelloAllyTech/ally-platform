@@ -384,3 +384,83 @@ async def test_a_near_duplicate_thread_is_not_opened_twice(store):
     await store.commit(1, opened_threads=[Thread(topic="the brother's visits")])
     state = await store.snapshot()
     assert len(state.unresolved) == 1
+
+
+# ---------------------------------------------------------------------------
+# Thread closing must match the way opening does
+# ---------------------------------------------------------------------------
+
+
+async def test_a_thread_can_be_closed_by_a_near_duplicate_label(store):
+    # Opening folded near-duplicates while closing required an exact string, so
+    # a thread opened as "brother's visits" could never be closed by "the
+    # brother's visits" — it stayed open for the rest of the session, threads
+    # only ever accumulated, and `reflecting` became unreachable through the
+    # Zeigarnik gate.
+    await store.begin_turn()
+    await store.commit(0, opened_threads=[Thread(topic="brother's visits")])
+    await store.begin_turn()
+    await store.commit(1, closed_topics=["the brother's visits"])
+    state = await store.snapshot()
+    assert state.open_threads == []
+
+
+async def test_closing_an_unrelated_topic_leaves_the_thread_open(store):
+    await store.begin_turn()
+    await store.commit(0, opened_threads=[Thread(topic="brother's visits")])
+    await store.begin_turn()
+    await store.commit(1, closed_topics=["the badminton group"])
+    state = await store.snapshot()
+    assert len(state.open_threads) == 1
+
+
+# ---------------------------------------------------------------------------
+# The withheld ledger's three states must all be reachable
+# ---------------------------------------------------------------------------
+
+
+async def test_reaching_disclosing_unlocks_what_was_withheld(store):
+    # Nothing anywhere set "unlocked", so a topic stayed locked for the whole
+    # session however well the counsellor did and the actor deflected it
+    # forever — the uniform-responsiveness failure this design exists to fix,
+    # reintroduced inside the ledger.
+    await store.begin_turn()
+    await store.commit(0, withheld=[WithheldTopic(topic="the visit", deflection="d")])
+    assert (await store.snapshot()).withheld[0].status == "locked"
+
+    await store.begin_turn()
+    await store.commit(1, stance="disclosing")
+    assert (await store.snapshot()).withheld[0].status == "unlocked"
+
+
+async def test_an_early_stance_does_not_unlock(store):
+    await store.begin_turn()
+    await store.commit(0, withheld=[WithheldTopic(topic="the visit", deflection="d")])
+    await store.begin_turn()
+    await store.commit(1, stance="testing")
+    assert (await store.snapshot()).withheld[0].status == "locked"
+
+
+async def test_saying_the_thing_marks_it_revealed(store):
+    # Derived from the disclosure ledger rather than asserted by the model:
+    # nothing passed `revealed_topics`, so that transition was unreachable too.
+    await store.begin_turn()
+    await store.commit(
+        0, withheld=[WithheldTopic(topic="her brother not visiting", deflection="d")]
+    )
+    await store.begin_turn()
+    await store.commit(1, stance="disclosing")
+    await store.begin_turn()
+    await store.commit(2, disclosed=[Fact(text="her brother has not been visiting")])
+    assert (await store.snapshot()).withheld[0].status == "revealed"
+
+
+async def test_a_locked_topic_is_not_revealed_by_disclosure(store):
+    # Order matters: a client cannot reveal what it was not yet ready to say.
+    await store.begin_turn()
+    await store.commit(
+        0,
+        withheld=[WithheldTopic(topic="her brother not visiting", deflection="d")],
+        disclosed=[Fact(text="her brother has not been visiting")],
+    )
+    assert (await store.snapshot()).withheld[0].status == "locked"

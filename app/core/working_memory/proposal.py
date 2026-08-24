@@ -66,6 +66,30 @@ CLIENT_EVENTS = frozenset(
 MAX_FRAGMENT_CHARS = 120
 MAX_FRAGMENTS = 3
 
+#: Caps on every OTHER free-text field, which had none.
+#:
+#: MAX_FRAGMENT_CHARS existed for a stated reason — the model must not be able
+#: to smuggle a whole reply in as "voice" — and that reason applies verbatim to
+#: `affect`, `register` and each ledger entry, which were unbounded. This block
+#: is rendered into EVERY turn's prompt, so an unbounded field is unbounded
+#: prompt growth on a latency-critical path, and a 4,000-character "affect" is
+#: an instruction the actor will follow.
+#:
+#: Sized against what the field is for rather than by guess: measured across the
+#: offline runs, `affect` ran 8-31 characters, `register` 4-19, and disclosures
+#: 15-80, so these are 3-5x the observed range — generous enough never to clip
+#: real output, tight enough to bound the block.
+MAX_STATE_FIELD_CHARS = 120
+MAX_APPRAISAL_CHARS = 240
+MAX_LEDGER_ITEM_CHARS = 200
+MAX_TOPIC_CHARS = 120
+MAX_CUE_CHARS = 60
+
+
+def _capped(value: Optional[str], limit: int) -> Optional[str]:
+    text = (value or "").strip()
+    return text[:limit] if text else None
+
 
 class ObservedEvent(BaseModel):
     """One client-side event the updater claims to have seen."""
@@ -234,9 +258,32 @@ def _clean(values: List[str], *, limit: int, max_chars: int = 0) -> List[str]:
 
 def validate(proposal: ProposedUpdate, memory: ClientWorkingMemory) -> ValidatedUpdate:
     """Turn an advisory proposal into what code is willing to commit."""
-    kinds = {
-        e.kind.strip().lower() for e in proposal.events if e.kind and e.kind.strip()
-    }
+    # An event without evidence cannot earn anything.
+    #
+    # The prompt demands a quoted span per event and this module's thesis is
+    # that the proposal is untrusted — but nothing read `evidence`, so `kind`
+    # alone was enough to advance a stance. The single strongest
+    # anti-fabrication rule in the prompt was unenforced in the one place whose
+    # job is enforcing it.
+    #
+    # Checked before turning this on, because enforcing it blindly would
+    # re-freeze the stance the way the overshoot veto did: across three probe
+    # conversations the updater populated evidence on 4 of 4 events, every one a
+    # real span from the turns. So this rejects fabrication rather than normal
+    # output.
+    kinds = set()
+    for event in proposal.events:
+        kind = (event.kind or "").strip().lower()
+        if not kind:
+            continue
+        if not (event.evidence or "").strip():
+            logger.info(
+                "[working-memory] discarding unevidenced event %r — a claim "
+                "with nothing to quote cannot earn a transition",
+                kind,
+            )
+            continue
+        kinds.add(kind)
     unknown = kinds - CLIENT_EVENTS
     if unknown:
         logger.debug("[working-memory] discarding unknown events: %s", sorted(unknown))
@@ -277,16 +324,21 @@ def validate(proposal: ProposedUpdate, memory: ClientWorkingMemory) -> Validated
         deflection = (
             raw_deflections[index].strip() if index < len(raw_deflections) else ""
         )
-        withheld.append((topic, deflection or "change the subject naturally"))
+        withheld.append(
+            (
+                topic[:MAX_TOPIC_CHARS],
+                (deflection or "change the subject naturally")[:MAX_LEDGER_ITEM_CHARS],
+            )
+        )
         if len(withheld) >= 10:
             break
 
     return ValidatedUpdate(
         stance=stance,
         stance_rejected_reason=reason,
-        affect=(proposal.affect or "").strip() or None,
-        appraisal=(proposal.appraisal or "").strip() or None,
-        register=(proposal.voice_register or "").strip() or None,
+        affect=_capped(proposal.affect, MAX_STATE_FIELD_CHARS),
+        appraisal=_capped(proposal.appraisal, MAX_APPRAISAL_CHARS),
+        register=_capped(proposal.voice_register, MAX_STATE_FIELD_CHARS),
         speech_fragments=(
             _clean(
                 proposal.speech_fragments,
@@ -295,10 +347,14 @@ def validate(proposal: ProposedUpdate, memory: ClientWorkingMemory) -> Validated
             )
             or None
         ),
-        disclosed=_clean(proposal.disclosed, limit=20),
+        disclosed=_clean(proposal.disclosed, limit=20, max_chars=MAX_LEDGER_ITEM_CHARS),
         withheld=withheld,
-        opened_threads=_clean(proposal.opened_threads, limit=10),
-        closed_threads=_clean(proposal.closed_threads, limit=10),
-        retrieve_cues=_clean(proposal.retrieve_cues, limit=8),
+        opened_threads=_clean(
+            proposal.opened_threads, limit=10, max_chars=MAX_TOPIC_CHARS
+        ),
+        closed_threads=_clean(
+            proposal.closed_threads, limit=10, max_chars=MAX_TOPIC_CHARS
+        ),
+        retrieve_cues=_clean(proposal.retrieve_cues, limit=8, max_chars=MAX_CUE_CHARS),
         events=sorted(kinds),
     )

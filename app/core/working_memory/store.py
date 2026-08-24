@@ -35,6 +35,7 @@ from typing import Iterable, List, Optional
 
 from app.core.logger import get_logger
 from app.core.working_memory.state import (
+    STANCES,
     ClientWorkingMemory,
     Fact,
     Stance,
@@ -136,6 +137,29 @@ class ClientWorkingMemoryStore:
                 st.stance = stance
                 st.turns_in_stance = 0
                 st.stance_path.append(stance)
+                # Reaching `disclosing` unlocks what was being withheld.
+                #
+                # Without this the ledger's three states had only one reachable
+                # one: nothing anywhere set "unlocked", so a topic stayed locked
+                # for the entire session however well the counsellor did, and
+                # the actor deflected it forever. That is the uniform-
+                # responsiveness failure this whole design exists to fix,
+                # reintroduced inside the ledger — and it made render.py's
+                # "you could let this come out now" branch dead code.
+                #
+                # Code decides it, not the LLM, and the rule is the ladder's own
+                # definition rather than a threshold I picked: `disclosing` MEANS
+                # the client says the thing they had been holding back.
+                if _rung(stance) >= _rung("disclosing"):
+                    for item in st.withheld:
+                        if item.status == "locked":
+                            item.status = "unlocked"
+                            logger.info(
+                                "[working-memory] withheld topic unlocked at "
+                                "stance=%s: %s",
+                                stance,
+                                item.topic,
+                            )
 
             if affect is not None:
                 st.affect = affect
@@ -157,9 +181,17 @@ class ClientWorkingMemoryStore:
                 for thread in opened_threads:
                     if not any(same_fact(t.topic, thread.topic) for t in st.unresolved):
                         st.unresolved.append(thread)
+            # Closing matches the SAME way opening does. It did not, and the
+            # asymmetry was silently fatal: opening folded near-duplicates while
+            # closing required an exact string, so a thread opened as
+            # "brother's visits" could never be closed by "the brother's visits"
+            # and stayed open for the rest of the session. Threads then only
+            # ever accumulate, `reflecting` becomes permanently unreachable
+            # through the Zeigarnik gate, and the actor is told it is still
+            # carrying things it has finished.
             for topic in closed_topics:
                 for thread in st.unresolved:
-                    if thread.topic == topic and thread.is_open:
+                    if thread.is_open and same_fact(thread.topic, topic):
                         thread.closed_turn = update_turn_index
 
             if withheld is not None:
@@ -168,8 +200,23 @@ class ClientWorkingMemoryStore:
                         st.withheld.append(item)
             for topic in revealed_topics:
                 for item in st.withheld:
-                    if item.topic == topic and item.status == "unlocked":
+                    if item.status == "unlocked" and same_fact(item.topic, topic):
                         item.status = "revealed"
+
+            # A topic the client has now actually SAID is revealed, derived from
+            # the disclosure ledger rather than asserted by the model. Nothing
+            # passed `revealed_topics`, so this transition was unreachable too —
+            # and it needs no new LLM field, because "the client said it" is
+            # exactly what `disclosed` already records.
+            for item in st.withheld:
+                if item.status != "unlocked":
+                    continue
+                if any(same_fact(f.text, item.topic) for f in st.disclosed):
+                    item.status = "revealed"
+                    logger.info(
+                        "[working-memory] withheld topic revealed by " "disclosure: %s",
+                        item.topic,
+                    )
 
             if salient_backstory is not None:
                 st.salient_backstory = list(salient_backstory)
@@ -234,6 +281,14 @@ _SAME_FACT_JACCARD = 0.45
 #: Two shared content words minimum, so a pair of short unrelated facts cannot
 #: merge on one incidental token.
 _SAME_FACT_MIN_SHARED = 2
+
+
+def _rung(stance: str) -> int:
+    """Position on the stance ladder; -1 for anything not on it."""
+    try:
+        return list(STANCES).index(stance)
+    except ValueError:
+        return -1
 
 
 def _content_words(text: str) -> set:

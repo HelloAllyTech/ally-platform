@@ -15,6 +15,11 @@ output.
 
 from app.core.working_memory import ClientWorkingMemory, Thread
 from app.core.working_memory.proposal import (
+    MAX_APPRAISAL_CHARS,
+    MAX_CUE_CHARS,
+    MAX_LEDGER_ITEM_CHARS,
+    MAX_STATE_FIELD_CHARS,
+    MAX_TOPIC_CHARS,
     MIN_TURNS_BEFORE_ADVANCE,
     STANCE_ORDER,
     ObservedEvent,
@@ -32,6 +37,20 @@ def _memory(stance="guarded", turns_in_stance=5, **kw):
 
 
 def _proposal(**kw):
+    """A proposal with evidenced events, which is what the model actually sends.
+
+    Evidence is attached by default because an unevidenced event can no longer
+    earn anything, and a helper that omitted it would make every earning test
+    pass for the wrong reason. Use `_unevidenced` for the fabrication case.
+    """
+    events = [
+        ObservedEvent(kind=k, evidence=f"quoted span for {k}")
+        for k in kw.pop("event_kinds", [])
+    ]
+    return ProposedUpdate(events=events, **kw)
+
+
+def _unevidenced(**kw):
     events = [ObservedEvent(kind=k) for k in kw.pop("event_kinds", [])]
     return ProposedUpdate(events=events, **kw)
 
@@ -324,3 +343,101 @@ def test_the_cap_counts_kept_pairs_not_raw_positions():
     )
     assert len(out.withheld) == 10
     assert out.withheld[9] == ("topic 9", "deflection 9")
+
+
+# ---------------------------------------------------------------------------
+# Evidence is required to EARN, not merely requested
+# ---------------------------------------------------------------------------
+
+
+def test_an_unevidenced_event_cannot_earn_a_transition():
+    # The prompt demands a quoted span per event, but nothing read `evidence`,
+    # so `kind` alone advanced a stance — the strongest anti-fabrication rule in
+    # the prompt, unenforced in the module whose whole job is enforcing it.
+    out = validate(
+        _unevidenced(stance="testing", event_kinds=["repair"]), _memory("guarded")
+    )
+    assert out.stance is None
+    assert "earned, not asserted" in out.stance_rejected_reason
+    assert out.events == []
+
+
+def test_a_blank_evidence_string_counts_as_none():
+    out = validate(
+        ProposedUpdate(
+            stance="testing", events=[ObservedEvent(kind="repair", evidence="   ")]
+        ),
+        _memory("guarded"),
+    )
+    assert out.stance is None
+
+
+def test_evidenced_and_unevidenced_events_are_separated():
+    # One good event should still count when it arrives beside a bare claim.
+    out = validate(
+        ProposedUpdate(
+            stance="testing",
+            events=[
+                ObservedEvent(kind="repair", evidence="I'm sorry, I misread that"),
+                ObservedEvent(kind="rupture"),
+            ],
+        ),
+        _memory("guarded"),
+    )
+    assert out.events == ["repair"]
+    assert out.stance == "testing"
+
+
+def test_an_unevidenced_rupture_cannot_force_a_collapse():
+    # Regression needs no advancing event, so an unevidenced `rupture` was a
+    # free two-rung drop.
+    out = validate(
+        _unevidenced(stance="guarded", event_kinds=["rupture"]),
+        _memory("reflecting"),
+    )
+    assert out.stance is None
+    assert "more than one rung without a rupture" in out.stance_rejected_reason
+
+
+# ---------------------------------------------------------------------------
+# Free-text fields are bounded — this block is in every turn's prompt
+# ---------------------------------------------------------------------------
+
+
+def test_state_fields_are_capped():
+    out = validate(
+        _proposal(affect="x" * 500, voice_register="y" * 500, appraisal="z" * 900),
+        _memory(),
+    )
+    assert len(out.affect) == MAX_STATE_FIELD_CHARS
+    assert len(out.register) == MAX_STATE_FIELD_CHARS
+    assert len(out.appraisal) == MAX_APPRAISAL_CHARS
+
+
+def test_ledger_items_are_capped():
+    out = validate(
+        _proposal(
+            disclosed=["d" * 400],
+            opened_threads=["t" * 400],
+            retrieve_cues=["c" * 400],
+            withheld_topics=["w" * 400],
+            withheld_deflections=["f" * 400],
+        ),
+        _memory(),
+    )
+    assert len(out.disclosed[0]) == MAX_LEDGER_ITEM_CHARS
+    assert len(out.opened_threads[0]) == MAX_TOPIC_CHARS
+    assert len(out.retrieve_cues[0]) == MAX_CUE_CHARS
+    assert len(out.withheld[0][0]) == MAX_TOPIC_CHARS
+    assert len(out.withheld[0][1]) == MAX_LEDGER_ITEM_CHARS
+
+
+def test_normal_length_values_are_untouched():
+    # The caps must never clip real output: measured ranges were affect 8-31
+    # chars and register 4-19.
+    out = validate(
+        _proposal(affect="anxious but slightly relieved", voice_register="clipped"),
+        _memory(),
+    )
+    assert out.affect == "anxious but slightly relieved"
+    assert out.register == "clipped"
