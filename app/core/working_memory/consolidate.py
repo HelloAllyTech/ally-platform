@@ -53,6 +53,11 @@ _TEMPLATE_PATH = "system/client_working_memory_updater"
 #: already committed, which is how a stance starts drifting on re-reads.
 DEFAULT_WINDOW_TURNS = 6
 
+#: Disclosures shown to the UPDATER. Smaller than the actor's render cap: the
+#: actor must avoid repeating itself, while the updater only needs to avoid
+#: re-reporting, and it also sees the raw turns.
+_DIGEST_DISCLOSURES = 10
+
 
 def _digest(memory: ClientWorkingMemory) -> str:
     """The current state, as the updater needs to see it.
@@ -70,9 +75,22 @@ def _digest(memory: ClientWorkingMemory) -> str:
         f"voice_register: {memory.register or '(unset)'}",
     ]
     if memory.disclosed:
-        lines.append(
-            "already disclosed: " + "; ".join(f.text for f in memory.disclosed)
+        # Bounded for the same reason the rendered block is: the first v2v run
+        # showed this ledger reaching 21 items in ten exchanges, and it is sent
+        # to the updater on EVERY turn as well as to the actor. That double
+        # charge is why client_working_memory outspent agent_turn on prompt
+        # tokens in that run (18,629 vs 18,431).
+        #
+        # The updater needs enough not to re-report what it already reported,
+        # which the recent tail gives it — the rolling summary carries the rest.
+        recent = memory.disclosed[-_DIGEST_DISCLOSURES:]
+        omitted = len(memory.disclosed) - len(recent)
+        prefix = (
+            f"already disclosed (most recent of {len(memory.disclosed)})"
+            if omitted
+            else "already disclosed"
         )
+        lines.append(prefix + ": " + "; ".join(f.text for f in recent))
     open_threads = [t.topic for t in memory.open_threads]
     if open_threads:
         lines.append("open threads: " + "; ".join(open_threads))

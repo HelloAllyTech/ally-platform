@@ -56,6 +56,21 @@ _TEMPLATE = "system/client_working_memory"
 _NO_WITHHELD = "(nothing you are holding back right now)"
 _NO_UNRESOLVED = "(nothing left hanging)"
 _NO_DISCLOSED = "(you have not told them anything yet)"
+
+#: How many disclosures the block RENDERS. The store keeps every one — the
+#: write-out needs them all — but the prompt shows only the most recent.
+#:
+#: Measured, not guessed: the first v2v run ended a 10-exchange session with 21
+#: disclosures, and the block had grown 1221 -> 2777 chars. That cost lands
+#: twice, because the same ledger goes into the updater's digest, and the run's
+#: numbers show it plainly — client_working_memory spent 18,629 prompt tokens
+#: against agent_turn's 18,431, so the feature cost slightly MORE than the
+#: conversation it serves. A 30-turn session would have been far worse.
+#:
+#: Most-recent rather than most-salient: this section exists to stop the actor
+#: re-introducing something as new, and what it is most likely to repeat is what
+#: it just said.
+MAX_RENDERED_DISCLOSURES = 12
 _NO_SALIENT = "(nothing from your own life is on your mind this turn)"
 _NO_FRAGMENTS = "(you have not spoken yet — this is your first reply)"
 _NO_STATE_GUIDANCE = "(no particular direction for this stage)"
@@ -98,8 +113,13 @@ def _render_unresolved(threads: Sequence[Thread]) -> str:
     return _bullets(lines, _NO_UNRESOLVED)
 
 
-def _render_facts(facts: Sequence[Fact], empty: str) -> str:
-    return _bullets([f.text for f in facts], empty)
+def _render_facts(facts: Sequence[Fact], empty: str, limit: int = 0) -> str:
+    texts = [f.text for f in facts]
+    if limit and len(texts) > limit:
+        # Tail, not head: the oldest disclosures are the ones the rolling
+        # summary already covers, and the newest are what the actor might repeat.
+        texts = texts[-limit:]
+    return _bullets(texts, empty)
 
 
 def render_block(
@@ -138,7 +158,9 @@ def render_block(
         speech_fragments=_bullets(memory.speech_fragments, _NO_FRAGMENTS),
         withheld_section=_render_withheld(memory.withheld),
         unresolved_section=_render_unresolved(memory.unresolved),
-        disclosed_section=_render_facts(memory.disclosed, _NO_DISCLOSED),
+        disclosed_section=_render_facts(
+            memory.disclosed, _NO_DISCLOSED, MAX_RENDERED_DISCLOSURES
+        ),
         salient_section=_render_facts(memory.salient_backstory, _NO_SALIENT),
     ).strip()
 

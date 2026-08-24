@@ -84,6 +84,16 @@ _PHASE_BONUS_PER_STANCE = 0.35
 #: discussed has to outrank standing importance.
 _CUE_MATCH_WEIGHT = 2.5
 
+#: Ceiling on counted cue hits.
+#:
+#: Needed once cues are tokenized: one sentence-cue becomes ~10 token-cues, so
+#: an unbounded count would let a VERBOSE counsellor turn dominate the ranking
+#: purely by word volume, and _CUE_MATCH_WEIGHT was justified against §7.3's
+#: encoding ceiling assuming hits of 0 or 1. Three keeps a clear preference for
+#: the strongly-cued fact (8.5x) while making the tail independent of how much
+#: the counsellor happened to say.
+_MAX_CUE_HITS = 3
+
 #: Bower. State biases accessibility: a guarded client should not have warm
 #: memories equally available. Operationalised as "this fact was laid down in
 #: the stance we are now in" rather than by inventing a valence lexicon, which
@@ -213,7 +223,7 @@ def score_fact(
         max(fact.encoding_strength, 0.0)
         * _recency_decay(fact, turn_index)
         * (1.0 + _PHASE_BONUS_PER_STANCE * distinct_stances)
-        * (1.0 + _CUE_MATCH_WEIGHT * cue_hits)
+        * (1.0 + _CUE_MATCH_WEIGHT * min(cue_hits, _MAX_CUE_HITS))
         * (1.0 + _SEMANTIC_WEIGHT * max(similarity, 0.0))
         * (1.0 + (_MOOD_CONGRUENT_BONUS if mood_congruent else 0.0))
     )
@@ -250,14 +260,42 @@ def select(
     if not candidates:
         return [], []
 
-    cue_set = {
-        c.strip().lower()
-        for c in cues
-        if c and len(c.strip()) >= _MIN_MATCHABLE_CUE_LEN
-    }
+    # Cues are TOKENIZED before matching, because `_stem_match_count` compares
+    # each cue against single words and the updater emits whole sentences —
+    # "how do you feel about taking that first step?" as one cue. Measured in
+    # the first v2v run: cue_hits was 0 on every turn, or an accidental 1 from
+    # prefix matching, so recall selected five facts by encoding strength and
+    # decay while appearing to respond to the conversation. Tokenizing takes the
+    # panic-episodes fact from 0 hits to 3 on a "panic episodes / cope" cue.
+    cue_set: set[str] = set()
+    for cue in cues:
+        text = (cue or "").strip()
+        if len(text) < _MIN_MATCHABLE_CUE_LEN:
+            continue
+        # `_tokens` (unfiltered) with the MATCHING floor, not `_keywords` — which
+        # applies a 4-char minimum meant for DERIVING cues from prose and would
+        # silently drop "job", "mom", "HR". That is the same distinction the
+        # _keywords/_tokens split was introduced for, and using the wrong one
+        # here made short cues unmatchable all over again.
+        cue_set |= {w for w in _tokens(text) if len(w) >= _MIN_MATCHABLE_CUE_LEN}
     if not cue_set:
         # Tier 2 — no nomination, so read the learner's own words as the cue.
         cue_set = _keywords(last_learner_text)
+
+    # Drop cue tokens that match most of the pool: a word appearing in half the
+    # facts cannot discriminate between them, so counting it as a hit is noise
+    # dressed as signal. Document frequency rather than a stopword list, because
+    # a stopword list would be English-only and this runs in nine languages.
+    if cue_set and candidates:
+        cutoff = max(1, len(candidates) // 2)
+        discriminating = {
+            cue
+            for cue in cue_set
+            if sum(1 for f in candidates if _stem_match_count(_tokens(f.text), {cue}))
+            <= cutoff
+        }
+        if discriminating:
+            cue_set = discriminating
 
     sims: Dict[str, float] = {}
     if vectors and query_vec:

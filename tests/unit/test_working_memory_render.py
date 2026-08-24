@@ -10,7 +10,7 @@ of constraint rather than as an absence of data.
 
 import app.core.graph.nodes  # noqa: F401  (settles a pre-existing import cycle)
 from app.core.working_memory import ClientWorkingMemory, Fact, Thread, WithheldTopic
-from app.core.working_memory.render import render_block
+from app.core.working_memory.render import MAX_RENDERED_DISCLOSURES, render_block
 
 
 def _memory(**kw) -> ClientWorkingMemory:
@@ -151,3 +151,41 @@ def test_blank_fragments_are_dropped_rather_than_bulleted():
     block = render_block(_memory(speech_fragments=["  ", "", "I guess"]))
     assert block.count("- ") >= 1
     assert "-  \n" not in block
+
+
+# ---------------------------------------------------------------------------
+# The disclosure ledger is bounded in the PROMPT, unbounded in the store
+# ---------------------------------------------------------------------------
+
+
+def test_the_rendered_ledger_is_capped():
+    # The first v2v run reached 21 disclosures in ten exchanges and the block
+    # grew to 2777 chars. That cost lands twice — actor prompt and updater
+    # digest — and client_working_memory outspent agent_turn on prompt tokens
+    # in that run as a result.
+    memory = ClientWorkingMemory(
+        affect="tired",
+        disclosed=[Fact(text=f"disclosure {i}") for i in range(25)],
+    )
+    block = render_block(memory)
+    assert block.count("disclosure ") == MAX_RENDERED_DISCLOSURES
+
+
+def test_the_cap_keeps_the_most_recent():
+    # Most-recent, not most-salient: this section exists to stop the actor
+    # re-introducing something as new, and what it might repeat is what it just
+    # said. The oldest are already covered by the rolling summary.
+    memory = ClientWorkingMemory(
+        affect="tired",
+        disclosed=[Fact(text=f"disclosure {i}") for i in range(25)],
+    )
+    block = render_block(memory)
+    assert "disclosure 24" in block
+    assert "disclosure 0" not in block
+
+
+def test_a_short_ledger_is_rendered_whole():
+    memory = ClientWorkingMemory(
+        affect="tired", disclosed=[Fact(text="lost the job in March")]
+    )
+    assert "lost the job in March" in render_block(memory)
