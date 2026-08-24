@@ -37,6 +37,7 @@ from typing import Dict, Iterable, List, Optional, Sequence
 
 from app.core.logger import get_logger
 from app.core.working_memory.state import SALIENT_BACKSTORY_CAP, Fact
+from app.core.working_memory.text import content_words, tokens
 
 logger = get_logger(__name__)
 
@@ -135,23 +136,15 @@ class ScoredFact:
 
 
 def _keywords(text: Optional[str]) -> set[str]:
-    """Cues DERIVED from prose — length-filtered to drop function words."""
-    if not text:
-        return set()
-    return {w.lower() for w in _WORD_RE.findall(text) if len(w) >= _MIN_CUE_LEN}
+    """Content words, for DERIVING cues. See working_memory/text.py."""
+    return content_words(text)
 
 
 def _tokens(text: Optional[str]) -> set[str]:
-    """Every word of a candidate, UNFILTERED.
-
-    Deliberately not `_keywords`. That filter exists to stop function words
-    becoming cues; applying it to the thing being matched instead made a short
-    nominated cue unmatchable — "job" could never match "lost the job", because
-    the fact's own three-letter word had been dropped before comparison.
+    """Every word, for MATCHING. Unfiltered on purpose — a short cue like "job"
+    must still be matchable even though it is too short to be derived AS a cue.
     """
-    if not text:
-        return set()
-    return {w.lower() for w in _WORD_RE.findall(text)}
+    return tokens(text)
 
 
 def _stem_match_count(candidate_words: set[str], cues: set[str]) -> int:

@@ -34,6 +34,7 @@ from langchain_core.messages import BaseMessage
 
 from app.core.logger import get_logger
 from app.core.working_memory.state import ClientWorkingMemory
+from app.core.working_memory.text import content_words
 
 logger = get_logger(__name__)
 
@@ -54,10 +55,6 @@ _GROUNDING_THRESHOLD = 0.6
 _MIN_WORD_LEN = 4
 
 
-def _content_words(text: str) -> set[str]:
-    return {w.lower() for w in _WORD_RE.findall(text or "") if len(w) >= _MIN_WORD_LEN}
-
-
 def _transcript_words(messages: Sequence[BaseMessage]) -> set[str]:
     """Every content word spoken by anyone, both sides.
 
@@ -70,7 +67,7 @@ def _transcript_words(messages: Sequence[BaseMessage]) -> set[str]:
     for message in messages:
         content = getattr(message, "content", None)
         if isinstance(content, str):
-            words |= _content_words(content)
+            words |= content_words(content)
     return words
 
 
@@ -92,7 +89,7 @@ def check_grounding(
     grounded: List[str] = []
     ungrounded: List[str] = []
     for text in texts:
-        words = _content_words(text)
+        words = content_words(text)
         if not words:
             continue
         overlap = len(words & spoken) / len(words)

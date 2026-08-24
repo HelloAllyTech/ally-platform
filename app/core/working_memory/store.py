@@ -42,6 +42,7 @@ from app.core.working_memory.state import (
     Thread,
     WithheldTopic,
 )
+from app.core.working_memory.text import content_words
 
 logger = get_logger(__name__)
 
@@ -291,10 +292,6 @@ def _rung(stance: str) -> int:
         return -1
 
 
-def _content_words(text: str) -> set:
-    return {w.lower() for w in _WORD_RE.findall(text or "") if len(w) >= _MIN_WORD_LEN}
-
-
 def same_fact(a: str, b: str) -> bool:
     """Are these two phrasings of the same fact?
 
@@ -304,7 +301,7 @@ def same_fact(a: str, b: str) -> bool:
     """
     if a == b:
         return True
-    wa, wb = _content_words(a), _content_words(b)
+    wa, wb = content_words(a), content_words(b)
     if not wa or not wb:
         return False
     shared = wa & wb
