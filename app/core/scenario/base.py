@@ -310,18 +310,26 @@ class PromptData(BaseModel):
             "settings.HISTORY_TRIM_* and app/core/graph/nodes.py."
         ),
     )
+    # EXPERIMENT(turn-endpointing) — TEMPORARY, remove once a good global pair
+    # is found and promoted to settings.TURN_MIN/MAX_ENDPOINTING_DELAY. Grep the
+    # marker to find every touchpoint across ally-web / ally-be / ally-ai-learn.
+    turn_min_endpointing_delay: Optional[float] = Field(
+        default=None,
+        description=(
+            "Per-simulation override (seconds) for settings."
+            "TURN_MIN_ENDPOINTING_DELAY — the fast path taken when the EOU model "
+            "is confident the learner finished. None uses the global. Only "
+            "applied when SEMANTIC_TURN_DETECTION_ENABLED and the pair is valid "
+            "(0 < min < max); see app/worker.py:_resolve_turn_detection."
+        ),
+    )
     turn_max_endpointing_delay: Optional[float] = Field(
         default=None,
         description=(
             "Per-simulation override (seconds) for settings."
-            "TURN_MAX_ENDPOINTING_DELAY — how long semantic turn-detection will "
-            "wait for a learner who seems mid-thought before giving up and "
-            "replying anyway. None (default) uses the global setting. Lower = "
-            "faster replies but more risk of interrupting; higher = fewer "
-            "interruptions but more perceived dead air. Only takes effect when "
-            "settings.SEMANTIC_TURN_DETECTION_ENABLED and settings."
-            "TURN_ENDPOINTING_SCENARIO_OVERRIDE_ENABLED are both True. See "
-            "app/worker.py:_resolve_turn_detection."
+            "TURN_MAX_ENDPOINTING_DELAY — how long turn detection waits for a "
+            "learner who seems mid-thought before replying anyway. None uses the "
+            "global. Same gating as turn_min_endpointing_delay."
         ),
     )
     selected_main_prompt_code: Optional[str] = Field(
@@ -754,6 +762,20 @@ class Scenario(BaseModel):
                 ),
                 "history_trim_enabled": bool(
                     prompt_data_dict.get("historyTrimEnabled") or False
+                ),
+                # EXPERIMENT(turn-endpointing) — PromptData is built from this
+                # hand-maintained dict, NOT a generic camelCase->snake_case
+                # conversion. Omitting these two lines is exactly how the
+                # previous attempt shipped inert; tests/unit/scenario guards it.
+                "turn_min_endpointing_delay": (
+                    prompt_data_dict.get("turnMinEndpointingDelay")
+                    if prompt_data_dict.get("turnMinEndpointingDelay") is not None
+                    else prompt_data_dict.get("turn_min_endpointing_delay")
+                ),
+                "turn_max_endpointing_delay": (
+                    prompt_data_dict.get("turnMaxEndpointingDelay")
+                    if prompt_data_dict.get("turnMaxEndpointingDelay") is not None
+                    else prompt_data_dict.get("turn_max_endpointing_delay")
                 ),
                 "selected_main_prompt_code": prompt_data_dict.get(
                     "selectedMainPromptCode"

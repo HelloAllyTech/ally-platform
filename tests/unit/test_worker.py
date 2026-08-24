@@ -254,7 +254,10 @@ class TestWorker:
         assert isinstance(td, FakeMultilingualModel)
         assert "eou_load_ms" in w._timing
 
-    def test_resolve_turn_detection_scenario_override_used(self, monkeypatch):
+    # ---- EXPERIMENT(turn-endpointing): per-sim pair, remove with the feature ----
+
+    def _eou_worker(self, monkeypatch, scenario=None):
+        """Bare worker with a faked EOU model and known globals (0.5 / 3.0)."""
         import livekit.plugins.turn_detector.multilingual as ml
 
         class FakeMultilingualModel:
@@ -266,50 +269,79 @@ class TestWorker:
             worker.settings, "SEMANTIC_TURN_DETECTION_ENABLED", True, raising=False
         )
         monkeypatch.setattr(
-            worker.settings, "TURN_MAX_ENDPOINTING_DELAY", 3.0, raising=False
+            worker.settings, "TURN_MIN_ENDPOINTING_DELAY", 0.5, raising=False
         )
         monkeypatch.setattr(
-            worker.settings,
-            "TURN_ENDPOINTING_SCENARIO_OVERRIDE_ENABLED",
-            True,
-            raising=False,
+            worker.settings, "TURN_MAX_ENDPOINTING_DELAY", 3.0, raising=False
         )
         w = self._bare_worker()
-        w.scenario = types.SimpleNamespace(
-            prompt_data=types.SimpleNamespace(turn_max_endpointing_delay=1.2)
-        )
-        td, kwargs = w._resolve_turn_detection("VAD")
-        assert kwargs["max_endpointing_delay"] == 1.2
+        if scenario is not None:
+            w.scenario = scenario
+        return w
 
-    def test_resolve_turn_detection_scenario_override_disabled_by_global_flag(
+    @staticmethod
+    def _scenario(**prompt_data):
+        return types.SimpleNamespace(prompt_data=types.SimpleNamespace(**prompt_data))
+
+    def test_resolve_turn_detection_applies_scenario_pair(self, monkeypatch):
+        w = self._eou_worker(
+            monkeypatch,
+            self._scenario(
+                turn_min_endpointing_delay=0.3,
+                turn_max_endpointing_delay=1.8,
+            ),
+        )
+        _td, kwargs = w._resolve_turn_detection("VAD")
+        assert kwargs == {
+            "min_endpointing_delay": 0.3,
+            "max_endpointing_delay": 1.8,
+        }
+
+    @pytest.mark.parametrize(
+        "sim_min,sim_max",
+        [
+            (2.0, 0.5),  # inverted
+            (1.0, 1.0),  # equal — no room for the model to modulate
+            (0.0, 1.5),  # zero floor
+            (-0.2, 1.5),  # negative floor
+            (0.3, None),  # half-configured
+            (None, 1.8),  # half-configured
+            ("fast", 1.8),  # non-numeric
+        ],
+    )
+    def test_resolve_turn_detection_rejects_bad_pair(
+        self, monkeypatch, sim_min, sim_max
+    ):
+        """A nonsensical or half-configured pair leaves BOTH globals in place —
+        never one tuned bound mixed with one default."""
+        w = self._eou_worker(
+            monkeypatch,
+            self._scenario(
+                turn_min_endpointing_delay=sim_min,
+                turn_max_endpointing_delay=sim_max,
+            ),
+        )
+        _td, kwargs = w._resolve_turn_detection("VAD")
+        assert kwargs == {
+            "min_endpointing_delay": 0.5,
+            "max_endpointing_delay": 3.0,
+        }
+
+    def test_resolve_turn_detection_scenario_without_pair_uses_globals(
         self, monkeypatch
     ):
-        import livekit.plugins.turn_detector.multilingual as ml
-
-        class FakeMultilingualModel:
-            def __init__(self):
-                pass
-
-        monkeypatch.setattr(ml, "MultilingualModel", FakeMultilingualModel)
-        monkeypatch.setattr(
-            worker.settings, "SEMANTIC_TURN_DETECTION_ENABLED", True, raising=False
+        w = self._eou_worker(
+            monkeypatch,
+            self._scenario(
+                turn_min_endpointing_delay=None,
+                turn_max_endpointing_delay=None,
+            ),
         )
-        monkeypatch.setattr(
-            worker.settings, "TURN_MAX_ENDPOINTING_DELAY", 3.0, raising=False
-        )
-        monkeypatch.setattr(
-            worker.settings,
-            "TURN_ENDPOINTING_SCENARIO_OVERRIDE_ENABLED",
-            False,
-            raising=False,
-        )
-        w = self._bare_worker()
-        w.scenario = types.SimpleNamespace(
-            prompt_data=types.SimpleNamespace(turn_max_endpointing_delay=1.2)
-        )
-        td, kwargs = w._resolve_turn_detection("VAD")
-        # Global flag off -> scenario override ignored, global value used.
-        assert kwargs["max_endpointing_delay"] == 3.0
+        _td, kwargs = w._resolve_turn_detection("VAD")
+        assert kwargs == {
+            "min_endpointing_delay": 0.5,
+            "max_endpointing_delay": 3.0,
+        }
 
     def test_resolve_turn_detection_no_scenario_uses_global(self, monkeypatch):
         import livekit.plugins.turn_detector.multilingual as ml
