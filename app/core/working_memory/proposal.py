@@ -188,10 +188,25 @@ def decide_stance(
 
     if there < here:
         if "rupture" in event_kinds:
+            # Instant, and deliberately ungated: a client who feels judged
+            # closes up NOW, and making them wait would be the same
+            # uniform-responsiveness failure §1 measures.
             return proposed, None  # type: ignore[return-value]
-        # A regression with no rupture is still allowed, but only one rung: the
-        # client drifting shut is plausible; collapsing to guarded is not.
         if here - there == 1:
+            # A drift shut with no rupture must not happen on the turn straight
+            # after arriving. Observed in the second v2v run: the ladder went
+            # disclosing -> opening with no rupture, then the attempt back up was
+            # refused for pacing — so an eventless drop cost nothing but took two
+            # turns to undo, and the durable write-out recorded a bounce
+            # (...opening, disclosing, opening, disclosing) that misrepresents
+            # what happened. MIN_TURNS_BEFORE_ADVANCE guarded oscillation on the
+            # way up only; this is the same guard on the way down, one turn
+            # rather than two because retreating IS more responsive than opening.
+            if memory.turns_in_stance < 1:
+                return None, (
+                    f"arrived in {memory.stance} this turn; an eventless drift "
+                    "shut needs at least one turn there"
+                )
             return proposed, None  # type: ignore[return-value]
         return None, "regression of more than one rung without a rupture"
 
@@ -247,8 +262,14 @@ def _clean(values: List[str], *, limit: int, max_chars: int = 0) -> List[str]:
         text = (value or "").strip()
         if not text:
             continue
-        if max_chars:
+        if max_chars and len(text) > max_chars:
+            # Cut at a word boundary. A mid-word cut leaves a fragment like
+            # "ove" (seen in the second v2v run), and cue matching is
+            # prefix-based, so that fragment silently matches every "over…"
+            # word in the pool.
             text = text[:max_chars]
+            if " " in text:
+                text = text.rsplit(" ", 1)[0]
         if text not in out:
             out.append(text)
         if len(out) >= limit:

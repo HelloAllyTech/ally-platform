@@ -168,8 +168,31 @@ def test_a_rupture_closes_the_client_up_at_once():
 
 
 def test_drifting_shut_one_rung_needs_no_event():
-    out = validate(_proposal(stance="testing"), _memory("opening", turns_in_stance=0))
+    # Still no EVENT required — just a turn actually spent in the stance.
+    out = validate(_proposal(stance="testing"), _memory("opening", turns_in_stance=1))
     assert out.stance == "testing"
+
+
+def test_an_eventless_drift_cannot_happen_the_turn_it_arrives():
+    # The second v2v run went disclosing -> opening with no rupture, then had
+    # the way back up refused for pacing: an eventless drop cost nothing but
+    # took two turns to undo, and the write-out recorded a bounce that
+    # misrepresented the session.
+    out = validate(
+        _proposal(stance="opening"), _memory("disclosing", turns_in_stance=0)
+    )
+    assert out.stance is None
+    assert "at least one turn" in out.stance_rejected_reason
+
+
+def test_a_rupture_still_drops_instantly_on_arrival():
+    # The gate above must not slow a real rupture down. A client who feels
+    # judged closes up NOW, whenever it happens.
+    out = validate(
+        _proposal(stance="opening", event_kinds=["rupture"]),
+        _memory("disclosing", turns_in_stance=0),
+    )
+    assert out.stance == "opening"
 
 
 def test_collapsing_several_rungs_needs_a_rupture():

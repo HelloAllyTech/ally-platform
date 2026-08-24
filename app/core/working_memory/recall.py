@@ -303,16 +303,37 @@ def select(
             f.text: _cosine(query_vec, vectors.get(f.text) or ()) for f in candidates
         }
 
-    scored = [
-        score_fact(
-            f,
-            turn_index=turn_index,
-            cues=cue_set,
-            stance=stance,
-            similarity=sims.get(f.text, 0.0),
-        )
-        for f in candidates
-    ]
+    def _score_all(active_cues: set) -> List[ScoredFact]:
+        return [
+            score_fact(
+                f,
+                turn_index=turn_index,
+                cues=active_cues,
+                stance=stance,
+                similarity=sims.get(f.text, 0.0),
+            )
+            for f in candidates
+        ]
+
+    scored = _score_all(cue_set)
+
+    # Tier 2, widened. The fallback fired only when the updater nominated
+    # NOTHING, but it also emits cue sets made entirely of function words —
+    # "bit, feel, might, what, you" — which match a third-person profile not at
+    # all. Observed twice in the second v2v run: cue_hits=0 with cues present,
+    # so recall silently stopped responding to the conversation while looking
+    # like it was. A cue set that matches nothing is as useless as no cue set.
+    if last_learner_text and not any(s.cue_hits for s in scored):
+        fallback = _keywords(last_learner_text) - cue_set
+        if fallback:
+            rescored = _score_all(cue_set | fallback)
+            if any(s.cue_hits for s in rescored):
+                logger.debug(
+                    "[working-memory] nominated cues matched nothing; falling "
+                    "back to the learner's own words"
+                )
+                cue_set = cue_set | fallback
+                scored = rescored
 
     # Spreading activation: a second pass that can only PROMOTE. Facts sharing
     # vocabulary with something already cued get a bump, so the selection hangs
@@ -324,7 +345,20 @@ def select(
     if primed:
         for s in scored:
             if not s.cue_hits and _stem_match_count(_tokens(s.fact.text), primed):
-                s.score += _SPREADING_ACTIVATION
+                # MULTIPLICATIVE, not a flat add, so the promotion scales the
+                # ordering already established instead of overwriting it: a flat
+                # bonus moves every promoted fact by the same absolute amount,
+                # which compresses real differences between them.
+                #
+                # This is a refinement, NOT a fix for the tie I first blamed it
+                # for. I measured 13 of 16 facts promoted with the 5th and 6th
+                # scores exactly equal, and attributed that to additivity — but
+                # the run had no vectors, so every fact scored exactly 1.0
+                # before the bonus and multiplying identical values changes
+                # nothing. With the semantic term live, as it is in a real
+                # session, the same pool separates cleanly (gap 0.066, five
+                # distinct scores). The tie was in my measurement, not the code.
+                s.score *= 1.0 + _SPREADING_ACTIVATION
                 s.spread = True
 
     # Stable ordering: score desc, then first-seen so a tie is resolved by the
