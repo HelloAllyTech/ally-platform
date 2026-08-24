@@ -78,7 +78,7 @@ class TestConsolidate:
         llm.llm_instance.with_structured_output.assert_not_called()
 
     async def test_empty_template_skips_rather_than_calling(self, monkeypatch):
-        monkeypatch.setattr(mod, "load_template", lambda *a, **k: "")
+        monkeypatch.setattr(mod, "load_and_format", lambda *a, **k: "")
         llm = _llm(ProposedUpdate())
         out = await mod.consolidate(
             memory=ClientWorkingMemory(), new_messages=_turns(), llm_client=llm
@@ -87,7 +87,7 @@ class TestConsolidate:
         llm.llm_instance.with_structured_output.assert_not_called()
 
     async def test_returns_validated_not_proposed(self, monkeypatch):
-        monkeypatch.setattr(mod, "load_template", lambda *a, **k: "SYS")
+        monkeypatch.setattr(mod, "load_and_format", lambda *a, **k: "SYS")
         # The LLM asserts a two-rung jump with no advancing event: exactly the
         # fake-success failure. Validation must strip it.
         llm = _llm(ProposedUpdate(stance="opening", affect="calmer"))
@@ -101,7 +101,7 @@ class TestConsolidate:
         assert out.affect == "calmer"
 
     async def test_earned_advance_survives(self, monkeypatch):
-        monkeypatch.setattr(mod, "load_template", lambda *a, **k: "SYS")
+        monkeypatch.setattr(mod, "load_and_format", lambda *a, **k: "SYS")
         llm = _llm(
             ProposedUpdate(
                 stance="testing",
@@ -116,7 +116,7 @@ class TestConsolidate:
         assert out.stance == "testing"
 
     async def test_parse_failure_raises(self, monkeypatch):
-        monkeypatch.setattr(mod, "load_template", lambda *a, **k: "SYS")
+        monkeypatch.setattr(mod, "load_and_format", lambda *a, **k: "SYS")
         structured = AsyncMock()
         structured.ainvoke = AsyncMock(
             return_value={"parsed": None, "raw": None, "parsing_error": "bad json"}
@@ -131,7 +131,7 @@ class TestConsolidate:
             )
 
     async def test_tolerates_provider_ignoring_include_raw(self, monkeypatch):
-        monkeypatch.setattr(mod, "load_template", lambda *a, **k: "SYS")
+        monkeypatch.setattr(mod, "load_and_format", lambda *a, **k: "SYS")
         structured = AsyncMock()
         structured.ainvoke = AsyncMock(return_value=ProposedUpdate(affect="tired"))
         llm_instance = MagicMock()
@@ -185,7 +185,7 @@ class TestScheduleUpdate:
         )
 
     async def test_commits_under_the_snapshot_turn(self, monkeypatch):
-        monkeypatch.setattr(mod, "load_template", lambda *a, **k: "SYS")
+        monkeypatch.setattr(mod, "load_and_format", lambda *a, **k: "SYS")
         store = ClientWorkingMemoryStore()
         llm = _llm(ProposedUpdate(affect="wary", disclosed=["a thing"]))
         assert mod.schedule_update(store, **self._args(llm))
@@ -197,7 +197,7 @@ class TestScheduleUpdate:
         assert state.disclosed[0].first_seen_turn == 4
 
     async def test_skips_when_already_in_flight(self, monkeypatch):
-        monkeypatch.setattr(mod, "load_template", lambda *a, **k: "SYS")
+        monkeypatch.setattr(mod, "load_and_format", lambda *a, **k: "SYS")
         store = ClientWorkingMemoryStore()
 
         async def _slow():
@@ -210,7 +210,7 @@ class TestScheduleUpdate:
         await store._task
 
     async def test_timeout_is_a_miss_that_leaves_the_next_turn_free(self, monkeypatch):
-        monkeypatch.setattr(mod, "load_template", lambda *a, **k: "SYS")
+        monkeypatch.setattr(mod, "load_and_format", lambda *a, **k: "SYS")
         store = ClientWorkingMemoryStore()
 
         async def _hang(*a, **k):
@@ -233,7 +233,7 @@ class TestScheduleUpdate:
         assert store.last_committed_turn == -1
 
     async def test_llm_failure_is_a_miss_not_a_crash(self, monkeypatch):
-        monkeypatch.setattr(mod, "load_template", lambda *a, **k: "SYS")
+        monkeypatch.setattr(mod, "load_and_format", lambda *a, **k: "SYS")
         store = ClientWorkingMemoryStore()
         structured = AsyncMock()
         structured.ainvoke = AsyncMock(side_effect=RuntimeError("provider down"))
@@ -248,7 +248,7 @@ class TestScheduleUpdate:
         assert state.affect == ""
 
     async def test_a_miss_then_a_later_success_commits(self, monkeypatch):
-        monkeypatch.setattr(mod, "load_template", lambda *a, **k: "SYS")
+        monkeypatch.setattr(mod, "load_and_format", lambda *a, **k: "SYS")
         store = ClientWorkingMemoryStore()
         structured = AsyncMock()
         structured.ainvoke = AsyncMock(side_effect=RuntimeError("boom"))
@@ -268,7 +268,7 @@ class TestScheduleUpdate:
         assert (await store.snapshot()).affect == "steadier"
 
     async def test_discard_cancels_without_counting_a_miss(self, monkeypatch):
-        monkeypatch.setattr(mod, "load_template", lambda *a, **k: "SYS")
+        monkeypatch.setattr(mod, "load_and_format", lambda *a, **k: "SYS")
         store = ClientWorkingMemoryStore()
 
         async def _hang(*a, **k):
@@ -289,7 +289,7 @@ class TestScheduleUpdate:
         assert (await store.snapshot()).updates_missed == 0
 
     async def test_nothing_to_summarize_commits_nothing(self, monkeypatch):
-        monkeypatch.setattr(mod, "load_template", lambda *a, **k: "SYS")
+        monkeypatch.setattr(mod, "load_and_format", lambda *a, **k: "SYS")
         store = ClientWorkingMemoryStore()
         args = self._args(_llm(ProposedUpdate()))
         args["new_messages"] = []

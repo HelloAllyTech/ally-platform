@@ -155,3 +155,91 @@ class TestRecall:
             last_learner_text="आपकी पत्नी के बारे में बताइए",
         )
         assert any(s.cue_hits for s in scored)
+
+
+class TestTheUpdaterIsToldWhichLanguage:
+    """The Hindi v2v run returned an ENGLISH ledger for a Devanagari session.
+
+    The template already said "write in the same language as the conversation
+    turns" — but it was one rule among a dozen at the bottom of a 4,000-char
+    prompt, resolved with `load_template`, which does no formatting, so the
+    prompt could not name the language. The groundedness check then correctly
+    found no overlap with the transcript and dropped 13 of 14 disclosures: the
+    write-out was empty again, from a different cause than the regex bug.
+    """
+
+    def _capture(self, monkeypatch, prompt_data):
+        from types import SimpleNamespace
+        from unittest.mock import AsyncMock, MagicMock
+
+        from app.core.working_memory import consolidate as mod
+        from app.core.working_memory.proposal import ProposedUpdate
+
+        seen = {}
+
+        def fake_load(path, pd=None, **kwargs):
+            seen["kwargs"] = kwargs
+            return f"SYS for {kwargs.get('language_label')}"
+
+        monkeypatch.setattr(mod, "load_and_format", fake_load)
+        structured = AsyncMock()
+        structured.ainvoke = AsyncMock(
+            return_value={"parsed": ProposedUpdate(), "raw": None}
+        )
+        instance = MagicMock()
+        instance.with_structured_output = MagicMock(return_value=structured)
+
+        import asyncio
+
+        asyncio.get_event_loop()
+        return seen, structured, mod, SimpleNamespace(llm_instance=instance)
+
+    async def test_the_language_label_reaches_the_system_prompt(self, monkeypatch):
+        from types import SimpleNamespace
+
+        seen, structured, mod, llm = self._capture(
+            monkeypatch, SimpleNamespace(language_label="Hindi")
+        )
+        await mod.consolidate(
+            memory=ClientWorkingMemory(),
+            new_messages=[HumanMessage(content="बताइए"), AIMessage(content="ठीक")],
+            llm_client=llm,
+            prompt_data=SimpleNamespace(language_label="Hindi"),
+        )
+        assert seen["kwargs"]["language_label"] == "Hindi"
+
+    async def test_the_language_is_repeated_in_the_user_message(self, monkeypatch):
+        # Repeated on purpose: the last instruction before the data is the one
+        # that survives the pull of the examples above it.
+        from types import SimpleNamespace
+
+        seen, structured, mod, llm = self._capture(
+            monkeypatch, SimpleNamespace(language_label="Tamil")
+        )
+        await mod.consolidate(
+            memory=ClientWorkingMemory(),
+            new_messages=[
+                HumanMessage(content="சொல்லுங்கள்"),
+                AIMessage(content="சரி"),
+            ],
+            llm_client=llm,
+            prompt_data=SimpleNamespace(language_label="Tamil"),
+        )
+        user_msg = structured.ainvoke.await_args.args[0][1].content
+        assert "Tamil" in user_msg
+
+    async def test_a_missing_label_degrades_to_a_usable_phrase(self, monkeypatch):
+        # Never the literal string "None" in an instruction.
+        from types import SimpleNamespace
+
+        seen, structured, mod, llm = self._capture(
+            monkeypatch, SimpleNamespace(language_label=None)
+        )
+        await mod.consolidate(
+            memory=ClientWorkingMemory(),
+            new_messages=[HumanMessage(content="hi"), AIMessage(content="ok")],
+            llm_client=llm,
+            prompt_data=SimpleNamespace(language_label=None),
+        )
+        label = seen["kwargs"]["language_label"]
+        assert "None" not in label and label

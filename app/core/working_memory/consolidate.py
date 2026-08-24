@@ -41,7 +41,7 @@ from app.core.working_memory.state import (
 )
 from app.core.working_memory.store import ClientWorkingMemoryStore
 from app.llms.base import BaseLLMClient
-from app.prompts.resolver import load_template
+from app.prompts.resolver import load_and_format
 
 logger = get_logger(__name__)
 
@@ -165,7 +165,26 @@ async def consolidate(
     if not turns_text.strip():
         return None
 
-    system_text = load_template(_TEMPLATE_PATH, prompt_data)
+    # The language has to be NAMED, not implied.
+    #
+    # The template already carried "write in the same language as the
+    # conversation turns" — the same line the rolling summarizer uses
+    # successfully — but it was one rule among a dozen at the bottom of a
+    # 4,000-character prompt, and it was resolved with `load_template`, which
+    # does no formatting, so the prompt could not even say WHICH language.
+    #
+    # Measured in the Hindi v2v run: the conversation was Devanagari on both
+    # sides and the updater returned an English ledger ("feeling nervous during
+    # the alertness test"). The groundedness check then correctly found no
+    # overlap with a Devanagari transcript and dropped 13 of 14 disclosures, so
+    # the write-out was empty again — a different cause from the regex bug, same
+    # symptom.
+    language_label = (
+        getattr(prompt_data, "language_label", None) or ""
+    ).strip() or "the language of the conversation turns"
+    system_text = load_and_format(
+        _TEMPLATE_PATH, prompt_data, language_label=language_label
+    )
     if not system_text:
         logger.warning("[working-memory] updater template resolved empty; skipping")
         return None
@@ -174,7 +193,11 @@ async def consolidate(
         "Current client state:\n"
         f"{_digest(memory)}\n\n"
         "Newest conversation turns:\n"
-        f"{turns_text}"
+        f"{turns_text}\n\n"
+        # Repeated here deliberately: this is the last thing the model reads
+        # before it answers, and the failure being prevented is an instruction
+        # at the top of a long prompt losing to the pull of the examples.
+        f"Reply with every field written in {language_label}."
     )
 
     # include_raw for the same reason as the summarizer: with_structured_output

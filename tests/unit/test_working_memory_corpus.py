@@ -234,7 +234,7 @@ class TestFoldIntoTheUpdate:
     async def test_commits_in_one_write_with_the_state(self, monkeypatch):
         # commit() rejects a turn index at or below the last committed, so a
         # second write for the same turn would be silently discarded.
-        monkeypatch.setattr(mod, "load_template", lambda *a, **k: "SYS")
+        monkeypatch.setattr(mod, "load_and_format", lambda *a, **k: "SYS")
         from app.core.working_memory.proposal import ProposedUpdate
 
         store = ClientWorkingMemoryStore()
@@ -296,7 +296,7 @@ class TestSemanticTierIsActuallyWired:
         return SimpleNamespace(llm_instance=instance)
 
     async def test_embed_query_is_called_through_schedule_update(self, monkeypatch):
-        monkeypatch.setattr(mod, "load_template", lambda *a, **k: "SYS")
+        monkeypatch.setattr(mod, "load_and_format", lambda *a, **k: "SYS")
         store = ClientWorkingMemoryStore()
         store.corpus = build_corpus(
             character_profile_text="She stopped going to Saturday badminton."
@@ -320,7 +320,7 @@ class TestSemanticTierIsActuallyWired:
     async def test_no_vectors_means_no_embedding_call(self, monkeypatch):
         # An unembedded pool ranks lexically, so paying for a query embedding
         # would buy a number nothing multiplies by.
-        monkeypatch.setattr(mod, "load_template", lambda *a, **k: "SYS")
+        monkeypatch.setattr(mod, "load_and_format", lambda *a, **k: "SYS")
         store = ClientWorkingMemoryStore()
         store.corpus = build_corpus(character_profile_text="She stopped going.")
         embed_query = AsyncMock(return_value=[1.0, 0.0])
@@ -336,7 +336,7 @@ class TestSemanticTierIsActuallyWired:
         embed_query.assert_not_awaited()
 
     async def test_a_failing_embedder_still_recalls_lexically(self, monkeypatch):
-        monkeypatch.setattr(mod, "load_template", lambda *a, **k: "SYS")
+        monkeypatch.setattr(mod, "load_and_format", lambda *a, **k: "SYS")
         store = ClientWorkingMemoryStore()
         store.corpus = build_corpus(
             character_profile_text="She stopped going to Saturday badminton."
