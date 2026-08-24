@@ -263,3 +263,108 @@ class TestFoldIntoTheUpdate:
             "She lost the job in March."
         ]
         assert store.last_committed_turn == 2
+
+
+class TestSemanticTierIsActuallyWired:
+    """The semantic tier was written, tested in isolation, and called by nothing.
+
+    Both halves were missing independently — `attach_vectors` had no caller, and
+    the query vector was hardcoded None at the only call site — so either one
+    alone kept it inert. These tests drive `schedule_update`, the real entry
+    point, because the earlier tests exercised `_select_salient` directly and
+    would have passed against a completely unwired feature.
+    """
+
+    def _messages(self):
+        return [
+            HumanMessage(content="what about the badminton you mentioned"),
+            AIMessage(content="I stopped going"),
+        ]
+
+    def _llm(self, cues):
+        from app.core.working_memory.proposal import ProposedUpdate
+
+        structured = AsyncMock()
+        structured.ainvoke = AsyncMock(
+            return_value={
+                "parsed": ProposedUpdate(affect="flat", retrieve_cues=cues),
+                "raw": None,
+            }
+        )
+        instance = MagicMock()
+        instance.with_structured_output = MagicMock(return_value=structured)
+        return SimpleNamespace(llm_instance=instance)
+
+    async def test_embed_query_is_called_through_schedule_update(self, monkeypatch):
+        monkeypatch.setattr(mod, "load_template", lambda *a, **k: "SYS")
+        store = ClientWorkingMemoryStore()
+        store.corpus = build_corpus(
+            character_profile_text="She stopped going to Saturday badminton."
+        )
+        # A pool WITH vectors: the precondition for spending an embedding call.
+        await attach_vectors(store.corpus, AsyncMock(return_value=[[1.0, 0.0]]))
+
+        embed_query = AsyncMock(return_value=[1.0, 0.0])
+        assert mod.schedule_update(
+            store,
+            memory=ClientWorkingMemory(turn_index=1),
+            new_messages=self._messages(),
+            llm_client=self._llm(["badminton"]),
+            timeout=5.0,
+            embed_query=embed_query,
+        )
+        await store._task
+        embed_query.assert_awaited_once()
+        assert "badminton" in embed_query.await_args.args[0]
+
+    async def test_no_vectors_means_no_embedding_call(self, monkeypatch):
+        # An unembedded pool ranks lexically, so paying for a query embedding
+        # would buy a number nothing multiplies by.
+        monkeypatch.setattr(mod, "load_template", lambda *a, **k: "SYS")
+        store = ClientWorkingMemoryStore()
+        store.corpus = build_corpus(character_profile_text="She stopped going.")
+        embed_query = AsyncMock(return_value=[1.0, 0.0])
+        mod.schedule_update(
+            store,
+            memory=ClientWorkingMemory(turn_index=1),
+            new_messages=self._messages(),
+            llm_client=self._llm(["badminton"]),
+            timeout=5.0,
+            embed_query=embed_query,
+        )
+        await store._task
+        embed_query.assert_not_awaited()
+
+    async def test_a_failing_embedder_still_recalls_lexically(self, monkeypatch):
+        monkeypatch.setattr(mod, "load_template", lambda *a, **k: "SYS")
+        store = ClientWorkingMemoryStore()
+        store.corpus = build_corpus(
+            character_profile_text="She stopped going to Saturday badminton."
+        )
+        await attach_vectors(store.corpus, AsyncMock(return_value=[[1.0, 0.0]]))
+        mod.schedule_update(
+            store,
+            memory=ClientWorkingMemory(turn_index=1),
+            new_messages=self._messages(),
+            llm_client=self._llm(["badminton"]),
+            timeout=5.0,
+            embed_query=AsyncMock(side_effect=RuntimeError("no key")),
+        )
+        await store._task
+        state = await store.snapshot()
+        assert [f.text for f in state.salient_backstory] == [
+            "She stopped going to Saturday badminton."
+        ]
+
+    async def test_numpy_vectors_do_not_break_cosine(self):
+        # _cosine opens with `if not a or not b`, which RAISES on an ndarray —
+        # and the embedding client returns ndarrays. Unfixed, this surfaced as
+        # recall silently failing inside a detached task.
+        import numpy as np
+
+        corpus = build_corpus(character_profile_text="She stopped going to badminton.")
+        await attach_vectors(corpus, AsyncMock(return_value=[np.array([0.6, 0.8])]))
+        assert corpus.vectors
+        vector = next(iter(corpus.vectors.values()))
+        assert isinstance(vector, list)
+        assert all(isinstance(x, float) for x in vector)

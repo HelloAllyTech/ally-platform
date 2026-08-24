@@ -487,6 +487,30 @@ class AgentWorker:
                 ),
                 retrieved_context=None,
             )
+            # Embed the pool for the semantic half of recall (§7.3), as a
+            # DETACHED task rather than inline. Setup is already off the reply
+            # path, but it is NOT off the join path, and this repo has a history
+            # of "agent joins but doesn't speak" — an embedding batch between
+            # dispatch and the opening line is exactly the kind of thing that
+            # turns into a silent join delay. Recall ranks lexically until the
+            # vectors land, which is a weaker ranking and not a broken one.
+            if (
+                self.embedding_client is not None
+                and self.client_working_memory_store.corpus
+            ):
+                from app.core.working_memory.corpus import attach_vectors
+
+                async def _embed_pool() -> None:
+                    await attach_vectors(
+                        self.client_working_memory_store.corpus,
+                        self.embedding_client.get_embeddings_batch,
+                    )
+
+                _pool_task = asyncio.create_task(_embed_pool())
+                # Tracked, so teardown cancels it instead of leaving a task
+                # holding the embedding client past session end.
+                self._background_tasks.add(_pool_task)
+                _pool_task.add_done_callback(self._background_tasks.discard)
         except Exception as _corpus_error:  # noqa: BLE001
             # Recall having nothing to draw on is a quiet degradation; failing
             # session setup over it would not be.

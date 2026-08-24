@@ -2506,6 +2506,15 @@ async def update_working_memory(
     window = max(2, settings.CLIENT_WORKING_MEMORY_WINDOW_TURNS)
     _room = configurable.get("room")
 
+    # The semantic half of recall (§7.3). Optional by design: without an
+    # embedding client the pool is ranked lexically, which is a weaker ranking
+    # and not a broken one. Passed as a callable rather than the client so the
+    # store layer never learns which provider it is talking to.
+    _embedding_client = configurable.get("embedding_client")
+    embed_query = (
+        _embedding_client.get_embedding if _embedding_client is not None else None
+    )
+
     schedule_update(
         store,
         memory=memory,
@@ -2514,6 +2523,7 @@ async def update_working_memory(
         timeout=settings.CLIENT_WORKING_MEMORY_TIMEOUT,
         prompt_data=prompt_data,
         room_id=getattr(_room, "name", None),
+        embed_query=embed_query,
     )
     return {}
 

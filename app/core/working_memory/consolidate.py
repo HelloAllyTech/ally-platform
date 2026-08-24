@@ -240,6 +240,38 @@ def _last_learner_text(messages: List[BaseMessage]) -> Optional[str]:
     return None
 
 
+async def _embed_query(embed_query, cues, last_learner_text) -> Optional[list]:
+    """Embed this turn's query, or None on any failure.
+
+    The query is the nominated cues plus the learner's own words — the same
+    construction `persona_bible.build_semantic_retriever` used. One short
+    embedding per turn, inside the detached update, so it costs the actor
+    nothing.
+
+    Never raises: recall falls back to lexical, which is the whole reason the
+    semantic term is a multiplier rather than the ranking.
+    """
+    if embed_query is None:
+        return None
+    query = " ".join(
+        part for part in [" ".join(cues or []), last_learner_text or ""] if part
+    ).strip()
+    if not query:
+        return None
+    try:
+        vector = await embed_query(query)
+    except Exception as exc:  # noqa: BLE001 - lexical recall is a fine fallback
+        logger.warning(
+            "[working-memory] query embedding failed (%s); recall stays lexical",
+            exc,
+        )
+        return None
+    try:
+        return [float(x) for x in vector] or None
+    except TypeError:
+        return None
+
+
 def _select_salient(
     corpus,
     *,
@@ -296,6 +328,7 @@ def schedule_update(
     prompt_data=None,
     room_id: Optional[str] = None,
     reason: str = "cadence",
+    embed_query=None,
 ) -> bool:
     """Fire the consolidation as a DETACHED task writing into ``store``.
 
@@ -352,12 +385,21 @@ def schedule_update(
         # this turn's nominated cues drive this turn's selection rather than the
         # next one's, and the selection costs the actor nothing because nobody
         # is waiting on it.
+        # Only worth an embedding call when there is a pool with vectors to
+        # compare against; otherwise the lexical path is the whole path.
+        query_vec = None
+        if store.corpus is not None and store.corpus.vectors:
+            query_vec = await _embed_query(
+                embed_query,
+                update.retrieve_cues,
+                _last_learner_text(new_messages),
+            )
         salient = _select_salient(
             store.corpus,
             update=update,
             memory=memory,
             new_messages=new_messages,
-            query_vec=None,
+            query_vec=query_vec,
         )
         committed = await apply_update(store, update, turn_index, salient)
         if committed:

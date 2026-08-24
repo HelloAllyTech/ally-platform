@@ -161,6 +161,19 @@ async def attach_vectors(
             len(texts),
         )
         return corpus
-    corpus.vectors = {t: v for t, v in zip(texts, vectors) if v}
+    # Coerced to plain float lists, not stored as returned. The embedding client
+    # hands back numpy arrays, and `_cosine` opens with `if not a or not b` —
+    # which raises "truth value of an array is ambiguous" on an ndarray. That
+    # would surface as recall silently failing inside a detached task, i.e. the
+    # hardest possible place to notice it.
+    coerced: Dict[str, Sequence[float]] = {}
+    for text, vector in zip(texts, vectors):
+        try:
+            values = [float(x) for x in vector]
+        except TypeError:
+            continue
+        if values:
+            coerced[text] = values
+    corpus.vectors = coerced
     logger.info("[working-memory] pool embedded: %d vector(s)", len(corpus.vectors))
     return corpus
