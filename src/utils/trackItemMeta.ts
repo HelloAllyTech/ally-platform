@@ -49,7 +49,7 @@ export const getTrackItemMeta = (
       // A minScore of 0 is the unconfigured default and gates nothing (see
       // meetsMinimumScore in ally-be), so only a real threshold is shown —
       // advertising "min score 0" would read as a hurdle that isn't there.
-      if (criteria?.minScore != null && criteria.minScore > 0) {
+      if ((criteria?.minScore ?? 0) > 0) {
         return `${t('courses.meta.roleplay')} · ${t('courses.meta.minScore', {
           score: criteria.minScore,
         })}`;
