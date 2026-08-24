@@ -243,3 +243,56 @@ class TestTheUpdaterIsToldWhichLanguage:
         )
         label = seen["kwargs"]["language_label"]
         assert "None" not in label and label
+
+
+class TestZeroWidthAndNormalisation:
+    """Zero-width joiners are ORTHOGRAPHY in Indic scripts, not formatting.
+
+    They sit inside words to control conjunct formation and are Unicode category
+    Cf, so `\\w` does not match them and they split a word in two. Found in the
+    Kannada v2v run: the updater emitted "ಅಲರ್ಟ್\\u200cನೆಸ್" (alertness), it
+    tokenised as two words, and the halved overlap helped push all three of that
+    run's disclosures under the groundedness threshold.
+    """
+
+    def test_zwnj_does_not_split_a_kannada_word(self):
+        assert len(tokens("ಅಲರ್ಟ್‌ನೆಸ್")) == 1
+
+    def test_zwj_does_not_split_a_devanagari_word(self):
+        assert len(tokens("क्‍ष")) == 1
+
+    def test_the_two_spellings_of_one_word_match(self):
+        # One side of a comparison may carry the joiner and the other may not.
+        with_zw = "ಅಲರ್ಟ್‌ನೆಸ್"
+        assert tokens(with_zw) == tokens(with_zw.replace("‌", ""))
+
+    def test_same_fact_survives_a_zero_width_difference(self):
+        a = "ಅಲರ್ಟ್‌ನೆಸ್ ಪರೀಕ್ಷೆ ಮುಖ್ಯ ಎಂದು ಅನಿಸಲಿಲ್ಲ"
+        b = "ಅಲರ್ಟ್ನೆಸ್ ಪರೀಕ್ಷೆ ಮುಖ್ಯ ಎಂದು ಅನಿಸಲಿಲ್ಲ"
+        assert same_fact(a, b)
+
+    def test_grounding_survives_a_zero_width_difference(self):
+        # The transcript and the ledger need not agree on the joiner.
+        transcript = [
+            HumanMessage(content="ಪರೀಕ್ಷೆ ಬಗ್ಗೆ ಹೇಳಿ"),
+            AIMessage(content="ಅಲರ್ಟ್ನೆಸ್ ಪರೀಕ್ಷೆ ಮುಖ್ಯ ಎಂದು ಅನಿಸಲಿಲ್ಲ"),
+        ]
+        grounded, ungrounded = check_grounding(
+            ["ಅಲರ್ಟ್‌ನೆಸ್ ಪರೀಕ್ಷೆ ಮುಖ್ಯ ಎಂದು ಅನಿಸಲಿಲ್ಲ"], transcript
+        )
+        assert len(grounded) == 1 and ungrounded == []
+
+    def test_decomposed_and_composed_forms_match(self):
+        import unicodedata
+
+        word = "நீ"
+        assert tokens(word) == tokens(unicodedata.normalize("NFD", word))
+
+    def test_english_is_untouched(self):
+        assert content_words("wife works nights at a garment unit") == {
+            "wife",
+            "works",
+            "nights",
+            "garment",
+            "unit",
+        }

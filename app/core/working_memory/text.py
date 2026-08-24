@@ -45,6 +45,27 @@ _MARKS = "".join(
 
 WORD_RE = re.compile(rf"[\w{re.escape(_MARKS)}']+", re.UNICODE)
 
+#: Zero-width joiner / non-joiner. Orthographically required INSIDE Indic words
+#: to control conjunct formation, and Unicode category Cf — so `\w` does not
+#: match them and they split a word in two.
+#:
+#: Found in the Kannada v2v run: the updater emitted "ಅಲರ್ಟ್\u200cನೆಸ್"
+#: (alertness) and it tokenized as two words, halving the overlap available to
+#: the groundedness check. STRIPPED rather than added to the class, because they
+#: affect rendering and not identity: one side of a comparison may include them
+#: and the other may not, and normalising makes the match robust either way.
+_ZERO_WIDTH = dict.fromkeys((0x200C, 0x200D))
+
+
+def _normalise(text: str) -> str:
+    """NFC + zero-width strip, before any tokenising.
+
+    NFC because a model may emit decomposed forms for the same grapheme, and two
+    spellings of one word must not read as two words.
+    """
+    return unicodedata.normalize("NFC", text or "").translate(_ZERO_WIDTH)
+
+
 #: Minimum length for a LATIN token to count as content-bearing. A crude
 #: stopword proxy: "the", "and", "you" are short, "badminton" is not.
 MIN_LATIN_LEN = 4
@@ -67,13 +88,13 @@ def _is_latin(token: str) -> bool:
 
 def tokens(text: Optional[str]) -> Set[str]:
     """Every word, lowercased and unfiltered. For MATCHING against cues."""
-    return {w.lower() for w in WORD_RE.findall(text or "")}
+    return {w.lower() for w in WORD_RE.findall(_normalise(text))}
 
 
 def content_words(text: Optional[str]) -> Set[str]:
     """Words long enough to carry meaning. For DERIVING cues and comparing."""
     out: Set[str] = set()
-    for raw in WORD_RE.findall(text or ""):
+    for raw in WORD_RE.findall(_normalise(text)):
         word = raw.lower()
         floor = MIN_LATIN_LEN if _is_latin(word) else MIN_OTHER_LEN
         if len(word) >= floor:
