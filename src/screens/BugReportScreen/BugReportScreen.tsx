@@ -1,5 +1,5 @@
 import {useCallback} from 'react';
-import {useNavigationState} from '@react-navigation/native';
+import {NavigationState, useNavigationState} from '@react-navigation/native';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -19,6 +19,28 @@ import {colors, fontFamily, fontWeights, stroke, typography} from '@/theme';
 
 const isIOS = Platform.OS === 'ios';
 
+type RouteWithNestedState = NavigationState['routes'][number];
+
+// A route reached through the Drawer/BottomTabs subtree is registered on the
+// root Stack under one shared route name, with the actual screen nested
+// several navigators deeper. Walk down to the innermost active route to find it.
+const getDeepestActiveRouteName = (
+  route?: RouteWithNestedState,
+): string | undefined => {
+  let current = route;
+  let name = current?.name;
+
+  while (current?.state?.routes?.length) {
+    const nested = current.state as NavigationState;
+    const activeRoute = nested.routes[nested.index ?? nested.routes.length - 1];
+    if (!activeRoute) break;
+    name = activeRoute.name;
+    current = activeRoute;
+  }
+
+  return name;
+};
+
 export const BugReportScreen: React.FC = () => {
   const navigation = useAppNavigation();
   const insets = useSafeAreaInsets();
@@ -28,7 +50,7 @@ export const BugReportScreen: React.FC = () => {
   // silently as diagnostic context, never shown in the UI.
   const previousScreenName = useNavigationState(state => {
     const routes = state?.routes ?? [];
-    return routes[routes.length - 2]?.name;
+    return getDeepestActiveRouteName(routes[routes.length - 2]);
   });
 
   const handleGoBack = useCallback(() => {
