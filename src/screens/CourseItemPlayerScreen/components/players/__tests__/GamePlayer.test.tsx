@@ -152,4 +152,19 @@ describe('GamePlayer', () => {
       expect(getByText('courses.game.bestScore.TREX_RUNNER:{"score":55}')).toBeTruthy(),
     );
   });
+
+  it('shows a friendly message instead of a blank screen for a gameKey this build does not know', () => {
+    const unknownGameKey = 'FUTURE_GAME' as TrackGameKey;
+    const {getByText, queryByTestId} = render(
+      <GamePlayer
+        payload={buildPayload({gameKey: unknownGameKey})}
+        itemId="item-1"
+        onCompleted={jest.fn()}
+      />,
+    );
+
+    expect(getByText('courses.player.unsupportedTitle')).toBeTruthy();
+    expect(getByText('courses.player.unsupportedBody')).toBeTruthy();
+    expect(queryByTestId('webview')).toBeNull();
+  });
 });
