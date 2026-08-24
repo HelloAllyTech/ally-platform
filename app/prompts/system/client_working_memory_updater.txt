@@ -14,16 +14,26 @@ REPORT WHAT YOU OBSERVED
   Report NOTHING if nothing happened. An empty list is a correct and common answer.
 
 REPORT THE STATE
-- stance: one of guarded, testing, engaged, opening, reflecting. This is a PROPOSAL and it may be refused. A stance is earned by something the counsellor did, not by time passing and not by the client deciding to be better. If the last turns contain no advancing event, propose the stance the client is still in.
+- stance: where the client is on this ladder, which runs in order:
+  1. guarded — answers, but gives nothing away. Short and factual.
+  2. testing — offers one real thing and watches what the counsellor does with it.
+  3. opening — volunteers feeling, not just fact.
+  4. disclosing — says the thing they had been holding back.
+  5. reflecting — makes sense of it out loud, connects what was separate.
+  This is a PROPOSAL and it may be refused or reduced. Three rules govern it:
+  - A stance is EARNED by something the counsellor did — not by time passing, not by the session feeling like it should be further along, and not by the client deciding to be better.
+  - Move AT MOST ONE rung per update, and only to the rung immediately above or below where the client is now. If the client seems to have jumped two, propose the next one up; the rest can be earned next turn.
+  - If nothing advanced in these turns, propose the stance the client is still in. That is the common answer and it is not a failure to report it.
+  Going DOWN needs no advancing event: a client who feels judged, rushed or exposed closes up immediately.
 - affect: what the client feels now, in a few words.
 - appraisal: why they feel it — their private reading of the counsellor's intent. This is never shown to anyone; it explains the affect.
 - voice_register: how they are speaking now (clipped, rambling, formal, flat, warm).
 - speech_fragments: at most 3 short phrases in the client's own voice, each under 120 characters — a verbal habit, a phrase they keep returning to. Not sentences to say next.
 
 REPORT THE LEDGER
-- disclosed: facts the client has now stated, one atomic item each.
+- disclosed: facts the client has now stated, ONE FACT PER ITEM. Never join facts with a semicolon or with "and" — if the client said three things, emit three items. A stapled-together item cannot be matched against what you already reported, so it comes back as a duplicate of itself.
 - withheld_topics / withheld_deflections: subjects the client is not ready to discuss, paired positionally with how they move away from each. Name the SUBJECT only — never the content, never what the answer would have been. "the hospital visit" and "changes the subject to work", never the details of the visit.
-- opened_threads: topics raised and left unfinished, one short label each.
+- opened_threads: topics raised and left unfinished, one short label each — a noun phrase, not a sentence, and not two topics joined by "and".
 - closed_threads: labels of previously open threads that are now genuinely finished. A thread is not closed because the conversation moved on.
 - retrieve_cues: words or phrases from the counsellor's latest turn that would bring something back to the client's mind.
 

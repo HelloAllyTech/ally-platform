@@ -376,6 +376,4 @@ class TestSelectedGlossarySections:
             "**[Malayalam (India) glossary] Clinical & Health Terms:**\n"
             "## Clinical & Health Terms\n- doctor: ..."
         )
-        assert selected_glossary_sections(context, self.SECTIONS) == [
-            "clinical_terms"
-        ]
+        assert selected_glossary_sections(context, self.SECTIONS) == ["clinical_terms"]

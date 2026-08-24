@@ -143,8 +143,11 @@ def decide_stance(
       direct answer to the 65.51/65.52 null: the actor currently responds to
       counsellor skill by talking more rather than by changing, so the thing that
       moves the client has to be something the counsellor did.
-    - **Advancing moves one rung.** Guarded to reflecting on one good question is
-      the fake-success failure in §1.
+    - **Advancing moves one rung**, by CLAMPING rather than refusing. Guarded to
+      reflecting on one good question is the fake-success failure in §1, but
+      refusing the whole move over an oversized proposal froze the stance
+      permanently in the first offline run — the direction was earned even when
+      the distance was not.
     - **Advancing needs time in the current stance**, or the client oscillates.
     - **`reflecting` needs every thread closed.** The Zeigarnik block, and the
       structural version of "Thank you for today!" being false rather than
@@ -170,19 +173,48 @@ def decide_stance(
 
     if not (event_kinds & ADVANCING_EVENTS):
         return None, "no advancing event — a stance is earned, not asserted"
-    if there - here > 1:
-        return None, f"cannot advance {there - here} rungs at once"
+
+    # CLAMP the magnitude rather than refuse the move. An advancing event was
+    # observed, so the DIRECTION is earned; only the size of the step is the
+    # model's invention, and discarding earned evidence because of an unearned
+    # quantity is the wrong trade.
+    #
+    # This is not leniency, it is v2's `_apply` split applied properly: there,
+    # scores came from rubric weights and never from the model. Here the
+    # direction comes from code-verified events and the magnitude comes from
+    # code. The proposed magnitude is simply not an input.
+    #
+    # Found by the first offline run, and it was not a subtle failure: the
+    # updater proposed `engaged` from `guarded` on four of five turns — two
+    # rungs, every time — so the old veto refused every advance and the stance
+    # sat at `guarded` for the whole session. A ladder that can never be climbed
+    # is decorative. The prompt now names the rungs and the adjacency rule too,
+    # but a model will ignore that sometimes, and the machine has to be right
+    # anyway.
+    target: Stance = STANCE_ORDER[here + 1]
+    clamped = target != proposed
+    if clamped:
+        logger.info(
+            "[working-memory] clamping proposed advance %s -> %s down to %s "
+            "(one rung per turn)",
+            memory.stance,
+            proposed,
+            target,
+        )
+
+    # Every remaining gate applies to the CLAMPED target, so an overshooting
+    # proposal cannot use the clamp to slip past them.
     if memory.turns_in_stance < MIN_TURNS_BEFORE_ADVANCE:
         return None, (
             f"only {memory.turns_in_stance} turn(s) in {memory.stance}; "
             f"{MIN_TURNS_BEFORE_ADVANCE} required before advancing"
         )
-    if proposed == "reflecting" and memory.open_threads:
+    if target == "reflecting" and memory.open_threads:
         return None, (
             f"{len(memory.open_threads)} thread(s) still open — reflecting is "
             "not reachable while the client is still carrying something"
         )
-    return proposed, None  # type: ignore[return-value]
+    return target, None
 
 
 def _clean(values: List[str], *, limit: int, max_chars: int = 0) -> List[str]:

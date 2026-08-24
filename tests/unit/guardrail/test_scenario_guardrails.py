@@ -3,7 +3,6 @@ Unit tests for guardrail parsing in Scenario.create().
 Tests that guardrails array is correctly converted to GuardrailEvent objects.
 """
 
-
 from app.core.constants import DetectionType, VisibilityType
 from app.core.scenario.base import Scenario
 

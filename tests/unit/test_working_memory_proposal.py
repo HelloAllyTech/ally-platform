@@ -16,6 +16,7 @@ output.
 from app.core.working_memory import ClientWorkingMemory, Thread
 from app.core.working_memory.proposal import (
     MIN_TURNS_BEFORE_ADVANCE,
+    STANCE_ORDER,
     ObservedEvent,
     ProposedUpdate,
     validate,
@@ -56,14 +57,38 @@ def test_an_advancing_event_earns_one_rung():
 
 def test_the_ladder_cannot_be_skipped():
     # Guarded to reflecting because one question landed well IS the §1 failure.
+    # The overshoot is CLAMPED to one rung rather than refused: the repair earned
+    # an advance, so throwing the move away entirely would discard real evidence
+    # over a bad quantity. Refusing outright froze the stance for a whole session
+    # in the first offline run, because the updater overshot on nearly every turn.
     out = validate(
         _proposal(stance="reflecting", event_kinds=["repair"]), _memory("guarded")
     )
+    assert out.stance == STANCE_ORDER[1]
+    assert out.stance_rejected_reason is None
+
+
+def test_a_clamped_advance_still_obeys_the_other_gates():
+    # The clamp must not become a way around the gates it is not about.
+    too_soon = validate(
+        _proposal(stance="opening", event_kinds=["repair"]),
+        _memory("guarded", turns_in_stance=MIN_TURNS_BEFORE_ADVANCE - 1),
+    )
+    assert too_soon.stance is None
+    assert "required before advancing" in too_soon.stance_rejected_reason
+
+
+def test_a_clamped_advance_respects_the_zeigarnik_block():
+    # From the rung below `reflecting`, any overshoot clamps ONTO the gated
+    # rung — the one case where the clamp lands on it, so the thread check has
+    # to be applied to the TARGET rather than to what was proposed. Derived
+    # from STANCE_ORDER rather than hardcoded: naming the stance here would
+    # make inserting a rung look like a regression.
+    memory = _memory(STANCE_ORDER[-2], turns_in_stance=5)
+    memory.unresolved = [Thread(topic="the argument", opened_turn=1)]
+    out = validate(_proposal(stance="reflecting", event_kinds=["repair"]), memory)
     assert out.stance is None
-    # Asserting on the phrase rather than the count: the number is arithmetic
-    # over the ladder length, and pinning it would make adding a stance look
-    # like a regression.
-    assert "rungs at once" in out.stance_rejected_reason
+    assert "still open" in out.stance_rejected_reason
 
 
 def test_advancing_too_soon_is_refused():

@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import re
 from typing import Iterable, List, Optional
 
 from app.core.logger import get_logger
@@ -149,16 +150,22 @@ class ClientWorkingMemoryStore:
                 st.disclosed = _fold_facts(st.disclosed, disclosed)
 
             if opened_threads is not None:
-                known = {t.topic for t in st.unresolved}
-                st.unresolved.extend(t for t in opened_threads if t.topic not in known)
+                # Near-duplicate, not exact: the run that produced three
+                # phrasings of one disclosure also opened "brother's visits"
+                # and "brother's support" as separate threads, so the actor was
+                # told it was carrying two unfinished things when it had one.
+                for thread in opened_threads:
+                    if not any(same_fact(t.topic, thread.topic) for t in st.unresolved):
+                        st.unresolved.append(thread)
             for topic in closed_topics:
                 for thread in st.unresolved:
                     if thread.topic == topic and thread.is_open:
                         thread.closed_turn = update_turn_index
 
             if withheld is not None:
-                known_topics = {w.topic for w in st.withheld}
-                st.withheld.extend(w for w in withheld if w.topic not in known_topics)
+                for item in withheld:
+                    if not any(same_fact(w.topic, item.topic) for w in st.withheld):
+                        st.withheld.append(item)
             for topic in revealed_topics:
                 for item in st.withheld:
                     if item.topic == topic and item.status == "unlocked":
@@ -199,19 +206,83 @@ class ClientWorkingMemoryStore:
             self._state.updates_missed += 1
 
 
+_WORD_RE = re.compile(r"[\w']+", re.UNICODE)
+
+#: Content words below this length carry too little meaning to count as
+#: evidence that two facts are the same one.
+_MIN_WORD_LEN = 4
+
+#: Jaccard overlap at which two phrasings are treated as the same fact.
+#:
+#: Jaccard rather than containment, deliberately: containment would fold
+#: "feeling overwhelmed lately" into "feeling overwhelmed managing her mother's
+#: appointments", because the short one's words all appear in the long one — and
+#: those are two different disclosures, one general and one specific. Jaccard
+#: penalises the length mismatch and keeps them apart.
+#:
+#: 0.45, measured rather than guessed. Over a set built from the first offline
+#: run's actual output plus adversarial pairs from the same session's material,
+#: the phrasings that should fold scored 0.500-1.000 (the three variants of one
+#: disclosure at 0.714 and 0.583; "lost the job in March" against "she lost the
+#: job back in March, it was hard" at 0.500) and the pairs that must stay apart
+#: scored at most 0.154 once the shared-word floor below rejects the one case
+#: that reached 0.333 on a single word. 0.45 sits in that gap and errs toward
+#: NOT merging, which is the safer error: two entries for one fact is untidy,
+#: while merging two real disclosures silently loses one.
+_SAME_FACT_JACCARD = 0.45
+
+#: Two shared content words minimum, so a pair of short unrelated facts cannot
+#: merge on one incidental token.
+_SAME_FACT_MIN_SHARED = 2
+
+
+def _content_words(text: str) -> set:
+    return {w.lower() for w in _WORD_RE.findall(text or "") if len(w) >= _MIN_WORD_LEN}
+
+
+def same_fact(a: str, b: str) -> bool:
+    """Are these two phrasings of the same fact?
+
+    Lexical on purpose. An embedding call per pair would be a network round
+    trip inside a lock, and the failure being prevented — an LLM restating what
+    it already stored in slightly different words — is overwhelmingly lexical.
+    """
+    if a == b:
+        return True
+    wa, wb = _content_words(a), _content_words(b)
+    if not wa or not wb:
+        return False
+    shared = wa & wb
+    if len(shared) < _SAME_FACT_MIN_SHARED:
+        return False
+    return len(shared) / len(wa | wb) >= _SAME_FACT_JACCARD
+
+
 def _fold_facts(existing: List[Fact], incoming: Iterable[Fact]) -> List[Fact]:
-    """Merge facts by text, rewriting in place rather than appending.
+    """Merge facts by MEANING, rewriting in place rather than appending.
 
     Reconsolidation, and QM's `foldCapture` contract: a retrieved memory is
     re-stored, possibly altered, so a fact revisited must be REWRITTEN and not
     duplicated beside its earlier form. A `disclosed` list that only appends
     ends up holding three versions of the same fact and no way to choose.
+
+    That docstring described exactly what then happened. Matching on exact text
+    is effectively append-only against a model that paraphrases: the first
+    offline run ended a five-turn session with three phrasings of one
+    disclosure in the ledger, which the actor is then told not to re-introduce
+    three separate times. Hence `same_fact`.
+
+    The EARLIER wording wins on a merge. Two reasons, and the second is the
+    stronger: the first phrasing is closest to what the client actually said,
+    and keeping it makes the rendered ledger byte-stable across turns — this
+    block sits in the prompt, so a ledger that re-words itself every turn would
+    cost prompt-cache hits on every remaining turn of the session.
     """
-    by_text = {f.text: f for f in existing}
+    folded: List[Fact] = list(existing)
     for fact in incoming:
-        prior = by_text.get(fact.text)
+        prior = next((f for f in folded if same_fact(f.text, fact.text)), None)
         if prior is None:
-            by_text[fact.text] = fact
+            folded.append(fact)
             continue
         # Strengthen rather than replace: the earlier encoding happened.
         prior.encoding_strength = max(prior.encoding_strength, fact.encoding_strength)
@@ -219,4 +290,4 @@ def _fold_facts(existing: List[Fact], incoming: Iterable[Fact]) -> List[Fact]:
         for stance in fact.stances_seen:
             if stance not in prior.stances_seen:
                 prior.stances_seen.append(stance)
-    return list(by_text.values())
+    return folded

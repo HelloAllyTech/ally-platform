@@ -21,6 +21,7 @@ from app.core.working_memory import (
     Thread,
     WithheldTopic,
 )
+from app.core.working_memory.store import same_fact
 
 
 @pytest.fixture
@@ -318,3 +319,68 @@ async def test_discard_does_not_wipe_the_record(store):
     store.discard()
 
     assert (await store.snapshot()).stance == "opening"
+
+
+# ---------------------------------------------------------------------------
+# Near-duplicate folding — found by the first offline run
+# ---------------------------------------------------------------------------
+
+
+def test_paraphrases_of_one_disclosure_fold_together():
+    # The five-turn offline run ended with three phrasings of one disclosure in
+    # the ledger, so the actor was told not to re-introduce it three times.
+    assert same_fact(
+        "feeling resentful about my brother not visiting",
+        "feeling resentful about her brother not visiting more often",
+    )
+
+
+def test_a_compound_restating_the_same_fact_folds():
+    assert same_fact(
+        "feeling resentful about her brother not visiting more often",
+        "feeling overwhelmed managing her mother's appointments alone; "
+        "feeling resentful about her brother not visiting more often",
+    )
+
+
+def test_general_and_specific_stay_separate():
+    # Containment would merge these — every word of the short one appears in
+    # the long one — but they are two different disclosures.
+    assert not same_fact(
+        "feeling overwhelmed lately",
+        "feeling overwhelmed managing her mother's appointments alone; "
+        "feeling resentful about her brother not visiting more often",
+    )
+
+
+def test_unrelated_facts_do_not_merge():
+    assert not same_fact("her mother is ill", "her brother lives in Pune")
+
+
+def test_one_shared_word_is_not_enough():
+    assert not same_fact("mother appointments", "mother badminton")
+
+
+async def test_the_ledger_keeps_the_earliest_wording(store):
+    # Byte-stability matters more than marginal specificity: this block sits in
+    # the prompt, so a ledger that re-words itself every turn would cost cache
+    # hits for the rest of the session.
+    await store.begin_turn()
+    await store.commit(0, disclosed=[Fact(text="lost the job in March")])
+    await store.begin_turn()
+    await store.commit(
+        1, disclosed=[Fact(text="she lost the job back in March, it was hard")]
+    )
+    state = await store.snapshot()
+    assert [f.text for f in state.disclosed] == ["lost the job in March"]
+
+
+async def test_a_near_duplicate_thread_is_not_opened_twice(store):
+    # The same run opened "brother's visits" and "brother's support" as two
+    # threads, so the client read as carrying two unfinished things, not one.
+    await store.begin_turn()
+    await store.commit(0, opened_threads=[Thread(topic="brother's visits")])
+    await store.begin_turn()
+    await store.commit(1, opened_threads=[Thread(topic="the brother's visits")])
+    state = await store.snapshot()
+    assert len(state.unresolved) == 1
