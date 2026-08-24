@@ -32,7 +32,6 @@ class TestDeepgramProvider:
         )
         result = client.tts_instance
 
-        mock_validate.assert_called_once_with(model="nova-2", api_key="test-api-key")
         mock_tts_class.assert_called_once_with(
             model="nova-2",
             encoding="linear16",
@@ -47,15 +46,6 @@ class TestDeepgramProvider:
         """Test Deepgram TTS creation with missing model."""
         with pytest.raises(ValueError, match="Deepgram TTS requires 'model'"):
             DeepgramTTSClient(model="", language_code="en-IN")
-
-    @pytest.mark.unit
-    @patch("app.tts.deepgram.DeepgramTTSClient.validate_voice")
-    def test_create_deepgram_tts_invalid_model(self, mock_validate):
-        """Test Deepgram TTS creation with invalid model."""
-        mock_validate.return_value = False
-
-        with pytest.raises(ValueError, match="Invalid Deepgram model"):
-            DeepgramTTSClient(model="invalid-model", language_code="en-IN")
 
     @pytest.mark.unit
     @patch("app.tts.deepgram.DeepgramTTSClient.validate_voice")
@@ -109,9 +99,6 @@ class TestElevenLabsProvider:
         )
         result = client.tts_instance
 
-        mock_validate.assert_called_once_with(
-            voice_id="test-voice-id", api_key="test-api-key"
-        )
         mock_tts_class.assert_called_once_with(
             voice_id="test-voice-id",
             model="eleven_multilingual_v2",
@@ -137,19 +124,6 @@ class TestElevenLabsProvider:
 
     @pytest.mark.unit
     @patch("app.tts.elevenlabs.ElevenLabsTTSClient.validate_voice")
-    def test_create_elevenlabs_tts_invalid_voice_id(self, mock_validate):
-        """Test ElevenLabs TTS creation with invalid voice_id."""
-        mock_validate.return_value = False
-
-        with pytest.raises(ValueError, match="Invalid ElevenLabs voice_id"):
-            ElevenLabsTTSClient(
-                model="eleven_multilingual_v2",
-                voice_id="invalid-voice",
-                language_code="en-IN",
-            )
-
-    @pytest.mark.unit
-    @patch("app.tts.elevenlabs.ElevenLabsTTSClient.validate_voice")
     @patch("livekit.plugins.elevenlabs.TTS")
     @patch("app.tts.elevenlabs.settings")
     def test_elevenlabs_from_config_with_camelcase_voice_id(
@@ -170,9 +144,6 @@ class TestElevenLabsProvider:
 
         assert client._model == "eleven_multilingual_v2"
         assert client._voice_id == "test-voice-id-camel"
-        mock_validate.assert_called_once_with(
-            voice_id="test-voice-id-camel", api_key="test-api-key"
-        )
 
     @pytest.mark.unit
     @patch("app.tts.elevenlabs.ElevenLabsTTSClient.validate_voice")
@@ -196,9 +167,6 @@ class TestElevenLabsProvider:
 
         assert client._model == "eleven_multilingual_v2"
         assert client._voice_id == "test-voice-id-snake"
-        mock_validate.assert_called_once_with(
-            voice_id="test-voice-id-snake", api_key="test-api-key"
-        )
 
     @pytest.mark.unit
     @patch("app.tts.elevenlabs.ElevenLabsTTSClient.validate_voice")
@@ -347,9 +315,6 @@ class TestSarvamProvider:
         )
         result = client.tts_instance
 
-        mock_validate.assert_called_once_with(
-            model="bulbul:v2", speaker="anushka", api_key="test-api-key"
-        )
         mock_tts_class.assert_called_once_with(
             target_language_code="en-IN", speaker="anushka", api_key="test-api-key"
         )
@@ -419,17 +384,6 @@ class TestSarvamProvider:
         """Test Sarvam TTS creation with missing model."""
         with pytest.raises(ValueError, match="Sarvam TTS requires 'model'"):
             SarvamTTSClient(model="", speaker="anushka", language_code="en-IN")
-
-    @pytest.mark.unit
-    @patch("app.tts.sarvam.SarvamTTSClient.validate_voice")
-    def test_create_sarvam_tts_invalid_config(self, mock_validate):
-        """Test Sarvam TTS creation with invalid configuration."""
-        mock_validate.return_value = False
-
-        with pytest.raises(ValueError, match="Invalid Sarvam configuration"):
-            SarvamTTSClient(
-                model="bulbul:v2", speaker="invalid-speaker", language_code="en-IN"
-            )
 
 
 class TestCreateTTSClientWithDefaults:

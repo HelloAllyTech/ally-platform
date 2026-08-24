@@ -76,12 +76,6 @@ class SarvamTTSClient(BaseTTSClient):
         # Convert language code to Sarvam format (en-GB/en-US -> en-IN, or-IN -> od-IN)
         target_language = convert_language_code_for_sarvam(language_code)
 
-        # Validate configuration
-        if not self.validate_voice(model=model, speaker=speaker, api_key=api_key):
-            raise ValueError(
-                f"Invalid Sarvam configuration: model={model}, speaker={speaker}"
-            )
-
         self._model = model
         self._speaker = speaker
         self._language_code = language_code

@@ -33,10 +33,6 @@ class DeepgramTTSClient(BaseTTSClient):
         if not model:
             raise ValueError("Deepgram TTS requires 'model'")
 
-        # Validate configuration
-        if not self.validate_voice(model=model, api_key=api_key):
-            raise ValueError(f"Invalid Deepgram model: {model}")
-
         self._model = model
         self._language_code = language_code
         self._api_key = api_key or settings.DEEPGRAM_API_KEY
