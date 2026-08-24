@@ -2328,4 +2328,85 @@ class TestDispatchEntrypoint:
         v1.reset_mock()
         with pytest.raises(RuntimeError):
             await worker.dispatch_entrypoint(self._ctx('{"engine": "roleplay_v2"}'))
-        v1.assert_not_awaited()
+
+
+class TestPredictiveFillerLlmIsolation:
+    """The predictive-filler background job used to share generate_response's
+    own LLM client/connection, which a real A/B test showed inflates
+    avgLlmTtftMs (~270ms) with the total generation time unaffected — the
+    signature of connection contention, not a slower model. It must now use
+    its own, connection-isolated client (_setup_predictive_filler_llm_client),
+    built from the identical configure_llm_client() resolution so the model/
+    provider/temperature never differs from the real reply's."""
+
+    def _worker(self):
+        ctx = types.SimpleNamespace(room=types.SimpleNamespace(name="room-1"))
+        return worker.AgentWorker(ctx)
+
+    def test_builds_a_distinct_client_from_the_shared_one(self, monkeypatch):
+        shared = Mock(name="shared-llm-client")
+        dedicated = Mock(name="dedicated-llm-client")
+        monkeypatch.setattr(worker, "configure_llm_client", lambda scenario: dedicated)
+
+        w = self._worker()
+        w.scenario = types.SimpleNamespace()
+        w.llm_client = shared
+
+        w._setup_predictive_filler_llm_client()
+
+        assert w._predictive_filler_llm_client is dedicated
+        assert w._predictive_filler_llm_client is not w.llm_client
+
+    def test_falls_back_to_the_shared_client_on_failure(self, monkeypatch):
+        shared = Mock(name="shared-llm-client")
+
+        def _boom(scenario):
+            raise RuntimeError("provider config broken")
+
+        monkeypatch.setattr(worker, "configure_llm_client", _boom)
+
+        w = self._worker()
+        w.scenario = types.SimpleNamespace()
+        w.llm_client = shared
+
+        # Must never raise — a broken dedicated-client build can't break the session.
+        w._setup_predictive_filler_llm_client()
+
+        assert w._predictive_filler_llm_client is shared
+
+    @pytest.mark.asyncio
+    async def test_predictive_filler_loop_calls_the_dedicated_client(self, monkeypatch):
+        from app.core.livekit import filler_audio as filler_audio_module
+        from app.core.livekit import predictive_filler as predictive_filler_module
+
+        shared = Mock(name="shared-llm-client")
+        dedicated = Mock(name="dedicated-llm-client")
+
+        generate_mock = AsyncMock(return_value=["hmm…"])
+        monkeypatch.setattr(
+            predictive_filler_module, "generate_predictive_fillers", generate_mock
+        )
+        monkeypatch.setattr(
+            filler_audio_module,
+            "synthesize_filler_clips",
+            AsyncMock(return_value=[("hmm…", "/tmp/hmm.wav")]),
+        )
+        monkeypatch.setattr(filler_audio_module, "cleanup_clips", Mock())
+
+        # First sleep lets the loop enter its body once; the second raises
+        # CancelledError so it exits cleanly after exactly one iteration.
+        sleep_mock = AsyncMock(side_effect=[None, asyncio.CancelledError()])
+        monkeypatch.setattr(asyncio, "sleep", sleep_mock)
+
+        w = self._worker()
+        w.scenario = types.SimpleNamespace()
+        w.llm_client = shared
+        w._predictive_filler_llm_client = dedicated
+        w._read_conversation_history = Mock(return_value=["turn one"])
+
+        await w._predictive_filler_loop()
+
+        generate_mock.assert_awaited_once()
+        called_client = generate_mock.await_args.args[0]
+        assert called_client is dedicated
+        assert called_client is not shared

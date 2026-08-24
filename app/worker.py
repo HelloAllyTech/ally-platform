@@ -280,6 +280,10 @@ class AgentWorker:
         # the static clips above stay as the fallback.
         self._dynamic_filler_clips: list[tuple[str, str]] = []  # (phrase, wav_path)
         self._predictor_task: Optional[asyncio.Task] = None
+        # Connection-isolated LLM client for the predictive-filler loop's own
+        # calls, so they can't contend with the real reply's in-flight call
+        # for the same connection — see _setup_predictive_filler_llm_client.
+        self._predictive_filler_llm_client = None
         # Recently spoken filler phrases, so we don't repeat the same one on
         # consecutive turns (random.choice has no memory). Kept short and capped
         # below the clip count so there's always a candidate to pick.
@@ -1722,6 +1726,7 @@ class AgentWorker:
             # self._dynamic_filler_clips, which playback prefers over the static
             # set. Tracked in _background_tasks so it's cancelled on shutdown.
             if predictive_on:
+                self._setup_predictive_filler_llm_client()
                 self._predictor_task = asyncio.create_task(
                     self._predictive_filler_loop()
                 )
@@ -2113,6 +2118,34 @@ class AgentWorker:
             int(getattr(settings, "INTERIM_REPLY_MIN_WORDS", 8)),
         )
 
+    def _setup_predictive_filler_llm_client(self) -> None:
+        """Build a connection-isolated LLM client for the predictive-filler
+        background job.
+
+        Same resolved provider/model/temperature as self.llm_client (built via
+        the identical configure_llm_client() call) — this is purely a second
+        HTTP connection, not a different model. Without it, the predictive
+        filler loop's LLM call (on its own free-running ~10s timer, decoupled
+        from turn boundaries — see _predictive_filler_loop) shares the real
+        reply's connection and can delay its first token even though total
+        generation time is unaffected: confirmed via a real A/B test showing
+        avgLlmTtftMs up ~270ms with fillers on while avgLlmResponseMs stayed
+        flat, the signature of connection contention rather than a slower
+        model or a bigger prompt.
+
+        Best-effort: on failure, falls back to sharing self.llm_client (the
+        prior behavior) rather than breaking the session.
+        """
+        try:
+            self._predictive_filler_llm_client = configure_llm_client(self.scenario)
+        except Exception as e:  # noqa: BLE001 - must never break a session
+            logger.warning(
+                "[FILLER] dedicated predictive-filler client setup failed; "
+                "falling back to the shared client: %s",
+                e,
+            )
+            self._predictive_filler_llm_client = self.llm_client
+
     def _on_interim_user_state(self, ev) -> None:
         """Reset interim state and (re)start the turn clock when the learner speaks.
 
@@ -2474,7 +2507,7 @@ class AgentWorker:
                     continue
 
                 phrases = await generate_predictive_fillers(
-                    self.llm_client,
+                    self._predictive_filler_llm_client,
                     self.scenario,
                     messages,
                     count,
