@@ -699,13 +699,31 @@ async def entrypoint(ctx: agents.JobContext):
         raise RuntimeError("ROLEPLAY_V2_ENABLED is off — refusing v2 job")
 
     worker = AgentWorkerV2(ctx)
-    _t0 = time.monotonic()
-    await worker.configure()
-    worker._timing["configure_ms"] = (time.monotonic() - _t0) * 1000
-    _t0 = time.monotonic()
-    await worker.initialize()
-    worker._timing["initialize_ms"] = (time.monotonic() - _t0) * 1000
-    await worker.start()
+    try:
+        _t0 = time.monotonic()
+        await worker.configure()
+        worker._timing["configure_ms"] = (time.monotonic() - _t0) * 1000
+        _t0 = time.monotonic()
+        await worker.initialize()
+        worker._timing["initialize_ms"] = (time.monotonic() - _t0) * 1000
+        await worker.start()
+    except Exception:
+        # configure()/initialize() and the first half of start() all run
+        # before ctx.connect() is guaranteed to have fired. livekit-agents'
+        # run_job() only resolves its shutdown future on ctx.connect(),
+        # ctx.shutdown(), or a room-disconnect event — raising alone does
+        # none of those, so the job process hangs forever, the agent never
+        # joins, and the room never frees (this exact pattern was fixed once
+        # for one cause in commit dd61115, "fix v2 agent-join hang"; this is
+        # the general case). Call shutdown explicitly so the job terminates
+        # and the failure is visible instead of hanging silently.
+        logger.exception(
+            "[AgentWorkerV2] Startup failed before the agent could join "
+            "room %s — shutting down the job",
+            ctx.room.name,
+        )
+        ctx.shutdown("startup_failed")
+        raise
 
     logger.info(
         "[AgentWorkerV2] START_TIMING configure=%.0fms initialize=%.0fms "

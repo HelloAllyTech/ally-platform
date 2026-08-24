@@ -2,6 +2,7 @@
 
 import json
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 
@@ -200,3 +201,71 @@ class TestConfigDefaults:
         assert settings.ROLEPLAY_V2_ENABLED is True
         assert settings.ACTOR_DEFAULT_MODEL
         assert settings.DIRECTOR_MODEL
+
+
+class TestStartupFailureShutsDownJob:
+    """A startup failure (configure/initialize/start, all pre-connect or
+    racing it) must call ctx.shutdown() explicitly.
+
+    livekit-agents' run_job() only resolves its shutdown future when
+    ctx.connect(), ctx.shutdown(), or a room-disconnect event fires — an
+    unhandled exception in the job task alone does none of those, so the
+    job process hangs forever, the agent never joins, and the room is never
+    freed. This is the same failure mode fixed once already for a specific
+    cause (commit dd61115, "roleplay_v2: coerce numeric IDs in spec envelope
+    (fix v2 agent-join hang)"); this test guards the general case so any
+    future configure()/initialize()/start() failure fails the job cleanly
+    instead of hanging silently.
+    """
+
+    def _ctx(self):
+        return SimpleNamespace(
+            job=SimpleNamespace(id="job-1"),
+            room=SimpleNamespace(name="room-1"),
+            shutdown=Mock(),
+        )
+
+    async def test_configure_failure_shuts_down_the_job(self, monkeypatch):
+        import app.worker_v2 as worker_v2
+
+        class ExplodingWorker:
+            _timing: dict = {}
+
+            def __init__(self, ctx):
+                pass
+
+            async def configure(self):
+                raise ValueError("bad metadata")
+
+        monkeypatch.setattr(settings, "ROLEPLAY_V2_ENABLED", True)
+        monkeypatch.setattr(worker_v2, "AgentWorkerV2", ExplodingWorker)
+
+        ctx = self._ctx()
+        with pytest.raises(ValueError, match="bad metadata"):
+            await worker_v2.entrypoint(ctx)
+
+        ctx.shutdown.assert_called_once()
+
+    async def test_initialize_failure_shuts_down_the_job(self, monkeypatch):
+        import app.worker_v2 as worker_v2
+
+        class ExplodingWorker:
+            _timing: dict = {}
+
+            def __init__(self, ctx):
+                pass
+
+            async def configure(self):
+                pass
+
+            async def initialize(self):
+                raise RuntimeError("director wiring failed")
+
+        monkeypatch.setattr(settings, "ROLEPLAY_V2_ENABLED", True)
+        monkeypatch.setattr(worker_v2, "AgentWorkerV2", ExplodingWorker)
+
+        ctx = self._ctx()
+        with pytest.raises(RuntimeError, match="director wiring failed"):
+            await worker_v2.entrypoint(ctx)
+
+        ctx.shutdown.assert_called_once()
