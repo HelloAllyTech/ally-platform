@@ -4,6 +4,10 @@ import type {FetchBaseQueryError} from '@reduxjs/toolkit/query';
 import {useLazyGetSimulationSessionRecordingQuery} from '@/services/simulationTranscriptApi';
 
 const ERROR_REFRESH_COOLDOWN_MS = 4000;
+// A non-404 failure (network blip, 5xx, timeout) doesn't mean the recording
+// is actually missing, so it's worth one immediate retry before giving up —
+// otherwise a one-off glitch permanently hides a recording that exists.
+const MAX_LOAD_ATTEMPTS = 2;
 
 const normalizePresignedUrl = (
   presignedUrl: string | undefined,
@@ -63,21 +67,31 @@ export const useSimulationSessionRecordingUrl = (
     }
     fetchingRef.current = true;
     try {
-      const result = await trigger({scenarioSessionId}).unwrap();
-      const url = normalizePresignedUrl(result.presignedUrl);
-      if (url) {
-        setPresignedUrl(url);
-        setMissingOnServer(false);
-      } else {
-        setPresignedUrl(undefined);
-        setMissingOnServer(true);
+      for (let attempt = 0; attempt < MAX_LOAD_ATTEMPTS; attempt++) {
+        try {
+          const result = await trigger({scenarioSessionId}).unwrap();
+          const url = normalizePresignedUrl(result.presignedUrl);
+          if (url) {
+            setPresignedUrl(url);
+            setMissingOnServer(false);
+          } else {
+            setPresignedUrl(undefined);
+            setMissingOnServer(true);
+          }
+          return;
+        } catch (e) {
+          const status = getErrorStatus(e);
+          if (status === 404) {
+            setPresignedUrl(undefined);
+            setMissingOnServer(true);
+            return;
+          }
+          // Transient error: fall through and retry, up to MAX_LOAD_ATTEMPTS.
+        }
       }
-    } catch (e) {
-      const status = getErrorStatus(e);
+      // Every attempt hit a transient error. Leave the URL cleared, but don't
+      // report the recording as confirmed-missing — it may still exist.
       setPresignedUrl(undefined);
-      if (status === 404) {
-        setMissingOnServer(true);
-      }
     } finally {
       fetchingRef.current = false;
       setInitialLoadDone(true);
