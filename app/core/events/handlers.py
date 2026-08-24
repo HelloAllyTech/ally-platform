@@ -219,6 +219,20 @@ def create_conversation_handler(
     # ---- main conversation handler ----
 
     def on_conversation_item_added(event: ConversationItemAddedEvent):
+        try:
+            _on_conversation_item_added(event)
+        except Exception:  # noqa: BLE001
+            # LiveKit's EventEmitter re-raises TypeError (unlike every other
+            # exception, which it logs and swallows), so letting one escape
+            # here propagates out of session.emit("conversation_item_added",
+            # ...) and can kill whichever internal task drives that event for
+            # the rest of the session — silently stopping the transcript feed
+            # mid-session while audio/turn-taking carry on unaffected.
+            logger.exception(
+                "conversation_item_added handler failed for room=%s", room_id
+            )
+
+    def _on_conversation_item_added(event: ConversationItemAddedEvent):
         content = extract_content(event.item)
 
         # Deduplication: Use content + timestamp as unique key
@@ -295,9 +309,11 @@ def create_conversation_handler(
             interrupted=interrupted,
         )
 
+        start_time_str = "None" if start_time is None else f"{start_time:.2f}"
+        end_time_str = "None" if end_time is None else f"{end_time:.2f}"
         logger.debug(
-            f"Transcript [{role}]: start_time={start_time:.2f}s, "
-            f"end_time={end_time:.2f}s, content={content[:20]}"
+            f"Transcript [{role}]: start_time={start_time_str}s, "
+            f"end_time={end_time_str}s, content={content[:20]}"
         )
 
         core_event = CoreEventMessageType.create(

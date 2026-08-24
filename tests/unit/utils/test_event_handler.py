@@ -356,6 +356,38 @@ class TestEventHandler:
         handler(event4)
         assert len(created_tasks) == 3  # New task created
 
+    def test_create_conversation_handler_survives_falsy_created_at(self, monkeypatch):
+        """A conversation item with a falsy created_at must not raise.
+
+        calculate_start_time() returns None for a falsy timestamp, and with
+        no speaking-start recorded for this role, both start_time and
+        end_time end up None. LiveKit's EventEmitter re-raises TypeError
+        (unlike every other exception, which it logs and swallows), so an
+        unguarded TypeError escaping this handler propagates out of
+        session.emit("conversation_item_added", ...) and can kill whichever
+        LiveKit-internal task drives that event for the rest of the
+        session -- silently stopping the transcript mid-session while audio
+        and turn-taking carry on unaffected.
+        """
+        monkeypatch.setattr(
+            eh,
+            "CoreEventMessageType",
+            types.SimpleNamespace(
+                create=lambda **_: types.SimpleNamespace(model_dump_json=lambda: "{}")
+            ),
+        )
+        monkeypatch.setattr(
+            asyncio, "create_task", lambda _: types.SimpleNamespace(cancel=lambda: None)
+        )
+
+        handler, _, _ = eh.create_conversation_handler(
+            "room-123", "2024-01-01T00:00:00+00:00"
+        )
+
+        event = DummyEvent(DummyItem(role="user", content="hello"), created_at=0)
+
+        handler(event)  # must not raise TypeError
+
     def test_create_conversation_handler_cleanup(self, monkeypatch):
         """Test that cleanup function clears the seen_utterances set."""
 
