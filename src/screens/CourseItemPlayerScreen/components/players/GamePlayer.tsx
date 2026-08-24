@@ -61,10 +61,11 @@ const GAME_HEIGHT: Record<TrackGameKey, number> = {
  * the learner's language for itself — anything it renders in words has to be
  * handed to it. The runner and the tic-tac-toe board are pure canvas and need
  * nothing; the memory deck has a move counter and an end-of-round card, the
- * puzzle has a level list, a solved count and the lines that teach it, and the
- * plant has a picker, a running commentary and the whole of its screen-reader
- * narration, so those three get these. A bundle falls back to its own baked-in
- * English if the host sends nothing, which is what keeps this list optional.
+ * puzzle has a level list, a solved count and the lines that teach it, the
+ * snake has a score, a best and a restart button, and the plant has a picker,
+ * a running commentary and the whole of its screen-reader narration, so those
+ * four get these. A bundle falls back to its own baked-in English if the host
+ * sends nothing, which is what keeps this list optional.
  */
 const FRAME_STRING_KEYS: Partial<
   Record<TrackGameKey, Readonly<Record<string, TranslationType>>>
@@ -88,6 +89,12 @@ const FRAME_STRING_KEYS: Partial<
     hintFree: 'courses.game.frameStrings.CUB_N_PUP.hintFree',
     hintPivot: 'courses.game.frameStrings.CUB_N_PUP.hintPivot',
     hintRotateLink: 'courses.game.frameStrings.CUB_N_PUP.hintRotateLink',
+  },
+  [TrackGameKey.SNAKE]: {
+    score: 'courses.game.frameStrings.SNAKE.score',
+    best: 'courses.game.frameStrings.SNAKE.best',
+    restart: 'courses.game.frameStrings.SNAKE.restart',
+    gameOver: 'courses.game.frameStrings.SNAKE.gameOver',
   },
   /*
    * The longest list here by some way, and deliberately so: the plant's scene
