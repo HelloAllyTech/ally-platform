@@ -46,12 +46,6 @@ export const styles = ScaledSheet.create({
     paddingBottom: '24@vs',
   },
 
-  // ── Checklist (relocated here from the retired Session Review tab for
-  // CHECKLIST-mode roleplays — same EventChecklist component, unchanged) ──
-  checklistContainer: {
-    marginBottom: '4@vs',
-  },
-
   // ── Note ──────────────────────────────────────────────────────────
   noteRow: {
     flexDirection: 'row',

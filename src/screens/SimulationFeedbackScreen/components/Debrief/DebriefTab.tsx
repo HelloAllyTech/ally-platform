@@ -13,11 +13,10 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 import {useTranslate} from '@/hooks';
 import {colors} from '@/theme';
-import {ExperienceMode, SimulationSummaryData} from '@/types';
+import {SimulationSummaryData} from '@/types';
 
 import {AskAIChatMessage, ChatMessageRole} from '../AskAI/types';
 import {useAskAIChat} from '../AskAI/useAskAIChat';
-import {EventChecklist} from '../EventChecklist';
 import {DebriefReplyInput} from './DebriefReplyInput';
 import {styles} from './styles';
 import {SupervisorNote} from './SupervisorNote';
@@ -145,21 +144,9 @@ export const DebriefTab: React.FC<DebriefTabProps> = ({
   // asynchronously after the session ends, so "empty" here means "not yet".
   const isGenerating = !note && !errorMessage && !retryLimitReached;
 
-  // CHECKLIST-mode roleplays used to show this in the old Session Review tab;
-  // it moves here — same component, same query, same condition — now that
-  // Debrief is the landing tab.
-  const isChecklistMode =
-    simulationDetails?.scenario?.metadata?.experienceMode ===
-    ExperienceMode.CHECKLIST;
-
   const renderHeader = useCallback(
     () => (
       <View>
-        {isChecklistMode && !!scenarioSessionId && (
-          <View style={styles.checklistContainer}>
-            <EventChecklist scenarioSessionId={scenarioSessionId} />
-          </View>
-        )}
         {isGenerating ? (
           <View>
             <NoteSkeleton />
@@ -188,8 +175,6 @@ export const DebriefTab: React.FC<DebriefTabProps> = ({
       </View>
     ),
     [
-      isChecklistMode,
-      scenarioSessionId,
       isGenerating,
       note,
       errorMessage,
