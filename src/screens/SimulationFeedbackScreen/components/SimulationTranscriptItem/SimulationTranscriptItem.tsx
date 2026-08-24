@@ -6,6 +6,11 @@ import {TRANSCRIPT_TAG_COLORS} from '@/constants';
 import {SimulationMessageTag} from '@/services/simulationTranscriptApi';
 import {colors, fontFamily, radius, typography} from '@/theme';
 
+const NEUTRAL_TAG_COLORS = {
+  background: colors.ds.grey[100],
+  text: colors.ds.grey[800],
+};
+
 export type SimulationTranscriptItemProps = {
   time: string;
   message: string;
@@ -41,7 +46,10 @@ export const SimulationTranscriptItem: React.FC<
     : colors.ds.deepPurple[800];
 
   const renderTag = (tag: SimulationMessageTag, index: number) => {
-    const tagColors = TRANSCRIPT_TAG_COLORS[tag.category];
+    // tag.category is typed as POSITIVE | NEGATIVE, but that isn't enforced
+    // at runtime. An unrecognised category produced an undefined lookup, and
+    // reading .background/.text off it crashed the whole debrief screen.
+    const tagColors = TRANSCRIPT_TAG_COLORS[tag.category] ?? NEUTRAL_TAG_COLORS;
     return (
       <View
         key={index}
