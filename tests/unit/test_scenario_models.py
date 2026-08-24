@@ -276,13 +276,13 @@ class TestPromptData:
         ],
     )
     def test_prompt_data_endpointing_pair_reaches_prompt_data(self, payload_keys):
-        """EXPERIMENT(turn-endpointing): the per-sim pair must survive
+        """ally-be's globally admin-configured endpointing pair must survive
         _build_prompt_data.
 
-        This is the guard the first attempt lacked. PromptData is assembled from
-        a hand-maintained mapped_data dict — a field defined on the model but
-        missing there is silently always None, so the whole feature ships inert
-        with every other layer (admin, DTO, metadata, promptData) looking right.
+        PromptData is assembled from a hand-maintained mapped_data dict — a
+        field defined on the model but missing there is silently always None,
+        so the whole pipeline ships inert with every other layer (admin, DTO,
+        metadata, promptData) looking right.
         """
         min_key, max_key = payload_keys
         result = Scenario._build_prompt_data(

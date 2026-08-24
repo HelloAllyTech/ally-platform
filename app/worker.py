@@ -664,17 +664,20 @@ class AgentWorker:
         (e.g. weights weren't baked into the image), we fall back to the plain
         "vad" timeout so a session never fails to start over turn detection.
 
-        EXPERIMENT(turn-endpointing) — TEMPORARY: a simulation may override BOTH
-        bounds (Studio Basic Settings → prompt_data.turn_min/max_endpointing_delay)
-        so we can find a good pair by trying them on real scenarios. Once found,
-        promote it to the globals and strip the per-sim controls; grep the marker
-        for every touchpoint. The admin form and the ally-be DTO both reject
-        max <= min, but stored data is never trusted here: the pair is applied
-        only when both are present and 0 < min < max, otherwise the session
-        falls back to the globals and logs why. A previous attempt at this
-        shipped inert because PromptData is built from a hand-maintained
-        mapped_data dict in Scenario._build_prompt_data and the mapping line was
-        missing — that line now exists and is covered by a test.
+        ally-be always sends this session's endpointing bounds (admin-configured
+        globally on the Settings page) via room metadata → prompt_data.turn_min/
+        max_endpointing_delay. This is the production path, not a per-sim
+        experiment: the value read here IS the platform's configured min/max.
+        settings.TURN_MIN/MAX_ENDPOINTING_DELAY (the local env-var defaults) are
+        a fallback-of-last-resort, used only when that metadata is missing or
+        fails validation — e.g. ally-be is unreachable, a cached room-metadata
+        blob predates this field, or a non-numeric/invalid pair somehow arrives.
+        The admin form and the ally-be DTO both reject max <= min, but stored
+        data is never trusted here: the pair is applied only when both are
+        present and 0 < min < max, otherwise the session falls back to the
+        local defaults and logs why. PromptData is built from a hand-maintained
+        mapped_data dict in Scenario._build_prompt_data, so the mapping for
+        these two fields matters — it's covered by a test.
 
         Returns ``(turn_detection, endpointing_kwargs)``.
         """
@@ -687,8 +690,8 @@ class AgentWorker:
 
             min_delay = float(getattr(settings, "TURN_MIN_ENDPOINTING_DELAY", 0.5))
             max_delay = float(getattr(settings, "TURN_MAX_ENDPOINTING_DELAY", 3.0))
-            # EXPERIMENT(turn-endpointing): per-sim pair, all-or-nothing.
-            min_delay, max_delay = self._apply_scenario_endpointing(
+            # Overlay ally-be's configured pair (all-or-nothing) on the local defaults.
+            min_delay, max_delay = self._apply_configured_endpointing(
                 min_delay, max_delay
             )
             # The EOU model weights are loaded once per WORKER by the inference
@@ -719,18 +722,23 @@ class AgentWorker:
             )
             return "vad", {}
 
-    def _apply_scenario_endpointing(
+    def _apply_configured_endpointing(
         self, min_delay: float, max_delay: float
     ) -> tuple[float, float]:
-        """EXPERIMENT(turn-endpointing) — TEMPORARY, remove with the per-sim UI.
+        """Overlay ally-be's admin-configured endpointing pair on the local
+        env-var defaults.
 
-        Overlay this simulation's endpointing pair on the platform globals.
-        Applied all-or-nothing: a half-configured or nonsensical pair (either
-        bound missing, non-numeric, <= 0, or min >= max) leaves BOTH globals in
-        place rather than mixing a tuned bound with a default one, which would
-        be near-impossible to reason about from a log line. The admin form and
-        the ally-be DTO already reject max <= min; this guard is for stored data
-        that predates them, or anything written straight through the API.
+        ally-be always populates prompt_data.turn_min/max_endpointing_delay
+        from its global Settings-page value, so in normal operation this pair
+        IS what gets applied — the local defaults (`min_delay`/`max_delay` as
+        passed in) only surface when that value is absent or invalid. Applied
+        all-or-nothing: a half-configured or nonsensical pair (either bound
+        missing, non-numeric, <= 0, or min >= max) leaves BOTH local defaults
+        in place rather than mixing a configured bound with a default one,
+        which would be near-impossible to reason about from a log line. The
+        admin form and the ally-be DTO already reject max <= min; this guard
+        is for stale/cached room metadata or anything written straight
+        through the API.
         """
         prompt_data = getattr(self.scenario, "prompt_data", None)
         raw_min = getattr(prompt_data, "turn_min_endpointing_delay", None)
@@ -738,37 +746,38 @@ class AgentWorker:
         if raw_min is None and raw_max is None:
             return min_delay, max_delay
         try:
-            sim_min = float(raw_min)
-            sim_max = float(raw_max)
+            configured_min = float(raw_min)
+            configured_max = float(raw_max)
         except (TypeError, ValueError):
             logger.warning(
-                "[TURN] per-sim endpointing ignored (non-numeric min=%r max=%r); "
-                "using globals %.2fs/%.2fs",
+                "[TURN] configured endpointing ignored (non-numeric min=%r "
+                "max=%r); using local defaults %.2fs/%.2fs",
                 raw_min,
                 raw_max,
                 min_delay,
                 max_delay,
             )
             return min_delay, max_delay
-        if not (0 < sim_min < sim_max):
+        if not (0 < configured_min < configured_max):
             logger.warning(
-                "[TURN] per-sim endpointing ignored (invalid pair min=%.2fs "
-                "max=%.2fs; need 0 < min < max); using globals %.2fs/%.2fs",
-                sim_min,
-                sim_max,
+                "[TURN] configured endpointing ignored (invalid pair min=%.2fs "
+                "max=%.2fs; need 0 < min < max); using local defaults "
+                "%.2fs/%.2fs",
+                configured_min,
+                configured_max,
                 min_delay,
                 max_delay,
             )
             return min_delay, max_delay
         logger.info(
-            "[TURN] per-sim endpointing applied: min=%.2fs max=%.2fs "
-            "(globals were %.2fs/%.2fs)",
-            sim_min,
-            sim_max,
+            "[TURN] configured endpointing applied: min=%.2fs max=%.2fs "
+            "(local defaults were %.2fs/%.2fs)",
+            configured_min,
+            configured_max,
             min_delay,
             max_delay,
         )
-        return sim_min, sim_max
+        return configured_min, configured_max
 
     def _setup_event_orchestrator(self, score_keeper=None):
         """Initialize event orchestrator with callbacks."""

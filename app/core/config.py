@@ -625,17 +625,21 @@ class Settings(BaseSettings):
         description=(
             "Minimum endpointing delay (s) — the fast path used when the EOU "
             "model is confident the learner finished. LiveKit default 0.5. "
-            "Platform baseline; a simulation may override it while the "
-            "EXPERIMENT(turn-endpointing) per-sim controls are in place."
+            "Fallback-of-last-resort: ally-be always sends its global "
+            "admin-configured value via room metadata (prompt_data."
+            "turn_min_endpointing_delay); this default is only used if that "
+            "value is missing or fails validation."
         ),
     )
     TURN_MAX_ENDPOINTING_DELAY: float = Field(
         default=3.0,
         description=(
             "Maximum endpointing delay (s) — the ceiling the agent waits when the "
-            "learner is likely mid-thought. LiveKit default 3.0. Platform "
-            "baseline; a simulation may override it while the "
-            "EXPERIMENT(turn-endpointing) per-sim controls are in place."
+            "learner is likely mid-thought. LiveKit default 3.0. "
+            "Fallback-of-last-resort: ally-be always sends its global "
+            "admin-configured value via room metadata (prompt_data."
+            "turn_max_endpointing_delay); this default is only used if that "
+            "value is missing or fails validation."
         ),
     )
 
