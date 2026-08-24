@@ -234,3 +234,93 @@ def test_empty_free_text_becomes_none_not_an_empty_string():
     out = validate(_proposal(affect="   ", voice_register=""), _memory())
     assert out.affect is None
     assert out.register is None
+
+
+# ---------------------------------------------------------------------------
+# The withheld ledger pairs two parallel lists — alignment is the whole thing
+# ---------------------------------------------------------------------------
+
+
+def test_a_blank_topic_does_not_shift_later_deflections():
+    # The reported bug. Cleaning the topics BEFORE pairing shifted every later
+    # deflection up one, so "her brother" was handed the padding entry meant for
+    # the blank. A mismatched excuse is a visible character break, which is
+    # worse than no excuse at all.
+    out = validate(
+        _proposal(
+            withheld_topics=["the hospital visit", "", "her brother"],
+            withheld_deflections=[
+                "says she is fine and asks about work",
+                "(padding for the blank)",
+                "changes the subject to her mother",
+            ],
+        ),
+        _memory(),
+    )
+    assert out.withheld == [
+        ("the hospital visit", "says she is fine and asks about work"),
+        ("her brother", "changes the subject to her mother"),
+    ]
+
+
+def test_a_duplicate_topic_does_not_shift_later_deflections():
+    out = validate(
+        _proposal(
+            withheld_topics=["the visit", "the visit", "the money"],
+            withheld_deflections=["asks about work", "(dropped)", "goes quiet"],
+        ),
+        _memory(),
+    )
+    assert out.withheld == [
+        ("the visit", "asks about work"),
+        ("the money", "goes quiet"),
+    ]
+
+
+def test_a_missing_deflection_falls_back_without_stealing_another():
+    # Fewer deflections than topics: the unmatched topic gets the fallback, and
+    # must not borrow a neighbour's.
+    out = validate(
+        _proposal(
+            withheld_topics=["the visit", "the money"],
+            withheld_deflections=["asks about work"],
+        ),
+        _memory(),
+    )
+    assert out.withheld[0] == ("the visit", "asks about work")
+    assert out.withheld[1][0] == "the money"
+    assert out.withheld[1][1] == "change the subject naturally"
+
+
+def test_a_blank_deflection_falls_back_rather_than_rendering_empty():
+    out = validate(
+        _proposal(withheld_topics=["the visit"], withheld_deflections=["   "]),
+        _memory(),
+    )
+    assert out.withheld == [("the visit", "change the subject naturally")]
+
+
+def test_surplus_deflections_are_ignored():
+    out = validate(
+        _proposal(
+            withheld_topics=["the visit"],
+            withheld_deflections=["asks about work", "unused", "also unused"],
+        ),
+        _memory(),
+    )
+    assert out.withheld == [("the visit", "asks about work")]
+
+
+def test_the_cap_counts_kept_pairs_not_raw_positions():
+    # Blanks interleaved with real topics must not eat the budget, or a padded
+    # list would silently drop real withheld topics.
+    topics, deflections = [], []
+    for i in range(12):
+        topics += [f"topic {i}", ""]
+        deflections += [f"deflection {i}", "padding"]
+    out = validate(
+        _proposal(withheld_topics=topics, withheld_deflections=deflections),
+        _memory(),
+    )
+    assert len(out.withheld) == 10
+    assert out.withheld[9] == ("topic 9", "deflection 9")

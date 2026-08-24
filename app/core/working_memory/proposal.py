@@ -252,19 +252,34 @@ def validate(proposal: ProposedUpdate, memory: ClientWorkingMemory) -> Validated
         )
 
     # A withheld topic needs a deflection to be usable — the actor has to know
-    # how to move away, not merely that it should. Positional pairing, with a
-    # fallback so a missing deflection degrades to a usable instruction rather
-    # than to an empty one.
-    topics = _clean(proposal.withheld_topics, limit=10)
-    deflections = proposal.withheld_deflections
-    withheld = [
-        (
-            topic,
-            (deflections[i].strip() if i < len(deflections) else "")
-            or "change the subject naturally",
+    # how to move away, not merely that it should. The two lists are paired
+    # POSITIONALLY, so pairing has to happen on the RAW indices and cleaning
+    # afterwards.
+    #
+    # Doing it the other way round was an off-by-one: `_clean` drops blanks and
+    # duplicates, so a padded or repeated topic shifted every later deflection
+    # up by one and the actor was handed the wrong excuse for the wrong subject.
+    # ["the hospital visit", "", "her brother"] against three deflections gave
+    # "her brother" the padding entry meant for the blank. That is worse than a
+    # missing deflection: a nonsensical or mismatched excuse is a visible
+    # character break, and the whole point of the ledger is that the actor
+    # deflects convincingly.
+    #
+    # The fallback keeps a missing deflection usable rather than empty.
+    raw_deflections = proposal.withheld_deflections
+    withheld: List[Tuple[str, str]] = []
+    seen_topics: List[str] = []
+    for index, raw_topic in enumerate(proposal.withheld_topics):
+        topic = (raw_topic or "").strip()
+        if not topic or topic in seen_topics:
+            continue
+        seen_topics.append(topic)
+        deflection = (
+            raw_deflections[index].strip() if index < len(raw_deflections) else ""
         )
-        for i, topic in enumerate(topics)
-    ]
+        withheld.append((topic, deflection or "change the subject naturally"))
+        if len(withheld) >= 10:
+            break
 
     return ValidatedUpdate(
         stance=stance,
