@@ -70,6 +70,12 @@ if settings.SEMANTIC_TURN_DETECTION_ENABLED:
     )
 
 logger = get_logger(__name__)
+
+
+class _SkipWorkingMemoryPool(Exception):
+    """Internal: the scenario has not opted into the client working memory."""
+
+
 setup_livekit_logging(
     settings.LIVEKIT_LOG_LEVEL,
     devmode=settings.LIVEKIT_LOG_DEV_MODE,
@@ -497,6 +503,7 @@ class AgentWorker:
         # scenario by the `{client_working_memory}` placeholder in the selected
         # main-agent prompt (design §6.1), so a scenario that has not opted in
         # neither renders the block nor pays for the call that fills it.
+        from app.core.graph.prompt import prompt_declares_client_working_memory
         from app.core.working_memory import ClientWorkingMemoryStore, build_corpus
 
         self.client_working_memory_store = ClientWorkingMemoryStore()
@@ -510,8 +517,20 @@ class AgentWorker:
         # learner just said, five facts instead of the whole biography. Scenario
         # knowledge folds into the same pool so a personal memory and a case-file
         # detail compete on relevance rather than occupying separate blocks.
+        # Gated on the flag AND the scenario's opt-in, both. Without this the
+        # pool was built and EMBEDDED on every session in the fleet — an
+        # embedding API call per session, at setup, for a pool that nothing
+        # would read while the feature is off. The updater only runs for an
+        # opted-in scenario, so the same gate belongs here.
+        _cwm_prompt_data = getattr(self.scenario, "prompt_data", None)
+        _cwm_opted_in = bool(
+            settings.CLIENT_WORKING_MEMORY_ENABLED
+            and _cwm_prompt_data is not None
+            and prompt_declares_client_working_memory(_cwm_prompt_data)
+        )
         try:
-            _cwm_prompt_data = getattr(self.scenario, "prompt_data", None)
+            if not _cwm_opted_in:
+                raise _SkipWorkingMemoryPool
             self.client_working_memory_store.corpus = build_corpus(
                 character_profile_text=getattr(
                     _cwm_prompt_data, "character_profile_text", None
@@ -542,6 +561,8 @@ class AgentWorker:
                 # holding the embedding client past session end.
                 self._background_tasks.add(_pool_task)
                 _pool_task.add_done_callback(self._background_tasks.discard)
+        except _SkipWorkingMemoryPool:
+            logger.debug("[working-memory] pool skipped: scenario has not opted in")
         except Exception as _corpus_error:  # noqa: BLE001
             # Recall having nothing to draw on is a quiet degradation; failing
             # session setup over it would not be.

@@ -310,3 +310,45 @@ class TestGraphWiring:
         edges = {(e.source, e.target) for e in compiled.get_graph().edges}
         assert ("compact_history", "update_working_memory") not in edges
         assert ("update_working_memory", "compact_history") not in edges
+
+
+class TestFlagOffCostsNothing:
+    """With the feature off, a session must do NO working-memory work.
+
+    The pool build and its embedding call were not gated, so every session in
+    the fleet would have fired an embedding API call at setup for a pool nothing
+    would read. A disabled feature must be free, not merely harmless.
+    """
+
+    def test_the_pool_is_not_built_when_the_flag_is_off(self, monkeypatch):
+        monkeypatch.setattr(settings, "CLIENT_WORKING_MEMORY_ENABLED", False)
+        from app.core.graph.prompt import prompt_declares_client_working_memory
+
+        assert not (
+            settings.CLIENT_WORKING_MEMORY_ENABLED
+            and prompt_declares_client_working_memory(
+                _prompt_data("client_working_memory")
+            )
+        )
+
+    def test_the_pool_is_not_built_when_the_scenario_has_not_opted_in(
+        self, monkeypatch
+    ):
+        # Flag on, but the prompt does not declare the placeholder: still free.
+        monkeypatch.setattr(settings, "CLIENT_WORKING_MEMORY_ENABLED", True)
+        from app.core.graph.prompt import prompt_declares_client_working_memory
+
+        assert not prompt_declares_client_working_memory(
+            _prompt_data("state_x_guidelines")
+        )
+
+    def test_both_conditions_together_enable_it(self, monkeypatch):
+        monkeypatch.setattr(settings, "CLIENT_WORKING_MEMORY_ENABLED", True)
+        from app.core.graph.prompt import prompt_declares_client_working_memory
+
+        assert (
+            settings.CLIENT_WORKING_MEMORY_ENABLED
+            and prompt_declares_client_working_memory(
+                _prompt_data("client_working_memory")
+            )
+        )
