@@ -83,7 +83,9 @@ async def send_message_to_queue(message_data: str) -> bool:
         return False
 
 
-def create_session_end_message(room_id: str, final_score: int) -> CoreEventMessageType:
+def create_session_end_message(
+    room_id: str, final_score: int, reason: Optional[str] = None
+) -> CoreEventMessageType:
     """
     Create a session end message with total score for backend.
 
@@ -93,13 +95,19 @@ def create_session_end_message(room_id: str, final_score: int) -> CoreEventMessa
     Args:
         room_id: LiveKit room identifier
         final_score: Final total score for the session
+        reason: Present only when this end-of-session was produced by the
+            emergency/force-exit path (e.g. "watchdog_force_exit") rather than
+            a clean shutdown, so ally-be can record that the session ended
+            technically rather than normally. Omitted (the normal path) keeps
+            the message byte-identical to before this field existed.
 
     Returns:
         CoreEventMessageType ready to be sent to queue
     """
-    return CoreEventMessageType.create(
-        room_id=room_id, event_data={"id": "end-of-session", "totalScore": final_score}
-    )
+    event_data = {"id": "end-of-session", "totalScore": final_score}
+    if reason:
+        event_data["reason"] = reason
+    return CoreEventMessageType.create(room_id=room_id, event_data=event_data)
 
 
 async def send_session_paused_message(room_id: str, at_ms: int) -> None:

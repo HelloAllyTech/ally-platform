@@ -47,11 +47,11 @@ WHAT IT DELIBERATELY DOES NOT DO
   with it.
 * No final-compaction LLM call — needs the blocked loop, and the last
   maintained summary is what PHASE 1 would have sent anyway.
-* No new wire fields. The end-of-session message is byte-identical in shape to
-  the normal one, so ally-be needs no change to accept it. (A ``reason``
-  field distinguishing "scored after a technical fault" from a clean finish
-  would be genuinely useful, but that is an ally-be contract change and is
-  out of scope here — the distinction is logged instead.)
+* One new, additive wire field: the end-of-session message carries
+  ``reason`` (e.g. ``"watchdog_force_exit"``) so ally-be can record that this
+  session was scored after a technical fault rather than a clean finish. The
+  normal path (``finalize_session``) never sets it, so those messages are
+  still byte-identical to before this field existed.
 
 Core's session_memory processor keeps whichever write covers more messages, so
 a later/duplicate delivery cannot clobber a better one. The end-of-session
@@ -227,7 +227,9 @@ class EmergencyFinalizer:
                     self._room_id,
                 )
 
-            message = create_session_end_message(self._room_id, final_score)
+            message = create_session_end_message(
+                self._room_id, final_score, reason=reason
+            )
             ok = bool(self._get_queue().send_message_sync(message.model_dump_json()))
             logger.error(
                 "[EMERGENCY-FINALIZE] end_of_session sent=%s room=%s score=%s "
