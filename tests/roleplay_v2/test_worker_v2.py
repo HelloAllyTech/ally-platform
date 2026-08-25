@@ -189,6 +189,30 @@ class TestNoiseCancellationRequiresCloud:
 
         assert captured["noise_cancellation"] == "PREWARMED_BVC"
 
+    async def test_job_assigned_to_a_non_cloud_media_url_gets_no_filter(
+        self, monkeypatch
+    ):
+        # The room connects to RunningJobInfo.url, not to the URL the worker
+        # registered with — judge the former (mirrors the v1 worker test).
+        captured = {}
+        monkeypatch.setattr(settings, "LIVEKIT_URL", "wss://ally.livekit.cloud")
+        w = self._prepare(monkeypatch, captured)
+        w.ctx._info = SimpleNamespace(url="wss://sfu.internal")
+
+        await w.start()
+
+        assert captured["noise_cancellation"] is None
+
+    async def test_kill_switch_off_declines_the_filter_on_cloud(self, monkeypatch):
+        captured = {}
+        monkeypatch.setattr(settings, "LIVEKIT_URL", "wss://ally.livekit.cloud")
+        monkeypatch.setattr(settings, "LIVEKIT_NOISE_CANCELLATION_ENABLED", False)
+        w = self._prepare(monkeypatch, captured)
+
+        await w.start()
+
+        assert captured["noise_cancellation"] is None
+
 
 class TestConfigDefaults:
     def test_v2_settings_present(self):

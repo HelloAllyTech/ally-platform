@@ -11,8 +11,23 @@ SDK refuses it and the session simply runs unfiltered:
 
 So the workers gate on the deployment before asking for the filter — same
 hostname test the agents SDK uses for its own Cloud-only features.
+
+Two things that gate has to get right, both learned the hard way:
+
+* **Which URL.** A worker *registers* with ``settings.LIVEKIT_URL``, but each
+  job connects its room to ``RunningJobInfo.url`` — ``job_assign.url or
+  ws_url`` in the SDK's worker, i.e. whatever media URL the server handed
+  this particular job. The SDK gates its own Cloud-only features on that job
+  URL (``is_cloud(self._info.url)``), and so must we: a Cloud control plane
+  can dispatch a job to a media server that is not Cloud, which looks fine to
+  a check on the registration URL and still gets the filter refused.
+* **When no URL can tell.** A project can sit on a genuine ``*.livekit.cloud``
+  hostname whose media plane still refuses Krisp. No hostname distinguishes
+  that from a fully managed Cloud project, so an operator needs a way to say
+  so — ``LIVEKIT_NOISE_CANCELLATION_ENABLED``.
 """
 
+from typing import Any
 from urllib.parse import urlparse
 
 # LiveKit Cloud (and its sandbox/dev domain) — the only deployments that can
@@ -20,10 +35,32 @@ from urllib.parse import urlparse
 _CLOUD_HOST_SUFFIXES = (".livekit.cloud", ".livekit.run")
 
 
-def supports_noise_cancellation(livekit_url: str) -> bool:
-    """True when the LiveKit deployment at ``livekit_url`` can run Krisp BVC."""
+def session_livekit_url(ctx: Any, fallback: str) -> str:
+    """The LiveKit URL this job's room actually connects to.
+
+    ``JobContext`` keeps it on the private ``_info`` (there is no public
+    accessor), so read it defensively: anything missing, blank or not a
+    string means "the SDK didn't give us one", and the registration URL it
+    would have fallen back to is the answer.
+    """
+    url = getattr(getattr(ctx, "_info", None), "url", None)
+    if isinstance(url, str) and url.strip():
+        return url
+    return fallback
+
+
+def supports_noise_cancellation(livekit_url: str, *, enabled: bool = True) -> bool:
+    """True when the LiveKit deployment at ``livekit_url`` can run Krisp BVC.
+
+    ``livekit_url`` must be the URL of the deployment the session connects to
+    (see :func:`session_livekit_url`), not necessarily the worker's own.
+    ``enabled`` is the operator kill-switch: False refuses the filter whatever
+    the URL says. Both must agree before we ask for BVC.
+    """
+    if not enabled:
+        return False
     try:
         hostname = urlparse(livekit_url or "").hostname
-    except ValueError:  # malformed URL — treat as "can't"
+    except (TypeError, ValueError):  # malformed URL — treat as "can't"
         return False
     return bool(hostname) and hostname.endswith(_CLOUD_HOST_SUFFIXES)

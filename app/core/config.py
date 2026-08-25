@@ -38,6 +38,22 @@ class Settings(BaseSettings):
     LIVEKIT_URL: str = Field(...)
     AGENT_NAME: str = Field(default="Agent", description="Agent name for LiveKit")
 
+    # Krisp BVC is a LiveKit Cloud feature; app/core/livekit/audio_filters.py
+    # decides per session from the URL the room actually connects to. A URL is
+    # not always enough — a project can sit on a real *.livekit.cloud hostname
+    # whose media plane still refuses the filter ("audio filter cannot be
+    # enabled: LiveKit Cloud is required" in prd, 2026-08-25), and no hostname
+    # can reveal that. This is the operator's override for exactly that case.
+    LIVEKIT_NOISE_CANCELLATION_ENABLED: bool = Field(
+        default=True,
+        description=(
+            "Request Krisp BVC noise cancellation when the deployment the "
+            "session connects to looks Cloud-capable. Set False to stop asking "
+            "for it at all on a deployment whose media servers reject the "
+            "filter (kill-switch; sessions then run unfiltered)."
+        ),
+    )
+
     OPENAI_API_KEY: str = Field(...)
     OPENAI_MODEL: str = Field(
         default="gpt-4o-mini", description="OpenAI model to use for LLM responses"

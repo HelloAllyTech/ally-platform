@@ -2124,6 +2124,38 @@ class TestNoiseCancellationRequiresCloud:
 
         assert captured["noise_cancellation"] == "PREWARMED_BVC"
 
+    @pytest.mark.asyncio
+    async def test_job_assigned_to_a_non_cloud_media_url_gets_no_filter(
+        self, monkeypatch
+    ):
+        """We register with Cloud; this job's room connects somewhere else.
+
+        The SDK connects the room to RunningJobInfo.url (job_assign.url or
+        ws_url), so the registration URL saying "Cloud" proves nothing about
+        the deployment that has to run the filter.
+        """
+        captured = {}
+        monkeypatch.setattr(worker.settings, "LIVEKIT_URL", "wss://ally.livekit.cloud")
+        w = self._prepare(monkeypatch, captured)
+        w.ctx._info = types.SimpleNamespace(url="wss://sfu.internal")
+
+        await w.start()
+
+        assert captured["noise_cancellation"] is None
+
+    @pytest.mark.asyncio
+    async def test_kill_switch_off_declines_the_filter_on_cloud(self, monkeypatch):
+        captured = {}
+        monkeypatch.setattr(worker.settings, "LIVEKIT_URL", "wss://ally.livekit.cloud")
+        monkeypatch.setattr(
+            worker.settings, "LIVEKIT_NOISE_CANCELLATION_ENABLED", False
+        )
+        w = self._prepare(monkeypatch, captured)
+
+        await w.start()
+
+        assert captured["noise_cancellation"] is None
+
 
 class TestEmitStartMetrics:
     """The per-session start-latency ("time to first word") emit to Core."""

@@ -74,9 +74,11 @@ taking a whole task description and returning full chunk bodies. Setup, citation
 - **Latency is the feature.** Anything you add to the path between the learner finishing a
   sentence and hearing a reply is a product regression, even if it is correct. Move work off
   that path — do it during setup, or in the background — rather than making it faster.
-- **Krisp BVC noise cancellation only works on LiveKit Cloud.** The workers pass it only
-  when `supports_noise_cancellation(settings.LIVEKIT_URL)` says the deployment can run it;
-  a self-hosted SFU rejects the filter, so don't assume background noise is being removed.
+- **Krisp BVC noise cancellation only works on LiveKit Cloud — judge the job's URL, not
+  the worker's.** `supports_noise_cancellation()` must see the URL the room actually
+  connects to (`session_livekit_url()`), since a Cloud control plane can still assign a
+  non-Cloud media server; `LIVEKIT_NOISE_CANCELLATION_ENABLED=False` is the operator
+  kill-switch for a Cloud project whose media plane rejects the filter anyway.
 - **STT confidence is not usable for Indian languages.** Don't gate behaviour on it. The
   mitigation for mis-transcription is a live guardrail that asks the learner to repeat.
 - **Provider behaviour differs per language, not just per provider.** A fix verified in

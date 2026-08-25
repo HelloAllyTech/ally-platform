@@ -38,7 +38,10 @@ from app.core.events.handlers import (
     create_termination_handler,
     setup_interruption_detection,
 )
-from app.core.livekit.audio_filters import supports_noise_cancellation
+from app.core.livekit.audio_filters import (
+    session_livekit_url,
+    supports_noise_cancellation,
+)
 from app.core.logger import (
     get_logger,
     make_child_logging_forward_only,
@@ -2807,14 +2810,20 @@ class AgentWorker:
             # Krisp BVC only runs on LiveKit Cloud. On a self-hosted SFU the
             # SDK rejects the filter ("audio filter cannot be enabled: LiveKit
             # Cloud is required") and the session runs unfiltered anyway, so
-            # asking for it there only buys two error lines per session.
-            if supports_noise_cancellation(settings.LIVEKIT_URL):
+            # asking for it there only buys two error lines per session. Judge
+            # the URL this job's room actually connects to — the server can
+            # assign a media URL that differs from the one we registered with.
+            _lk_url = session_livekit_url(self.ctx, settings.LIVEKIT_URL)
+            _bvc_enabled = getattr(settings, "LIVEKIT_NOISE_CANCELLATION_ENABLED", True)
+            if supports_noise_cancellation(_lk_url, enabled=_bvc_enabled):
                 bvc = userdata.get("bvc") or noise_cancellation.BVC()
             else:
                 bvc = None
                 logger.info(
-                    "[AgentWorker] noise cancellation off — this LiveKit "
-                    "deployment is not Cloud, which Krisp BVC requires"
+                    "[AgentWorker] noise cancellation off — Krisp BVC needs a "
+                    "LiveKit Cloud deployment (url=%s, enabled=%s)",
+                    _lk_url,
+                    _bvc_enabled,
                 )
             # V2V test rooms: DISABLE noise cancellation. Krisp BVC is
             # Background VOICE Cancellation — it can classify a synthetic
