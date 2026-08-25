@@ -392,15 +392,28 @@ def configure_llm_client(scenario: Scenario) -> BaseLLMClient:
     Returns:
         Configured LLM client instance
     """
-    llm_config_from_metadata = None
-    if scenario.language_config:
-        llm_config_from_metadata = scenario.language_config.llm_config
-
     language_code = (
         scenario.language_config.language_code
         if scenario.language_config
         else DEFAULT_LANGUAGE_CODE
     )
+
+    # TEMPORARY A/B test override (2026-08-24): force scenario 122 onto
+    # gpt-5-mini regardless of its prompt's configured model, to compare
+    # avgLlmTtftMs/avgLlmResponseMs against the gpt-4o-mini baseline without
+    # touching Studio's shared default prompt
+    # (ally_ai_learn_system_main_agent_prompt), which many other scenarios
+    # also use. Remove once the test concludes.
+    if getattr(scenario, "id", None) == 122:
+        logger.info("[AB_TEST] scenario 122: forcing gpt-5-mini")
+        return create_llm_client(
+            llm_config={"provider": "openai", "config": {"model": "gpt-5-mini"}},
+            language_code=language_code,
+        )
+
+    llm_config_from_metadata = None
+    if scenario.language_config:
+        llm_config_from_metadata = scenario.language_config.llm_config
 
     # Simulation-level temperature (promptData.temperature) — main agent only.
     roleplay_temperature = getattr(scenario.prompt_data, "temperature", None)
