@@ -2410,3 +2410,65 @@ class TestPredictiveFillerLlmIsolation:
         called_client = generate_mock.await_args.args[0]
         assert called_client is dedicated
         assert called_client is not shared
+
+
+class TestStartupFailureShutsDownJob:
+    """A startup failure (configure/initialize/start, all pre-connect or
+    racing it) must call ctx.shutdown() explicitly.
+
+    livekit-agents' run_job() only resolves its shutdown future when
+    ctx.connect(), ctx.shutdown(), or a room-disconnect event fires — an
+    unhandled exception in the job task alone does none of those, so the
+    job process hangs forever, the agent never joins, and the room is never
+    freed. app/worker_v2.py::entrypoint() was fixed for this exact pattern;
+    this guards the same fix for v1's entrypoint(), which dispatch_entrypoint
+    still routes non-v2 jobs to.
+    """
+
+    def _ctx(self):
+        return types.SimpleNamespace(
+            job=types.SimpleNamespace(id="job-1", metadata="{}"),
+            room=types.SimpleNamespace(name="room-1"),
+            shutdown=Mock(),
+        )
+
+    @pytest.mark.asyncio
+    async def test_configure_failure_shuts_down_the_job(self, monkeypatch):
+        class ExplodingWorker:
+            _timing: dict = {}
+
+            def __init__(self, ctx):
+                pass
+
+            async def configure(self):
+                raise ValueError("bad metadata")
+
+        monkeypatch.setattr(worker, "AgentWorker", ExplodingWorker)
+
+        ctx = self._ctx()
+        with pytest.raises(ValueError, match="bad metadata"):
+            await worker.entrypoint(ctx)
+
+        ctx.shutdown.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_initialize_failure_shuts_down_the_job(self, monkeypatch):
+        class ExplodingWorker:
+            _timing: dict = {}
+
+            def __init__(self, ctx):
+                pass
+
+            async def configure(self):
+                pass
+
+            async def initialize(self):
+                raise RuntimeError("agent wiring failed")
+
+        monkeypatch.setattr(worker, "AgentWorker", ExplodingWorker)
+
+        ctx = self._ctx()
+        with pytest.raises(RuntimeError, match="agent wiring failed"):
+            await worker.entrypoint(ctx)
+
+        ctx.shutdown.assert_called_once()

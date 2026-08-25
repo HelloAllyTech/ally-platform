@@ -3175,18 +3175,35 @@ async def entrypoint(ctx: agents.JobContext):
 
     worker = AgentWorker(ctx)
     logger.info(f"[AgentWorker] Starting job {ctx.job.id}...")
-    _seg_t0 = time.monotonic()
-    await worker.configure()  # Phase 1: Configure clients
-    worker._timing["configure_ms"] = (time.monotonic() - _seg_t0) * 1000
-    logger.info(f"[AgentWorker] Job {ctx.job.id} configured.")
-    _seg_t0 = time.monotonic()
-    await worker.initialize()  # Phase 2: Create session, agent, orchestrator
-    worker._timing["initialize_ms"] = (time.monotonic() - _seg_t0) * 1000
-    logger.info(f"[AgentWorker] Job {ctx.job.id} initialized.")
-    _seg_t0 = time.monotonic()
-    await worker.start()  # Phase 3: Connect and start
-    worker._timing["start_ms"] = (time.monotonic() - _seg_t0) * 1000
-    logger.info(f"[AgentWorker] Job {ctx.job.id} started.")
+    try:
+        _seg_t0 = time.monotonic()
+        await worker.configure()  # Phase 1: Configure clients
+        worker._timing["configure_ms"] = (time.monotonic() - _seg_t0) * 1000
+        logger.info(f"[AgentWorker] Job {ctx.job.id} configured.")
+        _seg_t0 = time.monotonic()
+        await worker.initialize()  # Phase 2: Create session, agent, orchestrator
+        worker._timing["initialize_ms"] = (time.monotonic() - _seg_t0) * 1000
+        logger.info(f"[AgentWorker] Job {ctx.job.id} initialized.")
+        _seg_t0 = time.monotonic()
+        await worker.start()  # Phase 3: Connect and start
+        worker._timing["start_ms"] = (time.monotonic() - _seg_t0) * 1000
+        logger.info(f"[AgentWorker] Job {ctx.job.id} started.")
+    except Exception:
+        # configure()/initialize() and the first half of start() all run
+        # before ctx.connect() is guaranteed to have fired. livekit-agents'
+        # run_job() only resolves its shutdown future on ctx.connect(),
+        # ctx.shutdown(), or a room-disconnect event — raising alone does
+        # none of those, so the job process hangs forever, the agent never
+        # joins, and the room never frees (same defect class fixed for
+        # app/worker_v2.py::entrypoint(); see its docstring for the prior
+        # narrow fix in commit dd61115). Call shutdown explicitly so the job
+        # terminates and the failure is visible instead of hanging silently.
+        logger.exception(
+            f"[AgentWorker] Startup failed before the agent could join "
+            f"job {ctx.job.id} — shutting down the job"
+        )
+        ctx.shutdown("startup_failed")
+        raise
 
     # One-line breakdown of the pre-opening critical path so we can see which
     # segment dominates the delay before the agent speaks. Log-only, guarded so
