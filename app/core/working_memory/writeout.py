@@ -50,6 +50,31 @@ _WORD_RE = re.compile(r"[\w']+", re.UNICODE)
 #: footprint in the conversation at all — not to enforce quotation.
 _GROUNDING_THRESHOLD = 0.6
 
+#: **The check does not discriminate in morphologically rich languages, and that
+#: is measured rather than suspected.** Tamil grounded at 27% in the 2026-08-24
+#: sweep against 83-100% for English, Hindi, Marathi and Kannada.
+#:
+#: Reading that session's real transcript, the client HAD discussed sleep —
+#: "தூக்கம் சரியா வர மாட்டேங்க" — and the updater wrote "சரியா தூங்கவில்லை".
+#: Tamil derivational morphology turns the noun தூக்கம் into the verb
+#: தூங்கவில்லை, changing the consonant, so the two share no token and not even a
+#: common prefix. A paraphrase that shifts part of speech scores zero.
+#:
+#: Both alternatives were tried and MEASURED, and neither separates the cases:
+#:
+#:   lexical overlap : genuine paraphrase 0.00-0.50, an inference 0.20
+#:   embedding cosine: genuine 0.380-0.442, INVENTED content 0.345-0.422
+#:
+#: one invention scoring higher than a true disclosure. The signal distinguishing
+#: "said differently" from "not said at all" is not present in either measure, so
+#: no threshold and no better metric fixes this.
+#:
+#: What changed instead is the CONSEQUENCE. An item below the threshold is
+#: recorded as unverified rather than discarded, because the check is good
+#: evidence of corroboration and poor evidence of invention — and dropping
+#: asserts the stronger claim. Same reasoning as an empty transcript keeping
+#: everything: missing evidence is not evidence of invention.
+
 #: Words too short to carry meaning in the overlap count. Same threshold the
 #: recall keyword filter uses, for the same reason.
 _MIN_WORD_LEN = 4
@@ -109,11 +134,11 @@ def build_writeout(
     """
     grounded, ungrounded = check_grounding([f.text for f in memory.disclosed], messages)
     if ungrounded:
-        # WARNING, not debug: an ungrounded disclosure means the updater
-        # invented something, and that is worth seeing in production logs
-        # rather than discovering later in a next session's prompt.
+        # WARNING, not debug: a disclosure the transcript cannot corroborate
+        # is worth seeing in production logs rather than discovering later
+        # in a next session's prompt.
         logger.warning(
-            "[working-memory] dropping %d ungrounded disclosure(s) at " "write-out: %s",
+            "[working-memory] %d unverified disclosure(s) at write-out: %s",
             len(ungrounded),
             ungrounded,
         )
@@ -121,7 +146,7 @@ def build_writeout(
     open_threads = [t.topic for t in memory.open_threads]
     withheld_still_locked = [w.topic for w in memory.withheld if w.status == "locked"]
 
-    if not (grounded or open_threads or withheld_still_locked):
+    if not (grounded or ungrounded or open_threads or withheld_still_locked):
         return None
 
     return {
@@ -133,6 +158,12 @@ def build_writeout(
         "final_stance": memory.stance,
         "stance_path": list(memory.stance_path),
         "disclosed": grounded,
+        # Kept, not discarded. See the note on _GROUNDING_THRESHOLD: the
+        # check cannot tell a paraphrase from an inference, so discarding
+        # would assert "invented" on evidence that does not support it. A
+        # reader wanting only corroborated history uses `disclosed`; this
+        # exists so the rest is recoverable rather than destroyed.
+        "disclosed_unverified": ungrounded,
         # Named so a reader cannot mistake these for closed business.
         "unresolved_threads": open_threads,
         "still_withheld": withheld_still_locked,
@@ -142,5 +173,5 @@ def build_writeout(
         # tell without being told.
         "updates_committed": memory.updates_committed,
         "updates_missed": memory.updates_missed,
-        "ungrounded_dropped": len(ungrounded),
+        "unverified_count": len(ungrounded),
     }

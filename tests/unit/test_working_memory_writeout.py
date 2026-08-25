@@ -70,7 +70,12 @@ class TestGrounding:
 
 
 class TestWriteout:
-    def test_keeps_only_grounded_disclosures(self):
+    def test_separates_corroborated_from_unverified(self):
+        # Both are KEPT, in different fields. The check is good evidence of
+        # corroboration and poor evidence of invention — Tamil grounded at 27%
+        # while the client had genuinely said the things, because derivational
+        # morphology changed every surface form. Discarding asserts "invented"
+        # on evidence that does not support it.
         memory = ClientWorkingMemory(
             disclosed=[
                 Fact(text="lost the job in March"),
@@ -79,7 +84,8 @@ class TestWriteout:
         )
         record = build_writeout(memory, _transcript())
         assert record["disclosed"] == ["lost the job in March"]
-        assert record["ungrounded_dropped"] == 1
+        assert record["disclosed_unverified"] == ["her brother emigrated to Canada"]
+        assert record["unverified_count"] == 1
 
     def test_records_the_path_not_just_the_endpoint(self):
         # "guarded -> testing -> guarded" and "guarded -> testing -> engaged"
@@ -132,11 +138,20 @@ class TestWriteout:
         # inherit a record asserting that nothing happened.
         assert build_writeout(ClientWorkingMemory(), _transcript()) is None
 
-    def test_a_session_of_only_invented_facts_leaves_no_trace(self):
+    def test_a_session_of_only_unverified_facts_still_leaves_a_record(self):
+        # Reversed deliberately on 2026-08-24. This previously returned None, on
+        # the reasoning that an all-invented session should leave no trace. The
+        # Tamil run showed the premise was wrong: an all-UNVERIFIED session is
+        # usually a real conversation the check could not corroborate, and
+        # returning None destroyed the stance path with it. The unverified items
+        # are quarantined by field name, not deleted.
         memory = ClientWorkingMemory(
             disclosed=[Fact(text="her brother emigrated to Canada")]
         )
-        assert build_writeout(memory, _transcript()) is None
+        record = build_writeout(memory, _transcript())
+        assert record is not None
+        assert record["disclosed"] == []
+        assert record["disclosed_unverified"] == ["her brother emigrated to Canada"]
 
     def test_withheld_alone_is_worth_keeping(self):
         # Nothing was disclosed, but "this subject is still closed" is exactly

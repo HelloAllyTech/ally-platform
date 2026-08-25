@@ -288,9 +288,7 @@ class TestScheduleUpdate:
         # Teardown is not a failure to measure.
         assert (await store.snapshot()).updates_missed == 0
 
-    async def test_hung_embedding_call_does_not_freeze_the_session(
-        self, monkeypatch
-    ):
+    async def test_hung_embedding_call_does_not_freeze_the_session(self, monkeypatch):
         """A stuck embedding call must not leave `in_flight` True forever.
 
         `_embed_query`'s bare try/except only ever catches a call that RAISES;
