@@ -193,8 +193,20 @@ async def _emit_session_memory(
     from app.core.config import settings
 
     if not settings.ROLLING_SUMMARY_ENABLED:
-        logger.debug("session_memory skipped: ROLLING_SUMMARY_ENABLED is off")
-        return
+        # The two flags are independent (config.py): a disabled rolling
+        # summary must not take client working memory down with it. Without a
+        # working-memory store there is nothing left to ship at all.
+        if client_working_memory_store is None:
+            logger.debug(
+                "session_memory skipped: ROLLING_SUMMARY_ENABLED is off and no "
+                "client_working_memory_store was provided"
+            )
+            return
+        logger.debug(
+            "ROLLING_SUMMARY_ENABLED is off; shipping client working memory only"
+        )
+        rolling_summary_store = None
+        llm_client = None
 
     # Phase 7: the semantic half of the write-out. Folded into `structured`
     # under one namespaced key rather than sent as its own message — ally-be

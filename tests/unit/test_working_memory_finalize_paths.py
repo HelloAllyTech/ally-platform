@@ -139,3 +139,57 @@ class TestNoRollingSummary:
     async def test_nothing_is_sent_when_there_is_nothing_at_all(self, monkeypatch):
         sent = await self._emit(ClientWorkingMemoryStore(), monkeypatch)
         assert sent == []
+
+
+class TestRollingSummaryDisabled:
+    """CLIENT_WORKING_MEMORY_ENABLED is independent of ROLLING_SUMMARY_ENABLED —
+    turning off the rolling summary must not silently take working memory
+    down with it."""
+
+    async def _emit(self, wm_store, monkeypatch):
+        from app.core.config import settings
+        from app.core.queue import utils as qu
+
+        sent = []
+        monkeypatch.setattr(
+            qu, "send_message_to_queue", AsyncMock(side_effect=lambda p: sent.append(p))
+        )
+        monkeypatch.setattr(qu, "_tail_messages_for_grounding", lambda thread_id: [])
+        monkeypatch.setattr(settings, "ROLLING_SUMMARY_ENABLED", False)
+        rs = SimpleNamespace(
+            summary="a maintained summary",
+            covered_count=4,
+            total_count=8,
+            structured={"a": 1},
+        )
+        await qu._emit_session_memory(
+            room_id="ss_z",
+            thread_id="ss_z",
+            llm_client=None,
+            language_code="hi-IN",
+            prompt_data=None,
+            rolling_summary_store=rs,
+            client_working_memory_store=wm_store,
+        )
+        return sent
+
+    async def test_the_record_ships_even_though_rolling_summary_is_off(
+        self, monkeypatch
+    ):
+        sent = await self._emit(_store_with_content(), monkeypatch)
+        assert sent, (
+            "client working memory was dropped because ROLLING_SUMMARY_ENABLED "
+            "was off"
+        )
+        assert "client_working_memory" in sent[0]
+
+    async def test_the_rolling_summary_itself_stays_suppressed(self, monkeypatch):
+        # The kill switch must still work for the thing it targets.
+        sent = await self._emit(_store_with_content(), monkeypatch)
+        assert "a maintained summary" not in sent[0]
+
+    async def test_nothing_is_sent_without_a_working_memory_store_either(
+        self, monkeypatch
+    ):
+        sent = await self._emit(None, monkeypatch)
+        assert sent == []
