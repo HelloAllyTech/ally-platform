@@ -230,7 +230,35 @@ async def _emit_session_memory(
             # A failed finalize costs this session its score.
             logger.warning("[working-memory] write-out skipped: %s", writeout_error)
 
+    # SHIP IT FIRST, before the episodic work that can outlive its own budget.
+    #
+    # Fourth path found for losing this record, and the one that defeated the
+    # try/finally below: `finalize_session` awaits this coroutine, and the
+    # shutdown drain gives it `wait_for(shield(...), timeout=16.0)`. The final
+    # compaction alone can spend 14s of that (two attempts at 8s and 6s), so the
+    # drain expires with the coroutine still inside the summary logic — and a
+    # `finally` never runs if the coroutine never completes. A shield keeps the
+    # task alive but nothing keeps the loop alive.
+    #
+    # So the semantic record goes out on its own message as soon as it exists,
+    # while there is certainly still runway. The normal path below sends again
+    # with the summary attached; ally-be's upsert is guarded on coverage and the
+    # later message also carries the record, so the second write is an upgrade
+    # rather than a clobber.
     record_shipped = False
+    if working_memory_record is not None:
+        try:
+            await _ship_working_memory_only(
+                room_id, working_memory_record, language_code
+            )
+            record_shipped = True
+        except Exception as early_error:  # noqa: BLE001
+            # Not fatal: the try/finally below is still a second chance.
+            logger.warning(
+                "[working-memory] early record ship failed for room=%s: %s",
+                room_id,
+                early_error,
+            )
 
     async def _send(
         summary_text: str,

@@ -258,3 +258,77 @@ class TestNoEarlyReturnCanDropTheRecord:
 
         sent = await self._emit(monkeypatch, maintained="", compaction=ok)
         assert sum("client_working_memory" in m for m in sent) == 1
+
+
+class TestTheRecordShipsBeforeTheSlowWork:
+    """A finally cannot save a coroutine that is never allowed to finish.
+
+    Fourth path to lose the record, and the one that defeated the try/finally:
+    finalize_session awaits _emit_session_memory, and the shutdown drain gives it
+    wait_for(shield(...), timeout=16.0). The final compaction can spend 14s of
+    that on its own, so the drain expires mid-coroutine — observed on a clean 8/8
+    Tamil run that built a 6-item record and stored nothing.
+    """
+
+    async def test_the_record_goes_out_before_the_compaction_runs(self, monkeypatch):
+        from app.core.queue import utils as qu
+
+        order = []
+        monkeypatch.setattr(
+            qu,
+            "send_message_to_queue",
+            AsyncMock(side_effect=lambda p: order.append("ship")),
+        )
+        monkeypatch.setattr(qu, "_tail_messages_for_grounding", lambda t: [])
+
+        async def slow_compaction(*a, **k):
+            order.append("compaction")
+            raise RuntimeError("drain would have expired here")
+
+        monkeypatch.setattr(
+            qu,
+            "update_rolling_summary",
+            AsyncMock(side_effect=slow_compaction),
+            raising=False,
+        )
+        rs = SimpleNamespace(
+            summary="", covered_count=0, total_count=6, structured=None
+        )
+        await qu._emit_session_memory(
+            room_id="ss_order",
+            thread_id="ss_order",
+            llm_client=object(),
+            language_code="ta-IN",
+            prompt_data=None,
+            rolling_summary_store=rs,
+            client_working_memory_store=_store_with_content(),
+        )
+        assert order, "nothing was sent at all"
+        assert order[0] == "ship", f"record did not ship first: {order}"
+
+    async def test_a_failed_early_ship_still_falls_back(self, monkeypatch):
+        from app.core.queue import utils as qu
+
+        calls = {"n": 0}
+
+        async def flaky(payload):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise RuntimeError("transient SQS failure")
+
+        monkeypatch.setattr(qu, "send_message_to_queue", flaky)
+        monkeypatch.setattr(qu, "_tail_messages_for_grounding", lambda t: [])
+        rs = SimpleNamespace(
+            summary="", covered_count=0, total_count=0, structured=None
+        )
+        await qu._emit_session_memory(
+            room_id="ss_retry",
+            thread_id="ss_retry",
+            llm_client=None,
+            language_code="ta-IN",
+            prompt_data=None,
+            rolling_summary_store=rs,
+            client_working_memory_store=_store_with_content(),
+        )
+        # First attempt raised; the finally must try again.
+        assert calls["n"] >= 2
