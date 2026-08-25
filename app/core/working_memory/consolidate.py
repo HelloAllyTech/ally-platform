@@ -430,11 +430,26 @@ def schedule_update(
         # compare against; otherwise the lexical path is the whole path.
         query_vec = None
         if store.corpus is not None and store.corpus.vectors:
-            query_vec = await _embed_query(
-                embed_query,
-                update.retrieve_cues,
-                _last_learner_text(new_messages),
-            )
+            # Same hard timeout as the consolidation call above: `_embed_query`'s
+            # own try/except only catches a call that RAISES, not one that hangs,
+            # and a hung embedding call would otherwise keep `store.in_flight`
+            # True (and this session's memory frozen) until the session ends.
+            try:
+                query_vec = await asyncio.wait_for(
+                    _embed_query(
+                        embed_query,
+                        update.retrieve_cues,
+                        _last_learner_text(new_messages),
+                    ),
+                    timeout=timeout,
+                )
+            except asyncio.TimeoutError:
+                logger.warning(
+                    "[working-memory] query embedding for turn %d timed out "
+                    "after %ss; recall stays lexical",
+                    turn_index,
+                    timeout,
+                )
         salient = _select_salient(
             store.corpus,
             update=update,

@@ -288,6 +288,42 @@ class TestScheduleUpdate:
         # Teardown is not a failure to measure.
         assert (await store.snapshot()).updates_missed == 0
 
+    async def test_hung_embedding_call_does_not_freeze_the_session(
+        self, monkeypatch
+    ):
+        """A stuck embedding call must not leave `in_flight` True forever.
+
+        `_embed_query`'s bare try/except only ever catches a call that RAISES;
+        one that hangs sails straight past it, and with no timeout of its own
+        it would keep the background task alive (and `store.in_flight` True)
+        for the rest of the session, since `consolidate`'s own timeout window
+        has already closed by the time this call starts.
+        """
+        monkeypatch.setattr(mod, "load_and_format", lambda *a, **k: "SYS")
+        store = ClientWorkingMemoryStore()
+
+        from app.core.working_memory.corpus import BackstoryCorpus
+        from app.core.working_memory.state import Fact
+
+        store.corpus = BackstoryCorpus(
+            facts=[Fact(text="grew up in Kochi")],
+            vectors={"grew up in Kochi": [0.1, 0.2]},
+        )
+
+        async def _hangs_forever(*a, **k):
+            await asyncio.sleep(10)
+
+        llm = _llm(ProposedUpdate(retrieve_cues=["kochi"]))
+        args = self._args(llm)
+        args["timeout"] = 0.05
+        args["embed_query"] = _hangs_forever
+
+        assert mod.schedule_update(store, **args)
+        await asyncio.wait_for(store._task, timeout=2.0)
+        # The next turn's update must be free to schedule, not stuck behind a
+        # background task an unbounded network call never lets finish.
+        assert not store.in_flight
+
     async def test_nothing_to_summarize_commits_nothing(self, monkeypatch):
         monkeypatch.setattr(mod, "load_and_format", lambda *a, **k: "SYS")
         store = ClientWorkingMemoryStore()
