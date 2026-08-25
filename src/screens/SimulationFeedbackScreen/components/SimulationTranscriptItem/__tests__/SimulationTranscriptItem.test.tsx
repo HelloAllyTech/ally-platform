@@ -234,4 +234,22 @@ describe('SimulationTranscriptItem', () => {
     expect(getByText('Avoid Advice Giving')).toBeTruthy();
     expect(getByText('Hello, this is a test message')).toBeTruthy();
   });
+
+  it('does not crash when a tag has a category outside POSITIVE/NEGATIVE', () => {
+    // Regression: TRANSCRIPT_TAG_COLORS only has POSITIVE/NEGATIVE keys, but
+    // the type is not enforced by the backend at runtime. An unexpected
+    // category (e.g. "NEUTRAL", or a lowercase variant) produces an
+    // undefined lookup, and reading .background/.text off it crashes the
+    // whole debrief screen.
+    const tags = [{label: 'Unexpected', category: 'NEUTRAL'}] as any;
+    const {getByText} = render(
+      <SimulationTranscriptItem
+        {...defaultProps}
+        speakerLabel="Speaker"
+        tags={tags}
+      />,
+    );
+    expect(getByText('Unexpected')).toBeTruthy();
+    expect(getByText('Hello, this is a test message')).toBeTruthy();
+  });
 });
