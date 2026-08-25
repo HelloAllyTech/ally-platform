@@ -193,3 +193,68 @@ class TestRollingSummaryDisabled:
     ):
         sent = await self._emit(None, monkeypatch)
         assert sent == []
+
+
+class TestNoEarlyReturnCanDropTheRecord:
+    """Every return path in the summary logic must still ship the record.
+
+    Three separate paths have now dropped it: the emergency finalizer, the
+    `elif not maintained` branch, and `if upgraded is None: return` — the last
+    of which threw away an 18-item record from a completed 8/8 Tamil session.
+    Hence a `finally`, not a fourth branch.
+    """
+
+    async def _emit(self, monkeypatch, *, maintained, compaction):
+        from app.core.queue import utils as qu
+
+        sent = []
+        monkeypatch.setattr(
+            qu, "send_message_to_queue", AsyncMock(side_effect=lambda p: sent.append(p))
+        )
+        monkeypatch.setattr(qu, "_tail_messages_for_grounding", lambda t: [])
+        # A real conversation exists, so the final-compaction path is entered.
+        monkeypatch.setattr(
+            qu, "get_simulation_state_messages", lambda t: ["m"] * 6, raising=False
+        )
+        monkeypatch.setattr(
+            qu,
+            "update_rolling_summary",
+            AsyncMock(side_effect=compaction),
+            raising=False,
+        )
+        rs = SimpleNamespace(
+            summary=maintained, covered_count=0, total_count=6, structured=None
+        )
+        await qu._emit_session_memory(
+            room_id="ss_z",
+            thread_id="ss_z",
+            llm_client=object(),
+            language_code="ta-IN",
+            prompt_data=None,
+            rolling_summary_store=rs,
+            client_working_memory_store=_store_with_content(),
+        )
+        return sent
+
+    async def test_a_failed_final_compaction_still_ships_the_record(self, monkeypatch):
+        # THE observed failure: 8/8 exchanges, an 18-item record, nothing stored.
+        sent = await self._emit(
+            monkeypatch, maintained="", compaction=RuntimeError("compaction died")
+        )
+        assert sent, "the record was dropped when the final compaction failed"
+        assert "client_working_memory" in sent[-1]
+
+    async def test_the_standalone_summary_is_not_a_narrative(self, monkeypatch):
+        sent = await self._emit(
+            monkeypatch, maintained="", compaction=RuntimeError("boom")
+        )
+        assert "no conversation summary was produced" in sent[-1]
+        assert "guarded -> testing" in sent[-1]
+
+    async def test_the_record_is_not_shipped_twice(self, monkeypatch):
+        # When the summary path DOES send, the fallback must stay quiet.
+        async def ok(*a, **k):
+            return ("a real summary", {"disclosures": []})
+
+        sent = await self._emit(monkeypatch, maintained="", compaction=ok)
+        assert sum("client_working_memory" in m for m in sent) == 1

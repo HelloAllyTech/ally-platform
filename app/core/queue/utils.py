@@ -230,15 +230,19 @@ async def _emit_session_memory(
             # A failed finalize costs this session its score.
             logger.warning("[working-memory] write-out skipped: %s", writeout_error)
 
+    record_shipped = False
+
     async def _send(
         summary_text: str,
         message_count: int,
         covered: int,
         structured: dict | None = None,
     ) -> None:
+        nonlocal record_shipped
         if working_memory_record is not None:
             structured = dict(structured or {})
             structured["client_working_memory"] = working_memory_record
+            record_shipped = True
         memory = SessionMemoryData(
             summary=summary_text,
             language=language_code,
@@ -258,127 +262,156 @@ async def _emit_session_memory(
         )
         await send_message_to_queue(message.model_dump_json())
 
-    store = rolling_summary_store
-    maintained = (store.summary or "").strip() if store is not None else ""
-    covered_count = max(0, store.covered_count) if store is not None else 0
-
-    # Best-effort read of the full message list for the final compaction.
-    messages = []
+    # try/finally, not a branch. The semantic record does not depend on the
+    # episodic summary, and every attempt to express that as one more branch
+    # has missed a path: first the emergency finalizer, then `elif not
+    # maintained`, then `if upgraded is None: return` — which is how a
+    # completed 8/8 Tamil session built an 18-item record and threw it away.
+    # A `finally` covers every return, present and future, including a raise.
     try:
-        from app.core.graph import agent_graph
+        store = rolling_summary_store
+        maintained = (store.summary or "").strip() if store is not None else ""
+        covered_count = max(0, store.covered_count) if store is not None else 0
 
-        state = agent_graph.get_state({"configurable": {"thread_id": thread_id}})
-        values = state.values if state and state.values else {}
-        messages = values.get("messages") or []
-    except Exception as state_error:
-        logger.warning(
-            "Could not read graph state for final compaction (%s); "
-            "using the maintained summary as-is",
-            state_error,
+        # Best-effort read of the full message list for the final compaction.
+        messages = []
+        try:
+            from app.core.graph import agent_graph
+
+            state = agent_graph.get_state({"configurable": {"thread_id": thread_id}})
+            values = state.values if state and state.values else {}
+            messages = values.get("messages") or []
+        except Exception as state_error:
+            logger.warning(
+                "Could not read graph state for final compaction (%s); "
+                "using the maintained summary as-is",
+                state_error,
+            )
+
+        message_count = max(
+            len(messages), store.total_count if store is not None else 0
         )
 
-    message_count = max(len(messages), store.total_count if store is not None else 0)
+        # PHASE 1 — ship the maintained summary IMMEDIATELY (pure SQS send,
+        # milliseconds). The disconnect path gives this task almost no runway:
+        # the worker's shutdown cancels background tasks and the job process
+        # exits within ~2s, which killed the emission entirely when it waited on
+        # a final-compaction LLM call first (observed live: the finalize task
+        # died inside wait_for and CancelledError skipped every log). Delivering
+        # the last good summary must never depend on another LLM round-trip.
+        if maintained:
+            await _send(
+                maintained,
+                message_count,
+                covered_count,
+                structured=getattr(store, "structured", None),
+            )
 
-    # PHASE 1 — ship the maintained summary IMMEDIATELY (pure SQS send,
-    # milliseconds). The disconnect path gives this task almost no runway:
-    # the worker's shutdown cancels background tasks and the job process
-    # exits within ~2s, which killed the emission entirely when it waited on
-    # a final-compaction LLM call first (observed live: the finalize task
-    # died inside wait_for and CancelledError skipped every log). Delivering
-    # the last good summary must never depend on another LLM round-trip.
-    if maintained:
-        await _send(
-            maintained,
-            message_count,
-            covered_count,
-            structured=getattr(store, "structured", None),
-        )
+        # PHASE 2 — best-effort upgrade: fold the not-yet-covered tail in and
+        # send a message with higher coverage. Core's processor keeps whichever
+        # write covers more messages, so a cancelled/never-delivered upgrade (or
+        # out-of-order delivery) can't clobber phase 1. This is also what gives
+        # SHORT sessions (< one compaction cycle, no maintained summary) a
+        # memory at all — when the runway allows it.
+        if llm_client is not None and messages and covered_count < len(messages):
+            from app.core.graph.rolling_summary import update_rolling_summary
 
-    # PHASE 2 — best-effort upgrade: fold the not-yet-covered tail in and
-    # send a message with higher coverage. Core's processor keeps whichever
-    # write covers more messages, so a cancelled/never-delivered upgrade (or
-    # out-of-order delivery) can't clobber phase 1. This is also what gives
-    # SHORT sessions (< one compaction cycle, no maintained summary) a
-    # memory at all — when the runway allows it.
-    if llm_client is not None and messages and covered_count < len(messages):
-        from app.core.graph.rolling_summary import update_rolling_summary
+            # Two attempts: a transient LLM stall (observed live: TimeoutError on
+            # a 6-exchange session) must not silently lose the session's ONLY
+            # memory when there is no maintained summary to fall back on. The
+            # retry uses a shorter timeout so both attempts fit the shutdown
+            # drain window (handlers.py).
+            upgraded = upgraded_structured = None
+            for attempt, attempt_timeout in enumerate(
+                (settings.ROLLING_SUMMARY_TIMEOUT, 6.0), start=1
+            ):
+                try:
+                    upgraded, upgraded_structured = await asyncio.wait_for(
+                        update_rolling_summary(
+                            previous_summary=maintained or None,
+                            new_messages=messages[covered_count:],
+                            llm_client=llm_client,
+                            prompt_data=prompt_data,
+                            room_id=room_id,
+                        ),
+                        timeout=attempt_timeout,
+                    )
+                    break
+                except Exception as e:
+                    logger.warning(
+                        "Final session-memory compaction attempt %d failed (%r); %s",
+                        attempt,
+                        e,
+                        (
+                            "retrying once"
+                            if attempt == 1
+                            else (
+                                f"phase-1 summary covering {covered_count}/"
+                                f"{message_count} messages already sent"
+                                if maintained
+                                else "no summary was available to send"
+                            )
+                        ),
+                    )
+            if upgraded is None:
+                return
+            upgraded = (upgraded or "").strip()
+            if upgraded and upgraded != maintained:
+                await _send(
+                    upgraded,
+                    len(messages),
+                    len(messages),
+                    structured=upgraded_structured,
+                )
+        elif not maintained:
+            logger.info(
+                "No rolling summary available for room=%s; the semantic record "
+                "still ships below if there is one",
+                room_id,
+            )
 
-        # Two attempts: a transient LLM stall (observed live: TimeoutError on
-        # a 6-exchange session) must not silently lose the session's ONLY
-        # memory when there is no maintained summary to fall back on. The
-        # retry uses a shorter timeout so both attempts fit the shutdown
-        # drain window (handlers.py).
-        upgraded = upgraded_structured = None
-        for attempt, attempt_timeout in enumerate(
-            (settings.ROLLING_SUMMARY_TIMEOUT, 6.0), start=1
-        ):
+    finally:
+        if working_memory_record is not None and not record_shipped:
             try:
-                upgraded, upgraded_structured = await asyncio.wait_for(
-                    update_rolling_summary(
-                        previous_summary=maintained or None,
-                        new_messages=messages[covered_count:],
-                        llm_client=llm_client,
-                        prompt_data=prompt_data,
-                        room_id=room_id,
-                    ),
-                    timeout=attempt_timeout,
+                await _ship_working_memory_only(
+                    room_id, working_memory_record, language_code
                 )
-                break
-            except Exception as e:
+            except Exception as ship_error:  # noqa: BLE001
                 logger.warning(
-                    "Final session-memory compaction attempt %d failed (%r); %s",
-                    attempt,
-                    e,
-                    (
-                        "retrying once"
-                        if attempt == 1
-                        else (
-                            f"phase-1 summary covering {covered_count}/"
-                            f"{message_count} messages already sent"
-                            if maintained
-                            else "no summary was available to send"
-                        )
-                    ),
+                    "[working-memory] standalone record ship failed for " "room=%s: %s",
+                    room_id,
+                    ship_error,
                 )
-        if upgraded is None:
-            return
-        upgraded = (upgraded or "").strip()
-        if upgraded and upgraded != maintained:
-            await _send(
-                upgraded,
-                len(messages),
-                len(messages),
-                structured=upgraded_structured,
-            )
-    elif not maintained:
-        # No episodic summary — but the SEMANTIC record does not depend on one,
-        # and gating it on the summary silently threw it away for exactly the
-        # sessions most likely to need it. Measured: an 8-exchange Hindi run had
-        # boundary=0 on every turn, so compaction never fired and the write-out
-        # was dropped even though the memory itself was fully populated.
-        #
-        # ally-be requires a non-empty summary to accept the message, so the
-        # record travels with a short factual line naming what it is. That line
-        # is not a fabricated narrative — it states the stance path and nothing
-        # more, so nothing downstream can mistake it for a real summary.
-        if working_memory_record is not None:
-            path = " -> ".join(working_memory_record.get("stance_path") or [])
-            await _send(
-                f"(no conversation summary was produced for this session; "
-                f"client stance path: {path or 'unknown'})",
-                0,
-                0,
-            )
-            logger.info(
-                "No rolling summary for room=%s; shipped the working-memory "
-                "record on its own",
-                room_id,
-            )
-        else:
-            logger.info(
-                "No rolling summary available for room=%s; skipping " "session_memory",
-                room_id,
-            )
+
+
+async def _ship_working_memory_only(
+    room_id: str,
+    record: dict,
+    language_code: str | None,
+    send=None,
+) -> None:
+    """Ship the semantic record with no episodic summary to carry it.
+
+    ally-be requires a non-empty summary to accept the message, so one is
+    synthesised that states the stance path and NOTHING else — deliberately not
+    a narrative, so nothing downstream can mistake it for a real summary.
+    """
+    path = " -> ".join(record.get("stance_path") or []) or "unknown"
+    memory = SessionMemoryData(
+        summary=(
+            "(no conversation summary was produced for this session; "
+            f"client stance path: {path})"
+        ),
+        language=language_code,
+        message_count=0,
+        summarized_message_count=0,
+        structured={"client_working_memory": record},
+    )
+    message = CoreEventMessageType.create_session_memory(
+        room_id=room_id, session_memory=memory
+    )
+    logger.info("Shipping the working-memory record on its own for room=%s", room_id)
+    await (send or send_message_to_queue)(message.model_dump_json())
 
 
 async def finalize_session(
