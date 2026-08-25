@@ -202,6 +202,12 @@ class SupervisorNotesService:
         handler, so it must not await and must not raise.
         """
         try:
+            logger.info(
+                "[supervisor] room=%s scenario=%s turn %s committed — evaluating",
+                self._room_id,
+                self._scenario_id,
+                turn_index,
+            )
             if not self._should_consider(turn_index):
                 return
             self._in_flight = True
@@ -217,17 +223,28 @@ class SupervisorNotesService:
     def _should_consider(self, turn_index: int) -> bool:
         """Code-enforced gates. The prompt argues for silence; this guarantees it."""
         if self._in_flight:
-            logger.debug(
-                "[supervisor] turn %s skipped — a note call is already in flight",
+            logger.info(
+                "[supervisor] room=%s scenario=%s turn %s skipped — a note call "
+                "is already in flight",
+                self._room_id,
+                self._scenario_id,
                 turn_index,
             )
             return False
         if self._paused():
-            logger.debug("[supervisor] turn %s skipped — session paused", turn_index)
+            logger.info(
+                "[supervisor] room=%s scenario=%s turn %s skipped — session paused",
+                self._room_id,
+                self._scenario_id,
+                turn_index,
+            )
             return False
         if self._notes_sent >= self._max_notes:
-            logger.debug(
-                "[supervisor] turn %s skipped — session cap of %d notes reached",
+            logger.info(
+                "[supervisor] room=%s scenario=%s turn %s skipped — session cap "
+                "of %d notes reached",
+                self._room_id,
+                self._scenario_id,
                 turn_index,
                 self._max_notes,
             )
@@ -236,21 +253,39 @@ class SupervisorNotesService:
             self._last_note_turn is not None
             and (turn_index - self._last_note_turn) < self._min_turn_gap
         ):
-            logger.debug(
-                "[supervisor] turn %s skipped — only %s turn(s) since the last note "
-                "(min gap %d)",
+            logger.info(
+                "[supervisor] room=%s scenario=%s turn %s skipped — only %s "
+                "turn(s) since the last note (min gap %d)",
+                self._room_id,
+                self._scenario_id,
                 turn_index,
                 turn_index - self._last_note_turn,
                 self._min_turn_gap,
             )
             return False
         if not self._window:
+            logger.info(
+                "[supervisor] room=%s scenario=%s turn %s skipped — no "
+                "conversation window recorded yet",
+                self._room_id,
+                self._scenario_id,
+                turn_index,
+            )
             return False
         if not self._system_prompt:
             logger.warning(
-                "[supervisor] no system prompt resolved — live notes are inert"
+                "[supervisor] room=%s scenario=%s no system prompt resolved — "
+                "live notes are inert",
+                self._room_id,
+                self._scenario_id,
             )
             return False
+        logger.info(
+            "[supervisor] room=%s scenario=%s turn %s passed gates — invoking LLM",
+            self._room_id,
+            self._scenario_id,
+            turn_index,
+        )
         return True
 
     def _paused(self) -> bool:
@@ -303,8 +338,11 @@ class SupervisorNotesService:
         latency_ms = round((time.perf_counter() - started) * 1000.0, 1)
 
         if verdict is None or not verdict.should_note:
-            logger.debug(
-                "[supervisor] turn %s — staying silent (%.0fms)",
+            logger.info(
+                "[supervisor] room=%s scenario=%s turn %s — LLM chose silence "
+                "(%.0fms)",
+                self._room_id,
+                self._scenario_id,
                 turn_index,
                 latency_ms,
             )
@@ -314,8 +352,11 @@ class SupervisorNotesService:
         if not note:
             # should_note with nothing to say: treat as silence rather than
             # publishing an empty bubble to the learner.
-            logger.debug(
-                "[supervisor] turn %s — should_note set but note was empty",
+            logger.info(
+                "[supervisor] room=%s scenario=%s turn %s — should_note set but "
+                "note was empty",
+                self._room_id,
+                self._scenario_id,
                 turn_index,
             )
             return
