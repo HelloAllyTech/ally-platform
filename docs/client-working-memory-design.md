@@ -636,6 +636,25 @@ that call returns and must not reach the prompt verbatim (`appraisal`, the conte
 Nine things this needs in order to be shippable, each following an existing precedent
 in this repo rather than inventing one.
 
+> **Two operational facts learned by running it, 2026-08-24.**
+>
+> **The consolidation timeout is sized for contention, not for the work.** At 8s, nine calls
+> timed out in one sweep, four consecutively — those turns produced no update and the memory
+> silently stopped tracking the conversation. Measured in isolation the same call takes
+> **2.4–3.1s across English, Hindi, Kannada and Tamil** (Hindi and Kannada *faster* than
+> English, so the obvious Indic-token-inflation explanation is wrong). 8s was never too tight
+> for the work; it was too tight for competing with the agent's own streaming turn calls.
+> Now 25s, and the asymmetry picks the number: the call is detached, so waiting costs only
+> staleness — which `staleness_turns` already surfaces — while giving up costs the whole
+> turn's update.
+>
+> **"Off" has to mean no work, not invisible work.** The backstory pool was built and
+> *embedded* on every session regardless of the flag, so a disabled feature was still making
+> an embedding API call per session, fleet-wide, for a pool nothing would read. Behaviourally
+> harmless; not harmless in cost, and on the session-setup path in a repo with a documented
+> history of setup work becoming "agent joins but doesn't speak". Both the flag and the
+> per-scenario opt-in now gate the pool, not just the behaviour.
+
 **Feature flag — and the separate per-session lever.** `CLIENT_WORKING_MEMORY_ENABLED`,
 defaulting off, exactly as `ROLLING_SUMMARY_ENABLED`, `EVENTS_OFF_GATE`,
 `BEHAVIORS_OFF_GATE` and `KNOWLEDGE_RETRIEVAL_*` do. Nothing here ships without a
@@ -1297,6 +1316,29 @@ Two things are wrong at the end of a session today. The actor decides when to wr
 **Semantic write-out.** `disclosed` facts, consolidated via `foldCapture`, become the
 character's accumulated history across sessions for recurring-client scenarios.
 
+> **A session ends in THREE ways, and the first implementation only served one.** Written
+> 2026-08-24 after a v2v run produced no record at all — which read as the feature having
+> nothing to say, and was actually the record never being built.
+>
+> The record rides inside the existing `session_memory` message (no wire change, no new
+> consumer — ally-be already stores `structured` whole). That was the right call, but it
+> silently inherited two of that message's properties:
+>
+> 1. **`EmergencyFinalizer` is a separate path with its own message-building code**, used
+>    when the event loop never ran `finalize_session`. It had no working-memory store, so a
+>    session ending there produced nothing. It also cannot `await snapshot()`, so it reads
+>    the state directly — safe *only* there, because no detached update can still be
+>    committing by then, and a torn read beats no record.
+> 2. **`_emit_session_memory` returns early when no rolling summary exists**, and the
+>    semantic record went with it. An 8-exchange session logged `boundary=0` on every turn —
+>    compaction never fired once — so the record was lost for exactly the short sessions
+>    where a stance path is most of what there is to keep.
+>
+> The semantic record does not depend on an episodic one and no longer waits for it. ally-be
+> requires a non-empty summary to accept the message, so it travels with a line stating the
+> stance path and **nothing else** — deliberately not a narrative, so nothing downstream can
+> mistake it for a real summary.
+
 Store the semantic half under a `(tenant, case, session)` namespace. That is the shape
 LangGraph's own long-term-memory store uses, so the in-process implementation can later
 be swapped for a durable one without the write side changing — which is what turns this
@@ -1435,6 +1477,69 @@ not happening.
 
 ---
 
+### 12.1 Verified in five languages — and what that took
+
+Written 2026-08-24, after the first end-to-end v2v sweep across English, Hindi, Marathi,
+Tamil and Kannada. **Everything above this line was designed and tested in English.** The
+sweep is here because that turned out to be the single most consequential omission in the
+document.
+
+**Before the sweep, this feature was silently dead in every Indic language.** Not degraded —
+dead, with no exception raised and no log line. Four separate defects, each invisible in
+English:
+
+| Defect | Effect | Why English never showed it |
+|---|---|---|
+| `[\w']+` does not match Indic combining vowel signs (category Mn/Mc) | Every Devanagari/Tamil/Kannada/Malayalam word shredded at each matra; a Hindi sentence yielded **zero** content words | Latin script has no matras |
+| Zero-width joiners (U+200C/U+200D) are Cf, not `\w` | Words split in two mid-token — `ಅಲರ್ಟ್‌ನೆಸ್` became two words, halving grounding overlap | English never contains them |
+| The updater wrote the ledger in **English** during Hindi sessions | Grounding correctly found no overlap with a Devanagari transcript and dropped 13 of 14 disclosures | The instruction to match the conversation's language is a no-op when both are English |
+| A 4-character content-word floor | Removes ordinary Indic nouns rather than function words, because an abugida encodes a syllable per codepoint | Calibrated on English word lengths |
+
+The consequences all wore the same disguise: `build_writeout` returned `None`, `same_fact`
+never merged a paraphrase, recall never responded to the conversation. **Each looked exactly
+like a feature that had nothing to say.**
+
+**After the fixes, on 8 exchanges per language against a 16-fact profile:**
+
+| Language | Kept | Dropped | Grounded | Final stance | Updates committed / missed |
+|---|---|---|---|---|---|
+| English | 23 | 1 | 96% | disclosing | 8 / 0 |
+| Hindi | 11 | 1 | 92% | disclosing | 7 / 0 |
+| Marathi | 10 | 2 | 83% | testing | 6 / 0 |
+| Kannada | 7 | 0 | 100% | guarded | 4 / 0 |
+| Tamil | 4 | 11 | **27%** | opening | 4 / 0 |
+
+**What this establishes and what it does not.** It establishes that the *pipeline* runs
+end to end in five languages — consolidation, stance progression, recall, grounding,
+write-out, cost attribution. It does **not** establish quality: the test scenario had no
+translations, so all four Indic sessions opened with the English opening statement, three of
+them rendered phonetically in native script by the TTS. No quality conclusion should be drawn
+from these runs.
+
+**Two open items from the sweep.**
+
+*Tamil grounds at 27%, and it is undiagnosed.* It is the only language in the sweep with any
+`role_drift` (4), so cause and symptom cannot be separated. Transcripts are not persisted to
+`messages` for v2v sessions and the tester's logs truncate at ~99 characters, so there is no
+full transcript to compare against. A morphology explanation is plausible — Tamil marks
+person as a suffix, so a third-person paraphrase of a first-person utterance shares few
+surface forms — but stem-tolerant matching only lifted overlap from 0.20 to 0.40 against a
+0.60 threshold in the truncated sample, which is not enough evidence to move the threshold.
+**The threshold was deliberately left alone.**
+
+*Prompt caching is worse than §14's English-only figure.* Per language: **0% on Hindi,
+Marathi and Kannada**, 10–11% on English and Tamil. The cost tables in §12 count tokens and
+say nothing about cache state, so they understate the real cost wherever caching is off.
+
+**The rule this section exists to state.** `CLAUDE.md` already says it — *a fix verified in
+English tells you very little about Malayalam, Tamil or Kannada* — and this design ignored it
+for its entire first implementation. The test suite had **no non-English test** for a feature
+whose stated purpose includes register and voice, in a platform serving nine Indian languages
+where each Indic language is roughly one deployment. Hand-written Devanagari fixtures were not
+enough either: they contained no zero-width joiners, which is precisely why 40 of them passed
+against broken tokenisation. **The Indic defects were only ever going to surface in Indic text
+produced by a real model.**
+
 ## 13. Open questions
 
 **Retrieval helps, and the turn-level comparison that suggests otherwise is
@@ -1494,11 +1599,32 @@ Re-scoped 2026-08-20 after auditing `roleplay_v2` (§9.1). Most of phase 2's plu
 exists there, tested and passing, so the estimates below are smaller than a reading of §3
 and §5 alone suggests — what remains is deriving the state, not building the machinery.
 
-**Status, 2026-08-24.** Phases 0 and 2 are done; phase 3's code is complete and merged but
-its measurement is not taken. Phases 1, 4, 5, 6 and 7 are not started, and **phase 1 is the
-one that blocks the phase with the largest measured effect size.** Nothing is deployed and
-nothing is enabled: `CLIENT_WORKING_MEMORY_ENABLED` defaults off and no prompt declares the
-placeholder, so the code is inert in production by construction rather than by luck.
+**Status, end of 2026-08-24.** Every phase is code-complete and **deployed** —
+ally-ai-learn `v1.34.7`, ally-be `v1.77.3`. Phase 5 turned out to have shipped already
+(`RETRIEVED_CONTEXT_DEFER_TO_SUFFIX` has defaulted true since 2026-08-18). Phase 7's
+write-out is done; its `roleplay_v2` deletion is **not**, and is gated on the precondition
+below rather than on reaching phase 7. Phase 4 is the only phase not started, and it is now
+the gate on enabling anything.
+
+**The feature ships OFF and is off in production.** `CLIENT_WORKING_MEMORY_ENABLED` defaults
+false, no prod prompt declares the placeholder, and — since 2026-08-24 — a session that has
+not opted in does no working-memory work *at all* rather than merely no visible work. That
+distinction was a live regression for three releases: the backstory pool was built and
+embedded on every session in the fleet regardless of the flag.
+
+**What has been verified, and what has not.** The pipeline is verified end to end in five
+languages (§12.1) and against two English scenarios. **Nothing about quality is verified.**
+There is no production A/B, no comparison against §12's 14.0% `persona_break` baseline, and
+the five-language runs used a scenario with no translations. Three findings stand between
+here and enabling it: prompt caching collapses to **0% in three of five languages**, Tamil
+grounds at 27% for reasons that could not be isolated, and the write-out's disclosures come
+back as verbatim client sentences rather than atomic facts.
+
+**Fourteen defects in this feature were found by running it rather than by reading it**, four
+of them in code written the same day, and several by a reviewer reading the diff rather than
+by the test suite. The pattern worth carrying forward: every one of them was silent — a
+missing row, an empty block, a counter that stayed at zero — because the failure mode of a
+memory feature is *having nothing to say*, which is indistinguishable from working.
 
 **0. Get the measurements trustworthy first. — DONE.** Not a phase of this design, but
 everything below is read through them. Truncation is conditioned on barge-in (shipped), and
@@ -1618,7 +1744,9 @@ pass it the stance to weight against, and retire `{retrieved_context}` and
 inherits `persona_bible`'s selector from phase 2. Read against the latency distribution as
 much as against quality — the phase with the measured effect size, ≈1,000–1,500ms.
 
-**7. Session-end write-out**, episodic and semantic, plus the groundedness cross-check.
+**7. Session-end write-out — DONE (2026-08-24)**, episodic and semantic, plus the
+groundedness cross-check. Shipped in `v1.34.7`, including the two finalize paths that
+originally lost it (§10).
 
 **Then `roleplay_v2` is deleted — but the precondition is a fact about the code, not a
 position in this list.** The original wording assumed that reaching phase 7 meant everything
