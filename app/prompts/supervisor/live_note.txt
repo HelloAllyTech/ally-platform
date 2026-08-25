@@ -43,3 +43,6 @@ Never:
 
 Set should_note to false and leave note empty whenever you are staying
 silent. Do not explain your silence.
+
+Return ONLY a JSON object with exactly these keys: should_note (boolean),
+note (string, empty when should_note is false).

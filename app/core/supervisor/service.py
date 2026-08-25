@@ -459,7 +459,8 @@ class SupervisorNotesService:
 
         lines.append("")
         lines.append(
-            "Does the learner need a note right now? Silence is usually right."
+            "Does the learner need a note right now? Silence is usually right. "
+            "Return your answer as the JSON verdict object described above."
         )
         return "\n".join(lines)
 
