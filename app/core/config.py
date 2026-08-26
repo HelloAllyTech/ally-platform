@@ -940,6 +940,21 @@ class Settings(BaseSettings):
         ),
     )
 
+    CLIENT_WORKING_MEMORY_MAX_RENDERED_DISCLOSURES: int = Field(
+        default=12,
+        description=(
+            "How many disclosures the block RENDERS each turn. The store keeps "
+            "every one (the write-out needs them all); this bounds only what "
+            "the prompt shows, most-recent first. "
+            "Made configurable to be measured: prod v2v shows the block's "
+            "front-loaded saving is spent within one exchange. Turn 1 is 40% "
+            "cheaper than the #2 prompt in English (577 vs 961 tokens), but "
+            "the ledger re-renders in full every turn and by turn 7 the arm "
+            "runs ~20% ABOVE control. The cap is the lever on that curve, so "
+            "it has to be an A/B knob rather than a constant someone edits."
+        ),
+    )
+
     ROLLING_SUMMARY_COMPACT_ON_PAUSE: bool = Field(
         default=True,
         description=(

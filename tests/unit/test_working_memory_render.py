@@ -189,3 +189,39 @@ def test_a_short_ledger_is_rendered_whole():
         affect="tired", disclosed=[Fact(text="lost the job in March")]
     )
     assert "lost the job in March" in render_block(memory)
+
+
+def test_the_cap_is_configurable_so_it_can_be_A_B_tested(monkeypatch):
+    # The cap became a setting because prod showed it was not the growth
+    # driver it was assumed to be: across five languages the ledgers reached
+    # 3-10 disclosures, so a cap of 12 never once bound, while the block still
+    # grew ~600 tokens over seven turns. Moving it has to be measurable rather
+    # than a constant someone edits and redeploys.
+    from app.core.config import settings
+
+    monkeypatch.setattr(
+        settings, "CLIENT_WORKING_MEMORY_MAX_RENDERED_DISCLOSURES", 4, raising=False
+    )
+    memory = ClientWorkingMemory(
+        affect="tired",
+        disclosed=[Fact(text=f"disclosure {i}") for i in range(25)],
+    )
+    block = render_block(memory)
+    assert block.count("disclosure ") == 4
+    # Still the most recent, not the oldest.
+    assert "disclosure 24" in block
+    assert "disclosure 0" not in block
+
+
+def test_an_unreadable_cap_setting_falls_back_to_the_default(monkeypatch):
+    # A config problem must degrade to the old behaviour, never break a turn.
+    from app.core.working_memory import render as render_mod
+
+    monkeypatch.setattr(
+        render_mod, "_rendered_disclosure_cap", lambda: MAX_RENDERED_DISCLOSURES
+    )
+    memory = ClientWorkingMemory(
+        affect="tired",
+        disclosed=[Fact(text=f"disclosure {i}") for i in range(25)],
+    )
+    assert render_block(memory).count("disclosure ") == MAX_RENDERED_DISCLOSURES

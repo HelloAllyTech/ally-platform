@@ -71,6 +71,28 @@ _NO_DISCLOSED = "(you have not told them anything yet)"
 #: re-introducing something as new, and what it is most likely to repeat is what
 #: it just said.
 MAX_RENDERED_DISCLOSURES = 12
+
+
+def _rendered_disclosure_cap() -> int:
+    """The live cap, read per render so an A/B can move it by env var.
+
+    Falls back to the module constant if the setting is absent, so importing
+    this module never depends on config being loaded (several unit tests
+    construct blocks directly).
+    """
+    try:
+        from app.core.config import settings
+
+        value = getattr(
+            settings,
+            "CLIENT_WORKING_MEMORY_MAX_RENDERED_DISCLOSURES",
+            MAX_RENDERED_DISCLOSURES,
+        )
+        return int(value) if value else MAX_RENDERED_DISCLOSURES
+    except Exception:  # noqa: BLE001 - a config problem must not break a turn
+        return MAX_RENDERED_DISCLOSURES
+
+
 _NO_SALIENT = "(nothing from your own life is on your mind this turn)"
 _NO_FRAGMENTS = "(you have not spoken yet — this is your first reply)"
 _NO_STATE_GUIDANCE = "(no particular direction for this stage)"
@@ -148,31 +170,46 @@ def render_block(
     if not has_derived and not guidance:
         return ""
 
+    cap = _rendered_disclosure_cap()
+    sections = {
+        "state_guidance": guidance or _NO_STATE_GUIDANCE,
+        "affect": memory.affect.strip(),
+        "register": memory.register.strip() or _NO_REGISTER,
+        "speech_fragments": _bullets(memory.speech_fragments, _NO_FRAGMENTS),
+        "withheld_section": _render_withheld(memory.withheld),
+        "unresolved_section": _render_unresolved(memory.unresolved),
+        "disclosed_section": _render_facts(memory.disclosed, _NO_DISCLOSED, cap),
+        "salient_section": _render_facts(memory.salient_backstory, _NO_SALIENT),
+    }
+
     block = load_and_format(
         _TEMPLATE,
         prompt_data,
-        state_guidance=guidance or _NO_STATE_GUIDANCE,
         stance=memory.stance,
-        affect=memory.affect.strip(),
-        register=memory.register.strip() or _NO_REGISTER,
-        speech_fragments=_bullets(memory.speech_fragments, _NO_FRAGMENTS),
-        withheld_section=_render_withheld(memory.withheld),
-        unresolved_section=_render_unresolved(memory.unresolved),
-        disclosed_section=_render_facts(
-            memory.disclosed, _NO_DISCLOSED, MAX_RENDERED_DISCLOSURES
-        ),
-        salient_section=_render_facts(memory.salient_backstory, _NO_SALIENT),
+        **sections,
     ).strip()
 
-    logger.debug(
+    # INFO, not DEBUG, and sized PER SECTION.
+    #
+    # Prod runs at INFO, so the old debug line was invisible exactly where the
+    # question gets asked. And a single total could not answer it: the block
+    # grew ~600 tokens over 7 turns in prod while every ledger stayed in single
+    # digits — the disclosure cap of 12 never once bound. Without per-section
+    # sizes the only way to find the growth is to guess a section and cap it,
+    # which is how you end up tuning a knob that is not attached to the problem.
+    logger.info(
         "[working-memory] rendered block: %d chars stance=%s turn=%d "
-        "staleness=%d withheld=%d open_threads=%d salient=%d",
+        "staleness=%d cap=%d | %s | counts withheld=%d open_threads=%d "
+        "disclosed=%d salient=%d",
         len(block),
         memory.stance,
         memory.turn_index,
         memory.staleness_turns,
+        cap,
+        " ".join(f"{name}={len(text)}" for name, text in sections.items()),
         len(memory.withheld),
         len(memory.open_threads),
+        len(memory.disclosed),
         len(memory.salient_backstory),
     )
     return block
