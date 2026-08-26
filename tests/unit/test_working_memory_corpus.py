@@ -368,3 +368,48 @@ class TestSemanticTierIsActuallyWired:
         vector = next(iter(corpus.vectors.values()))
         assert isinstance(vector, list)
         assert all(isinstance(x, float) for x in vector)
+
+
+class TestProseChunking:
+    """Prose backstories, which production showed were not being split at all."""
+
+    PROSE = (
+        "You are Rohan, 17, a first-year NEET student at ALLEN. "
+        "By November your scores had fallen sharply.\n"
+        "Your grandfather raised you. He died while you were here."
+    )
+
+    def test_prose_splits_into_sentences_not_one_blob(self):
+        # Prod: `backstory pool built: 1 fact(s)` for a 1721-char profile, so
+        # SALIENT_BACKSTORY_CAP selected from a pool of one and the block
+        # rendered the whole profile every turn.
+        facts = chunk_text(self.PROSE)
+        assert len(facts) == 4
+        assert "You are Rohan, 17, a first-year NEET student at ALLEN." in facts
+        assert "Your grandfather raised you." in facts
+
+    def test_a_newline_after_a_full_stop_is_a_boundary(self):
+        # The paragraph break that the structural pass misses (single newline,
+        # not blank line) is caught by the sentence pass, because \s matches it.
+        facts = chunk_text("First thing happened.\nSecond thing happened.")
+        assert facts == ["First thing happened.", "Second thing happened."]
+
+    def test_a_soft_wrapped_sentence_is_NOT_split(self):
+        # The regression guard: splitting on a bare newline invented a claim
+        # the author never made by cutting a sentence in half.
+        assert chunk_text("She lost   her\n  job in March.") == [
+            "She lost her job in March."
+        ]
+
+    def test_indic_danda_is_a_sentence_boundary(self):
+        # A translated or natively-authored Indic profile has no full stops.
+        facts = chunk_text("आप रोहन हैं। दादाजी ने आपको पाला। वे भर्ती हुए थे।")
+        assert len(facts) == 3
+        assert facts[0] == "आप रोहन हैं।"
+
+    def test_text_with_no_punctuation_still_bounded(self):
+        # Last resort: without this a run-on comes back as one blob, which is
+        # the exact failure being fixed.
+        facts = chunk_text("word " * 200)
+        assert len(facts) > 1
+        assert all(len(f) <= 220 for f in facts)

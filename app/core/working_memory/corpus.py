@@ -46,9 +46,41 @@ MAX_POOL_FACTS = 120
 #: A chunk shorter than this is a heading or a stray bullet marker, not a fact.
 _MIN_FACT_CHARS = 12
 
-#: Splits on blank lines and on markdown list markers, so an authored profile
-#: written as prose OR as bullets chunks the same way.
+#: Structural boundaries an author put there deliberately: blank lines,
+#: markdown bullets, numbered lists. UNCHANGED.
+#:
+#: A bare `\n` was tried here and reverted: a single newline is just as often a
+#: soft wrap INSIDE a sentence, and splitting on it turned
+#: "She lost   her\n  job in March." into two fragments — inventing a claim the
+#: author did not make. The sentence pass below handles real paragraph breaks
+#: anyway, because `\s` matches the newline that follows the full stop.
 _SPLIT_RE = re.compile(r"\n\s*\n|\n\s*[-*•]\s+|\n\s*\d+[.)]\s+")
+
+#: Sentence boundaries, applied to whatever survives the structural pass.
+#:
+#: MEASURED, NOT ASSUMED. `chunk_text` used to stop at structural boundaries on
+#: the theory that "the paragraph and the bullet already mark where one fact
+#: ends". Prod says otherwise: a prose backstory yielded `backstory pool built:
+#: 1 fact(s)`, so `SALIENT_BACKSTORY_CAP` selected from a pool of one and the
+#: block rendered the ENTIRE profile every turn — 1723 chars, 64% of the block,
+#: uncached. The whole premise of the feature ("recalled backstory instead of
+#: the whole profile") was inverted, and every scoring tier in `recall.py`
+#: — decay, cue matching, spreading activation, embeddings — was ranking a
+#: single blob.
+#:
+#: Sentence-level, not finer: a clause fragment WOULD invent claims the author
+#: did not make, which is the risk the original docstring was right about. A
+#: whole sentence is the smallest unit that still stands on its own.
+#:
+#: Includes the Devanagari danda (।) and its double (॥) — a translated or
+#: natively-authored Indic profile has no full stops to split on.
+_SENTENCE_RE = re.compile(r"(?<=[.!?।॥])\s+")
+
+#: Last resort. Text with no structural AND no sentence punctuation (a
+#: run-on, or a script this regex does not know) would otherwise come back as
+#: one blob again — the exact failure this fix exists to remove. Split on word
+#: boundaries so a fact is never cut mid-word.
+_HARD_MAX_FACT_CHARS = 220
 
 #: Markdown heading / emphasis noise to strip from a chunk's edges.
 _TRIM_RE = re.compile(r"^[#>\s*_`-]+|[\s*_`]+$")
@@ -67,27 +99,53 @@ class BackstoryCorpus:
         return bool(self.facts)
 
 
+def _hard_wrap(chunk: str) -> List[str]:
+    """Split on word boundaries when nothing else would split at all."""
+    if len(chunk) <= _HARD_MAX_FACT_CHARS:
+        return [chunk]
+    pieces: List[str] = []
+    current = ""
+    for word in chunk.split(" "):
+        if current and len(current) + 1 + len(word) > _HARD_MAX_FACT_CHARS:
+            pieces.append(current)
+            current = word
+        else:
+            current = f"{current} {word}".strip()
+    if current:
+        pieces.append(current)
+    return pieces
+
+
 def chunk_text(text: Optional[str]) -> List[str]:
     """Split authored prose into atomic, self-contained facts.
 
-    Deliberately dumb. A profile is written by a human for a human, so the
-    paragraph and the bullet already mark where one fact ends — inferring
-    finer boundaries would invent claims the author did not make.
+    Three passes, widest boundary first, each only doing what the one before
+    it could not: structural (what the author marked) -> sentence -> hard wrap.
+
+    The original was structural-only, on the theory that a human-written
+    profile already marks where a fact ends. Production disproved it: a prose
+    backstory produced ONE fact of 1721 chars, so the recall pool had a single
+    member and the block rendered the whole profile every turn. Sentences are
+    where it stops — finer would invent claims the author did not make.
     """
     if not text or not text.strip():
         return []
     out: List[str] = []
     seen: set[str] = set()
     for raw in _SPLIT_RE.split(text):
-        chunk = _TRIM_RE.sub("", (raw or "").strip())
-        chunk = " ".join(chunk.split())
-        if len(chunk) < _MIN_FACT_CHARS:
-            continue
-        key = chunk.lower()
-        if key in seen:
-            continue
-        seen.add(key)
-        out.append(chunk)
+        for sentence in _SENTENCE_RE.split(raw or ""):
+            cleaned = _TRIM_RE.sub("", sentence.strip())
+            cleaned = " ".join(cleaned.split())
+            if not cleaned:
+                continue
+            for chunk in _hard_wrap(cleaned):
+                if len(chunk) < _MIN_FACT_CHARS:
+                    continue
+                key = chunk.lower()
+                if key in seen:
+                    continue
+                seen.add(key)
+                out.append(chunk)
     return out
 
 
