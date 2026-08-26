@@ -365,7 +365,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 67;
-				DEVELOPMENT_TEAM = GS528Q8583;
+				DEVELOPMENT_TEAM = W3ZL4N9N9J;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = ally/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Ally;
@@ -401,7 +401,7 @@
 				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 67;
 				DEVELOPMENT_TEAM = "";
-				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = GS528Q8583;
+				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = W3ZL4N9N9J;
 				INFOPLIST_FILE = ally/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Ally;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
@@ -419,7 +419,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.helloally.app;
 				PRODUCT_NAME = ally;
 				PROVISIONING_PROFILE_SPECIFIER = "";
-				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = ally_appstore_26_may_2026;
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "Ally AppStore Distribution";
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
 			};
