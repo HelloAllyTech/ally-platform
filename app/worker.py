@@ -526,11 +526,50 @@ class AgentWorker:
         # would read while the feature is off. The updater only runs for an
         # opted-in scenario, so the same gate belongs here.
         _cwm_prompt_data = getattr(self.scenario, "prompt_data", None)
-        _cwm_opted_in = bool(
-            settings.CLIENT_WORKING_MEMORY_ENABLED
-            and _cwm_prompt_data is not None
-            and prompt_declares_client_working_memory(_cwm_prompt_data)
+        _cwm_declares = _cwm_prompt_data is not None and (
+            prompt_declares_client_working_memory(_cwm_prompt_data)
         )
+        _cwm_opted_in = bool(settings.CLIENT_WORKING_MEMORY_ENABLED and _cwm_declares)
+
+        # ALWAYS log the opt-in decision, at INFO, with the REASON.
+        #
+        # This is the one line that says whether the feature ran. Without it the
+        # off state is indistinguishable from the on state from the outside: a
+        # non-opted-in session produces a complete transcript, a good score and
+        # no errors, and simply lacks the block. That is exactly how a prod
+        # session ran for a full 8 exchanges looking perfect while the feature
+        # was silently disabled — the prompt was file-backed, so ally-be never
+        # dispatched it (getPromptsForScenarioSession filters
+        # useDashboardOverrideOnly) and the placeholder check found nothing.
+        #
+        # The old signal for the off path was logger.debug, and prod runs at
+        # INFO, so the only way to tell was correlating [PROMPT_SOURCE] lines in
+        # CloudWatch. Anyone authoring a scenario against this feature needs to
+        # be able to answer "did it engage?" without that.
+        if _cwm_opted_in:
+            logger.info(
+                "[working-memory] ENGAGED room=%s — scenario opted in via the "
+                "{client_working_memory} placeholder",
+                self.ctx.room.name,
+            )
+        else:
+            if not settings.CLIENT_WORKING_MEMORY_ENABLED:
+                _why = "CLIENT_WORKING_MEMORY_ENABLED is false"
+            elif _cwm_prompt_data is None:
+                _why = "no prompt_data on the scenario"
+            else:
+                _why = (
+                    "the selected main-agent prompt does not declare "
+                    "{client_working_memory} — if it should, check the prompt "
+                    "has useDashboardOverride=true, or ally-be will not ship "
+                    "it to the worker at all"
+                )
+            logger.info(
+                "[working-memory] NOT ENGAGED room=%s — %s",
+                self.ctx.room.name,
+                _why,
+            )
+
         try:
             if not _cwm_opted_in:
                 raise _SkipWorkingMemoryPool
