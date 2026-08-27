@@ -122,8 +122,25 @@ class TestKillSwitch:
 
 
 class TestSettingDefault:
+    """The default has to be off, because our LiveKit is self-hosted.
+
+    The URL gate above shipped on 2026-08-25 and was live in prd from 05:58Z,
+    yet the same FFI error recurred on three distinct rooms the next morning
+    (2026-08-26 05:05:00Z, 05:05:10Z, 05:09:32Z). For the filter to have been
+    requested at all, the job's media URL must have passed the ``*.livekit
+    .cloud``/``*.livekit.run`` test — while the media plane serving it is
+    self-hosted and refuses Krisp. That is the "no hostname can tell" case,
+    and the flag is the only thing that can express it.
+
+    A default of True made that case fail open: it asks for a filter nobody
+    will run, on every session, until an operator sets an env var. Since the
+    deployment is self-hosted, the honest default is "don't ask" — an
+    operator on a real Cloud project with BVC entitlement opts back in with
+    LIVEKIT_NOISE_CANCELLATION_ENABLED=True.
+    """
+
     @pytest.mark.unit
-    def test_flag_defaults_to_on_so_nothing_changes_until_an_operator_acts(self):
+    def test_flag_defaults_to_off_because_our_livekit_is_self_hosted(self):
         from app.core.config import settings
 
-        assert settings.LIVEKIT_NOISE_CANCELLATION_ENABLED is True
+        assert settings.LIVEKIT_NOISE_CANCELLATION_ENABLED is False

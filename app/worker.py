@@ -2857,7 +2857,9 @@ class AgentWorker:
             # the URL this job's room actually connects to — the server can
             # assign a media URL that differs from the one we registered with.
             _lk_url = session_livekit_url(self.ctx, settings.LIVEKIT_URL)
-            _bvc_enabled = getattr(settings, "LIVEKIT_NOISE_CANCELLATION_ENABLED", True)
+            _bvc_enabled = getattr(
+                settings, "LIVEKIT_NOISE_CANCELLATION_ENABLED", False
+            )
             if supports_noise_cancellation(_lk_url, enabled=_bvc_enabled):
                 bvc = userdata.get("bvc") or noise_cancellation.BVC()
             else:

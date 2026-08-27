@@ -21,10 +21,14 @@ Two things that gate has to get right, both learned the hard way:
   URL (``is_cloud(self._info.url)``), and so must we: a Cloud control plane
   can dispatch a job to a media server that is not Cloud, which looks fine to
   a check on the registration URL and still gets the filter refused.
-* **When no URL can tell.** A project can sit on a genuine ``*.livekit.cloud``
-  hostname whose media plane still refuses Krisp. No hostname distinguishes
-  that from a fully managed Cloud project, so an operator needs a way to say
-  so — ``LIVEKIT_NOISE_CANCELLATION_ENABLED``.
+* **No URL can tell.** A deployment can sit on a genuine ``*.livekit.cloud``
+  hostname whose media plane still refuses Krisp — which is ours: self-hosted
+  LiveKit behind a Cloud-shaped hostname. The URL fix above shipped to prd on
+  2026-08-25 and the same FFI error came back the next morning on three
+  distinct rooms, because the URL check was passing. So the URL is only ever a
+  veto, never a yes: ``LIVEKIT_NOISE_CANCELLATION_ENABLED`` has to agree, and
+  it is off by default. An operator turns it on for a Cloud project that
+  really does have BVC entitlement.
 """
 
 from typing import Any

@@ -181,13 +181,31 @@ class TestNoiseCancellationRequiresCloud:
         assert captured["noise_cancellation"] is None
 
     async def test_cloud_deployment_still_gets_the_filter(self, monkeypatch):
+        # Opt in explicitly: this case is about the hostname test, not about
+        # the shipped default of the flag (off — see the test below).
         captured = {}
         monkeypatch.setattr(settings, "LIVEKIT_URL", "wss://ally.livekit.cloud")
+        monkeypatch.setattr(settings, "LIVEKIT_NOISE_CANCELLATION_ENABLED", True)
         w = self._prepare(monkeypatch, captured)
 
         await w.start()
 
         assert captured["noise_cancellation"] == "PREWARMED_BVC"
+
+    async def test_a_cloud_hostname_alone_is_not_enough_to_ask_for_the_filter(
+        self, monkeypatch
+    ):
+        # Mirrors the v1 worker test: prd kept logging "audio filter cannot be
+        # enabled" a day after the job-URL fix, so a Cloud-shaped media URL was
+        # fronting a self-hosted media plane. Default off, no filter requested.
+        captured = {}
+        monkeypatch.setattr(settings, "LIVEKIT_URL", "wss://ally.livekit.cloud")
+        w = self._prepare(monkeypatch, captured)
+        w.ctx._info = SimpleNamespace(url="wss://ally.livekit.cloud")
+
+        await w.start()
+
+        assert captured["noise_cancellation"] is None
 
     async def test_job_assigned_to_a_non_cloud_media_url_gets_no_filter(
         self, monkeypatch
