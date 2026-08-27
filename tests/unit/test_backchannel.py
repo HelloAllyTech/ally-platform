@@ -1,10 +1,12 @@
 """Tests for continuous back-channeling during the learner's turn."""
 
+import types
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+import app.worker as worker
 from app.core.livekit import backchannel
 
 
@@ -148,3 +150,49 @@ class TestGenerateBackchannelPhrases:
             llm_client, _make_scenario()
         )
         assert out == []
+
+
+class _MockCtx:
+    def __init__(self):
+        self.room = types.SimpleNamespace(name="room-1")
+        self.proc = types.SimpleNamespace(userdata={})
+        self.job = types.SimpleNamespace(metadata="{}", id="test-job")
+
+
+def _backchannel_worker(monkeypatch):
+    """A bare AgentWorker wired up just enough to exercise backchannel stop."""
+    w = worker.AgentWorker(_MockCtx())
+    w._bg_audio = MagicMock()
+    w._backchannel_clips = [("mm-hmm", "/tmp/mmhmm.wav")]
+    return w
+
+
+class TestUserStateStop:
+    """Leaving 'speaking' must cut a still-playing back-channel clip immediately."""
+
+    @pytest.mark.unit
+    def test_leaving_speaking_flushes_playing_clip(self, monkeypatch):
+        w = _backchannel_worker(monkeypatch)
+        handle = MagicMock()
+        handle.done.return_value = False
+        w._backchannel_handle = handle
+        w._user_speaking = True
+
+        w._on_backchannel_user_state(types.SimpleNamespace(new_state="listening"))
+
+        handle.stop.assert_called_once()
+        # stop() only halts the feeder; frames already buffered in the shared
+        # AudioSource keep playing for up to ~1s and bleed into the agent's
+        # real reply on its own track unless the queue is flushed too.
+        w._bg_audio.flush.assert_called_once()
+        assert w._backchannel_handle is None
+
+    @pytest.mark.unit
+    def test_no_flush_when_no_clip_playing(self, monkeypatch):
+        w = _backchannel_worker(monkeypatch)
+        w._backchannel_handle = None
+        w._user_speaking = True
+
+        w._on_backchannel_user_state(types.SimpleNamespace(new_state="listening"))
+
+        w._bg_audio.flush.assert_not_called()

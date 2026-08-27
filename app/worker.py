@@ -2281,6 +2281,10 @@ class AgentWorker:
                     and not self._backchannel_handle.done()
                 ):
                     self._backchannel_handle.stop()
+                    # stop() only halts the feeder; flush the buffered tail so
+                    # the clip can't keep playing over the real reply on the
+                    # agent track (see _interim_cutover / bg_audio.flush).
+                    self._bg_audio.flush()
                 self._backchannel_handle = None
         except Exception as e:  # noqa: BLE001 - back-channel must never break a session
             logger.warning("[BACKCHANNEL] user-state handler error: %s", e)
