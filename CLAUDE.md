@@ -77,8 +77,10 @@ taking a whole task description and returning full chunk bodies. Setup, citation
 - **Krisp BVC noise cancellation only works on LiveKit Cloud — judge the job's URL, not
   the worker's.** `supports_noise_cancellation()` must see the URL the room actually
   connects to (`session_livekit_url()`), since a Cloud control plane can still assign a
-  non-Cloud media server; `LIVEKIT_NOISE_CANCELLATION_ENABLED=False` is the operator
-  kill-switch for a Cloud project whose media plane rejects the filter anyway.
+  non-Cloud media server. But the URL is only ever a veto, never a yes: our LiveKit is
+  self-hosted behind a Cloud-shaped hostname, so `LIVEKIT_NOISE_CANCELLATION_ENABLED`
+  defaults `False` — an operator opts in only on a genuine Cloud project with BVC
+  entitlement, where the URL check still has to agree.
 - **STT confidence is not usable for Indian languages.** Don't gate behaviour on it. The
   mitigation for mis-transcription is a live guardrail that asks the learner to repeat.
 - **Provider behaviour differs per language, not just per provider.** A fix verified in

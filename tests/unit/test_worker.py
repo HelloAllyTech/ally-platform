@@ -1996,8 +1996,17 @@ class TestBackgroundAudioDeferral:
 class TestStartUsesPrewarmedBVC:
     @pytest.mark.asyncio
     async def test_start_uses_prewarmed_bvc(self, monkeypatch):
+        """Reuse the prewarmed instance rather than building a fresh one.
+
+        Opt in explicitly: whether we ask for a filter at all is the gate's
+        business (TestNoiseCancellationRequiresCloud), and it is off by
+        default. This case only cares about which instance we hand over once
+        the answer is yes.
+        """
         prewarmed_bvc = object()
         captured = {}
+        monkeypatch.setattr(worker.settings, "LIVEKIT_URL", "wss://ally.livekit.cloud")
+        monkeypatch.setattr(worker.settings, "LIVEKIT_NOISE_CANCELLATION_ENABLED", True)
 
         class DummyRIO:
             def __init__(self, **kwargs):
@@ -2116,13 +2125,43 @@ class TestNoiseCancellationRequiresCloud:
 
     @pytest.mark.asyncio
     async def test_cloud_deployment_still_gets_the_filter(self, monkeypatch):
+        """The URL heuristic, with an operator who has opted in.
+
+        The opt-in is explicit here so this case keeps testing the hostname
+        test rather than the shipped default of the flag (which is off — see
+        test_a_cloud_hostname_alone_is_not_enough_to_ask_for_the_filter).
+        """
         captured = {}
         monkeypatch.setattr(worker.settings, "LIVEKIT_URL", "wss://ally.livekit.cloud")
+        monkeypatch.setattr(worker.settings, "LIVEKIT_NOISE_CANCELLATION_ENABLED", True)
         w = self._prepare(monkeypatch, captured)
 
         await w.start()
 
         assert captured["noise_cancellation"] == "PREWARMED_BVC"
+
+    @pytest.mark.asyncio
+    async def test_a_cloud_hostname_alone_is_not_enough_to_ask_for_the_filter(
+        self, monkeypatch
+    ):
+        """The production failure that survived the job-URL fix.
+
+        prd ran the URL-based gate from 2026-08-25 05:58Z and still logged
+        "audio filter cannot be enabled: LiveKit Cloud is required" on three
+        distinct rooms the next morning, so the job's media URL was passing
+        the Cloud hostname test while the media plane behind it — self-hosted
+        — refused Krisp. Nothing in the URL can distinguish the two, so a
+        Cloud-shaped hostname must not by itself turn the filter on: the
+        operator flag has to say yes too, and by default it doesn't.
+        """
+        captured = {}
+        monkeypatch.setattr(worker.settings, "LIVEKIT_URL", "wss://ally.livekit.cloud")
+        w = self._prepare(monkeypatch, captured)
+        w.ctx._info = types.SimpleNamespace(url="wss://ally.livekit.cloud")
+
+        await w.start()
+
+        assert captured["noise_cancellation"] is None
 
     @pytest.mark.asyncio
     async def test_job_assigned_to_a_non_cloud_media_url_gets_no_filter(

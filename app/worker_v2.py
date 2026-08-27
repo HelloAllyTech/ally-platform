@@ -546,7 +546,7 @@ class AgentWorkerV2:
         # the session runs unfiltered anyway (mirrors v1).
         userdata = getattr(getattr(self.ctx, "proc", None), "userdata", {}) or {}
         _lk_url = session_livekit_url(self.ctx, settings.LIVEKIT_URL)
-        _bvc_enabled = getattr(settings, "LIVEKIT_NOISE_CANCELLATION_ENABLED", True)
+        _bvc_enabled = getattr(settings, "LIVEKIT_NOISE_CANCELLATION_ENABLED", False)
         if supports_noise_cancellation(_lk_url, enabled=_bvc_enabled):
             bvc = userdata.get("bvc") or noise_cancellation.BVC()
         else:

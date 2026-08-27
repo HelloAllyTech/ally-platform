@@ -39,18 +39,24 @@ class Settings(BaseSettings):
     AGENT_NAME: str = Field(default="Agent", description="Agent name for LiveKit")
 
     # Krisp BVC is a LiveKit Cloud feature; app/core/livekit/audio_filters.py
-    # decides per session from the URL the room actually connects to. A URL is
-    # not always enough — a project can sit on a real *.livekit.cloud hostname
-    # whose media plane still refuses the filter ("audio filter cannot be
-    # enabled: LiveKit Cloud is required" in prd, 2026-08-25), and no hostname
-    # can reveal that. This is the operator's override for exactly that case.
+    # also checks the URL the room actually connects to. But a URL is never
+    # enough on its own — our LiveKit is self-hosted behind a Cloud-shaped
+    # hostname, so the media plane refuses the filter while every hostname
+    # test says yes. That is why "audio filter cannot be enabled: LiveKit
+    # Cloud is required" kept appearing in prd on 2026-08-26, a full day after
+    # the gate was corrected to read the job's media URL: the URL was passing.
+    # So this defaults OFF — we don't ask for a filter nobody will run. An
+    # operator on a genuine Cloud project with BVC entitlement opts in with
+    # LIVEKIT_NOISE_CANCELLATION_ENABLED=True (the URL still has to agree).
     LIVEKIT_NOISE_CANCELLATION_ENABLED: bool = Field(
-        default=True,
+        default=False,
         description=(
-            "Request Krisp BVC noise cancellation when the deployment the "
-            "session connects to looks Cloud-capable. Set False to stop asking "
-            "for it at all on a deployment whose media servers reject the "
-            "filter (kill-switch; sessions then run unfiltered)."
+            "Opt in to requesting Krisp BVC noise cancellation. Off by "
+            "default because our LiveKit deployment is self-hosted and its "
+            "media servers reject the filter, whatever the hostname looks "
+            "like; sessions simply run unfiltered. Set True only on a "
+            "LiveKit Cloud project that actually has BVC entitlement — the "
+            "per-session URL check still has to agree before we ask."
         ),
     )
 
