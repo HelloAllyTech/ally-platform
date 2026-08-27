@@ -142,6 +142,11 @@ additionally falls back from `synthesize()` to the websocket `stream()` path
 per phrase, which is the route the live agent speaks through and works where
 Sarvam's one-shot endpoint is broken.
 
+`filler_audio` also lowercases a phrase that arrives fully ALL-CAPS before
+synthesis: several TTS providers treat a fully-uppercase token as an acronym
+and spell it out letter by letter (an "MMM" hesitation heard as "M, M, M"
+instead of a hum) even for plain English text.
+
 ---
 
 ## Key Source Files

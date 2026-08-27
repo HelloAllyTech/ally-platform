@@ -47,6 +47,17 @@ async def _collect_frames(stream) -> Tuple[list, int, int]:
     return frames, sample_rate, num_channels
 
 
+def _normalize_for_synthesis(phrase: str) -> str:
+    """Avoid an ALL-CAPS filler being read out as spelled-out letters.
+
+    Several TTS providers treat a fully-uppercase token as an acronym and
+    spell it letter by letter — e.g. a "MMM" hesitation heard as "M, M, M"
+    instead of a hum. Mixed- or lower-case text (the common case) is
+    untouched; only a phrase that is entirely uppercase is affected.
+    """
+    return phrase.lower() if phrase.isupper() else phrase
+
+
 async def _synthesize_one(tts, phrase: str) -> Optional[Tuple[str, str]]:
     """Synthesize a single phrase to a temp WAV; return ``(phrase, path)`` or None.
 
@@ -61,6 +72,7 @@ async def _synthesize_one(tts, phrase: str) -> Optional[Tuple[str, str]]:
     """
     if not phrase or not phrase.strip():
         return None
+    phrase = _normalize_for_synthesis(phrase)
     try:
         frames: list[bytes] = []
         sample_rate = 24000

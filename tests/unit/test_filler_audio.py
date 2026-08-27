@@ -151,3 +151,19 @@ class TestSynthesizeFillerClips:
             assert [phrase for phrase, _ in clips] == phrases
         finally:
             cleanup_clips([path for _, path in clips])
+
+    @pytest.mark.unit
+    async def test_all_caps_filler_is_lowercased_before_synthesis(self):
+        # An ALL-CAPS thinking filler like "MMM" must not reach the TTS
+        # engine as-is: several providers treat a fully-uppercase token as
+        # an acronym and spell it out letter by letter ("M, M, M") instead
+        # of speaking it as a hum.
+        tts = _FakeTTS()
+        client = _client(tts)
+
+        clips = await synthesize_filler_clips(client, ["MMM"])
+        try:
+            assert tts.calls == ["mmm"]
+            assert [phrase for phrase, _ in clips] == ["mmm"]
+        finally:
+            cleanup_clips([path for _, path in clips])
