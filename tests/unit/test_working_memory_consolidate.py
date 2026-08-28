@@ -16,7 +16,7 @@ import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
 from app.core.working_memory import consolidate as mod
-from app.core.working_memory.proposal import ObservedEvent, ProposedUpdate
+from app.core.working_memory.proposal import ObservedEvent, ProposedUpdate, validate
 from app.core.working_memory.state import ClientWorkingMemory, WithheldTopic
 from app.core.working_memory.store import ClientWorkingMemoryStore
 
@@ -102,6 +102,13 @@ class TestConsolidate:
 
     async def test_earned_advance_survives(self, monkeypatch):
         monkeypatch.setattr(mod, "load_and_format", lambda *a, **k: "SYS")
+        # The quote has to be something actually said. `validate` now checks
+        # the evidence AGAINST the transcript, not merely that a quote exists,
+        # so this fixture supplies the line the event points at.
+        turns = [
+            HumanMessage(content="sorry, I misread what you told me earlier"),
+            AIMessage(content="that is alright"),
+        ]
         llm = _llm(
             ProposedUpdate(
                 stance="testing",
@@ -110,8 +117,49 @@ class TestConsolidate:
         )
         out = await mod.consolidate(
             memory=ClientWorkingMemory(stance="guarded", turns_in_stance=4),
+            new_messages=turns,
+            llm_client=llm,
+        )
+        assert out.stance == "testing"
+
+    async def test_a_confabulated_quote_cannot_earn_an_advance(self, monkeypatch):
+        # The gap the presence check left open: an event pointing at something
+        # the client never said passed unchanged, advanced the stance, and then
+        # biased every later update. Caught at write-out, long after it could
+        # matter. Now it is caught before it reaches a prompt.
+        monkeypatch.setattr(mod, "load_and_format", lambda *a, **k: "SYS")
+        llm = _llm(
+            ProposedUpdate(
+                stance="testing",
+                events=[
+                    ObservedEvent(
+                        kind="repair", evidence="I forgive you for everything"
+                    )
+                ],
+            )
+        )
+        out = await mod.consolidate(
+            memory=ClientWorkingMemory(stance="guarded", turns_in_stance=4),
             new_messages=_turns(),
             llm_client=llm,
+        )
+        assert out.stance is None
+        assert out.stance_rejected_reason
+
+    def test_no_transcript_means_cannot_check_not_invented(self):
+        # `check_grounding` returns everything as grounded when there are no
+        # messages, so a caller without a transcript keeps the behaviour it had
+        # before this gate existed. The alternative — treating "unreadable" as
+        # "fabricated" — would silently strip every transition a session
+        # earned, which is the worse failure and the same reasoning the
+        # write-out already applies to the ledger.
+        out = validate(
+            ProposedUpdate(
+                stance="testing",
+                events=[ObservedEvent(kind="repair", evidence="sorry, I misread")],
+            ),
+            ClientWorkingMemory(stance="guarded", turns_in_stance=4),
+            (),
         )
         assert out.stance == "testing"
 

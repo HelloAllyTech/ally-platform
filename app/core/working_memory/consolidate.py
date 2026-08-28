@@ -222,7 +222,9 @@ async def consolidate(
         # Defensive: some providers/wrappers may ignore include_raw.
         proposal = result
 
-    return validate(proposal, memory)
+    # The same window the updater read, so `validate` can check the evidence it
+    # produced against what was actually said.
+    return validate(proposal, memory, new_messages)
 
 
 async def apply_update(

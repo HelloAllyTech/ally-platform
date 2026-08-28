@@ -19,7 +19,7 @@ output, and ``validate`` decides what actually happens.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Sequence, Tuple
 
 from pydantic import BaseModel, Field
 
@@ -277,8 +277,18 @@ def _clean(values: List[str], *, limit: int, max_chars: int = 0) -> List[str]:
     return out
 
 
-def validate(proposal: ProposedUpdate, memory: ClientWorkingMemory) -> ValidatedUpdate:
-    """Turn an advisory proposal into what code is willing to commit."""
+def validate(
+    proposal: ProposedUpdate,
+    memory: ClientWorkingMemory,
+    messages: Sequence[Any] = (),
+) -> ValidatedUpdate:
+    """Turn an advisory proposal into what code is willing to commit.
+
+    `messages` is the turn window the proposal was derived from. Optional
+    because `check_grounding` treats an absent transcript as "cannot check"
+    rather than "invented" — a caller with no messages gets the previous
+    behaviour, not a silently emptied update.
+    """
     # An event without evidence cannot earn anything.
     #
     # The prompt demands a quoted span per event and this module's thesis is
@@ -292,19 +302,68 @@ def validate(proposal: ProposedUpdate, memory: ClientWorkingMemory) -> Validated
     # conversations the updater populated evidence on 4 of 4 events, every one a
     # real span from the turns. So this rejects fabrication rather than normal
     # output.
-    kinds = set()
+    # Second gate: the evidence must actually be IN the transcript.
+    #
+    # Requiring a quoted span stops an event with nothing to point at. It does
+    # not stop an event pointing at something the client never said — the
+    # updater writes `evidence` as free text, so a confabulated quote passes
+    # the presence check unchanged, advances the stance, and then shapes every
+    # subsequent prompt.
+    #
+    # `check_grounding` already answers exactly this question and is already
+    # trusted for it: the write-out runs it over the whole ledger at session
+    # end. Running it at COMMIT closes the loop from "caught after the session,
+    # too late to matter" to "caught before it reaches a prompt". Same lexical
+    # overlap test, no LLM, and it runs in the detached updater path so it
+    # costs no turn latency.
+    #
+    # Ungrounded events are PROVISIONAL, not deleted: they simply do not earn a
+    # stance transition. Everything else the proposal carries — affect,
+    # register, fragments, disclosures — is untouched, and disclosures keep
+    # their own grounding pass at write-out. That asymmetry is deliberate and
+    # follows 238dd0c's lesson: prod quarantines 1-8 items per session against
+    # 13-15 verified, so a strict delete here would throw away real events at
+    # that rate. A stance is the one thing worth being strict about, because it
+    # is the only field that persists and biases the NEXT update.
+    from app.core.working_memory.writeout import check_grounding
+
+    evidenced: List[tuple[str, str]] = []
     for event in proposal.events:
         kind = (event.kind or "").strip().lower()
         if not kind:
             continue
-        if not (event.evidence or "").strip():
+        evidence = (event.evidence or "").strip()
+        if not evidence:
             logger.info(
                 "[working-memory] discarding unevidenced event %r — a claim "
                 "with nothing to quote cannot earn a transition",
                 kind,
             )
             continue
+        evidenced.append((kind, evidence))
+
+    grounded_texts, ungrounded_texts = check_grounding(
+        [evidence for _, evidence in evidenced], messages
+    )
+    grounded_set = set(grounded_texts)
+
+    kinds = set()
+    for kind, evidence in evidenced:
+        if evidence not in grounded_set:
+            logger.info(
+                "[working-memory] event %r is PROVISIONAL — its evidence is not "
+                "in the transcript, so it cannot earn a stance transition: %r",
+                kind,
+                evidence[:80],
+            )
+            continue
         kinds.add(kind)
+    if ungrounded_texts:
+        logger.info(
+            "[working-memory] %d of %d evidenced event(s) were ungrounded",
+            len(ungrounded_texts),
+            len(evidenced),
+        )
     unknown = kinds - CLIENT_EVENTS
     if unknown:
         logger.debug("[working-memory] discarding unknown events: %s", sorted(unknown))
