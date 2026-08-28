@@ -2529,13 +2529,32 @@ async def update_working_memory(
         _embedding_client.get_embedding if _embedding_client is not None else None
     )
 
-    # The score the behaviour detector produced since the last update we
+    # The TOTAL score — events AND behaviours — since the last update we
     # scheduled. A positive delta means the counsellor did something the
     # SCENARIO AUTHOR scored as helpful, and consolidation treats that as an
-    # advancing event — which is what keeps the score-driven state machine and
-    # the event-driven stance ladder moving together instead of disagreeing.
-    _score_delta = int(state.current_score) - int(store.score_at_last_update)
-    store.score_at_last_update = int(state.current_score)
+    # advancing event.
+    #
+    # `state.current_score` is deliberately NOT the source, though it is the
+    # obvious one. ScoreKeeper keeps two buckets: `_event_score`, fed by the
+    # orchestrator, and `_behavior_score`, fed by detect_behaviors. Only the
+    # event bucket reaches `state.current_score`, so a counsellor validating,
+    # acknowledging and normalising — the behaviours a scenario author actually
+    # writes under "Helper should do" — moves the total the learner sees and
+    # moves `current_score` not at all. Measured in prod: over 12h fleet-wide,
+    # 15 positively-scored behaviour items produced exactly ONE change in
+    # `current_score`, and it was negative. Wiring the ladder to that bucket
+    # would have made this feature near-inert by construction.
+    #
+    # Falls back to `state.current_score` when no ScoreKeeper is in config, so
+    # a caller without one degrades to the old behaviour rather than to zero.
+    _score_keeper = configurable.get("score_keeper")
+    _live_total = (
+        _score_keeper.get_total_score()
+        if _score_keeper is not None
+        else int(state.current_score)
+    )
+    _score_delta = int(_live_total) - int(store.score_at_last_update)
+    store.score_at_last_update = int(_live_total)
 
     schedule_update(
         store,

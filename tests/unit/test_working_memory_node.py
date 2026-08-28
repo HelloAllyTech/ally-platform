@@ -352,3 +352,40 @@ class TestFlagOffCostsNothing:
                 _prompt_data("client_working_memory")
             )
         )
+
+
+# ---------------------------------------------------------------------------
+# The ladder reads the TOTAL score, not the event-only one
+# ---------------------------------------------------------------------------
+
+
+class _FakeScoreKeeper:
+    def __init__(self, total: int) -> None:
+        self._total = total
+
+    def get_total_score(self) -> int:
+        return self._total
+
+
+def test_the_delta_comes_from_the_total_score_not_current_score():
+    """ScoreKeeper keeps events and behaviours in SEPARATE buckets.
+
+    Only the event bucket reaches `state.current_score`, so a counsellor doing
+    the things a scenario author writes under "Helper should do" moves the
+    learner's visible total and moves `current_score` not at all. Measured in
+    prod: 15 positively-scored behaviour items over 12h produced exactly one
+    change in `current_score`, and it was negative.
+
+    Asserted at the arithmetic rather than through the node, which needs a
+    graph, an LLM client and a store to run.
+    """
+    store_last = 0
+    keeper = _FakeScoreKeeper(total=24)  # 24 earned, all from behaviours
+    current_score = 0  # event bucket never moved
+
+    live_total = keeper.get_total_score()
+    delta_from_total = live_total - store_last
+    delta_from_current = current_score - store_last
+
+    assert delta_from_total == 24, "behaviour scores must reach the ladder"
+    assert delta_from_current == 0, "the event bucket alone would earn nothing"
