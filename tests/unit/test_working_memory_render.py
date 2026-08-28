@@ -317,3 +317,21 @@ def test_a_locked_topic_still_cannot_leak_in_the_split_form():
         for name, text in sections.items()
         if name != "working_memory_withheld"
     )
+
+
+def test_the_split_form_is_not_a_telemetry_blackout(caplog):
+    # `render_block` is never called on the split path, so without its own line
+    # a split session emits no size telemetry at all. The per-section sizes are
+    # what found the backstory bug — one 1721-char fact that was 64% of the
+    # block while every ledger COUNT looked healthy.
+    import logging
+
+    with caplog.at_level(logging.INFO):
+        render_sections(_memory(disclosed=[Fact("she moved out in March")]))
+
+    line = next(
+        r.getMessage() for r in caplog.records if "rendered sections" in r.getMessage()
+    )
+    assert "chars total" in line
+    for name in SECTION_VARIABLES:
+        assert f"{name.removeprefix('working_memory_')}=" in line

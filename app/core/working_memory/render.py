@@ -288,7 +288,7 @@ def render_sections(memory: ClientWorkingMemory) -> dict:
     if affect:
         stance_line = f"{stance_line} {affect}"
 
-    return {
+    sections = {
         "working_memory_stance": f"{stance_line}\n\n{_STANCE_DISCIPLINE}",
         "working_memory_register": memory.register.strip() or _NO_REGISTER,
         "working_memory_speech_fragments": (
@@ -302,3 +302,36 @@ def render_sections(memory: ClientWorkingMemory) -> dict:
         ),
         "working_memory_salient": _render_facts(memory.salient_backstory, _NO_SALIENT),
     }
+
+    # The same per-section INFO line `render_block` emits, for the same reason.
+    #
+    # Without this the split form is a telemetry BLACKOUT: `render_block` is
+    # never called, so a split session emits no size line at all, and the
+    # question "which section is growing?" has no answer. That is not
+    # hypothetical — the per-section sizes are what found the backstory bug,
+    # where a single 1721-char fact was 64% of the block while every ledger
+    # count looked healthy. Counts alone would not have shown it; a single
+    # total would not have shown it either.
+    #
+    # Deliberately the same prefix and field names as the block form's line, so
+    # one CloudWatch query covers both forms and a session can be compared
+    # across them.
+    logger.info(
+        "[working-memory] rendered sections: %d chars total stance=%s turn=%d "
+        "staleness=%d cap=%d | %s | counts withheld=%d open_threads=%d "
+        "disclosed=%d salient=%d",
+        sum(len(text) for text in sections.values()),
+        memory.stance,
+        memory.turn_index,
+        memory.staleness_turns,
+        cap,
+        " ".join(
+            f"{name.removeprefix('working_memory_')}={len(text)}"
+            for name, text in sections.items()
+        ),
+        len(memory.withheld),
+        len(memory.open_threads),
+        len(memory.disclosed),
+        len(memory.salient_backstory),
+    )
+    return sections
