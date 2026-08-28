@@ -215,26 +215,42 @@ def _resolve_simulation_state_by_stance(
         ),
     )
     if len(ordered) > len(_STANCE_ORDER):
-        # Say it out loud. The compression itself is defensible — five rungs at
-        # a two-turn dwell already needs 8 turns to traverse, against a median
-        # session that inflects at 8-11, so a sixth posture could not be EARNED
-        # inside a real conversation anyway. What is not defensible is an author
-        # writing bands that silently never render.
+        # DECLINE rather than compress. Five rungs cannot index more than five
+        # distinct bands, so mapping eight of them ordinally would leave three
+        # pieces of authored content that never render.
+        #
+        # The earlier version of this warned and carried on, justified by "a
+        # sixth posture could not be EARNED in a median session anyway". That
+        # argument is about what the LADDER can traverse, not about whether the
+        # author's design is valid: under score-based selection band 8 IS
+        # reachable, because a large score delta jumps straight to it. Migrating
+        # such a scenario to a working-memory prompt would silently delete three
+        # bands it was written with, and a CloudWatch warning is not seen by the
+        # curator who wrote them.
+        #
+        # Returning None falls back to score-based selection for this scenario
+        # only. It keeps every band reachable and makes the cost of adopting
+        # stance selection explicit — reduce to five bands — instead of paying
+        # it in lost content.
         reachable = {
             (r * len(ordered)) // len(_STANCE_ORDER) for r in range(len(_STANCE_ORDER))
         }
         unreachable = [
             st.get("name") for i, st in enumerate(ordered) if i not in reachable
         ]
-        if unreachable:
-            logger.warning(
-                "%s [STATE] %d bands but %d stances — these never render under "
-                "stance selection: %s. Score-based prompts are unaffected.",
-                LOG_PREFIX,
-                len(ordered),
-                len(_STANCE_ORDER),
-                ", ".join(str(n) for n in unreachable),
-            )
+        logger.warning(
+            "%s [STATE] %d bands exceeds the %d stances, so stance selection is "
+            "OFF for this scenario and score-based selection is used instead — "
+            "no band is lost. These would have been unreachable: %s. Reduce to "
+            "%d bands to select by earned stance.",
+            LOG_PREFIX,
+            len(ordered),
+            len(_STANCE_ORDER),
+            ", ".join(str(n) for n in unreachable),
+            len(_STANCE_ORDER),
+        )
+        return None
+
     idx = min(len(ordered) - 1, (rung * len(ordered)) // len(_STANCE_ORDER))
     return ordered[idx]
 

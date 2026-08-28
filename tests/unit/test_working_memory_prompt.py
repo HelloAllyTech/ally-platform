@@ -466,20 +466,40 @@ class TestSplitForm:
         content = self._build(_pd("state_x_guidelines"), None, states=states, score=0)
         assert "LOW" in content
 
-    def test_bands_beyond_the_ladder_are_reported_not_hidden(self, caplog):
-        # The compression is defensible; the silence was not. An author writing
-        # more bands than there are rungs must be told which never render.
+    def test_more_bands_than_rungs_declines_rather_than_dropping_content(self, caplog):
+        # Five rungs cannot index seven bands, so compressing would delete two
+        # pieces of authored content. Under score-based selection those bands
+        # ARE reachable, so migrating the scenario must not lose them: decline
+        # stance selection for this scenario and let score selection stand.
         import logging
 
         from app.core.graph.prompt import _resolve_simulation_state_by_stance
 
         seven = [{"name": f"s{i}", "scoreLower": i * 10} for i in range(7)]
         with caplog.at_level(logging.WARNING):
-            _resolve_simulation_state_by_stance(seven, "guarded")
+            picked = _resolve_simulation_state_by_stance(seven, "guarded")
 
+        assert picked is None, "must fall back, not silently drop bands"
         warning = " ".join(r.getMessage() for r in caplog.records)
-        assert "never render" in warning
-        assert "7 bands but 5 stances" in warning
+        assert "stance selection is OFF" in warning
+        assert "no band is lost" in warning
+
+    def test_a_scenario_with_too_many_bands_still_renders_its_guidance(self):
+        # The property that matters: falling back must produce real guidance,
+        # not an empty section.
+        six = [
+            {
+                "name": f"s{i}",
+                "scoreLower": i * 10,
+                "scoreUpper": (i + 1) * 10,
+                "guidelines": f"BAND_{i}_TEXT",
+            }
+            for i in range(6)
+        ]
+        content = self._split(
+            memory=ClientWorkingMemory(stance="disclosing", affect="wary"), states=six
+        )
+        assert "BAND_0_TEXT" in content  # score 0 -> first band, via fallback
 
     def test_five_or_fewer_bands_warn_about_nothing(self, caplog):
         import logging
