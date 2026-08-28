@@ -1,4 +1,6 @@
+import ast
 import asyncio
+import inspect
 import types
 from unittest.mock import AsyncMock, Mock
 
@@ -2543,3 +2545,56 @@ class TestStartupFailureShutsDownJob:
             await worker.entrypoint(ctx)
 
         ctx.shutdown.assert_called_once()
+
+
+class TestWorkerOptionsShutdownProcessTimeout:
+    """shutdown_with_cleanup's own handler chain (app/worker.py:1168) budgets
+    well past the SDK's shutdown_process_timeout default of 10s: on_shutdown
+    (app/core/events/handlers.py) alone waits up to 3s draining orchestrator
+    sends plus up to 16s draining an in-flight finalize task, before
+    supervisor-notes/background-audio teardown even runs. Left at the SDK
+    default, the ipc supervisor's close_timeout races that budget and kills
+    the job process with SIGUSR1 before score/memory persistence finishes —
+    seen in production as paired "process did not exit in time, killing
+    process" / "exited with non-zero exit code -10" log lines. WorkerOptions
+    must therefore set shutdown_process_timeout explicitly, comfortably
+    above that ~19s internal budget.
+    """
+
+    def _worker_options_call(self):
+        source = inspect.getsource(worker)
+        tree = ast.parse(source)
+        calls = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and (
+                (
+                    isinstance(node.func, ast.Attribute)
+                    and node.func.attr == "WorkerOptions"
+                )
+                or (isinstance(node.func, ast.Name) and node.func.id == "WorkerOptions")
+            )
+        ]
+        assert (
+            len(calls) == 1
+        ), "expected exactly one WorkerOptions(...) call in app/worker.py"
+        return calls[0]
+
+    def test_shutdown_process_timeout_covers_the_finalize_drain_budget(self):
+        call = self._worker_options_call()
+        kwargs = {kw.arg: kw.value for kw in call.keywords if kw.arg}
+        assert "shutdown_process_timeout" in kwargs, (
+            "WorkerOptions leaves shutdown_process_timeout unset, so the "
+            "SDK default of 10s applies — shorter than the ~19s the "
+            "shutdown handler chain (on_shutdown's own drain waits) can "
+            "legitimately take, which forces the supervisor to SIGUSR1-kill "
+            "the job before it finishes saving score/memory."
+        )
+        value = ast.literal_eval(kwargs["shutdown_process_timeout"])
+        assert value >= 20, (
+            f"shutdown_process_timeout={value}s is too tight for the "
+            "shutdown handler's own drain budget (3s + 16s = 19s) plus "
+            "network time for finalize_session and background-audio/"
+            "supervisor-notes teardown"
+        )

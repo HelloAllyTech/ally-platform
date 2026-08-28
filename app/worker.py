@@ -3521,5 +3521,16 @@ if __name__ == "__main__":
             max_retry=360,
             job_memory_warn_mb=650,
             initialize_process_timeout=120,
+            # shutdown_with_cleanup's own on_shutdown handler (see
+            # app/core/events/handlers.py) budgets up to 3s draining
+            # orchestrator sends plus up to 16s draining an in-flight
+            # finalize task — ~19s before its own network calls (final
+            # score send, session-memory emission) even start. Left at the
+            # SDK's shutdown_process_timeout default of 10s, the ipc
+            # supervisor's close_timeout races that budget and SIGUSR1-kills
+            # the job process before score/memory persistence finishes
+            # (CloudWatch: "process did not exit in time, killing process" /
+            # exit code -10). 30s gives that budget real headroom.
+            shutdown_process_timeout=30,
         )
     )
