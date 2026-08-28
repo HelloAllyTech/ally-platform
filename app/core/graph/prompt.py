@@ -162,35 +162,6 @@ def _resolve_state_guidance(
     return ""
 
 
-def _resolve_simulation_state_by_stance(
-    states: Optional[List[Dict[str, Any]]],
-    stance: Optional[str],
-) -> Optional[Dict[str, Any]]:
-    """Pick the authored state whose NAME is the client's current stance.
-
-    There is no mapping any more, and that is the point. The session's ladder
-    is built from these same states (see worker.py), lowest rung first, so a
-    stance IS a state name and selection is a lookup.
-
-    The earlier version indexed a fixed five-rung ladder into N author bands
-    with `floor(i * N / 5)`. That worked for N <= 5 and quietly made bands
-    unreachable beyond it, then — once that was called out — declined to run at
-    all for N > 5. Both were symptoms of the framework owning a ladder the
-    scenario should have owned. With the ladder derived from the states, N is
-    whatever the author wrote and every band is reachable by construction.
-
-    Returns None when the stance is not one of these states' names — a scenario
-    with no states, or a session still on the generic default ladder — so the
-    caller falls back to score-based selection rather than to nothing.
-    """
-    if not states or not stance:
-        return None
-    for state in states:
-        if str(state.get("name") or "").strip() == stance:
-            return state
-    return None
-
-
 def _resolve_simulation_state_by_score(
     states: Optional[List[Dict[str, Any]]],
     current_score: Optional[int],
@@ -505,36 +476,26 @@ def _build_behavior_prompt(
         else None
     )
 
-    # Working-memory prompts select the authored guidance by STANCE instead.
+    # Working memory MIRRORS the authored state; it does not choose it.
     #
-    # Same guidance, better index. The score is a lossy summary — two very
-    # different sessions reach the same number — and in prod it barely moves at
-    # all, because state resolution reads ScoreKeeper's event bucket while the
-    # behaviours authors actually write ("Helper should do") land in the
-    # behaviour bucket. A stance had to be EARNED: one rung per turn, a dwell
-    # requirement, an immediate drop on rupture.
+    # For a while it did choose it, and that was the mistake: the ladder's
+    # gates — earned advance, two-turn dwell, one rung per turn — sat in front
+    # of the author's flow, so a scenario could not move through its own bands
+    # until working memory agreed. Two controllers for one behaviour, and the
+    # stricter one silently won. That is what "the states stopped doing
+    # anything" looked like from the outside.
     #
-    # The ladder is built FROM these states, so this is a name lookup rather
-    # than a mapping, and a scenario may define as many bands as it likes.
-    #
-    # Scoped to prompts that opted into working memory. Every other scenario
-    # keeps score-based selection exactly as it is, and the rollback is the one
-    # the design already documents: re-select a different prompt.
-    if prompt_has_states and client_working_memory is not None:
-        _by_stance = _resolve_simulation_state_by_stance(
-            sim_states, getattr(client_working_memory, "stance", None)
-        )
-        if _by_stance is not None:
-            if _by_stance is not active_sim_state:
-                logger.info(
-                    "%s [STATE] stance=%s selected state %r (score-based would "
-                    "have chosen %r)",
-                    LOG_PREFIX,
-                    getattr(client_working_memory, "stance", None),
-                    _by_stance.get("name"),
-                    (active_sim_state or {}).get("name"),
-                )
-            active_sim_state = _by_stance
+    # The author's states drive progression, exactly as they do for every other
+    # main-agent prompt. Working memory's job is the context around it: what has
+    # been said, what is being withheld, what is unresolved, how the client
+    # sounds, what their own history brings up. The stance is a LABEL for where
+    # the author's state machine already is, so that recall ranking and the
+    # withheld ledger have a rung to key off — not a second opinion about it.
+    if client_working_memory is not None and active_sim_state is not None:
+        _authored = str(active_sim_state.get("name") or "").strip()
+        if _authored:
+            client_working_memory.stance = _authored
+
     state_x_guidelines = (
         _coerce_block_value(active_sim_state.get("guidelines"))
         if active_sim_state

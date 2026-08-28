@@ -317,8 +317,19 @@ def validate(
     messages: Sequence[Any] = (),
     score_delta: int = 0,
     advancing_behaviours: Sequence[str] = (),
+    authored_stance: Optional[str] = None,
 ) -> ValidatedUpdate:
     """Turn an advisory proposal into what code is willing to commit.
+
+    `authored_stance` is the state the AUTHOR's score bands resolved to this
+    turn. When supplied it is simply TAKEN: working memory no longer
+    adjudicates progression, so `decide_stance` and its gates — earned advance,
+    two-turn dwell, one rung per turn — are bypassed entirely and the stance
+    becomes a label for where the author's state machine already is.
+
+    Everything else here is unchanged, because that IS working memory's job:
+    grounding events against the transcript, capping free text, validating the
+    ledgers, choosing what to recall.
 
     `messages` is the turn window the proposal was derived from. Optional
     because `check_grounding` treats an absent transcript as "cannot check"
@@ -443,7 +454,14 @@ def validate(
         logger.debug("[working-memory] discarding unknown events: %s", sorted(unknown))
     kinds &= CLIENT_EVENTS
 
-    stance, reason = decide_stance(memory, proposal.stance, kinds)
+    if authored_stance is not None:
+        # The author's flow decides; nothing here may refuse, clamp or delay it.
+        stance = authored_stance if authored_stance != memory.stance else None
+        reason = None
+    else:
+        # No authored state resolved — a scenario with no states. The generic
+        # ladder still governs itself, because there is nothing else to follow.
+        stance, reason = decide_stance(memory, proposal.stance, kinds)
     if reason:
         logger.info(
             "[working-memory] stance %s -> %s refused: %s",

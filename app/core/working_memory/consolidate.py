@@ -172,6 +172,7 @@ async def consolidate(
     room_id: Optional[str] = None,
     score_delta: int = 0,
     advancing_behaviours: Sequence[str] = (),
+    authored_stance: Optional[str] = None,
 ) -> Optional[ValidatedUpdate]:
     """One LLM call, then validation. Returns None when there is nothing to do.
 
@@ -415,6 +416,7 @@ def schedule_update(
     embed_query=None,
     score_delta: int = 0,
     advancing_behaviours: Sequence[str] = (),
+    authored_stance: Optional[str] = None,
 ) -> bool:
     """Fire the consolidation as a DETACHED task writing into ``store``.
 
@@ -443,6 +445,7 @@ def schedule_update(
                     room_id=room_id,
                     score_delta=score_delta,
                     advancing_behaviours=advancing_behaviours,
+                    authored_stance=authored_stance,
                 ),
                 timeout=timeout,
             )

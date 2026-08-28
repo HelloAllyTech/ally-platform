@@ -2578,6 +2578,20 @@ async def update_working_memory(
         and f.behavior_instruction_id
     ]
 
+    # The stance the AUTHOR's bands resolve to this turn. Working memory takes
+    # it rather than deciding one, so the client's progression is the
+    # scenario's, identical to every non-working-memory prompt.
+    from app.core.graph.prompt import _resolve_simulation_state_by_score
+
+    _sk = configurable.get("score_keeper")
+    _authored_state = _resolve_simulation_state_by_score(
+        getattr(prompt_data, "states", None),
+        _sk.get_total_score() if _sk is not None else None,
+    )
+    _authored_stance = (
+        str(_authored_state.get("name") or "").strip() if _authored_state else ""
+    ) or None
+
     schedule_update(
         store,
         memory=memory,
@@ -2589,6 +2603,7 @@ async def update_working_memory(
         embed_query=embed_query,
         score_delta=_score_delta,
         advancing_behaviours=_advancing_behaviours,
+        authored_stance=_authored_stance,
     )
     return {}
 

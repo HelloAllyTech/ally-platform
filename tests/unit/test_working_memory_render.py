@@ -302,7 +302,11 @@ def test_the_constraints_are_visible_in_the_prompt_body():
     # Assert on fragments that survive the template's line wrapping — the
     # stance sentence wraps mid-phrase ("has to be\nearned"), so matching the
     # whole clause would fail on formatting rather than on substance.
-    assert "Do not move past this on your own." in body
+    # The stance-discipline paragraph is deliberately GONE: it was the
+    # instruction that made working memory authoritative over the author's
+    # flow. The two that remain are about not repeating yourself and sounding
+    # like yourself — context, not progression.
+    assert "Do not move past this on your own." not in body
     assert "Do not re-introduce these as if they were new." in body
     assert "sound like the person who said these" in body
 

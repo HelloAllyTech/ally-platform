@@ -395,9 +395,11 @@ class TestSplitForm:
         assert "STAY GUARDED AND BRIEF" in content
         assert NO_STATE_GUIDANCE not in content
 
-    def test_the_stance_selects_the_band_of_the_same_name(self):
-        # No mapping any more: the session's ladder is BUILT from these states,
-        # so a stance is a state name and selection is a lookup.
+    def test_the_stance_mirrors_the_authored_state(self):
+        # Working memory does not choose the state any more; it labels the one
+        # the author's score bands resolved to. Two controllers for one
+        # behaviour is what made a scenario unable to move through its own
+        # bands until the ladder agreed.
         four = [
             {
                 "name": "dis-engaged",
@@ -411,47 +413,38 @@ class TestSplitForm:
                 "scoreUpper": 50,
                 "guidelines": "HEARD_TEXT",
             },
+        ]
+        memory = ClientWorkingMemory(stance="dis-engaged", affect="wary")
+        content = self._split(memory=memory, states=four)
+
+        # score 0 resolves "heard"; the stance follows it rather than pinning
+        # the prompt to where the ladder had got to
+        assert "HEARD_TEXT" in content
+        assert memory.stance == "heard"
+        assert "You are heard right now" in content
+
+    def test_the_authored_state_wins_even_when_the_ladder_disagrees(self):
+        # The regression that matters: a stance further along than the author's
+        # resolved band must not hold the prompt back.
+        two = [
             {
-                "name": "explores",
+                "name": "early",
+                "scoreLower": 0,
+                "scoreUpper": 50,
+                "guidelines": "EARLY_TEXT",
+            },
+            {
+                "name": "late",
                 "scoreLower": 50,
-                "scoreUpper": 100,
-                "guidelines": "EXPLORES_TEXT",
-            },
-            {
-                "name": "confident",
-                "scoreLower": 100,
                 "scoreUpper": 999,
-                "guidelines": "CONFIDENT_TEXT",
+                "guidelines": "LATE_TEXT",
             },
         ]
-        content = self._split(
-            memory=ClientWorkingMemory(stance="explores", affect="wary"),
-            states=four,
-        )
-        # score 0 would have chosen "heard"; the earned stance chooses its own
-        assert "EXPLORES_TEXT" in content
-        assert "HEARD_TEXT" not in content
+        memory = ClientWorkingMemory(stance="late", affect="wary")
+        content = self._split(memory=memory, states=two)
 
-    def test_any_number_of_bands_is_reachable(self):
-        # The whole reason for deriving the ladder from the states. Seven bands
-        # used to mean two were unreachable, then meant stance selection
-        # declined entirely. Now the seventh is simply a rung.
-        from app.core.graph.prompt import _resolve_simulation_state_by_stance
-
-        seven = [
-            {"name": f"s{i}", "scoreLower": i * 10, "guidelines": f"BAND_{i}"}
-            for i in range(7)
-        ]
-        for i in range(7):
-            picked = _resolve_simulation_state_by_stance(seven, f"s{i}")
-            assert picked is not None and picked["guidelines"] == f"BAND_{i}"
-
-    def test_an_unknown_stance_falls_back_to_score_selection(self):
-        from app.core.graph.prompt import _resolve_simulation_state_by_stance
-
-        states = [{"name": "a", "scoreLower": 0, "guidelines": "X"}]
-        assert _resolve_simulation_state_by_stance(states, "not-a-stance") is None
-        assert _resolve_simulation_state_by_stance(states, None) is None
+        assert "EARLY_TEXT" in content
+        assert "LATE_TEXT" not in content
 
     def test_a_non_working_memory_prompt_keeps_score_selection(self):
         # The blast radius. Every scenario that did not opt in must be
