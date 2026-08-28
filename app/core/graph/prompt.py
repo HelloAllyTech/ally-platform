@@ -523,12 +523,34 @@ def _build_behavior_prompt(
         )
 
     if client_working_memory is not None and not _declares_block and _declared_sections:
-        from app.core.working_memory.render import render_sections
+        from app.core.working_memory.render import NO_STATE_GUIDANCE, render_sections
 
         working_memory_sections = {
             **working_memory_sections,
             **render_sections(client_working_memory),
         }
+        # The authored half needs the same named absence the derived half gets.
+        #
+        # `state_x_guidelines` is "" whenever no state resolves — a score
+        # outside every configured band, which is ordinary, not an error. The
+        # block form never showed that: render_block substituted
+        # NO_STATE_GUIDANCE on the way through. The split form routes the
+        # authored guidance around this module entirely, so "" reached the
+        # template and left "## What this conversation is meant to be doing"
+        # with nothing under it.
+        #
+        # A bare heading reads to the model as an absence of CONSTRAINT rather
+        # than an absence of data — the exact failure every `NO_*` constant in
+        # render.py exists to prevent — and it lands on the heading that tells
+        # the actor what the conversation is FOR. Seen in prod: a live session
+        # logged the [STATE] warning on every turn as its score climbed past
+        # the last configured band.
+        #
+        # Scoped to the split form deliberately. Prompts like Main Agent Prompt
+        # #2 also declare {state_x_guidelines} and have rendered it empty
+        # forever; changing that globally would alter every one of them.
+        if not (state_x_guidelines or "").strip():
+            state_x_guidelines = NO_STATE_GUIDANCE
 
     if client_working_memory is not None and _declares_block:
         from app.core.working_memory.render import render_block

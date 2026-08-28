@@ -95,7 +95,13 @@ def _rendered_disclosure_cap() -> int:
 
 _NO_SALIENT = "(nothing from your own life is on your mind this turn)"
 _NO_FRAGMENTS = "(you have not spoken yet — this is your first reply)"
-_NO_STATE_GUIDANCE = "(no particular direction for this stage)"
+#: Public: the split form needs it too. In the block form `render_block`
+#: applies this itself, but the split form routes authored guidance through
+#: the standalone `{state_x_guidelines}` placeholder, which never passed
+#: through this module — so the named absence has to be applied by the
+#: caller instead. Same string either way; a reader comparing the two forms
+#: should not find two different phrasings for the same absence.
+NO_STATE_GUIDANCE = "(no particular direction for this stage)"
 _NO_REGISTER = "(speak as this person naturally would)"
 
 
@@ -172,7 +178,7 @@ def render_block(
 
     cap = _rendered_disclosure_cap()
     sections = {
-        "state_guidance": guidance or _NO_STATE_GUIDANCE,
+        "state_guidance": guidance or NO_STATE_GUIDANCE,
         "affect": memory.affect.strip(),
         "register": memory.register.strip() or _NO_REGISTER,
         "speech_fragments": _bullets(memory.speech_fragments, _NO_FRAGMENTS),

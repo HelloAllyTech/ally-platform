@@ -368,3 +368,29 @@ class TestSplitForm:
         assert _get_selected_prompt_has_states(
             _pd("working_memory_stance", body=_SPLIT_BODY)
         )
+
+    def test_an_unresolved_state_still_names_its_absence(self):
+        # Seen in prod on a live session: the score climbed past the last
+        # configured band, no state resolved, and `{state_x_guidelines}` went
+        # in empty — leaving "## What this conversation is meant to be doing"
+        # with nothing under it.
+        #
+        # The block form never showed this because render_block substituted the
+        # named absence on the way through. The split form routes the authored
+        # half around that module, so the caller has to do it. A bare heading
+        # reads as an absence of CONSTRAINT, not of data, and this is the
+        # heading that tells the actor what the conversation is FOR.
+        from app.core.working_memory.render import NO_STATE_GUIDANCE
+
+        content = self._split(memory=ClientWorkingMemory(affect="wary"), states=[])
+
+        assert NO_STATE_GUIDANCE in content
+        assert "GUIDANCE_HERE\n\n" not in content
+
+    def test_a_resolved_state_is_not_replaced_by_the_absence(self):
+        from app.core.working_memory.render import NO_STATE_GUIDANCE
+
+        content = self._split(memory=ClientWorkingMemory(affect="wary"), states=_STATES)
+
+        assert "STAY GUARDED AND BRIEF" in content
+        assert NO_STATE_GUIDANCE not in content
