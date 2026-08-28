@@ -214,6 +214,27 @@ def _resolve_simulation_state_by_stance(
             st.get("scoreLower") if st.get("scoreLower") is not None else float("-inf")
         ),
     )
+    if len(ordered) > len(_STANCE_ORDER):
+        # Say it out loud. The compression itself is defensible — five rungs at
+        # a two-turn dwell already needs 8 turns to traverse, against a median
+        # session that inflects at 8-11, so a sixth posture could not be EARNED
+        # inside a real conversation anyway. What is not defensible is an author
+        # writing bands that silently never render.
+        reachable = {
+            (r * len(ordered)) // len(_STANCE_ORDER) for r in range(len(_STANCE_ORDER))
+        }
+        unreachable = [
+            st.get("name") for i, st in enumerate(ordered) if i not in reachable
+        ]
+        if unreachable:
+            logger.warning(
+                "%s [STATE] %d bands but %d stances — these never render under "
+                "stance selection: %s. Score-based prompts are unaffected.",
+                LOG_PREFIX,
+                len(ordered),
+                len(_STANCE_ORDER),
+                ", ".join(str(n) for n in unreachable),
+            )
     idx = min(len(ordered) - 1, (rung * len(ordered)) // len(_STANCE_ORDER))
     return ordered[idx]
 

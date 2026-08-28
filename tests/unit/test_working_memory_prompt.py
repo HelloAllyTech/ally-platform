@@ -465,3 +465,29 @@ class TestSplitForm:
         ]
         content = self._build(_pd("state_x_guidelines"), None, states=states, score=0)
         assert "LOW" in content
+
+    def test_bands_beyond_the_ladder_are_reported_not_hidden(self, caplog):
+        # The compression is defensible; the silence was not. An author writing
+        # more bands than there are rungs must be told which never render.
+        import logging
+
+        from app.core.graph.prompt import _resolve_simulation_state_by_stance
+
+        seven = [{"name": f"s{i}", "scoreLower": i * 10} for i in range(7)]
+        with caplog.at_level(logging.WARNING):
+            _resolve_simulation_state_by_stance(seven, "guarded")
+
+        warning = " ".join(r.getMessage() for r in caplog.records)
+        assert "never render" in warning
+        assert "7 bands but 5 stances" in warning
+
+    def test_five_or_fewer_bands_warn_about_nothing(self, caplog):
+        import logging
+
+        from app.core.graph.prompt import _resolve_simulation_state_by_stance
+
+        five = [{"name": f"s{i}", "scoreLower": i * 10} for i in range(5)]
+        with caplog.at_level(logging.WARNING):
+            _resolve_simulation_state_by_stance(five, "opening")
+
+        assert not [r for r in caplog.records if "never render" in r.getMessage()]
