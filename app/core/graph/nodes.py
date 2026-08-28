@@ -2529,6 +2529,14 @@ async def update_working_memory(
         _embedding_client.get_embedding if _embedding_client is not None else None
     )
 
+    # The score the behaviour detector produced since the last update we
+    # scheduled. A positive delta means the counsellor did something the
+    # SCENARIO AUTHOR scored as helpful, and consolidation treats that as an
+    # advancing event — which is what keeps the score-driven state machine and
+    # the event-driven stance ladder moving together instead of disagreeing.
+    _score_delta = int(state.current_score) - int(store.score_at_last_update)
+    store.score_at_last_update = int(state.current_score)
+
     schedule_update(
         store,
         memory=memory,
@@ -2538,6 +2546,7 @@ async def update_working_memory(
         prompt_data=prompt_data,
         room_id=getattr(_room, "name", None),
         embed_query=embed_query,
+        score_delta=_score_delta,
     )
     return {}
 

@@ -155,6 +155,7 @@ async def consolidate(
     llm_client: BaseLLMClient,
     prompt_data=None,
     room_id: Optional[str] = None,
+    score_delta: int = 0,
 ) -> Optional[ValidatedUpdate]:
     """One LLM call, then validation. Returns None when there is nothing to do.
 
@@ -224,7 +225,7 @@ async def consolidate(
 
     # The same window the updater read, so `validate` can check the evidence it
     # produced against what was actually said.
-    return validate(proposal, memory, new_messages)
+    return validate(proposal, memory, new_messages, score_delta)
 
 
 async def apply_update(
@@ -374,6 +375,7 @@ def schedule_update(
     room_id: Optional[str] = None,
     reason: str = "cadence",
     embed_query=None,
+    score_delta: int = 0,
 ) -> bool:
     """Fire the consolidation as a DETACHED task writing into ``store``.
 
@@ -400,6 +402,7 @@ def schedule_update(
                     llm_client=llm_client,
                     prompt_data=prompt_data,
                     room_id=room_id,
+                    score_delta=score_delta,
                 ),
                 timeout=timeout,
             )

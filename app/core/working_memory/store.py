@@ -54,6 +54,16 @@ class ClientWorkingMemoryStore:
         self._lock = asyncio.Lock()
         self._state = ClientWorkingMemory(stance=initial_stance)
         self._last_committed_turn = -1
+        #: Simulation score at the last update we SCHEDULED, so the node can
+        #: hand consolidation a per-turn delta.
+        #:
+        #: Lives on the store, not on ClientWorkingMemory: the dataclass is the
+        #: model's view of the client, and a counsellor-side scoreboard is not
+        #: part of what the client has in mind. Written on SCHEDULE rather than
+        #: on commit, so a turn skipped by EVERY_TURNS or lost to a timeout
+        #: leaves its delta to accumulate into the next update instead of
+        #: dropping the evidence on the floor.
+        self.score_at_last_update = 0
         #: Set when an update is in flight, so a second one is not started for
         #: the same turn. Mirrors RollingSummaryStore.in_flight.
         self._task: Optional[asyncio.Task] = None

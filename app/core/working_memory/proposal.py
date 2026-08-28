@@ -44,10 +44,31 @@ STANCE_ORDER: Tuple[Stance, ...] = STANCES
 #: `reflecting` unreachable inside a median session.
 MIN_TURNS_BEFORE_ADVANCE = 2
 
+#: A code-verified advancing event, synthesised from the turn's SCORE DELTA
+#: rather than proposed by the updater.
+#:
+#: The stance ladder and the score-driven state machine were two independent
+#: controllers of the same behaviour, and the ladder is the stricter one: a
+#: counsellor could score their way into a warmer state band while the client
+#: stayed guarded, because nothing the SCORE saw could earn a rung. That reads
+#: from the outside as "the states stopped doing anything" — reported from prod
+#: on scenario 440, where the score climbed 10 -> 104 across four configured
+#: states and the ladder moved only on updater-proposed events.
+#:
+#: This is deliberately the strongest evidence in the set. Every other
+#: advancing event is proposed by the updater LLM and then grounded against the
+#: transcript; this one is computed in code from detector events carrying
+#: scores the SCENARIO AUTHOR configured. It is also the only advancing event
+#: that does not depend on the updater at all, which removes the single point
+#: of failure the ladder has had since it shipped.
+HELPFUL_BEHAVIOUR = "helpful_behaviour"
+
 #: Events that can earn an advance. `repair` and `resistance_softened` are the
 #: two the design names as advancing (§4); `disclosed` counts because revealing
 #: something new IS the client opening up, not merely a bookkeeping event.
-ADVANCING_EVENTS = frozenset({"repair", "resistance_softened", "disclosed"})
+ADVANCING_EVENTS = frozenset(
+    {"repair", "resistance_softened", "disclosed", HELPFUL_BEHAVIOUR}
+)
 
 #: Events that force a regression regardless of anything else. There is no
 #: minimum-turns gate on the way down: a client who feels judged closes up
@@ -281,6 +302,7 @@ def validate(
     proposal: ProposedUpdate,
     memory: ClientWorkingMemory,
     messages: Sequence[Any] = (),
+    score_delta: int = 0,
 ) -> ValidatedUpdate:
     """Turn an advisory proposal into what code is willing to commit.
 
@@ -288,6 +310,18 @@ def validate(
     because `check_grounding` treats an absent transcript as "cannot check"
     rather than "invented" — a caller with no messages gets the previous
     behaviour, not a silently emptied update.
+
+    `score_delta` is this turn's change in the simulation score — the sum of
+    the scores on the events the behaviour detector fired. A POSITIVE delta
+    means the counsellor did something the scenario author scored as helpful,
+    and that earns an advancing event in its own right.
+
+    Only positive. A negative delta is NOT mirrored into a regression: the
+    regression path has no minimum-dwell gate by design (a client who feels
+    judged closes up immediately), so detector noise on the way down costs a
+    rung instantly, where noise on the way up is still bounded by the one-rung
+    clamp and the two-turn dwell. The asymmetry is the safeguard, not an
+    oversight — `rupture` remains the only way down.
     """
     # An event without evidence cannot earn anything.
     #
@@ -348,6 +382,15 @@ def validate(
     grounded_set = set(grounded_texts)
 
     kinds = set()
+    if score_delta > 0:
+        # NOT routed through the grounding gate below, and that is the point:
+        # grounding exists to check text the updater invented. This event was
+        # not proposed by any model — it is arithmetic over detector events —
+        # so there is no quote to verify and nothing to confabulate.
+        kinds.add(HELPFUL_BEHAVIOUR)
+        logger.info(
+            "[working-memory] score delta %+d earns an advancing event", score_delta
+        )
     for kind, evidence in evidenced:
         if evidence not in grounded_set:
             logger.info(

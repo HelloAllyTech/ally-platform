@@ -464,3 +464,65 @@ def test_normal_length_values_are_untouched():
     )
     assert out.affect == "anxious but slightly relieved"
     assert out.register == "clipped"
+
+
+# ---------------------------------------------------------------------------
+# Helpful behaviour as an advancing event
+# ---------------------------------------------------------------------------
+#
+# Reported from prod (scenario 440): the score climbed 10 -> 104 across four
+# configured states while the ladder moved only on updater-proposed events, so
+# the state machine and the stance ladder disagreed and it read as "the states
+# stopped doing anything".
+
+
+def test_a_positive_score_delta_can_earn_an_advance_with_no_updater_event():
+    # The whole point: this path does not depend on the updater proposing
+    # anything, which is what removes its single point of failure.
+    memory = ClientWorkingMemory(stance="guarded", turns_in_stance=5)
+
+    result = validate(
+        _proposal(stance="testing"),
+        memory,
+        (),
+        score_delta=6,
+    )
+
+    assert result.stance == "testing"
+
+
+def test_a_zero_delta_still_requires_an_earned_event():
+    memory = ClientWorkingMemory(stance="guarded", turns_in_stance=5)
+
+    result = validate(_proposal(stance="testing"), memory, (), score_delta=0)
+
+    assert result.stance is None
+
+
+def test_a_negative_delta_does_not_regress_the_stance():
+    # Deliberately asymmetric. The regression path has no minimum-dwell gate,
+    # so detector noise on the way down would cost a rung instantly, where the
+    # same noise upward is still bounded by the one-rung clamp and the two-turn
+    # dwell. `rupture` stays the only way down.
+    memory = ClientWorkingMemory(stance="opening", turns_in_stance=5)
+
+    result = validate(_proposal(stance="opening"), memory, (), score_delta=-8)
+
+    assert result.stance is None
+
+
+def test_a_score_delta_still_cannot_skip_a_rung():
+    # Earned direction, code-decided magnitude — unchanged by this feature.
+    memory = ClientWorkingMemory(stance="guarded", turns_in_stance=5)
+
+    result = validate(_proposal(stance="disclosing"), memory, (), score_delta=10)
+
+    assert result.stance == "testing"
+
+
+def test_a_score_delta_still_respects_the_dwell_gate():
+    memory = ClientWorkingMemory(stance="testing", turns_in_stance=1)
+
+    result = validate(_proposal(stance="opening"), memory, (), score_delta=10)
+
+    assert result.stance is None
