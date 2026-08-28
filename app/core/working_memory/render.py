@@ -235,27 +235,6 @@ SECTION_VARIABLES = (
     "working_memory_salient",
 )
 
-# Scaffolding that travels WITH the value rather than with the heading.
-#
-# In the block form these sentences live in `client_working_memory.txt`, which
-# is a repo file no curator can reach. The split form moves the headings into
-# the main-agent prompt, which is dashboard-editable — so if these sentences
-# moved with them, the three instructions that stop the actor treating the
-# block as world-facts would become editable too, and deletable by accident.
-#
-# Keeping them here costs one duplication (the same sentence exists in the
-# .txt) and buys the property that matters: a curator can move, reorder or drop
-# a SECTION, and cannot silently drop the constraint inside it.
-_STANCE_DISCIPLINE = (
-    "Do not move past this on your own. Warmth, insight or resolution has to be "
-    "earned by what the counsellor actually does — if it has not happened yet, "
-    "you are still here."
-)
-_FRAGMENTS_LEAD = (
-    "Your own recent words, for voice — sound like the person who said these:"
-)
-_DISCLOSED_LEAD = "Do not re-introduce these as if they were new."
-
 
 def render_sections(memory: ClientWorkingMemory) -> dict:
     """Render the working memory as one value per placeholder (the split form).
@@ -276,6 +255,15 @@ def render_sections(memory: ClientWorkingMemory) -> dict:
       module's own rule (see the `_NO_*` constants) applied to the one case the
       block form got to opt out of.
 
+    - **Static instructions are absent.** Each value is the derived data and
+      nothing else: the sentences that shape how the actor USES it — the
+      earned-advance discipline, the do-not-re-introduce rule, the voice
+      lead-in — are literal text in the prompt body. Baking them into the
+      values here would hide the single most important instruction in the
+      block behind a placeholder name, from exactly the people being asked to
+      curate it. A versioned prompt with a revert-to-default button and a diff
+      on every change does not need protecting from its own authors.
+
     - **State guidance is absent.** The block form takes `state_guidance` and
       renders it as its first section; the split form leaves it to the
       `{state_x_guidelines}` placeholder that already exists. That is the whole
@@ -289,17 +277,14 @@ def render_sections(memory: ClientWorkingMemory) -> dict:
         stance_line = f"{stance_line} {affect}"
 
     sections = {
-        "working_memory_stance": f"{stance_line}\n\n{_STANCE_DISCIPLINE}",
+        "working_memory_stance": stance_line,
         "working_memory_register": memory.register.strip() or _NO_REGISTER,
-        "working_memory_speech_fragments": (
-            f"{_FRAGMENTS_LEAD}\n" f"{_bullets(memory.speech_fragments, _NO_FRAGMENTS)}"
+        "working_memory_speech_fragments": _bullets(
+            memory.speech_fragments, _NO_FRAGMENTS
         ),
         "working_memory_withheld": _render_withheld(memory.withheld),
         "working_memory_unresolved": _render_unresolved(memory.unresolved),
-        "working_memory_disclosed": (
-            f"{_DISCLOSED_LEAD}\n"
-            f"{_render_facts(memory.disclosed, _NO_DISCLOSED, cap)}"
-        ),
+        "working_memory_disclosed": _render_facts(memory.disclosed, _NO_DISCLOSED, cap),
         "working_memory_salient": _render_facts(memory.salient_backstory, _NO_SALIENT),
     }
 

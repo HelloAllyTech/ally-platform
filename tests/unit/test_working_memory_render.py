@@ -261,11 +261,17 @@ def test_every_section_renders_even_when_the_memory_is_untouched():
     )
 
 
-def test_the_constraints_travel_with_the_values_not_the_headings():
-    # The one property that makes the split safe to hand to curators. The
-    # headings move into the dashboard-editable prompt; these three sentences
-    # must not, or the instructions that stop the actor treating the block as
-    # world-facts become deletable by accident.
+def test_a_section_value_is_derived_data_and_nothing_else():
+    # The inverse of what this file asserted when the split form shipped.
+    #
+    # The three static sentences — the earned-advance discipline, the
+    # do-not-re-introduce rule, the voice lead-in — used to be baked into these
+    # values so a curator could not delete them. That hid the single most
+    # important instruction in the block behind a placeholder name, from the
+    # people being asked to curate it: a reader saw `{working_memory_stance}`
+    # with no way to know a behavioural constraint arrived with it. They are
+    # literal text in the prompt body now, and what stays here is only what
+    # cannot be literal text — the values that depend on runtime state.
     sections = render_sections(
         _memory(
             speech_fragments=["I dunno."],
@@ -273,11 +279,32 @@ def test_the_constraints_travel_with_the_values_not_the_headings():
         )
     )
 
-    assert "has to be earned" in sections["working_memory_stance"]
-    assert "Do not re-introduce these" in sections["working_memory_disclosed"]
-    assert "sound like the person who said these" in (
-        sections["working_memory_speech_fragments"]
-    )
+    assert sections["working_memory_stance"] == "You are guarded right now. Worn out."
+    assert "has to be earned" not in sections["working_memory_stance"]
+    assert "Do not re-introduce" not in sections["working_memory_disclosed"]
+    assert "sound like the person" not in sections["working_memory_speech_fragments"]
+    # the derived data itself is still there
+    assert "she moved out in March" in sections["working_memory_disclosed"]
+    assert "I dunno." in sections["working_memory_speech_fragments"]
+
+
+def test_the_constraints_are_visible_in_the_prompt_body():
+    # They have to live SOMEWHERE, and the point of moving them is that a
+    # curator can read them. If a future edit drops one from the template this
+    # fails, which is the whole trade: visible and diffable beats hidden and
+    # unremovable.
+    from pathlib import Path
+
+    body = Path(
+        "app/prompts/system/main_agent_prompt_working_memory_split.txt"
+    ).read_text(encoding="utf-8")
+
+    # Assert on fragments that survive the template's line wrapping — the
+    # stance sentence wraps mid-phrase ("has to be\nearned"), so matching the
+    # whole clause would fail on formatting rather than on substance.
+    assert "Do not move past this on your own." in body
+    assert "Do not re-introduce these as if they were new." in body
+    assert "sound like the person who said these" in body
 
 
 def test_the_split_form_does_not_render_state_guidance():
@@ -298,7 +325,10 @@ def test_the_disclosure_cap_binds_in_the_split_form_too():
     many = [Fact(f"fact {i}") for i in range(MAX_RENDERED_DISCLOSURES + 6)]
     rendered = render_sections(_memory(disclosed=many))["working_memory_disclosed"]
 
-    assert rendered.count("\n- ") == MAX_RENDERED_DISCLOSURES
+    # Count bullet LINES, not "\n- " — the value now starts at the first
+    # bullet rather than after a lead sentence, so the separator form would
+    # silently under-count by one and this test would be checking cap-1.
+    assert len(rendered.splitlines()) == MAX_RENDERED_DISCLOSURES
     assert "fact 0" not in rendered  # oldest dropped, newest kept
     assert f"fact {len(many) - 1}" in rendered
 
