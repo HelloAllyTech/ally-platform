@@ -236,6 +236,7 @@ def select(
     stance: str,
     cues: Iterable[str] = (),
     last_learner_text: Optional[str] = None,
+    scenario_context: Optional[str] = None,
     cap: int = SALIENT_BACKSTORY_CAP,
     vectors: Optional[Dict[str, Sequence[float]]] = None,
     query_vec: Optional[Sequence[float]] = None,
@@ -274,6 +275,24 @@ def select(
     if not cue_set:
         # Tier 2 — no nomination, so read the learner's own words as the cue.
         cue_set = _keywords(last_learner_text)
+    if not cue_set:
+        # Tier 3 — the CONVERSATION has given nothing to go on, so fall back to
+        # what the scenario is about.
+        #
+        # Two cases reach here, and neither is exotic. The opening turn, where
+        # there is no learner text at all; and any content-free learner turn
+        # ("mm-hmm", "okay", "go on"), which yields no usable keywords. Without
+        # this the client recalls by encoding strength and decay alone — five
+        # true facts about themselves, but not the five this conversation is
+        # about. The failure mode is blandness rather than error, which is
+        # exactly the kind that goes unnoticed.
+        #
+        # The scenario DESCRIPTION, not the opening statement: openings are
+        # written to be generic ("they told me to come here"), while the
+        # description says what the session is actually about — "his scores
+        # dropped, something happened at home" — which is what should pull the
+        # grief facts forward on turn one.
+        cue_set = _keywords(scenario_context)
 
     # Drop cue tokens that match most of the pool: a word appearing in half the
     # facts cannot discriminate between them, so counting it as a hit is noise

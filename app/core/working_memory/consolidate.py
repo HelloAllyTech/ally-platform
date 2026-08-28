@@ -320,6 +320,7 @@ def _select_salient(
     memory: ClientWorkingMemory,
     new_messages: List[BaseMessage],
     query_vec=None,
+    scenario_context: Optional[str] = None,
 ) -> Optional[List[Fact]]:
     """Pick what the client has in mind, or None when there is no pool.
 
@@ -342,6 +343,7 @@ def _select_salient(
         stance=stance,
         cues=update.retrieve_cues,
         last_learner_text=_last_learner_text(new_messages),
+        scenario_context=scenario_context,
         vectors=corpus.vectors or None,
         query_vec=query_vec,
     )
@@ -456,6 +458,10 @@ def schedule_update(
             memory=memory,
             new_messages=new_messages,
             query_vec=query_vec,
+            # The challenge description — what this session is ABOUT — as the
+            # last-resort recall cue. Same field the branching prompt renders
+            # as {challenge_description}.
+            scenario_context=getattr(prompt_data, "description", None),
         )
         committed = await apply_update(store, update, turn_index, salient)
         if committed:

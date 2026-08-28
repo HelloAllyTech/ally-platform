@@ -212,3 +212,58 @@ def test_ties_resolve_to_the_older_memory():
     b = f("same score B", first_seen_turn=9)
     selected, _ = select([b, a], turn_index=3, stance="guarded", cap=1)
     assert _order(selected) == ["same score A"]
+
+
+def test_the_scenario_description_is_the_cue_when_the_conversation_gives_nothing():
+    # Tier 3. Two cases reach here and neither is exotic: the OPENING turn,
+    # which has no learner text at all, and any content-free learner turn
+    # ("mm-hmm", "okay"). Without it the client recalls by encoding strength
+    # and decay — five true facts about themselves, but not the five this
+    # session is about.
+    facts = [
+        Fact(text="His grandfather died a few weeks ago."),
+        Fact(text="He reads at night, whatever he can find."),
+        Fact(text="He is methodical and precise."),
+    ]
+    selected, _ = select(
+        facts,
+        turn_index=0,
+        stance="guarded",
+        cues=(),
+        last_learner_text=None,
+        scenario_context="Something happened at his home recently — his grandfather.",
+        cap=1,
+    )
+    assert selected[0].text == "His grandfather died a few weeks ago."
+
+
+def test_the_learner_utterance_still_outranks_the_scenario_description():
+    # Tier 3 is a LAST resort: a real cue from the conversation must win, or
+    # recall would stop responding to what is actually being said.
+    facts = [
+        Fact(text="His grandfather died a few weeks ago."),
+        Fact(text="He reads at night, whatever he can find."),
+    ]
+    selected, _ = select(
+        facts,
+        turn_index=3,
+        stance="opening",
+        cues=(),
+        last_learner_text="what do you do when you cannot sleep at night?",
+        scenario_context="Something happened at his home recently — his grandfather.",
+        cap=1,
+    )
+    assert selected[0].text == "He reads at night, whatever he can find."
+
+
+def test_no_cue_anywhere_still_returns_facts():
+    # Degrades to encoding strength and decay rather than returning nothing —
+    # a scenario with no description must not lose recall entirely.
+    facts = [
+        Fact(text="He is methodical and precise."),
+        Fact(text="He reads at night."),
+    ]
+    selected, _ = select(
+        facts, turn_index=0, stance="guarded", cues=(), last_learner_text=None, cap=2
+    )
+    assert len(selected) == 2
