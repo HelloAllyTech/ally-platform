@@ -162,6 +162,62 @@ def _resolve_state_guidance(
     return ""
 
 
+#: The ladder, lowest rung first. Kept here rather than imported from
+#: working_memory.state so this resolver has no dependency on the memory
+#: package — it maps an ordinal, and does not care what produced it.
+_STANCE_ORDER = ("guarded", "testing", "opening", "disclosing", "reflecting")
+
+
+def _resolve_simulation_state_by_stance(
+    states: Optional[List[Dict[str, Any]]],
+    stance: Optional[str],
+) -> Optional[Dict[str, Any]]:
+    """Pick the active state from the client's STANCE rather than the score.
+
+    Authors already write state guidance as client posture — scenario 440's
+    bands read "Dis-engaged, feeling discouraged and confused", "Feels heard
+    and is open to sharing", "Explores fears and preferences", "Confident to
+    draw boundary assertively". That IS a stance ladder; the score was only the
+    index into it, and a lossy one, since two very different sessions reach the
+    same number.
+
+    Selecting by stance indexes the same authored guidance with something that
+    carries structure: a rung that had to be EARNED by evidence, one step at a
+    time, with a dwell requirement and an immediate drop on rupture.
+
+    ORDINAL, not by name. Authors did not label their bands with stance names
+    and are not being asked to — the whole point is that no scenario has to be
+    re-authored. States arrive pre-sorted by `scoreLower` ascending, so their
+    ORDER already encodes the author's intended progression, and the ladder's
+    order encodes ours. Mapping position to position needs no new field, no
+    migration, and no per-scenario configuration.
+
+    `floor(i * N / 5)` rather than a proportional round: it is monotonic, it
+    reaches the last state, and every state is reachable for N <= 5. A scenario
+    with more than five bands compresses — some bands become unreachable, which
+    is a real limitation and the honest cost of not asking authors for a new
+    field.
+
+    Returns None when there is no stance to map, so the caller falls back to
+    score-based selection rather than to nothing.
+    """
+    if not states or not stance:
+        return None
+    try:
+        rung = _STANCE_ORDER.index(stance)
+    except ValueError:
+        return None  # unknown stance: fall back rather than guess
+
+    ordered = sorted(
+        states,
+        key=lambda st: (
+            st.get("scoreLower") if st.get("scoreLower") is not None else float("-inf")
+        ),
+    )
+    idx = min(len(ordered) - 1, (rung * len(ordered)) // len(_STANCE_ORDER))
+    return ordered[idx]
+
+
 def _resolve_simulation_state_by_score(
     states: Optional[List[Dict[str, Any]]],
     current_score: Optional[int],
@@ -475,6 +531,35 @@ def _build_behavior_prompt(
         if prompt_has_states
         else None
     )
+
+    # Working-memory prompts index the authored guidance by STANCE instead.
+    #
+    # Same guidance, better index. The score is a lossy summary — two very
+    # different sessions reach the same number — and in prod it barely moves at
+    # all, because state resolution reads ScoreKeeper's event bucket while the
+    # behaviours authors actually write ("Helper should do") land in the
+    # behaviour bucket. A stance had to be EARNED: one rung per turn, a dwell
+    # requirement, an immediate drop on rupture.
+    #
+    # Scoped to prompts that opted into working memory, and only when a stance
+    # exists to map. Every other scenario keeps score-based selection exactly
+    # as it is, and the rollback is the one the design already documents:
+    # re-select a different prompt.
+    if prompt_has_states and client_working_memory is not None:
+        _by_stance = _resolve_simulation_state_by_stance(
+            sim_states, getattr(client_working_memory, "stance", None)
+        )
+        if _by_stance is not None:
+            if _by_stance is not active_sim_state:
+                logger.info(
+                    "%s [STATE] stance=%s selected state %r (score-based would "
+                    "have chosen %r)",
+                    LOG_PREFIX,
+                    getattr(client_working_memory, "stance", None),
+                    _by_stance.get("name"),
+                    (active_sim_state or {}).get("name"),
+                )
+            active_sim_state = _by_stance
     state_x_guidelines = (
         _coerce_block_value(active_sim_state.get("guidelines"))
         if active_sim_state

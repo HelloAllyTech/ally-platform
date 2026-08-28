@@ -394,3 +394,74 @@ class TestSplitForm:
 
         assert "STAY GUARDED AND BRIEF" in content
         assert NO_STATE_GUIDANCE not in content
+
+    def test_the_stance_selects_the_authored_state_guidance(self):
+        # The synthesis: authors already write state guidance as client
+        # posture, so index it with a rung that had to be EARNED rather than
+        # with a score that in prod barely moves.
+        four = [
+            {
+                "name": "dis-engaged",
+                "scoreLower": -100,
+                "scoreUpper": 0,
+                "guidelines": "GUARDED_TEXT",
+            },
+            {
+                "name": "heard",
+                "scoreLower": 0,
+                "scoreUpper": 50,
+                "guidelines": "HEARD_TEXT",
+            },
+            {
+                "name": "explores",
+                "scoreLower": 50,
+                "scoreUpper": 100,
+                "guidelines": "EXPLORES_TEXT",
+            },
+            {
+                "name": "confident",
+                "scoreLower": 100,
+                "scoreUpper": 999,
+                "guidelines": "CONFIDENT_TEXT",
+            },
+        ]
+        content = self._split(
+            memory=ClientWorkingMemory(stance="disclosing", affect="wary"),
+            states=four,
+        )
+        # score 0 would have chosen "heard"; the earned stance chooses further on
+        assert "EXPLORES_TEXT" in content
+        assert "HEARD_TEXT" not in content
+
+    def test_the_ladder_walks_the_authored_bands_in_order(self):
+        from app.core.graph.prompt import _resolve_simulation_state_by_stance
+
+        four = [
+            {"name": "a", "scoreLower": -100},
+            {"name": "b", "scoreLower": 0},
+            {"name": "c", "scoreLower": 50},
+            {"name": "d", "scoreLower": 100},
+        ]
+        picked = [
+            _resolve_simulation_state_by_stance(four, s)["name"]
+            for s in ("guarded", "testing", "opening", "disclosing", "reflecting")
+        ]
+        assert picked == ["a", "a", "b", "c", "d"]  # monotonic, reaches the last
+
+    def test_an_unknown_stance_falls_back_to_score_selection(self):
+        from app.core.graph.prompt import _resolve_simulation_state_by_stance
+
+        states = [{"name": "a", "scoreLower": 0, "guidelines": "X"}]
+        assert _resolve_simulation_state_by_stance(states, "not-a-stance") is None
+        assert _resolve_simulation_state_by_stance(states, None) is None
+
+    def test_a_non_working_memory_prompt_keeps_score_selection(self):
+        # The blast radius. Every scenario that did not opt in must be
+        # untouched, which is what makes this safe to ship without migrating
+        # the library.
+        states = [
+            {"name": "low", "scoreLower": 0, "scoreUpper": 50, "guidelines": "LOW"},
+            {"name": "high", "scoreLower": 50, "scoreUpper": 999, "guidelines": "HIGH"},
+        ]
+        content = self._build(_pd("state_x_guidelines"), None, states=states, score=0)
+        assert "LOW" in content
