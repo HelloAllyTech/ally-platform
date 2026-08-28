@@ -164,9 +164,14 @@ class ValidatedUpdate:
     events: List[str] = field(default_factory=list)
 
 
-def _rung(stance: str) -> int:
+def _rung(stance: str, ladder: Sequence[str] = STANCE_ORDER) -> int:
+    """Position on THIS session's ladder, or -1 if the stance is not on it.
+
+    `ladder` defaults to the generic five so callers with no scenario states
+    behave exactly as before.
+    """
     try:
-        return STANCE_ORDER.index(stance)  # type: ignore[arg-type]
+        return list(ladder).index(stance)
     except ValueError:
         return -1
 
@@ -200,12 +205,16 @@ def decide_stance(
     """
     if proposed is None:
         return None, None
-    if proposed not in STANCE_ORDER:
+    ladder = tuple(memory.ladder or STANCE_ORDER)
+    if proposed not in ladder:
+        # Replaces what the `Stance` Literal used to catch, and catches more:
+        # a stance from a DIFFERENT scenario's ladder is rejected here, which a
+        # type covering one fixed vocabulary never could.
         return None, f"unknown stance {proposed!r}"
     if proposed == memory.stance:
         return None, None
 
-    here, there = _rung(memory.stance), _rung(proposed)
+    here, there = _rung(memory.stance, ladder), _rung(proposed, ladder)
 
     if there < here:
         if "rupture" in event_kinds:
@@ -251,7 +260,7 @@ def decide_stance(
     # is decorative. The prompt now names the rungs and the adjacency rule too,
     # but a model will ignore that sometimes, and the machine has to be right
     # anyway.
-    target: Stance = STANCE_ORDER[here + 1]
+    target: Stance = ladder[here + 1]
     clamped = target != proposed
     if clamped:
         logger.info(
@@ -269,9 +278,13 @@ def decide_stance(
             f"only {memory.turns_in_stance} turn(s) in {memory.stance}; "
             f"{MIN_TURNS_BEFORE_ADVANCE} required before advancing"
         )
-    if target == "reflecting" and memory.open_threads:
+    # POSITIONAL, not by name. The rule is "the top of the ladder is not
+    # reachable while the client is still carrying something"; it was written
+    # as `== "reflecting"` only because the ladder was fixed. With a
+    # scenario-defined ladder the top rung is whatever the author put last.
+    if here + 1 == len(ladder) - 1 and memory.open_threads:
         return None, (
-            f"{len(memory.open_threads)} thread(s) still open — reflecting is "
+            f"{len(memory.open_threads)} thread(s) still open — {target} is "
             "not reachable while the client is still carrying something"
         )
     return target, None

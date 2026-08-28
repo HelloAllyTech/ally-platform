@@ -162,97 +162,33 @@ def _resolve_state_guidance(
     return ""
 
 
-#: The ladder, lowest rung first. Kept here rather than imported from
-#: working_memory.state so this resolver has no dependency on the memory
-#: package — it maps an ordinal, and does not care what produced it.
-_STANCE_ORDER = ("guarded", "testing", "opening", "disclosing", "reflecting")
-
-
 def _resolve_simulation_state_by_stance(
     states: Optional[List[Dict[str, Any]]],
     stance: Optional[str],
 ) -> Optional[Dict[str, Any]]:
-    """Pick the active state from the client's STANCE rather than the score.
+    """Pick the authored state whose NAME is the client's current stance.
 
-    Authors already write state guidance as client posture — scenario 440's
-    bands read "Dis-engaged, feeling discouraged and confused", "Feels heard
-    and is open to sharing", "Explores fears and preferences", "Confident to
-    draw boundary assertively". That IS a stance ladder; the score was only the
-    index into it, and a lossy one, since two very different sessions reach the
-    same number.
+    There is no mapping any more, and that is the point. The session's ladder
+    is built from these same states (see worker.py), lowest rung first, so a
+    stance IS a state name and selection is a lookup.
 
-    Selecting by stance indexes the same authored guidance with something that
-    carries structure: a rung that had to be EARNED by evidence, one step at a
-    time, with a dwell requirement and an immediate drop on rupture.
+    The earlier version indexed a fixed five-rung ladder into N author bands
+    with `floor(i * N / 5)`. That worked for N <= 5 and quietly made bands
+    unreachable beyond it, then — once that was called out — declined to run at
+    all for N > 5. Both were symptoms of the framework owning a ladder the
+    scenario should have owned. With the ladder derived from the states, N is
+    whatever the author wrote and every band is reachable by construction.
 
-    ORDINAL, not by name. Authors did not label their bands with stance names
-    and are not being asked to — the whole point is that no scenario has to be
-    re-authored. States arrive pre-sorted by `scoreLower` ascending, so their
-    ORDER already encodes the author's intended progression, and the ladder's
-    order encodes ours. Mapping position to position needs no new field, no
-    migration, and no per-scenario configuration.
-
-    `floor(i * N / 5)` rather than a proportional round: it is monotonic, it
-    reaches the last state, and every state is reachable for N <= 5. A scenario
-    with more than five bands compresses — some bands become unreachable, which
-    is a real limitation and the honest cost of not asking authors for a new
-    field.
-
-    Returns None when there is no stance to map, so the caller falls back to
-    score-based selection rather than to nothing.
+    Returns None when the stance is not one of these states' names — a scenario
+    with no states, or a session still on the generic default ladder — so the
+    caller falls back to score-based selection rather than to nothing.
     """
     if not states or not stance:
         return None
-    try:
-        rung = _STANCE_ORDER.index(stance)
-    except ValueError:
-        return None  # unknown stance: fall back rather than guess
-
-    ordered = sorted(
-        states,
-        key=lambda st: (
-            st.get("scoreLower") if st.get("scoreLower") is not None else float("-inf")
-        ),
-    )
-    if len(ordered) > len(_STANCE_ORDER):
-        # DECLINE rather than compress. Five rungs cannot index more than five
-        # distinct bands, so mapping eight of them ordinally would leave three
-        # pieces of authored content that never render.
-        #
-        # The earlier version of this warned and carried on, justified by "a
-        # sixth posture could not be EARNED in a median session anyway". That
-        # argument is about what the LADDER can traverse, not about whether the
-        # author's design is valid: under score-based selection band 8 IS
-        # reachable, because a large score delta jumps straight to it. Migrating
-        # such a scenario to a working-memory prompt would silently delete three
-        # bands it was written with, and a CloudWatch warning is not seen by the
-        # curator who wrote them.
-        #
-        # Returning None falls back to score-based selection for this scenario
-        # only. It keeps every band reachable and makes the cost of adopting
-        # stance selection explicit — reduce to five bands — instead of paying
-        # it in lost content.
-        reachable = {
-            (r * len(ordered)) // len(_STANCE_ORDER) for r in range(len(_STANCE_ORDER))
-        }
-        unreachable = [
-            st.get("name") for i, st in enumerate(ordered) if i not in reachable
-        ]
-        logger.warning(
-            "%s [STATE] %d bands exceeds the %d stances, so stance selection is "
-            "OFF for this scenario and score-based selection is used instead — "
-            "no band is lost. These would have been unreachable: %s. Reduce to "
-            "%d bands to select by earned stance.",
-            LOG_PREFIX,
-            len(ordered),
-            len(_STANCE_ORDER),
-            ", ".join(str(n) for n in unreachable),
-            len(_STANCE_ORDER),
-        )
-        return None
-
-    idx = min(len(ordered) - 1, (rung * len(ordered)) // len(_STANCE_ORDER))
-    return ordered[idx]
+    for state in states:
+        if str(state.get("name") or "").strip() == stance:
+            return state
+    return None
 
 
 def _resolve_simulation_state_by_score(
@@ -569,7 +505,7 @@ def _build_behavior_prompt(
         else None
     )
 
-    # Working-memory prompts index the authored guidance by STANCE instead.
+    # Working-memory prompts select the authored guidance by STANCE instead.
     #
     # Same guidance, better index. The score is a lossy summary — two very
     # different sessions reach the same number — and in prod it barely moves at
@@ -578,10 +514,12 @@ def _build_behavior_prompt(
     # behaviour bucket. A stance had to be EARNED: one rung per turn, a dwell
     # requirement, an immediate drop on rupture.
     #
-    # Scoped to prompts that opted into working memory, and only when a stance
-    # exists to map. Every other scenario keeps score-based selection exactly
-    # as it is, and the rollback is the one the design already documents:
-    # re-select a different prompt.
+    # The ladder is built FROM these states, so this is a name lookup rather
+    # than a mapping, and a scenario may define as many bands as it likes.
+    #
+    # Scoped to prompts that opted into working memory. Every other scenario
+    # keeps score-based selection exactly as it is, and the rollback is the one
+    # the design already documents: re-select a different prompt.
     if prompt_has_states and client_working_memory is not None:
         _by_stance = _resolve_simulation_state_by_stance(
             sim_states, getattr(client_working_memory, "stance", None)

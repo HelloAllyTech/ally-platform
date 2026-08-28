@@ -601,3 +601,92 @@ def _caplog_at_info():
     finally:
         logger.removeHandler(handler)
         logger.setLevel(old)
+
+
+# ---------------------------------------------------------------------------
+# The ladder belongs to the scenario
+# ---------------------------------------------------------------------------
+
+
+_AUTHORED = (
+    "Dis-engaged, feeling discouraged and confused",
+    "Feels heard and is open to sharing",
+    "Explores fears and preferences",
+    "Confident to draw boundary assertively",
+)
+
+
+def test_a_scenario_ladder_advances_by_its_own_rung_names():
+    memory = ClientWorkingMemory(
+        stance=_AUTHORED[0], ladder=_AUTHORED, turns_in_stance=5
+    )
+
+    result = validate(
+        _proposal(stance=_AUTHORED[1]),
+        memory,
+        (),
+        advancing_behaviours=["beh-1"],
+    )
+
+    assert result.stance == _AUTHORED[1]
+
+
+def test_a_stance_from_another_ladder_is_refused():
+    # What the `Stance` Literal used to catch, and more: "opening" is a
+    # perfectly valid stance on the DEFAULT ladder and is not on this one.
+    memory = ClientWorkingMemory(
+        stance=_AUTHORED[0], ladder=_AUTHORED, turns_in_stance=5
+    )
+
+    result = validate(
+        _proposal(stance="opening"), memory, (), advancing_behaviours=["beh-1"]
+    )
+
+    assert result.stance is None
+    assert "unknown stance" in (result.stance_rejected_reason or "")
+
+
+def test_the_one_rung_clamp_uses_the_authored_ladder():
+    memory = ClientWorkingMemory(
+        stance=_AUTHORED[0], ladder=_AUTHORED, turns_in_stance=5
+    )
+
+    result = validate(
+        _proposal(stance=_AUTHORED[3]),  # tries to jump three rungs
+        memory,
+        (),
+        advancing_behaviours=["beh-1"],
+    )
+
+    assert result.stance == _AUTHORED[1]
+
+
+def test_the_top_rung_rule_is_positional_not_named():
+    # Was `target == "reflecting"`. The rule is "the top of the ladder is not
+    # reachable while the client is still carrying something", and the top rung
+    # is whatever the author put last.
+    memory = ClientWorkingMemory(
+        stance=_AUTHORED[2],
+        ladder=_AUTHORED,
+        turns_in_stance=5,
+        unresolved=[Thread(topic="whether to tell her mother")],
+    )
+
+    result = validate(
+        _proposal(stance=_AUTHORED[3]), memory, (), advancing_behaviours=["beh-1"]
+    )
+
+    assert result.stance is None
+    assert "still open" in (result.stance_rejected_reason or "")
+
+
+def test_a_seven_rung_ladder_is_ordinary():
+    # The cap is gone. Seven authored bands are seven rungs.
+    seven = tuple(f"band {i}" for i in range(7))
+    memory = ClientWorkingMemory(stance=seven[5], ladder=seven, turns_in_stance=5)
+
+    result = validate(
+        _proposal(stance=seven[6]), memory, (), advancing_behaviours=["beh-1"]
+    )
+
+    assert result.stance == seven[6]

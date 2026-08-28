@@ -148,6 +148,21 @@ def _emit_usage(raw, llm_client: BaseLLMClient, room_id: Optional[str]) -> None:
         pass
 
 
+def _coerce_guidance(value) -> str:
+    """One-line form of a band's guidance, for the ladder rendering.
+
+    Authored guidance can be several paragraphs; a rung description has to be
+    a line. Collapses whitespace and truncates, because the ladder's job here
+    is to let the model TELL THE RUNGS APART, not to restate the whole brief —
+    the active band's full text already reaches the actor through
+    `{state_x_guidelines}`.
+    """
+    if not isinstance(value, str):
+        return ""
+    flat = " ".join(value.split())
+    return flat if len(flat) <= 160 else flat[:157].rstrip() + "..."
+
+
 async def consolidate(
     *,
     memory: ClientWorkingMemory,
@@ -184,8 +199,30 @@ async def consolidate(
     language_label = (
         getattr(prompt_data, "language_label", None) or ""
     ).strip() or "the language of the conversation turns"
+    # The ladder is rendered from THIS session's rungs, not hardcoded.
+    #
+    # It used to be five fixed names with a behavioural gloss each. Those
+    # glosses were good prompt engineering, so the scenario's own bands must
+    # carry their weight: each rung is rendered with the author's `guidelines`
+    # where there is one, which is a fuller description than the generic line
+    # it replaces, and specific to this client rather than to clients in
+    # general.
+    _ladder = tuple(memory.ladder or ())
+    _guidance_by_name = {
+        str(st.get("name") or "").strip(): _coerce_guidance(st.get("guidelines"))
+        for st in (getattr(prompt_data, "states", None) or [])
+        if isinstance(st, dict)
+    }
+    stance_ladder = "\n".join(
+        f"  {i + 1}. {name}"
+        + (f" — {_guidance_by_name[name]}" if _guidance_by_name.get(name) else "")
+        for i, name in enumerate(_ladder)
+    )
     system_text = load_and_format(
-        _TEMPLATE_PATH, prompt_data, language_label=language_label
+        _TEMPLATE_PATH,
+        prompt_data,
+        language_label=language_label,
+        stance_ladder=stance_ladder,
     )
     if not system_text:
         logger.warning("[working-memory] updater template resolved empty; skipping")

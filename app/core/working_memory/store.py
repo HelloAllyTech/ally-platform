@@ -31,7 +31,7 @@ from __future__ import annotations
 import asyncio
 import copy
 import re
-from typing import Iterable, List, Optional
+from typing import Iterable, List, Optional, Sequence
 
 from app.core.logger import get_logger
 from app.core.working_memory.state import (
@@ -50,9 +50,19 @@ logger = get_logger(__name__)
 class ClientWorkingMemoryStore:
     """Lock-guarded owner of one session's working memory, monotonic commits."""
 
-    def __init__(self, initial_stance: Stance = "guarded") -> None:
+    def __init__(
+        self,
+        initial_stance: Optional[Stance] = None,
+        ladder: Optional[Sequence[str]] = None,
+    ) -> None:
+        # The ladder is the scenario's when it defines states, else the generic
+        # five. The opening stance is its FIRST rung — not the literal
+        # "guarded", which may not be on this ladder at all.
+        _ladder: tuple = tuple(ladder) if ladder else tuple(STANCES)
         self._lock = asyncio.Lock()
-        self._state = ClientWorkingMemory(stance=initial_stance)
+        self._state = ClientWorkingMemory(
+            stance=initial_stance or _ladder[0], ladder=_ladder
+        )
         self._last_committed_turn = -1
         #: Simulation score at the last update we SCHEDULED, so the node can
         #: hand consolidation a per-turn delta.
@@ -158,10 +168,12 @@ class ClientWorkingMemoryStore:
                 # reintroduced inside the ledger — and it made render.py's
                 # "you could let this come out now" branch dead code.
                 #
-                # Code decides it, not the LLM, and the rule is the ladder's own
-                # definition rather than a threshold I picked: `disclosing` MEANS
-                # the client says the thing they had been holding back.
-                if _rung(stance) >= _rung("disclosing"):
+                # Code decides it, not the LLM. The rule was `>= disclosing`,
+                # which is the second rung from the top of the default ladder;
+                # with a scenario-defined ladder it becomes that POSITION, since
+                # the author's rungs have their own names.
+                _ladder = tuple(st.ladder or STANCES)
+                if _rung(stance, _ladder) >= _unlock_rung(_ladder):
                     for item in st.withheld:
                         if item.status == "locked":
                             item.status = "unlocked"
@@ -294,12 +306,27 @@ _SAME_FACT_JACCARD = 0.45
 _SAME_FACT_MIN_SHARED = 2
 
 
-def _rung(stance: str) -> int:
-    """Position on the stance ladder; -1 for anything not on it."""
+def _rung(stance: str, ladder: Sequence[str] = STANCES) -> int:
+    """Position on THIS session's ladder; -1 for anything not on it."""
     try:
-        return list(STANCES).index(stance)
+        return list(ladder).index(stance)
     except ValueError:
         return -1
+
+
+def _unlock_rung(ladder: Sequence[str]) -> int:
+    """The rung at which withheld topics unlock.
+
+    The rule was `>= disclosing`, justified by the ladder's own definition:
+    `disclosing` MEANS the client says the thing they had been holding back.
+    With a scenario-defined ladder that name may not exist, so the rule becomes
+    its position — the second rung from the top, which is where `disclosing`
+    sat in the default five.
+
+    A ladder of one or two rungs unlocks at the top rung rather than below the
+    bottom of the ladder.
+    """
+    return max(0, len(ladder) - 2)
 
 
 def same_fact(a: str, b: str) -> bool:

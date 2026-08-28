@@ -509,7 +509,44 @@ class AgentWorker:
         from app.core.graph.prompt import prompt_declares_client_working_memory
         from app.core.working_memory import ClientWorkingMemoryStore, build_corpus
 
-        self.client_working_memory_store = ClientWorkingMemoryStore()
+        # THE LADDER IS THE SCENARIO'S, not the framework's.
+        #
+        # An author who wrote "Dis-engaged, feeling discouraged and confused" ->
+        # "Feels heard and is open to sharing" -> "Explores fears and
+        # preferences" -> "Confident to draw boundary assertively" has written a
+        # stance ladder. Making them climb a fixed five-rung one and mapping
+        # between the two lost content whenever they wrote more than five bands,
+        # and described the client in generic terms when they had authored
+        # specific ones.
+        #
+        # States arrive pre-sorted by scoreLower ascending, so their order IS
+        # the intended progression. Falls back to the generic five when a
+        # scenario defines no states.
+        from app.core.working_memory.state import STANCES
+
+        _states = getattr(getattr(self.scenario, "prompt_data", None), "states", None)
+        _ladder = tuple(
+            str(st.get("name")).strip()
+            for st in (_states or [])
+            if isinstance(st, dict) and str(st.get("name") or "").strip()
+        )
+        if len(_ladder) != len(set(_ladder)):
+            # Duplicate rung names would make `ladder.index()` ambiguous and
+            # silently pin two bands to one rung.
+            logger.warning(
+                "[working-memory] scenario states have duplicate names %s — "
+                "falling back to the generic ladder",
+                _ladder,
+            )
+            _ladder = ()
+        if len(_ladder) < 2:
+            _ladder = tuple(STANCES)
+        logger.info(
+            "[working-memory] ladder (%d rungs): %s",
+            len(_ladder),
+            " -> ".join(_ladder),
+        )
+        self.client_working_memory_store = ClientWorkingMemoryStore(ladder=_ladder)
 
         # The pool `salient_backstory` is recalled FROM (phase 6). Built once,
         # here, because it never changes during a session and because chunking

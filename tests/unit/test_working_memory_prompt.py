@@ -395,10 +395,9 @@ class TestSplitForm:
         assert "STAY GUARDED AND BRIEF" in content
         assert NO_STATE_GUIDANCE not in content
 
-    def test_the_stance_selects_the_authored_state_guidance(self):
-        # The synthesis: authors already write state guidance as client
-        # posture, so index it with a rung that had to be EARNED rather than
-        # with a score that in prod barely moves.
+    def test_the_stance_selects_the_band_of_the_same_name(self):
+        # No mapping any more: the session's ladder is BUILT from these states,
+        # so a stance is a state name and selection is a lookup.
         four = [
             {
                 "name": "dis-engaged",
@@ -426,27 +425,26 @@ class TestSplitForm:
             },
         ]
         content = self._split(
-            memory=ClientWorkingMemory(stance="disclosing", affect="wary"),
+            memory=ClientWorkingMemory(stance="explores", affect="wary"),
             states=four,
         )
-        # score 0 would have chosen "heard"; the earned stance chooses further on
+        # score 0 would have chosen "heard"; the earned stance chooses its own
         assert "EXPLORES_TEXT" in content
         assert "HEARD_TEXT" not in content
 
-    def test_the_ladder_walks_the_authored_bands_in_order(self):
+    def test_any_number_of_bands_is_reachable(self):
+        # The whole reason for deriving the ladder from the states. Seven bands
+        # used to mean two were unreachable, then meant stance selection
+        # declined entirely. Now the seventh is simply a rung.
         from app.core.graph.prompt import _resolve_simulation_state_by_stance
 
-        four = [
-            {"name": "a", "scoreLower": -100},
-            {"name": "b", "scoreLower": 0},
-            {"name": "c", "scoreLower": 50},
-            {"name": "d", "scoreLower": 100},
+        seven = [
+            {"name": f"s{i}", "scoreLower": i * 10, "guidelines": f"BAND_{i}"}
+            for i in range(7)
         ]
-        picked = [
-            _resolve_simulation_state_by_stance(four, s)["name"]
-            for s in ("guarded", "testing", "opening", "disclosing", "reflecting")
-        ]
-        assert picked == ["a", "a", "b", "c", "d"]  # monotonic, reaches the last
+        for i in range(7):
+            picked = _resolve_simulation_state_by_stance(seven, f"s{i}")
+            assert picked is not None and picked["guidelines"] == f"BAND_{i}"
 
     def test_an_unknown_stance_falls_back_to_score_selection(self):
         from app.core.graph.prompt import _resolve_simulation_state_by_stance
@@ -465,49 +463,3 @@ class TestSplitForm:
         ]
         content = self._build(_pd("state_x_guidelines"), None, states=states, score=0)
         assert "LOW" in content
-
-    def test_more_bands_than_rungs_declines_rather_than_dropping_content(self, caplog):
-        # Five rungs cannot index seven bands, so compressing would delete two
-        # pieces of authored content. Under score-based selection those bands
-        # ARE reachable, so migrating the scenario must not lose them: decline
-        # stance selection for this scenario and let score selection stand.
-        import logging
-
-        from app.core.graph.prompt import _resolve_simulation_state_by_stance
-
-        seven = [{"name": f"s{i}", "scoreLower": i * 10} for i in range(7)]
-        with caplog.at_level(logging.WARNING):
-            picked = _resolve_simulation_state_by_stance(seven, "guarded")
-
-        assert picked is None, "must fall back, not silently drop bands"
-        warning = " ".join(r.getMessage() for r in caplog.records)
-        assert "stance selection is OFF" in warning
-        assert "no band is lost" in warning
-
-    def test_a_scenario_with_too_many_bands_still_renders_its_guidance(self):
-        # The property that matters: falling back must produce real guidance,
-        # not an empty section.
-        six = [
-            {
-                "name": f"s{i}",
-                "scoreLower": i * 10,
-                "scoreUpper": (i + 1) * 10,
-                "guidelines": f"BAND_{i}_TEXT",
-            }
-            for i in range(6)
-        ]
-        content = self._split(
-            memory=ClientWorkingMemory(stance="disclosing", affect="wary"), states=six
-        )
-        assert "BAND_0_TEXT" in content  # score 0 -> first band, via fallback
-
-    def test_five_or_fewer_bands_warn_about_nothing(self, caplog):
-        import logging
-
-        from app.core.graph.prompt import _resolve_simulation_state_by_stance
-
-        five = [{"name": f"s{i}", "scoreLower": i * 10} for i in range(5)]
-        with caplog.at_level(logging.WARNING):
-            _resolve_simulation_state_by_stance(five, "opening")
-
-        assert not [r for r in caplog.records if "never render" in r.getMessage()]

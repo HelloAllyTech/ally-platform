@@ -21,14 +21,33 @@ this is what the store holds after that output has been validated.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Literal, Optional
+from typing import Dict, List, Optional, Tuple
 
 # The stance vocabulary is a STARTING POINT, not a finding. The design flags it
 # as invented, and says the clinical vocabulary should win once someone who
 # trains counsellors has looked at it. Kept as a Literal so a typo fails at the
 # call site rather than silently becoming a sixth stance.
-Stance = Literal["guarded", "testing", "opening", "disclosing", "reflecting"]
-STANCES: tuple[Stance, ...] = (
+#: A stance is now any string, because the ladder BELONGS TO THE SCENARIO.
+#:
+#: It was a Literal of five names so a typo would fail at the call site. That
+#: bought type safety and cost the thing that matters more: an author writing
+#: four bands called "Dis-engaged", "Feels heard", "Explores fears",
+#: "Confident to draw boundary" had written a ladder, and the framework made
+#: them climb a different one and then mapped between the two. Every rule in
+#: this package treats stance as an opaque ORDINAL — one rung per turn, a dwell
+#: gate, a drop on rupture — so the names were never load-bearing; only their
+#: ORDER was.
+#:
+#: Validation moves from the type to the value: a proposed stance must be in
+#: `memory.ladder`, checked at commit, which catches the typo the Literal used
+#: to catch and also catches a stance from a DIFFERENT scenario's ladder, which
+#: the Literal could not.
+Stance = str
+
+#: The default ladder, used when a scenario defines no states. Generic on
+#: purpose: with nothing authored to derive from, a neutral five-rung
+#: progression is better than refusing to run.
+STANCES: tuple[str, ...] = (
     "guarded",
     "testing",
     "opening",
@@ -100,6 +119,11 @@ class ClientWorkingMemory:
     """What the client currently has in mind. Derived; never authored."""
 
     stance: Stance = "guarded"
+    #: This session's ladder, lowest rung first — the scenario's own states when
+    #: it defines any, else `STANCES`. Carried on the memory rather than passed
+    #: around because every rule that reads a stance already has the memory, and
+    #: a rung index is meaningless without the ladder it indexes.
+    ladder: Tuple[str, ...] = STANCES
     affect: str = ""
     #: Why the stance is where it is. Filtered out of the rendered block — see
     #: the design's note on think_scrubber: this is scratchpad, not prompt text.
