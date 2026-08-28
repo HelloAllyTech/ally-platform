@@ -241,3 +241,130 @@ class TestStateWarningScope:
         with caplog.at_level(logging.WARNING):
             self._build(_pd("state_x_guidelines"), [])
         assert "no active state resolved" in caplog.text
+
+
+#: The split form. Same store, same consolidation — the memory is exposed as
+#: one placeholder per section so a curator can read what is being fed and can
+#: move, reorder or drop a section to experiment.
+_SPLIT_BODY = """You are {name}.
+GUIDANCE_HERE
+{state_x_guidelines}
+MARKER_TOP
+{working_memory_stance}
+{working_memory_register}
+{working_memory_speech_fragments}
+{working_memory_withheld}
+{working_memory_unresolved}
+{working_memory_disclosed}
+{working_memory_salient}
+MARKER_BOTTOM
+"""
+
+_SPLIT_VARS = (
+    "state_x_guidelines",
+    "working_memory_stance",
+    "working_memory_register",
+    "working_memory_speech_fragments",
+    "working_memory_withheld",
+    "working_memory_unresolved",
+    "working_memory_disclosed",
+    "working_memory_salient",
+)
+
+_STATES = [
+    {
+        "name": "opening",
+        "scoreLower": 0,
+        "scoreUpper": 10,
+        "guidelines": "STAY GUARDED AND BRIEF",
+    }
+]
+
+
+class TestSplitForm:
+    """The split form, built through the same real builder.
+
+    Reuses `TestBlockRendering`'s harness rather than inheriting its CASES:
+    subclassing would have re-run every block-form assertion against the
+    block-form body, which looks like extra coverage and is the same test
+    twice.
+    """
+
+    _build = TestBlockRendering._build
+
+    def _split(self, *variables, memory=None, states=None):
+        return self._build(
+            _pd(*(variables or _SPLIT_VARS), body=_SPLIT_BODY),
+            memory if memory is not None else ClientWorkingMemory(),
+            states=states,
+        )
+
+    def test_section_placeholders_are_an_opt_in(self):
+        # The opt-in is still the placeholder — there is just more than one
+        # spelling of it now.
+        assert prompt_declares_client_working_memory(
+            _pd("working_memory_disclosed", body=_SPLIT_BODY)
+        )
+
+    def test_a_single_section_opts_in(self):
+        # ANY, not ALL. Requiring all seven would turn a curator dropping one
+        # section into a silent, total opt-OUT.
+        assert prompt_declares_client_working_memory(
+            _pd("working_memory_salient", body=_SPLIT_BODY)
+        )
+
+    def test_the_split_form_leaves_the_authored_guidance_visible(self):
+        # THE reason this form exists. The block form folds state guidance in
+        # and blanks `{state_x_guidelines}`, so a designer opening the prompt
+        # could not see their own words in it and read the absence as deletion.
+        content = self._split(memory=ClientWorkingMemory(affect="wary"), states=_STATES)
+
+        assert "STAY GUARDED AND BRIEF" in content
+        assert content.count("STAY GUARDED AND BRIEF") == 1
+        assert content.index("GUIDANCE_HERE") < content.index("STAY GUARDED AND BRIEF")
+
+    def test_sections_land_where_the_author_put_them(self):
+        content = self._split(
+            memory=ClientWorkingMemory(
+                affect="wary", disclosed=[Fact(text="a distinctive fact")]
+            )
+        )
+        assert (
+            content.index("MARKER_TOP")
+            < content.index("a distinctive fact")
+            < content.index("MARKER_BOTTOM")
+        )
+
+    def test_an_undeclared_section_simply_does_not_render(self):
+        # Dropping a section is the FEATURE. What must not happen is the rest
+        # of the memory disappearing with it.
+        content = self._split(
+            "working_memory_disclosed",
+            memory=ClientWorkingMemory(
+                affect="wary",
+                disclosed=[Fact(text="a distinctive fact")],
+                withheld=[WithheldTopic(topic="the diagnosis", deflection="deflect")],
+            ),
+        )
+        assert "a distinctive fact" in content
+        assert "{working_memory_withheld}" not in content
+
+    def test_declaring_both_forms_renders_the_block_and_leaves_sections_bare(self):
+        # The tie is broken toward the block because the block is what runs in
+        # production: a working prompt must not change behaviour because
+        # someone pasted a section in to try it. The bare heading is the
+        # visible symptom; a silently swapped renderer would not be.
+        body = _SPLIT_BODY + "\n{client_working_memory}\n"
+        content = self._build(
+            _pd(*_SPLIT_VARS, "client_working_memory", body=body),
+            ClientWorkingMemory(disclosed=[Fact(text="a distinctive fact")]),
+        )
+        assert content.count("a distinctive fact") == 1
+
+    def test_the_split_form_resolves_states_even_without_the_guidance_field(self):
+        # Resolution gates RAG, not just guidance. A split prompt that skipped
+        # it would keep knowledge sources on in states an author turned them
+        # off — a per-state retrieval leak with no visible symptom.
+        assert _get_selected_prompt_has_states(
+            _pd("working_memory_stance", body=_SPLIT_BODY)
+        )

@@ -547,10 +547,42 @@ class AgentWorker:
         # CloudWatch. Anyone authoring a scenario against this feature needs to
         # be able to answer "did it engage?" without that.
         if _cwm_opted_in:
+            # Which FORM, and for the split form which SECTIONS.
+            #
+            # The block form makes "did it engage?" a yes/no. The split form
+            # adds a state that could not exist before: opted in and HALF
+            # rendered, where a prompt declares some sections and omits others.
+            # That session produces a complete transcript, a good score and no
+            # errors — the same shape of invisible failure this log was added
+            # for in the first place, one level down. So report the sections by
+            # name rather than the fact of engagement.
+            from app.core.graph.prompt import declared_working_memory_sections
+            from app.core.working_memory.render import SECTION_VARIABLES
+
+            _cwm_sections = declared_working_memory_sections(_cwm_prompt_data)
+            if not _cwm_sections:
+                _how = "the {client_working_memory} block placeholder"
+            elif len(_cwm_sections) == len(SECTION_VARIABLES):
+                _how = "all %d working_memory_* section placeholders" % len(
+                    SECTION_VARIABLES
+                )
+            else:
+                _missing = [
+                    name for name in SECTION_VARIABLES if name not in _cwm_sections
+                ]
+                _how = (
+                    "%d of %d working_memory_* section placeholders — NOT "
+                    "rendering: %s. Add them to the prompt body if that was "
+                    "not deliberate."
+                ) % (
+                    len(_cwm_sections),
+                    len(SECTION_VARIABLES),
+                    ", ".join(_missing),
+                )
             logger.info(
-                "[working-memory] ENGAGED room=%s — scenario opted in via the "
-                "{client_working_memory} placeholder",
+                "[working-memory] ENGAGED room=%s — scenario opted in via %s",
                 self.ctx.room.name,
+                _how,
             )
         else:
             if not settings.CLIENT_WORKING_MEMORY_ENABLED:
@@ -559,8 +591,9 @@ class AgentWorker:
                 _why = "no prompt_data on the scenario"
             else:
                 _why = (
-                    "the selected main-agent prompt does not declare "
-                    "{client_working_memory} — if it should, check the prompt "
+                    "the selected main-agent prompt declares neither "
+                    "{client_working_memory} nor any working_memory_* section "
+                    "placeholder — if it should, check the prompt "
                     "has useDashboardOverride=true, or ally-be will not ship "
                     "it to the worker at all"
                 )

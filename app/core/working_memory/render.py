@@ -213,3 +213,92 @@ def render_block(
         len(memory.salient_backstory),
     )
     return block
+
+
+#: The split form's placeholders, in the ascending-churn order the module
+#: docstring describes. Ordering is advisory here in a way it is not for
+#: ``render_block``: in the split form the AUTHOR decides where each field
+#: lands, and that is the point of the form. It stays the order of this tuple
+#: because the coverage log reads it, and a log that lists sections in a
+#: different order than the reference prompt is a log people misread.
+#:
+#: `state_x_guidelines` is deliberately NOT here. It is the authored half
+#: (§3.1) and it already had a placeholder of its own long before this module
+#: existed; the split form simply stops swallowing it.
+SECTION_VARIABLES = (
+    "working_memory_stance",
+    "working_memory_register",
+    "working_memory_speech_fragments",
+    "working_memory_withheld",
+    "working_memory_unresolved",
+    "working_memory_disclosed",
+    "working_memory_salient",
+)
+
+# Scaffolding that travels WITH the value rather than with the heading.
+#
+# In the block form these sentences live in `client_working_memory.txt`, which
+# is a repo file no curator can reach. The split form moves the headings into
+# the main-agent prompt, which is dashboard-editable — so if these sentences
+# moved with them, the three instructions that stop the actor treating the
+# block as world-facts would become editable too, and deletable by accident.
+#
+# Keeping them here costs one duplication (the same sentence exists in the
+# .txt) and buys the property that matters: a curator can move, reorder or drop
+# a SECTION, and cannot silently drop the constraint inside it.
+_STANCE_DISCIPLINE = (
+    "Do not move past this on your own. Warmth, insight or resolution has to be "
+    "earned by what the counsellor actually does — if it has not happened yet, "
+    "you are still here."
+)
+_FRAGMENTS_LEAD = (
+    "Your own recent words, for voice — sound like the person who said these:"
+)
+_DISCLOSED_LEAD = "Do not re-introduce these as if they were new."
+
+
+def render_sections(memory: ClientWorkingMemory) -> dict:
+    """Render the working memory as one value per placeholder (the split form).
+
+    Same derived state as ``render_block``, cut along the boundaries a curator
+    would want to move, and returned as a mapping rather than one string.
+
+    Two differences from the block form, both deliberate:
+
+    - **No whole-block short-circuit.** ``render_block`` returns "" when the
+      memory is untouched, because rendering its own scaffolding to say
+      "(nothing yet)" seven times would spend tokens to tell the model nothing.
+      That option does not exist here: the headings are the author's text, so
+      Python cannot suppress them, and a blanked value would leave a bare
+      heading — which reads to the model as an absence of constraint in exactly
+      the way `_NO_WITHHELD` and friends exist to prevent. So every section
+      always renders, and renders a NAMED absence when it is empty. This is the
+      module's own rule (see the `_NO_*` constants) applied to the one case the
+      block form got to opt out of.
+
+    - **State guidance is absent.** The block form takes `state_guidance` and
+      renders it as its first section; the split form leaves it to the
+      `{state_x_guidelines}` placeholder that already exists. That is the whole
+      reason the split form was asked for: a designer looking at the prompt
+      could not see their own state guidance in it any more.
+    """
+    cap = _rendered_disclosure_cap()
+    affect = memory.affect.strip()
+    stance_line = f"You are {memory.stance} right now."
+    if affect:
+        stance_line = f"{stance_line} {affect}"
+
+    return {
+        "working_memory_stance": f"{stance_line}\n\n{_STANCE_DISCIPLINE}",
+        "working_memory_register": memory.register.strip() or _NO_REGISTER,
+        "working_memory_speech_fragments": (
+            f"{_FRAGMENTS_LEAD}\n" f"{_bullets(memory.speech_fragments, _NO_FRAGMENTS)}"
+        ),
+        "working_memory_withheld": _render_withheld(memory.withheld),
+        "working_memory_unresolved": _render_unresolved(memory.unresolved),
+        "working_memory_disclosed": (
+            f"{_DISCLOSED_LEAD}\n"
+            f"{_render_facts(memory.disclosed, _NO_DISCLOSED, cap)}"
+        ),
+        "working_memory_salient": _render_facts(memory.salient_backstory, _NO_SALIENT),
+    }

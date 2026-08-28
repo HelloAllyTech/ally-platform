@@ -10,7 +10,12 @@ of constraint rather than as an absence of data.
 
 import app.core.graph.nodes  # noqa: F401  (settles a pre-existing import cycle)
 from app.core.working_memory import ClientWorkingMemory, Fact, Thread, WithheldTopic
-from app.core.working_memory.render import MAX_RENDERED_DISCLOSURES, render_block
+from app.core.working_memory.render import (
+    MAX_RENDERED_DISCLOSURES,
+    SECTION_VARIABLES,
+    render_block,
+    render_sections,
+)
 
 
 def _memory(**kw) -> ClientWorkingMemory:
@@ -225,3 +230,90 @@ def test_an_unreadable_cap_setting_falls_back_to_the_default(monkeypatch):
         disclosed=[Fact(text=f"disclosure {i}") for i in range(25)],
     )
     assert render_block(memory).count("disclosure ") == MAX_RENDERED_DISCLOSURES
+
+
+# ---------------------------------------------------------------------------
+# The split form: one placeholder per section
+# ---------------------------------------------------------------------------
+#
+# Why it exists: the block form absorbed `{state_x_guidelines}`, so a designer
+# opening a main-agent prompt could no longer see their own state guidance in
+# it, and a non-technical reader read the absence as "that was removed". One
+# opaque placeholder also gave a curator nothing to experiment with.
+
+
+def test_every_section_renders_even_when_the_memory_is_untouched():
+    # The property the block form gets to opt out of and this one cannot.
+    # `render_block` returns "" for an untouched memory because rendering its
+    # own scaffolding to say "(nothing yet)" seven times buys nothing. Here the
+    # headings belong to the AUTHOR's prompt text, so a blanked value leaves a
+    # bare heading — and a bare heading reads to the model as an absence of
+    # CONSTRAINT, which is the exact failure the named absences exist to stop.
+    sections = render_sections(ClientWorkingMemory())
+
+    assert set(sections) == set(SECTION_VARIABLES)
+    assert all(text.strip() for text in sections.values())
+    assert "(nothing you are holding back right now)" in (
+        sections["working_memory_withheld"]
+    )
+    assert "(you have not told them anything yet)" in (
+        sections["working_memory_disclosed"]
+    )
+
+
+def test_the_constraints_travel_with_the_values_not_the_headings():
+    # The one property that makes the split safe to hand to curators. The
+    # headings move into the dashboard-editable prompt; these three sentences
+    # must not, or the instructions that stop the actor treating the block as
+    # world-facts become deletable by accident.
+    sections = render_sections(
+        _memory(
+            speech_fragments=["I dunno."],
+            disclosed=[Fact("she moved out in March")],
+        )
+    )
+
+    assert "has to be earned" in sections["working_memory_stance"]
+    assert "Do not re-introduce these" in sections["working_memory_disclosed"]
+    assert "sound like the person who said these" in (
+        sections["working_memory_speech_fragments"]
+    )
+
+
+def test_the_split_form_does_not_render_state_guidance():
+    # It is the authored half (§3.1) and it has had `{state_x_guidelines}` of
+    # its own since long before this feature. The split form's whole purpose is
+    # to stop swallowing it, so rendering it here would restore the bug.
+    sections = render_sections(_memory())
+
+    assert not any("state_guidance" in name for name in sections)
+    assert not any(
+        "(no particular direction for this stage)" in t for t in sections.values()
+    )
+
+
+def test_the_disclosure_cap_binds_in_the_split_form_too():
+    # Same store, same cap. A curator moving a section must not accidentally
+    # opt out of the bound that keeps the prompt from growing all session.
+    many = [Fact(f"fact {i}") for i in range(MAX_RENDERED_DISCLOSURES + 6)]
+    rendered = render_sections(_memory(disclosed=many))["working_memory_disclosed"]
+
+    assert rendered.count("\n- ") == MAX_RENDERED_DISCLOSURES
+    assert "fact 0" not in rendered  # oldest dropped, newest kept
+    assert f"fact {len(many) - 1}" in rendered
+
+
+def test_a_locked_topic_still_cannot_leak_in_the_split_form():
+    sections = render_sections(
+        _memory(withheld=[WithheldTopic("the diagnosis", "say it is nothing")])
+    )
+    withheld = sections["working_memory_withheld"]
+
+    assert "the diagnosis" in withheld
+    assert "say it is nothing" in withheld
+    # and it must not have wandered into a neighbouring section
+    assert not any(
+        "the diagnosis" in text
+        for name, text in sections.items()
+        if name != "working_memory_withheld"
+    )

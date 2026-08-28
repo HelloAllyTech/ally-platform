@@ -355,8 +355,56 @@ def prompt_declares_client_working_memory(prompt_data: PromptData) -> bool:
     Read by the graph as well as the prompt builder: a simulation that has not
     opted in must not pay for a consolidation call whose output nothing would
     render.
+
+    True for EITHER form. A prompt opts in with the single
+    `{client_working_memory}` block, or with any one of the `working_memory_*`
+    section placeholders. Both produce the same derived state from the same
+    store and the same consolidation call — the difference is only where the
+    text lands in the prompt — so the gate this predicate guards (do not pay
+    for a consolidation nobody renders) has the same answer for both.
+
+    Deliberately ANY rather than ALL. A prompt carrying one section is opted
+    in: it renders that section, pays for the update that fills it, and gets
+    what it asked for. Requiring all seven would turn a curator dropping the
+    fragments section into a silent, total opt-OUT — the loudest possible
+    failure for the quietest possible edit. The partial case is a real state
+    and it is reported by the coverage log in `worker.py`, not prevented here.
     """
-    return _prompt_declares_variable(prompt_data, "client_working_memory")
+    if _prompt_declares_variable(prompt_data, "client_working_memory"):
+        return True
+    return prompt_declares_working_memory_sections(prompt_data)
+
+
+def prompt_declares_working_memory_sections(prompt_data: PromptData) -> bool:
+    """Is this prompt using the SPLIT form (one placeholder per section)?
+
+    Distinct from `prompt_declares_client_working_memory` because the two forms
+    render differently: the split form leaves `{state_x_guidelines}` alone,
+    while the block form folds it in and blanks it to avoid a double render.
+    """
+    from app.core.working_memory.render import SECTION_VARIABLES
+
+    return any(
+        _prompt_declares_variable(prompt_data, name) for name in SECTION_VARIABLES
+    )
+
+
+def declared_working_memory_sections(prompt_data: PromptData) -> tuple:
+    """Which section placeholders this prompt actually declares, in render order.
+
+    Used by the opt-in log: with the block form "did it engage?" is a yes/no,
+    but the split form adds a state that could not exist before — opted in and
+    HALF rendered, where a prompt declares the disclosure ledger and omits the
+    stance. That session looks entirely healthy from outside. Naming the
+    resolved sections is what makes the difference visible.
+    """
+    from app.core.working_memory.render import SECTION_VARIABLES
+
+    return tuple(
+        name
+        for name in SECTION_VARIABLES
+        if _prompt_declares_variable(prompt_data, name)
+    )
 
 
 def _get_selected_prompt_has_states(prompt_data: PromptData) -> bool:
@@ -374,6 +422,14 @@ def _get_selected_prompt_has_states(prompt_data: PromptData) -> bool:
     nothing, which is exactly the failure the [STATE] warning below exists to
     make visible.
 
+    The SPLIT form counts too, and for a reason that is easy to miss: it does
+    NOT render state guidance, so it looks like it has no stake in state
+    resolution. But resolving a state is also what gates RAG
+    (`activeSimState.ragEnabled`), so a split prompt that left this False
+    would keep its knowledge sources switched on in states an author had
+    switched them off — a silent, per-state retrieval leak with no visible
+    symptom. Resolution is the shared dependency; rendering is not.
+
     The backend's BackfillAvailableVariables1780150000000 migration populates
     `availableVariables` for every existing row from its latest body, so we no
     longer fall back to the legacy `hasStates` boolean. Empty / missing list
@@ -381,7 +437,7 @@ def _get_selected_prompt_has_states(prompt_data: PromptData) -> bool:
     """
     return _prompt_declares_variable(
         prompt_data, "state_x_guidelines"
-    ) or _prompt_declares_variable(prompt_data, "client_working_memory")
+    ) or prompt_declares_client_working_memory(prompt_data)
 
 
 def _build_behavior_prompt(
@@ -436,10 +492,45 @@ def _build_behavior_prompt(
     # keeps a designer's instruction verbatim: the consolidation call rewrites
     # what lives in the store, and an authored instruction must never be
     # paraphrased into an approximation of itself.
+    #
+    # Two forms, one store. The BLOCK form (`{client_working_memory}`) renders
+    # everything including the authored state guidance, which is why it blanks
+    # `{state_x_guidelines}` below. The SPLIT form renders one value per
+    # section and leaves the authored half alone — a designer opening the
+    # prompt can see their own state guidance in it, which the block form took
+    # away and is the reason the split form exists.
+    from app.core.working_memory.render import SECTION_VARIABLES
+
     client_working_memory_block = ""
-    if client_working_memory is not None and _prompt_declares_variable(
-        prompt_data, "client_working_memory"
-    ):
+    working_memory_sections = {name: "" for name in SECTION_VARIABLES}
+    _declares_block = _prompt_declares_variable(prompt_data, "client_working_memory")
+    _declared_sections = declared_working_memory_sections(prompt_data)
+
+    if client_working_memory is not None and _declares_block and _declared_sections:
+        # A prompt mid-migration between the two forms. The block WINS, and the
+        # tie is broken that way for one reason: the block form is what runs in
+        # production today, and a prompt that works must not change behaviour
+        # because someone pasted one section in to try it. The sections stay
+        # blank, their headings render bare, and this warning says exactly which
+        # edit fixes it — a bare heading is a visible symptom, where a silently
+        # replaced block would not be.
+        logger.warning(
+            "%s [CWM] prompt declares BOTH forms — the {client_working_memory} "
+            "block is rendering and these section placeholders are blank: %s. "
+            "Remove {client_working_memory} from the body to use the split form.",
+            LOG_PREFIX,
+            ", ".join(_declared_sections),
+        )
+
+    if client_working_memory is not None and not _declares_block and _declared_sections:
+        from app.core.working_memory.render import render_sections
+
+        working_memory_sections = {
+            **working_memory_sections,
+            **render_sections(client_working_memory),
+        }
+
+    if client_working_memory is not None and _declares_block:
         from app.core.working_memory.render import render_block
 
         client_working_memory_block = render_block(
@@ -624,6 +715,10 @@ def _build_behavior_prompt(
         # The client working-memory block. Empty string for every variant that
         # does not declare the placeholder, which is every variant today.
         client_working_memory=client_working_memory_block,
+        # The split form. Every variant gets all seven kwargs; SafeFormatter
+        # drops the ones the body does not reference, so a prompt using the
+        # block form — or no working memory at all — is unaffected.
+        **working_memory_sections,
         behavior_instructions_json=_build_behavior_instructions_json(
             behavior_instructions, current_state
         ),

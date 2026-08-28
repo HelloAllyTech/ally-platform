@@ -3,7 +3,7 @@
     "kind": "prompt",
     "promptType": "main_agent",
     "hasStates": false,
-    "description": "Main-agent variant driven by the derived client working memory (docs/client-working-memory-design.md). Selecting it is the entire opt-in: the {client_working_memory} placeholder is what switches the feature on for a scenario, and re-selecting another prompt is the whole rollback. Drops {character_profile_text}, {state_x_guidelines} and {retrieved_context} on purpose \u2014 the block supplies recalled backstory instead of the whole profile, renders the active state's guidelines itself, and folds retrieved knowledge into the same recall pool. Needs CLIENT_WORKING_MEMORY_ENABLED as well.",
+    "description": "Main-agent variant driven by the derived client working memory (docs/client-working-memory-design.md). Selecting it is the entire opt-in: the {client_working_memory} placeholder is what switches the feature on for a scenario, and re-selecting another prompt is the whole rollback. Drops {character_profile_text} and {state_x_guidelines} on purpose \u2014 the block supplies recalled backstory a few facts at a time instead of the whole profile every turn, and renders the active state's guidelines itself. {retrieved_context} is NOT specific to this prompt: it is blank in every prompt fleet-wide because RETRIEVED_CONTEXT_DEFER_TO_SUFFIX delivers knowledge sources as a trailing message after the conversation history. Knowledge retrieval is unaffected by this variant. If you want to see the memory's contents in the prompt body rather than one opaque block, use the split-fields variant instead. Needs CLIENT_WORKING_MEMORY_ENABLED as well.",
     "availableVariables": [
         {
             "name": "role_instructions",
