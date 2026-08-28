@@ -7,6 +7,7 @@ gating/phrase-generation helpers read).
 
 import json
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 from app.core.livekit.naturalness import NaturalnessController
 
@@ -88,6 +89,48 @@ class TestNaturalnessController:
             read_history=lambda: [],
         )
         assert await controller._resolve_comfort_audio() is None
+
+
+def _controller():
+    return NaturalnessController(
+        room=SimpleNamespace(name="room-1"),
+        session=SimpleNamespace(on=lambda *a, **k: (lambda f: f)),
+        tts_client=None,
+        llm_client=None,
+        scenario=_scenario(
+            filler_enabled=False,
+            comfort_audio_enabled=False,
+            continuous_backchanneling=True,
+            interim_reply_enabled=False,
+        ),
+        joined_iso="2026-07-08T00:00:00Z",
+        background_tasks=set(),
+        read_history=lambda: [],
+    )
+
+
+class TestBackchannelUserStateStop:
+    """Leaving 'speaking' must cut a still-playing back-channel clip immediately."""
+
+    def test_leaving_speaking_flushes_playing_clip(self):
+        controller = _controller()
+        controller._bg_audio = MagicMock()
+        controller._backchannel_clips = [("mm-hmm", "/tmp/mmhmm.wav")]
+        handle = MagicMock()
+        handle.done.return_value = False
+        controller._backchannel_handle = handle
+        controller._user_speaking = True
+
+        controller._on_backchannel_user_state(
+            SimpleNamespace(new_state="listening")
+        )
+
+        handle.stop.assert_called_once()
+        # stop() only halts the feeder; frames already buffered in the shared
+        # AudioSource keep playing for up to ~1s and bleed into the agent's
+        # real reply on its own track unless the queue is flushed too.
+        controller._bg_audio.flush.assert_called_once()
+        assert controller._backchannel_handle is None
 
 
 class TestWorkerV2NaturalnessShim:
