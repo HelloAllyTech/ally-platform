@@ -25,8 +25,11 @@ export const getTrackItemMeta = (
       if (meta?.questionCount) {
         parts.push(t('courses.meta.questions', {count: meta.questionCount}));
       }
+      // Unlike ROLEPLAY's minScore, a QUIZ passScore of 0 is a real,
+      // configured threshold (the quiz's own intro screen shows it
+      // unconditionally too), so it must not be dropped as falsy.
       const passScore = meta?.passScore ?? criteria?.passScore;
-      if (passScore)
+      if (passScore !== undefined)
         parts.push(t('courses.meta.passScore', {score: passScore}));
       return parts.length ? parts.join(' · ') : t('courses.meta.quiz');
     }
