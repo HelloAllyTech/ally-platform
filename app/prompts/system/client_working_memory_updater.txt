@@ -16,14 +16,7 @@ REPORT WHAT YOU OBSERVED
   Report NOTHING if nothing happened. An empty list is a correct and common answer.
 
 REPORT THE STATE
-- stance: where the client is on this ladder, which runs in order:
-{stance_ladder}
-  Use these names EXACTLY as written; a name that is not on the ladder is discarded.
-  This is a PROPOSAL and it may be refused or reduced. Three rules govern it:
-  - A stance is EARNED by something the counsellor did — not by time passing, not by the session feeling like it should be further along, and not by the client deciding to be better.
-  - Move AT MOST ONE rung per update, and only to the rung immediately above or below where the client is now. If the client seems to have jumped two, propose the next one up; the rest can be earned next turn.
-  - If nothing advanced in these turns, propose the stance the client is still in. That is the common answer and it is not a failure to report it.
-  Going DOWN needs no advancing event: a client who feels judged, rushed or exposed closes up immediately.
+{stance_instruction}
 - affect: what the client feels now, in a few words.
 - appraisal: why they feel it — their private reading of the counsellor's intent. This is never shown to anyone; it explains the affect.
 - voice_register: how they are speaking now (clipped, rambling, formal, flat, warm).

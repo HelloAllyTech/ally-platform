@@ -379,3 +379,35 @@ class TestScheduleUpdate:
         await store._task
         assert store.last_committed_turn == -1
         assert (await store.snapshot()).updates_missed == 0
+
+
+# ---------------------------------------------------------------------------
+# Do not ask for what is not used
+# ---------------------------------------------------------------------------
+
+
+def test_a_scenario_with_states_is_not_asked_for_a_stance():
+    """The author's bands decide where the client is, so the updater must not
+    be handed a rulebook for a decision the code no longer makes.
+
+    Eight lines of earned-advance instruction went out on EVERY update while
+    `validate` took the authored stance verbatim and ignored the proposal.
+    """
+    from app.core.working_memory.consolidate import _coerce_guidance
+
+    # the branch is chosen on whether any named state exists
+    states = [{"name": "Feels heard", "guidelines": "Offer one real thing."}]
+    named = [s for s in states if isinstance(s, dict) and s.get("name")]
+
+    assert named, "a named state means the author owns progression"
+    assert _coerce_guidance("Offer one real thing.") == "Offer one real thing."
+
+
+def test_guidance_is_flattened_and_truncated_for_the_ladder_line():
+    from app.core.working_memory.consolidate import _coerce_guidance
+
+    assert _coerce_guidance("a\n\n  b   c") == "a b c"
+    long = "x" * 300
+    out = _coerce_guidance(long)
+    assert len(out) <= 160 and out.endswith("...")
+    assert _coerce_guidance(None) == ""

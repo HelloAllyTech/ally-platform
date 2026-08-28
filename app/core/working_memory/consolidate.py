@@ -208,6 +208,10 @@ async def consolidate(
     # where there is one, which is a fuller description than the generic line
     # it replaces, and specific to this client rather than to clients in
     # general.
+    _authored_states = getattr(prompt_data, "states", None) or []
+    _has_authored_states = bool(
+        [st for st in _authored_states if isinstance(st, dict) and st.get("name")]
+    )
     _ladder = tuple(memory.ladder or ())
     _guidance_by_name = {
         str(st.get("name") or "").strip(): _coerce_guidance(st.get("guidelines"))
@@ -219,11 +223,39 @@ async def consolidate(
         + (f" — {_guidance_by_name[name]}" if _guidance_by_name.get(name) else "")
         for i, name in enumerate(_ladder)
     )
+    # Only ASK for a stance when one is actually used.
+    #
+    # When the scenario defines states, the author's bands decide where the
+    # client is and `validate` takes that verbatim — so the eight lines of
+    # earned-advance rulebook this template used to carry were instructions for
+    # a decision the code no longer makes. Sending them cost tokens on every
+    # update and told the model something contradicting what actually happens.
+    if _has_authored_states:
+        stance_instruction = (
+            "- stance: DO NOT report this. Where the client is in the "
+            "conversation is decided by the scenario, not by you. Report only "
+            "what you observed in the turns below."
+        )
+    else:
+        stance_instruction = (
+            "- stance: where the client is on this ladder, which runs in "
+            "order:\n"
+            f"{stance_ladder}\n"
+            "  Use these names EXACTLY as written; a name that is not on the "
+            "ladder is discarded.\n"
+            "  This is a PROPOSAL and it may be refused or reduced. A stance is "
+            "EARNED by something the counsellor did, moves AT MOST ONE rung per "
+            "update, and stays where it is when nothing advanced — that is the "
+            "common answer and not a failure to report it.\n"
+            "  Going DOWN needs no advancing event: a client who feels judged, "
+            "rushed or exposed closes up immediately."
+        )
+
     system_text = load_and_format(
         _TEMPLATE_PATH,
         prompt_data,
         language_label=language_label,
-        stance_ladder=stance_ladder,
+        stance_instruction=stance_instruction,
     )
     if not system_text:
         logger.warning("[working-memory] updater template resolved empty; skipping")
