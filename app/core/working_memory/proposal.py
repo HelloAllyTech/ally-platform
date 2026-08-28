@@ -303,6 +303,7 @@ def validate(
     memory: ClientWorkingMemory,
     messages: Sequence[Any] = (),
     score_delta: int = 0,
+    advancing_behaviours: Sequence[str] = (),
 ) -> ValidatedUpdate:
     """Turn an advisory proposal into what code is willing to commit.
 
@@ -311,7 +312,17 @@ def validate(
     rather than "invented" — a caller with no messages gets the previous
     behaviour, not a silently emptied update.
 
-    `score_delta` is this turn's change in the simulation score — the sum of
+    `advancing_behaviours` are the ids of SHOULD_DO behaviour instructions the
+    detector credited this turn. Preferred over `score_delta` because it is the
+    behaviour ITSELF rather than a sum: a +9 from "Validate experience" and a
+    +9 from "Follows appropriate reporting or referral procedures" are the same
+    number and are not the same evidence. Carrying the ids is also what makes
+    the relational-vs-procedural question answerable from logs later, instead
+    of unanswerable as it is today.
+
+    `score_delta` remains as the fallback for scenarios that score through
+    events rather than behaviour instructions. It is this turn's change in the
+    simulation score — the sum of
     the scores on the events the behaviour detector fired. A POSITIVE delta
     means the counsellor did something the scenario author scored as helpful,
     and that earns an advancing event in its own right.
@@ -382,7 +393,14 @@ def validate(
     grounded_set = set(grounded_texts)
 
     kinds = set()
-    if score_delta > 0:
+    if advancing_behaviours:
+        kinds.add(HELPFUL_BEHAVIOUR)
+        logger.info(
+            "[working-memory] %d SHOULD_DO behaviour(s) earn an advancing " "event: %s",
+            len(advancing_behaviours),
+            ", ".join(str(b) for b in advancing_behaviours),
+        )
+    elif score_delta > 0:
         # NOT routed through the grounding gate below, and that is the point:
         # grounding exists to check text the updater invented. This event was
         # not proposed by any model — it is arithmetic over detector events —

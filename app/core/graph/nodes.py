@@ -2556,6 +2556,28 @@ async def update_working_memory(
     _score_delta = int(_live_total) - int(store.score_at_last_update)
     store.score_at_last_update = int(_live_total)
 
+    # The behaviours THEMSELVES, preferred over the scalar above.
+    #
+    # `BehaviorInstructionFeedbackData` carries `category` — SHOULD_DO or
+    # SHOULD_NOT_DO — which is a code-level semantic rather than the sign of a
+    # number, and an id, which says WHICH behaviour was credited. A +9 from
+    # "Validate experience" and a +9 from "Follows appropriate reporting or
+    # referral procedures" are the same number and are not the same evidence;
+    # only one of them should plausibly make a guarded client confide.
+    #
+    # Passing the ids does not act on that distinction yet — every SHOULD_DO
+    # counts today — but it is what makes the question answerable at all. The
+    # earlier attempt to measure it failed because the logs recorded scores and
+    # feedback text with no behaviour identity and no room, so nothing could be
+    # attributed. These ids are logged in `validate`.
+    _advancing_behaviours = [
+        str(f.behavior_instruction_id)
+        for f in (getattr(state, "behavior_feedback_data", None) or [])
+        if getattr(getattr(f, "category", None), "value", None) == "SHOULD_DO"
+        and (f.score or 0) > 0
+        and f.behavior_instruction_id
+    ]
+
     schedule_update(
         store,
         memory=memory,
@@ -2566,6 +2588,7 @@ async def update_working_memory(
         room_id=getattr(_room, "name", None),
         embed_query=embed_query,
         score_delta=_score_delta,
+        advancing_behaviours=_advancing_behaviours,
     )
     return {}
 

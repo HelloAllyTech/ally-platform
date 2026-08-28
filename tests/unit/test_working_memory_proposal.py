@@ -526,3 +526,78 @@ def test_a_score_delta_still_respects_the_dwell_gate():
     result = validate(_proposal(stance="opening"), memory, (), score_delta=10)
 
     assert result.stance is None
+
+
+def test_a_should_do_behaviour_earns_an_advance_by_identity_not_by_sum():
+    # The last synthesis element: the behaviour ITSELF is the evidence, so the
+    # ladder can eventually tell "Validate experience" from "Follows reporting
+    # procedures" — two behaviours that can carry the identical score and are
+    # not the identical evidence.
+    memory = ClientWorkingMemory(stance="guarded", turns_in_stance=5)
+
+    result = validate(
+        _proposal(stance="testing"),
+        memory,
+        (),
+        score_delta=0,  # no scalar movement at all
+        advancing_behaviours=["beh-validate-experience"],
+    )
+
+    assert result.stance == "testing"
+
+
+def test_behaviour_identity_is_preferred_over_the_scalar():
+    memory = ClientWorkingMemory(stance="guarded", turns_in_stance=5)
+
+    with _caplog_at_info() as records:
+        validate(
+            _proposal(stance="testing"),
+            memory,
+            (),
+            score_delta=9,
+            advancing_behaviours=["beh-1", "beh-2"],
+        )
+
+    logged = " ".join(records)
+    assert "SHOULD_DO behaviour(s)" in logged
+    assert "beh-1, beh-2" in logged
+    # the scalar path must not ALSO fire; it is the fallback, not a second vote
+    assert "earns an advancing event" not in logged.replace(
+        "SHOULD_DO behaviour(s) earn an advancing event", ""
+    )
+
+
+def test_the_scalar_still_works_when_no_behaviours_were_credited():
+    # Scenarios that score through EVENTS rather than behaviour instructions
+    # must keep working.
+    memory = ClientWorkingMemory(stance="guarded", turns_in_stance=5)
+
+    result = validate(
+        _proposal(stance="testing"), memory, (), score_delta=7, advancing_behaviours=[]
+    )
+
+    assert result.stance == "testing"
+
+
+import contextlib  # noqa: E402
+import logging  # noqa: E402
+
+
+@contextlib.contextmanager
+def _caplog_at_info():
+    records: list = []
+
+    class _H(logging.Handler):
+        def emit(self, record):
+            records.append(record.getMessage())
+
+    logger = logging.getLogger("app.core.working_memory.proposal")
+    handler = _H()
+    logger.addHandler(handler)
+    old = logger.level
+    logger.setLevel(logging.INFO)
+    try:
+        yield records
+    finally:
+        logger.removeHandler(handler)
+        logger.setLevel(old)

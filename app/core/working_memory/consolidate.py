@@ -27,7 +27,7 @@ the plumbing, and deliberately makes no judgement of its own.
 from __future__ import annotations
 
 import asyncio
-from typing import List, Optional
+from typing import List, Optional, Sequence
 
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 
@@ -156,6 +156,7 @@ async def consolidate(
     prompt_data=None,
     room_id: Optional[str] = None,
     score_delta: int = 0,
+    advancing_behaviours: Sequence[str] = (),
 ) -> Optional[ValidatedUpdate]:
     """One LLM call, then validation. Returns None when there is nothing to do.
 
@@ -225,7 +226,7 @@ async def consolidate(
 
     # The same window the updater read, so `validate` can check the evidence it
     # produced against what was actually said.
-    return validate(proposal, memory, new_messages, score_delta)
+    return validate(proposal, memory, new_messages, score_delta, advancing_behaviours)
 
 
 async def apply_update(
@@ -376,6 +377,7 @@ def schedule_update(
     reason: str = "cadence",
     embed_query=None,
     score_delta: int = 0,
+    advancing_behaviours: Sequence[str] = (),
 ) -> bool:
     """Fire the consolidation as a DETACHED task writing into ``store``.
 
@@ -403,6 +405,7 @@ def schedule_update(
                     prompt_data=prompt_data,
                     room_id=room_id,
                     score_delta=score_delta,
+                    advancing_behaviours=advancing_behaviours,
                 ),
                 timeout=timeout,
             )
