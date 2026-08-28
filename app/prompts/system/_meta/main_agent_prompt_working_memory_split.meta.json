@@ -1,5 +1,5 @@
 {
-    "name": "Main Agent Prompt \u2014 Client Working Memory",
+    "name": "Main Agent Prompt #3",
     "kind": "prompt",
     "promptType": "main_agent",
     "hasStates": true,
