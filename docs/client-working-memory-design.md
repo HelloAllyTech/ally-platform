@@ -1,9 +1,57 @@
 # The Client's Working Memory — one rolling structured context
 
-**Status**: design proposal, not built
+**Status**: **BUILT AND IN PRODUCTION** (ally-ai-learn v1.39.1). Four things in this
+document were superseded by what production taught us — see [§0](#0-what-production-changed)
+before trusting any section on the stance ladder, the placeholder, or where the authored
+guidance lives.
 **Scope**: `ally-ai-learn` actor prompt assembly, memory, and the session-end write-out
 **Target template**: a **new main-agent prompt inheriting Main Agent Prompt #2** — see §6.1. #2 is `ally_ai_learn_system_main_agent_prompt_full`, live at **version 6** with `useDashboardOverride: true`, so its authoritative text is in `prompts_versions`, **not** the file of the same name. The new prompt is what carries `{client_working_memory}`, which is also what scopes this design to the simulations that opt in; #2 itself is left untouched so it stays the control arm.
 **Related**: [`02-graph-pipeline.md`](02-graph-pipeline.md) · [`03-event-system.md`](03-event-system.md) · [`12-prompts-system.md`](12-prompts-system.md) · [`knowledge-source-retrieval-policies.md`](knowledge-source-retrieval-policies.md) · [`events-off-gate-design.md`](events-off-gate-design.md)
+
+---
+
+## 0. What production changed
+
+Four claims below are now false. They are left in place because the reasoning that produced
+them is still worth reading — but each is corrected here and flagged where it appears.
+
+**1. Working memory no longer adjudicates progression (§4).** The stance ladder was built to
+be EARNED: an advance required a client-side event, moved at most one rung, and waited two
+turns. In production that put it in front of the author's state machine. Scenario 440's
+states ran `anxious -> partial resolution -> resolved` and the UI showed them reaching
+`resolved`, while the ladder held the client at `guarded` and the prompt said *"Do not move
+past this on your own."* Two controllers for one behaviour, and the stricter one won
+silently — the client never changed, which is what the scenario author reported.
+
+The states drive progression now, exactly as they do for every other main-agent prompt. The
+stance MIRRORS the resolved state; `decide_stance` and its gates survive only for scenarios
+that define no states, where there is nothing else to follow. Working memory's job is the
+context around the flow: recall, the ledgers, voice, affect, grounding.
+
+**2. The ladder is the scenario's, not the framework's.** §4 and the schema assumed five
+fixed stances. An author who writes `anxious -> partial resolution -> resolved` has written a
+ladder; the framework made the client climb a different one and mapped between them, which
+lost bands whenever an author wrote more than five. `Stance` is now `str`, the ladder is
+derived from the scenario's states in author order, and validation moved from the type to
+the value.
+
+**3. `state_x_guidelines` did NOT move inside the block (§3.1).** It was moved in, and moved
+back out. Folding it in meant a designer opening their own prompt could not see their own
+state guidance — it had been absorbed into an opaque placeholder. §3.1's reasoning about the
+two provenances is still right; its conclusion about where the authored half renders is not.
+
+**4. One placeholder became seven (§2.3).** `{client_working_memory}` rendered the whole
+block, which meant a curator could not see what was being fed to the model or reorder any of
+it. The prompt now declares `{working_memory_stance}`, `{working_memory_register}`,
+`{working_memory_speech_fragments}`, `{working_memory_withheld}`,
+`{working_memory_unresolved}`, `{working_memory_disclosed}` and `{working_memory_salient}`
+alongside `{state_x_guidelines}`. The single-placeholder form is still supported by the
+runtime; the prompt that used it is retired (`isObsolete`). §2.3's argument that POSITION
+should be authorable is unchanged and is why the split was possible at all.
+
+**Naming.** The prompt shipped as **Main Agent Prompt #3**, not as a
+"client working memory" prompt — it sits in a picker beside #2, and naming it after its
+mechanism described how it was built rather than where it sits.
 
 ---
 
@@ -340,6 +388,10 @@ rolling summary and glossary work today. Only the small tail changes.
 
 ### 2.3 Position is authorable: the `{client_working_memory}` placeholder
 
+> **Superseded — see §0.4.** One placeholder became seven, one per section, so a
+> curator can read what is fed and move each part independently. The argument below
+> for authorable position is what made that possible and still holds.
+
 The claim that last is the best position is a hypothesis, and it is cheap to test — so
 the block ships as a **real placeholder** rather than a hardcoded append. An author moves
 `{client_working_memory}` in the template, and the block renders there.
@@ -453,6 +505,18 @@ class ClientWorkingMemory(BaseModel):
 
 ### 3.1 Two provenances in one block: derived and authored
 
+> **Partly superseded — see §0.3.** The two provenances are real and the rule that the
+> updater must never paraphrase authored guidance still holds. What changed: the authored
+> half does NOT render inside the block. It stayed as `{state_x_guidelines}`, because a
+> designer who cannot see their own guidance in their own prompt reasonably concludes it
+> was deleted.
+
+> **Partly superseded — see §0.3.** The two provenances are real and the rule that the
+> updater must never paraphrase authored guidance still holds. What changed: the
+> authored half does NOT render inside the block. It stayed as `{state_x_guidelines}`,
+> because a designer who cannot see their own guidance in their own prompt reasonably
+> concludes it was deleted.
+
 The block is assembled from **two sources that must never be confused**, and separating them
 is what keeps the existing state mechanism intact.
 
@@ -525,6 +589,12 @@ absence does not.
 ---
 
 ## 4. Triggers: a new client-side event type
+
+> **Superseded for scenarios with states — see §0.1 and §0.2.** The events below are
+> still detected, still grounded against the transcript, and still drive the ledgers,
+> the affect and retrieval. They no longer drive STANCE: the author's states do, and
+> the "Drives" column's stance claims (`rupture` regresses, `repair` may advance,
+> `resistance_softened` advances) apply only where a scenario defines no states.
 
 The existing event vocabulary is about the **counsellor**. Measured: 27,422 events across 405 of 517 sessions, 53 per session, 172 distinct types — but only 6.3% carry a non-zero score, **96% of unscored events carry no message at all**, and the messages that do exist read:
 
@@ -858,6 +928,14 @@ term list is not a substitute for naming the variety.
 ---
 
 ### 6.1 A new prompt, not an edit to #2
+
+> **Shipped, and named Main Agent Prompt #3.** The reasoning here held up: scoping the
+> change to consenting simulations is what made every correction in §0 recoverable by
+> re-selecting a prompt.
+
+> **Shipped, and named Main Agent Prompt #3.** The reasoning here held up: scoping the
+> change to consenting simulations is what made every correction in §0 recoverable by
+> re-selecting a prompt.
 
 **This ships as its own main-agent prompt that inherits #2's body**, rather than as
 placeholders added to #2. That is a change from an earlier version of this document, and it
