@@ -31,7 +31,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Sequence
+from typing import Dict, Iterable, List, Optional, Sequence
 
 from app.core.logger import get_logger
 from app.core.working_memory.state import Fact
@@ -99,6 +99,49 @@ class BackstoryCorpus:
         return bool(self.facts)
 
 
+def _coalesce_short(sentences: Iterable[str]) -> List[str]:
+    """Clean each sentence, and never let a short one vanish on its own.
+
+    `_MIN_FACT_CHARS` exists to drop headings and stray bullet markers. Once
+    the splitter went sentence-level that filter started deleting real content:
+    "He is 17. He reads at night, whatever he can find." kept the second
+    sentence and DROPPED the first, because "He is 17." is nine characters.
+    Before sentence splitting the pair was one chunk and survived whole, so the
+    client's age silently left the recall pool — a fact the author wrote, gone,
+    with nothing to show it.
+
+    A sub-minimum sentence is therefore merged into its neighbour (forward by
+    preference, backward when it is last) rather than discarded. Merging stays
+    INSIDE one structural chunk, so two short bullets are never fused into a
+    compound fact the author never wrote — a lone short bullet still falls to
+    the minimum, which is the pre-existing behaviour and a separate question.
+    """
+    cleaned: List[str] = []
+    for sentence in sentences:
+        text = _TRIM_RE.sub("", (sentence or "").strip())
+        text = " ".join(text.split())
+        if text:
+            cleaned.append(text)
+
+    merged: List[str] = []
+    pending = ""
+    for text in cleaned:
+        candidate = f"{pending} {text}".strip() if pending else text
+        if len(candidate) < _MIN_FACT_CHARS:
+            pending = candidate
+            continue
+        merged.append(candidate)
+        pending = ""
+    if pending:
+        if merged:
+            merged[-1] = f"{merged[-1]} {pending}"
+        else:
+            # The whole chunk is under the minimum — a heading. Hand it on and
+            # let the caller's filter drop it, as it always did.
+            merged.append(pending)
+    return merged
+
+
 def _hard_wrap(chunk: str) -> List[str]:
     """Split on word boundaries when nothing else would split at all."""
     if len(chunk) <= _HARD_MAX_FACT_CHARS:
@@ -133,11 +176,7 @@ def chunk_text(text: Optional[str]) -> List[str]:
     out: List[str] = []
     seen: set[str] = set()
     for raw in _SPLIT_RE.split(text):
-        for sentence in _SENTENCE_RE.split(raw or ""):
-            cleaned = _TRIM_RE.sub("", sentence.strip())
-            cleaned = " ".join(cleaned.split())
-            if not cleaned:
-                continue
+        for cleaned in _coalesce_short(_SENTENCE_RE.split(raw or "")):
             for chunk in _hard_wrap(cleaned):
                 if len(chunk) < _MIN_FACT_CHARS:
                     continue

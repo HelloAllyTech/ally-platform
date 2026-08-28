@@ -413,3 +413,42 @@ class TestProseChunking:
         facts = chunk_text("word " * 200)
         assert len(facts) > 1
         assert all(len(f) <= 220 for f in facts)
+
+
+class TestShortSentencesAreNotLost:
+    """The regression sentence-splitting introduced, and its guard.
+
+    `_MIN_FACT_CHARS` was written to drop headings. Applied per SENTENCE it
+    started deleting real content instead: "He is 17." is nine characters, so
+    the client's age silently left the recall pool — a fact the author wrote,
+    gone, with nothing to show for it.
+    """
+
+    def test_a_short_first_sentence_merges_forward(self):
+        assert chunk_text(
+            "He is 17. He reads at night, whatever he can find, not textbooks."
+        ) == ["He is 17. He reads at night, whatever he can find, not textbooks."]
+
+    def test_a_short_middle_sentence_merges_forward(self):
+        facts = chunk_text(
+            "She is tired. She copes. "
+            "Her mother calls every day and she does not answer."
+        )
+        assert any("She copes." in f for f in facts)
+
+    def test_a_short_LAST_sentence_merges_backward(self):
+        # Nothing follows it, so the only way to keep it is to attach it to
+        # what came before.
+        assert chunk_text("He reads at night, whatever he can find. He is 17.") == [
+            "He reads at night, whatever he can find. He is 17."
+        ]
+
+    def test_merging_never_crosses_a_structural_boundary(self):
+        # Two short bullets must not fuse into a compound fact the author never
+        # wrote. A lone short bullet still falls to the minimum, which is the
+        # behaviour that predates sentence splitting.
+        facts = chunk_text("- likes tea\n- works nights and has not told anyone")
+        assert facts == ["works nights and has not told anyone"]
+
+    def test_a_heading_alone_is_still_dropped(self):
+        assert chunk_text("## Background") == []
