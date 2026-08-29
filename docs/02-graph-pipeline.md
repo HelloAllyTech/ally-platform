@@ -38,6 +38,7 @@ Two nodes (`resolve_branching_instruction` and `retrieve_knowledge`) are wrapped
 | `next_instruction` | `Optional[str]` | `replace_next_instruction` | Resolved branching instruction text for the LLM |
 | `feedback_to_send` | `Optional[EventFeedback]` | `replace_feedback_to_send` | Feedback selected for UI delivery |
 | `behavior_feedback_data` | `List[BehaviorInstructionFeedbackData]` | `add_behavior_feedback_data` | Behavior detection results (from detect_behaviors) |
+| `advancing_behaviour_ids` | `List[str]` | `replace_advancing_behaviour_ids` | SHOULD_DO behaviour ids that advanced the score this turn, snapshotted by `resolve_branching_instruction` from `behavior_feedback_data` before `send_event_feedback` clears it. Read by `update_working_memory`, which runs after `behavior_feedback_data` has already been cleared. |
 
 ### Key Data Classes
 
@@ -88,8 +89,9 @@ This node resolves branching instructions that guide the LLM response. Steps:
 2. **Resolve LLM response tags** -- if the instruction contains `<llm_response(...)>` tags, call the LLM to generate content (blocking)
 3. **Resolve dynamic tags** -- substitute `<last_helper_utterance>` and `<chat_summary>` from conversation history
 4. **Select feedback** -- pick the selected branching event's feedback for UI
+5. **Snapshot advancing behaviours** -- capture the SHOULD_DO ids from `behavior_feedback_data` into `advancing_behaviour_ids`, since this is the last point before the graph fans out to `send_event_feedback`, which unconditionally clears `behavior_feedback_data`
 
-Returns `next_instruction` (resolved instruction text) and `feedback_to_send`.
+Returns `next_instruction`, `feedback_to_send`, and `advancing_behaviour_ids`.
 
 ## Node 3a: generate_response
 

@@ -934,9 +934,23 @@ async def resolve_branching_instruction(
                 f"(score={selected_event_data.score}) for UI feedback"
             )
 
+    # Snapshot the SHOULD_DO behaviours that advanced the score this turn
+    # HERE, before the fan-out to send_event_feedback (which unconditionally
+    # clears behavior_feedback_data) and generate_response ->
+    # publish_done_thinking -> update_working_memory (which needs this data
+    # and runs strictly after send_event_feedback has already cleared it).
+    advancing_behaviour_ids = [
+        str(f.behavior_instruction_id)
+        for f in (state.behavior_feedback_data or [])
+        if getattr(getattr(f, "category", None), "value", None) == "SHOULD_DO"
+        and (f.score or 0) > 0
+        and f.behavior_instruction_id
+    ]
+
     return {
         "next_instruction": next_instruction,
         "feedback_to_send": feedback_to_send,
+        "advancing_behaviour_ids": advancing_behaviour_ids,
     }
 
 
@@ -2570,13 +2584,14 @@ async def update_working_memory(
     # earlier attempt to measure it failed because the logs recorded scores and
     # feedback text with no behaviour identity and no room, so nothing could be
     # attributed. These ids are logged in `validate`.
-    _advancing_behaviours = [
-        str(f.behavior_instruction_id)
-        for f in (getattr(state, "behavior_feedback_data", None) or [])
-        if getattr(getattr(f, "category", None), "value", None) == "SHOULD_DO"
-        and (f.score or 0) > 0
-        and f.behavior_instruction_id
-    ]
+    #
+    # Read from advancing_behaviour_ids, NOT behavior_feedback_data directly:
+    # send_event_feedback (a parallel successor of resolve_branching_instruction,
+    # same as generate_response -> publish_done_thinking -> this node) clears
+    # behavior_feedback_data to [] every turn, and it always runs first. By the
+    # time this node runs, behavior_feedback_data is always already []. See
+    # resolve_branching_instruction, which snapshots this before that clear.
+    _advancing_behaviours = list(getattr(state, "advancing_behaviour_ids", None) or [])
 
     # The stance the AUTHOR's bands resolve to this turn. Working memory takes
     # it rather than deciding one, so the client's progression is the

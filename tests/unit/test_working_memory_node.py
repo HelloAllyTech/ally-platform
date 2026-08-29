@@ -14,8 +14,13 @@ import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
 from app.core.config import settings
-from app.core.graph.nodes import update_working_memory
-from app.core.graph.state import SimulationState
+from app.core.graph.nodes import (
+    resolve_branching_instruction,
+    send_event_feedback,
+    update_working_memory,
+)
+from app.core.graph.state import BehaviorInstructionFeedbackData, SimulationState
+from app.core.scenario.simulation_instructions import SimulationBehaviorCategory
 from app.core.working_memory.store import ClientWorkingMemoryStore
 
 pytestmark = pytest.mark.unit
@@ -352,6 +357,61 @@ class TestFlagOffCostsNothing:
                 _prompt_data("client_working_memory")
             )
         )
+
+
+class TestAdvancingBehaviourAttribution:
+    """The per-behaviour attribution must survive the graph's fan-out, not
+    just work when the node is called in isolation.
+
+    resolve_branching_instruction and send_event_feedback are both parallel
+    successors of the same upstream node, and send_event_feedback always
+    finishes first — generate_response -> publish_done_thinking ->
+    update_working_memory is a strictly longer chain. send_event_feedback
+    unconditionally clears behavior_feedback_data (reducer treats `None` as
+    an explicit clear). A test that hands update_working_memory a
+    hand-built state would hide this entirely: the bug is about node ORDER
+    in the real graph, not about update_working_memory's own logic.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _on(self, monkeypatch):
+        monkeypatch.setattr(settings, "CLIENT_WORKING_MEMORY_ENABLED", True)
+        monkeypatch.setattr(settings, "CLIENT_WORKING_MEMORY_EVERY_TURNS", 1)
+
+    async def test_survives_send_event_feedbacks_clear(self):
+        state = _state()
+        state.behavior_feedback_data = [
+            BehaviorInstructionFeedbackData(
+                behavior_instruction_id="beh-validate-experience",
+                score=9,
+                category=SimulationBehaviorCategory.SHOULD_DO,
+            )
+        ]
+
+        # resolve_branching_instruction is the fan-out point: it is the last
+        # node with access to this turn's fresh behavior_feedback_data before
+        # the graph splits into send_event_feedback (which clears it) and
+        # generate_response -> ... -> update_working_memory (which needs it).
+        branch_result = await resolve_branching_instruction(
+            state, {"configurable": {}}
+        )
+        for key, value in branch_result.items():
+            setattr(state, key, value)
+
+        # Mirrors the reducer committing send_event_feedback's unconditional
+        # clear, which always happens before update_working_memory runs.
+        fb_result = await send_event_feedback(state, {"configurable": {}})
+        assert fb_result["behavior_feedback_data"] is None
+        state.behavior_feedback_data = []
+
+        store = ClientWorkingMemoryStore()
+        await store.begin_turn()
+        with patch("app.core.working_memory.consolidate.schedule_update") as sched:
+            await update_working_memory(state, _config(store))
+
+        assert sched.call_args.kwargs["advancing_behaviours"] == [
+            "beh-validate-experience"
+        ]
 
 
 # ---------------------------------------------------------------------------

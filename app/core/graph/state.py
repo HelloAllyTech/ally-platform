@@ -233,6 +233,18 @@ def replace_feedback_to_send(
     return right
 
 
+def replace_advancing_behaviour_ids(_: List[str], right: List[str]) -> List[str]:
+    """
+    Reducer to replace advancing_behaviour_ids.
+
+    Always replaces with the new value (right), unlike behavior_feedback_data's
+    reducer — there is no "missing key means untouched" ambiguity to guard
+    against here, since resolve_branching_instruction is the only writer and
+    always sets this fresh every turn it runs.
+    """
+    return right
+
+
 class SimulationState(BaseModel):
     """
     State model for the LangGraph simulation workflow.
@@ -273,6 +285,12 @@ class SimulationState(BaseModel):
     retrieved_context: Annotated[Optional[str], replace_retrieved_context] = (
         None  # Retrieved knowledge context for prompt enrichment
     )
+    # SHOULD_DO behaviour ids that advanced the score this turn, captured by
+    # resolve_branching_instruction from behavior_feedback_data before its
+    # fan-out to send_event_feedback, which unconditionally clears that field.
+    # update_working_memory runs several supersteps later (after
+    # publish_done_thinking) and would otherwise always see it already reset.
+    advancing_behaviour_ids: Annotated[List[str], replace_advancing_behaviour_ids] = []
     # NOTE: the rolling summary (episodic memory) deliberately does NOT live in
     # graph state — it is held in the worker-owned RollingSummaryStore (see
     # app/core/graph/rolling_summary.py) and passed via config, so background
