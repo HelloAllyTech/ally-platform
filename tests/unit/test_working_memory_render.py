@@ -100,6 +100,18 @@ def test_missing_state_guidance_is_named_not_blank():
     assert "no particular direction for this stage" in block
 
 
+def test_the_block_form_does_not_contradict_the_mirrored_stance():
+    # `prompt.py` mirrors the author's resolved state name into `memory.stance`
+    # so the block announces the state the scenario has actually reached (the
+    # scenario-440 fix). The split template had its "Do not move past this on
+    # your own" paragraph removed for the same reason (see
+    # test_the_constraints_are_visible_in_the_prompt_body) — the block form
+    # must not still say it right after announcing the mirrored stance.
+    block = render_block(_memory(stance="resolved"))
+    assert "You are resolved right now" in block
+    assert "Do not move past this on your own" not in block
+
+
 # ---------------------------------------------------------------------------
 # Ordering — ascending churn, so the stable bytes sit highest
 # ---------------------------------------------------------------------------

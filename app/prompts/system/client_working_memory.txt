@@ -9,10 +9,6 @@ conversation moves, so treat it as where you are now rather than as a script.
 ## Where you are
 You are {stance} right now. {affect}
 
-Do not move past this on your own. Warmth, insight or resolution has to be
-earned by what the counsellor actually does — if it has not happened yet, you
-are still here.
-
 ## How you are speaking
 {register}
 
