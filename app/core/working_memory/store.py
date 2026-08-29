@@ -266,14 +266,20 @@ class ClientWorkingMemoryStore:
             self._task.cancel()
         self._task = None
 
-    async def mark_miss(self) -> None:
+    async def mark_miss(self, score_delta: int = 0) -> None:
         """Count an update that timed out or failed.
 
         Deliberately does NOT advance the monotonic counter: a missed turn must
         leave the next update free to commit, and a miss is not a write.
+
+        ``score_delta`` rolls back the baseline `schedule_update` already
+        advanced for this turn's attempt, so the credit that turn earned is not
+        lost — it re-appears in the next update's delta instead, the timeout
+        half of the guarantee documented on ``score_at_last_update``.
         """
         async with self._lock:
             self._state.updates_missed += 1
+            self.score_at_last_update -= score_delta
 
 
 _WORD_RE = re.compile(r"[\w']+", re.UNICODE)

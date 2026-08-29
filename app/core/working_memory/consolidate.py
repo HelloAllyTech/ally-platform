@@ -488,7 +488,7 @@ def schedule_update(
                 turn_index,
                 timeout,
             )
-            await store.mark_miss()
+            await store.mark_miss(score_delta)
             return
         except asyncio.CancelledError:
             # Session teardown via discard(). Not a miss — nobody will read it.
@@ -497,7 +497,7 @@ def schedule_update(
             logger.warning(
                 "[working-memory] update for turn %d failed: %s", turn_index, exc
             )
-            await store.mark_miss()
+            await store.mark_miss(score_delta)
             return
 
         if update is None:

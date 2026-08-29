@@ -280,6 +280,43 @@ class TestScheduleUpdate:
         # the next update would be rejected as stale for the same turn.
         assert store.last_committed_turn == -1
 
+    async def test_a_timeout_rolls_back_the_score_baseline(self, monkeypatch):
+        """A missed turn's score credit must reach a future update, not vanish.
+
+        `nodes.py` advances `store.score_at_last_update` to the live total
+        SYNCHRONOUSLY, before ever calling `schedule_update` — the docstring on
+        `score_at_last_update` promises that a turn lost to a timeout still
+        "accumulate[s] into the next update" rather than dropping the evidence.
+        If the miss leaves the baseline at the already-advanced value, the next
+        turn's delta is computed against it and this turn's points are gone for
+        good.
+        """
+        monkeypatch.setattr(mod, "load_and_format", lambda *a, **k: "SYS")
+        store = ClientWorkingMemoryStore()
+        # Mirrors the caller: baseline already moved from 4 to 12 (delta=8)
+        # before scheduling the now-doomed background call.
+        store.score_at_last_update = 12
+
+        async def _hang(*a, **k):
+            await asyncio.sleep(10)
+
+        structured = AsyncMock()
+        structured.ainvoke = _hang
+        llm_instance = MagicMock()
+        llm_instance.with_structured_output = MagicMock(return_value=structured)
+        llm = SimpleNamespace(llm_instance=llm_instance)
+
+        args = self._args(llm)
+        args["timeout"] = 0.01
+        args["score_delta"] = 8
+        assert mod.schedule_update(store, **args)
+        await store._task
+
+        assert (await store.snapshot()).updates_missed == 1
+        # Rolled back to 4, so the next scheduled update's delta includes the
+        # 8 points this timed-out turn earned instead of losing them.
+        assert store.score_at_last_update == 4
+
     async def test_llm_failure_is_a_miss_not_a_crash(self, monkeypatch):
         monkeypatch.setattr(mod, "load_and_format", lambda *a, **k: "SYS")
         store = ClientWorkingMemoryStore()
