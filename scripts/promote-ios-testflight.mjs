@@ -95,13 +95,26 @@ const KNOWN_FOOTERS = [
 
 function describePemShape(pem) {
   const lines = pem.split("\n");
-  const matchedHeader = KNOWN_HEADERS.find(h => pem.startsWith(h)) ?? "none of the known headers";
+  // Report the matched candidate's INDEX, not the string itself — GitHub masks any log output
+  // that matches a registered secret substring regardless of where that text came from, so even
+  // a hardcoded candidate string gets redacted to "***" once it happens to equal one of the
+  // secret's own lines (confirmed: that's exactly what happened last run). A plain number can
+  // never trigger that.
+  const headerIndex = KNOWN_HEADERS.findIndex(h => pem.startsWith(h));
   const trimmedEnd = pem.trimEnd();
-  const matchedFooter =
-    KNOWN_FOOTERS.find(f => trimmedEnd.endsWith(f)) ?? "none of the known footers";
+  const footerIndex = KNOWN_FOOTERS.findIndex(f => trimmedEnd.endsWith(f));
+  // Character codes are likewise never a substring match of the secret's own text — this is the
+  // part that actually pins down *what* is different, e.g. a smart-dash or duplicated character
+  // introduced by copying the secret through a rich-text tool that mangled a run of hyphens.
+  const lastLine = lines.at(-1) ?? "";
+  const lastLineCharCodes = [...lastLine].map(c => c.charCodeAt(0));
+  const firstLineCharCodes = [...(lines[0] ?? "")].map(c => c.charCodeAt(0));
   return (
     `total length ${pem.length}, ${lines.length} line(s) (lengths: ${lines.map(l => l.length).join(",")}), ` +
-    `header matches: ${matchedHeader}, footer matches: ${matchedFooter}`
+    `header candidate index: ${headerIndex} (-1 = no known header matched), ` +
+    `footer candidate index: ${footerIndex} (-1 = no known footer matched), ` +
+    `first line char codes: [${firstLineCharCodes.join(",")}], ` +
+    `last line char codes: [${lastLineCharCodes.join(",")}]`
   );
 }
 
