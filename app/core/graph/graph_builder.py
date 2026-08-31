@@ -226,21 +226,25 @@ def build_simulation_graph() -> StateGraph[SimulationState]:
 
     graph.add_edge("generate_response", "publish_done_thinking")
 
-    if settings.CLIENT_WORKING_MEMORY_ENABLED:
-        # Client working memory: also strictly AFTER publish_done_thinking, and
-        # PARALLEL to compact_history rather than chained behind it. The two are
-        # independent — one records what was said, the other who said it — and
-        # chaining would make this wait on the summarizer's gate for no reason.
-        # Both only schedule detached work, so neither extends the run
-        # measurably.
-        #
-        # Read at BUILD time, and the graph is compiled once at import: turning
-        # this on needs a restart. Turning it OFF does not — the node re-checks
-        # the flag every turn, which is what makes it a kill switch.
-        working_memory_subgraph = build_update_working_memory_subgraph()
-        graph.add_node("update_working_memory", working_memory_subgraph)
-        graph.add_edge("publish_done_thinking", "update_working_memory")
-        graph.add_edge("update_working_memory", END)
+    # Client working memory: also strictly AFTER publish_done_thinking, and
+    # PARALLEL to compact_history rather than chained behind it. The two are
+    # independent — one records what was said, the other who said it — and
+    # chaining would make this wait on the summarizer's gate for no reason.
+    # Both only schedule detached work, so neither extends the run measurably.
+    #
+    # Unconditional now that prompt selection is the only opt-in. The node used
+    # to be added only when CLIENT_WORKING_MEMORY_ENABLED was true, which read
+    # the flag at BUILD time against a graph compiled once at import — so the
+    # env var could only be turned on by a restart, and a scenario pointed at
+    # the working-memory prompt on a worker built without it ran silently
+    # without the feature. The per-turn gate inside the node is what decides
+    # whether any work happens: a scenario whose prompt declares no
+    # working_memory placeholder returns immediately, so the cost for every
+    # other simulation in the fleet is one no-op node visit.
+    working_memory_subgraph = build_update_working_memory_subgraph()
+    graph.add_node("update_working_memory", working_memory_subgraph)
+    graph.add_edge("publish_done_thinking", "update_working_memory")
+    graph.add_edge("update_working_memory", END)
 
     if settings.ROLLING_SUMMARY_ENABLED:
         # Rolling-summary compactor: strictly AFTER publish_done_thinking (the

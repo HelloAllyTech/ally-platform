@@ -557,16 +557,14 @@ class AgentWorker:
         # learner just said, five facts instead of the whole biography. Scenario
         # knowledge folds into the same pool so a personal memory and a case-file
         # detail compete on relevance rather than occupying separate blocks.
-        # Gated on the flag AND the scenario's opt-in, both. Without this the
-        # pool was built and EMBEDDED on every session in the fleet — an
-        # embedding API call per session, at setup, for a pool that nothing
-        # would read while the feature is off. The updater only runs for an
-        # opted-in scenario, so the same gate belongs here.
+        # Gated on the scenario's opt-in. Without this the pool was built and
+        # EMBEDDED on every session in the fleet — an embedding API call per
+        # session, at setup, for a pool that nothing would read. The updater
+        # only runs for an opted-in scenario, so the same gate belongs here.
         _cwm_prompt_data = getattr(self.scenario, "prompt_data", None)
-        _cwm_declares = _cwm_prompt_data is not None and (
+        _cwm_opted_in = _cwm_prompt_data is not None and (
             prompt_declares_client_working_memory(_cwm_prompt_data)
         )
-        _cwm_opted_in = bool(settings.CLIENT_WORKING_MEMORY_ENABLED and _cwm_declares)
 
         # ALWAYS log the opt-in decision, at INFO, with the REASON.
         #
@@ -622,9 +620,7 @@ class AgentWorker:
                 _how,
             )
         else:
-            if not settings.CLIENT_WORKING_MEMORY_ENABLED:
-                _why = "CLIENT_WORKING_MEMORY_ENABLED is false"
-            elif _cwm_prompt_data is None:
+            if _cwm_prompt_data is None:
                 _why = "no prompt_data on the scenario"
             else:
                 _why = (

@@ -67,35 +67,53 @@ def _config(store, opted_in=True, **extra):
     return {"configurable": configurable}
 
 
-class TestKillSwitch:
-    async def test_disabled_does_nothing(self, monkeypatch):
-        monkeypatch.setattr(settings, "CLIENT_WORKING_MEMORY_ENABLED", False)
+class TestPromptSelectionIsTheOnlySwitch:
+    """Selecting the prompt is the switch; there is no env flag beside it.
+
+    The node is now unconditionally on the reply path, so these are the tests
+    that stand between "every simulation in the fleet" and "a consolidation
+    call per turn".
+    """
+
+    async def test_a_scenario_that_has_not_opted_in_does_nothing(self):
         store = ClientWorkingMemoryStore()
         await store.begin_turn()
         with patch("app.core.working_memory.consolidate.schedule_update") as sched:
-            assert await update_working_memory(_state(), _config(store)) == {}
+            result = await update_working_memory(
+                _state(), _config(store, opted_in=False)
+            )
+            assert result == {}
         sched.assert_not_called()
 
-    async def test_disabled_at_runtime_even_though_wired(self, monkeypatch):
-        # The node is in the graph because the flag was true at BUILD time.
-        # Flipping it off must stop the work without a redeploy — that is the
-        # whole claim being made for it as a kill switch.
-        monkeypatch.setattr(settings, "CLIENT_WORKING_MEMORY_ENABLED", True)
+    async def test_switching_the_prompt_back_stops_the_work(self):
+        # Re-selecting a prompt without the placeholder is the rollback, and it
+        # has to take effect on the very next turn without a redeploy — the
+        # property the removed env flag used to carry.
         store = ClientWorkingMemoryStore()
         await store.begin_turn()
         with patch("app.core.working_memory.consolidate.schedule_update") as sched:
             await update_working_memory(_state(), _config(store))
             assert sched.called
-            monkeypatch.setattr(settings, "CLIENT_WORKING_MEMORY_ENABLED", False)
             sched.reset_mock()
-            await update_working_memory(_state(), _config(store))
+            await update_working_memory(_state(), _config(store, opted_in=False))
             sched.assert_not_called()
+
+    async def test_the_split_form_opts_in_too(self):
+        # Main Agent Prompt #3 declares no {client_working_memory}; it declares
+        # one placeholder per section. Missing this would leave #3 running with
+        # a memory nothing ever updated.
+        store = ClientWorkingMemoryStore()
+        await store.begin_turn()
+        config = _config(store)
+        config["configurable"]["scenario"] = _scenario("working_memory_stance")
+        with patch("app.core.working_memory.consolidate.schedule_update") as sched:
+            await update_working_memory(_state(), config)
+        assert sched.called
 
 
 class TestGates:
     @pytest.fixture(autouse=True)
     def _on(self, monkeypatch):
-        monkeypatch.setattr(settings, "CLIENT_WORKING_MEMORY_ENABLED", True)
         monkeypatch.setattr(settings, "CLIENT_WORKING_MEMORY_EVERY_TURNS", 1)
 
     async def test_no_store_is_the_report_graph_not_an_error(self):
@@ -169,10 +187,6 @@ class TestGates:
 
 
 class TestCadence:
-    @pytest.fixture(autouse=True)
-    def _on(self, monkeypatch):
-        monkeypatch.setattr(settings, "CLIENT_WORKING_MEMORY_ENABLED", True)
-
     async def test_every_turn_by_default(self, monkeypatch):
         monkeypatch.setattr(settings, "CLIENT_WORKING_MEMORY_EVERY_TURNS", 1)
         store = ClientWorkingMemoryStore()
@@ -206,7 +220,6 @@ class TestCadence:
 class TestWindow:
     @pytest.fixture(autouse=True)
     def _on(self, monkeypatch):
-        monkeypatch.setattr(settings, "CLIENT_WORKING_MEMORY_ENABLED", True)
         monkeypatch.setattr(settings, "CLIENT_WORKING_MEMORY_EVERY_TURNS", 1)
 
     async def test_passes_only_the_recent_window(self, monkeypatch):
@@ -239,8 +252,7 @@ class TestTurnOpener:
     generate a reply.
     """
 
-    async def test_generate_response_opens_the_turn(self, monkeypatch):
-        monkeypatch.setattr(settings, "CLIENT_WORKING_MEMORY_ENABLED", True)
+    async def test_generate_response_opens_the_turn(self):
         from app.core.graph.nodes import generate_response
 
         store = ClientWorkingMemoryStore()
@@ -251,22 +263,12 @@ class TestTurnOpener:
             await generate_response(_state(), _config(store))
         assert (await store.snapshot()).turn_index == 0
 
-    async def test_opener_skips_a_scenario_that_has_not_opted_in(self, monkeypatch):
-        monkeypatch.setattr(settings, "CLIENT_WORKING_MEMORY_ENABLED", True)
+    async def test_opener_skips_a_scenario_that_has_not_opted_in(self):
         from app.core.graph.nodes import generate_response
 
         store = ClientWorkingMemoryStore()
         with suppress(Exception):
             await generate_response(_state(), _config(store, opted_in=False))
-        assert (await store.snapshot()).turn_index == -1
-
-    async def test_opener_respects_the_kill_switch(self, monkeypatch):
-        monkeypatch.setattr(settings, "CLIENT_WORKING_MEMORY_ENABLED", False)
-        from app.core.graph.nodes import generate_response
-
-        store = ClientWorkingMemoryStore()
-        with suppress(Exception):
-            await generate_response(_state(), _config(store))
         assert (await store.snapshot()).turn_index == -1
 
     async def test_unopened_store_is_distinguishable_from_turn_zero(self):
@@ -281,22 +283,16 @@ class TestTurnOpener:
 
 
 class TestGraphWiring:
-    def test_node_is_present_when_enabled(self, monkeypatch):
-        monkeypatch.setattr(settings, "CLIENT_WORKING_MEMORY_ENABLED", True)
+    def test_node_is_always_present(self):
+        # Unconditional by design: the node used to be added only when the env
+        # flag was true at BUILD time, so a worker built without it ignored a
+        # scenario that had correctly selected the working-memory prompt.
         from app.core.graph.graph_builder import build_simulation_graph
 
         graph = build_simulation_graph()
         assert "update_working_memory" in graph.nodes
 
-    def test_node_is_absent_when_disabled(self, monkeypatch):
-        monkeypatch.setattr(settings, "CLIENT_WORKING_MEMORY_ENABLED", False)
-        from app.core.graph.graph_builder import build_simulation_graph
-
-        graph = build_simulation_graph()
-        assert "update_working_memory" not in graph.nodes
-
-    def test_runs_after_the_reply_has_streamed(self, monkeypatch):
-        monkeypatch.setattr(settings, "CLIENT_WORKING_MEMORY_ENABLED", True)
+    def test_runs_after_the_reply_has_streamed(self):
         from app.core.graph.graph_builder import build_simulation_graph
 
         graph = build_simulation_graph()
@@ -307,7 +303,6 @@ class TestGraphWiring:
         assert ("publish_done_thinking", "update_working_memory") in edges
 
     def test_is_parallel_to_compaction_not_chained(self, monkeypatch):
-        monkeypatch.setattr(settings, "CLIENT_WORKING_MEMORY_ENABLED", True)
         monkeypatch.setattr(settings, "ROLLING_SUMMARY_ENABLED", True)
         from app.core.graph.graph_builder import build_simulation_graph
 
@@ -317,45 +312,36 @@ class TestGraphWiring:
         assert ("update_working_memory", "compact_history") not in edges
 
 
-class TestFlagOffCostsNothing:
-    """With the feature off, a session must do NO working-memory work.
+class TestNotOptedInCostsNothing:
+    """A scenario that has not opted in must do NO working-memory work.
 
     The pool build and its embedding call were not gated, so every session in
     the fleet would have fired an embedding API call at setup for a pool nothing
-    would read. A disabled feature must be free, not merely harmless.
+    would read. With the env flag gone this is the ONLY thing standing between
+    the fleet and that cost, so it is asserted directly rather than implied.
     """
 
-    def test_the_pool_is_not_built_when_the_flag_is_off(self, monkeypatch):
-        monkeypatch.setattr(settings, "CLIENT_WORKING_MEMORY_ENABLED", False)
-        from app.core.graph.prompt import prompt_declares_client_working_memory
-
-        assert not (
-            settings.CLIENT_WORKING_MEMORY_ENABLED
-            and prompt_declares_client_working_memory(
-                _prompt_data("client_working_memory")
-            )
-        )
-
-    def test_the_pool_is_not_built_when_the_scenario_has_not_opted_in(
-        self, monkeypatch
-    ):
-        # Flag on, but the prompt does not declare the placeholder: still free.
-        monkeypatch.setattr(settings, "CLIENT_WORKING_MEMORY_ENABLED", True)
+    def test_the_pool_is_not_built_when_the_scenario_has_not_opted_in(self):
         from app.core.graph.prompt import prompt_declares_client_working_memory
 
         assert not prompt_declares_client_working_memory(
             _prompt_data("state_x_guidelines")
         )
 
-    def test_both_conditions_together_enable_it(self, monkeypatch):
-        monkeypatch.setattr(settings, "CLIENT_WORKING_MEMORY_ENABLED", True)
+    def test_the_block_form_opts_in(self):
         from app.core.graph.prompt import prompt_declares_client_working_memory
 
-        assert (
-            settings.CLIENT_WORKING_MEMORY_ENABLED
-            and prompt_declares_client_working_memory(
-                _prompt_data("client_working_memory")
-            )
+        assert prompt_declares_client_working_memory(
+            _prompt_data("client_working_memory")
+        )
+
+    def test_the_split_form_opts_in(self):
+        # Prompt #3 carries no {client_working_memory}; a check that looked only
+        # for the block form would build no pool for it and recall from nothing.
+        from app.core.graph.prompt import prompt_declares_client_working_memory
+
+        assert prompt_declares_client_working_memory(
+            _prompt_data("working_memory_disclosed")
         )
 
 
@@ -375,7 +361,6 @@ class TestAdvancingBehaviourAttribution:
 
     @pytest.fixture(autouse=True)
     def _on(self, monkeypatch):
-        monkeypatch.setattr(settings, "CLIENT_WORKING_MEMORY_ENABLED", True)
         monkeypatch.setattr(settings, "CLIENT_WORKING_MEMORY_EVERY_TURNS", 1)
 
     async def test_survives_send_event_feedbacks_clear(self):
@@ -392,9 +377,7 @@ class TestAdvancingBehaviourAttribution:
         # node with access to this turn's fresh behavior_feedback_data before
         # the graph splits into send_event_feedback (which clears it) and
         # generate_response -> ... -> update_working_memory (which needs it).
-        branch_result = await resolve_branching_instruction(
-            state, {"configurable": {}}
-        )
+        branch_result = await resolve_branching_instruction(state, {"configurable": {}})
         for key, value in branch_result.items():
             setattr(state, key, value)
 

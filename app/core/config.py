@@ -894,20 +894,17 @@ class Settings(BaseSettings):
     # and rendered as the last block of the prompt. Where the rolling summary
     # answers "what has been said", this answers "who is saying it, and where
     # are they now".
-    CLIENT_WORKING_MEMORY_ENABLED: bool = Field(
-        default=False,
-        description=(
-            "Global switch for the client working memory. OFF by default: "
-            "unlike the rolling summary this has no live A/B behind it yet, and "
-            "it spends one structured LLM call per turn, so it must be opted "
-            "into deliberately rather than arriving with a deploy. This is the "
-            "outer gate only — even when true, the block is rendered solely for "
-            "scenarios whose selected main-agent prompt contains the "
-            "{client_working_memory} placeholder (design §6.1), so turning it "
-            "on affects no existing simulation. Set false as the kill switch: "
-            "no consolidation runs and prompts are unchanged."
-        ),
-    )
+    #
+    # There is no CLIENT_WORKING_MEMORY_ENABLED env switch any more. Selecting
+    # the main-agent prompt IS the switch: a scenario gets working memory when
+    # its selected prompt declares {client_working_memory} or any
+    # working_memory_* section placeholder, and loses it by selecting another
+    # prompt. The env flag was a second, invisible gate on top of that one —
+    # a scenario could be correctly pointed at Main Agent Prompt #3 and still
+    # silently run without the feature, which is indistinguishable from the
+    # on state in a transcript. Rollback is per-scenario prompt selection,
+    # which is also the granularity the feature is actually rolled out at.
+    # The settings below tune the feature; none of them turn it on or off.
     CLIENT_WORKING_MEMORY_TIMEOUT: float = Field(
         default=25.0,
         description=(

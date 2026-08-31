@@ -142,9 +142,8 @@ class TestNoRollingSummary:
 
 
 class TestRollingSummaryDisabled:
-    """CLIENT_WORKING_MEMORY_ENABLED is independent of ROLLING_SUMMARY_ENABLED —
-    turning off the rolling summary must not silently take working memory
-    down with it."""
+    """Working memory is independent of ROLLING_SUMMARY_ENABLED — turning off
+    the rolling summary must not silently take working memory down with it."""
 
     async def _emit(self, wm_store, monkeypatch):
         from app.core.config import settings

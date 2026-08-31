@@ -1391,14 +1391,15 @@ async def generate_response(
     # that is correct: the turn happened. The update for it may never run, which
     # costs one turn of observations and is why the updater reads a WINDOW of
     # recent messages rather than a strict delta.
-    # Gated on the scenario's OPT-IN as well as the global flag: the opt-in is
-    # the `{client_working_memory}` placeholder in the selected main-agent
-    # prompt's body (design §6.1). A simulation that has not opted in must not
-    # pay for a consolidation call whose output nothing would render, so the
-    # turn is not even opened for it — which is what makes enabling the flag
-    # safe for every existing simulation.
+    # Gated on the scenario's OPT-IN, which is now the ONLY gate: the opt-in is
+    # the `{client_working_memory}` placeholder — or any working_memory_*
+    # section placeholder — in the selected main-agent prompt's body
+    # (design §6.1). A simulation that has not opted in must not pay for a
+    # consolidation call whose output nothing would render, so the turn is not
+    # even opened for it — which is what makes this safe to run unconditionally
+    # for every existing simulation.
     _cwm_memory = None
-    if settings.CLIENT_WORKING_MEMORY_ENABLED and config and "configurable" in config:
+    if config and "configurable" in config:
         _cwm_store = config["configurable"].get("client_working_memory_store")
         _cwm_scenario = config["configurable"].get("scenario")
         _cwm_prompt_data = (
@@ -2487,14 +2488,15 @@ async def update_working_memory(
     disclosure) and only the call can see one, so a wider cadence misses the
     turn the event happened on rather than saving a call.
 
+    Runs on every reply path — the node is always in the graph — and returns
+    immediately for a scenario whose selected prompt declares no working-memory
+    placeholder. That prompt-selection check below is the only opt-in there is.
+
     On any failure the previous memory is kept and the miss is counted without
     advancing the store's monotonic turn, so the next update is free to commit.
     Never writes graph state — the store is the single source of truth, for the
     reason recorded on SimulationState.
     """
-    if not settings.CLIENT_WORKING_MEMORY_ENABLED:
-        return {}
-
     configurable = (config or {}).get("configurable", {})
     store = configurable.get("client_working_memory_store")
     if store is None:
@@ -2510,10 +2512,11 @@ async def update_working_memory(
         return {}
 
     # Same opt-in as the read path, and for the same reason: without it every
-    # simulation in the fleet would pay a call per turn the moment the flag went
-    # on. `turn_index < 0` below would already catch this, since generate_response
-    # only opens a turn for an opted-in scenario — but relying on that would make
-    # the cost of a mistake in one gate an invisible LLM bill in the other.
+    # simulation in the fleet would pay a call per turn, since this node is now
+    # unconditionally on the reply path. `turn_index < 0` below would already
+    # catch this, since generate_response only opens a turn for an opted-in
+    # scenario — but relying on that would make the cost of a mistake in one
+    # gate an invisible LLM bill in the other.
     scenario = cast(Scenario, configurable.get("scenario")) if configurable else None
     prompt_data = getattr(scenario, "prompt_data", None) if scenario else None
     if prompt_data is None or not prompt_declares_client_working_memory(prompt_data):

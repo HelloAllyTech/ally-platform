@@ -725,27 +725,31 @@ in this repo rather than inventing one.
 > history of setup work becoming "agent joins but doesn't speak". Both the flag and the
 > per-scenario opt-in now gate the pool, not just the behaviour.
 
-**Feature flag — and the separate per-session lever.** `CLIENT_WORKING_MEMORY_ENABLED`,
-defaulting off, exactly as `ROLLING_SUMMARY_ENABLED`, `EVENTS_OFF_GATE`,
-`BEHAVIORS_OFF_GATE` and `KNOWLEDGE_RETRIEVAL_*` do. Nothing here ships without a
-kill-switch.
+**Feature flag — REMOVED (2026-08-31).** This section originally specified
+`CLIENT_WORKING_MEMORY_ENABLED`, defaulting off, on the principle that nothing ships without a
+kill-switch. It has been deleted, and the reasoning that killed it is worth keeping.
 
-That flag is read while the graph topology is built, at import, so it is a
-**deploy-time** switch: one topology per worker process, and it cannot express per-cohort
-rollout.
+The flag was read while the graph topology is built, at import, so it was a **deploy-time**
+switch: one topology per worker process, unable to express per-cohort rollout. §6.1 had
+already superseded it as the rollout lever — the scoping mechanism is the prompt itself, a
+main-agent prompt carrying `{client_working_memory}` (or the `working_memory_*` sections),
+selected per simulation via `scenario.metadata.selectedMainPromptCode`. Capability is
+body-driven, so presence of the placeholder is what turns this on, per simulation,
+reversibly, with no new plumbing.
 
-**§6.1 supersedes this as the rollout lever.** The scoping mechanism is the prompt itself: a
-new main-agent prompt carrying `{client_working_memory}`, selected per simulation via
-`scenario.metadata.selectedMainPromptCode`. Capability is already body-driven — the repo
-retired the `hasStates` boolean in favour of reading `availableVariables` from the prompt
-body — so presence of the placeholder is what turns this on, per simulation, reversibly, with
-no new plumbing.
+Leaving the flag in place as a "global kill-switch" turned out to cost more than it bought.
+It was a second, invisible gate stacked on a visible one: a scenario could be correctly
+pointed at Main Agent Prompt #3 and still run without the feature, producing a complete
+transcript, a good score and no errors — the exact invisible-failure shape the `[working-memory]
+ENGAGED / NOT ENGAGED` log was added to expose one level up. Prompt selection is already a
+per-scenario kill switch that takes effect on the next session with no redeploy, which is
+strictly better than the flag it was backing up.
 
-`CLIENT_WORKING_MEMORY_ENABLED` therefore survives only as a **global kill-switch**: the
-thing to reach for when it misbehaves in production, not the thing that decides who gets it.
-The store handle in the per-session config remains the graph-node no-op guard (`store =
-configurable.get("client_working_memory_store")`, `if store is None: return {}`), which is
-how the report graph degrades — see below.
+What remains is the store handle in the per-session config as the graph-node no-op guard
+(`store = configurable.get("client_working_memory_store")`, `if store is None: return {}`),
+which is how the report graph degrades — see below — plus the per-turn opt-in check inside
+the node, which is what keeps an unconditional node free for every scenario that has not
+opted in.
 
 **Guardrail precedence — the safety-relevant one.** Guardrails are not prompt text;
 they are `GuardrailEvent`s that reach the reply through `next_instruction`. Because the
@@ -963,9 +967,10 @@ on, by the mechanism the repo already uses.
 That **supersedes the rollout lever in §5.1.** That section proposed a deploy-time topology
 flag plus store-presence in the per-session config, because a topology flag cannot express
 per-cohort rollout. The prompt code can: it is per-simulation, visible in the studio,
-reversible, and needs no new plumbing. `CLIENT_WORKING_MEMORY_ENABLED` survives only as a
-global kill-switch — the thing you reach for when it is misbehaving in production, not the
-thing that decides who gets it.
+reversible, and needs no new plumbing. `CLIENT_WORKING_MEMORY_ENABLED` was removed
+outright on 2026-08-31 (§5.1): prompt selection is both the rollout lever and the kill
+switch, and a second invisible gate on top of it only created sessions that looked enabled
+and were not.
 
 #### The migration path, and why it is one field
 
@@ -1684,11 +1689,13 @@ write-out is done; its `roleplay_v2` deletion is **not**, and is gated on the pr
 below rather than on reaching phase 7. Phase 4 is the only phase not started, and it is now
 the gate on enabling anything.
 
-**The feature ships OFF and is off in production.** `CLIENT_WORKING_MEMORY_ENABLED` defaults
-false, no prod prompt declares the placeholder, and — since 2026-08-24 — a session that has
-not opted in does no working-memory work *at all* rather than merely no visible work. That
-distinction was a live regression for three releases: the backstory pool was built and
-embedded on every session in the fleet regardless of the flag.
+**The feature is reached only by selecting Main Agent Prompt #3.** Since 2026-08-31 there
+is no `CLIENT_WORKING_MEMORY_ENABLED`; a scenario gets working memory when its selected
+main-agent prompt declares the placeholders and not otherwise. Since 2026-08-24 a session
+that has not opted in does no working-memory work *at all* rather than merely no visible
+work — that distinction was a live regression for three releases, where the backstory pool
+was built and embedded on every session in the fleet regardless of the gate, and it is what
+makes an unconditionally-wired node safe.
 
 **What has been verified, and what has not.** The pipeline is verified end to end in five
 languages (§12.1) and against two English scenarios. **Nothing about quality is verified.**
@@ -1756,7 +1763,7 @@ it does change the precondition on phase 7, below.
 
 **3. `stance` + `register` + `speech_fragments` + `withheld`, no retrieval. — CODE COMPLETE
 (2026-08-24), NOT MEASURED.** The derivation layer — the part v2 never had. Off-path updater
-behind `CLIENT_WORKING_MEMORY_ENABLED` on the salvaged store, cadence fallback, ledger
+behind the prompt-selection opt-in on the salvaged store, cadence fallback, ledger
 contract and framing (§3), guardrail precedence and the rest of §5.1. Read against
 `persona_break` **on clean turns** at turns 8+, baseline **14.0%** (§12).
 
