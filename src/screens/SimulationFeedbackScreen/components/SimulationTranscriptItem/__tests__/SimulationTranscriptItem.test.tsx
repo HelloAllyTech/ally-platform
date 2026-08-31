@@ -107,149 +107,30 @@ describe('SimulationTranscriptItem', () => {
     expect(getByText(longMessage)).toBeTruthy();
   });
 
-  it('renders tags when provided', () => {
-    const tags = [
-      {label: 'Empathy', category: 'POSITIVE' as const},
-      {label: 'Open-Ended Question', category: 'POSITIVE' as const},
-    ];
-    const {getByText} = render(
-      <SimulationTranscriptItem
-        {...defaultProps}
-        speakerLabel="Speaker"
-        tags={tags}
-      />,
-    );
-    expect(getByText('Empathy')).toBeTruthy();
-    expect(getByText('Open-Ended Question')).toBeTruthy();
-  });
-
-  it('renders NEGATIVE tags correctly', () => {
-    const tags = [
-      {label: 'Avoid Advice Giving', category: 'NEGATIVE' as const},
-      {label: 'Minimizing', category: 'NEGATIVE' as const},
-    ];
-    const {getByText} = render(
-      <SimulationTranscriptItem
-        {...defaultProps}
-        speakerLabel="Speaker"
-        tags={tags}
-      />,
-    );
-    expect(getByText('Avoid Advice Giving')).toBeTruthy();
-    expect(getByText('Minimizing')).toBeTruthy();
-  });
-
-  it('renders POSITIVE tags correctly', () => {
-    const tags = [
-      {label: 'Reflection', category: 'POSITIVE' as const},
-      {label: 'Pacing', category: 'POSITIVE' as const},
-    ];
-    const {getByText} = render(
-      <SimulationTranscriptItem
-        {...defaultProps}
-        speakerLabel="Speaker"
-        tags={tags}
-      />,
-    );
-    expect(getByText('Reflection')).toBeTruthy();
-    expect(getByText('Pacing')).toBeTruthy();
-  });
-
-  it('renders multiple tags of mixed categories', () => {
-    const tags = [
-      {label: 'Empathy', category: 'POSITIVE' as const},
-      {label: 'Avoid Advice Giving', category: 'NEGATIVE' as const},
-      {label: 'Reflection', category: 'POSITIVE' as const},
-    ];
-    const {getByText} = render(
-      <SimulationTranscriptItem
-        {...defaultProps}
-        speakerLabel="Speaker"
-        tags={tags}
-      />,
-    );
-    expect(getByText('Empathy')).toBeTruthy();
-    expect(getByText('Avoid Advice Giving')).toBeTruthy();
-    expect(getByText('Reflection')).toBeTruthy();
-  });
-
-  it('does not render tags section when tags array is empty', () => {
-    const {queryByText, getByText} = render(
-      <SimulationTranscriptItem
-        {...defaultProps}
-        speakerLabel="Speaker"
-        tags={[]}
-      />,
-    );
-    // Message should still be rendered
-    expect(getByText('Hello, this is a test message')).toBeTruthy();
-    // But no tags should be present (we can't test for absence of container directly,
-    // but we know if there are no tag labels, the container isn't rendered)
-  });
-
-  it('does not render tags section when tags is undefined', () => {
-    const {getByText} = render(
-      <SimulationTranscriptItem
-        {...defaultProps}
-        speakerLabel="Speaker"
-        tags={undefined}
-      />,
-    );
-    // Message should still be rendered
-    expect(getByText('Hello, this is a test message')).toBeTruthy();
-  });
-
-  it('renders correctly with tags for learner messages', () => {
-    const tags = [
-      {label: 'Empathy', category: 'POSITIVE' as const},
-      {label: 'Reflection', category: 'POSITIVE' as const},
-    ];
+  // Annotations over the transcript were deprecated: the row renders the
+  // speaker, the time and the message, and nothing else.
+  it('renders a learner message', () => {
     const {getByText} = render(
       <SimulationTranscriptItem
         {...defaultProps}
         speakerLabel="You"
         isLearner={true}
-        tags={tags}
       />,
     );
     expect(getByText('You')).toBeTruthy();
-    expect(getByText('Empathy')).toBeTruthy();
-    expect(getByText('Reflection')).toBeTruthy();
     expect(getByText('Hello, this is a test message')).toBeTruthy();
   });
 
-  it('renders correctly with tags for AI client messages', () => {
-    const tags = [
-      {label: 'Avoid Advice Giving', category: 'NEGATIVE' as const},
-    ];
+  it('renders an AI client message', () => {
     const {getByText} = render(
       <SimulationTranscriptItem
         {...defaultProps}
         speakerLabel="AI Client"
         isLearner={false}
-        tags={tags}
       />,
     );
     expect(getByText('AI Client')).toBeTruthy();
-    expect(getByText('Avoid Advice Giving')).toBeTruthy();
     expect(getByText('Hello, this is a test message')).toBeTruthy();
   });
 
-  it('does not crash when a tag has a category outside POSITIVE/NEGATIVE', () => {
-    // Regression: TRANSCRIPT_TAG_COLORS only has POSITIVE/NEGATIVE keys, but
-    // the type is not enforced by the backend at runtime. An unexpected
-    // category (e.g. "NEUTRAL", or a lowercase variant) produces an
-    // undefined lookup, and reading .background/.text off it crashes the
-    // whole debrief screen.
-    const tags = [{label: 'Unexpected', category: 'NEUTRAL'}] as any;
-    const {getByText} = render(
-      <SimulationTranscriptItem
-        {...defaultProps}
-        speakerLabel="Speaker"
-        tags={tags}
-      />,
-    );
-    expect(getByText('Unexpected')).toBeTruthy();
-    expect(getByText('Hello, this is a test message')).toBeTruthy();
-  });
 });
