@@ -62,7 +62,7 @@ _DIGEST_DISCLOSURES = 10
 def _digest(memory: ClientWorkingMemory) -> str:
     """The current state, as the updater needs to see it.
 
-    Not ``render.render_block``: that renders for the ACTOR, in the second
+    Not ``render.render_sections``: that renders for the ACTOR, in the second
     person, with the withheld ledger phrased as instructions to follow. The
     updater needs a third-person record to diff against, and giving it the
     actor's block invites it to answer as the client instead of about the

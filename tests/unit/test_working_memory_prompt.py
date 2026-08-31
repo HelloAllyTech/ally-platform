@@ -45,8 +45,14 @@ def _pd(*variables, code="code_x", body=_BODY):
 
 
 class TestOptIn:
-    def test_placeholder_is_the_opt_in(self):
-        assert prompt_declares_client_working_memory(_pd("client_working_memory"))
+    def test_a_section_placeholder_is_the_opt_in(self):
+        assert prompt_declares_client_working_memory(_pd("working_memory_stance"))
+
+    def test_the_retired_block_placeholder_no_longer_opts_in(self):
+        # `{client_working_memory}` used to be the opt-in and is now inert. A
+        # prompt still carrying it gets NO working memory, which is the visible
+        # symptom telling a curator to move to the `working_memory_*` sections.
+        assert not prompt_declares_client_working_memory(_pd("client_working_memory"))
 
     def test_absent_placeholder_is_opted_out(self):
         assert not prompt_declares_client_working_memory(_pd("state_x_guidelines"))
@@ -63,7 +69,7 @@ class TestOptIn:
             prompts={
                 "c": {
                     "availableVariables": [
-                        {"name": "client_working_memory", "required": False}
+                        {"name": "working_memory_stance", "required": False}
                     ]
                 }
             },
@@ -82,170 +88,66 @@ class TestStateGateGeneralization:
         assert _get_selected_prompt_has_states(_pd("state_x_guidelines"))
 
     def test_working_memory_placeholder_also_resolves_states(self):
-        # The block renders the active state's guidelines as its authored half,
-        # so declaring the block asks for state resolution. Without this a
-        # variant that swapped the placeholder for the block would lose its
-        # state guidance AND its per-state RAG gating, silently.
-        assert _get_selected_prompt_has_states(_pd("client_working_memory"))
+        # Resolution gates per-state RAG as well as guidance, so a working
+        # memory prompt must resolve states even though this module does not
+        # render the guidance itself. Otherwise a scenario keeps its knowledge
+        # sources on in states the author switched them off — silently.
+        assert _get_selected_prompt_has_states(_pd("working_memory_stance"))
 
     def test_neither_placeholder_resolves_nothing(self):
         assert not _get_selected_prompt_has_states(_pd("language_glossary"))
 
 
-class TestBlockRendering:
-    """_build_behavior_prompt's handling of the block, via the real builder."""
+def _build_content(prompt_data, memory, states=None, score=0):
+    """Render a prompt through the real builder.
 
-    def _build(self, prompt_data, memory, states=None, score=0):
-        from app.core.graph.prompt import _build_behavior_prompt
+    Module-level rather than a method because two test classes need it and
+    neither owns it: it used to hang off the block-form class, which is gone.
+    """
+    from app.core.graph.prompt import _build_behavior_prompt
 
-        prompt_data.states = states or []
-        for attr in (
-            "title",
-            "description",
-            "role_instructions",
-            "name",
-            "age",
-            "gender",
-        ):
-            if not hasattr(prompt_data, attr):
-                setattr(prompt_data, attr, "")
-        msg, _ = _build_behavior_prompt(
-            prompt_data,
-            [],
-            None,
-            None,
-            None,
-            current_score=score,
-            client_working_memory=memory,
+    prompt_data.states = states or []
+    for attr in ("title", "description", "role_instructions", "name", "age", "gender"):
+        if not hasattr(prompt_data, attr):
+            setattr(prompt_data, attr, "")
+    msg, _ = _build_behavior_prompt(
+        prompt_data,
+        [],
+        None,
+        None,
+        None,
+        current_score=score,
+        client_working_memory=memory,
+    )
+    return msg.content
+
+
+class TestRetiredBlockPlaceholder:
+    """`{client_working_memory}` is gone. What matters is how it fails."""
+
+    def _build(self, prompt_data, memory, states=None):
+        return _build_content(prompt_data, memory, states=states)
+
+    def test_the_retired_placeholder_renders_away_rather_than_leaking(self):
+        # Passed as "" forever (see prompt.py). If the kwarg were dropped the
+        # SafeFormatter would leave the literal `{client_working_memory}` in the
+        # actor's prompt, which is worse than rendering nothing.
+        content = self._build(_pd("client_working_memory"), None)
+        assert "{client_working_memory}" not in content
+
+    def test_a_prompt_declaring_only_the_retired_placeholder_gets_no_memory(self):
+        memory = ClientWorkingMemory(
+            affect="wary", disclosed=[Fact(text="lost the job in March")]
         )
-        return msg.content
+        content = self._build(_pd("client_working_memory"), memory)
+        assert "lost the job in March" not in content
 
-    def test_opted_out_prompt_gets_no_block(self):
+    def test_an_opted_out_prompt_gets_nothing(self):
         memory = ClientWorkingMemory(affect="wary", disclosed=[Fact(text="a fact")])
         content = self._build(_pd("state_x_guidelines"), memory)
         assert "a fact" not in content
 
-    def test_no_memory_renders_nothing(self):
-        content = self._build(_pd("client_working_memory"), None)
-        assert "{client_working_memory}" not in content
 
-    def test_opted_in_prompt_gets_the_derived_state(self):
-        memory = ClientWorkingMemory(
-            affect="wary",
-            disclosed=[Fact(text="lost the job in March")],
-        )
-        content = self._build(_pd("client_working_memory"), memory)
-        assert "lost the job in March" in content
-
-    def test_withheld_topic_reaches_the_prompt_without_its_content(self):
-        memory = ClientWorkingMemory(
-            affect="tense",
-            withheld=[
-                WithheldTopic(
-                    topic="the hospital visit", deflection="asks about work instead"
-                )
-            ],
-        )
-        content = self._build(_pd("client_working_memory"), memory)
-        assert "the hospital visit" in content
-        assert "asks about work instead" in content
-
-    def test_appraisal_is_never_rendered(self):
-        memory = ClientWorkingMemory(
-            affect="wary", appraisal="they are just ticking boxes"
-        )
-        content = self._build(_pd("client_working_memory"), memory)
-        assert "ticking boxes" not in content
-
-    def test_authored_guidance_renders_once_not_twice(self):
-        # A variant mid-migration may declare BOTH placeholders. The same
-        # instruction rendered twice reads as emphasis, not duplication.
-        states = [
-            {
-                "name": "opening",
-                "scoreLower": 0,
-                "scoreUpper": 10,
-                "guidelines": "STAY GUARDED AND BRIEF",
-            }
-        ]
-        memory = ClientWorkingMemory(affect="wary")
-        content = self._build(
-            _pd("client_working_memory", "state_x_guidelines"), memory, states=states
-        )
-        assert content.count("STAY GUARDED AND BRIEF") == 1
-
-    def test_the_block_lands_where_the_author_put_the_placeholder(self):
-        # The point of a placeholder over a suffix append (§2.3): position is a
-        # variable we intend to test, and only the author can move it.
-        memory = ClientWorkingMemory(disclosed=[Fact(text="a distinctive fact")])
-        content = self._build(_pd("client_working_memory"), memory)
-        top = content.index("MARKER_TOP")
-        bottom = content.index("MARKER_BOTTOM")
-        assert top < content.index("a distinctive fact") < bottom
-
-    def test_authored_guidance_reaches_the_block(self):
-        states = [
-            {
-                "name": "opening",
-                "scoreLower": 0,
-                "scoreUpper": 10,
-                "guidelines": "STAY GUARDED AND BRIEF",
-            }
-        ]
-        content = self._build(
-            _pd("client_working_memory"), ClientWorkingMemory(), states=states
-        )
-        assert "STAY GUARDED AND BRIEF" in content
-
-
-class TestStateWarningScope:
-    """The misconfiguration warning must not fire for a valid configuration."""
-
-    def _build(self, prompt_data, states):
-        from app.core.graph.prompt import _build_behavior_prompt
-
-        prompt_data.states = states
-        for attr in (
-            "title",
-            "description",
-            "role_instructions",
-            "name",
-            "age",
-            "gender",
-        ):
-            if not hasattr(prompt_data, attr):
-                setattr(prompt_data, attr, "")
-        return _build_behavior_prompt(
-            prompt_data,
-            [],
-            None,
-            None,
-            None,
-            current_score=0,
-            client_working_memory=ClientWorkingMemory(affect="wary"),
-        )
-
-    def test_no_warning_when_only_the_block_is_declared(self, caplog):
-        # Generalising the states gate made this fire every turn for a valid
-        # setup: the block names the absence, so no states is not an error.
-        import logging
-
-        with caplog.at_level(logging.WARNING):
-            self._build(_pd("client_working_memory"), [])
-        assert "no active state resolved" not in caplog.text
-
-    def test_warning_still_fires_for_a_states_prompt_with_no_states(self, caplog):
-        # The real misconfiguration must still be visible.
-        import logging
-
-        with caplog.at_level(logging.WARNING):
-            self._build(_pd("state_x_guidelines"), [])
-        assert "no active state resolved" in caplog.text
-
-
-#: The split form. Same store, same consolidation — the memory is exposed as
-#: one placeholder per section so a curator can read what is being fed and can
-#: move, reorder or drop a section to experiment.
 _SPLIT_BODY = """You are {name}.
 GUIDANCE_HERE
 {state_x_guidelines}
@@ -284,13 +186,14 @@ _STATES = [
 class TestSplitForm:
     """The split form, built through the same real builder.
 
-    Reuses `TestBlockRendering`'s harness rather than inheriting its CASES:
-    subclassing would have re-run every block-form assertion against the
-    block-form body, which looks like extra coverage and is the same test
+    Uses the shared `_build_content` harness rather than inheriting cases from
+    another class: subclassing would re-run one form's assertions against the
+    other form's body, which looks like extra coverage and is the same test
     twice.
     """
 
-    _build = TestBlockRendering._build
+    def _build(self, prompt_data, memory, states=None, score=0):
+        return _build_content(prompt_data, memory, states=states, score=score)
 
     def _split(self, *variables, memory=None, states=None):
         return self._build(
@@ -349,18 +252,6 @@ class TestSplitForm:
         assert "a distinctive fact" in content
         assert "{working_memory_withheld}" not in content
 
-    def test_declaring_both_forms_renders_the_block_and_leaves_sections_bare(self):
-        # The tie is broken toward the block because the block is what runs in
-        # production: a working prompt must not change behaviour because
-        # someone pasted a section in to try it. The bare heading is the
-        # visible symptom; a silently swapped renderer would not be.
-        body = _SPLIT_BODY + "\n{client_working_memory}\n"
-        content = self._build(
-            _pd(*_SPLIT_VARS, "client_working_memory", body=body),
-            ClientWorkingMemory(disclosed=[Fact(text="a distinctive fact")]),
-        )
-        assert content.count("a distinctive fact") == 1
-
     def test_the_split_form_resolves_states_even_without_the_guidance_field(self):
         # Resolution gates RAG, not just guidance. A split prompt that skipped
         # it would keep knowledge sources on in states an author turned them
@@ -375,7 +266,7 @@ class TestSplitForm:
         # in empty — leaving "## What this conversation is meant to be doing"
         # with nothing under it.
         #
-        # The block form never showed this because render_block substituted the
+        # The retired block renderer hid this by substituting the
         # named absence on the way through. The split form routes the authored
         # half around that module, so the caller has to do it. A bare heading
         # reads as an absence of CONSTRAINT, not of data, and this is the

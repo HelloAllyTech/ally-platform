@@ -348,20 +348,21 @@ def prompt_declares_client_working_memory(prompt_data: PromptData) -> bool:
     """Is this simulation opted into the client working memory?
 
     The opt-in IS the placeholder. A scenario joins by selecting a main-agent
-    prompt whose body contains `{client_working_memory}` — one field on the
-    scenario, no migration, and nothing to undo but re-selecting the old
-    prompt (design §6.1).
+    prompt that declares one or more of the `working_memory_*` section
+    placeholders — one field on the scenario, no migration, and nothing to undo
+    but re-selecting the old prompt (design §6.1).
 
     Read by the graph as well as the prompt builder: a simulation that has not
     opted in must not pay for a consolidation call whose output nothing would
     render.
 
-    True for EITHER form. A prompt opts in with the single
-    `{client_working_memory}` block, or with any one of the `working_memory_*`
-    section placeholders. Both produce the same derived state from the same
-    store and the same consolidation call — the difference is only where the
-    text lands in the prompt — so the gate this predicate guards (do not pay
-    for a consolidation nobody renders) has the same answer for both.
+    There used to be a second form: a single `{client_working_memory}`
+    placeholder that rendered every section as one block. It was removed once
+    the split form had fully replaced it — two readers for one state meant a
+    curator could not tell from a prompt which one was live, and the tie-break
+    between them (block wins, sections render bare) was a trap. Production's
+    last block render was 2026-08-26; the split form has served every session
+    since.
 
     Deliberately ANY rather than ALL. A prompt carrying one section is opted
     in: it renders that section, pays for the update that fills it, and gets
@@ -370,8 +371,6 @@ def prompt_declares_client_working_memory(prompt_data: PromptData) -> bool:
     failure for the quietest possible edit. The partial case is a real state
     and it is reported by the coverage log in `worker.py`, not prevented here.
     """
-    if _prompt_declares_variable(prompt_data, "client_working_memory"):
-        return True
     return prompt_declares_working_memory_sections(prompt_data)
 
 
@@ -522,28 +521,10 @@ def _build_behavior_prompt(
     # away and is the reason the split form exists.
     from app.core.working_memory.render import SECTION_VARIABLES
 
-    client_working_memory_block = ""
     working_memory_sections = {name: "" for name in SECTION_VARIABLES}
-    _declares_block = _prompt_declares_variable(prompt_data, "client_working_memory")
     _declared_sections = declared_working_memory_sections(prompt_data)
 
-    if client_working_memory is not None and _declares_block and _declared_sections:
-        # A prompt mid-migration between the two forms. The block WINS, and the
-        # tie is broken that way for one reason: the block form is what runs in
-        # production today, and a prompt that works must not change behaviour
-        # because someone pasted one section in to try it. The sections stay
-        # blank, their headings render bare, and this warning says exactly which
-        # edit fixes it — a bare heading is a visible symptom, where a silently
-        # replaced block would not be.
-        logger.warning(
-            "%s [CWM] prompt declares BOTH forms — the {client_working_memory} "
-            "block is rendering and these section placeholders are blank: %s. "
-            "Remove {client_working_memory} from the body to use the split form.",
-            LOG_PREFIX,
-            ", ".join(_declared_sections),
-        )
-
-    if client_working_memory is not None and not _declares_block and _declared_sections:
+    if client_working_memory is not None and _declared_sections:
         from app.core.working_memory.render import NO_STATE_GUIDANCE, render_sections
 
         working_memory_sections = {
@@ -554,11 +535,9 @@ def _build_behavior_prompt(
         #
         # `state_x_guidelines` is "" whenever no state resolves — a score
         # outside every configured band, which is ordinary, not an error. The
-        # block form never showed that: render_block substituted
-        # NO_STATE_GUIDANCE on the way through. The split form routes the
-        # authored guidance around this module entirely, so "" reached the
-        # template and left "## What this conversation is meant to be doing"
-        # with nothing under it.
+        # split form routes the authored guidance around the render module
+        # entirely, so "" reached the template and left "## What this
+        # conversation is meant to be doing" with nothing under it.
         #
         # A bare heading reads to the model as an absence of CONSTRAINT rather
         # than an absence of data — the exact failure every `NO_*` constant in
@@ -567,31 +546,12 @@ def _build_behavior_prompt(
         # logged the [STATE] warning on every turn as its score climbed past
         # the last configured band.
         #
-        # Scoped to the split form deliberately. Prompts like Main Agent Prompt
-        # #2 also declare {state_x_guidelines} and have rendered it empty
-        # forever; changing that globally would alter every one of them.
+        # Scoped to working-memory prompts deliberately. Prompts like Main
+        # Agent Prompt #2 also declare {state_x_guidelines} and have rendered
+        # it empty forever; changing that globally would alter every one.
         if not (state_x_guidelines or "").strip():
             state_x_guidelines = NO_STATE_GUIDANCE
 
-    if client_working_memory is not None and _declares_block:
-        from app.core.working_memory.render import render_block
-
-        client_working_memory_block = render_block(
-            client_working_memory,
-            state_guidance=state_x_guidelines,
-            prompt_data=prompt_data,
-        )
-        # The block carries the guidance now, so blank the standalone kwarg. A
-        # variant mid-migration may still declare BOTH placeholders, and the
-        # same instruction rendered twice reads to the model as emphasis rather
-        # than as duplication.
-        if client_working_memory_block and state_x_guidelines:
-            logger.debug(
-                "%s [CWM] state guidance folded into the working-memory block; "
-                "{state_x_guidelines} blanked to avoid a double render",
-                LOG_PREFIX,
-            )
-            state_x_guidelines = ""
     # Observability: surface variant + state + RAG decisions every turn so
     # we can verify behaviour from session logs alone. These fire on every
     # conversation turn — emitted at DEBUG to keep production INFO logs
@@ -755,9 +715,15 @@ def _build_behavior_prompt(
         # prompt did not opt in). Variants without {state_x_guidelines} in
         # their text simply ignore this kwarg via SafeFormatter.
         state_x_guidelines=state_x_guidelines,
-        # The client working-memory block. Empty string for every variant that
-        # does not declare the placeholder, which is every variant today.
-        client_working_memory=client_working_memory_block,
+        # Retired placeholder, still passed as "" on purpose. The single-block
+        # form is gone (see `prompt_declares_client_working_memory`), but a
+        # prompt row in the dashboard may still carry `{client_working_memory}`
+        # in its body. Dropping the kwarg would make SafeFormatter leave that
+        # placeholder as literal text in the actor's prompt; passing "" renders
+        # it away. Declaring it no longer opts a scenario in, so such a prompt
+        # gets no working memory at all — which is the visible symptom that
+        # tells a curator to move to the `working_memory_*` sections.
+        client_working_memory="",
         # The split form. Every variant gets all seven kwargs; SafeFormatter
         # drops the ones the body does not reference, so a prompt using the
         # block form — or no working memory at all — is unaffected.

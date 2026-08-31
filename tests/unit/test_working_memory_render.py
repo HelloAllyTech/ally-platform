@@ -13,9 +13,18 @@ from app.core.working_memory import ClientWorkingMemory, Fact, Thread, WithheldT
 from app.core.working_memory.render import (
     MAX_RENDERED_DISCLOSURES,
     SECTION_VARIABLES,
-    render_block,
     render_sections,
 )
+
+
+def _rendered(memory) -> str:
+    """Every section joined, for assertions that do not care which one.
+
+    The retired `render_block` returned exactly this shape as one string, so
+    tests written against it carry over unchanged. Assertions about a SPECIFIC
+    section index `render_sections(...)` directly instead.
+    """
+    return "\n".join(render_sections(memory).values())
 
 
 def _memory(**kw) -> ClientWorkingMemory:
@@ -42,7 +51,7 @@ def test_a_withheld_topic_renders_as_fact_not_permission():
     readiness calls, and readiness is the author's state guidance to make.
     """
     memory = _memory(withheld=[WithheldTopic("the hospital visit", "talks about work")])
-    block = render_block(memory)
+    block = _rendered(memory)
 
     assert "the hospital visit" in block
     assert "has not come up yet" in block
@@ -56,13 +65,13 @@ def test_a_withheld_topic_renders_as_fact_not_permission():
 def test_the_withheld_section_never_carries_the_content():
     # The record has no content field at all, so there is nothing to leak.
     memory = _memory(withheld=[WithheldTopic("the diagnosis", "changes the subject")])
-    assert "the diagnosis" in render_block(memory)
+    assert "the diagnosis" in _rendered(memory)
 
 
 def test_a_revealed_topic_drops_out_of_the_withheld_section():
     # Once it is out, `disclosed` carries it. Leaving it here would have the
     # actor still guarding something it has already said.
-    block = render_block(
+    block = _rendered(
         _memory(withheld=[WithheldTopic("the diagnosis", "deflect", status="revealed")])
     )
     assert "the diagnosis" not in block
@@ -72,7 +81,7 @@ def test_a_revealed_topic_drops_out_of_the_withheld_section():
 def test_the_appraisal_is_never_rendered():
     # Scratchpad, not instruction. It exists for telemetry and debugging — the
     # think_scrubber rule, applied at assembly rather than before TTS.
-    block = render_block(_memory(appraisal="they are pushing too fast and I resent it"))
+    block = _rendered(_memory(appraisal="they are pushing too fast and I resent it"))
     assert "resent" not in block
 
 
@@ -81,37 +90,19 @@ def test_the_appraisal_is_never_rendered():
 # ---------------------------------------------------------------------------
 
 
-def test_every_empty_section_says_so_in_words():
-    # A blank section reads to the model as an absence of CONSTRAINT. A named
-    # absence does not. Salvaged from v2's empty states.
-    block = render_block(_memory(), state_guidance="Stay resistant.")
-    for phrase in (
-        "nothing has been left unsaid",
-        "nothing left hanging",
-        "have not told them anything yet",
-        "nothing from your own life",
-    ):
-        assert phrase in block
-
-
 def test_the_first_turn_says_the_client_has_not_spoken():
-    block = render_block(_memory(), state_guidance="Open cautiously.")
+    block = _rendered(_memory())
     assert "this is your first reply" in block
 
 
-def test_missing_state_guidance_is_named_not_blank():
-    block = render_block(_memory(disclosed=[Fact("something")]))
-    assert "no particular direction for this stage" in block
-
-
-def test_the_block_form_does_not_contradict_the_mirrored_stance():
+def test_the_rendered_stance_does_not_contradict_the_mirrored_state():
     # `prompt.py` mirrors the author's resolved state name into `memory.stance`
-    # so the block announces the state the scenario has actually reached (the
-    # scenario-440 fix). The split template had its "Do not move past this on
-    # your own" paragraph removed for the same reason (see
-    # test_the_constraints_are_visible_in_the_prompt_body) — the block form
-    # must not still say it right after announcing the mirrored stance.
-    block = render_block(_memory(stance="resolved"))
+    # so the prompt announces the state the scenario has actually reached (the
+    # scenario-440 fix). The template had its "Do not move past this on your
+    # own" paragraph removed for the same reason (see
+    # test_the_constraints_are_visible_in_the_prompt_body) — nothing may say it
+    # right after announcing the mirrored stance.
+    block = _rendered(_memory(stance="resolved"))
     assert "You are resolved right now" in block
     assert "Do not move past this on your own" not in block
 
@@ -121,22 +112,11 @@ def test_the_block_form_does_not_contradict_the_mirrored_stance():
 # ---------------------------------------------------------------------------
 
 
-def test_authored_guidance_precedes_the_recalled_memories():
-    # State guidance changes only on a score-band crossing; recall refreshes
-    # every couple of turns. Slowest first keeps more of the block cacheable and
-    # puts the freshest content nearest generation.
-    block = render_block(
-        _memory(salient_backstory=[Fact("brother stopped calling")]),
-        state_guidance="Resist advice.",
-    )
-    assert block.index("Resist advice.") < block.index("brother stopped calling")
-
-
 def test_voice_fragments_render_verbatim():
     # The direct repair for the 2026-08-06 regression: the rolling summary
     # carries facts and no voice, which removed the actor's only in-context
     # style exemplars. Paraphrasing them here would reintroduce the bug.
-    block = render_block(_memory(speech_fragments=["I dunno, it's just...", "yeah"]))
+    block = _rendered(_memory(speech_fragments=["I dunno, it's just...", "yeah"]))
     assert "I dunno, it's just..." in block
     assert "yeah" in block
 
@@ -146,30 +126,15 @@ def test_voice_fragments_render_verbatim():
 # ---------------------------------------------------------------------------
 
 
-def test_an_untouched_memory_with_no_guidance_renders_nothing():
-    # Rendering the scaffolding with every section reading "(nothing yet)" would
-    # spend tokens telling the model nothing — and latency is the product.
-    empty = ClientWorkingMemory()
-    assert render_block(empty) == ""
-
-
-def test_authored_guidance_alone_is_enough_to_render():
-    # Turn one of a stateful scenario: nothing derived yet, but the scenario
-    # still has something to say.
-    empty = ClientWorkingMemory()
-    block = render_block(empty, state_guidance="Begin closed off.")
-    assert "Begin closed off." in block
-
-
 def test_a_closed_thread_stops_being_unfinished():
     m = _memory(unresolved=[Thread("money", closed_turn=4)])
-    block = render_block(m)
+    block = _rendered(m)
     assert "nothing left hanging" in block
     assert "money" not in block
 
 
 def test_blank_fragments_are_dropped_rather_than_bulleted():
-    block = render_block(_memory(speech_fragments=["  ", "", "I guess"]))
+    block = _rendered(_memory(speech_fragments=["  ", "", "I guess"]))
     assert block.count("- ") >= 1
     assert "-  \n" not in block
 
@@ -188,7 +153,7 @@ def test_the_rendered_ledger_is_capped():
         affect="tired",
         disclosed=[Fact(text=f"disclosure {i}") for i in range(25)],
     )
-    block = render_block(memory)
+    block = _rendered(memory)
     assert block.count("disclosure ") == MAX_RENDERED_DISCLOSURES
 
 
@@ -200,7 +165,7 @@ def test_the_cap_keeps_the_most_recent():
         affect="tired",
         disclosed=[Fact(text=f"disclosure {i}") for i in range(25)],
     )
-    block = render_block(memory)
+    block = _rendered(memory)
     assert "disclosure 24" in block
     assert "disclosure 0" not in block
 
@@ -209,7 +174,7 @@ def test_a_short_ledger_is_rendered_whole():
     memory = ClientWorkingMemory(
         affect="tired", disclosed=[Fact(text="lost the job in March")]
     )
-    assert "lost the job in March" in render_block(memory)
+    assert "lost the job in March" in _rendered(memory)
 
 
 def test_the_cap_is_configurable_so_it_can_be_A_B_tested(monkeypatch):
@@ -227,7 +192,7 @@ def test_the_cap_is_configurable_so_it_can_be_A_B_tested(monkeypatch):
         affect="tired",
         disclosed=[Fact(text=f"disclosure {i}") for i in range(25)],
     )
-    block = render_block(memory)
+    block = _rendered(memory)
     assert block.count("disclosure ") == 4
     # Still the most recent, not the oldest.
     assert "disclosure 24" in block
@@ -245,7 +210,7 @@ def test_an_unreadable_cap_setting_falls_back_to_the_default(monkeypatch):
         affect="tired",
         disclosed=[Fact(text=f"disclosure {i}") for i in range(25)],
     )
-    assert render_block(memory).count("disclosure ") == MAX_RENDERED_DISCLOSURES
+    assert _rendered(memory).count("disclosure ") == MAX_RENDERED_DISCLOSURES
 
 
 # ---------------------------------------------------------------------------
@@ -259,12 +224,12 @@ def test_an_unreadable_cap_setting_falls_back_to_the_default(monkeypatch):
 
 
 def test_every_section_renders_even_when_the_memory_is_untouched():
-    # The property the block form gets to opt out of and this one cannot.
-    # `render_block` returns "" for an untouched memory because rendering its
-    # own scaffolding to say "(nothing yet)" seven times buys nothing. Here the
-    # headings belong to the AUTHOR's prompt text, so a blanked value leaves a
-    # bare heading — and a bare heading reads to the model as an absence of
-    # CONSTRAINT, which is the exact failure the named absences exist to stop.
+    # The retired block renderer could return "" for an untouched memory: it
+    # owned its own scaffolding, and printing "(nothing yet)" seven times buys
+    # nothing. This form has no such option — the headings belong to the
+    # AUTHOR's prompt text, so a blanked value leaves a bare heading, and a
+    # bare heading reads to the model as an absence of CONSTRAINT. That is the
+    # exact failure the named absences exist to stop.
     sections = render_sections(ClientWorkingMemory())
 
     assert set(sections) == set(SECTION_VARIABLES)
@@ -370,10 +335,10 @@ def test_a_locked_topic_still_cannot_leak_in_the_split_form():
 
 
 def test_the_split_form_is_not_a_telemetry_blackout(caplog):
-    # `render_block` is never called on the split path, so without its own line
-    # a split session emits no size telemetry at all. The per-section sizes are
-    # what found the backstory bug — one 1721-char fact that was 64% of the
-    # block while every ledger COUNT looked healthy.
+    # Without this line a session emits no size telemetry at all, and "which
+    # section is growing?" has no answer. The per-section sizes are what found
+    # the backstory bug — one 1721-char fact that was 64% of the block while
+    # every ledger COUNT looked healthy.
     import logging
 
     with caplog.at_level(logging.INFO):

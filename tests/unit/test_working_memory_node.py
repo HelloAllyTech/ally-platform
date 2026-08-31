@@ -61,7 +61,7 @@ def _config(store, opted_in=True, **extra):
     configurable = {
         "client_working_memory_store": store,
         "llm_client": SimpleNamespace(llm_instance=MagicMock()),
-        "scenario": _scenario("client_working_memory") if opted_in else _scenario(),
+        "scenario": (_scenario("working_memory_stance") if opted_in else _scenario()),
     }
     configurable.update(extra)
     return {"configurable": configurable}
@@ -98,10 +98,10 @@ class TestPromptSelectionIsTheOnlySwitch:
             await update_working_memory(_state(), _config(store, opted_in=False))
             sched.assert_not_called()
 
-    async def test_the_split_form_opts_in_too(self):
-        # Main Agent Prompt #3 declares no {client_working_memory}; it declares
-        # one placeholder per section. Missing this would leave #3 running with
-        # a memory nothing ever updated.
+    async def test_every_section_placeholder_opts_in(self):
+        # Prompt #3 declares one placeholder per section, and any single one is
+        # enough. Missing this would leave a prompt running with a memory
+        # nothing ever updated.
         store = ClientWorkingMemoryStore()
         await store.begin_turn()
         config = _config(store)
@@ -328,16 +328,19 @@ class TestNotOptedInCostsNothing:
             _prompt_data("state_x_guidelines")
         )
 
-    def test_the_block_form_opts_in(self):
+    def test_the_retired_block_placeholder_does_not_opt_in(self):
+        # `{client_working_memory}` is inert since the single-block renderer was
+        # removed. A prompt still carrying it must build no pool and pay for no
+        # embedding call — the same as any prompt that never opted in.
         from app.core.graph.prompt import prompt_declares_client_working_memory
 
-        assert prompt_declares_client_working_memory(
+        assert not prompt_declares_client_working_memory(
             _prompt_data("client_working_memory")
         )
 
-    def test_the_split_form_opts_in(self):
-        # Prompt #3 carries no {client_working_memory}; a check that looked only
-        # for the block form would build no pool for it and recall from nothing.
+    def test_a_section_placeholder_opts_in(self):
+        # Any one section is enough; requiring all seven would make a curator
+        # dropping one a silent total opt-out.
         from app.core.graph.prompt import prompt_declares_client_working_memory
 
         assert prompt_declares_client_working_memory(
