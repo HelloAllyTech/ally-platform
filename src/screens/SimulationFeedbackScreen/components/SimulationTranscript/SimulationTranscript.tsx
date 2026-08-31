@@ -279,7 +279,7 @@ export const SimulationTranscript: React.FC<{
     item: SimulationTranscriptMessage;
     index: number;
   }) => {
-    const {id, time, message, isLearner, startSeconds, tags} = item;
+    const {id, time, message, isLearner, startSeconds} = item;
     const speakerLabel = isLearner
       ? t('transcription.youLabel')
       : agentName
@@ -295,7 +295,6 @@ export const SimulationTranscript: React.FC<{
         isFocused={focusedMessageId !== null && String(id) === focusedMessageId}
         onPress={() => queueSeekToSeconds(startSeconds)}
         isLearner={isLearner}
-        tags={tags}
       />
     );
   };
@@ -316,7 +315,7 @@ export const SimulationTranscript: React.FC<{
 
   return (
     <SummaryCard
-      title={t('postSim.tabs.annotatedTranscript')}
+      title={t('postSim.tabs.transcript')}
       titleRight={
         <View style={styles.languagePicker}>
           <CustomDropdown

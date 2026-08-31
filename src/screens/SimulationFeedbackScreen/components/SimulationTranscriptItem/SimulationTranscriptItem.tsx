@@ -2,14 +2,7 @@ import React from 'react';
 import {Pressable, Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {TRANSCRIPT_TAG_COLORS} from '@/constants';
-import {SimulationMessageTag} from '@/services/simulationTranscriptApi';
-import {colors, fontFamily, radius, typography} from '@/theme';
-
-const NEUTRAL_TAG_COLORS = {
-  background: colors.ds.grey[100],
-  text: colors.ds.grey[800],
-};
+import {colors, fontFamily} from '@/theme';
 
 export type SimulationTranscriptItemProps = {
   time: string;
@@ -19,7 +12,6 @@ export type SimulationTranscriptItemProps = {
   /** Briefly marks the moment a debrief chip jumped to. */
   isFocused?: boolean;
   isLearner?: boolean;
-  tags?: SimulationMessageTag[];
   onPress?: () => void;
 };
 
@@ -32,7 +24,6 @@ export const SimulationTranscriptItem: React.FC<
   isLearner = false,
   isActive = false,
   isFocused = false,
-  tags,
   onPress,
 }) => {
   const backgroundColor = isLearner
@@ -44,22 +35,6 @@ export const SimulationTranscriptItem: React.FC<
   const speakerColor = isLearner
     ? colors.ds.theme.primary
     : colors.ds.deepPurple[800];
-
-  const renderTag = (tag: SimulationMessageTag, index: number) => {
-    // tag.category is typed as POSITIVE | NEGATIVE, but that isn't enforced
-    // at runtime. An unrecognised category produced an undefined lookup, and
-    // reading .background/.text off it crashed the whole debrief screen.
-    const tagColors = TRANSCRIPT_TAG_COLORS[tag.category] ?? NEUTRAL_TAG_COLORS;
-    return (
-      <View
-        key={index}
-        style={[styles.tag, {backgroundColor: tagColors.background}]}>
-        <Text style={[styles.tagText, {color: tagColors.text}]}>
-          {tag.label}
-        </Text>
-      </View>
-    );
-  };
 
   const shellStyle = [
     styles.messageContainer,
@@ -89,9 +64,6 @@ export const SimulationTranscriptItem: React.FC<
             </View>
           )}
         </Text>
-        {tags && tags.length > 0 && (
-          <View style={styles.tagsContainer}>{tags.map(renderTag)}</View>
-        )}
         <Text style={styles.message}>{message}</Text>
       </View>
     </Pressable>
@@ -163,20 +135,5 @@ const styles = ScaledSheet.create({
     color: colors.ds.typography.highEmphasis,
     letterSpacing: '0.25@ms',
     lineHeight: '20@vs',
-  },
-  tagsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: '4@ms',
-    marginBottom: '2@vs',
-  },
-  tag: {
-    paddingHorizontal: '4@ms',
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-  },
-  tagText: {
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    ...typography.body.small,
   },
 });

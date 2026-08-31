@@ -527,6 +527,10 @@ export const SimulationFeedbackScreen: React.FC<
               scenarioSessionId={scenarioSessionId || ''}
               simulationDetails={simulationDetails ?? null}
               retryLimitReached={retryLimitReached}
+              // Opened from Logs the debrief is being read back, not received:
+              // no reply thread, and no chance of an admin typing into the
+              // learner's own conversation with Ally.
+              readOnly={Boolean(fromLogs)}
               // Anchors only become chips when there is a transcript tab to
               // switch to; otherwise they render as plain prose.
               onOpenMoment={
@@ -572,6 +576,7 @@ export const SimulationFeedbackScreen: React.FC<
       scenarioSessionId,
       simulationDetails,
       retryLimitReached,
+      fromLogs,
       pathId,
       caseId,
       handleFeedbackAndNavigate,
