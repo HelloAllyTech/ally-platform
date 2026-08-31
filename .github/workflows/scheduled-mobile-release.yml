@@ -146,7 +146,11 @@ jobs:
           else
             LOG=$(git log "$LAST_TAG"..HEAD --pretty='%s' | grep -v '^Merge pull request' || true)
           fi
-          NOTES=$(printf '%s\n' "$LOG" | sed 's/^/- /' | cut -c1-480)
+          # `cut -c1-480` truncates each *line* to 480 chars, not the combined output — with
+          # several commit lines the total can still blow past Play Store's 500-char whatsnew
+          # limit (hit this for real: 800 chars from ~15 short commit lines). `head -c` operates
+          # on the whole byte stream regardless of newlines, so it actually caps the total.
+          NOTES=$(printf '%s\n' "$LOG" | sed 's/^/- /' | head -c 480)
           {
             echo "notes<<NOTES_EOF"
             echo "$NOTES"
