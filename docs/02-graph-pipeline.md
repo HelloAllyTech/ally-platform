@@ -307,6 +307,32 @@ def build_simulation_graph() -> StateGraph[SimulationState]:
     return graph
 ```
 
+The sketch above is the reply path only. Three more nodes are wired in the
+real builder, and the difference between them is *when* they are added:
+
+| Node | Position | Added |
+|---|---|---|
+| `retrieve_knowledge` (subgraph) | fans out from `START`, joins at `sync_events_and_behaviors_node` | always |
+| `update_working_memory` (subgraph) | after `publish_done_thinking` | **always** |
+| `compact_history` (subgraph) | after `publish_done_thinking` | only when `ROLLING_SUMMARY_ENABLED` |
+
+Both post-reply nodes sit strictly after `publish_done_thinking` — the reply
+has fully streamed and the done-thinking signal is already out — and they are
+parallel to each other, not chained: one records what was said, the other who
+said it, and chaining would make working memory wait on the summarizer's gate
+for no reason. When `ROLLING_SUMMARY_ENABLED` is false, `publish_done_thinking`
+gets its own edge to `END` instead.
+
+`update_working_memory` is unconditional as of the removal of
+`CLIENT_WORKING_MEMORY_ENABLED`. It used to be added only when that env flag
+was true, which was read at BUILD time against a graph compiled once at import
+— so the flag could only be turned on by a restart, and a scenario correctly
+pointed at a working-memory prompt on a worker built without it ran silently
+without the feature. The opt-in is now the selected main-agent prompt's body:
+the node returns immediately unless that prompt declares
+`{client_working_memory}` or a `working_memory_*` section placeholder, so the
+cost for every other simulation is one no-op node visit.
+
 ---
 
 ## Key Source Files
