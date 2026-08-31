@@ -55,6 +55,20 @@ const SECTION_HEADING = new RegExp(
   'i',
 );
 
+/**
+ * The same key when the model wrote it inline instead of on its own line —
+ * `## [what_worked] You effectively acknowledged…`. The prompt is explicit that
+ * a marker line carries nothing but the marker, but this is the drift that
+ * actually reached learners, and the fallback for it has to be the section
+ * heading rather than a marker left sitting in the prose.
+ */
+const INLINE_SECTION_HEADING = new RegExp(
+  `^\\s*(?:#{1,6}\\s*)?(?:\\*\\*|__)?\\s*\\[\\s*(${SECTION_KEYS.join(
+    '|',
+  )})\\s*\\]\\s*(?:\\*\\*|__)?\\s*:?\\s*`,
+  'i',
+);
+
 export const isLabelledSectionKey = (
   key: DebriefSectionKey | null,
 ): key is (typeof LABELLED_SECTION_KEYS)[number] =>
@@ -108,6 +122,13 @@ export const parseDebriefSections = (note: string): DebriefSection[] => {
     if (heading) {
       flushSection();
       key = heading[1].toLowerCase() as DebriefSectionKey;
+      continue;
+    }
+    const inline = line.match(INLINE_SECTION_HEADING);
+    if (inline) {
+      flushSection();
+      key = inline[1].toLowerCase() as DebriefSectionKey;
+      lines.push(line.slice(inline[0].length));
       continue;
     }
     if (!line.trim()) {
