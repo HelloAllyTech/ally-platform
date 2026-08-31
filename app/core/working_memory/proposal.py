@@ -42,51 +42,6 @@ STANCE_ORDER: Tuple[Stance, ...] = STANCES
 #: curve inflects at turns 8–11, so a ladder of five stances gated at 2 turns
 #: each cannot reach the top before the inflection, and gating at 3 makes
 #: `reflecting` unreachable inside a median session.
-MIN_TURNS_BEFORE_ADVANCE = 2
-
-#: A code-verified advancing event, synthesised from the turn's SCORE DELTA
-#: rather than proposed by the updater.
-#:
-#: The stance ladder and the score-driven state machine were two independent
-#: controllers of the same behaviour, and the ladder is the stricter one: a
-#: counsellor could score their way into a warmer state band while the client
-#: stayed guarded, because nothing the SCORE saw could earn a rung. That reads
-#: from the outside as "the states stopped doing anything" — reported from prod
-#: on scenario 440, where the score climbed 10 -> 104 across four configured
-#: states and the ladder moved only on updater-proposed events.
-#:
-#: This is deliberately the strongest evidence in the set. Every other
-#: advancing event is proposed by the updater LLM and then grounded against the
-#: transcript; this one is computed in code from detector events carrying
-#: scores the SCENARIO AUTHOR configured. It is also the only advancing event
-#: that does not depend on the updater at all, which removes the single point
-#: of failure the ladder has had since it shipped.
-HELPFUL_BEHAVIOUR = "helpful_behaviour"
-
-#: Events that can earn an advance. `repair` and `resistance_softened` are the
-#: two the design names as advancing (§4); `disclosed` counts because revealing
-#: something new IS the client opening up, not merely a bookkeeping event.
-ADVANCING_EVENTS = frozenset(
-    {"repair", "resistance_softened", "disclosed", HELPFUL_BEHAVIOUR}
-)
-
-#: Events that force a regression regardless of anything else. There is no
-#: minimum-turns gate on the way down: a client who feels judged closes up
-#: immediately, and making them wait two turns for it would be the same
-#: uniform-responsiveness failure §1 measures from the other direction.
-REGRESSING_EVENTS = frozenset({"rupture"})
-
-#: Every kind the updater may report. It is exactly the advancing and
-#: regressing sets, because those are the only two things an event decides.
-#:
-#: Four bookkeeping kinds used to sit here — `withheld`, `affect_shift`,
-#: `thread_opened`, `thread_closed`. None of them was in ADVANCING_EVENTS or
-#: REGRESSING_EVENTS, so none ever moved a stance; and each duplicated a field
-#: the same call already returns (`withheld_topics`, `affect`,
-#: `opened_threads`, `closed_threads`). They were the same question asked
-#: twice, and the ledger fields are the copy that gets used.
-CLIENT_EVENTS = frozenset(ADVANCING_EVENTS | REGRESSING_EVENTS)
-
 #: Cap on a rendered voice fragment. Long enough to carry a speech habit, short
 #: enough that the model cannot smuggle a whole reply in as "voice".
 MAX_FRAGMENT_CHARS = 120
@@ -117,24 +72,12 @@ def _capped(value: Optional[str], limit: int) -> Optional[str]:
     return text[:limit] if text else None
 
 
-class ObservedEvent(BaseModel):
-    """One client-side event the updater claims to have seen."""
-
-    kind: str = Field(description="One of the client-side event kinds (§4).")
-    topic: str = Field(default="", description="Subject, where the kind has one.")
-    evidence: str = Field(
-        default="",
-        description="The span that justifies it — for review, not for the prompt.",
-    )
-
-
 class ProposedUpdate(BaseModel):
     """The updater's structured output. Untrusted; see ``validate``."""
 
-    events: List[ObservedEvent] = Field(default_factory=list)
-    stance: Optional[str] = Field(
-        default=None, description="Proposed stance. Advisory — code decides."
-    )
+    #: No `events` and no `stance`. The updater reports what the client's
+    #: inner state IS; where the client is in the conversation is the author's
+    #: states, resolved from the simulation score, and taken verbatim.
     affect: Optional[str] = None
     appraisal: Optional[str] = None
     #: Named `voice_register` rather than `register`, which shadows an attribute
@@ -155,8 +98,8 @@ class ProposedUpdate(BaseModel):
 class ValidatedUpdate:
     """What code decided to commit, and why the stance did or did not move."""
 
+    #: Mirrors the author's resolved state. Never proposed, never refused.
     stance: Optional[Stance] = None
-    stance_rejected_reason: Optional[str] = None
     affect: Optional[str] = None
     appraisal: Optional[str] = None
     register: Optional[str] = None
@@ -166,133 +109,6 @@ class ValidatedUpdate:
     opened_threads: List[str] = field(default_factory=list)
     closed_threads: List[str] = field(default_factory=list)
     retrieve_cues: List[str] = field(default_factory=list)
-    events: List[str] = field(default_factory=list)
-
-
-def _rung(stance: str, ladder: Sequence[str] = STANCE_ORDER) -> int:
-    """Position on THIS session's ladder, or -1 if the stance is not on it.
-
-    `ladder` defaults to the generic five so callers with no scenario states
-    behave exactly as before.
-    """
-    try:
-        return list(ladder).index(stance)
-    except ValueError:
-        return -1
-
-
-def decide_stance(
-    memory: ClientWorkingMemory,
-    proposed: Optional[str],
-    event_kinds: set[str],
-) -> Tuple[Optional[Stance], Optional[str]]:
-    """Decide the stance. Returns (new_stance_or_None, rejection_reason).
-
-    The rules, and each one exists because of something measured or named:
-
-    - An unknown stance is discarded outright. A typo must not become a sixth
-      rung, and a model asked for an enum will occasionally invent one.
-    - **Regression is always permitted, immediately.** A client who feels judged
-      closes up now, not in two turns.
-    - **Advancing needs an earning event.** This is §4's contingency, and the
-      direct answer to the 65.51/65.52 null: the actor currently responds to
-      counsellor skill by talking more rather than by changing, so the thing that
-      moves the client has to be something the counsellor did.
-    - **Advancing moves one rung**, by CLAMPING rather than refusing. Guarded to
-      reflecting on one good question is the fake-success failure in §1, but
-      refusing the whole move over an oversized proposal froze the stance
-      permanently in the first offline run — the direction was earned even when
-      the distance was not.
-    - **Advancing needs time in the current stance**, or the client oscillates.
-    - **`reflecting` needs every thread closed.** The Zeigarnik block, and the
-      structural version of "Thank you for today!" being false rather than
-      discouraged.
-    """
-    if proposed is None:
-        return None, None
-    ladder = tuple(memory.ladder or STANCE_ORDER)
-    if proposed not in ladder:
-        # Replaces what the `Stance` Literal used to catch, and catches more:
-        # a stance from a DIFFERENT scenario's ladder is rejected here, which a
-        # type covering one fixed vocabulary never could.
-        return None, f"unknown stance {proposed!r}"
-    if proposed == memory.stance:
-        return None, None
-
-    here, there = _rung(memory.stance, ladder), _rung(proposed, ladder)
-
-    if there < here:
-        if "rupture" in event_kinds:
-            # Instant, and deliberately ungated: a client who feels judged
-            # closes up NOW, and making them wait would be the same
-            # uniform-responsiveness failure §1 measures.
-            return proposed, None  # type: ignore[return-value]
-        if here - there == 1:
-            # A drift shut with no rupture must not happen on the turn straight
-            # after arriving. Observed in the second v2v run: the ladder went
-            # disclosing -> opening with no rupture, then the attempt back up was
-            # refused for pacing — so an eventless drop cost nothing but took two
-            # turns to undo, and the durable write-out recorded a bounce
-            # (...opening, disclosing, opening, disclosing) that misrepresents
-            # what happened. MIN_TURNS_BEFORE_ADVANCE guarded oscillation on the
-            # way up only; this is the same guard on the way down, one turn
-            # rather than two because retreating IS more responsive than opening.
-            if memory.turns_in_stance < 1:
-                return None, (
-                    f"arrived in {memory.stance} this turn; an eventless drift "
-                    "shut needs at least one turn there"
-                )
-            return proposed, None  # type: ignore[return-value]
-        return None, "regression of more than one rung without a rupture"
-
-    if not (event_kinds & ADVANCING_EVENTS):
-        return None, "no advancing event — a stance is earned, not asserted"
-
-    # CLAMP the magnitude rather than refuse the move. An advancing event was
-    # observed, so the DIRECTION is earned; only the size of the step is the
-    # model's invention, and discarding earned evidence because of an unearned
-    # quantity is the wrong trade.
-    #
-    # This is not leniency, it is v2's `_apply` split applied properly: there,
-    # scores came from rubric weights and never from the model. Here the
-    # direction comes from code-verified events and the magnitude comes from
-    # code. The proposed magnitude is simply not an input.
-    #
-    # Found by the first offline run, and it was not a subtle failure: the
-    # updater proposed `engaged` from `guarded` on four of five turns — two
-    # rungs, every time — so the old veto refused every advance and the stance
-    # sat at `guarded` for the whole session. A ladder that can never be climbed
-    # is decorative. The prompt now names the rungs and the adjacency rule too,
-    # but a model will ignore that sometimes, and the machine has to be right
-    # anyway.
-    target: Stance = ladder[here + 1]
-    clamped = target != proposed
-    if clamped:
-        logger.info(
-            "[working-memory] clamping proposed advance %s -> %s down to %s "
-            "(one rung per turn)",
-            memory.stance,
-            proposed,
-            target,
-        )
-
-    # Every remaining gate applies to the CLAMPED target, so an overshooting
-    # proposal cannot use the clamp to slip past them.
-    if memory.turns_in_stance < MIN_TURNS_BEFORE_ADVANCE:
-        return None, (
-            f"only {memory.turns_in_stance} turn(s) in {memory.stance}; "
-            f"{MIN_TURNS_BEFORE_ADVANCE} required before advancing"
-        )
-    # POSITIONAL, not by name. The rule is "the top of the ladder is not
-    # reachable while the client is still carrying something"; it was written
-    # as `== "reflecting"` only because the ladder was fixed. With a
-    # scenario-defined ladder the top rung is whatever the author put last.
-    if here + 1 == len(ladder) - 1 and memory.open_threads:
-        return None, (
-            f"{len(memory.open_threads)} thread(s) still open — {target} is "
-            "not reachable while the client is still carrying something"
-        )
-    return target, None
 
 
 def _clean(values: List[str], *, limit: int, max_chars: int = 0) -> List[str]:
@@ -320,161 +136,30 @@ def validate(
     proposal: ProposedUpdate,
     memory: ClientWorkingMemory,
     messages: Sequence[Any] = (),
-    score_delta: int = 0,
-    advancing_behaviours: Sequence[str] = (),
     authored_stance: Optional[str] = None,
 ) -> ValidatedUpdate:
     """Turn an advisory proposal into what code is willing to commit.
 
     `authored_stance` is the state the AUTHOR's score bands resolved to this
-    turn. When supplied it is simply TAKEN: working memory no longer
-    adjudicates progression, so `decide_stance` and its gates — earned advance,
-    two-turn dwell, one rung per turn — are bypassed entirely and the stance
-    becomes a label for where the author's state machine already is.
+    turn, and it is simply TAKEN. Working memory does not adjudicate
+    progression: there is no ladder, no earned advance, no dwell gate and no
+    rung clamp, because where the client is in the conversation is the
+    scenario's decision and the stance is a label for it.
 
-    Everything else here is unchanged, because that IS working memory's job:
-    grounding events against the transcript, capping free text, validating the
-    ledgers, choosing what to recall.
+    What remains IS working memory's job: capping free text, pairing and
+    validating the ledgers, and choosing what to recall.
 
-    `messages` is the turn window the proposal was derived from. Optional
-    because `check_grounding` treats an absent transcript as "cannot check"
-    rather than "invented" — a caller with no messages gets the previous
-    behaviour, not a silently emptied update.
+    `messages` is the turn window the proposal was derived from. It is no
+    longer used to ground events — the updater reports none — but stays in the
+    signature because the ledger's own grounding pass runs at write-out over
+    the same window, and a caller that already has it should not have to
+    rediscover it later.
 
-    `advancing_behaviours` are the ids of SHOULD_DO behaviour instructions the
-    detector credited this turn. Preferred over `score_delta` because it is the
-    behaviour ITSELF rather than a sum: a +9 from "Validate experience" and a
-    +9 from "Follows appropriate reporting or referral procedures" are the same
-    number and are not the same evidence. Carrying the ids is also what makes
-    the relational-vs-procedural question answerable from logs later, instead
-    of unanswerable as it is today.
-
-    `score_delta` remains as the fallback for scenarios that score through
-    events rather than behaviour instructions. It is this turn's change in the
-    simulation score — the sum of
-    the scores on the events the behaviour detector fired. A POSITIVE delta
-    means the counsellor did something the scenario author scored as helpful,
-    and that earns an advancing event in its own right.
-
-    Only positive. A negative delta is NOT mirrored into a regression: the
-    regression path has no minimum-dwell gate by design (a client who feels
-    judged closes up immediately), so detector noise on the way down costs a
-    rung instantly, where noise on the way up is still bounded by the one-rung
-    clamp and the two-turn dwell. The asymmetry is the safeguard, not an
-    oversight — `rupture` remains the only way down.
+    Removed with the ladder: `score_delta` and `advancing_behaviours`. Both
+    existed only to derive `helpful_behaviour`, the one advancing event the
+    code computed rather than the model proposing, and an advancing event with
+    nothing to advance is not a thing.
     """
-    # An event without evidence cannot earn anything.
-    #
-    # The prompt demands a quoted span per event and this module's thesis is
-    # that the proposal is untrusted — but nothing read `evidence`, so `kind`
-    # alone was enough to advance a stance. The single strongest
-    # anti-fabrication rule in the prompt was unenforced in the one place whose
-    # job is enforcing it.
-    #
-    # Checked before turning this on, because enforcing it blindly would
-    # re-freeze the stance the way the overshoot veto did: across three probe
-    # conversations the updater populated evidence on 4 of 4 events, every one a
-    # real span from the turns. So this rejects fabrication rather than normal
-    # output.
-    # Second gate: the evidence must actually be IN the transcript.
-    #
-    # Requiring a quoted span stops an event with nothing to point at. It does
-    # not stop an event pointing at something the client never said — the
-    # updater writes `evidence` as free text, so a confabulated quote passes
-    # the presence check unchanged, advances the stance, and then shapes every
-    # subsequent prompt.
-    #
-    # `check_grounding` already answers exactly this question and is already
-    # trusted for it: the write-out runs it over the whole ledger at session
-    # end. Running it at COMMIT closes the loop from "caught after the session,
-    # too late to matter" to "caught before it reaches a prompt". Same lexical
-    # overlap test, no LLM, and it runs in the detached updater path so it
-    # costs no turn latency.
-    #
-    # Ungrounded events are PROVISIONAL, not deleted: they simply do not earn a
-    # stance transition. Everything else the proposal carries — affect,
-    # register, fragments, disclosures — is untouched, and disclosures keep
-    # their own grounding pass at write-out. That asymmetry is deliberate and
-    # follows 238dd0c's lesson: prod quarantines 1-8 items per session against
-    # 13-15 verified, so a strict delete here would throw away real events at
-    # that rate. A stance is the one thing worth being strict about, because it
-    # is the only field that persists and biases the NEXT update.
-    from app.core.working_memory.writeout import check_grounding
-
-    evidenced: List[tuple[str, str]] = []
-    for event in proposal.events:
-        kind = (event.kind or "").strip().lower()
-        if not kind:
-            continue
-        evidence = (event.evidence or "").strip()
-        if not evidence:
-            logger.info(
-                "[working-memory] discarding unevidenced event %r — a claim "
-                "with nothing to quote cannot earn a transition",
-                kind,
-            )
-            continue
-        evidenced.append((kind, evidence))
-
-    grounded_texts, ungrounded_texts = check_grounding(
-        [evidence for _, evidence in evidenced], messages
-    )
-    grounded_set = set(grounded_texts)
-
-    kinds = set()
-    if advancing_behaviours:
-        kinds.add(HELPFUL_BEHAVIOUR)
-        logger.info(
-            "[working-memory] %d SHOULD_DO behaviour(s) earn an advancing " "event: %s",
-            len(advancing_behaviours),
-            ", ".join(str(b) for b in advancing_behaviours),
-        )
-    elif score_delta > 0:
-        # NOT routed through the grounding gate below, and that is the point:
-        # grounding exists to check text the updater invented. This event was
-        # not proposed by any model — it is arithmetic over detector events —
-        # so there is no quote to verify and nothing to confabulate.
-        kinds.add(HELPFUL_BEHAVIOUR)
-        logger.info(
-            "[working-memory] score delta %+d earns an advancing event", score_delta
-        )
-    for kind, evidence in evidenced:
-        if evidence not in grounded_set:
-            logger.info(
-                "[working-memory] event %r is PROVISIONAL — its evidence is not "
-                "in the transcript, so it cannot earn a stance transition: %r",
-                kind,
-                evidence[:80],
-            )
-            continue
-        kinds.add(kind)
-    if ungrounded_texts:
-        logger.info(
-            "[working-memory] %d of %d evidenced event(s) were ungrounded",
-            len(ungrounded_texts),
-            len(evidenced),
-        )
-    unknown = kinds - CLIENT_EVENTS
-    if unknown:
-        logger.debug("[working-memory] discarding unknown events: %s", sorted(unknown))
-    kinds &= CLIENT_EVENTS
-
-    if authored_stance is not None:
-        # The author's flow decides; nothing here may refuse, clamp or delay it.
-        stance = authored_stance if authored_stance != memory.stance else None
-        reason = None
-    else:
-        # No authored state resolved — a scenario with no states. The generic
-        # ladder still governs itself, because there is nothing else to follow.
-        stance, reason = decide_stance(memory, proposal.stance, kinds)
-    if reason:
-        logger.info(
-            "[working-memory] stance %s -> %s refused: %s",
-            memory.stance,
-            proposal.stance,
-            reason,
-        )
-
     # A withheld topic needs a deflection to be usable — the actor has to know
     # how to move away, not merely that it should. The two lists are paired
     # POSITIONALLY, so pairing has to happen on the RAW indices and cleaning
@@ -490,6 +175,11 @@ def validate(
     # deflects convincingly.
     #
     # The fallback keeps a missing deflection usable rather than empty.
+    stance = (
+        authored_stance
+        if authored_stance is not None and authored_stance != memory.stance
+        else None
+    )
     raw_deflections = proposal.withheld_deflections
     withheld: List[Tuple[str, str]] = []
     seen_topics: List[str] = []
@@ -512,7 +202,6 @@ def validate(
 
     return ValidatedUpdate(
         stance=stance,
-        stance_rejected_reason=reason,
         affect=_capped(proposal.affect, MAX_STATE_FIELD_CHARS),
         appraisal=_capped(proposal.appraisal, MAX_APPRAISAL_CHARS),
         register=_capped(proposal.voice_register, MAX_STATE_FIELD_CHARS),
@@ -533,5 +222,4 @@ def validate(
             proposal.closed_threads, limit=10, max_chars=MAX_TOPIC_CHARS
         ),
         retrieve_cues=_clean(proposal.retrieve_cues, limit=8, max_chars=MAX_CUE_CHARS),
-        events=sorted(kinds),
     )

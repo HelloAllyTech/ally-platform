@@ -2562,40 +2562,6 @@ async def update_working_memory(
     # `current_score`, and it was negative. Wiring the ladder to that bucket
     # would have made this feature near-inert by construction.
     #
-    # Falls back to `state.current_score` when no ScoreKeeper is in config, so
-    # a caller without one degrades to the old behaviour rather than to zero.
-    _score_keeper = configurable.get("score_keeper")
-    _live_total = (
-        _score_keeper.get_total_score()
-        if _score_keeper is not None
-        else int(state.current_score)
-    )
-    _score_delta = int(_live_total) - int(store.score_at_last_update)
-    store.score_at_last_update = int(_live_total)
-
-    # The behaviours THEMSELVES, preferred over the scalar above.
-    #
-    # `BehaviorInstructionFeedbackData` carries `category` — SHOULD_DO or
-    # SHOULD_NOT_DO — which is a code-level semantic rather than the sign of a
-    # number, and an id, which says WHICH behaviour was credited. A +9 from
-    # "Validate experience" and a +9 from "Follows appropriate reporting or
-    # referral procedures" are the same number and are not the same evidence;
-    # only one of them should plausibly make a guarded client confide.
-    #
-    # Passing the ids does not act on that distinction yet — every SHOULD_DO
-    # counts today — but it is what makes the question answerable at all. The
-    # earlier attempt to measure it failed because the logs recorded scores and
-    # feedback text with no behaviour identity and no room, so nothing could be
-    # attributed. These ids are logged in `validate`.
-    #
-    # Read from advancing_behaviour_ids, NOT behavior_feedback_data directly:
-    # send_event_feedback (a parallel successor of resolve_branching_instruction,
-    # same as generate_response -> publish_done_thinking -> this node) clears
-    # behavior_feedback_data to [] every turn, and it always runs first. By the
-    # time this node runs, behavior_feedback_data is always already []. See
-    # resolve_branching_instruction, which snapshots this before that clear.
-    _advancing_behaviours = list(getattr(state, "advancing_behaviour_ids", None) or [])
-
     # The stance the AUTHOR's bands resolve to this turn. Working memory takes
     # it rather than deciding one, so the client's progression is the
     # scenario's, identical to every non-working-memory prompt.
@@ -2619,8 +2585,6 @@ async def update_working_memory(
         prompt_data=prompt_data,
         room_id=getattr(_room, "name", None),
         embed_query=embed_query,
-        score_delta=_score_delta,
-        advancing_behaviours=_advancing_behaviours,
         authored_stance=_authored_stance,
     )
     return {}

@@ -1,28 +1,26 @@
 """The LLM proposes, code disposes.
 
-Salvaged from roleplay_v2's DirectorService._apply (design §9.1). §3 says a
-stance transition must be EARNED but does not say who enforces it; this module
-is the answer, and these tests are the enforcement.
+The updater's output is untrusted input that happens to arrive as structured
+output. What code still disposes of: capping every free-text field, pairing the
+withheld ledger positionally, and dropping blanks and duplicates.
 
-The failure this exists to prevent is measured, not hypothetical: §1's critical
-persona annotations are all the client declaring insight it has not reached —
-"I'm starting to see the pattern a little more clearly now. Thank you for
-today!" at turn 14 — which hands the trainee a fake success and inflates their
-score. A model asked nicely to only advance when earned will sometimes do it
-anyway. So the proposal is untrusted input that happens to arrive as structured
-output.
+What it no longer disposes of is PROGRESSION. There used to be a stance ladder
+here — five fixed rungs, an earned-advance rule, a two-turn dwell gate, a
+one-rung clamp and an event taxonomy to feed it — and roughly thirty tests
+enforcing it. All of it was ours, not the product's: no scenario author ever
+asked for `guarded -> testing -> opening -> disclosing -> reflecting`. The
+author's states decide where the client is, the stance mirrors the resolved
+state, and a second controller for the same decision was the bug rather than
+the safeguard.
 """
 
-from app.core.working_memory import ClientWorkingMemory, Thread
+from app.core.working_memory import ClientWorkingMemory
 from app.core.working_memory.proposal import (
     MAX_APPRAISAL_CHARS,
     MAX_CUE_CHARS,
     MAX_LEDGER_ITEM_CHARS,
     MAX_STATE_FIELD_CHARS,
     MAX_TOPIC_CHARS,
-    MIN_TURNS_BEFORE_ADVANCE,
-    STANCE_ORDER,
-    ObservedEvent,
     ProposedUpdate,
     validate,
 )
@@ -37,204 +35,41 @@ def _memory(stance="guarded", turns_in_stance=5, **kw):
 
 
 def _proposal(**kw):
-    """A proposal with evidenced events, which is what the model actually sends.
-
-    Evidence is attached by default because an unevidenced event can no longer
-    earn anything, and a helper that omitted it would make every earning test
-    pass for the wrong reason. Use `_unevidenced` for the fabrication case.
-    """
-    events = [
-        ObservedEvent(kind=k, evidence=f"quoted span for {k}")
-        for k in kw.pop("event_kinds", [])
-    ]
-    return ProposedUpdate(events=events, **kw)
-
-
-def _unevidenced(**kw):
-    events = [ObservedEvent(kind=k) for k in kw.pop("event_kinds", [])]
-    return ProposedUpdate(events=events, **kw)
+    return ProposedUpdate(**kw)
 
 
 # ---------------------------------------------------------------------------
-# Advancing has to be earned
+# The author decides where the client is
 # ---------------------------------------------------------------------------
 
 
-def test_a_bare_stance_claim_is_refused():
-    out = validate(_proposal(stance="testing"), _memory())
-    assert out.stance is None
-    assert "earned, not asserted" in out.stance_rejected_reason
+def test_the_authored_stance_is_taken_verbatim():
+    result = validate(_proposal(), _memory("guarded"), (), authored_stance="resolved")
+    assert result.stance == "resolved"
 
 
-def test_an_advancing_event_earns_one_rung():
-    out = validate(
-        _proposal(stance="testing", event_kinds=["repair"]), _memory("guarded")
-    )
-    assert out.stance == "testing"
-    assert out.stance_rejected_reason is None
-
-
-def test_the_ladder_cannot_be_skipped():
-    # Guarded to reflecting because one question landed well IS the §1 failure.
-    # The overshoot is CLAMPED to one rung rather than refused: the repair earned
-    # an advance, so throwing the move away entirely would discard real evidence
-    # over a bad quantity. Refusing outright froze the stance for a whole session
-    # in the first offline run, because the updater overshot on nearly every turn.
-    out = validate(
-        _proposal(stance="reflecting", event_kinds=["repair"]), _memory("guarded")
-    )
-    assert out.stance == STANCE_ORDER[1]
-    assert out.stance_rejected_reason is None
-
-
-def test_a_clamped_advance_still_obeys_the_other_gates():
-    # The clamp must not become a way around the gates it is not about.
-    too_soon = validate(
-        _proposal(stance="opening", event_kinds=["repair"]),
-        _memory("guarded", turns_in_stance=MIN_TURNS_BEFORE_ADVANCE - 1),
-    )
-    assert too_soon.stance is None
-    assert "required before advancing" in too_soon.stance_rejected_reason
-
-
-def test_a_clamped_advance_respects_the_zeigarnik_block():
-    # From the rung below `reflecting`, any overshoot clamps ONTO the gated
-    # rung — the one case where the clamp lands on it, so the thread check has
-    # to be applied to the TARGET rather than to what was proposed. Derived
-    # from STANCE_ORDER rather than hardcoded: naming the stance here would
-    # make inserting a rung look like a regression.
-    memory = _memory(STANCE_ORDER[-2], turns_in_stance=5)
-    memory.unresolved = [Thread(topic="the argument", opened_turn=1)]
-    out = validate(_proposal(stance="reflecting", event_kinds=["repair"]), memory)
-    assert out.stance is None
-    assert "still open" in out.stance_rejected_reason
-
-
-def test_advancing_too_soon_is_refused():
-    # Without a minimum the actor oscillates turn to turn, which reads as
-    # instability rather than as a person.
-    out = validate(
-        _proposal(stance="testing", event_kinds=["resistance_softened"]),
-        _memory("guarded", turns_in_stance=MIN_TURNS_BEFORE_ADVANCE - 1),
-    )
-    assert out.stance is None
-    assert "required before advancing" in out.stance_rejected_reason
-
-
-def test_disclosing_something_new_counts_as_advancing():
-    # Revealing something IS the client opening up, not merely bookkeeping.
-    out = validate(
-        _proposal(stance="opening", event_kinds=["disclosed"]), _memory("testing")
-    )
-    assert out.stance == "opening"
-
-
-# ---------------------------------------------------------------------------
-# The Zeigarnik block on reflecting
-# ---------------------------------------------------------------------------
-
-
-def test_reflecting_is_unreachable_while_a_thread_is_open():
-    out = validate(
-        _proposal(stance="reflecting", event_kinds=["repair"]),
-        _memory("disclosing", unresolved=[Thread("the argument with mum")]),
-    )
-    assert out.stance is None
-    assert "still open" in out.stance_rejected_reason
-
-
-def test_reflecting_opens_up_once_everything_is_closed():
-    out = validate(
-        _proposal(stance="reflecting", event_kinds=["repair"]),
-        _memory("disclosing", unresolved=[Thread("money", closed_turn=6)]),
-    )
-    assert out.stance == "reflecting"
-
-
-# ---------------------------------------------------------------------------
-# Regression is immediate — the other half of contingency
-# ---------------------------------------------------------------------------
-
-
-def test_a_rupture_closes_the_client_up_at_once():
-    # No minimum-turns gate on the way down. A client who feels judged closes up
-    # now; making them wait two turns would be the same uniform-responsiveness
-    # failure §1 measures, just from the other direction.
-    out = validate(
-        _proposal(stance="guarded", event_kinds=["rupture"]),
-        _memory("disclosing", turns_in_stance=0),
-    )
-    assert out.stance == "guarded"
-
-
-def test_drifting_shut_one_rung_needs_no_event():
-    # Still no EVENT required — just a turn actually spent in the stance.
-    out = validate(_proposal(stance="testing"), _memory("opening", turns_in_stance=1))
-    assert out.stance == "testing"
-
-
-def test_an_eventless_drift_cannot_happen_the_turn_it_arrives():
-    # The second v2v run went disclosing -> opening with no rupture, then had
-    # the way back up refused for pacing: an eventless drop cost nothing but
-    # took two turns to undo, and the write-out recorded a bounce that
-    # misrepresented the session.
-    out = validate(
-        _proposal(stance="opening"), _memory("disclosing", turns_in_stance=0)
-    )
-    assert out.stance is None
-    assert "at least one turn" in out.stance_rejected_reason
-
-
-def test_a_rupture_still_drops_instantly_on_arrival():
-    # The gate above must not slow a real rupture down. A client who feels
-    # judged closes up NOW, whenever it happens.
-    out = validate(
-        _proposal(stance="opening", event_kinds=["rupture"]),
-        _memory("disclosing", turns_in_stance=0),
-    )
-    assert out.stance == "opening"
-
-
-def test_collapsing_several_rungs_needs_a_rupture():
-    out = validate(_proposal(stance="guarded"), _memory("reflecting"))
-    assert out.stance is None
-    assert "more than one rung without a rupture" in out.stance_rejected_reason
-
-
-# ---------------------------------------------------------------------------
-# Malformed proposals
-# ---------------------------------------------------------------------------
-
-
-def test_an_invented_stance_is_discarded():
-    # A model asked for an enum will occasionally return something else, and a
-    # typo must not become a sixth rung.
-    out = validate(
-        _proposal(stance="vulnerable", event_kinds=["repair"]), _memory("guarded")
-    )
-    assert out.stance is None
-    assert "unknown stance" in out.stance_rejected_reason
-
-
-def test_unknown_event_kinds_are_dropped_and_cannot_earn():
-    out = validate(
-        _proposal(stance="testing", event_kinds=["felt_seen", "vibed"]),
-        _memory("guarded"),
-    )
-    assert out.stance is None
-    assert out.events == []
+def test_no_authored_stance_leaves_the_stance_alone():
+    # A scenario with no states has no progression for anyone to adjudicate.
+    result = validate(_proposal(), _memory("guarded"), ())
+    assert result.stance is None
 
 
 def test_restating_the_current_stance_is_not_a_transition():
-    out = validate(
-        _proposal(stance="guarded", event_kinds=["repair"]), _memory("guarded")
-    )
-    assert out.stance is None
-    assert out.stance_rejected_reason is None
+    # None means "no change to commit", which keeps `stance_path` honest.
+    result = validate(_proposal(), _memory("guarded"), (), authored_stance="guarded")
+    assert result.stance is None
+
+
+def test_the_updater_cannot_propose_a_stance_or_an_event():
+    # Not merely ignored — absent from the schema, so the model is never asked
+    # and cannot spend attention on a field nothing reads.
+    fields = set(ProposedUpdate.model_fields)
+    assert "stance" not in fields
+    assert "events" not in fields
 
 
 # ---------------------------------------------------------------------------
-# Bounds on the free-text fields
+# Caps and the withheld ledger — what code still disposes of
 # ---------------------------------------------------------------------------
 
 
@@ -373,60 +208,6 @@ def test_the_cap_counts_kept_pairs_not_raw_positions():
 # ---------------------------------------------------------------------------
 
 
-def test_an_unevidenced_event_cannot_earn_a_transition():
-    # The prompt demands a quoted span per event, but nothing read `evidence`,
-    # so `kind` alone advanced a stance — the strongest anti-fabrication rule in
-    # the prompt, unenforced in the module whose whole job is enforcing it.
-    out = validate(
-        _unevidenced(stance="testing", event_kinds=["repair"]), _memory("guarded")
-    )
-    assert out.stance is None
-    assert "earned, not asserted" in out.stance_rejected_reason
-    assert out.events == []
-
-
-def test_a_blank_evidence_string_counts_as_none():
-    out = validate(
-        ProposedUpdate(
-            stance="testing", events=[ObservedEvent(kind="repair", evidence="   ")]
-        ),
-        _memory("guarded"),
-    )
-    assert out.stance is None
-
-
-def test_evidenced_and_unevidenced_events_are_separated():
-    # One good event should still count when it arrives beside a bare claim.
-    out = validate(
-        ProposedUpdate(
-            stance="testing",
-            events=[
-                ObservedEvent(kind="repair", evidence="I'm sorry, I misread that"),
-                ObservedEvent(kind="rupture"),
-            ],
-        ),
-        _memory("guarded"),
-    )
-    assert out.events == ["repair"]
-    assert out.stance == "testing"
-
-
-def test_an_unevidenced_rupture_cannot_force_a_collapse():
-    # Regression needs no advancing event, so an unevidenced `rupture` was a
-    # free two-rung drop.
-    out = validate(
-        _unevidenced(stance="guarded", event_kinds=["rupture"]),
-        _memory("reflecting"),
-    )
-    assert out.stance is None
-    assert "more than one rung without a rupture" in out.stance_rejected_reason
-
-
-# ---------------------------------------------------------------------------
-# Free-text fields are bounded — this block is in every turn's prompt
-# ---------------------------------------------------------------------------
-
-
 def test_state_fields_are_capped():
     out = validate(
         _proposal(affect="x" * 500, voice_register="y" * 500, appraisal="z" * 900),
@@ -474,219 +255,3 @@ def test_normal_length_values_are_untouched():
 # configured states while the ladder moved only on updater-proposed events, so
 # the state machine and the stance ladder disagreed and it read as "the states
 # stopped doing anything".
-
-
-def test_a_positive_score_delta_can_earn_an_advance_with_no_updater_event():
-    # The whole point: this path does not depend on the updater proposing
-    # anything, which is what removes its single point of failure.
-    memory = ClientWorkingMemory(stance="guarded", turns_in_stance=5)
-
-    result = validate(
-        _proposal(stance="testing"),
-        memory,
-        (),
-        score_delta=6,
-    )
-
-    assert result.stance == "testing"
-
-
-def test_a_zero_delta_still_requires_an_earned_event():
-    memory = ClientWorkingMemory(stance="guarded", turns_in_stance=5)
-
-    result = validate(_proposal(stance="testing"), memory, (), score_delta=0)
-
-    assert result.stance is None
-
-
-def test_a_negative_delta_does_not_regress_the_stance():
-    # Deliberately asymmetric. The regression path has no minimum-dwell gate,
-    # so detector noise on the way down would cost a rung instantly, where the
-    # same noise upward is still bounded by the one-rung clamp and the two-turn
-    # dwell. `rupture` stays the only way down.
-    memory = ClientWorkingMemory(stance="opening", turns_in_stance=5)
-
-    result = validate(_proposal(stance="opening"), memory, (), score_delta=-8)
-
-    assert result.stance is None
-
-
-def test_a_score_delta_still_cannot_skip_a_rung():
-    # Earned direction, code-decided magnitude — unchanged by this feature.
-    memory = ClientWorkingMemory(stance="guarded", turns_in_stance=5)
-
-    result = validate(_proposal(stance="disclosing"), memory, (), score_delta=10)
-
-    assert result.stance == "testing"
-
-
-def test_a_score_delta_still_respects_the_dwell_gate():
-    memory = ClientWorkingMemory(stance="testing", turns_in_stance=1)
-
-    result = validate(_proposal(stance="opening"), memory, (), score_delta=10)
-
-    assert result.stance is None
-
-
-def test_a_should_do_behaviour_earns_an_advance_by_identity_not_by_sum():
-    # The last synthesis element: the behaviour ITSELF is the evidence, so the
-    # ladder can eventually tell "Validate experience" from "Follows reporting
-    # procedures" — two behaviours that can carry the identical score and are
-    # not the identical evidence.
-    memory = ClientWorkingMemory(stance="guarded", turns_in_stance=5)
-
-    result = validate(
-        _proposal(stance="testing"),
-        memory,
-        (),
-        score_delta=0,  # no scalar movement at all
-        advancing_behaviours=["beh-validate-experience"],
-    )
-
-    assert result.stance == "testing"
-
-
-def test_behaviour_identity_is_preferred_over_the_scalar():
-    memory = ClientWorkingMemory(stance="guarded", turns_in_stance=5)
-
-    with _caplog_at_info() as records:
-        validate(
-            _proposal(stance="testing"),
-            memory,
-            (),
-            score_delta=9,
-            advancing_behaviours=["beh-1", "beh-2"],
-        )
-
-    logged = " ".join(records)
-    assert "SHOULD_DO behaviour(s)" in logged
-    assert "beh-1, beh-2" in logged
-    # the scalar path must not ALSO fire; it is the fallback, not a second vote
-    assert "earns an advancing event" not in logged.replace(
-        "SHOULD_DO behaviour(s) earn an advancing event", ""
-    )
-
-
-def test_the_scalar_still_works_when_no_behaviours_were_credited():
-    # Scenarios that score through EVENTS rather than behaviour instructions
-    # must keep working.
-    memory = ClientWorkingMemory(stance="guarded", turns_in_stance=5)
-
-    result = validate(
-        _proposal(stance="testing"), memory, (), score_delta=7, advancing_behaviours=[]
-    )
-
-    assert result.stance == "testing"
-
-
-import contextlib  # noqa: E402
-import logging  # noqa: E402
-
-
-@contextlib.contextmanager
-def _caplog_at_info():
-    records: list = []
-
-    class _H(logging.Handler):
-        def emit(self, record):
-            records.append(record.getMessage())
-
-    logger = logging.getLogger("app.core.working_memory.proposal")
-    handler = _H()
-    logger.addHandler(handler)
-    old = logger.level
-    logger.setLevel(logging.INFO)
-    try:
-        yield records
-    finally:
-        logger.removeHandler(handler)
-        logger.setLevel(old)
-
-
-# ---------------------------------------------------------------------------
-# The ladder belongs to the scenario
-# ---------------------------------------------------------------------------
-
-
-_AUTHORED = (
-    "Dis-engaged, feeling discouraged and confused",
-    "Feels heard and is open to sharing",
-    "Explores fears and preferences",
-    "Confident to draw boundary assertively",
-)
-
-
-def test_a_scenario_ladder_advances_by_its_own_rung_names():
-    memory = ClientWorkingMemory(
-        stance=_AUTHORED[0], ladder=_AUTHORED, turns_in_stance=5
-    )
-
-    result = validate(
-        _proposal(stance=_AUTHORED[1]),
-        memory,
-        (),
-        advancing_behaviours=["beh-1"],
-    )
-
-    assert result.stance == _AUTHORED[1]
-
-
-def test_a_stance_from_another_ladder_is_refused():
-    # What the `Stance` Literal used to catch, and more: "opening" is a
-    # perfectly valid stance on the DEFAULT ladder and is not on this one.
-    memory = ClientWorkingMemory(
-        stance=_AUTHORED[0], ladder=_AUTHORED, turns_in_stance=5
-    )
-
-    result = validate(
-        _proposal(stance="opening"), memory, (), advancing_behaviours=["beh-1"]
-    )
-
-    assert result.stance is None
-    assert "unknown stance" in (result.stance_rejected_reason or "")
-
-
-def test_the_one_rung_clamp_uses_the_authored_ladder():
-    memory = ClientWorkingMemory(
-        stance=_AUTHORED[0], ladder=_AUTHORED, turns_in_stance=5
-    )
-
-    result = validate(
-        _proposal(stance=_AUTHORED[3]),  # tries to jump three rungs
-        memory,
-        (),
-        advancing_behaviours=["beh-1"],
-    )
-
-    assert result.stance == _AUTHORED[1]
-
-
-def test_the_top_rung_rule_is_positional_not_named():
-    # Was `target == "reflecting"`. The rule is "the top of the ladder is not
-    # reachable while the client is still carrying something", and the top rung
-    # is whatever the author put last.
-    memory = ClientWorkingMemory(
-        stance=_AUTHORED[2],
-        ladder=_AUTHORED,
-        turns_in_stance=5,
-        unresolved=[Thread(topic="whether to tell her mother")],
-    )
-
-    result = validate(
-        _proposal(stance=_AUTHORED[3]), memory, (), advancing_behaviours=["beh-1"]
-    )
-
-    assert result.stance is None
-    assert "still open" in (result.stance_rejected_reason or "")
-
-
-def test_a_seven_rung_ladder_is_ordinary():
-    # The cap is gone. Seven authored bands are seven rungs.
-    seven = tuple(f"band {i}" for i in range(7))
-    memory = ClientWorkingMemory(stance=seven[5], ladder=seven, turns_in_stance=5)
-
-    result = validate(
-        _proposal(stance=seven[6]), memory, (), advancing_behaviours=["beh-1"]
-    )
-
-    assert result.stance == seven[6]

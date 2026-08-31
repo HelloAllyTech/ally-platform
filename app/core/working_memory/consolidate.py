@@ -27,7 +27,7 @@ the plumbing, and deliberately makes no judgement of its own.
 from __future__ import annotations
 
 import asyncio
-from typing import List, Optional, Sequence
+from typing import List, Optional
 
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 
@@ -46,6 +46,13 @@ from app.prompts.resolver import load_and_format
 logger = get_logger(__name__)
 
 _TEMPLATE_PATH = "system/client_working_memory_updater"
+
+#: Named absences for the two scenario placeholders. A scenario with no states
+#: still renders the whole block, because the block is the author's prompt text
+#: and Python cannot suppress it — so it has to say what is missing rather than
+#: leave a blank line under a heading.
+NO_AUTHORED_STAGES = "  (this scenario defines no stages)"
+NO_CURRENT_STAGE = "(no stage defined — judge from the turns alone)"
 
 #: Turns of conversation handed to the updater. The rolling summary already
 #: carries everything older, so this window only has to cover "what just
@@ -163,109 +170,6 @@ def _coerce_guidance(value) -> str:
     return flat if len(flat) <= 160 else flat[:157].rstrip() + "..."
 
 
-def _scenario_instruction(
-    authored_stance: str | None,
-    stance_ladder: str,
-) -> str:
-    """The author's scenario, given to the updater as GROUND TRUTH.
-
-    The ledger fields are inferences: an author rarely enumerates what their
-    client holds back, so the updater has to work it out. What it works it out
-    FROM is the question. Without this block its only evidence is the
-    transcript, which means the inference is ungrounded in the scenario — it
-    can mark a subject withheld that the author's current state openly invites,
-    and the actor then deflects something it was written to discuss.
-
-    This is context, not control. The stance instruction still forbids
-    reporting a stance; the arc is here so that "what is this client not saying
-    yet" is answered against the author's intent rather than against the
-    model's own idea of how a counseling session should go.
-    """
-    if not authored_stance and not stance_ladder.strip():
-        return ""
-    lines = ["THE SCENARIO (written by the author — treat as ground truth)"]
-    if stance_ladder.strip():
-        lines.append("The client moves through these stages, in order:")
-        lines.append(stance_ladder)
-    if authored_stance:
-        lines.append(f"The client is at: {authored_stance}")
-    # Deliberately says only "use the author's words"; it does NOT say how
-    # stages relate to each other. An earlier draft added "a subject belonging
-    # to a later stage may well be withheld", which is the monotonic-
-    # progression assumption the stance ladder used to encode, reintroduced as
-    # advice: nothing guarantees an author's later states hold more disclosure,
-    # and a scenario that opens with a confession and closes guarded would be
-    # read backwards.
-    lines.append(
-        "Judge what the client is holding back against these stage "
-        "descriptions, and against the turns wherever the descriptions do not "
-        "speak to a subject. Do not record a subject the current stage invites "
-        "as withheld."
-    )
-    return "\n".join(lines) + "\n"
-
-
-def _events_instruction(has_authored_states: bool) -> str:
-    """The REPORT WHAT YOU OBSERVED section, or the one line that replaces it.
-
-    Only ASK for events when something still reads them. `kinds` decides
-    exactly one thing: whether the generic ladder advances. With authored
-    states `validate` takes the author's stance verbatim and discards `kinds`
-    entirely, so every event reported on that path is produced, evidenced,
-    grounding-checked and then dropped — paid for in prompt tokens and in the
-    model's attention, to populate one log field.
-    """
-    if has_authored_states:
-        return (
-            "REPORT WHAT YOU OBSERVED\n"
-            "- events: leave this list EMPTY. Nothing reads it in this "
-            "scenario. Everything worth recording goes in the fields below."
-        )
-    return (
-        "REPORT WHAT YOU OBSERVED\n"
-        "- events: the client-side things that happened in these turns. "
-        "Each has a `kind`, an optional `topic`, and `evidence` quoting "
-        "the span that justifies it. Use only these kinds:\n"
-        "  - repair: the counsellor noticed something they had missed or "
-        "gotten wrong, and addressed it\n"
-        "  - resistance_softened: the client let go of a defence they were "
-        "holding\n"
-        "  - disclosed: the client revealed something not previously said\n"
-        "  - rupture: the client felt judged, dismissed, rushed or exposed\n"
-        "  Report NOTHING if nothing happened. An empty list is a correct "
-        "and common answer."
-    )
-
-
-def _stance_instruction(has_authored_states: bool, stance_ladder: str) -> str:
-    """The stance line, or the ladder rulebook when no author decides it.
-
-    When the scenario defines states, the author's bands decide where the
-    client is and `validate` takes that verbatim — so the eight lines of
-    earned-advance rulebook this template used to carry were instructions for
-    a decision the code no longer makes.
-    """
-    if has_authored_states:
-        return (
-            "- stance: DO NOT report this. Where the client is in the "
-            "conversation is decided by the scenario, not by you. Report only "
-            "the state and ledger fields below."
-        )
-    return (
-        "- stance: where the client is on this ladder, which runs in "
-        "order:\n"
-        f"{stance_ladder}\n"
-        "  Use these names EXACTLY as written; a name that is not on the "
-        "ladder is discarded.\n"
-        "  This is a PROPOSAL and it may be refused or reduced. A stance is "
-        "EARNED by something the counsellor did, moves AT MOST ONE rung per "
-        "update, and stays where it is when nothing advanced — that is the "
-        "common answer and not a failure to report it.\n"
-        "  Going DOWN needs no advancing event: a client who feels judged, "
-        "rushed or exposed closes up immediately."
-    )
-
-
 async def consolidate(
     *,
     memory: ClientWorkingMemory,
@@ -273,8 +177,6 @@ async def consolidate(
     llm_client: BaseLLMClient,
     prompt_data=None,
     room_id: Optional[str] = None,
-    score_delta: int = 0,
-    advancing_behaviours: Sequence[str] = (),
     authored_stance: Optional[str] = None,
 ) -> Optional[ValidatedUpdate]:
     """One LLM call, then validation. Returns None when there is nothing to do.
@@ -311,10 +213,6 @@ async def consolidate(
     # where there is one, which is a fuller description than the generic line
     # it replaces, and specific to this client rather than to clients in
     # general.
-    _authored_states = getattr(prompt_data, "states", None) or []
-    _has_authored_states = bool(
-        [st for st in _authored_states if isinstance(st, dict) and st.get("name")]
-    )
     _ladder = tuple(memory.ladder or ())
     _guidance_by_name = {
         str(st.get("name") or "").strip(): _coerce_guidance(st.get("guidelines"))
@@ -326,23 +224,22 @@ async def consolidate(
         + (f" — {_guidance_by_name[name]}" if _guidance_by_name.get(name) else "")
         for i, name in enumerate(_ladder)
     )
-    events_instruction = _events_instruction(_has_authored_states)
-    stance_instruction = _stance_instruction(_has_authored_states, stance_ladder)
-    # Only on the authored path. Without states the ladder IS the scenario, and
-    # `stance_instruction` already carries it in full.
-    scenario_instruction = (
-        _scenario_instruction(authored_stance, stance_ladder)
-        if _has_authored_states
-        else ""
-    )
-
     system_text = load_and_format(
         _TEMPLATE_PATH,
         prompt_data,
         language_label=language_label,
-        scenario_instruction=scenario_instruction,
-        events_instruction=events_instruction,
-        stance_instruction=stance_instruction,
+        # Data, not prose. The sentences that frame these live in the template
+        # where a reader of the prompt can see them; Python only supplies the
+        # author's stages and which one the score resolved to.
+        #
+        # Named absences rather than blanks, the same rule `render.py` applies
+        # to every section it fills: a blank line under "these stages" reads to
+        # the model as an absence of constraint, where a named absence reads as
+        # an absence of data. A scenario with no states has no progression for
+        # anyone to adjudicate, and the closing instruction already tells the
+        # model what to do then — judge from the turns.
+        stance_ladder=stance_ladder or NO_AUTHORED_STAGES,
+        current_stance=authored_stance or NO_CURRENT_STAGE,
     )
     if not system_text:
         logger.warning("[working-memory] updater template resolved empty; skipping")
@@ -383,7 +280,7 @@ async def consolidate(
 
     # The same window the updater read, so `validate` can check the evidence it
     # produced against what was actually said.
-    return validate(proposal, memory, new_messages, score_delta, advancing_behaviours)
+    return validate(proposal, memory, new_messages, authored_stance=authored_stance)
 
 
 async def apply_update(
@@ -533,8 +430,6 @@ def schedule_update(
     room_id: Optional[str] = None,
     reason: str = "cadence",
     embed_query=None,
-    score_delta: int = 0,
-    advancing_behaviours: Sequence[str] = (),
     authored_stance: Optional[str] = None,
 ) -> bool:
     """Fire the consolidation as a DETACHED task writing into ``store``.
@@ -562,8 +457,6 @@ def schedule_update(
                     llm_client=llm_client,
                     prompt_data=prompt_data,
                     room_id=room_id,
-                    score_delta=score_delta,
-                    advancing_behaviours=advancing_behaviours,
                     authored_stance=authored_stance,
                 ),
                 timeout=timeout,
@@ -575,7 +468,7 @@ def schedule_update(
                 turn_index,
                 timeout,
             )
-            await store.mark_miss(score_delta)
+            await store.mark_miss()
             return
         except asyncio.CancelledError:
             # Session teardown via discard(). Not a miss — nobody will read it.
@@ -584,7 +477,7 @@ def schedule_update(
             logger.warning(
                 "[working-memory] update for turn %d failed: %s", turn_index, exc
             )
-            await store.mark_miss(score_delta)
+            await store.mark_miss()
             return
 
         if update is None:
@@ -633,11 +526,14 @@ def schedule_update(
         committed = await apply_update(store, update, turn_index, salient)
         if committed:
             logger.info(
-                "[working-memory] turn %d committed (%s): stance=%s events=%s",
+                "[working-memory] turn %d committed (%s): stance=%s "
+                "disclosed=%d withheld=%d threads=%+d",
                 turn_index,
                 reason,
                 update.stance or "unchanged",
-                ",".join(update.events) or "none",
+                len(update.disclosed),
+                len(update.withheld),
+                len(update.opened_threads) - len(update.closed_threads),
             )
 
     store._task = asyncio.create_task(_update_in_background())
