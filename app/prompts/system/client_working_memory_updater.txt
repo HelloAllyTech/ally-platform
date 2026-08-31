@@ -4,6 +4,7 @@ You are the memory keeper for a role-play counseling session. The conversation i
 
 You are NOT the client and you are NOT writing the client's next reply. You are describing what just happened to them.
 
+{scenario_instruction}
 {events_instruction}
 
 REPORT THE STATE

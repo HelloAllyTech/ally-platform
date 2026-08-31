@@ -7,7 +7,11 @@ These tests pin the gate, because the failure it prevents is silent: a prompt
 that asks for work nobody consumes looks exactly like one that doesn't.
 """
 
-from app.core.working_memory.consolidate import _events_instruction, _stance_instruction
+from app.core.working_memory.consolidate import (
+    _events_instruction,
+    _scenario_instruction,
+    _stance_instruction,
+)
 from app.core.working_memory.proposal import (
     ADVANCING_EVENTS,
     CLIENT_EVENTS,
@@ -64,3 +68,41 @@ def test_no_authored_states_gets_the_ladder_verbatim():
     text = _stance_instruction(False, "  1. anxious\n  2. resolved")
     assert "1. anxious" in text and "2. resolved" in text
     assert "AT MOST ONE rung" in text
+
+
+# ---------------------------------------------------------------------------
+# The author's scenario, as ground truth for the ledger
+# ---------------------------------------------------------------------------
+
+LADDER = (
+    "  1. anxious — frightened, gives short answers\n"
+    "  2. partial resolution — begins to trust\n"
+    "  3. resolved — speaks openly"
+)
+
+
+def test_the_arc_and_the_current_stage_both_reach_the_updater():
+    text = _scenario_instruction("partial resolution", LADDER)
+    assert "ground truth" in text
+    assert "begins to trust" in text  # the author's own words, not a paraphrase
+    assert "The client is at: partial resolution" in text
+
+
+def test_the_scenario_block_grounds_the_ledger_without_deciding_a_stance():
+    # It says how to INFER what is withheld; it must not hand back the stance
+    # decision the stance instruction just took away.
+    text = _scenario_instruction("anxious", LADDER)
+    assert "NOT withheld" in text
+    assert "report" not in text.lower().replace("ground truth", "")
+
+
+def test_a_stage_silent_on_a_subject_defers_to_the_turns():
+    # The point of the whole block: an author rarely enumerates what the client
+    # holds back, so the updater still has to infer — just not blindly.
+    assert "judge it from the turns" in _scenario_instruction("anxious", LADDER)
+
+
+def test_nothing_authored_renders_nothing():
+    # With no states the ladder IS the scenario and `stance_instruction` already
+    # carries it in full; repeating it here would be two copies to disagree.
+    assert _scenario_instruction(None, "") == ""

@@ -163,6 +163,41 @@ def _coerce_guidance(value) -> str:
     return flat if len(flat) <= 160 else flat[:157].rstrip() + "..."
 
 
+def _scenario_instruction(
+    authored_stance: str | None,
+    stance_ladder: str,
+) -> str:
+    """The author's scenario, given to the updater as GROUND TRUTH.
+
+    The ledger fields are inferences: an author rarely enumerates what their
+    client holds back, so the updater has to work it out. What it works it out
+    FROM is the question. Without this block its only evidence is the
+    transcript, which means the inference is ungrounded in the scenario — it
+    can mark a subject withheld that the author's current state openly invites,
+    and the actor then deflects something it was written to discuss.
+
+    This is context, not control. The stance instruction still forbids
+    reporting a stance; the arc is here so that "what is this client not saying
+    yet" is answered against the author's intent rather than against the
+    model's own idea of how a counseling session should go.
+    """
+    if not authored_stance and not stance_ladder.strip():
+        return ""
+    lines = ["THE SCENARIO (written by the author — treat as ground truth)"]
+    if stance_ladder.strip():
+        lines.append("The client moves through these stages, in order:")
+        lines.append(stance_ladder)
+    if authored_stance:
+        lines.append(f"The client is at: {authored_stance}")
+    lines.append(
+        "Infer the ledger against this. A subject the current stage openly "
+        "invites is NOT withheld; a subject belonging to a later stage may "
+        "well be. Where the stage says nothing about a subject, judge it from "
+        "the turns."
+    )
+    return "\n".join(lines) + "\n"
+
+
 def _events_instruction(has_authored_states: bool) -> str:
     """The REPORT WHAT YOU OBSERVED section, or the one line that replaces it.
 
@@ -286,11 +321,19 @@ async def consolidate(
     )
     events_instruction = _events_instruction(_has_authored_states)
     stance_instruction = _stance_instruction(_has_authored_states, stance_ladder)
+    # Only on the authored path. Without states the ladder IS the scenario, and
+    # `stance_instruction` already carries it in full.
+    scenario_instruction = (
+        _scenario_instruction(authored_stance, stance_ladder)
+        if _has_authored_states
+        else ""
+    )
 
     system_text = load_and_format(
         _TEMPLATE_PATH,
         prompt_data,
         language_label=language_label,
+        scenario_instruction=scenario_instruction,
         events_instruction=events_instruction,
         stance_instruction=stance_instruction,
     )
