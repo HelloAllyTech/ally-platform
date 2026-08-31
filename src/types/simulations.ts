@@ -38,18 +38,20 @@ export interface ScenarioMetadata {
   sexualOrientation?: string;
   sessionBehaviorGuidelines?: string;
   experienceMode?: string;
-  enableFeedback?: boolean;
   /**
-   * Which post-session tabs this roleplay shows, as sub-toggles of the
-   * `enableFeedback` master switch. The backend always sends this RESOLVED,
-   * so the client never has to re-implement the "absent means all on"
-   * default — but it stays optional here because a cached or older response
-   * may predate it, in which case treat every tab as on (see
-   * DEFAULT_FEEDBACK_TABS in constants/simulationSummary).
+   * Which post-session tabs this roleplay shows: the debrief note and the
+   * annotated transcript. The backend always sends this RESOLVED, so the
+   * client never has to re-implement the "absent means on" default — but it
+   * stays optional here because a cached or older response may predate it, in
+   * which case treat both tabs as on (see DEFAULT_FEEDBACK_TABS in
+   * constants/simulationSummary).
+   *
+   * Both false is the wholesale opt-out. There is no master switch above these
+   * two: `enableFeedback` was retired on 2026-08-31 and folded into them by
+   * ally-be migration 1944200000000.
    */
   feedbackTabs?: {
     debrief: boolean;
-    skills: boolean;
     transcript: boolean;
   };
 }
