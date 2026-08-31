@@ -189,11 +189,18 @@ def _scenario_instruction(
         lines.append(stance_ladder)
     if authored_stance:
         lines.append(f"The client is at: {authored_stance}")
+    # Deliberately says only "use the author's words"; it does NOT say how
+    # stages relate to each other. An earlier draft added "a subject belonging
+    # to a later stage may well be withheld", which is the monotonic-
+    # progression assumption the stance ladder used to encode, reintroduced as
+    # advice: nothing guarantees an author's later states hold more disclosure,
+    # and a scenario that opens with a confession and closes guarded would be
+    # read backwards.
     lines.append(
-        "Infer the ledger against this. A subject the current stage openly "
-        "invites is NOT withheld; a subject belonging to a later stage may "
-        "well be. Where the stage says nothing about a subject, judge it from "
-        "the turns."
+        "Judge what the client is holding back against these stage "
+        "descriptions, and against the turns wherever the descriptions do not "
+        "speak to a subject. Do not record a subject the current stage invites "
+        "as withheld."
     )
     return "\n".join(lines) + "\n"
 

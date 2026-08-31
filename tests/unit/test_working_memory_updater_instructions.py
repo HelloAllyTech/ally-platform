@@ -92,17 +92,31 @@ def test_the_scenario_block_grounds_the_ledger_without_deciding_a_stance():
     # It says how to INFER what is withheld; it must not hand back the stance
     # decision the stance instruction just took away.
     text = _scenario_instruction("anxious", LADDER)
-    assert "NOT withheld" in text
+    assert "Do not record a subject the current stage invites as withheld" in text
     assert "report" not in text.lower().replace("ground truth", "")
 
 
 def test_a_stage_silent_on_a_subject_defers_to_the_turns():
     # The point of the whole block: an author rarely enumerates what the client
     # holds back, so the updater still has to infer — just not blindly.
-    assert "judge it from the turns" in _scenario_instruction("anxious", LADDER)
+    #
+    # And it infers from the author's words only. No claim is made here about
+    # how stages relate to one another: "later stage" reasoning is exactly the
+    # monotonic assumption the ladder used to make for every scenario.
+    assert "against the turns" in _scenario_instruction("anxious", LADDER)
 
 
 def test_nothing_authored_renders_nothing():
     # With no states the ladder IS the scenario and `stance_instruction` already
     # carries it in full; repeating it here would be two copies to disagree.
     assert _scenario_instruction(None, "") == ""
+
+
+def test_the_block_makes_no_claim_about_how_stages_relate():
+    # Ordering the stages is factual (the author's score bands are ordered).
+    # Inferring that later stages hold more disclosure is not, and a scenario
+    # that opens with a confession and closes guarded must not be read
+    # backwards.
+    text = _scenario_instruction("anxious", LADDER)
+    for phrase in ("later stage", "earlier stage", "further along", "progress"):
+        assert phrase not in text.lower(), phrase
