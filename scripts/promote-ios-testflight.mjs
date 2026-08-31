@@ -48,10 +48,15 @@ for (const [name, value] of Object.entries({
 // stray wrapping quotes/whitespace, depending on how it was originally pasted into the secret —
 // strip/un-flatten defensively rather than assume a single canonical storage form.
 function normalizePrivateKey(raw) {
-  let key = raw.includes("BEGIN PRIVATE KEY")
-    ? raw
-    : Buffer.from(raw, "base64").toString("utf-8");
+  // "PRIVATE KEY" alone (not "BEGIN PRIVATE KEY") so this also matches SEC1-format keys headed
+  // "-----BEGIN EC PRIVATE KEY-----", which does NOT contain the literal substring
+  // "BEGIN PRIVATE KEY" (there's "EC " in between) — the previous, stricter check would have
+  // silently misrouted a SEC1 key into the base64-decode branch instead of using it as-is.
+  let key = raw.includes("PRIVATE KEY") ? raw : Buffer.from(raw, "base64").toString("utf-8");
   key = key.includes("\\n") ? key.replace(/\\n/g, "\n") : key;
+  // Strip carriage returns unconditionally: a \r\n-terminated PEM (e.g. saved/copied on
+  // Windows) parses fine by eye but can trip OpenSSL's PEM decoder on the base64 body lines.
+  key = key.replace(/\r/g, "");
   key = key.trim();
   if (
     (key.startsWith('"') && key.endsWith('"')) ||
@@ -75,9 +80,14 @@ function loadPrivateKey() {
   try {
     keyObject = crypto.createPrivateKey({ key: pem, format: "pem" });
   } catch (error) {
+    // The PEM header/footer lines are boilerplate, not secret material — safe to log, and the
+    // fastest way to settle format questions (PKCS8 "PRIVATE KEY" vs SEC1 "EC PRIVATE KEY",
+    // stray characters before/after) without guessing further.
+    const headerLine = pem.split("\n")[0];
+    const footerLine = pem.trim().split("\n").at(-1);
     throw new Error(
       `APPSTORE_API_PRIVATE_KEY could not be parsed as a PEM private key at all ` +
-        `(normalized length ${pem.length}, expected ~250 for a P-256 EC key — ${pem.length > 300 ? "this is notably longer, check for stray characters (quotes, duplicated content)" : "length looks plausible"}). ` +
+        `(normalized length ${pem.length}, header line "${headerLine}", footer line "${footerLine}"). ` +
         `Node crypto error: ${error.message}. Re-check the secret is the exact, complete ` +
         `contents of the .p8 file downloaded from App Store Connect, nothing added or removed.`,
     );
