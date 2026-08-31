@@ -4,10 +4,13 @@ name: Submit iOS for App Store review
 # listing + latest TestFlight build for Apple's FULL App Store review — real public distribution,
 # not TestFlight. Never auto-triggered by anything else here.
 #
-# Does NOT prepare the App Store Connect listing (screenshots/description/metadata/export
-# compliance) — that's human content work assumed already done for the current version. Does NOT
-# auto-release once approved either: the script forces releaseType to MANUAL, so a second,
-# explicit action is still required in App Store Connect before real users see it.
+# If no version is ready in App Store Connect, the script creates the next one and carries the
+# previous version's en-US listing forward onto it (text fields as-is, screenshots re-uploaded
+# byte-for-byte since Apple's API has no "reuse existing screenshot" call) — this only makes
+# "identical to last time" free, not "different this time"; a human still updates the listing in
+# App Store Connect when it actually needs to change. Export compliance is never answered here.
+# Does NOT auto-release once approved either: the script forces releaseType to MANUAL, so a
+# second, explicit action is still required in App Store Connect before real users see it.
 
 on:
   workflow_dispatch:

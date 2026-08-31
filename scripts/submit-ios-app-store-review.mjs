@@ -4,11 +4,21 @@
  * release, not TestFlight. This is the highest-stakes action in this repo's release tooling:
  * once Apple approves it, the app can go live to every real App Store user.
  *
- * Deliberately does NOT prepare the App Store Connect listing (screenshots, description,
- * metadata, export compliance answers) — that's real content-authoring work only a human can
- * do, and this script assumes it's already done for the current version sitting in App Store
- * Connect. It also does NOT check readiness ahead of time; if the listing isn't ready, Apple's
- * own API error surfaces directly, same as every other error path in this script.
+ * If no version is sitting ready in App Store Connect, this script creates the next one itself
+ * and carries the previous version's listing forward onto it: text fields (description,
+ * keywords, promotional text, support URL — copied as-is, unedited) and screenshots (downloaded
+ * from the previous version's assets and re-uploaded as new assets on this one — Apple's public
+ * API has no "reuse this existing screenshot" call, only fresh upload, so a real byte-for-byte
+ * copy is the only way to avoid a human re-attaching images that haven't changed). This assumes
+ * the screenshots/description genuinely don't need to change for this release; if they do, a
+ * human still needs to update them in App Store Connect before (or after) this runs — this
+ * script only makes "identical to last time" free, not "different this time."
+ *
+ * Export compliance answers are NOT copied or answered here — that's still on whatever's already
+ * declared for the build itself (e.g. via Info.plist), and Apple's own error surfaces if it's
+ * genuinely missing. It also does NOT check listing readiness ahead of time otherwise; if
+ * something Apple requires is still missing, Apple's own API error surfaces directly, same as
+ * every other error path in this script.
  *
  * Deliberately DOES force releaseType to MANUAL regardless of whatever was previously
  * configured on the version — approval here only enqueues for release, it never auto-releases
@@ -35,6 +45,7 @@
  *        does fill in on its own, same idea as build-android-production.yml's single-locale
  *        (en-US) Play Store release notes.
  */
+import crypto from "node:crypto";
 import fs from "node:fs/promises";
 
 import jwt from "jsonwebtoken";
@@ -117,6 +128,227 @@ async function appleApi(path, token, init = {}) {
   return res.status === 204 ? null : res.json();
 }
 
+/** Reads the app's current marketing version straight from the checked-out repo — the same
+ * value the live build was made with, and the source of truth scheduled-mobile-release.yml
+ * already writes/reads for this exact field. */
+async function readLocalMarketingVersion() {
+  const pbxproj = await fs.readFile("ios/ally.xcodeproj/project.pbxproj", "utf-8");
+  const match = pbxproj.match(/MARKETING_VERSION\s*=\s*([\d.]+)\s*;/);
+  if (!match) {
+    throw new Error("Could not find MARKETING_VERSION in ios/ally.xcodeproj/project.pbxproj");
+  }
+  return match[1];
+}
+
+/** All existing App Store versions for this app/platform, newest-first by parsed version number.
+ * No `sort` query param exists on this endpoint (checked against Apple's real OpenAPI spec), so
+ * sorting is done locally. */
+async function fetchAllExistingVersions(appId, token) {
+  const response = await appleApi(
+    `/apps/${appId}/appStoreVersions?filter[platform]=IOS&limit=200`,
+    token,
+  );
+  const versions = response.data ?? [];
+  const parse = v => (v.attributes?.versionString ?? "0").split(".").map(n => Number(n) || 0);
+  return versions.sort((a, b) => {
+    const [pa, pb] = [parse(a), parse(b)];
+    for (let i = 0; i < Math.max(pa.length, pb.length); i += 1) {
+      if ((pb[i] ?? 0) !== (pa[i] ?? 0)) return (pb[i] ?? 0) - (pa[i] ?? 0);
+    }
+    return 0;
+  });
+}
+
+/** Copies the previous version's en-US text listing fields onto a freshly created version.
+ * Returns the new en-US localization's id (needed by the caller for the screenshot copy and the
+ * existing whatsNew step), or null if the previous version had no en-US localization to copy. */
+async function copyEnUsLocalizationForward(sourceVersionId, newVersionId, token) {
+  const sourceLocsResponse = await appleApi(
+    `/appStoreVersions/${sourceVersionId}/appStoreVersionLocalizations`,
+    token,
+  );
+  const sourceLoc = sourceLocsResponse.data?.find(loc => loc?.attributes?.locale === "en-US");
+  if (!sourceLoc) return null;
+
+  const { description, keywords, marketingUrl, promotionalText, supportUrl } =
+    sourceLoc.attributes ?? {};
+  const newLocResponse = await appleApi("/appStoreVersionLocalizations", token, {
+    method: "POST",
+    body: JSON.stringify({
+      data: {
+        type: "appStoreVersionLocalizations",
+        attributes: { locale: "en-US", description, keywords, marketingUrl, promotionalText, supportUrl },
+        relationships: {
+          appStoreVersion: { data: { type: "appStoreVersions", id: newVersionId } },
+        },
+      },
+    }),
+  });
+  return { newLocalizationId: newLocResponse.data.id, sourceLocalizationId: sourceLoc.id };
+}
+
+/** Apple's asset CDN URLs are templates with {w}/{h}/{f} placeholders, filled in from the same
+ * ImageAsset's own width/height — the same convention Apple uses for iTunes/App Store artwork
+ * URLs generally. */
+function resolveImageAssetUrl(imageAsset) {
+  if (!imageAsset?.templateUrl) return null;
+  return imageAsset.templateUrl
+    .replace("{w}", String(imageAsset.width))
+    .replace("{h}", String(imageAsset.height))
+    .replace("{f}", "png");
+}
+
+/** Downloads every screenshot on the source localization and re-uploads each as a new asset on
+ * the target localization, preserving the source's display-type grouping (iPhone 6.7", iPad
+ * 12.9", etc.). Best-effort per screenshot: one failing to download/upload is logged and skipped
+ * rather than aborting the whole submission — Apple's own review-readiness check will surface
+ * anything still missing far more precisely than this script could. */
+async function copyScreenshotsForward(sourceLocalizationId, targetLocalizationId, token) {
+  const setsResponse = await appleApi(
+    `/appStoreVersionLocalizations/${sourceLocalizationId}/appScreenshotSets`,
+    token,
+  );
+
+  for (const sourceSet of setsResponse.data ?? []) {
+    const displayType = sourceSet.attributes?.screenshotDisplayType;
+    if (!displayType) continue;
+
+    const screenshotsResponse = await appleApi(
+      `/appScreenshotSets/${sourceSet.id}/appScreenshots`,
+      token,
+    );
+    const sourceScreenshots = screenshotsResponse.data ?? [];
+    if (sourceScreenshots.length === 0) continue;
+
+    const newSetResponse = await appleApi("/appScreenshotSets", token, {
+      method: "POST",
+      body: JSON.stringify({
+        data: {
+          type: "appScreenshotSets",
+          attributes: { screenshotDisplayType: displayType },
+          relationships: {
+            appStoreVersionLocalization: {
+              data: { type: "appStoreVersionLocalizations", id: targetLocalizationId },
+            },
+          },
+        },
+      }),
+    });
+    const newSetId = newSetResponse.data.id;
+
+    for (const screenshot of sourceScreenshots) {
+      try {
+        const fileName = screenshot.attributes?.fileName ?? "screenshot.png";
+        const downloadUrl = resolveImageAssetUrl(screenshot.attributes?.imageAsset);
+        if (!downloadUrl) {
+          console.warn(`Skipping screenshot "${fileName}" — source asset isn't ready to copy yet.`);
+          continue;
+        }
+
+        const imageRes = await fetch(downloadUrl);
+        if (!imageRes.ok) {
+          console.warn(`Skipping screenshot "${fileName}" — download failed: ${imageRes.status}`);
+          continue;
+        }
+        const imageBuffer = Buffer.from(await imageRes.arrayBuffer());
+
+        const newScreenshotResponse = await appleApi("/appScreenshots", token, {
+          method: "POST",
+          body: JSON.stringify({
+            data: {
+              type: "appScreenshots",
+              attributes: { fileName, fileSize: imageBuffer.length },
+              relationships: { appScreenshotSet: { data: { type: "appScreenshotSets", id: newSetId } } },
+            },
+          }),
+        });
+        const newScreenshotId = newScreenshotResponse.data.id;
+        const uploadOperations = newScreenshotResponse.data.attributes?.uploadOperations ?? [];
+
+        for (const op of uploadOperations) {
+          const headers = Object.fromEntries(
+            (op.requestHeaders ?? []).map(h => [h.name, h.value]),
+          );
+          const chunk = imageBuffer.subarray(op.offset, op.offset + op.length);
+          const uploadRes = await fetch(op.url, { method: op.method ?? "PUT", headers, body: chunk });
+          if (!uploadRes.ok) {
+            throw new Error(`upload chunk failed: ${uploadRes.status}`);
+          }
+        }
+
+        // MD5 is the checksum algorithm Apple's asset-upload APIs have historically used for
+        // this field; the OpenAPI schema itself only says `type: string`, no algorithm specified,
+        // so this is the one piece of this flow not verifiable against the spec directly. If a
+        // copied screenshot ends up in a FAILED assetDeliveryState in App Store Connect despite
+        // the upload itself succeeding, a checksum mismatch here is the first thing to check.
+        const checksum = crypto.createHash("md5").update(imageBuffer).digest("hex");
+        await appleApi(`/appScreenshots/${newScreenshotId}`, token, {
+          method: "PATCH",
+          body: JSON.stringify({
+            data: {
+              type: "appScreenshots",
+              id: newScreenshotId,
+              attributes: { uploaded: true, sourceFileChecksum: checksum },
+            },
+          }),
+        });
+      } catch (error) {
+        console.warn(`Skipping a screenshot in ${displayType} — ${error.message ?? error}`);
+      }
+    }
+  }
+}
+
+/** Finds an existing submittable App Store version, or creates the next one and carries the
+ * previous version's en-US listing (text + screenshots) forward onto it. See the file header for
+ * why this is a deliberate, bounded amount of automation — not a substitute for a human updating
+ * the listing when it actually needs to change. */
+async function ensureSubmittableVersion(appId, token) {
+  const stateFilter = EDITABLE_STATES.join(",");
+  const existingResponse = await appleApi(
+    `/apps/${appId}/appStoreVersions?filter[platform]=IOS&filter[appVersionState]=${stateFilter}&limit=1`,
+    token,
+  );
+  const existing = existingResponse.data?.[0];
+  if (existing) {
+    return { versionId: existing.id, versionString: existing.attributes?.versionString ?? "(unknown version)" };
+  }
+
+  console.log("No submittable App Store version found — creating the next one and carrying the previous listing forward.");
+
+  const allVersions = await fetchAllExistingVersions(appId, token);
+  const previousVersion = allVersions[0] ?? null;
+  const versionString = await readLocalMarketingVersion();
+
+  const newVersionResponse = await appleApi("/appStoreVersions", token, {
+    method: "POST",
+    body: JSON.stringify({
+      data: {
+        type: "appStoreVersions",
+        attributes: { platform: "IOS", versionString },
+        relationships: { app: { data: { type: "apps", id: appId } } },
+      },
+    }),
+  });
+  const versionId = newVersionResponse.data.id;
+
+  if (previousVersion) {
+    const copied = await copyEnUsLocalizationForward(previousVersion.id, versionId, token);
+    if (copied) {
+      await copyScreenshotsForward(copied.sourceLocalizationId, copied.newLocalizationId, token);
+    } else {
+      console.warn(
+        `Previous version ${previousVersion.attributes?.versionString ?? "(unknown)"} had no ` +
+          "en-US localization to copy — the new version has no listing text or screenshots yet.",
+      );
+    }
+  } else {
+    console.warn("No previous App Store version exists to copy a listing from — this looks like a first-ever submission, which this script doesn't set up from scratch.");
+  }
+
+  return { versionId, versionString };
+}
+
 async function main() {
   const token = mintToken();
 
@@ -124,20 +356,7 @@ async function main() {
   const appId = appsResponse.data?.[0]?.id;
   if (!appId) throw new Error(`No app found for bundle id ${BUNDLE_ID}`);
 
-  const stateFilter = EDITABLE_STATES.join(",");
-  const versionsResponse = await appleApi(
-    `/apps/${appId}/appStoreVersions?filter[platform]=IOS&filter[appVersionState]=${stateFilter}&limit=1`,
-    token,
-  );
-  const version = versionsResponse.data?.[0];
-  if (!version) {
-    throw new Error(
-      `No App Store version found in a submittable state (checked: ${EDITABLE_STATES.join(", ")}). ` +
-        "Prepare the next version's listing (screenshots, description, export compliance, etc.) in App Store Connect first — this script only submits an already-prepared listing, it never creates or fills one in.",
-    );
-  }
-  const versionId = version.id;
-  const versionString = version.attributes?.versionString ?? "(unknown version)";
+  const { versionId, versionString } = await ensureSubmittableVersion(appId, token);
 
   const buildsResponse = await appleApi(
     `/builds?filter[app]=${appId}&sort=-uploadedDate&limit=1&filter[processingState]=VALID`,
