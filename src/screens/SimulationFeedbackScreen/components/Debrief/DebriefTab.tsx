@@ -15,6 +15,7 @@ import {useTranslate} from '@/hooks';
 import {colors} from '@/theme';
 import {SimulationSummaryData} from '@/types';
 
+import {CitationsTable} from '../AskAI/ChatElements';
 import {AskAIChatMessage, ChatMessageRole} from '../AskAI/types';
 import {useAskAIChat} from '../AskAI/useAskAIChat';
 import {DebriefReplyInput} from './DebriefReplyInput';
@@ -54,24 +55,117 @@ const NoteSkeleton = () => (
 );
 
 /**
+ * A timestamp Ally wrote to point at a moment in the transcript, e.g. `[4:12]`.
+ * The chat prompt tells it to format these exactly as the transcript does and
+ * never to invent one; the backend resolves each into a Citation against the
+ * real transcript row.
+ */
+const TIMESTAMP = /\[(\d{1,2}:\d{2})\]/g;
+
+/** Inline `**bold**`, matching how the note itself renders emphasis. */
+const REPLY_BOLD = /\*\*(.+?)\*\*/g;
+
+type ReplySegment =
+  | {type: 'text'; value: string}
+  | {type: 'bold'; value: string}
+  | {type: 'timestamp'; value: string};
+
+const parseReplySegments = (line: string): ReplySegment[] => {
+  const segments: ReplySegment[] = [];
+  const pattern = new RegExp(`${TIMESTAMP.source}|${REPLY_BOLD.source}`, 'g');
+  let cursor = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(line)) !== null) {
+    if (match.index > cursor) {
+      segments.push({type: 'text', value: line.slice(cursor, match.index)});
+    }
+    if (match[1] !== undefined) {
+      segments.push({type: 'timestamp', value: match[1]});
+    } else if (match[2] !== undefined) {
+      segments.push({type: 'bold', value: match[2]});
+    }
+    cursor = pattern.lastIndex;
+  }
+  if (cursor < line.length) {
+    segments.push({type: 'text', value: line.slice(cursor)});
+  }
+  return segments.length ? segments : [{type: 'text', value: line}];
+};
+
+/**
  * A reply in the conversation the note opened. Deliberately plainer than the
  * note itself: the note is the thing being read, the replies are a
  * conversation about it — mirrors ally-web's ReplyBubble.
+ *
+ * Ally is told to ground every factual claim in the transcript, so its replies
+ * carry timestamps. Those used to render as literal `[4:12]` text and the
+ * resolved citations were dropped on the floor — the backend computed them and
+ * nothing displayed them.
  */
-const ReplyBubble: React.FC<{role: ChatMessageRole; content: string}> = ({
-  role,
-  content,
-}) => {
-  if (role === ChatMessageRole.USER) {
+const ReplyBubble: React.FC<{
+  message: AskAIChatMessage;
+  clientName?: string;
+  onOpenMoment?: (messageId: string) => void;
+}> = ({message, clientName, onOpenMoment}) => {
+  const {t} = useTranslate();
+
+  if (message.role === ChatMessageRole.USER) {
     return (
       <View style={styles.learnerBubble}>
-        <Text style={styles.learnerBubbleText}>{content}</Text>
+        <Text style={styles.learnerBubbleText}>{message.content}</Text>
       </View>
     );
   }
+
+  const citations = message.citations ?? [];
+  // A timestamp is only worth making tappable if the backend actually resolved
+  // it to a transcript row; an unresolved one stays plain text.
+  const citationByTimestamp = new Map(
+    citations.map(citation => [citation.timestamp, citation]),
+  );
+  const showCitations = !message.isStreaming && citations.length > 0;
+  const clientLabel = clientName
+    ? `${clientName} (${t('transcription.aiClientSuffix')})`
+    : t('transcription.aiClientSuffix');
+
   return (
     <View style={styles.allyReplyRow}>
-      <Text style={styles.allyReplyText}>{content}</Text>
+      <Text style={styles.allyReplyText}>
+        {parseReplySegments(message.content).map((segment, segmentIndex) => {
+          if (segment.type === 'bold') {
+            return (
+              <Text key={segmentIndex} style={styles.boldText}>
+                {segment.value}
+              </Text>
+            );
+          }
+          if (segment.type === 'timestamp') {
+            const citation = citationByTimestamp.get(segment.value);
+            if (!citation || !onOpenMoment) {
+              return <Text key={segmentIndex}>[{segment.value}]</Text>;
+            }
+            return (
+              <Text
+                key={segmentIndex}
+                style={styles.momentChip}
+                onPress={() => onOpenMoment(String(citation.transcriptId))}
+                suppressHighlighting>
+                {' '}
+                {segment.value}{' '}
+              </Text>
+            );
+          }
+          return <Text key={segmentIndex}>{segment.value}</Text>;
+        })}
+      </Text>
+      {showCitations && (
+        <CitationsTable
+          citations={citations}
+          clientLabel={clientLabel}
+          youLabel={t('transcription.youLabel')}
+        />
+      )}
     </View>
   );
 };
@@ -94,6 +188,10 @@ export const DebriefTab: React.FC<DebriefTabProps> = ({
   const {t} = useTranslate();
   const insets = useSafeAreaInsets();
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  // Who the simulated client is, so a citation can attribute the line it
+  // quotes to a name rather than just "AI Client".
+  const clientName = simulationDetails?.scenario?.metadata?.name;
 
   const {
     messages,
@@ -224,9 +322,13 @@ export const DebriefTab: React.FC<DebriefTabProps> = ({
 
   const renderItem = useCallback(
     ({item}: {item: AskAIChatMessage}) => (
-      <ReplyBubble role={item.role} content={item.content} />
+      <ReplyBubble
+        message={item}
+        clientName={clientName}
+        onOpenMoment={onOpenMoment}
+      />
     ),
-    [],
+    [clientName, onOpenMoment],
   );
 
   const keyExtractor = useCallback((item: AskAIChatMessage) => item.id, []);
