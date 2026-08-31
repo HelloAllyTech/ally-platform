@@ -223,9 +223,41 @@ async function main() {
     throw new Error(`Failed to assign build ${buildId} to group ${groupId}: ${assignRes.status} ${body}`);
   }
 
+  // Assigning a build to an external group only associates the two — it does NOT submit the
+  // build for Apple's Beta App Review, which is a separate resource entirely. Without this call
+  // the build sits at "Ready to Submit" in App Store Connect indefinitely (confirmed live: this
+  // step was missing on the first real run, and the build never left that state).
+  const submissionRes = await fetch(`${API_BASE}/betaAppReviewSubmissions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      data: {
+        type: "betaAppReviewSubmissions",
+        relationships: {
+          build: { data: { type: "builds", id: buildId } },
+        },
+      },
+    }),
+  });
+  if (!submissionRes.ok) {
+    const body = await submissionRes.text();
+    // Apple commonly rejects this specific call for missing export-compliance info on the
+    // build — surface the raw response rather than a generic message, since that's the most
+    // likely real cause and the response body names it explicitly.
+    throw new Error(
+      `Build ${buildId} was assigned to the group, but submitting it for Beta App Review ` +
+        `failed: ${submissionRes.status} ${body}. A common cause is missing export compliance ` +
+        `information for this build in App Store Connect — check TestFlight -> Build Uploads.`,
+    );
+  }
+
   console.log(
-    `Submitted build ${buildVersion} (${buildId}) to TestFlight group "${TESTFLIGHT_EXTERNAL_GROUP_NAME}". ` +
-      "Apple's Beta App Review still needs to clear before external testers can install it.",
+    `Build ${buildVersion} (${buildId}) submitted for Beta App Review under TestFlight group ` +
+      `"${TESTFLIGHT_EXTERNAL_GROUP_NAME}". Apple's review still needs to clear before external ` +
+      "testers can install it.",
   );
 
   const githubOutput = process.env.GITHUB_OUTPUT;
