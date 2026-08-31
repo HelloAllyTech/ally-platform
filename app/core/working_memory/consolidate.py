@@ -32,6 +32,7 @@ from typing import List, Optional
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 
 from app.core.logger import get_logger
+from app.core.working_memory import monologue
 from app.core.working_memory.proposal import ProposedUpdate, ValidatedUpdate, validate
 from app.core.working_memory.state import (
     ClientWorkingMemory,
@@ -431,6 +432,16 @@ def schedule_update(
     reason: str = "cadence",
     embed_query=None,
     authored_stance: Optional[str] = None,
+    # ---- DISPLAY ONLY, for the internal-monologue panel ----
+    # These three exist solely so the preview can explain WHY the client moved.
+    # Nothing here influences the update: `score` and `credited_behaviours` are
+    # never read by `validate`, which takes `authored_stance` verbatim. They
+    # were removed from this signature when the stance ladder was deleted; if
+    # you find yourself passing them into a decision, the ladder has come back
+    # and that is the bug.
+    room=None,
+    score: Optional[int] = None,
+    credited_behaviours: Optional[List[str]] = None,
 ) -> bool:
     """Fire the consolidation as a DETACHED task writing into ``store``.
 
@@ -469,6 +480,21 @@ def schedule_update(
                 timeout,
             )
             await store.mark_miss()
+            # Report the miss: this turn ran on last turn's memory, and a
+            # curator watching the client behave oddly needs the cause visible.
+            await monologue.publish_and_record(
+                room,
+                store,
+                monologue.build_payload(
+                    memory=memory,
+                    update=None,
+                    turn_index=turn_index,
+                    score=score,
+                    prompt_data=prompt_data,
+                    messages=new_messages,
+                    missed=True,
+                ),
+            )
             return
         except asyncio.CancelledError:
             # Session teardown via discard(). Not a miss — nobody will read it.
@@ -478,6 +504,21 @@ def schedule_update(
                 "[working-memory] update for turn %d failed: %s", turn_index, exc
             )
             await store.mark_miss()
+            # Report the miss: this turn ran on last turn's memory, and a
+            # curator watching the client behave oddly needs the cause visible.
+            await monologue.publish_and_record(
+                room,
+                store,
+                monologue.build_payload(
+                    memory=memory,
+                    update=None,
+                    turn_index=turn_index,
+                    score=score,
+                    prompt_data=prompt_data,
+                    messages=new_messages,
+                    missed=True,
+                ),
+            )
             return
 
         if update is None:
@@ -525,6 +566,22 @@ def schedule_update(
         )
         committed = await apply_update(store, update, turn_index, salient)
         if committed:
+            # Publish the turn to the preview's internal-monologue panel. After
+            # the commit so the panel shows what was actually kept, and awaited
+            # inside the detached task so it costs the reply path nothing.
+            await monologue.publish_and_record(
+                room,
+                store,
+                monologue.build_payload(
+                    memory=memory,
+                    update=update,
+                    turn_index=turn_index,
+                    score=score,
+                    prompt_data=prompt_data,
+                    advancing_behaviours=credited_behaviours,
+                    messages=new_messages,
+                ),
+            )
             logger.info(
                 "[working-memory] turn %d committed (%s): stance=%s "
                 "disclosed=%d withheld=%d threads=%+d",

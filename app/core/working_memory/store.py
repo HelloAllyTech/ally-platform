@@ -68,6 +68,14 @@ class ClientWorkingMemoryStore:
         #: Set when an update is in flight, so a second one is not started for
         #: the same turn. Mirrors RollingSummaryStore.in_flight.
         self._task: Optional[asyncio.Task] = None
+        #: Per-turn internal-monologue payloads, kept so an admin can revisit a
+        #: finished session rather than only watching one live. Bounded: a long
+        #: session would otherwise grow this without limit, and the recent turns
+        #: are the ones anyone reads. Lives on the store, not on
+        #: ClientWorkingMemory — the dataclass is the model's view of the
+        #: client, and a UI transcript is not part of what the client has in
+        #: mind.
+        self.monologue: List[dict] = []
         #: The pool `salient_backstory` is recalled from (see corpus.py).
         #: Immutable for the session and held HERE rather than on the state
         #: record, which is deep-copied on every snapshot — copying an unchanging

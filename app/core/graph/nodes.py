@@ -2586,6 +2586,18 @@ async def update_working_memory(
         room_id=getattr(_room, "name", None),
         embed_query=embed_query,
         authored_stance=_authored_stance,
+        # ---- internal-monologue panel (display only) ----
+        # The preview renders why the client moved. `score` and
+        # `credited_behaviours` are read for DISPLAY and never feed the update;
+        # `validate` takes `authored_stance` verbatim. Reading the score here is
+        # not the stance ladder returning.
+        room=_room,
+        score=(
+            _score_keeper.get_total_score()
+            if (_score_keeper := configurable.get("score_keeper")) is not None
+            else None
+        ),
+        credited_behaviours=list(getattr(state, "advancing_behaviour_ids", None) or []),
     )
     return {}
 

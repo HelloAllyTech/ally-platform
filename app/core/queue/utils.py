@@ -231,7 +231,9 @@ async def _emit_session_memory(
 
             snapshot = await client_working_memory_store.snapshot()
             working_memory_record = build_writeout(
-                snapshot, _tail_messages_for_grounding(thread_id)
+                snapshot,
+                _tail_messages_for_grounding(thread_id),
+                monologue=getattr(client_working_memory_store, "monologue", None),
             )
         except Exception as writeout_error:  # noqa: BLE001
             # A missing semantic record costs the next session its continuity.

@@ -125,6 +125,7 @@ def check_grounding(
 def build_writeout(
     memory: ClientWorkingMemory,
     messages: Sequence[BaseMessage] = (),
+    monologue: Optional[Sequence[Dict[str, Any]]] = None,
 ) -> Optional[Dict[str, Any]]:
     """The semantic record, or None when there is nothing worth keeping.
 
@@ -146,7 +147,9 @@ def build_writeout(
     open_threads = [t.topic for t in memory.open_threads]
     withheld_still_locked = [w.topic for w in memory.withheld if w.status == "unsaid"]
 
-    if not (grounded or ungrounded or open_threads or withheld_still_locked):
+    if not (
+        grounded or ungrounded or open_threads or withheld_still_locked or monologue
+    ):
         return None
 
     return {
@@ -174,4 +177,12 @@ def build_writeout(
         "updates_committed": memory.updates_committed,
         "updates_missed": memory.updates_missed,
         "unverified_count": len(ungrounded),
+        # The per-turn internal monologue, so an admin can reopen a finished
+        # session and work out why the client behaved as it did. Rides here
+        # rather than on its own message because this record already reaches
+        # ally-be as passthrough `structured` — no wire change, no migration.
+        #
+        # Carried even when every other field is empty: a session whose client
+        # disclosed nothing is exactly the one someone will want to inspect.
+        "monologue": list(monologue or []),
     }
