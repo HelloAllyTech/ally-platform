@@ -13,6 +13,12 @@ on:
   schedule:
     - cron: '0 5 * * *'
   workflow_dispatch:
+    inputs:
+      force:
+        description: 'Skip the 48h/new-commits cadence gate (still requires green tests and the kill switch)'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -51,6 +57,11 @@ jobs:
         if: steps.gate_enabled.outputs.proceed == 'true'
         run: |
           set -e
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.force }}" = "true" ]; then
+            echo "force=true on a manual dispatch — skipping the cadence/new-commits gate."
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           LAST_TAG=$(git tag -l 'auto-release/*' --sort=-creatordate | head -1 || true)
           if [ -z "$LAST_TAG" ]; then
             echo "No previous auto-release tag found. Proceeding (first run)."
@@ -171,7 +182,7 @@ jobs:
         env:
           INCOMING_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         with:
-          text: 'Scheduled mobile release: bumped to ${{ steps.version.outputs.next_version }}, triggered Android + iOS production builds.'
+          text: "${{ (github.event_name == 'workflow_dispatch' && inputs.force == true) && 'Manually triggered' || 'Scheduled' }} mobile release: bumped to ${{ steps.version.outputs.next_version }}, triggered Android + iOS production builds."
           attachments: |
             [
               {
