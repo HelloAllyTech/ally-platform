@@ -147,6 +147,31 @@ synthesis: several TTS providers treat a fully-uppercase token as an acronym
 and spell it out letter by letter (an "MMM" hesitation heard as "M, M, M"
 instead of a hum) even for plain English text.
 
+## Isolated synthesis failures (`_register_tts_error_fallback`)
+
+**File:** `app/worker.py`
+
+LiveKit tees a reply's text stream into two independent consumers: one
+synthesizes audio, the other commits the text to the transcript unconditionally.
+A single TTS failure (after the plugin's own retries are exhausted) is swallowed
+by `wait_if_not_interrupted`'s `asyncio.gather(..., return_exceptions=True)` — the
+transcript still commits, but no audio plays. `AgentSession._on_error` only
+closes the session after four *consecutive* unrecoverable TTS errors, resetting
+that count on the next successful "speaking" state, so an isolated failure never
+closes the session and never surfaces beyond one log line. Reported from a
+course roleplay: the actor went silent for one turn, its dialogue still showed
+up in the transcript, and the rest of the session carried on normally.
+
+`AgentWorker._register_tts_error_fallback()` listens on the same TTS instance's
+`"error"` event `_on_error` above does. On an unrecoverable error it speaks
+`tts_failure_fallback_line()` (the LLM-timeout fallback line reused, since the
+learner's situation — silence after saying something — is identical) and
+publishes a non-fatal `session-fault`, throttled to one recovery per
+`TTS_FAILURE_FALLBACK_COOLDOWN_S` so a provider outage cannot turn into a burst
+of failing `say()` calls that push the session toward the four-in-a-row close
+threshold above. It cannot re-speak the lost line itself — `TTSError` carries
+only a label and the exception, never the failed text.
+
 ---
 
 ## Key Source Files
