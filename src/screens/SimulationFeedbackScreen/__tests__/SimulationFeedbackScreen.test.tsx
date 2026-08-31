@@ -237,18 +237,7 @@ jest.mock('../components', () => {
         )}
       </View>
     ),
-    SessionSkills: () => <View testID="session-skills-tab" />,
     EventChecklist: () => <View testID="event-checklist" />,
-    UpNext: ({onFinish, onBack}: any) => (
-      <View testID="up-next-tab">
-        <TouchableOpacity testID="finish-button" onPress={onFinish}>
-          <Text>Finish</Text>
-        </TouchableOpacity>
-        <TouchableOpacity testID="back-button" onPress={onBack}>
-          <Text>Back</Text>
-        </TouchableOpacity>
-      </View>
-    ),
   };
 });
 
@@ -284,13 +273,14 @@ describe('SimulationFeedbackScreen', () => {
     });
   });
 
-  it('renders try another button on the skills tab', async () => {
+  it('renders try another button on the transcript tab', async () => {
     const {getByTestId} = renderWithProviders(
       <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1'}} as any} />,
     );
     // The floating "try another" button is hidden on Debrief (it has its own
-    // bottom-pinned reply composer, same reason Ask AI used to hide it).
-    fireEvent.press(getByTestId('tab-1'));
+    // bottom-pinned reply composer). Transcript is the only other tab now that
+    // Skills is retired.
+    fireEvent.press(getByTestId('tab-2'));
     await waitFor(() => {
       expect(getByTestId('primary-button')).toBeTruthy();
     });
@@ -325,16 +315,15 @@ describe('SimulationFeedbackScreen', () => {
     });
   });
 
-  it('shows up next tab when pathId is provided', async () => {
-    const {getByTestId} = renderWithProviders(
+  it('adds no Up next tab even when pathId is provided', async () => {
+    // The legacy Up next tab was retired on 2026-08-31 along with Skills;
+    // pathId/caseId now only pick the back-navigation target.
+    const {queryByTestId} = renderWithProviders(
       <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1', pathId: 'path-1'}} as any} />,
     );
-    // UP_NEXT always gets testID 'tab-3', regardless of how many tabs precede
-    // it (DEBRIEF=0, SKILLS=1, TRANSCRIPTION=2, UP_NEXT=3).
-    fireEvent.press(getByTestId('tab-3'));
-    await waitFor(() => {
-      expect(getByTestId('up-next-tab')).toBeTruthy();
-    });
+
+    expect(queryByTestId('tab-3')).toBeNull();
+    expect(queryByTestId('up-next-tab')).toBeNull();
   });
 
   it('falls back to the first visible tab when debrief is turned off', async () => {
@@ -350,7 +339,7 @@ describe('SimulationFeedbackScreen', () => {
           scenario: {
             title: 'Test',
             metadata: {
-              feedbackTabs: {debrief: false, skills: true, transcript: true},
+              feedbackTabs: {debrief: false, transcript: true},
             },
           },
           events: [],
@@ -363,9 +352,9 @@ describe('SimulationFeedbackScreen', () => {
       <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1'}} as any} />,
     );
     // Debrief starts as the default activeTabKey, but it isn't in the visible
-    // set here, so the screen falls through to Skills without a tap.
+    // set here, so the screen falls through to Transcript without a tap.
     await waitFor(() => {
-      expect(getByTestId('session-skills-tab')).toBeTruthy();
+      expect(getByTestId('transcript-tab')).toBeTruthy();
     });
     expect(queryByTestId('debrief-tab')).toBeNull();
   });
@@ -384,7 +373,7 @@ describe('SimulationFeedbackScreen', () => {
             title: 'Test',
             metadata: {
               experienceMode: 'CHECKLIST',
-              feedbackTabs: {debrief: false, skills: true, transcript: true},
+              feedbackTabs: {debrief: false, transcript: true},
             },
           },
           events: [],
@@ -461,16 +450,16 @@ describe('SimulationFeedbackScreen', () => {
     });
   });
 
-  it('renders tabs with correct count based on route params', () => {
+  it('renders exactly two tabs: Debrief and Transcript', () => {
     const {getByTestId, queryByTestId} = renderWithProviders(
       <SimulationFeedbackScreen navigation={{} as any} route={{params: {scenarioSessionId: '1'}} as any} />,
     );
-    // Without pathId/caseId, Debrief/Skills/Transcript render but Up Next
-    // doesn't. testIDs are per tab, not per position: DEBRIEF (0), SKILLS (1),
-    // TRANSCRIPTION (2), UP_NEXT (3).
+    // testIDs are per tab, not per position: DEBRIEF (0), TRANSCRIPTION (2).
+    // Skills (1) and Up next (3) were retired on 2026-08-31 and their ids are
+    // deliberately not reused.
     expect(getByTestId('tab-0')).toBeTruthy();
-    expect(getByTestId('tab-1')).toBeTruthy();
     expect(getByTestId('tab-2')).toBeTruthy();
+    expect(queryByTestId('tab-1')).toBeNull();
     expect(queryByTestId('tab-3')).toBeNull();
   });
 
@@ -546,7 +535,7 @@ describe('SimulationFeedbackScreen', () => {
             scenario: {
               title: 'Test',
               metadata: {
-                feedbackTabs: {debrief: true, skills: true, transcript: false},
+                feedbackTabs: {debrief: true, transcript: false},
               },
             },
             events: [],

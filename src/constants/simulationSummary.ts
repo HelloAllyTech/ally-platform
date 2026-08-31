@@ -8,39 +8,35 @@ export enum SimulationSummaryTabKey {
   SUMMARY = 'SUMMARY',
   DEBRIEF = 'DEBRIEF',
   TRANSCRIPTION = 'TRANSCRIPTION',
-  SKILLS = 'SKILLS',
-  UP_NEXT = 'UP_NEXT',
 }
 
 export interface FeedbackTabsConfig {
   debrief: boolean;
-  skills: boolean;
   transcript: boolean;
 }
 
 /**
- * Which post-session tabs a roleplay shows, when the backend response
- * predates the `feedbackTabs` sub-toggle (or a cached one is in memory) —
- * every tab defaults on, matching ally-web's PostSimulationSummary fallback.
- * A stable module-level constant so it doesn't churn the `tabs` useMemo on
- * every render.
+ * Which post-session tabs a roleplay shows, when the backend response predates
+ * the `feedbackTabs` toggles (or a cached one is in memory) — both default on,
+ * matching the backend resolver and ally-web's fallback. A stable module-level
+ * constant so it doesn't churn the `tabs` useMemo on every render.
+ *
+ * This used to carry `skills: true`, which disagreed with both the backend and
+ * ally-web (each defaulted it off) — so a roleplay with no stored config, 31 of
+ * 58 in the local seed, showed a Skills tab here and not on the web. The tab
+ * was retired outright on 2026-08-31, which settles it.
  */
 export const DEFAULT_FEEDBACK_TABS: FeedbackTabsConfig = {
   debrief: true,
-  skills: true,
   transcript: true,
 };
 
 export const getSimulationSummaryTabs = (
   t: TFunction,
   {
-    pathId,
-    caseId,
     shortSession,
     feedbackTabs = DEFAULT_FEEDBACK_TABS,
   }: {
-    pathId?: string;
-    caseId?: string;
     shortSession?: boolean;
     feedbackTabs?: FeedbackTabsConfig;
   },
@@ -63,33 +59,20 @@ export const getSimulationSummaryTabs = (
     title: t('postSim.tabs.debrief'),
     testID: 'tab-0',
   };
-  const skillsTab = {
-    key: SimulationSummaryTabKey.SKILLS,
-    title: t('postSim.tabs.skillsDemonstrated'),
-    testID: 'tab-1',
-  };
   const transcriptionTab = {
     key: SimulationSummaryTabKey.TRANSCRIPTION,
     title: t('postSim.tabs.transcript'),
     testID: 'tab-2',
   };
 
-  // Debrief → Skills → Transcript → Up Next, matching ally-web: the note is
-  // what the learner came back for, so it leads. Each sub-toggle can
-  // independently hide its own tab.
+  // Exactly two tabs, one per toggle, matching ally-web. Skills Demonstrated
+  // and the legacy "Up next" tab were both retired on 2026-08-31 — Skills had
+  // been off platform-wide since 2026-08-24, and Up next only ever appeared
+  // for legacy pathway/case sessions.
   const tabs = [
     ...(feedbackTabs.debrief ? [debriefTab] : []),
-    ...(feedbackTabs.skills ? [skillsTab] : []),
     ...(feedbackTabs.transcript ? [transcriptionTab] : []),
   ];
-
-  if (pathId || caseId) {
-    tabs.push({
-      key: SimulationSummaryTabKey.UP_NEXT,
-      title: t('postSim.tabs.upNext'),
-      testID: 'tab-3',
-    });
-  }
 
   return tabs;
 };
