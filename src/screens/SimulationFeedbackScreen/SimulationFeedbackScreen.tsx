@@ -55,10 +55,8 @@ import {
 import {
   DebriefTab,
   EventChecklist,
-  SessionSkills,
   SummaryTab,
   TranscriptTab,
-  UpNext,
 } from './components';
 import {styles} from './styles';
 
@@ -68,8 +66,7 @@ const RETRY_DELAY = 3500;
 export const SimulationFeedbackScreen: React.FC<
   RootStackScreenProps<'SimulationFeedback'>
 > = ({route}) => {
-  const {fromLogs, scenarioSessionId, pathId, caseId, languageId} =
-    route.params;
+  const {fromLogs, scenarioSessionId, pathId, caseId} = route.params;
   const permissions = useAppSelector(state => state.user.permissions);
   const {t, i18n} = useTranslation();
   // Feedback text is generated server-side in this language; translations for a
@@ -126,24 +123,21 @@ export const SimulationFeedbackScreen: React.FC<
 
   // Which post-session tabs this roleplay shows. The backend sends this
   // already resolved; the fallback here only covers a response cached from
-  // before the sub-toggles existed, where every tab was on (web parity).
+  // before these toggles existed.
   const feedbackTabs =
     simulationDetails?.scenario?.metadata?.feedbackTabs ??
     DEFAULT_FEEDBACK_TABS;
 
-  // When the trainer has disabled the AI feedback summary for this scenario,
-  // skip the evaluation surface and only collect the star rating. Default to
-  // enabled when the flag is missing (legacy scenarios). Switching every
-  // sub-toggle off is the same thing said a longer way, so it lands in the
-  // same branch — there is nothing left to show but the star rating.
-  const feedbackEnabled =
-    simulationDetails?.scenario?.metadata?.enableFeedback !== false &&
-    (feedbackTabs.debrief || feedbackTabs.skills || feedbackTabs.transcript);
+  // Both tabs off means the author wants no post-session evaluation surface at
+  // all — the wholesale opt-out the retired `enableFeedback` master switch used
+  // to express, now said by the two toggles themselves. Only the star rating
+  // is left.
+  const feedbackEnabled = feedbackTabs.debrief || feedbackTabs.transcript;
 
-  // CHECKLIST-mode roleplays show this regardless of which sub-tabs are on —
-  // it used to live in a tab that always existed (Session Review) and lost
-  // that guarantee when Debrief/Skills/Transcript became independently
-  // toggleable, so it renders here rather than inside any one of them.
+  // CHECKLIST-mode roleplays show this regardless of which tabs are on — it
+  // used to live in a tab that always existed (Session Review) and lost that
+  // guarantee when the tabs became independently toggleable, so it renders
+  // here rather than inside any one of them.
   const isChecklistMode =
     simulationDetails?.scenario?.metadata?.experienceMode ===
     ExperienceMode.CHECKLIST;
@@ -183,8 +177,12 @@ export const SimulationFeedbackScreen: React.FC<
           id: scenarioSessionId,
         }).unwrap();
 
+        // Stop retrying once the feedback lands, or once we can see the
+        // roleplay shows no post-session surface at all (both tabs off) —
+        // there is nothing being generated to wait for.
+        const tabs = response?.scenario?.metadata?.feedbackTabs;
         if (
-          response?.scenario?.metadata?.enableFeedback === false ||
+          (tabs && !tabs.debrief && !tabs.transcript) ||
           response?.details?.summary?.feedback
         ) {
           return;
@@ -470,12 +468,10 @@ export const SimulationFeedbackScreen: React.FC<
   const tabs = useMemo(
     () =>
       getSimulationSummaryTabs(t, {
-        pathId,
-        caseId,
         shortSession,
         feedbackTabs,
       }),
-    [t, pathId, caseId, shortSession, feedbackTabs],
+    [t, shortSession, feedbackTabs],
   );
 
   const tabIndex = useMemo(() => {
@@ -547,26 +543,6 @@ export const SimulationFeedbackScreen: React.FC<
               focusMessage={momentRequest}
             />
           );
-        case SimulationSummaryTabKey.SKILLS:
-          return (
-            <SessionSkills
-              scenarioSessionId={scenarioSessionId}
-              simulationDetails={simulationDetails}
-              isActive={activeTabKey === SimulationSummaryTabKey.SKILLS}
-              retryLimitReached={retryLimitReached}
-            />
-          );
-        case SimulationSummaryTabKey.UP_NEXT:
-          return (
-            <UpNext
-              scenarioSessionId={scenarioSessionId}
-              pathId={pathId}
-              caseId={caseId}
-              languageId={languageId}
-              onFinish={handleFeedbackAndNavigate}
-              onBack={handleFeedbackAndNavigate}
-            />
-          );
         default:
           return null;
       }
@@ -577,11 +553,6 @@ export const SimulationFeedbackScreen: React.FC<
       simulationDetails,
       retryLimitReached,
       fromLogs,
-      pathId,
-      caseId,
-      handleFeedbackAndNavigate,
-      languageId,
-      activeTabKey,
       feedbackTabs,
       handleOpenMoment,
       momentRequest,
