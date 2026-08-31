@@ -1,0 +1,194 @@
+name: Scheduled mobile release
+#
+# Runs daily, but only *acts* roughly every 2 days: bumps the Android + iOS version, commits
+# and tags the bump on master, then dispatches the existing production build workflows
+# (build-android-production.yml, build-ios-production.yml) unchanged. Release destination is
+# unchanged too — still TestFlight (iOS) and the Play Store internal track (Android), same as
+# today's manual process.
+#
+# A daily check with an internal 48h-elapsed gate is used instead of a `*/2 * *` day-of-month
+# cron, which drifts at month boundaries and doesn't actually mean "every 2 days".
+
+on:
+  schedule:
+    - cron: '0 5 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: scheduled-mobile-release
+  cancel-in-progress: false
+
+env:
+  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+
+      - name: Check kill switch
+        id: gate_enabled
+        run: |
+          if [ "${{ vars.AUTO_RELEASE_ENABLED }}" = "false" ]; then
+            echo "Automated release disabled via the AUTO_RELEASE_ENABLED repo variable. Skipping."
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check cadence and new commits
+        id: gate_cadence
+        if: steps.gate_enabled.outputs.proceed == 'true'
+        run: |
+          set -e
+          LAST_TAG=$(git tag -l 'auto-release/*' --sort=-creatordate | head -1 || true)
+          if [ -z "$LAST_TAG" ]; then
+            echo "No previous auto-release tag found. Proceeding (first run)."
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+          else
+            LAST_SHA=$(git rev-list -n 1 "$LAST_TAG")
+            HEAD_SHA=$(git rev-parse HEAD)
+            LAST_TS=$(git log -1 --format=%ct "$LAST_TAG")
+            NOW_TS=$(date +%s)
+            ELAPSED_H=$(( (NOW_TS - LAST_TS) / 3600 ))
+            echo "Last auto-release: $LAST_TAG ($LAST_SHA), ${ELAPSED_H}h ago"
+            if [ "$LAST_SHA" = "$HEAD_SHA" ]; then
+              echo "No new commits on master since $LAST_TAG. Skipping."
+              echo "proceed=false" >> "$GITHUB_OUTPUT"
+            elif [ "$ELAPSED_H" -lt 48 ]; then
+              echo "Only ${ELAPSED_H}h since $LAST_TAG (need 48h). Skipping."
+              echo "proceed=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "proceed=true" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+      - name: Check master tests are green
+        id: gate_tests
+        if: steps.gate_enabled.outputs.proceed == 'true' && steps.gate_cadence.outputs.proceed == 'true'
+        run: |
+          set -e
+          HEAD_SHA=$(git rev-parse HEAD)
+          CONCLUSION=$(gh run list --repo "${{ github.repository }}" --workflow test.yml --branch master --limit 20 --json headSha,conclusion \
+            --jq "[.[] | select(.headSha == \"$HEAD_SHA\")] | .[0].conclusion // \"\"")
+          echo "Tests conclusion for $HEAD_SHA: '$CONCLUSION'"
+          if [ "$CONCLUSION" != "success" ]; then
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Notify Slack - tests not green
+        if: steps.gate_enabled.outputs.proceed == 'true' && steps.gate_cadence.outputs.proceed == 'true' && steps.gate_tests.outputs.proceed == 'false'
+        uses: tokorom/action-slack-incoming-webhook@main
+        env:
+          INCOMING_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          text: 'Scheduled mobile release skipped: the latest master commit does not have a green Tests run.'
+
+      - name: Compute next version
+        id: version
+        if: steps.gate_enabled.outputs.proceed == 'true' && steps.gate_cadence.outputs.proceed == 'true' && steps.gate_tests.outputs.proceed == 'true'
+        run: |
+          set -e
+          CURRENT_VERSION=$(grep 'versionName' android/app/build.gradle | head -1 | sed -E 's/.*versionName "([0-9]+\.[0-9]+\.[0-9]+)".*/\1/')
+          CURRENT_CODE=$(grep 'versionCode' android/app/build.gradle | head -1 | awk '{print $2}')
+          MAJOR=$(echo "$CURRENT_VERSION" | cut -d. -f1)
+          MINOR=$(echo "$CURRENT_VERSION" | cut -d. -f2)
+          PATCH=$(echo "$CURRENT_VERSION" | cut -d. -f3)
+          NEXT_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))"
+          NEXT_CODE=$((CURRENT_CODE + 1))
+          echo "Bumping $CURRENT_VERSION ($CURRENT_CODE) -> $NEXT_VERSION ($NEXT_CODE)"
+          echo "next_version=$NEXT_VERSION" >> "$GITHUB_OUTPUT"
+          echo "next_code=$NEXT_CODE" >> "$GITHUB_OUTPUT"
+
+      - name: Bump version files
+        if: steps.version.outputs.next_version != ''
+        run: |
+          set -e
+          NEXT_VERSION="${{ steps.version.outputs.next_version }}"
+          NEXT_CODE="${{ steps.version.outputs.next_code }}"
+          sed -i -E "s/versionCode [0-9]+/versionCode ${NEXT_CODE}/" android/app/build.gradle
+          sed -i -E "s/versionName \"[0-9]+\.[0-9]+\.[0-9]+\"/versionName \"${NEXT_VERSION}\"/" android/app/build.gradle
+          sed -i -E "s/MARKETING_VERSION = [0-9]+\.[0-9]+\.[0-9]+;/MARKETING_VERSION = ${NEXT_VERSION};/g" ios/ally.xcodeproj/project.pbxproj
+          grep -n 'versionCode\|versionName' android/app/build.gradle
+          grep -n 'MARKETING_VERSION' ios/ally.xcodeproj/project.pbxproj
+
+      - name: Generate release notes
+        id: notes
+        if: steps.version.outputs.next_version != ''
+        run: |
+          set -e
+          LAST_TAG=$(git tag -l 'auto-release/*' --sort=-creatordate | head -1 || true)
+          if [ -z "$LAST_TAG" ]; then
+            LOG=$(git log -20 --pretty='%s' | grep -v '^Merge pull request' || true)
+          else
+            LOG=$(git log "$LAST_TAG"..HEAD --pretty='%s' | grep -v '^Merge pull request' || true)
+          fi
+          NOTES=$(printf '%s\n' "$LOG" | sed 's/^/- /' | cut -c1-480)
+          {
+            echo "notes<<NOTES_EOF"
+            echo "$NOTES"
+            echo "NOTES_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Commit and tag version bump
+        if: steps.version.outputs.next_version != ''
+        run: |
+          set -e
+          git config user.name "ally-release-bot"
+          git config user.email "release-bot@helloally.ai"
+          git add android/app/build.gradle ios/ally.xcodeproj/project.pbxproj
+          git commit -m "chore(release): bump version to ${{ steps.version.outputs.next_version }} [automated]"
+          git push origin HEAD:master
+          git tag "auto-release/${{ steps.version.outputs.next_version }}"
+          git push origin "auto-release/${{ steps.version.outputs.next_version }}"
+
+      - name: Trigger Android production build
+        if: steps.version.outputs.next_version != ''
+        run: |
+          gh workflow run build-android-production.yml --repo "${{ github.repository }}" --ref master \
+            -f release_notes="${{ steps.notes.outputs.notes }}"
+
+      - name: Trigger iOS production build
+        if: steps.version.outputs.next_version != ''
+        run: |
+          gh workflow run build-ios-production.yml --repo "${{ github.repository }}" --ref master
+
+      - name: Notify Slack - release triggered
+        if: steps.version.outputs.next_version != ''
+        uses: tokorom/action-slack-incoming-webhook@main
+        env:
+          INCOMING_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          text: 'Scheduled mobile release: bumped to ${{ steps.version.outputs.next_version }}, triggered Android + iOS production builds.'
+          attachments: |
+            [
+              {
+                "color": "good",
+                "fields": [
+                  {
+                    "title": "New version",
+                    "value": "${{ steps.version.outputs.next_version }} (Android versionCode ${{ steps.version.outputs.next_code }})"
+                  },
+                  {
+                    "title": "Actions",
+                    "value": "<${{ github.server_url }}/${{ github.repository }}/actions|View Actions>"
+                  }
+                ]
+              }
+            ]
+
+      - name: Write skip summary
+        if: steps.gate_enabled.outputs.proceed == 'false' || steps.gate_cadence.outputs.proceed == 'false'
+        run: echo "Scheduled mobile release skipped this run (see step logs for the reason)." >> "$GITHUB_STEP_SUMMARY"
