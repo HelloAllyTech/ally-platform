@@ -583,3 +583,61 @@ class TestConversationHandlerTimestamps:
         # Second message: no speaking start captured → falls back to end_time
         assert collected[1].start_time == collected[1].end_time
         assert pytest.approx(collected[1].end_time, rel=1e-3) == 8.0
+
+
+class TestShutdownHandlerBoundsInlineFinalize:
+    """Regression for the recurring SIGUSR1 kill (supervised_proc.py:256/364).
+
+    on_shutdown has two finalize paths: one that drains an already in-flight
+    finalize task under asyncio.wait_for(timeout=16.0), and one that calls
+    finalize_session() inline when no task had been scheduled yet. Only the
+    first was bounded by commit a94fa6b — the inline path could run
+    unbounded and push on_shutdown past the SDK's shutdown_process_timeout,
+    triggering a forced kill mid-save.
+    """
+
+    @pytest.mark.asyncio
+    async def test_on_shutdown_times_out_a_hanging_inline_finalize(
+        self, monkeypatch
+    ):
+        finalize_started = asyncio.Event()
+
+        async def hanging_finalize_session(**kwargs):
+            finalize_started.set()
+            await asyncio.sleep(3600)
+
+        monkeypatch.setattr(eh, "finalize_session", hanging_finalize_session)
+
+        # Exercise the real timeout/shield machinery but on a test-sized
+        # clock: clamp every asyncio.wait_for call to at most 50ms instead of
+        # the production 16s budget.
+        real_wait_for = asyncio.wait_for
+
+        async def clamped_wait_for(aw, timeout=None):
+            if timeout is not None:
+                timeout = min(timeout, 0.05)
+            return await real_wait_for(aw, timeout=timeout)
+
+        monkeypatch.setattr(eh.asyncio, "wait_for", clamped_wait_for)
+
+        class DummyOrchestrator:
+            deferred_termination_event = None
+            _background_tasks = set()
+
+        async def noop_cleanup():
+            pass
+
+        handler = eh.create_shutdown_handler(
+            event_orchestrator=DummyOrchestrator(),
+            room_name="room-1",
+            final_score_sent_ref=lambda: False,
+            set_final_score_sent=lambda v: None,
+            cleanup_background_tasks=noop_cleanup,
+        )
+
+        # Bounded regardless of whether the fix is present: pre-fix, the
+        # inline finalize_session() call has no cap of its own, on_shutdown()
+        # never returns, and this raises TimeoutError.
+        await real_wait_for(handler(), timeout=2.0)
+
+        assert finalize_started.is_set()

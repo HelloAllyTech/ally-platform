@@ -642,19 +642,39 @@ def create_shutdown_handler(
         # Finalize session (send final score and cleanup)
         if not final_score_sent_ref():
             try:
-                await finalize_session(
-                    room_id=room_name,
-                    thread_id=room_name,
-                    event_orchestrator=event_orchestrator,
-                    score_keeper=score_keeper,
-                    llm_client=llm_client,
-                    language_code=language_code,
-                    prompt_data=prompt_data,
-                    rolling_summary_store=rolling_summary_store,
-                    client_working_memory_store=client_working_memory_store,
+                # Same budget as the in-flight-task drain below: one full
+                # compaction attempt (ROLLING_SUMMARY_TIMEOUT, 8s) + the 6s
+                # retry inside finalize_session, with headroom. Without this
+                # cap, finalize_session's uncapped SQS/LLM time stacked on
+                # top of the 3s orchestrator drain above could push
+                # on_shutdown past the SDK's shutdown_process_timeout,
+                # triggering a forced SIGUSR1 kill mid-finalize (observed
+                # live: supervised_proc.py "did not exit in time" followed by
+                # exit code -10). Shielded so our timeout can't cancel a
+                # healthy finalize that is merely running long.
+                await asyncio.wait_for(
+                    asyncio.shield(
+                        finalize_session(
+                            room_id=room_name,
+                            thread_id=room_name,
+                            event_orchestrator=event_orchestrator,
+                            score_keeper=score_keeper,
+                            llm_client=llm_client,
+                            language_code=language_code,
+                            prompt_data=prompt_data,
+                            rolling_summary_store=rolling_summary_store,
+                            client_working_memory_store=client_working_memory_store,
+                        )
+                    ),
+                    timeout=16.0,
                 )
                 set_final_score_sent(True)
                 logger.info("Session finalized successfully")
+            except asyncio.TimeoutError:
+                logger.warning(
+                    "finalize_session did not finish within 16s; final "
+                    "score or session memory may be lost for this session"
+                )
             except Exception as e:
                 logger.exception(f"Failed to finalize session: {e}")
 
