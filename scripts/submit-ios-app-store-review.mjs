@@ -25,6 +25,15 @@
  * Usage: node scripts/submit-ios-app-store-review.mjs
  * Env:   APPSTORE_ISSUER_ID, APPSTORE_API_KEY_ID, APPSTORE_API_PRIVATE_KEY — the same secrets
  *        build-ios-production.yml and promote-ios-testflight.mjs already use.
+ *        WHATS_NEW_TEXT — optional "What's New in This Version" text. Passed as an env var, not
+ *        a CLI arg, same reason build-android-production.yml passes its release notes via
+ *        $RELEASE_NOTES rather than interpolating the workflow_dispatch input straight into a
+ *        run: line: this text is admin-typed free text, and interpolating an untrusted
+ *        ${{ inputs.* }} value directly into a shell command is a real injection risk. Omit it
+ *        to leave whatever's already set in App Store Connect untouched; if given, it overwrites
+ *        the en-US listing's "What's New" text — the one piece of listing content this script
+ *        does fill in on its own, same idea as build-android-production.yml's single-locale
+ *        (en-US) Play Store release notes.
  */
 import fs from "node:fs/promises";
 
@@ -145,6 +154,39 @@ async function main() {
     method: "PATCH",
     body: JSON.stringify({ data: { type: "builds", id: buildId } }),
   });
+
+  // Optional: overwrite the "What's New in This Version" text for the en-US listing — the same
+  // single-locale convention build-android-production.yml already uses for Play Store release
+  // notes (distribution/whatsnew/whatsnew-en-US). Skipped entirely if not provided, leaving
+  // whatever's already set in App Store Connect untouched — this is the one piece of listing
+  // content this script *does* fill in, everything else (screenshots, description, compliance
+  // answers) still has to already be prepared by a human.
+  const whatsNew = process.env.WHATS_NEW_TEXT?.trim();
+  if (whatsNew) {
+    const localizationsResponse = await appleApi(
+      `/appStoreVersions/${versionId}/appStoreVersionLocalizations`,
+      token,
+    );
+    const enUsLocalization = localizationsResponse.data?.find(
+      loc => loc?.attributes?.locale === "en-US",
+    );
+    if (!enUsLocalization) {
+      throw new Error(
+        `An en-US listing localization is required to set "What's New" text, but none exists ` +
+          `on App Store version ${versionString}. Add an en-US localization in App Store Connect first.`,
+      );
+    }
+    await appleApi(`/appStoreVersionLocalizations/${enUsLocalization.id}`, token, {
+      method: "PATCH",
+      body: JSON.stringify({
+        data: {
+          type: "appStoreVersionLocalizations",
+          id: enUsLocalization.id,
+          attributes: { whatsNew },
+        },
+      }),
+    });
+  }
 
   // Force manual release regardless of whatever was previously configured — approval here must
   // only enqueue for release, never auto-release to real users.
