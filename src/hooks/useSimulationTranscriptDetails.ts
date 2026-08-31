@@ -139,7 +139,6 @@ export const useSimulationTranscriptDetails = (
             : 0,
       ),
       isLearner: message.senderId !== -1,
-      tags: message.tags,
     }));
   }, [messages, sessionStartedAt]);
 

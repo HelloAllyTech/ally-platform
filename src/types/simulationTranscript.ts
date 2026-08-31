@@ -1,5 +1,3 @@
-import {SimulationMessageTag} from '@/services/simulationTranscriptApi';
-
 /**
  * Represents a formatted message in a simulation transcript
  */
@@ -9,7 +7,6 @@ export interface SimulationTranscriptMessage {
   message: string;
   isLearner: boolean;
   startSeconds: number;
-  tags?: SimulationMessageTag[];
 }
 
 /**

@@ -70,7 +70,7 @@ export const getSimulationSummaryTabs = (
   };
   const transcriptionTab = {
     key: SimulationSummaryTabKey.TRANSCRIPTION,
-    title: t('postSim.tabs.annotatedTranscript'),
+    title: t('postSim.tabs.transcript'),
     testID: 'tab-2',
   };
 

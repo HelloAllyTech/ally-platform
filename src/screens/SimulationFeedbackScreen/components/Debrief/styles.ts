@@ -117,6 +117,27 @@ export const styles = ScaledSheet.create({
   boldText: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
   },
+  // Sections sit further apart than the paragraphs inside them, which is what
+  // makes the structure readable without drawing rules across the note.
+  noteSections: {
+    gap: '16@vs',
+  },
+  noteSection: {
+    gap: '4@vs',
+  },
+  noteSectionParagraphs: {
+    gap: '10@vs',
+  },
+  // The heading is a signpost, not a title: set quieter than the prose it
+  // introduces, so a scanning learner finds the part they want without the note
+  // starting to read like a report.
+  noteSectionHeading: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    fontSize: '11@ms',
+    letterSpacing: '0.3@ms',
+    textTransform: 'uppercase',
+    color: colors.ds.typography.mediumEmphasis,
+  },
 
   // ── Skeleton ──────────────────────────────────────────────────────
   skeletonRow: {

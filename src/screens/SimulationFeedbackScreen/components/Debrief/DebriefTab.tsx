@@ -31,6 +31,14 @@ interface DebriefTabProps {
    * when that tab is off for this roleplay (see `feedbackTabs.transcript`).
    */
   onOpenMoment?: (messageId: string) => void;
+  /**
+   * Read-only: show the note alone, with no reply thread and no composer. Set
+   * when the screen was opened from Logs (`fromLogs`), where the debrief is
+   * being read back rather than received. The thread is keyed by session id, so
+   * an admin reviewing someone else's roleplay would otherwise be typing into
+   * that learner's own conversation with Ally.
+   */
+  readOnly?: boolean;
 }
 
 const NoteSkeleton = () => (
@@ -81,6 +89,7 @@ export const DebriefTab: React.FC<DebriefTabProps> = ({
   simulationDetails,
   retryLimitReached,
   onOpenMoment,
+  readOnly = false,
 }) => {
   const {t} = useTranslate();
   const insets = useSafeAreaInsets();
@@ -93,7 +102,11 @@ export const DebriefTab: React.FC<DebriefTabProps> = ({
     error,
     sendMessage,
     retry,
-  } = useAskAIChat({scenarioSessionId});
+  } = useAskAIChat({
+    // An empty id is useAskAIChat's own no-op path — it guards loadHistory on a
+    // truthy session id — so a read-only debrief never loads the thread.
+    scenarioSessionId: readOnly ? '' : scenarioSessionId,
+  });
 
   const flatListRef = useRef<FlatList<AskAIChatMessage>>(null);
   const contentHeightRef = useRef(0);
@@ -158,7 +171,11 @@ export const DebriefTab: React.FC<DebriefTabProps> = ({
             </Text>
           </View>
         ) : note ? (
-          <SupervisorNote note={note} onOpenMoment={onOpenMoment} />
+          <SupervisorNote
+            note={note}
+            onOpenMoment={onOpenMoment}
+            hideClosing={readOnly}
+          />
         ) : (
           // Generation failed, or this session predates the debrief note.
           // Say so plainly rather than showing an empty panel.
@@ -167,7 +184,7 @@ export const DebriefTab: React.FC<DebriefTabProps> = ({
           </Text>
         )}
 
-        {!!note && messages.length === 0 && !isHistoryLoading && (
+        {!readOnly && !!note && messages.length === 0 && !isHistoryLoading && (
           <Text style={styles.replyPromptText}>
             {t('postSim.debrief.replyPrompt')}
           </Text>
@@ -181,12 +198,15 @@ export const DebriefTab: React.FC<DebriefTabProps> = ({
       messages.length,
       isHistoryLoading,
       onOpenMoment,
+      readOnly,
       t,
     ],
   );
 
   const renderFooter = useCallback(() => {
-    if (!error) {
+    // The only thing in the footer is a chat retry, which a read-only debrief
+    // has nothing to retry.
+    if (!error || readOnly) {
       return null;
     }
     return (
@@ -200,7 +220,7 @@ export const DebriefTab: React.FC<DebriefTabProps> = ({
         </TouchableOpacity>
       </View>
     );
-  }, [error, retry, t]);
+  }, [error, readOnly, retry, t]);
 
   const renderItem = useCallback(
     ({item}: {item: AskAIChatMessage}) => (
@@ -244,7 +264,7 @@ export const DebriefTab: React.FC<DebriefTabProps> = ({
               onContentSizeChange={handleContentSizeChange}
               onLayout={handleListLayout}
             />
-            {!!note && (
+            {!readOnly && !!note && (
               <DebriefReplyInput onSend={sendMessage} disabled={isStreaming} />
             )}
           </View>

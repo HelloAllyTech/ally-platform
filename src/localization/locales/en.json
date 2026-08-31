@@ -939,7 +939,7 @@
       }
     },
     "tabs": {
-      "annotatedTranscript": "Annotated Transcript",
+      "transcript": "Transcript",
       "transcriptTranslationFailed": "Failed to load transcript. Please retry.",
       "upNext": "Up next",
       "askAi": "Ask AI",
@@ -961,6 +961,11 @@
       "failed": "Ally couldn't write your debrief for this session.",
       "momentLabel": "See this moment",
       "momentNotFound": "We couldn't jump to that moment — here's the full transcript instead.",
+      "section": {
+        "what_worked": "What worked",
+        "what_it_cost": "What it cost",
+        "try_next": "Try this next"
+      },
       "replyPlaceholder": "Reply to Ally about this session…",
       "replyPrompt": "Have a question about any of this? Reply below."
     },
