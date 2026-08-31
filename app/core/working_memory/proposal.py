@@ -76,11 +76,16 @@ ADVANCING_EVENTS = frozenset(
 #: uniform-responsiveness failure §1 measures from the other direction.
 REGRESSING_EVENTS = frozenset({"rupture"})
 
-CLIENT_EVENTS = frozenset(
-    ADVANCING_EVENTS
-    | REGRESSING_EVENTS
-    | {"withheld", "affect_shift", "thread_opened", "thread_closed"}
-)
+#: Every kind the updater may report. It is exactly the advancing and
+#: regressing sets, because those are the only two things an event decides.
+#:
+#: Four bookkeeping kinds used to sit here — `withheld`, `affect_shift`,
+#: `thread_opened`, `thread_closed`. None of them was in ADVANCING_EVENTS or
+#: REGRESSING_EVENTS, so none ever moved a stance; and each duplicated a field
+#: the same call already returns (`withheld_topics`, `affect`,
+#: `opened_threads`, `closed_threads`). They were the same question asked
+#: twice, and the ledger fields are the copy that gets used.
+CLIENT_EVENTS = frozenset(ADVANCING_EVENTS | REGRESSING_EVENTS)
 
 #: Cap on a rendered voice fragment. Long enough to carry a speech habit, short
 #: enough that the model cannot smuggle a whole reply in as "voice".

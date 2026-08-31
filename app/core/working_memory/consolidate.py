@@ -163,6 +163,67 @@ def _coerce_guidance(value) -> str:
     return flat if len(flat) <= 160 else flat[:157].rstrip() + "..."
 
 
+def _events_instruction(has_authored_states: bool) -> str:
+    """The REPORT WHAT YOU OBSERVED section, or the one line that replaces it.
+
+    Only ASK for events when something still reads them. `kinds` decides
+    exactly one thing: whether the generic ladder advances. With authored
+    states `validate` takes the author's stance verbatim and discards `kinds`
+    entirely, so every event reported on that path is produced, evidenced,
+    grounding-checked and then dropped — paid for in prompt tokens and in the
+    model's attention, to populate one log field.
+    """
+    if has_authored_states:
+        return (
+            "REPORT WHAT YOU OBSERVED\n"
+            "- events: leave this list EMPTY. Nothing reads it in this "
+            "scenario. Everything worth recording goes in the fields below."
+        )
+    return (
+        "REPORT WHAT YOU OBSERVED\n"
+        "- events: the client-side things that happened in these turns. "
+        "Each has a `kind`, an optional `topic`, and `evidence` quoting "
+        "the span that justifies it. Use only these kinds:\n"
+        "  - repair: the counsellor noticed something they had missed or "
+        "gotten wrong, and addressed it\n"
+        "  - resistance_softened: the client let go of a defence they were "
+        "holding\n"
+        "  - disclosed: the client revealed something not previously said\n"
+        "  - rupture: the client felt judged, dismissed, rushed or exposed\n"
+        "  Report NOTHING if nothing happened. An empty list is a correct "
+        "and common answer."
+    )
+
+
+def _stance_instruction(has_authored_states: bool, stance_ladder: str) -> str:
+    """The stance line, or the ladder rulebook when no author decides it.
+
+    When the scenario defines states, the author's bands decide where the
+    client is and `validate` takes that verbatim — so the eight lines of
+    earned-advance rulebook this template used to carry were instructions for
+    a decision the code no longer makes.
+    """
+    if has_authored_states:
+        return (
+            "- stance: DO NOT report this. Where the client is in the "
+            "conversation is decided by the scenario, not by you. Report only "
+            "the state and ledger fields below."
+        )
+    return (
+        "- stance: where the client is on this ladder, which runs in "
+        "order:\n"
+        f"{stance_ladder}\n"
+        "  Use these names EXACTLY as written; a name that is not on the "
+        "ladder is discarded.\n"
+        "  This is a PROPOSAL and it may be refused or reduced. A stance is "
+        "EARNED by something the counsellor did, moves AT MOST ONE rung per "
+        "update, and stays where it is when nothing advanced — that is the "
+        "common answer and not a failure to report it.\n"
+        "  Going DOWN needs no advancing event: a client who feels judged, "
+        "rushed or exposed closes up immediately."
+    )
+
+
 async def consolidate(
     *,
     memory: ClientWorkingMemory,
@@ -223,38 +284,14 @@ async def consolidate(
         + (f" — {_guidance_by_name[name]}" if _guidance_by_name.get(name) else "")
         for i, name in enumerate(_ladder)
     )
-    # Only ASK for a stance when one is actually used.
-    #
-    # When the scenario defines states, the author's bands decide where the
-    # client is and `validate` takes that verbatim — so the eight lines of
-    # earned-advance rulebook this template used to carry were instructions for
-    # a decision the code no longer makes. Sending them cost tokens on every
-    # update and told the model something contradicting what actually happens.
-    if _has_authored_states:
-        stance_instruction = (
-            "- stance: DO NOT report this. Where the client is in the "
-            "conversation is decided by the scenario, not by you. Report only "
-            "what you observed in the turns below."
-        )
-    else:
-        stance_instruction = (
-            "- stance: where the client is on this ladder, which runs in "
-            "order:\n"
-            f"{stance_ladder}\n"
-            "  Use these names EXACTLY as written; a name that is not on the "
-            "ladder is discarded.\n"
-            "  This is a PROPOSAL and it may be refused or reduced. A stance is "
-            "EARNED by something the counsellor did, moves AT MOST ONE rung per "
-            "update, and stays where it is when nothing advanced — that is the "
-            "common answer and not a failure to report it.\n"
-            "  Going DOWN needs no advancing event: a client who feels judged, "
-            "rushed or exposed closes up immediately."
-        )
+    events_instruction = _events_instruction(_has_authored_states)
+    stance_instruction = _stance_instruction(_has_authored_states, stance_ladder)
 
     system_text = load_and_format(
         _TEMPLATE_PATH,
         prompt_data,
         language_label=language_label,
+        events_instruction=events_instruction,
         stance_instruction=stance_instruction,
     )
     if not system_text:

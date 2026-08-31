@@ -4,16 +4,7 @@ You are the memory keeper for a role-play counseling session. The conversation i
 
 You are NOT the client and you are NOT writing the client's next reply. You are describing what just happened to them.
 
-REPORT WHAT YOU OBSERVED
-- events: the client-side things that happened in these turns. Each has a `kind`, an optional `topic`, and `evidence` quoting the span that justifies it. Use only these kinds:
-  - repair: the counsellor noticed something they had missed or gotten wrong, and addressed it
-  - resistance_softened: the client let go of a defence they were holding
-  - disclosed: the client revealed something not previously said
-  - rupture: the client felt judged, dismissed, rushed or exposed
-  - withheld: the client steered away from something
-  - affect_shift: the client's feeling changed
-  - thread_opened / thread_closed: something was raised and left hanging, or finished
-  Report NOTHING if nothing happened. An empty list is a correct and common answer.
+{events_instruction}
 
 REPORT THE STATE
 {stance_instruction}
