@@ -180,24 +180,48 @@ async function appleApi(path, token) {
   return res.json();
 }
 
-async function main() {
-  const token = mintToken();
-
-  const appsResponse = await appleApi(`/apps?filter[bundleId]=${encodeURIComponent(BUNDLE_ID)}`, token);
-  const appId = appsResponse.data?.[0]?.id;
-  if (!appId) throw new Error(`No app found for bundle id ${BUNDLE_ID}`);
-
-  const buildsResponse = await appleApi(
-    `/builds?filter[app]=${appId}&sort=-uploadedDate&limit=1&filter[processingState]=VALID`,
-    token,
-  );
-  const buildId = buildsResponse.data?.[0]?.id;
-  const buildVersion = buildsResponse.data?.[0]?.attributes?.version;
-  if (!buildId) {
-    throw new Error(
-      "No processed (VALID) build found to submit. TestFlight processing can take a few minutes after upload — wait and retry if the build was just uploaded.",
+// Apple processes an uploaded build asynchronously — it's not immediately queryable as
+// processingState=VALID right after upload, and can take anywhere from a couple of minutes to
+// (rarely) tens of minutes. Polls rather than failing on the first miss, since this script now
+// also runs automatically right after build-ios-production.yml's upload step, where the build
+// is essentially guaranteed not to be processed yet. Re-mints the JWT on every attempt: a single
+// token is only valid for ~19 minutes (see mintToken), which a long wait can outlive.
+async function waitForValidBuild(appId, { timeoutMinutes = 25, intervalSeconds = 60 } = {}) {
+  const deadline = Date.now() + timeoutMinutes * 60 * 1000;
+  for (let attempt = 1; ; attempt += 1) {
+    const token = mintToken();
+    const buildsResponse = await appleApi(
+      `/builds?filter[app]=${appId}&sort=-uploadedDate&limit=1&filter[processingState]=VALID`,
+      token,
     );
+    const build = buildsResponse.data?.[0];
+    if (build) {
+      return { buildId: build.id, buildVersion: build.attributes?.version, token };
+    }
+    if (Date.now() >= deadline) {
+      throw new Error(
+        `No processed (VALID) build found after waiting ${timeoutMinutes} minutes (${attempt} attempts). ` +
+          "TestFlight processing is taking longer than usual this time — check App Store Connect directly and retry.",
+      );
+    }
+    console.log(`Attempt ${attempt}: build not processed yet, waiting ${intervalSeconds}s...`);
+    await new Promise(resolve => setTimeout(resolve, intervalSeconds * 1000));
   }
+}
+
+async function main() {
+  const appId = await (async () => {
+    const appsResponse = await appleApi(
+      `/apps?filter[bundleId]=${encodeURIComponent(BUNDLE_ID)}`,
+      mintToken(),
+    );
+    const id = appsResponse.data?.[0]?.id;
+    if (!id) throw new Error(`No app found for bundle id ${BUNDLE_ID}`);
+    return id;
+  })();
+
+  const timeoutMinutes = Number(process.env.TESTFLIGHT_WAIT_MINUTES) || 25;
+  const { buildId, buildVersion, token } = await waitForValidBuild(appId, { timeoutMinutes });
 
   const groupsResponse = await appleApi(
     `/betaGroups?filter[app]=${appId}&filter[name]=${encodeURIComponent(TESTFLIGHT_EXTERNAL_GROUP_NAME)}`,
