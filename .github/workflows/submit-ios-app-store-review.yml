@@ -11,6 +11,11 @@ name: Submit iOS for App Store review
 
 on:
   workflow_dispatch:
+    inputs:
+      whats_new:
+        description: "\"What's New in This Version\" text (optional - leave blank to keep whatever is already set in App Store Connect)"
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -43,6 +48,11 @@ jobs:
           APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
           APPSTORE_API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
           APPSTORE_API_PRIVATE_KEY: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+          # Passed as an env var, never interpolated straight into the run: line — this is
+          # admin-typed free text, and ${{ }}-interpolating untrusted input directly into a
+          # shell command is a real injection risk. Same pattern build-android-production.yml
+          # already uses for its release-notes input.
+          WHATS_NEW_TEXT: ${{ inputs.whats_new }}
         run: node scripts/submit-ios-app-store-review.mjs
 
       - name: Notify Slack - submitted for App Store review
