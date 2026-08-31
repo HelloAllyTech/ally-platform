@@ -64,6 +64,14 @@ function normalizePrivateKey(raw) {
   ) {
     key = key.slice(1, -1).trim();
   }
+  // Confirmed root cause via char-code diagnostics on a real run: a trailing "%" after the PEM
+  // footer. That's zsh's own indicator that the line it printed had no trailing newline (visible
+  // when running e.g. `cat AuthKey_XXXXX.p8` in zsh) — someone copied that terminal display,
+  // including the artifact, instead of the file's raw bytes, when the secret was originally set.
+  // No valid PEM ever legitimately ends in "%", so stripping it is safe unconditionally.
+  if (key.endsWith("%")) {
+    key = key.slice(0, -1).trimEnd();
+  }
   return key;
 }
 
