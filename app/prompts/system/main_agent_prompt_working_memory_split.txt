@@ -31,7 +31,7 @@ conversation moves, so treat it as where you are now rather than as a script.
 Your own recent words, for voice — sound like the person who said these:
 {working_memory_speech_fragments}
 
-## What you are not ready to talk about
+## What has not come up yet
 {working_memory_withheld}
 
 ## Still unfinished

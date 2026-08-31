@@ -144,7 +144,7 @@ def build_writeout(
         )
 
     open_threads = [t.topic for t in memory.open_threads]
-    withheld_still_locked = [w.topic for w in memory.withheld if w.status == "locked"]
+    withheld_still_locked = [w.topic for w in memory.withheld if w.status == "unsaid"]
 
     if not (grounded or ungrounded or open_threads or withheld_still_locked):
         return None

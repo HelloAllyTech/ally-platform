@@ -53,7 +53,7 @@ _TEMPLATE = "system/client_working_memory"
 # Named absences, never blanks. A blank section reads to the model as an absence
 # of constraint; a named absence does not. Borrowed from roleplay_v2's empty
 # states, which is the one part of that prompt surface that was always populated.
-_NO_WITHHELD = "(nothing you are holding back right now)"
+_NO_WITHHELD = "(nothing has been left unsaid so far)"
 _NO_UNRESOLVED = "(nothing left hanging)"
 _NO_DISCLOSED = "(you have not told them anything yet)"
 
@@ -111,22 +111,37 @@ def _bullets(lines: Sequence[str], empty: str) -> str:
 
 
 def _render_withheld(items: Sequence[WithheldTopic]) -> str:
-    """Topic and deflection only. There is no content field to leak."""
+    """Topic and deflection only. There is no content field to leak.
+
+    **Descriptive, never permissive.** This section states what has not come up
+    yet and how the client has moved away from it before; it does not say
+    whether the client is ready to talk about it now. That call belongs to the
+    author's `state_x_guidelines` and to nothing else.
+
+    It used to say "you have NOT talked about this and are not ready to" while
+    locked and "you could let this come out now" once unlocked, with the
+    transition driven by the stance reaching the ladder's second-from-top rung.
+    That made the ledger a second controller for disclosure: what to withhold
+    was chosen by the updater rather than the author, and when to release it by
+    a rung position rather than the author's states — so a scenario whose own
+    guidance invited an early disclosure was overruled, and one whose later
+    state was still guarded was contradicted. Same two-controllers shape as the
+    stance ladder, one level down, and removed for the same reason.
+
+    The deflection is kept because it is CONTINUITY, not permission: a client
+    who sidestepped a subject by talking about work should sidestep it the same
+    way next time rather than inventing a new evasion each turn. Whether to
+    sidestep at all is the state's decision.
+    """
     lines: List[str] = []
     for item in items:
         if item.status == "revealed":
             continue  # already out; `disclosed` carries it now
-        if item.status == "locked":
-            deflection = item.deflection.strip() or "change the subject naturally"
-            lines.append(
-                f"{item.topic} — you have NOT talked about this and are not "
-                f"ready to. If they push: {deflection}"
-            )
-        else:  # unlocked
-            lines.append(
-                f"{item.topic} — you could let this come out now, if the moment "
-                f"genuinely fits. Do not volunteer it."
-            )
+        deflection = item.deflection.strip()
+        line = f"{item.topic} — has not come up yet"
+        if deflection:
+            line += f". When you have moved away from it before: {deflection}"
+        lines.append(line)
     return _bullets(lines, _NO_WITHHELD)
 
 

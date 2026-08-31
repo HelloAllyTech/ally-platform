@@ -96,7 +96,7 @@ def _digest(memory: ClientWorkingMemory) -> str:
         lines.append("open threads: " + "; ".join(open_threads))
     # Topics only. The updater has no more business holding withheld content
     # than the actor does.
-    locked = [w.topic for w in memory.withheld if w.status == "locked"]
+    locked = [w.topic for w in memory.withheld if w.status == "unsaid"]
     if locked:
         lines.append("currently withheld: " + "; ".join(locked))
     return "\n".join(lines)

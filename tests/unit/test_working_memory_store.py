@@ -229,26 +229,29 @@ async def test_re_opening_a_known_thread_does_not_duplicate_it(store):
 # ---------------------------------------------------------------------------
 
 
-async def test_a_withheld_topic_starts_locked(store):
+async def test_a_withheld_topic_starts_unsaid(store):
     await store.begin_turn()
     await store.commit(
         1, withheld=[WithheldTopic("the diagnosis", "change the subject")]
     )
 
     item = (await store.snapshot()).withheld[0]
-    assert item.status == "locked"
+    assert item.status == "unsaid"
     assert item.deflection == "change the subject"
 
 
-async def test_only_an_unlocked_topic_can_become_revealed(store):
-    # Three states, not two. "May now discuss" and "has discussed" are different
-    # facts, and revealing something still locked would skip the gate entirely.
+async def test_an_unsaid_topic_is_revealed_when_it_is_said(store):
+    # Two states, not three. There used to be a `locked -> unlocked` gate in
+    # between, opened by the stance reaching a rung near the top of the ladder,
+    # and reveal required passing through it. That gate was the ledger
+    # adjudicating disclosure — a decision that belongs to the author's states —
+    # so it is gone, and "the client said it" is now the only thing reveal needs.
     await store.begin_turn()
     await store.commit(1, withheld=[WithheldTopic("the diagnosis", "deflect")])
     await store.begin_turn()
     await store.commit(2, revealed_topics=["the diagnosis"])
 
-    assert (await store.snapshot()).withheld[0].status == "locked"
+    assert (await store.snapshot()).withheld[0].status == "revealed"
 
 
 # ---------------------------------------------------------------------------
@@ -419,26 +422,19 @@ async def test_closing_an_unrelated_topic_leaves_the_thread_open(store):
 # ---------------------------------------------------------------------------
 
 
-async def test_reaching_disclosing_unlocks_what_was_withheld(store):
-    # Nothing anywhere set "unlocked", so a topic stayed locked for the whole
-    # session however well the counsellor did and the actor deflected it
-    # forever — the uniform-responsiveness failure this design exists to fix,
-    # reintroduced inside the ledger.
+async def test_stance_does_not_touch_the_withheld_ledger(store):
+    # The ledger used to unlock on the stance reaching the ladder's
+    # second-from-top rung, which meant working memory decided when a subject
+    # became available. The author's states decide that. No stance, early or
+    # late, may move a topic here.
     await store.begin_turn()
     await store.commit(0, withheld=[WithheldTopic(topic="the visit", deflection="d")])
-    assert (await store.snapshot()).withheld[0].status == "locked"
+    assert (await store.snapshot()).withheld[0].status == "unsaid"
 
-    await store.begin_turn()
-    await store.commit(1, stance="disclosing")
-    assert (await store.snapshot()).withheld[0].status == "unlocked"
-
-
-async def test_an_early_stance_does_not_unlock(store):
-    await store.begin_turn()
-    await store.commit(0, withheld=[WithheldTopic(topic="the visit", deflection="d")])
-    await store.begin_turn()
-    await store.commit(1, stance="testing")
-    assert (await store.snapshot()).withheld[0].status == "locked"
+    for stance in ("testing", "opening", "disclosing", "reflecting"):
+        await store.begin_turn()
+        await store.commit(1, stance=stance)
+        assert (await store.snapshot()).withheld[0].status == "unsaid", stance
 
 
 async def test_saying_the_thing_marks_it_revealed(store):
@@ -455,12 +451,15 @@ async def test_saying_the_thing_marks_it_revealed(store):
     assert (await store.snapshot()).withheld[0].status == "revealed"
 
 
-async def test_a_locked_topic_is_not_revealed_by_disclosure(store):
-    # Order matters: a client cannot reveal what it was not yet ready to say.
+async def test_a_topic_said_in_the_same_update_is_revealed(store):
+    # This asserted the opposite until the unlock gate came out, and it was the
+    # gate's sharpest failure: a client who disclosed a withheld subject while
+    # the scenario was still in an early state kept being told "you have NOT
+    # talked about this" about something already in the transcript.
     await store.begin_turn()
     await store.commit(
         0,
         withheld=[WithheldTopic(topic="her brother not visiting", deflection="d")],
         disclosed=[Fact(text="her brother has not been visiting")],
     )
-    assert (await store.snapshot()).withheld[0].status == "locked"
+    assert (await store.snapshot()).withheld[0].status == "revealed"

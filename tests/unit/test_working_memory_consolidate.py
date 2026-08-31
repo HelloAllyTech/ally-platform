@@ -220,7 +220,7 @@ class TestApplyUpdate:
         state = await store.snapshot()
         assert state.withheld[0].topic == "the visit"
         assert state.withheld[0].deflection == "asks about work"
-        assert state.withheld[0].status == "locked"
+        assert state.withheld[0].status == "unsaid"
 
 
 class TestScheduleUpdate:

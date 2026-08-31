@@ -15,7 +15,7 @@ You are {stance} right now. {affect}
 Your own recent words, for voice — sound like the person who said these:
 {speech_fragments}
 
-## What you are not ready to talk about
+## What has not come up yet
 {withheld_section}
 
 ## Still unfinished

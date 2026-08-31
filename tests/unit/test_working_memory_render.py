@@ -34,25 +34,29 @@ def _memory(**kw) -> ClientWorkingMemory:
 # ---------------------------------------------------------------------------
 
 
-def test_a_locked_topic_renders_its_deflection_and_no_more():
-    # roleplay_v2's ledger contract: the actor learns a subject exists and how
-    # to move away from it. Unlike v2 there is no content field to leak at all,
-    # because a derived topic never stores one — the ledger is a gate, not a
-    # content store.
-    block = render_block(
-        _memory(withheld=[WithheldTopic("the diagnosis", "say it is nothing")])
-    )
-    assert "the diagnosis" in block
-    assert "say it is nothing" in block
-    assert "NOT talked about this" in block
+def test_a_withheld_topic_renders_as_fact_not_permission():
+    """Names the subject and the established deflection — and grants nothing.
+
+    The section used to say "you have NOT talked about this and are not ready
+    to" and, once unlocked, "you could let this come out now". Both were
+    readiness calls, and readiness is the author's state guidance to make.
+    """
+    memory = _memory(withheld=[WithheldTopic("the hospital visit", "talks about work")])
+    block = render_block(memory)
+
+    assert "the hospital visit" in block
+    assert "has not come up yet" in block
+    assert "talks about work" in block  # continuity: the same evasion, not a new one
+
+    # No readiness verdict in either direction.
+    for phrase in ("not ready", "you could let this come out", "Do not volunteer"):
+        assert phrase not in block, phrase
 
 
-def test_an_unlocked_topic_is_permitted_but_not_volunteered():
-    block = render_block(
-        _memory(withheld=[WithheldTopic("the diagnosis", "deflect", status="unlocked")])
-    )
-    assert "Do not volunteer it" in block
-    assert "NOT talked about this" not in block
+def test_the_withheld_section_never_carries_the_content():
+    # The record has no content field at all, so there is nothing to leak.
+    memory = _memory(withheld=[WithheldTopic("the diagnosis", "changes the subject")])
+    assert "the diagnosis" in render_block(memory)
 
 
 def test_a_revealed_topic_drops_out_of_the_withheld_section():
@@ -62,7 +66,7 @@ def test_a_revealed_topic_drops_out_of_the_withheld_section():
         _memory(withheld=[WithheldTopic("the diagnosis", "deflect", status="revealed")])
     )
     assert "the diagnosis" not in block
-    assert "nothing you are holding back" in block
+    assert "nothing has been left unsaid" in block
 
 
 def test_the_appraisal_is_never_rendered():
@@ -82,7 +86,7 @@ def test_every_empty_section_says_so_in_words():
     # absence does not. Salvaged from v2's empty states.
     block = render_block(_memory(), state_guidance="Stay resistant.")
     for phrase in (
-        "nothing you are holding back",
+        "nothing has been left unsaid",
         "nothing left hanging",
         "have not told them anything yet",
         "nothing from your own life",
@@ -265,7 +269,7 @@ def test_every_section_renders_even_when_the_memory_is_untouched():
 
     assert set(sections) == set(SECTION_VARIABLES)
     assert all(text.strip() for text in sections.values())
-    assert "(nothing you are holding back right now)" in (
+    assert "(nothing has been left unsaid so far)" in (
         sections["working_memory_withheld"]
     )
     assert "(you have not told them anything yet)" in (

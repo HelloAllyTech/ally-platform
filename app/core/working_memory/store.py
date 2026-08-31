@@ -158,31 +158,6 @@ class ClientWorkingMemoryStore:
                 st.stance = stance
                 st.turns_in_stance = 0
                 st.stance_path.append(stance)
-                # Reaching `disclosing` unlocks what was being withheld.
-                #
-                # Without this the ledger's three states had only one reachable
-                # one: nothing anywhere set "unlocked", so a topic stayed locked
-                # for the entire session however well the counsellor did, and
-                # the actor deflected it forever. That is the uniform-
-                # responsiveness failure this whole design exists to fix,
-                # reintroduced inside the ledger — and it made render.py's
-                # "you could let this come out now" branch dead code.
-                #
-                # Code decides it, not the LLM. The rule was `>= disclosing`,
-                # which is the second rung from the top of the default ladder;
-                # with a scenario-defined ladder it becomes that POSITION, since
-                # the author's rungs have their own names.
-                _ladder = tuple(st.ladder or STANCES)
-                if _rung(stance, _ladder) >= _unlock_rung(_ladder):
-                    for item in st.withheld:
-                        if item.status == "locked":
-                            item.status = "unlocked"
-                            logger.info(
-                                "[working-memory] withheld topic unlocked at "
-                                "stance=%s: %s",
-                                stance,
-                                item.topic,
-                            )
 
             if affect is not None:
                 st.affect = affect
@@ -223,7 +198,7 @@ class ClientWorkingMemoryStore:
                         st.withheld.append(item)
             for topic in revealed_topics:
                 for item in st.withheld:
-                    if item.status == "unlocked" and same_fact(item.topic, topic):
+                    if item.status != "revealed" and same_fact(item.topic, topic):
                         item.status = "revealed"
 
             # A topic the client has now actually SAID is revealed, derived from
@@ -232,7 +207,7 @@ class ClientWorkingMemoryStore:
             # and it needs no new LLM field, because "the client said it" is
             # exactly what `disclosed` already records.
             for item in st.withheld:
-                if item.status != "unlocked":
+                if item.status == "revealed":
                     continue
                 if any(same_fact(f.text, item.topic) for f in st.disclosed):
                     item.status = "revealed"
@@ -318,21 +293,6 @@ def _rung(stance: str, ladder: Sequence[str] = STANCES) -> int:
         return list(ladder).index(stance)
     except ValueError:
         return -1
-
-
-def _unlock_rung(ladder: Sequence[str]) -> int:
-    """The rung at which withheld topics unlock.
-
-    The rule was `>= disclosing`, justified by the ladder's own definition:
-    `disclosing` MEANS the client says the thing they had been holding back.
-    With a scenario-defined ladder that name may not exist, so the rule becomes
-    its position — the second rung from the top, which is where `disclosing`
-    sat in the default five.
-
-    A ladder of one or two rungs unlocks at the top rung rather than below the
-    bottom of the ladder.
-    """
-    return max(0, len(ladder) - 2)
 
 
 def same_fact(a: str, b: str) -> bool:

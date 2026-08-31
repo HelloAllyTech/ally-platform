@@ -111,7 +111,7 @@ class WithheldTopic:
     #: locked -> unlocked -> revealed. Three states, not two: "the client may
     #: now discuss this" and "the client has discussed it" are different facts,
     #: and only the second should stop the actor deflecting.
-    status: str = "locked"
+    status: str = "unsaid"
 
 
 @dataclass
