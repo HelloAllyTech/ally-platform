@@ -14,6 +14,7 @@
  *        TESTFLIGHT_EXTERNAL_GROUP_NAME — must exactly match an existing external group's name
  *        in App Store Connect (this script looks it up by name, it does not create one).
  */
+import crypto from "node:crypto";
 import fs from "node:fs/promises";
 
 import jwt from "jsonwebtoken";
@@ -43,42 +44,72 @@ for (const [name, value] of Object.entries({
 // The secret may be stored as raw PEM text or base64-encoded PEM depending on how it was set —
 // handle either, since this repo's other Apple-key consumer (Apple-Actions/upload-testflight-build)
 // abstracts this away internally and doesn't reveal which convention was used here. Either form
-// can also have its real newlines flattened into literal "\n" escape-sequence text when the
-// secret was originally set (a common failure mode for multi-line PEM secrets) — jsonwebtoken
-// then fails to parse it as an EC key and throws the generic "must be an asymmetric key" error,
-// which is what actually surfaced here. Un-flattening covers that case regardless of which
-// storage form was used.
+// can also have its real newlines flattened into literal "\n" escape-sequence text, or pick up
+// stray wrapping quotes/whitespace, depending on how it was originally pasted into the secret —
+// strip/un-flatten defensively rather than assume a single canonical storage form.
 function normalizePrivateKey(raw) {
-  const key = raw.includes("BEGIN PRIVATE KEY")
+  let key = raw.includes("BEGIN PRIVATE KEY")
     ? raw
     : Buffer.from(raw, "base64").toString("utf-8");
-  return key.includes("\\n") ? key.replace(/\\n/g, "\n") : key;
+  key = key.includes("\\n") ? key.replace(/\\n/g, "\n") : key;
+  key = key.trim();
+  if (
+    (key.startsWith('"') && key.endsWith('"')) ||
+    (key.startsWith("'") && key.endsWith("'"))
+  ) {
+    key = key.slice(1, -1).trim();
+  }
+  return key;
+}
+
+// Parsed with Node's own crypto module rather than handed to jsonwebtoken as a raw string:
+// jsonwebtoken's own PEM handling gives a single opaque "secretOrPrivateKey must be an
+// asymmetric key" error no matter what's actually wrong with the input, which isn't enough to
+// debug a real formatting problem against a secret we can't print. crypto.createPrivateKey
+// gives Node/OpenSSL's own specific parse error, and once parsed we can directly confirm it's
+// an EC key on the P-256 curve ES256 requires (a wrong-but-parseable key, e.g. RSA or the wrong
+// curve, would otherwise fail with the exact same generic jsonwebtoken message).
+function loadPrivateKey() {
+  const pem = normalizePrivateKey(APPSTORE_API_PRIVATE_KEY);
+  let keyObject;
+  try {
+    keyObject = crypto.createPrivateKey({ key: pem, format: "pem" });
+  } catch (error) {
+    throw new Error(
+      `APPSTORE_API_PRIVATE_KEY could not be parsed as a PEM private key at all ` +
+        `(normalized length ${pem.length}, expected ~250 for a P-256 EC key — ${pem.length > 300 ? "this is notably longer, check for stray characters (quotes, duplicated content)" : "length looks plausible"}). ` +
+        `Node crypto error: ${error.message}. Re-check the secret is the exact, complete ` +
+        `contents of the .p8 file downloaded from App Store Connect, nothing added or removed.`,
+    );
+  }
+  if (keyObject.asymmetricKeyType !== "ec") {
+    throw new Error(
+      `APPSTORE_API_PRIVATE_KEY parsed as a "${keyObject.asymmetricKeyType}" key, not "ec" — ` +
+        `App Store Connect API keys are EC (P-256) keys, so this looks like the wrong secret.`,
+    );
+  }
+  const curve = keyObject.asymmetricKeyDetails?.namedCurve;
+  if (curve && curve !== "prime256v1") {
+    throw new Error(
+      `APPSTORE_API_PRIVATE_KEY is an EC key on curve "${curve}", but ES256 requires P-256 ` +
+        `(prime256v1) — this doesn't look like a valid App Store Connect API key.`,
+    );
+  }
+  return keyObject;
 }
 
 function mintToken() {
   const now = Math.floor(Date.now() / 1000);
-  const privateKey = normalizePrivateKey(APPSTORE_API_PRIVATE_KEY);
-  try {
-    return jwt.sign(
-      {
-        iss: APPSTORE_ISSUER_ID,
-        iat: now,
-        exp: now + 19 * 60, // Apple caps this at 20 minutes; stay comfortably under it.
-        aud: "appstoreconnect-v1",
-      },
-      privateKey,
-      { algorithm: "ES256", keyid: APPSTORE_API_KEY_ID },
-    );
-  } catch (error) {
-    // jsonwebtoken's own error here ("secretOrPrivateKey must be an asymmetric key when using
-    // ES256") is generic and doesn't say why the key failed to parse — surface enough about the
-    // normalized key's shape to debug a formatting problem without ever logging the key itself.
-    throw new Error(
-      `Failed to sign the App Store Connect JWT with APPSTORE_API_PRIVATE_KEY as an ES256 key ` +
-        `(normalized length ${privateKey.length}, starts with "${privateKey.slice(0, 27)}", ` +
-        `has real newlines: ${privateKey.includes("\n")}). Original error: ${error.message}`,
-    );
-  }
+  return jwt.sign(
+    {
+      iss: APPSTORE_ISSUER_ID,
+      iat: now,
+      exp: now + 19 * 60, // Apple caps this at 20 minutes; stay comfortably under it.
+      aud: "appstoreconnect-v1",
+    },
+    loadPrivateKey(),
+    { algorithm: "ES256", keyid: APPSTORE_API_KEY_ID },
+  );
 }
 
 async function appleApi(path, token) {
