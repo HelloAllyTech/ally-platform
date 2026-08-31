@@ -1,8 +1,0 @@
-{
-    "name": "Roleplay v2 Director — System Prompt",
-    "kind": "prompt",
-    "promptType": "roleplay_v2_director",
-    "hasStates": false,
-    "description": "Static referee instructions for the v2 Director LLM: behavior observation rules, guard evaluation, unlock discipline, stage-direction style, and the verdict JSON shape. Contains literal JSON braces, so the runtime resolves it via load_template and appends the scenario spec (rubric + state machine + FULL ledger + unlock conditions as JSON) manually — never str.format.",
-    "availableVariables": []
-}

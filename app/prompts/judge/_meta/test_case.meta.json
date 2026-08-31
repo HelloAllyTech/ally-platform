@@ -1,8 +1,0 @@
-{
-    "name": "Roleplay v2 Rehearsal Judge — Agent Test Case Evaluator",
-    "kind": "prompt",
-    "promptType": "roleplay_v2_judge",
-    "hasStates": false,
-    "description": "Evaluates ONE agent test case (condition + test) against ONE rehearsal transcript, judging the runtime (actor + director), not the scripted CONDITION_DRIVEN trainee. Two-step protocol: verify the condition genuinely occurred (else INCONCLUSIVE), then check the test assertion (PASSED/FAILED) with verbatim [turn N] evidence. Contains literal JSON braces, so the runtime resolves it via load_template and appends the spec manually; condition_recreated=false deterministically forces INCONCLUSIVE after the LLM call.",
-    "availableVariables": []
-}

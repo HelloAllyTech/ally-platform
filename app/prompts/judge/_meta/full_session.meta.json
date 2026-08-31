@@ -1,8 +1,0 @@
-{
-    "name": "Roleplay v2 Rehearsal Judge — Full-Session Rubric Evaluator",
-    "kind": "prompt",
-    "promptType": "roleplay_v2_judge",
-    "hasStates": false,
-    "description": "Scores ONE full_session agent test case's rubrics (criteria + scoring instructions) against ONE rehearsal transcript, judging the runtime (actor + director), not the scripted FULL_SESSION trainee. Per rubric: 0-100 score with verbatim [turn N] evidence and reasoning, plus overall_score and summary_markdown. Contains literal JSON braces, so the runtime resolves it via load_template and appends the spec manually; code deterministically clamps scores, realigns rubric_scores to the request order, and recomputes overall_score as the mean after the LLM call.",
-    "availableVariables": []
-}

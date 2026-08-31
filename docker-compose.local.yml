@@ -47,8 +47,3 @@ services:
       # Linux: host.docker.internal may not exist; this adds it
       - 'host.docker.internal:host-gateway'
     restart: on-failure
-    # NOTE: the Roleplay Studio v2 worker (LiveKit agent AGENT_NAME_V2) runs
-    # inside this `app` container via start.sh, alongside uvicorn + the v1
-    # worker — matching the deployed single-container topology. A separate
-    # worker-v2 service would register a SECOND worker under the same name and
-    # collide with this one on the shared LiveKit project.

@@ -1,7 +1,8 @@
 """The client's working memory — one rolling structured context.
 
 See docs/client-working-memory-design.md. This package is the phase-2 salvage:
-the runtime plumbing lifted out of ``app/roleplay_v2`` and generalised away from
+the runtime plumbing lifted out of the since-removed ``app/roleplay_v2``
+and generalised away from
 ``ScenarioSpec``, with nothing reading it yet. The derivation layer that fills it
 is phase 3.
 """

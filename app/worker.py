@@ -87,28 +87,6 @@ setup_livekit_logging(
     console=settings.LIVEKIT_LOG_CONSOLE,
 )
 
-# Roleplay Studio v2 runtime, served by THIS same worker process (single fleet).
-# Importing worker_v2 here — rather than launching a second `python -m
-# app.worker_v2` process — means both engines share this process's prewarmed
-# VAD/BVC and the one EOU inference executor, so v2 adds no second copy of the
-# model set. The import is idempotent for logging (setup_livekit_logging strips
-# root back to our tagged handler) and re-registers the EOU runner from the same
-# `turn_detector.multilingual` module worker.py already imported above.
-#
-# GUARDED on purpose: this is a shared worker, so a v2 import/load-time failure
-# must NOT sink the live v1 path. On failure we still know the engine marker
-# (literal fallback) so v2 jobs are DETECTED and refused cleanly rather than
-# misrouted into the v1 brain, while v1 keeps running untouched.
-try:
-    from app.roleplay_v2.spec.models import SPEC_ENGINE_MARKER  # noqa: E402
-    from app.worker_v2 import entrypoint as roleplay_v2_entrypoint  # noqa: E402
-except Exception:  # noqa: BLE001 - v2 import must never break v1
-    logger.exception(
-        "[dispatch] roleplay_v2 runtime failed to import; v2 disabled, v1 unaffected"
-    )
-    SPEC_ENGINE_MARKER = "roleplay_v2"  # still detect v2 jobs to refuse them
-    roleplay_v2_entrypoint = None
-
 # Pause/resume control channel (LiveKit data packets, topic-agnostic; clients
 # branch on the JSON ``type`` field).
 # Pause/resume tuning — resolved from settings (env-overridable; see config.py
@@ -3457,9 +3435,9 @@ async def entrypoint(ctx: agents.JobContext):
         # run_job() only resolves its shutdown future on ctx.connect(),
         # ctx.shutdown(), or a room-disconnect event — raising alone does
         # none of those, so the job process hangs forever, the agent never
-        # joins, and the room never frees (same defect class fixed for
-        # app/worker_v2.py::entrypoint(); see its docstring for the prior
-        # narrow fix in commit dd61115). Call shutdown explicitly so the job
+        # joins, and the room never frees (the same defect was fixed narrowly
+        # in the since-removed v2 entrypoint, commit dd61115). Call shutdown
+        # explicitly so the job
         # terminates and the failure is visible instead of hanging silently.
         logger.exception(
             f"[AgentWorker] Startup failed before the agent could join "
@@ -3575,41 +3553,15 @@ async def entrypoint(ctx: agents.JobContext):
         )
 
 
-def _is_roleplay_v2_job(ctx: agents.JobContext) -> bool:
-    """Cheap peek at the job's room metadata for the v2 engine marker (no full
-    spec parse). ally-be stamps ``engine: 'roleplay_v2'`` into the metadata of
-    every v2 room (see RoleplaySessionService.buildRoomMetadata in ally-be)."""
-    raw = getattr(ctx.job, "metadata", None)
-    if not raw:
-        return False
-    try:
-        data = json.loads(raw)
-    except (ValueError, TypeError):
-        return False
-    return isinstance(data, dict) and data.get("engine") == SPEC_ENGINE_MARKER
-
-
 async def dispatch_entrypoint(ctx: agents.JobContext):
-    """Single-fleet entrypoint. This one worker (one agent_name, one set of
-    prewarmed VAD/BVC, one EOU inference executor) serves BOTH the v1 scenario
-    engine and the Roleplay Studio v2 runtime. Route each job by the ``engine``
-    marker in room metadata: v2-marked rooms go to the v2 runtime, everything
-    else to v1.
+    """Entrypoint for every job.
 
-    The v2 entrypoint self-guards on ROLEPLAY_V2_ENABLED, so the worker-side
-    kill-switch still refuses v2 jobs cleanly when off. ally-be's flag+allowlist
-    is the primary who/whether gate; this dispatch is defense in depth.
+    Was a router: this worker served both the v1 scenario engine and the
+    Roleplay Studio v2 runtime, branching on an ``engine`` marker in room
+    metadata. Studio v2 is gone, so there is one engine and nothing to route.
+    Kept as a named indirection because `start.sh` and the LiveKit worker
+    options reference it, and because a second engine would land here again.
     """
-    if _is_roleplay_v2_job(ctx):
-        if roleplay_v2_entrypoint is None:
-            # v2 failed to import (see guarded import above). Refuse this v2 job
-            # loudly rather than misplay it on the v1 brain; v1 jobs are fine.
-            raise RuntimeError(
-                "roleplay_v2 runtime unavailable (import failed); refusing v2 "
-                "job. v1 is unaffected."
-            )
-        logger.info("[dispatch] job %s -> roleplay_v2 runtime", ctx.job.id)
-        return await roleplay_v2_entrypoint(ctx)
     return await entrypoint(ctx)
 
 

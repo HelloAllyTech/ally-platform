@@ -4,7 +4,7 @@ Configuration settings for the application.
 
 from typing import Optional
 
-from pydantic import AliasChoices, Field, model_validator
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.core.constants import Environment
@@ -1284,145 +1284,15 @@ class Settings(BaseSettings):
         ),
     )
 
-    # ---- Roleplay Studio v2 (spec-driven runtime; app/roleplay_v2) ----
-    ROLEPLAY_V2_ENABLED: bool = Field(
-        default=True,
-        description=(
-            "Kill-switch for the v2 runtime. When False, worker_v2 refuses "
-            "jobs at the entrypoint. Never affects the v1 worker."
-        ),
-    )
-    AGENT_NAME_V2: Optional[str] = Field(
-        default=None,
-        description=(
-            "LiveKit agent name the v2 worker registers under. Distinct from "
-            "AGENT_NAME so ally-be dispatches engine='roleplay_v2' rooms to "
-            "the v2 worker pool and everything else to v1. Defaults to "
-            "f'{AGENT_NAME}V2' so it inherits the same per-environment "
-            "namespacing as the v1 name (avoids 'AgentV2' collisions when "
-            "workers share one LiveKit project); set explicitly to override."
-        ),
-    )
-
-    @model_validator(mode="after")
-    def _derive_agent_name_v2(self) -> "Settings":
-        """Default the v2 agent name to '<AGENT_NAME>V2' when not set explicitly.
-
-        Mirrors the v1 per-environment naming so ally-be's
-        LIVEKIT_ROLEPLAY_AGENT_NAME (which defaults to '<LIVEKIT_AGENT_NAME>V2')
-        and this worker register under the *same unique* name on a shared
-        LiveKit project, instead of every worker colliding on 'AgentV2'.
-        """
-        if not self.AGENT_NAME_V2:
-            self.AGENT_NAME_V2 = f"{self.AGENT_NAME}V2"
-        return self
-
-    ACTOR_DEFAULT_MODEL: str = Field(
-        default="gpt-4o-mini",
-        description=("Default model for the v2 Actor when the spec has no actorModel."),
-    )
-    DIRECTOR_PROVIDER: str = Field(
-        default="openai",
-        description=(
-            "Default provider for the v2 Director LLM when the spec has no "
-            "directorModel (needs json_mode structured-output support)."
-        ),
-    )
-    DIRECTOR_MODEL: str = Field(
-        default="gpt-4o",
-        description=(
-            "Default model for the v2 Director when the spec has no "
-            "directorModel. The Director is the referee (scoring, transitions, "
-            "unlocks) and runs OFF the voice critical path, so it can afford a "
-            "stronger model than the Actor — accuracy matters more than latency "
-            "here. Must support json_mode structured output."
-        ),
-    )
-    DIRECTOR_MIN_CONFIDENCE: float = Field(
-        default=0.4,
-        description=(
-            "Minimum self-reported Director confidence (0..1) required before "
-            "IRREVERSIBLE verdict actions — state transitions and disclosure "
-            "unlocks — are applied. Behavior scoring is never gated (it is "
-            "additive and auditable); only actions that reshape the session "
-            "are held back on a low-confidence turn. 0 disables the gate."
-        ),
-    )
-    DIRECTOR_TIMEOUT_S: float = Field(
-        default=8.0,
-        description=(
-            "Hard timeout (seconds) for one Director verdict. The Director "
-            "runs OFF the voice critical path, so on timeout the turn simply "
-            "goes undirected (a recorded miss) — it never delays the actor."
-        ),
-    )
+    # ---- Room-metadata fetch fallback ----
     SPEC_FETCH_MAX_ATTEMPTS: int = Field(
         default=3,
         description=(
-            "How many times the v2 runtime retries GETting a large spec from "
-            "the specFetch webhook (exponential backoff) before failing the "
-            "session in configure(). Only the >55KB spec path uses this."
-        ),
-    )
-    DIRECTOR_GRACE_MS: float = Field(
-        default=0.0,
-        description=(
-            "Optional wait (ms) before the actor compiles its turn card, "
-            "giving a near-done Director verdict a chance to land and reduce "
-            "direction staleness. 0 (default) = never wait; keep small "
-            "(<300ms) — it adds directly to voice latency."
-        ),
-    )
-    REHEARSAL_CONCURRENCY_LIMIT: int = Field(
-        default=2,
-        description=(
-            "Maximum number of v2 rehearsals (whole runs) executing "
-            "concurrently across the process; excess requests queue. Bounds "
-            "cost/memory at the run level; within a run, units fan out up to "
-            "REHEARSAL_UNIT_CONCURRENCY_LIMIT."
-        ),
-    )
-    REHEARSAL_UNIT_CONCURRENCY_LIMIT: int = Field(
-        default=3,
-        description=(
-            "Maximum trainee-profile / test-case units executed in parallel "
-            "within a single rehearsal run. Units are independent sessions, so "
-            "this is the main lever on a run's wall-clock (the 3 default "
-            "profiles run concurrently). Bounded to avoid provider rate limits."
-        ),
-    )
-    REHEARSAL_JUDGE_MODEL: str = Field(
-        default="gpt-4o-mini",
-        description=(
-            "Default judge model for rehearsals (config.judge_model in the "
-            "request overrides per-run)."
-        ),
-    )
-    REHEARSAL_JUDGE_SAMPLES: int = Field(
-        default=1,
-        description=(
-            "How many times the rehearsal judge is sampled per run. The two "
-            "SOFT dimensions with no deterministic backstop — persona_"
-            "consistency and difficulty_calibration — are averaged across "
-            "samples to reduce single-shot LLM noise; all other fields come "
-            "from the first sample. 1 (default) = original single-shot behavior."
-        ),
-    )
-    REHEARSAL_TURNS_DEFAULT: int = Field(
-        default=8,
-        description=(
-            "Default trainee turns per rehearsal profile when the request "
-            "omits config.turns_per_profile. Kept in sync with ally-be's "
-            "TEST_RUN_DEFAULT_TURNS_PER_CASE (8), which drives test runs and "
-            "always sends an explicit value."
-        ),
-    )
-    REHEARSAL_TRAINEE_MODEL: str = Field(
-        default="",
-        description=(
-            "Default trainee model for rehearsals (config.trainee_model in "
-            "the request overrides per-run). Empty (default) = use the app's "
-            "default LLM client."
+            "Retries for the room-metadata fetch fallback, where ally-be points "
+            "at a URL instead of inlining metadata that would be oversized "
+            "(see app/core/agent/factory.py). Named for the Roleplay Studio v2 "
+            "spec fetch it was written for; that runtime is gone, this path is "
+            "not."
         ),
     )
 

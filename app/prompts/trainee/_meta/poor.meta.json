@@ -1,8 +1,0 @@
-{
-    "name": "Roleplay v2 Trainee — Poor Profile",
-    "kind": "prompt",
-    "promptType": "roleplay_v2_trainee",
-    "hasStates": false,
-    "description": "Realistically unskilled counselor profile: closed questions, premature advice, judgment/minimising. Used to verify the spec does not hand out progress or disclosures for free.",
-    "availableVariables": []
-}

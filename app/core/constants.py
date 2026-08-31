@@ -185,12 +185,6 @@ SCENARIO_REPORT_WEBHOOK_ENDPOINT: Final[str] = "/api/v1/learn/scenarios/reports/
 # Goal-based actor evaluation result is PATCHed to
 # {base}{ACTOR_EVALUATION_WEBHOOK_ENDPOINT}/{scenario_session_id}/evaluation
 ACTOR_EVALUATION_WEBHOOK_ENDPOINT: Final[str] = "/api/v1/learn/scenario-session"
-# Roleplay Studio v2 rehearsal (ally-be "test run") results are PATCHed to
-# {base}{ROLEPLAY_REHEARSAL_WEBHOOK_ENDPOINT}/{rehearsal_id}
-ROLEPLAY_REHEARSAL_WEBHOOK_ENDPOINT: Final[str] = (
-    "/api/v1/roleplay-studio/test-runs/webhook"
-)
-
 # Worker configuration constants
 DEFAULT_VAD_ACTIVATION_THRESHOLD: Final[float] = 0.7
 SESSION_TERMINATED_MESSAGE: Final[str] = "Session terminated"

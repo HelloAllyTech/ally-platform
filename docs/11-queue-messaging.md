@@ -205,7 +205,7 @@ When running inside Docker Compose, the app reaches LocalStack at `http://locals
 - `app/core/graph/utils.py` -- `serialize_event()`
 - `app/core/events/handlers.py` -- `send_event_to_ui()`, and where `turn_metrics` is emitted
 - `app/core/graph/nodes.py` -- where `behavior_instruction` is emitted
-- `app/worker.py` / `app/worker_v2.py` -- `_emit_start_metrics()` (`start_metrics`)
+- `app/worker.py` -- `_emit_start_metrics()` (`start_metrics`)
 - `app/core/llm_usage/emitter.py` -- `llm_usage`
 - `app/core/queue/utils.py` -- `session_memory`
 - `app/core/supervisor/service.py` -- `supervisor_note`

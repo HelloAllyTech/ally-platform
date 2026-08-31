@@ -1,8 +1,0 @@
-{
-    "name": "Roleplay v2 Trainee — Stagnation Steering",
-    "kind": "prompt",
-    "promptType": "roleplay_v2_trainee",
-    "hasStates": false,
-    "description": "Appended to the trainee system prompt when its recent turns become pairwise-similar (Jaccard repetition check), steering the simulated trainee out of loops without changing its profile.",
-    "availableVariables": []
-}

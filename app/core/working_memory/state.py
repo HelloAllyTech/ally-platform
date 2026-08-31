@@ -103,7 +103,8 @@ class WithheldTopic:
     roleplay_v2's disclosure-ledger contract verbatim: the actor learns that a
     subject exists and how to move away from it, without ever having the
     material in context to leak. `_render_ledger_section` in
-    app/roleplay_v2/actor/prompt_compiler.py is the reference rendering.
+    The reference rendering was app/roleplay_v2/actor/prompt_compiler.py,
+    removed with Studio v2; see git history.
     """
 
     topic: str

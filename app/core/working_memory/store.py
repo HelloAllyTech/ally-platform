@@ -1,6 +1,7 @@
 """Worker-owned store for the client's working memory.
 
-Salvaged from ``app/roleplay_v2/spec/runtime_state.py`` (design §9.1) and
+Salvaged from the since-removed ``app/roleplay_v2/spec/runtime_state.py``
+(design §9.1) and
 generalised: v2's store was constructed from a ``ScenarioSpec`` and seeded its
 ledger from authored secrets. This one derives its ledgers from the
 conversation, so it needs no spec at all — the salvage makes it smaller.

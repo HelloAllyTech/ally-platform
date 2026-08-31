@@ -1,8 +1,0 @@
-{
-    "name": "Roleplay v2 Rehearsal Judge — System Prompt",
-    "kind": "prompt",
-    "promptType": "roleplay_v2_judge",
-    "hasStates": false,
-    "description": "LLM-judge instructions for scoring one rehearsal run (persona_consistency, disclosure_discipline, difficulty_calibration, rubric_coverage, secret_leaks, critique). Contains literal JSON braces, so the runtime resolves it via load_template and appends the spec + transcript manually; deterministic leak/coverage checks override the LLM on conflict.",
-    "availableVariables": []
-}

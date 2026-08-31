@@ -597,9 +597,7 @@ class TestShutdownHandlerBoundsInlineFinalize:
     """
 
     @pytest.mark.asyncio
-    async def test_on_shutdown_times_out_a_hanging_inline_finalize(
-        self, monkeypatch
-    ):
+    async def test_on_shutdown_times_out_a_hanging_inline_finalize(self, monkeypatch):
         finalize_started = asyncio.Event()
 
         async def hanging_finalize_session(**kwargs):

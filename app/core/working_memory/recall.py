@@ -1,6 +1,7 @@
 """Which memories the client currently has in mind.
 
-Selection structure is salvaged from ``app/roleplay_v2/actor/retrieval/
+Selection structure is salvaged from the since-removed
+``app/roleplay_v2/actor/retrieval/
 persona_bible.py`` (design §9.1): three tiers, stem-tolerant cue matching,
 cue hits weighted to dominate incidental prose overlap, a hard budget, and a
 baseline so the actor is never left with nothing. What is added here is the
@@ -166,7 +167,8 @@ def _stem_match_count(candidate_words: set[str], cues: set[str]) -> int:
 def _cosine(a: Sequence[float], b: Sequence[float]) -> float:
     """Cosine similarity; 0 for a zero-length or mismatched vector.
 
-    Salvaged from ``roleplay_v2/actor/retrieval/persona_bible.py`` (§9.1).
+    Salvaged from the since-removed
+    ``roleplay_v2/actor/retrieval/persona_bible.py`` (§9.1).
     Pure and network-free by design: the pool's vectors are computed once at
     session setup (see corpus.attach_vectors), so per-turn cost is arithmetic.
     """

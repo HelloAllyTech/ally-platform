@@ -573,7 +573,8 @@ whether that is why register guidance fails to land is untested. §9.2 has the a
 `withheld` follows `roleplay_v2`'s ledger contract verbatim. A withheld item renders
 its **topic and its deflection, never its content** — so the actor knows a subject exists and how to move away from it
 without having the material in context to leak. `_render_ledger_section` in
-`app/roleplay_v2/actor/prompt_compiler.py` is the reference implementation.
+`app/roleplay_v2/actor/prompt_compiler.py` was the reference implementation, removed
+with Roleplay Studio v2 on 2026-08-31; see git history.
 
 **Framing.** The block is introduced as a *"directors' note for your next reply
 only"* — also borrowed from v2's turn card. It is the clearest way found so far to tell

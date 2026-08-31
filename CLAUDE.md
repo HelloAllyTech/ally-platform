@@ -53,7 +53,7 @@ taking a whole task description and returning full chunk bodies. Setup, citation
 
 ## Repo shape
 
-- `app/worker.py` — the LiveKit worker entry point. `app/worker_v2.py` is the roleplay-v2 variant.
+- `app/worker.py` — the LiveKit worker entry point.
 - `app/core/graph/` — the turn pipeline. `app/core/agent/` — agent construction.
 - `app/core/events/` — event definitions and dispatch. `app/core/livekit/` — room and track plumbing.
 - `app/core/branching_instructions/` — runtime guardrails injected into the prompt.
