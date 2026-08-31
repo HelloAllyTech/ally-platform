@@ -161,7 +161,14 @@ async function fetchAllExistingVersions(appId, token) {
 
 /** Copies the previous version's en-US text listing fields onto a freshly created version.
  * Returns the new en-US localization's id (needed by the caller for the screenshot copy and the
- * existing whatsNew step), or null if the previous version had no en-US localization to copy. */
+ * existing whatsNew step), or null if the previous version had no en-US localization to copy.
+ *
+ * Confirmed live: creating a version via POST /appStoreVersions already auto-creates a default
+ * en-US localization on it (undocumented in the create schema itself — Apple's backend just does
+ * it, inheriting the app's primary locale) — POSTing a fresh one 409s with
+ * ENTITY_ERROR.ATTRIBUTE.INVALID.DUPLICATE ("Entity with locale: en-US already exists"). So this
+ * checks for an existing one on the new version first and PATCHes it, only falling back to POST
+ * if genuinely none exists (e.g. a primary locale other than en-US). */
 async function copyEnUsLocalizationForward(sourceVersionId, newVersionId, token) {
   const sourceLocsResponse = await appleApi(
     `/appStoreVersions/${sourceVersionId}/appStoreVersionLocalizations`,
@@ -172,19 +179,40 @@ async function copyEnUsLocalizationForward(sourceVersionId, newVersionId, token)
 
   const { description, keywords, marketingUrl, promotionalText, supportUrl } =
     sourceLoc.attributes ?? {};
-  const newLocResponse = await appleApi("/appStoreVersionLocalizations", token, {
-    method: "POST",
-    body: JSON.stringify({
-      data: {
-        type: "appStoreVersionLocalizations",
-        attributes: { locale: "en-US", description, keywords, marketingUrl, promotionalText, supportUrl },
-        relationships: {
-          appStoreVersion: { data: { type: "appStoreVersions", id: newVersionId } },
+  const fields = { description, keywords, marketingUrl, promotionalText, supportUrl };
+
+  const newVersionLocsResponse = await appleApi(
+    `/appStoreVersions/${newVersionId}/appStoreVersionLocalizations`,
+    token,
+  );
+  const existingLoc = newVersionLocsResponse.data?.find(loc => loc?.attributes?.locale === "en-US");
+
+  let newLocalizationId;
+  if (existingLoc) {
+    await appleApi(`/appStoreVersionLocalizations/${existingLoc.id}`, token, {
+      method: "PATCH",
+      body: JSON.stringify({
+        data: { type: "appStoreVersionLocalizations", id: existingLoc.id, attributes: fields },
+      }),
+    });
+    newLocalizationId = existingLoc.id;
+  } else {
+    const newLocResponse = await appleApi("/appStoreVersionLocalizations", token, {
+      method: "POST",
+      body: JSON.stringify({
+        data: {
+          type: "appStoreVersionLocalizations",
+          attributes: { locale: "en-US", ...fields },
+          relationships: {
+            appStoreVersion: { data: { type: "appStoreVersions", id: newVersionId } },
+          },
         },
-      },
-    }),
-  });
-  return { newLocalizationId: newLocResponse.data.id, sourceLocalizationId: sourceLoc.id };
+      }),
+    });
+    newLocalizationId = newLocResponse.data.id;
+  }
+
+  return { newLocalizationId, sourceLocalizationId: sourceLoc.id };
 }
 
 /** Apple's asset CDN URLs are templates with {w}/{h}/{f} placeholders, filled in from the same
