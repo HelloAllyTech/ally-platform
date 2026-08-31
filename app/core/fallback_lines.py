@@ -108,6 +108,23 @@ def llm_timeout_fallback_line(language_code: Optional[str]) -> str:
     )
 
 
+def tts_failure_fallback_line(language_code: Optional[str]) -> str:
+    """The line to speak when a turn's audio was LOST to a TTS failure.
+
+    Different cause, identical need: the learner is sitting in silence after
+    saying something, and the only useful thing the persona can do is invite
+    them to speak again — which also drives a fresh turn, and with it a fresh
+    synthesis attempt. So this deliberately shares the LLM-timeout table rather
+    than introducing a second string: two near-identical lines would double the
+    translation work (see the TODO(i18n) list above) for no difference the
+    learner can hear. Kept as its own function so the call site reads honestly,
+    and so the two can diverge later without touching the caller.
+    """
+    return resolve_line(
+        LLM_TIMEOUT_FALLBACK_LINES, language_code, LLM_TIMEOUT_FALLBACK_EN
+    )
+
+
 def untranslated_languages(table: Dict[str, str] = None) -> list[str]:
     """Base language codes whose line is still the untranslated English string.
 

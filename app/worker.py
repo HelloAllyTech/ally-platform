@@ -25,6 +25,7 @@ from app.core.agent.factory import (
 from app.core.config import settings
 from app.core.constants import (
     DEFAULT_BRANCHING_LLM_CONFIG,
+    DEFAULT_LANGUAGE_CODE,
     DEFAULT_VAD_ACTIVATION_THRESHOLD,
     SESSION_TERMINATED_MESSAGE,
     Environment,
@@ -38,6 +39,7 @@ from app.core.events.handlers import (
     create_termination_handler,
     setup_interruption_detection,
 )
+from app.core.fallback_lines import tts_failure_fallback_line
 from app.core.livekit.audio_filters import (
     session_livekit_url,
     supports_noise_cancellation,
@@ -145,6 +147,16 @@ CONN_STATE_CONNECTED = "connected"
 # ``reason`` is the same string passed to ctx.shutdown, for support/debugging —
 # it is NOT user-facing copy and must not be rendered verbatim.
 CTRL_SESSION_FAULT = "session-fault"
+
+# Minimum gap between spoken recoveries from a lost-audio TTS failure (see
+# _register_tts_error_fallback). The recovery line is synthesized on the SAME
+# instance that just failed, so an unthrottled one-per-error reaction turns a
+# provider outage into a burst of failing say() calls — each of which is
+# another unrecoverable error counting toward AgentSession's own close
+# threshold. One line per window is enough for the learner: it either works
+# (and the session carries on) or it doesn't (and the existing close handler
+# owns the teardown).
+TTS_FAILURE_FALLBACK_COOLDOWN_S = 20.0
 
 
 # The agent is the AUTHORITATIVE enforcer of the scenario time limit: it ends
@@ -391,6 +403,12 @@ class AgentWorker:
         # True between CONN_RECONNECTING and the next CONN_CONNECTED, so the
         # recovery signal is only sent when a problem was actually reported.
         self._connection_recovering = False
+
+        # The exact TTS object handed to AgentSession (captured in
+        # _create_session) plus the last time we spoke a recovery line for one
+        # of its failures — see _register_tts_error_fallback.
+        self._session_tts_instance = None
+        self._last_tts_fallback_at: Optional[float] = None
 
     async def configure(self):
         """
@@ -829,6 +847,13 @@ class AgentWorker:
         # the language-coverage + graceful-fallback details.
         turn_detection, endpointing_kwargs = self._resolve_turn_detection(vad)
 
+        # Keep the exact instance we hand over: it is the one the session's own
+        # error handling listens on, and the one _register_tts_error_fallback
+        # must attach to (tts_instance is a lazily-built property, so reading it
+        # again is a per-client convention, not a guarantee — see
+        # BaseTTSClient.create_clip_tts).
+        self._session_tts_instance = tts_instance
+
         self.session = AgentSession(
             stt=stt_instance,
             tts=tts_instance,
@@ -1046,6 +1071,11 @@ class AgentWorker:
                     self.ctx.shutdown("agent_session_error")
                 except Exception:  # noqa: BLE001
                     logger.exception("[SESSION] fallback shutdown failed")
+
+        # The complementary case to the close handler above: ONE failed
+        # synthesis, which never accumulates to a close and costs the learner a
+        # whole turn of audio in silence.
+        self._register_tts_error_fallback()
 
         # Conversation handler (register on session)
         conversation_handler, state_handlers, cleanup_conversation_handler = (
@@ -1329,6 +1359,119 @@ class AgentWorker:
         self._shutdown_handler = shutdown_handler
 
         self.ctx.add_shutdown_callback(shutdown_handler)
+
+    def _register_tts_error_fallback(self) -> None:
+        """Recover the learner's turn when synthesis fails but the reply text
+        survives.
+
+        LiveKit tees the reply's text stream into two independent consumers: one
+        synthesizes audio, the other accumulates the transcript and commits it
+        to the chat context unconditionally. The synthesis task is awaited via
+        ``wait_if_not_interrupted`` — an ``asyncio.gather(...,
+        return_exceptions=True)`` whose results are never inspected — so once
+        the plugin's own retries are exhausted the failure is swallowed and the
+        transcript still commits. ``AgentSession._on_error`` closes the session
+        only after FOUR consecutive unrecoverable TTS errors, and resets that
+        count the next time the agent reaches "speaking".
+
+        Net effect, and exactly what was reported from a course roleplay: the
+        actor goes silent for one turn, its dialogue is in the transcript
+        anyway, the session carries on, and nothing surfaces beyond a log line.
+        The ``session.on("close")`` handler above covers the four-in-a-row case;
+        this covers the isolated one it cannot see.
+
+        We cannot re-speak the lost line — ``TTSError`` carries only a label and
+        the exception, never the text — so the learner gets the same treatment
+        as an LLM timeout: a short spoken line inviting them to say it again,
+        which is both an audible "still here" and the thing that drives a fresh
+        turn (and a fresh synthesis attempt). The client additionally gets a
+        NON-fatal session-fault so it need not present a degraded call as
+        healthy, mirroring the opening-statement stall path.
+        """
+        tts_instance = self._session_tts_instance
+        if tts_instance is None or not hasattr(tts_instance, "on"):
+            logger.warning(
+                "[TTS] no TTS instance to watch for synthesis errors — a lost "
+                "turn would be silent (room=%s)",
+                getattr(self.ctx.room, "name", "?"),
+            )
+            return
+
+        def _on_tts_error(error) -> None:
+            try:
+                # Recoverable errors are the plugin's own retry loop talking;
+                # the audio still lands, so reacting would be noise.
+                if getattr(error, "recoverable", True):
+                    return
+                logger.error(
+                    "[TTS] unrecoverable synthesis error (label=%s, room=%s) — "
+                    "this turn's audio is LOST though its text still reaches "
+                    "the transcript; speaking a recovery line. Session stays "
+                    "open (the close handler owns repeated failures).",
+                    getattr(error, "label", "?"),
+                    getattr(self.ctx.room, "name", "?"),
+                    exc_info=getattr(error, "error", None),
+                )
+                self._schedule_tts_failure_recovery()
+            except Exception:  # noqa: BLE001 - never break TTS error handling
+                logger.exception("[TTS] error handler failed")
+
+        tts_instance.on("error", _on_tts_error)
+
+    def _schedule_tts_failure_recovery(self) -> None:
+        """Throttle, then schedule the spoken recovery (the handler is sync)."""
+        now = time.monotonic()
+        last = self._last_tts_fallback_at
+        if last is not None and (now - last) < TTS_FAILURE_FALLBACK_COOLDOWN_S:
+            logger.warning(
+                "[TTS] recovery line suppressed — another synthesis failure "
+                "within %.0fs (room=%s)",
+                TTS_FAILURE_FALLBACK_COOLDOWN_S,
+                getattr(self.ctx.room, "name", "?"),
+            )
+            return
+        self._last_tts_fallback_at = now
+        task = asyncio.create_task(self._speak_tts_failure_recovery())
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
+
+    async def _speak_tts_failure_recovery(self) -> None:
+        """Speak the recovery line, then tell the client the session is degraded.
+
+        Speaking first: it is the part the learner experiences, and say() only
+        enqueues (the failed speech handle is already unwinding, so this plays
+        straight after it). The signal is informational and must not delay it.
+        """
+        session = self.session
+        if session is not None:
+            try:
+                lang_config = getattr(
+                    getattr(self, "scenario", None), "language_config", None
+                )
+                language_code = (
+                    lang_config.language_code if lang_config is not None else None
+                )
+                line = tts_failure_fallback_line(language_code)
+                # Interruptible: the learner may already be talking into the
+                # silence, and they must be able to talk over this.
+                session.say(line, allow_interruptions=True)
+                logger.info(
+                    "[TTS] spoke synthesis-failure recovery line (language=%s, "
+                    "room=%s)",
+                    language_code or DEFAULT_LANGUAGE_CODE,
+                    getattr(self.ctx.room, "name", "?"),
+                )
+            except Exception as e:  # noqa: BLE001 - a lost turn is not fatal
+                # Typically "AgentSession is closing, cannot use say()" (the
+                # close handler is taking over) or the same broken TTS again.
+                logger.warning("[TTS] recovery line could not be spoken: %s", e)
+        try:
+            await asyncio.wait_for(
+                self._publish_session_fault("tts_synthesis_failed", fatal=False),
+                timeout=2.0,
+            )
+        except Exception:  # noqa: BLE001 - includes TimeoutError
+            logger.debug("[TTS] could not signal the synthesis failure to client")
 
     async def _arm_orphan_deadline(self, timeout: float = 30.0) -> None:
         """Shut down if no human participant joins within `timeout` seconds
