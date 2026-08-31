@@ -74,22 +74,48 @@ function normalizePrivateKey(raw) {
 // gives Node/OpenSSL's own specific parse error, and once parsed we can directly confirm it's
 // an EC key on the P-256 curve ES256 requires (a wrong-but-parseable key, e.g. RSA or the wrong
 // curve, would otherwise fail with the exact same generic jsonwebtoken message).
+// Known PEM private-key header/footer pairs to test the normalized key against. GitHub Actions
+// masks every LINE of a multi-line secret in logs, independently — so printing a line pulled
+// out of the actual key (even just the boilerplate header) comes back as "***", which is why an
+// earlier version of this diagnostic went dark. Comparing against fixed candidate strings from
+// this script's own source, and reporting only which candidate matched, sidesteps that: nothing
+// printed here is ever a substring of the secret itself.
+const KNOWN_HEADERS = [
+  "-----BEGIN PRIVATE KEY-----", // PKCS8 — what App Store Connect's .p8 download normally is
+  "-----BEGIN EC PRIVATE KEY-----", // SEC1
+  "-----BEGIN RSA PRIVATE KEY-----", // wrong key type entirely
+  "-----BEGIN ENCRYPTED PRIVATE KEY-----", // password-protected — createPrivateKey needs a passphrase option for this, which nothing here provides
+];
+const KNOWN_FOOTERS = [
+  "-----END PRIVATE KEY-----",
+  "-----END EC PRIVATE KEY-----",
+  "-----END RSA PRIVATE KEY-----",
+  "-----END ENCRYPTED PRIVATE KEY-----",
+];
+
+function describePemShape(pem) {
+  const lines = pem.split("\n");
+  const matchedHeader = KNOWN_HEADERS.find(h => pem.startsWith(h)) ?? "none of the known headers";
+  const trimmedEnd = pem.trimEnd();
+  const matchedFooter =
+    KNOWN_FOOTERS.find(f => trimmedEnd.endsWith(f)) ?? "none of the known footers";
+  return (
+    `total length ${pem.length}, ${lines.length} line(s) (lengths: ${lines.map(l => l.length).join(",")}), ` +
+    `header matches: ${matchedHeader}, footer matches: ${matchedFooter}`
+  );
+}
+
 function loadPrivateKey() {
   const pem = normalizePrivateKey(APPSTORE_API_PRIVATE_KEY);
   let keyObject;
   try {
     keyObject = crypto.createPrivateKey({ key: pem, format: "pem" });
   } catch (error) {
-    // The PEM header/footer lines are boilerplate, not secret material — safe to log, and the
-    // fastest way to settle format questions (PKCS8 "PRIVATE KEY" vs SEC1 "EC PRIVATE KEY",
-    // stray characters before/after) without guessing further.
-    const headerLine = pem.split("\n")[0];
-    const footerLine = pem.trim().split("\n").at(-1);
     throw new Error(
       `APPSTORE_API_PRIVATE_KEY could not be parsed as a PEM private key at all ` +
-        `(normalized length ${pem.length}, header line "${headerLine}", footer line "${footerLine}"). ` +
-        `Node crypto error: ${error.message}. Re-check the secret is the exact, complete ` +
-        `contents of the .p8 file downloaded from App Store Connect, nothing added or removed.`,
+        `(${describePemShape(pem)}). Node crypto error: ${error.message}. Re-check the secret ` +
+        `is the exact, complete contents of the .p8 file downloaded from App Store Connect, ` +
+        `nothing added, removed, or re-wrapped.`,
     );
   }
   if (keyObject.asymmetricKeyType !== "ec") {
