@@ -49,6 +49,7 @@ jest.mock('../../SectionWrapper/SectionWrapper', () => ({
 }));
 
 // Mock Button to make onPress accessible
+const mockShowToast = jest.fn();
 jest.mock('@/components', () => ({
   Button: ({label, onPress}: any) => {
     const React = require('react');
@@ -59,6 +60,7 @@ jest.mock('@/components', () => ({
       </TouchableOpacity>
     );
   },
+  useToast: () => ({showToast: mockShowToast}),
 }));
 
 // Constants: two sections, one always visible, one conditionally visible
@@ -229,5 +231,48 @@ describe('CallSummaryDetails — custom field save does not revert fields the us
     const [{values}] = mockUpsertCustomFieldValues.mock.calls[0];
     expect(values).toEqual([{fieldDefinitionId: 'cf-b', value: null}]);
     expect(values[0].value).not.toBeUndefined();
+  });
+
+  it('does not mark a custom field as saved when the save request fails, and tells the user', async () => {
+    mockGetCustomFieldValues.mockReturnValue({
+      data: [{fieldDefinitionId: 'cf-b', value: 'Anxiety'}],
+    });
+    mockUpsertCustomFieldValues.mockClear();
+    mockShowToast.mockClear();
+    mockUpsertCustomFieldValues.mockReturnValueOnce(
+      Promise.resolve({error: {status: 500, data: 'Internal Server Error'}}),
+    );
+
+    const {getByTestId} = render(
+      <CallSummaryDetails isLoading={false} onSubmit={jest.fn()} showSaveButton chatId={1} />,
+    );
+
+    fireEvent.changeText(getByTestId('field-cf-b'), 'Depression');
+
+    await act(async () => {
+      fireEvent.press(getByTestId('save-conditional'));
+    });
+
+    // The write failed — the user must be told, not left thinking it saved.
+    expect(mockShowToast).toHaveBeenCalledWith(
+      'summary.customFieldSaveFailed',
+      'error',
+    );
+
+    // Saving again (e.g. after being told and retrying) must resend the same
+    // edit — it must still be considered unsaved. Before the fix, the failed
+    // save cleared the field's dirty flag anyway, so this second tap sent
+    // nothing and the edit was silently lost for good.
+    mockUpsertCustomFieldValues.mockReturnValueOnce(
+      Promise.resolve({data: {success: true}}),
+    );
+    await act(async () => {
+      fireEvent.press(getByTestId('save-conditional'));
+    });
+
+    expect(mockUpsertCustomFieldValues).toHaveBeenLastCalledWith({
+      chatId: 1,
+      values: [{fieldDefinitionId: 'cf-b', value: 'Depression'}],
+    });
   });
 });
