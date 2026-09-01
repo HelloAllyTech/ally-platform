@@ -232,12 +232,23 @@ function resolveImageAssetUrl(imageAsset) {
  * rather than aborting the whole submission — Apple's own review-readiness check will surface
  * anything still missing far more precisely than this script could. */
 async function copyScreenshotsForward(sourceLocalizationId, targetLocalizationId, token) {
-  const setsResponse = await appleApi(
-    `/appStoreVersionLocalizations/${sourceLocalizationId}/appScreenshotSets`,
-    token,
+  const [sourceSetsResponse, targetSetsResponse] = await Promise.all([
+    appleApi(`/appStoreVersionLocalizations/${sourceLocalizationId}/appScreenshotSets`, token),
+    appleApi(`/appStoreVersionLocalizations/${targetLocalizationId}/appScreenshotSets`, token),
+  ]);
+
+  // Apple auto-creates an empty screenshot set for some display types on the newly-created
+  // localization — confirmed live: POSTing a fresh one 409s with STATE_ERROR "Screenshot Set
+  // Already Exists!", the exact same auto-creation behavior already hit on
+  // appStoreVersionLocalizations itself (see copyEnUsLocalizationForward above). Indexed by
+  // display type so each source set can check for its own pre-existing target counterpart.
+  const targetSetsByDisplayType = new Map(
+    (targetSetsResponse.data ?? [])
+      .filter(set => set.attributes?.screenshotDisplayType)
+      .map(set => [set.attributes.screenshotDisplayType, set]),
   );
 
-  for (const sourceSet of setsResponse.data ?? []) {
+  for (const sourceSet of sourceSetsResponse.data ?? []) {
     const displayType = sourceSet.attributes?.screenshotDisplayType;
     if (!displayType) continue;
 
@@ -248,21 +259,41 @@ async function copyScreenshotsForward(sourceLocalizationId, targetLocalizationId
     const sourceScreenshots = screenshotsResponse.data ?? [];
     if (sourceScreenshots.length === 0) continue;
 
-    const newSetResponse = await appleApi("/appScreenshotSets", token, {
-      method: "POST",
-      body: JSON.stringify({
-        data: {
-          type: "appScreenshotSets",
-          attributes: { screenshotDisplayType: displayType },
-          relationships: {
-            appStoreVersionLocalization: {
-              data: { type: "appStoreVersionLocalizations", id: targetLocalizationId },
+    const existingTargetSet = targetSetsByDisplayType.get(displayType);
+    let newSetId;
+    if (existingTargetSet) {
+      // Apple's auto-created set might already carry screenshots too — from either Apple itself
+      // or a previous partial run of this script that got this far before failing elsewhere.
+      // Either way, re-uploading into an already-populated set would just duplicate images, so
+      // treat "already has screenshots" as "already copied" and skip it.
+      const existingScreenshotsResponse = await appleApi(
+        `/appScreenshotSets/${existingTargetSet.id}/appScreenshots`,
+        token,
+      );
+      if ((existingScreenshotsResponse.data ?? []).length > 0) {
+        console.log(
+          `Skipping ${displayType} — the target localization's screenshot set already has screenshots.`,
+        );
+        continue;
+      }
+      newSetId = existingTargetSet.id;
+    } else {
+      const newSetResponse = await appleApi("/appScreenshotSets", token, {
+        method: "POST",
+        body: JSON.stringify({
+          data: {
+            type: "appScreenshotSets",
+            attributes: { screenshotDisplayType: displayType },
+            relationships: {
+              appStoreVersionLocalization: {
+                data: { type: "appStoreVersionLocalizations", id: targetLocalizationId },
+              },
             },
           },
-        },
-      }),
-    });
-    const newSetId = newSetResponse.data.id;
+        }),
+      });
+      newSetId = newSetResponse.data.id;
+    }
 
     for (const screenshot of sourceScreenshots) {
       try {
