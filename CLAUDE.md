@@ -80,7 +80,10 @@ taking a whole task description and returning full chunk bodies. Setup, citation
   non-Cloud media server. But the URL is only ever a veto, never a yes: our LiveKit is
   self-hosted behind a Cloud-shaped hostname, so `LIVEKIT_NOISE_CANCELLATION_ENABLED`
   defaults `False` — an operator opts in only on a genuine Cloud project with BVC
-  entitlement, where the URL check still has to agree.
+  entitlement, where the URL check still has to agree. If the filter still gets requested
+  on a deployment that refuses it, the Rust FFI's rejection log is expected and benign
+  (session runs unfiltered) — `app/core/logger.py`'s `BenignNoiseCancellationFilter`
+  demotes it off `livekit`'s ERROR so it doesn't page as an internal error.
 - **STT confidence is not usable for Indian languages.** Don't gate behaviour on it. The
   mitigation for mis-transcription is a live guardrail that asks the learner to repeat.
 - **Provider behaviour differs per language, not just per provider.** A fix verified in
