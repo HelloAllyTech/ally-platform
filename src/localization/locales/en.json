@@ -1307,6 +1307,7 @@
     "saving": "Saving...",
     "enhance": "Enhance",
     "enhanceFailed": "Couldn't enhance this text. Please try again.",
+    "customFieldSaveFailed": "Couldn't save your changes. Please try again.",
     "tabs": {
       "returnToSelf": "Return to Self",
       "sessionSummary": "Session summary",

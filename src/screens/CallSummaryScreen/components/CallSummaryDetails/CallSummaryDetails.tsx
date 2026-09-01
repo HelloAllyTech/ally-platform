@@ -4,7 +4,7 @@ import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {GoldenShieldIcon} from '@/assets';
-import {Button} from '@/components';
+import {Button, useToast} from '@/components';
 import {
   ALWAYS_VISIBLE_SECTIONS,
   SECTION_LIST,
@@ -40,6 +40,7 @@ const CallSummaryDetailsComponent: React.FC<Props> = ({
   chatId,
 }) => {
   const {t} = useTranslate();
+  const {showToast} = useToast();
   const visibleFields = useAppSelector(selectSummaryVisibleFields);
   const {isUpdating, handleSubmit} = useCallSummaryForm();
 
@@ -114,7 +115,15 @@ const CallSummaryDetailsComponent: React.FC<Props> = ({
           value: customLocalValues[fieldDefinitionId] ?? null,
         }));
       if (changed.length > 0) {
-        await upsertCustomFieldValues({chatId, values: changed});
+        const result = await upsertCustomFieldValues({chatId, values: changed});
+        // A failed save must not be marked clean — clearing dirtyFieldIds here
+        // regardless of outcome silently discarded the edit: the field looked
+        // saved (no way to detect or retry it) even though the write never
+        // reached the backend.
+        if ('error' in result) {
+          showToast(t('summary.customFieldSaveFailed'), 'error');
+          return;
+        }
         setDirtyFieldIds(prev => {
           const next = new Set(prev);
           changed.forEach(c => next.delete(c.fieldDefinitionId));
@@ -128,6 +137,8 @@ const CallSummaryDetailsComponent: React.FC<Props> = ({
       dirtyFieldIds,
       customLocalValues,
       upsertCustomFieldValues,
+      showToast,
+      t,
     ],
   );
 
