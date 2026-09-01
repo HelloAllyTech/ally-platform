@@ -14,6 +14,10 @@ on:
         required: false
         type: string
         default: '20'
+      whats_new:
+        description: "\"What's New\" text for the production listing (optional - leave blank to promote with no release notes)"
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -44,6 +48,12 @@ jobs:
         id: promote
         env:
           ANDROID_SERVICE_ACCOUNT_JSON: ${{ secrets.ANDROID_SERVICE_ACCOUNT_JSON }}
+          # Passed as an env var, never interpolated straight into the run: line — this is
+          # admin-typed free text, and ${{ }}-interpolating untrusted input directly into a
+          # shell command is a real injection/quoting risk. Same pattern
+          # submit-ios-app-store-review.yml already uses for its own What's New input (and the
+          # exact bug scheduled-mobile-release.yml's Android dispatch step just got fixed for).
+          WHATS_NEW_TEXT: ${{ inputs.whats_new }}
         run: node scripts/promote-android-release.mjs "${{ inputs.rollout_percentage }}"
 
       - name: Notify Slack - Android promoted
