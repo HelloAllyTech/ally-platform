@@ -171,9 +171,16 @@ jobs:
 
       - name: Trigger Android production build
         if: steps.version.outputs.next_version != ''
+        # RELEASE_NOTES goes through env:, never ${{ }} straight into the run: script — commit
+        # subjects routinely contain double quotes (e.g. one of this repo's own commit messages,
+        # `Add optional "What's New in This Version" text...`), which breaks the shell's quoting
+        # when interpolated raw and fails with "unexpected EOF while looking for matching `'".
+        # Same safe pattern build-android-production.yml's own $RELEASE_NOTES step already uses.
+        env:
+          RELEASE_NOTES: ${{ steps.notes.outputs.notes }}
         run: |
           gh workflow run build-android-production.yml --repo "${{ github.repository }}" --ref master \
-            -f release_notes="${{ steps.notes.outputs.notes }}"
+            -f release_notes="$RELEASE_NOTES"
 
       - name: Trigger iOS production build
         if: steps.version.outputs.next_version != ''
