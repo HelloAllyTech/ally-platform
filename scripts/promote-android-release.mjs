@@ -107,6 +107,27 @@ async function main() {
 }
 
 main().catch(error => {
-  console.error("Failed to promote Android release:", error?.response?.data ?? error.message ?? error);
+  const errorData = error?.response?.data ?? error;
+  console.error("Failed to promote Android release:", errorData);
+
+  // A 403/PERMISSION_DENIED here specifically (not on the earlier internal-track read, which
+  // succeeded if this is even reachable) is almost never a code bug — it's the documented
+  // deployment prerequisite at the top of this file: the service account can read the internal
+  // track but hasn't been granted production-track release rights. Checked defensively across
+  // the couple of shapes a Google API error actually takes, since which one applies isn't
+  // consistent across googleapis versions.
+  const status = errorData?.error?.status ?? errorData?.status;
+  const code = errorData?.error?.code ?? errorData?.code ?? error?.code;
+  if (status === "PERMISSION_DENIED" || code === 403) {
+    console.error(
+      "\nThis looks like the known permission gap, not a bug: the service account behind " +
+        "ANDROID_SERVICE_ACCOUNT_JSON can read the internal track (this got past that step) " +
+        `but hasn't been granted release rights on the PRODUCTION track for ${PACKAGE_NAME}. ` +
+        "Fix in Play Console: Setup -> API access -> find this service account -> Manage " +
+        "Play Console permissions -> App permissions -> grant it production-track release " +
+        "permission (not just internal-track) for this app. This is a Play Console change, " +
+        "not something fixable in code.",
+    );
+  }
   process.exit(1);
 });
