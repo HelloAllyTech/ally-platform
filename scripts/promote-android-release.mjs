@@ -11,6 +11,11 @@
  * Env:   ANDROID_SERVICE_ACCOUNT_JSON — same service-account JSON used by the internal upload
  *        step, must additionally have "Release to production" permission in Play Console ->
  *        Users & permissions (internal-track release alone is not enough for this call).
+ *        WHATS_NEW_TEXT — optional "What's New" text for the production release. The internal
+ *        track's own whatsnew file (set by build-android-production.yml) is NOT carried over
+ *        automatically by the Play Developer API when promoting cross-track — each track's
+ *        release notes are independent — so without this the production listing would otherwise
+ *        show no release notes at all. Omit to promote with none, same as today.
  */
 import fs from "node:fs/promises";
 
@@ -29,6 +34,8 @@ if (!serviceAccountJson) {
   console.error("ANDROID_SERVICE_ACCOUNT_JSON is not set");
   process.exit(1);
 }
+
+const whatsNewText = process.env.WHATS_NEW_TEXT?.trim();
 
 const credentials = JSON.parse(serviceAccountJson);
 const auth = new google.auth.GoogleAuth({
@@ -69,6 +76,9 @@ async function main() {
   // userFraction is only valid (and required) when status is "inProgress" — a 100% rollout uses
   // "completed" with no userFraction at all.
   const isFullRollout = rolloutPercentage === 100;
+  if (whatsNewText) {
+    console.log("Setting production release notes (en-US) from WHATS_NEW_TEXT.");
+  }
   await androidpublisher.edits.tracks.update({
     packageName: PACKAGE_NAME,
     editId,
@@ -80,6 +90,7 @@ async function main() {
           versionCodes,
           status: isFullRollout ? "completed" : "inProgress",
           ...(isFullRollout ? {} : { userFraction: rolloutPercentage / 100 }),
+          ...(whatsNewText ? { releaseNotes: [{ language: "en-US", text: whatsNewText }] } : {}),
         },
       ],
     },
