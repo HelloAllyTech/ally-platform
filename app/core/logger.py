@@ -29,6 +29,35 @@ class TraceIdFilter(logging.Filter):
         return True
 
 
+class BenignNoiseCancellationFilter(logging.Filter):
+    """Demote the Rust FFI's Krisp-BVC-rejection log to INFO.
+
+    Krisp BVC is a LiveKit Cloud feature (see
+    ``app/core/livekit/audio_filters.py``): on our self-hosted deployment the
+    Rust FFI refuses it and reports that refusal through
+    ``logging.getLogger("livekit")`` (the bridge in
+    ``livekit.rtc._ffi_client.ffi_event_callback``) at ERROR/WARNING, even
+    though the session simply runs unfiltered — no user-facing impact. Our own
+    gate already avoids requesting the filter by default, but an operator can
+    still opt in on a deployment that cannot honor it, and that config choice
+    shouldn't page as an internal error every session. Scoped to this exact,
+    known FFI message so any other "livekit" ERROR still alerts normally.
+    """
+
+    _BENIGN_SNIPPETS = (
+        "audio filter cannot be enabled",
+        "failed to initialize the audio filter",
+    )
+
+    def filter(self, record: LogRecord) -> bool:
+        if record.levelno >= logging.WARNING and any(
+            snippet in record.getMessage() for snippet in self._BENIGN_SNIPPETS
+        ):
+            record.levelno = logging.INFO
+            record.levelname = "INFO"
+        return True
+
+
 # Severity → Slack emoji, so alerts are scannable at a glance.
 _LEVEL_EMOJI = {
     "CRITICAL": ":rotating_light:",
@@ -183,10 +212,13 @@ loggers = {
     "slack": {"level": settings.LOG_LEVEL, "handlers": ["stdout"], "propagate": False},
     # Route LiveKit's own logger through our handlers so its WARNING+ events
     # (notably job_memory_warn_mb breaches and process timeouts) reach Slack
-    # instead of dying silently on stdout.
+    # instead of dying silently on stdout. The noise-cancellation filter runs
+    # here too, ahead of every handler, so the benign Krisp-rejection line
+    # never reaches Slack as an ERROR either.
     "livekit": {
         "level": settings.LOG_LEVEL,
         "handlers": ["stdout"],
+        "filters": ["benign_noise_cancellation"],
         "propagate": False,
     },
     "livekit.agents": {
@@ -226,6 +258,9 @@ logging_config = {
     "filters": {
         "trace_id": {
             "()": TraceIdFilter,
+        },
+        "benign_noise_cancellation": {
+            "()": BenignNoiseCancellationFilter,
         },
     },
     "handlers": handlers,
