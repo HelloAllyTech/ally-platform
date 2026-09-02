@@ -2,10 +2,20 @@ name: 'Build & Upload iOS app - Production'
 
 on:
   workflow_dispatch:
+    inputs:
+      auto_submit_app_store:
+        description: 'Internal use — set by scheduled-mobile-release.yml on a real cron tick only. Chains straight to submit-ios-app-store-review.yml once this build succeeds.'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   id-token: write
   contents: read
+  # actions: write is only for the auto_submit_app_store chaining step at the end of this
+  # workflow (gh workflow run submit-ios-app-store-review.yml) — same GITHUB_TOKEN + gh CLI
+  # pattern scheduled-mobile-release.yml already uses to dispatch this workflow itself.
+  actions: write
 
 jobs:
   build_ios_production:
@@ -241,3 +251,38 @@ jobs:
           INCOMING_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         with:
           text: 'iOS build uploaded successfully, but automatic TestFlight external submission FAILED — needs a manual retry (promote-ios-testflight-external.yml, or the admin dashboard button). <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run logs>'
+
+      # End-to-end automation, cron-only: scheduled-mobile-release.yml passes
+      # auto_submit_app_store=true ONLY on a real, unattended cron tick (github.event_name ==
+      # 'schedule' there) — never for a manual "Trigger release now" click, even though that
+      # button goes through the exact same scheduled-mobile-release.yml job. That distinction
+      # is deliberate: escalating what "Trigger release now" does (from "just build" to "also
+      # submit for real public review") without changing that button's own confirmation copy
+      # would be a silent, surprising scope increase for a human clicking it. A genuine cron
+      # tick has no human in the loop to surprise, so it's the only trigger allowed to chain
+      # this far. Tests are already gated upstream — scheduled-mobile-release.yml's own
+      # gate_tests step refuses to bump/build anything unless the latest master commit has a
+      # green test.yml run — so nothing here re-checks that.
+      #
+      # Deliberately does NOT pass a whats_new value: generating one automatically would need
+      # ally-mobile's CI to call ally-be's LLM-backed suggestion endpoint, which has no
+      # service-to-service auth path today (it's gated on a human's JWT). Omitting it is a
+      # safe, well-defined fallback (submit-ios-app-store-review.mjs leaves whatever's already
+      # set in App Store Connect untouched) — real AI-generated text for the fully-automatic
+      # path is a distinct follow-up, not bundled into this.
+      - name: Dispatch the auto-submit chain
+        if: success() && inputs.auto_submit_app_store == true
+        id: dispatch_auto_submit
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run submit-ios-app-store-review.yml --repo "${{ github.repository }}" --ref master
+
+      - name: Notify Slack - auto-submit dispatch failed
+        if: success() && steps.dispatch_auto_submit.outcome == 'failure'
+        uses: tokorom/action-slack-incoming-webhook@main
+        env:
+          INCOMING_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          text: 'iOS build uploaded successfully, but the automatic App Store review submission could not even be DISPATCHED (not the same as the submission itself failing — this is the end-to-end automation trying to hand off to submit-ios-app-store-review.yml and failing to do so). Needs a manual dispatch. <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run logs>'
