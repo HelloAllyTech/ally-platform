@@ -1,4 +1,4 @@
-import {useCallback, useRef} from 'react';
+import {useCallback, useEffect, useRef} from 'react';
 import {io, Socket} from 'socket.io-client';
 
 import {env} from '@/config/env';
@@ -15,6 +15,8 @@ interface UseSocketOptions {
   onConnectionError?: (error?: Error) => void;
 }
 
+const RETRY_AFTER_FAILURE_MS = 2000;
+
 export const useSocket = ({
   userId,
   eventCallbacks,
@@ -23,91 +25,157 @@ export const useSocket = ({
   onDisconnect,
   onConnectionError,
 }: UseSocketOptions) => {
+  /**
+   * This hook owns exactly ONE socket at a time.
+   *
+   * It used to own however many `connect()` happened to create: each call did
+   * `socketRef.current = io(...)` with `forceNew`, so a second call orphaned the
+   * first socket — still open, still holding a server-side session, with nothing
+   * left pointing at it to close it. In production that showed up as connections
+   * arriving in pairs milliseconds apart with only one of each pair ever
+   * disconnecting, and counselors accumulating four to seven live sockets on
+   * `/microphone-chat`. The scribe session that mattered was then torn down by
+   * whichever of them died first.
+   *
+   * Two things keep that from happening now: `connect()` is idempotent (a socket
+   * we already own is reused, not replaced), and every connect carries a
+   * generation stamp so one that is still awaiting the access token can tell
+   * that `disconnect()` has since run and abandon itself instead of installing a
+   * socket nobody holds.
+   */
   const socketRef = useRef<Socket | null>(null);
-  const connectionAttemptsRef = useRef(0);
+  const generationRef = useRef(0);
+  const isConnectingRef = useRef(false);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const maxAttempts = 5;
+  /**
+   * Listeners are registered once per socket but dispatch through these refs, so
+   * a handler always runs the current render's callback. Binding the callbacks
+   * directly froze them at whatever `connect()` had closed over — for the
+   * listening screen, the very first render.
+   */
+  const eventCallbacksRef = useRef(eventCallbacks);
+  const onConnectRef = useRef(onConnect);
+  const onDisconnectRef = useRef(onDisconnect);
+  const onConnectionErrorRef = useRef(onConnectionError);
+
+  useEffect(() => {
+    eventCallbacksRef.current = eventCallbacks;
+    onConnectRef.current = onConnect;
+    onDisconnectRef.current = onDisconnect;
+    onConnectionErrorRef.current = onConnectionError;
+  });
+
   const baseUrl = env.API_BASE_URL;
 
-  const connect = useCallback(
-    async () => {
-      if (!userId || connectionAttemptsRef.current >= maxAttempts) {
-        logger.error('Max connection attempts reached');
-        return;
-      }
+  const clearRetryTimer = useCallback(() => {
+    if (retryTimerRef.current) {
+      clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
+  }, []);
 
-      try {
-        const accessToken = await getItem(AsyncStorageKeys.ACCESS_TOKEN);
-        if (!accessToken) {
-          logger.error('No access token found for socket connection');
-          return;
-        }
-        socketRef.current = io(`${baseUrl}${path}`, {
-          path: '/socket.io',
-          transports: ['websocket', 'polling'],
-          auth: {
-            token: accessToken,
-          },
-          reconnection: true,
-          reconnectionAttempts: 5,
-          reconnectionDelay: 1000,
-          reconnectionDelayMax: 5000,
-          timeout: 10000,
-          forceNew: true,
-          autoConnect: false,
-        });
-
-        socketRef.current.connect();
-
-        setupDefaultListeners();
-        connectionAttemptsRef.current++;
-      } catch (error) {
-        connectionAttemptsRef.current++;
-        setTimeout(() => connect(), 2000);
-      }
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [userId],
-  );
-
-  const setupDefaultListeners = useCallback(() => {
-    if (!socketRef.current) return;
-
-    socketRef.current.on('connect', () => {
-      connectionAttemptsRef.current = 0;
-      onConnect?.();
+  const setupListeners = useCallback((socket: Socket) => {
+    socket.on('connect', () => {
+      onConnectRef.current?.();
     });
 
-    socketRef.current.on('connect_error', error => {
-      onConnectionError?.(error);
+    socket.on('connect_error', error => {
+      onConnectionErrorRef.current?.(error);
       logger.error(`connect_error: Socket connection error: ${error}`);
     });
 
-    socketRef.current.on('disconnect', reason => {
-      onDisconnect?.(reason);
+    socket.on('disconnect', reason => {
+      onDisconnectRef.current?.(reason);
       logger.error(`disconnect: Socket disconnected: ${reason}`);
     });
 
-    socketRef.current.on('error', error => {
+    socket.on('error', error => {
       logger.error(`error: Socket error: ${error}`);
     });
 
-    const callbacks = eventCallbacks || {};
-    Object.entries(callbacks).forEach(([key, callback]) => {
-      socketRef.current?.on(key, callback);
+    Object.keys(eventCallbacksRef.current || {}).forEach(key => {
+      socket.on(key, (...args: any[]) =>
+        (eventCallbacksRef.current as any)?.[key]?.(...args),
+      );
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eventCallbacks]);
+  }, []);
+
+  const connect = useCallback(async () => {
+    if (!userId) return;
+
+    clearRetryTimer();
+
+    // Already ours. Never replace it — resume it if the transport dropped and
+    // socket.io's own reconnection has given up, otherwise leave it alone.
+    if (socketRef.current) {
+      if (!socketRef.current.connected) {
+        socketRef.current.connect();
+      }
+      return;
+    }
+
+    // A connect is already in flight; a second one would race it to the ref.
+    if (isConnectingRef.current) return;
+    isConnectingRef.current = true;
+
+    const generation = generationRef.current;
+
+    try {
+      const accessToken = await getItem(AsyncStorageKeys.ACCESS_TOKEN);
+
+      // `disconnect()` ran while we were awaiting the token. Whoever asked for
+      // this socket no longer wants it, and holds nothing that could close it.
+      if (generation !== generationRef.current) return;
+
+      if (!accessToken) {
+        logger.error('No access token found for socket connection');
+        return;
+      }
+
+      const socket = io(`${baseUrl}${path}`, {
+        path: '/socket.io',
+        transports: ['websocket', 'polling'],
+        auth: {
+          token: accessToken,
+        },
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        timeout: 10000,
+        forceNew: true,
+        autoConnect: false,
+      });
+
+      socketRef.current = socket;
+      setupListeners(socket);
+      socket.connect();
+    } catch (error) {
+      logger.error(`Failed to open socket connection: ${error}`);
+      if (generation !== generationRef.current) return;
+      retryTimerRef.current = setTimeout(() => {
+        retryTimerRef.current = null;
+        connect();
+      }, RETRY_AFTER_FAILURE_MS);
+    } finally {
+      isConnectingRef.current = false;
+    }
+  }, [userId, path, baseUrl, clearRetryTimer, setupListeners]);
 
   const disconnect = useCallback(() => {
+    // Invalidates any connect still awaiting its token, so it cannot install a
+    // socket after us.
+    generationRef.current += 1;
+    clearRetryTimer();
+    isConnectingRef.current = false;
+
     if (socketRef.current) {
+      socketRef.current.removeAllListeners();
       socketRef.current.disconnect();
       socketRef.current = null;
     }
-    // Reset so the next connect() (e.g. on foreground/refocus) starts fresh.
-    // Otherwise the cumulative cap permanently disables reconnection mid-session.
-    connectionAttemptsRef.current = 0;
-  }, []);
+  }, [clearRetryTimer]);
 
   const sendMessage = useCallback((message: string) => {
     if (!socketRef.current) {
