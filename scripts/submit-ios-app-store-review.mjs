@@ -4,6 +4,13 @@
  * release, not TestFlight. This is the highest-stakes action in this repo's release tooling:
  * once Apple approves it, the app can go live to every real App Store user.
  *
+ * Called by both a human (workflow_dispatch) and automation (build-ios-production.yml, chained
+ * automatically after a successful scheduled build) — main() refuses to do anything if this
+ * app already has a review submission Apple is still actively processing (see
+ * hasActiveReviewSubmission()/NON_TERMINAL_REVIEW_STATES below), so a stale or overlapping
+ * trigger can never stack a second submission on top of one still in flight. That guard is
+ * unconditional, not automation-only: it protects a human running this twice by mistake too.
+ *
  * If no version is sitting ready in App Store Connect, this script creates the next one itself
  * and carries the previous version's listing forward onto it: text fields (description,
  * keywords, promotional text, support URL — copied as-is, unedited) and screenshots (downloaded
@@ -409,12 +416,52 @@ async function ensureSubmittableVersion(appId, token) {
   return { versionId, versionString };
 }
 
+// Every reviewSubmissions state except COMPLETE means Apple is still actively working the
+// submission (or it's queued to be). Verified against the real App Store Connect OpenAPI spec.
+const NON_TERMINAL_REVIEW_STATES = [
+  "READY_FOR_REVIEW",
+  "WAITING_FOR_REVIEW",
+  "IN_REVIEW",
+  "UNRESOLVED_ISSUES",
+  "CANCELING",
+  "COMPLETING",
+];
+
+/**
+ * True if this app already has a review submission Apple is still actively processing.
+ * Checked unconditionally — for every caller, manual or automatic — before this script does
+ * anything else, because firing a second submission while one is already in flight is the
+ * single most likely way blind automation goes wrong here: a stale/overlapping trigger (two
+ * cron ticks, a double-click, a retry) would otherwise try to create or reuse a version and
+ * submit it right on top of a submission Apple hasn't finished with yet.
+ */
+async function hasActiveReviewSubmission(appId, token) {
+  const states = NON_TERMINAL_REVIEW_STATES.join(",");
+  const response = await appleApi(
+    `/apps/${appId}/reviewSubmissions?filter[platform]=IOS&filter[state]=${states}&limit=1`,
+    token,
+  );
+  return (response.data?.length ?? 0) > 0;
+}
+
 async function main() {
   const token = mintToken();
 
   const appsResponse = await appleApi(`/apps?filter[bundleId]=${encodeURIComponent(BUNDLE_ID)}`, token);
   const appId = appsResponse.data?.[0]?.id;
   if (!appId) throw new Error(`No app found for bundle id ${BUNDLE_ID}`);
+
+  if (await hasActiveReviewSubmission(appId, token)) {
+    console.log(
+      "A review submission is already in progress for this app — skipping to avoid submitting " +
+        "a second one while Apple is still processing the first. Nothing done.",
+    );
+    const githubOutput = process.env.GITHUB_OUTPUT;
+    if (githubOutput) {
+      await fs.appendFile(githubOutput, `skipped=true\n`);
+    }
+    return;
+  }
 
   const { versionId, versionString } = await ensureSubmittableVersion(appId, token);
 

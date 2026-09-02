@@ -184,8 +184,27 @@ jobs:
 
       - name: Trigger iOS production build
         if: steps.version.outputs.next_version != ''
+        # auto_submit_app_store=true only on a genuine unattended cron tick (github.event_name
+        # == 'schedule') — never for a manual "Trigger release now" dispatch, even though that
+        # goes through this exact same job/step. Escalating what that button does (from "just
+        # build" to "also submit for real public App Store review") without changing its own
+        # confirmation copy would be a silent, surprising scope increase for whoever clicks it.
+        # A cron tick has no human in the loop to surprise, so it's the only trigger allowed to
+        # chain that far. See build-ios-production.yml's own doc comment on the receiving end
+        # of this for the rest of the reasoning (tests already gated above, no auto-generated
+        # What's New for this path yet).
+        # Separate kill switch from AUTO_RELEASE_ENABLED above (which the whole rest of this
+        # pipeline already sits behind, transitively): this repo variable can turn off JUST the
+        # public-review escalation without also stopping the safer build+internal-upload half
+        # of automation. Defaults to on (empty/unset counts as enabled) — flip explicitly to
+        # 'false' to pause it.
         run: |
-          gh workflow run build-ios-production.yml --repo "${{ github.repository }}" --ref master
+          AUTO_SUBMIT="false"
+          if [ "${{ github.event_name }}" = "schedule" ] && [ "${{ vars.AUTO_SUBMIT_APP_STORE_ENABLED }}" != "false" ]; then
+            AUTO_SUBMIT="true"
+          fi
+          gh workflow run build-ios-production.yml --repo "${{ github.repository }}" --ref master \
+            -f auto_submit_app_store="$AUTO_SUBMIT"
 
       - name: Notify Slack - release triggered
         if: steps.version.outputs.next_version != ''
