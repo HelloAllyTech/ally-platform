@@ -145,6 +145,20 @@ TTS_FAILURE_FALLBACK_COOLDOWN_S = 20.0
 # Env-overridable (see config.py).
 MAX_DURATION_GRACE_SECONDS = settings.MAX_DURATION_GRACE_SECONDS
 
+# shutdown_with_cleanup's own teardown steps — none of these persist score or
+# memory, so unlike finalize_session they gain nothing from running long. Left
+# unbounded, any one of them stalling (e.g. a slow network call tearing down
+# the BVC audio track) stacks directly on top of on_shutdown's own ~19s
+# budget (see WorkerOptions' shutdown_process_timeout comment) and can push
+# the whole chain past the SDK's shutdown_process_timeout, getting the
+# process SIGUSR1-killed mid-finalize (observed live: "process did not exit
+# in time, killing process" / exit code -10, recurring days after that
+# budget was first tuned). Capped short so a stall can only ever cost a few
+# seconds, never the rest of the shutdown window.
+SUPERVISOR_NOTES_CLOSE_TIMEOUT = 3.0
+BG_AUDIO_CLOSE_TIMEOUT = 3.0
+BACKGROUND_TASKS_CLEANUP_TIMEOUT = 3.0
+
 
 def _now_ms() -> int:
     """Current epoch time in milliseconds."""
@@ -1221,14 +1235,32 @@ class AgentWorker:
             self._handle_control_packet(packet)
 
         # Shutdown handler
+        async def _cleanup_background_tasks_bounded():
+            # cleanup_background_tasks() cancels every tracked task then
+            # gathers them — normally near-instant, but a task that swallows
+            # CancelledError (e.g. stuck inside a shielded network call) can
+            # hang the gather indefinitely. Capped so that alone can't blow
+            # the shutdown budget; the tasks were already cancel()-requested,
+            # so giving up on the wait here is safe.
+            try:
+                await asyncio.wait_for(
+                    cleanup_background_tasks(self._background_tasks),
+                    timeout=BACKGROUND_TASKS_CLEANUP_TIMEOUT,
+                )
+            except asyncio.TimeoutError:
+                logger.warning(
+                    "cleanup_background_tasks did not finish within %ss; "
+                    "some background tasks may still be running as the "
+                    "process exits",
+                    BACKGROUND_TASKS_CLEANUP_TIMEOUT,
+                )
+
         original_shutdown_handler = create_shutdown_handler(
             event_orchestrator=self.event_orchestrator,
             room_name=self.ctx.room.name,
             final_score_sent_ref=lambda: self.final_score_sent,
             set_final_score_sent=lambda val: setattr(self, "final_score_sent", val),
-            cleanup_background_tasks=lambda: cleanup_background_tasks(
-                self._background_tasks
-            ),
+            cleanup_background_tasks=_cleanup_background_tasks_bounded,
             score_keeper=self.score_keeper,
             llm_client=self.llm_client,
             language_code=_memory_language_code,
@@ -1282,7 +1314,16 @@ class AgentWorker:
             # gone, so it has nowhere to land. Notes already sent are persisted.
             if getattr(self, "_supervisor_notes", None) is not None:
                 try:
-                    await self._supervisor_notes.aclose()
+                    await asyncio.wait_for(
+                        self._supervisor_notes.aclose(),
+                        timeout=SUPERVISOR_NOTES_CLOSE_TIMEOUT,
+                    )
+                except asyncio.TimeoutError:
+                    logger.warning(
+                        "Supervisor notes aclose() did not finish within %ss; "
+                        "continuing shutdown",
+                        SUPERVISOR_NOTES_CLOSE_TIMEOUT,
+                    )
                 except Exception as e:  # noqa: BLE001
                     logger.debug(f"Error closing supervisor notes: {e}")
                 self._supervisor_notes = None
@@ -1290,7 +1331,15 @@ class AgentWorker:
             # back-channel) and delete its temp clips.
             if self._bg_audio is not None:
                 try:
-                    await self._bg_audio.aclose()
+                    await asyncio.wait_for(
+                        self._bg_audio.aclose(), timeout=BG_AUDIO_CLOSE_TIMEOUT
+                    )
+                except asyncio.TimeoutError:
+                    logger.warning(
+                        "BackgroundAudioPlayer aclose() did not finish within "
+                        "%ss; continuing shutdown",
+                        BG_AUDIO_CLOSE_TIMEOUT,
+                    )
                 except Exception as e:  # noqa: BLE001
                     logger.debug(f"Error closing BackgroundAudioPlayer: {e}")
                 self._bg_audio = None
@@ -3691,7 +3740,15 @@ if __name__ == "__main__":
             # supervisor's close_timeout races that budget and SIGUSR1-kills
             # the job process before score/memory persistence finishes
             # (CloudWatch: "process did not exit in time, killing process" /
-            # exit code -10). 30s gives that budget real headroom.
+            # exit code -10). 30s gives that budget real headroom. On top of
+            # that ~19s, shutdown_with_cleanup's own supervisor-notes/
+            # background-audio/background-task teardown adds up to
+            # SUPERVISOR_NOTES_CLOSE_TIMEOUT + BG_AUDIO_CLOSE_TIMEOUT +
+            # BACKGROUND_TASKS_CLEANUP_TIMEOUT (3s each, ~9s) — those used to
+            # be unbounded awaits, which is what let a single stalled one
+            # (e.g. a slow BVC track teardown) push the whole chain past this
+            # ceiling and reproduce the same kill days after this timeout was
+            # first raised.
             shutdown_process_timeout=30,
         )
     )

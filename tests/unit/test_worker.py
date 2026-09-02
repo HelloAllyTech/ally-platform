@@ -1408,6 +1408,196 @@ class TestWorker:
         assert len(ctx._shutdown_callbacks) == 1
 
     @pytest.mark.asyncio
+    async def test_shutdown_with_cleanup_bounds_hanging_teardown_awaits(
+        self, monkeypatch
+    ):
+        """shutdown_with_cleanup awaits supervisor-notes and background-audio
+        teardown BEFORE handing off to on_shutdown's own (already budgeted)
+        drain chain — commit a94fa6b only bounded on_shutdown's own steps, not
+        these. A stalled aclose() here (e.g. a slow network call tearing down
+        the BVC track) used to block shutdown indefinitely, stacking on top
+        of on_shutdown's ~19s budget and getting the process force-killed
+        before it could persist the learner's score/memory — the exact
+        "process did not exit in time, killing process" / exit code -10
+        pair seen in production days after that commit's timeout bump."""
+        from app.core.scenario.base import PromptData
+
+        prompt_data = PromptData(
+            name="Test Client",
+            age="30",
+            gender="male",
+            current_location="Test Location",
+            context="test context",
+            opening_statements=["hello"],
+            prompt="test prompt",
+        )
+
+        scenario = _create_test_scenario(prompt_data)
+        rm_md_envelope = _create_test_envelope(scenario)
+
+        from app.core.livekit.livekit_models import RoomMetadataEnvelope
+
+        monkeypatch.setattr(
+            agent_utils,
+            "parse_room_metadata",
+            lambda md, embedding_client=None, branching_llm_config=None: rm_md_envelope,
+        )
+        monkeypatch.setattr(
+            RoomMetadataEnvelope,
+            "create",
+            lambda payload, embedding_client=None, branching_llm_config=None: (
+                rm_md_envelope
+            ),
+        )
+
+        class MockSTTClient:
+            def __init__(self):
+                self.stt_instance = "STT"
+
+        from app.stt import factory as stt_factory
+
+        monkeypatch.setattr(
+            stt_factory,
+            "create_stt_client",
+            lambda stt_config=None, language_code=None: MockSTTClient(),
+        )
+        monkeypatch.setattr(
+            agent_utils, "configure_stt_client", lambda scenario: MockSTTClient()
+        )
+
+        def mock_create_tts(*a, **k):
+            mock_client = Mock()
+            mock_client.tts_instance = "TTS"
+            mock_client.set_defaults = AsyncMock()
+            mock_client.get_parameter_metadata = Mock(return_value={})
+            mock_client._validate_parameters_dict = Mock(side_effect=lambda d: d)
+            mock_client._apply_parameters_dict = Mock()
+            return mock_client
+
+        from app.tts import factory as tts_factory
+
+        monkeypatch.setattr(tts_factory, "create_tts_client", mock_create_tts)
+        monkeypatch.setattr("app.tts.create_tts_client", mock_create_tts)
+        monkeypatch.setattr(agent_utils, "create_tts_client", mock_create_tts)
+        monkeypatch.setattr(
+            agent_utils, "configure_tts_client", lambda scenario: mock_create_tts()
+        )
+
+        dummy_session = self.DummySession()
+        monkeypatch.setattr(
+            worker,
+            "AgentSession",
+            lambda stt, tts, vad, turn_detection, **kwargs: dummy_session,
+        )
+        monkeypatch.setattr(worker, "Agent", self.DummyAgent)
+        monkeypatch.setattr(agent_graph, "update_state", lambda *a, **k: None)
+        monkeypatch.setattr(worker.noise_cancellation, "BVC", lambda: object())
+        monkeypatch.setattr(worker, "RoomInputOptions", lambda **k: object())
+        monkeypatch.setattr(
+            agent_utils,
+            "configure_llm_client",
+            lambda scenario, branching_llm_config=None: Mock(),
+        )
+        monkeypatch.setattr(
+            agent_utils,
+            "initialize_agent_state",
+            lambda thread_id, scenario: "2024-01-01T00:00:00Z",
+        )
+
+        def mock_create_agent_with_adapter(*a, **k):
+            return self.DummyAgent(llm=None)
+
+        monkeypatch.setattr(
+            agent_utils, "create_agent_with_adapter", mock_create_agent_with_adapter
+        )
+        monkeypatch.setattr("app.core.agent.factory.Agent", self.DummyAgent)
+        monkeypatch.setattr("livekit.agents.Agent", self.DummyAgent)
+
+        # These are bound directly into app.worker's own namespace (`from
+        # app.core.events.handlers import create_shutdown_handler, ...`), so
+        # unlike patching app.core.events.handlers itself, patching them here
+        # actually takes effect for _register_callbacks. Stubbed to isolate
+        # shutdown_with_cleanup's OWN teardown (under test) from on_shutdown's
+        # separately-tested drain chain.
+        async def _noop_original_shutdown_handler():
+            return None
+
+        monkeypatch.setattr(
+            worker,
+            "create_connection_state_handler",
+            lambda *a, **k: lambda state: None,
+        )
+        monkeypatch.setattr(
+            worker,
+            "create_shutdown_handler",
+            lambda *a, **k: _noop_original_shutdown_handler,
+        )
+        monkeypatch.setattr(
+            worker, "setup_interruption_detection", lambda session, room_id=None: None
+        )
+        monkeypatch.setattr(
+            agent_utils, "should_say_opening_statement", lambda *a, **k: False
+        )
+
+        # Keep the caps tiny so a bounded hang can't slow the test down — what
+        # matters here is that SOME bound applies, not its exact production
+        # duration. raising=False so this is a no-op pre-fix (the constants
+        # don't exist yet), leaving the awaits genuinely unbounded so the
+        # regression shows up as the outer wait_for's own TimeoutError below.
+        monkeypatch.setattr(
+            worker, "SUPERVISOR_NOTES_CLOSE_TIMEOUT", 0.05, raising=False
+        )
+        monkeypatch.setattr(worker, "BG_AUDIO_CLOSE_TIMEOUT", 0.05, raising=False)
+
+        captured = {}
+        RealAgentWorker = worker.AgentWorker
+
+        class SpyAgentWorker(RealAgentWorker):
+            def __init__(self, ctx):
+                super().__init__(ctx)
+                captured["worker"] = self
+
+        monkeypatch.setattr(worker, "AgentWorker", SpyAgentWorker)
+
+        class Ctx:
+            def __init__(self):
+                self.job = types.SimpleNamespace(metadata="{}", id="test-job")
+                self.room = TestWorker.DummyRoom()
+                self.proc = types.SimpleNamespace(userid="u", userdata={"vad": "VAD"})
+                self._shutdown_callbacks = []
+
+            async def connect(self):
+                return None
+
+            def add_shutdown_callback(self, callback):
+                self._shutdown_callbacks.append(callback)
+
+            def shutdown(self, reason):
+                pass
+
+        ctx = Ctx()
+        await worker.entrypoint(ctx)
+
+        w = captured["worker"]
+
+        class HangingCloser:
+            async def aclose(self):
+                await asyncio.sleep(999)
+
+        w._supervisor_notes = HangingCloser()
+        w._bg_audio = HangingCloser()
+
+        shutdown_handler = ctx._shutdown_callbacks[0]
+
+        # Before the fix, a hanging aclose() blocks shutdown_with_cleanup
+        # forever; the outer timeout here is only a test safety net so a
+        # regression fails fast instead of hanging the suite.
+        await asyncio.wait_for(shutdown_handler(), timeout=2.0)
+
+        assert w._supervisor_notes is None
+        assert w._bg_audio is None
+
+    @pytest.mark.asyncio
     async def test_entrypoint_handle_termination_callback(self, monkeypatch):
         from app.core.scenario.base import PromptData
 
