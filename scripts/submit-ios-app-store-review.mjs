@@ -20,10 +20,11 @@
  * something Apple requires is still missing, Apple's own API error surfaces directly, same as
  * every other error path in this script.
  *
- * Deliberately DOES force releaseType to MANUAL regardless of whatever was previously
- * configured on the version — approval here only enqueues for release, it never auto-releases
- * to real users. A second, explicit action (in App Store Connect, or a future admin button) is
- * required to actually go live once Apple approves it.
+ * Forces releaseType to AFTER_APPROVAL regardless of whatever was previously configured on the
+ * version — the moment Apple approves it, it goes live to every real App Store user, with no
+ * further human click required. This is a deliberate choice (previously MANUAL, requiring an
+ * explicit release click in App Store Connect after approval); if that safety gate is ever
+ * wanted back, this is the one line to change.
  *
  * Verified against Apple's real, current OpenAPI spec before writing this (App Store Connect
  * API v4.4.1) — the older single-POST /v1/appStoreVersionSubmissions flow this script's sibling
@@ -466,12 +467,16 @@ async function main() {
     });
   }
 
-  // Force manual release regardless of whatever was previously configured — approval here must
-  // only enqueue for release, never auto-release to real users.
+  // Force automatic release regardless of whatever was previously configured — the moment Apple
+  // approves this version, it goes live to every real App Store user, no further click needed.
   await appleApi(`/appStoreVersions/${versionId}`, token, {
     method: "PATCH",
     body: JSON.stringify({
-      data: { type: "appStoreVersions", id: versionId, attributes: { releaseType: "MANUAL" } },
+      data: {
+        type: "appStoreVersions",
+        id: versionId,
+        attributes: { releaseType: "AFTER_APPROVAL" },
+      },
     }),
   });
 
@@ -509,8 +514,8 @@ async function main() {
 
   console.log(
     `Submitted App Store version ${versionString} (build ${buildId}) for Apple's full App Store review. ` +
-      "Release type forced to MANUAL: once Apple approves it, someone still needs to explicitly release it " +
-      '("Release This Version" in App Store Connect) before real users see it.',
+      "Release type forced to AFTER_APPROVAL: the moment Apple approves it, it goes live to every " +
+      "real App Store user automatically — no further action needed.",
   );
 
   const githubOutput = process.env.GITHUB_OUTPUT;
