@@ -1,15 +1,8 @@
 name: Submit iOS for App Store review
 #
-# The highest-stakes workflow in this repo: submits the current App Store Connect listing +
-# latest TestFlight build for Apple's FULL App Store review — real public distribution, not
-# TestFlight. workflow_dispatch-only (never a `push`/`schedule` trigger of its own), but IS now
-# auto-triggered — build-ios-production.yml dispatches this automatically after a successful
-# build when scheduled-mobile-release.yml passed it auto_submit_app_store=true, which only
-# happens on a genuine unattended cron tick (see that workflow's own comment on the exact
-# trigger step for why manual "Trigger release now" clicks are deliberately excluded from this
-# escalation). Guards against firing on top of an already-in-flight submission itself, inside
-# scripts/submit-ios-app-store-review.mjs — see hasActiveReviewSubmission() there — so this is
-# safe to call repeatedly/automatically, not just once by a careful human.
+# Manual-only, the highest-stakes workflow in this repo: submits the current App Store Connect
+# listing + latest TestFlight build for Apple's FULL App Store review — real public distribution,
+# not TestFlight. Never auto-triggered by anything else here.
 #
 # If no version is ready in App Store Connect, the script creates the next one and carries the
 # previous version's en-US listing forward onto it (text fields as-is, screenshots re-uploaded
@@ -67,20 +60,12 @@ jobs:
         run: node scripts/submit-ios-app-store-review.mjs
 
       - name: Notify Slack - submitted for App Store review
-        if: success() && steps.submit.outputs.skipped != 'true'
+        if: success()
         uses: tokorom/action-slack-incoming-webhook@main
         env:
           INCOMING_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         with:
           text: "iOS version ${{ steps.submit.outputs.version_string }} submitted for Apple's full App Store review (triggered by ${{ github.actor }}). Release is set to AFTER_APPROVAL — the moment Apple approves it, it goes live to every real App Store user automatically, no further action needed."
-
-      - name: Notify Slack - skipped, a submission is already in progress
-        if: success() && steps.submit.outputs.skipped == 'true'
-        uses: tokorom/action-slack-incoming-webhook@main
-        env:
-          INCOMING_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        with:
-          text: "iOS App Store review dispatch (triggered by ${{ github.actor }}) skipped itself — Apple is already actively processing a previous submission for this app. Nothing was submitted; check App Store Connect for the one already in flight."
 
       - name: Notify Slack - submission failed
         if: failure()
