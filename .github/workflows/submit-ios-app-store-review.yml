@@ -9,8 +9,9 @@ name: Submit iOS for App Store review
 # byte-for-byte since Apple's API has no "reuse existing screenshot" call) — this only makes
 # "identical to last time" free, not "different this time"; a human still updates the listing in
 # App Store Connect when it actually needs to change. Export compliance is never answered here.
-# Does NOT auto-release once approved either: the script forces releaseType to MANUAL, so a
-# second, explicit action is still required in App Store Connect before real users see it.
+# DOES auto-release once approved: the script forces releaseType to AFTER_APPROVAL, so the
+# moment Apple approves this submission, it goes live to every real App Store user — no
+# further human click required.
 
 on:
   workflow_dispatch:
@@ -64,7 +65,7 @@ jobs:
         env:
           INCOMING_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         with:
-          text: "iOS version ${{ steps.submit.outputs.version_string }} submitted for Apple's full App Store review (triggered by ${{ github.actor }}). Release is set to MANUAL — once Apple approves it, someone still needs to explicitly release it in App Store Connect before real users see it."
+          text: "iOS version ${{ steps.submit.outputs.version_string }} submitted for Apple's full App Store review (triggered by ${{ github.actor }}). Release is set to AFTER_APPROVAL — the moment Apple approves it, it goes live to every real App Store user automatically, no further action needed."
 
       - name: Notify Slack - submission failed
         if: failure()
