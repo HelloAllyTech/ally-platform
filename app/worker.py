@@ -3204,7 +3204,7 @@ class AgentWorker:
                     self._timing["opening_ms"] = (time.monotonic() - _open_t0) * 1000
                     logger.info("[AgentWorker] Opening statement playout complete.")
                 except asyncio.TimeoutError:
-                    logger.error(
+                    logger.warning(
                         "[AgentWorker] Opening statement playout did not complete "
                         "within %.0fs (room=%s) — continuing session startup. The "
                         "learner may have heard nothing; the session is live and "

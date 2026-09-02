@@ -631,6 +631,208 @@ class TestWorker:
         assert "conversation_item_added" in dummy_session.handlers
 
     @pytest.mark.asyncio
+    async def test_opening_statement_playout_timeout_is_not_logged_as_error(
+        self, monkeypatch, caplog
+    ):
+        """A stalled opener TTS is an anticipated, self-recovering condition
+        (see the comment above the timeout in app/worker.py): the session
+        keeps going and the client is merely told it may have heard silence.
+        It must not log at ERROR, which pages like a real internal failure —
+        the same over-alerting this repo already fixed for the benign Krisp
+        noise-cancellation rejection (app/core/logger.py,
+        BenignNoiseCancellationFilter).
+        """
+        from app.core.livekit.livekit_models import RoomMetadataEnvelope
+        from app.core.scenario.base import PromptData, Scenario
+
+        prompt_data = PromptData(
+            name="Test Client",
+            age="30",
+            gender="male",
+            current_location="Test Location",
+            context="test context",
+            opening_statements=["hello", "hi"],
+            prompt="test prompt",
+        )
+
+        scenario = Scenario(
+            scenarioName="test",
+            metadata={},
+            events=[],
+            trigger_events=[],
+            termination_events=[],
+            voice=None,
+            prompt_data=prompt_data,
+            language_config=None,
+        )
+
+        rm_md_envelope = RoomMetadataEnvelope(
+            version="1.0",
+            scenario=scenario,
+        )
+
+        monkeypatch.setattr(
+            worker.settings, "OPENING_STATEMENT_PLAYOUT_TIMEOUT_S", 0.05
+        )
+
+        monkeypatch.setattr(
+            agent_utils,
+            "parse_room_metadata",
+            lambda md, embedding_client=None, branching_llm_config=None: rm_md_envelope,
+        )
+        monkeypatch.setattr(
+            RoomMetadataEnvelope,
+            "create",
+            lambda payload, embedding_client=None, branching_llm_config=None: (
+                rm_md_envelope
+            ),
+        )
+
+        class MockSTTClient:
+            def __init__(self):
+                self.stt_instance = "STT"
+
+        from app.stt import factory as stt_factory
+
+        monkeypatch.setattr(
+            stt_factory,
+            "create_stt_client",
+            lambda stt_config=None, language_code=None: MockSTTClient(),
+        )
+        monkeypatch.setattr(
+            agent_utils, "configure_stt_client", lambda scenario: MockSTTClient()
+        )
+
+        def mock_create_tts(*a, **k):
+            mock_client = Mock()
+            mock_client.tts_instance = "TTS"
+            mock_client.set_defaults = AsyncMock()
+            mock_client.get_parameter_metadata = Mock(return_value={})
+            mock_client._validate_parameters_dict = Mock(side_effect=lambda d: d)
+            mock_client._apply_parameters_dict = Mock()
+            return mock_client
+
+        from app.tts import factory as tts_factory
+
+        monkeypatch.setattr(tts_factory, "create_tts_client", mock_create_tts)
+        monkeypatch.setattr("app.tts.create_tts_client", mock_create_tts)
+        monkeypatch.setattr(agent_utils, "create_tts_client", mock_create_tts)
+        monkeypatch.setattr(
+            agent_utils, "configure_tts_client", lambda scenario: mock_create_tts()
+        )
+        monkeypatch.setattr(
+            agent_utils,
+            "configure_llm_client",
+            lambda scenario, branching_llm_config=None: Mock(),
+        )
+        monkeypatch.setattr(
+            agent_utils,
+            "initialize_agent_state",
+            lambda thread_id, scenario: "2024-01-01T00:00:00Z",
+        )
+
+        def mock_create_agent_with_adapter(*a, **k):
+            return self.DummyAgent(llm=None)
+
+        monkeypatch.setattr(
+            agent_utils, "create_agent_with_adapter", mock_create_agent_with_adapter
+        )
+        monkeypatch.setattr("app.core.agent.factory.Agent", self.DummyAgent)
+        monkeypatch.setattr("livekit.agents.Agent", self.DummyAgent)
+        monkeypatch.setattr(
+            event_handler,
+            "create_connection_state_handler",
+            lambda *a, **k: lambda state: None,
+        )
+        monkeypatch.setattr(
+            event_handler, "create_shutdown_handler", lambda *a, **k: lambda: None
+        )
+        monkeypatch.setattr(
+            event_handler,
+            "create_termination_handler",
+            lambda *a, **k: lambda event: None,
+        )
+        monkeypatch.setattr(
+            event_handler,
+            "setup_interruption_detection",
+            lambda session, room_id=None: None,
+        )
+        monkeypatch.setattr(
+            agent_utils, "should_say_opening_statement", lambda *a, **k: True
+        )
+        monkeypatch.setattr(agent_graph, "update_state", lambda *a, **k: None)
+        monkeypatch.setattr(worker, "Agent", self.DummyAgent)
+
+        # A handler whose playout never completes, so the bounded wait in
+        # entrypoint() always times out — this is what stalled opener TTS
+        # looks like from the caller's side.
+        class NeverPlaysOutHandler:
+            async def wait_for_playout(self):
+                await asyncio.sleep(10)
+
+        class StallingSession(self.DummySession):
+            def say(self, text):
+                self.said.append(text)
+                return NeverPlaysOutHandler()
+
+        dummy_session = StallingSession()
+        monkeypatch.setattr(
+            worker,
+            "AgentSession",
+            lambda stt, tts, vad, turn_detection, **kwargs: dummy_session,
+        )
+
+        monkeypatch.setattr(
+            event_handler,
+            "create_conversation_handler",
+            lambda *a, **k: (lambda e: None, lambda: None),
+        )
+
+        class DummyBVC:
+            def __init__(self):
+                pass
+
+        monkeypatch.setattr(worker.noise_cancellation, "BVC", DummyBVC)
+
+        class DummyRIO:
+            def __init__(self, **kwargs):
+                self.kwargs = kwargs
+
+        monkeypatch.setattr(worker, "RoomInputOptions", DummyRIO)
+
+        class Ctx:
+            def __init__(self):
+                self.job = types.SimpleNamespace(metadata="{}", id="test-job")
+                self.room = TestWorker.DummyRoom()
+                self.proc = types.SimpleNamespace(userid="u", userdata={"vad": "VAD"})
+                self._shutdown_callbacks = []
+
+            async def connect(self):
+                return None
+
+            def add_shutdown_callback(self, callback):
+                self._shutdown_callbacks.append(callback)
+
+        ctx = Ctx()
+
+        with caplog.at_level("INFO"):
+            await worker.entrypoint(ctx)
+
+        timeout_records = [
+            r
+            for r in caplog.records
+            if "Opening statement playout did not complete" in r.getMessage()
+        ]
+        assert timeout_records, "expected the opener-stall message to be logged"
+        assert all(
+            r.levelname != "ERROR" for r in timeout_records
+        ), (
+            "opener-stall is an anticipated, self-recovering condition and "
+            "must not log at ERROR severity (it would page like a real "
+            "internal failure)"
+        )
+
+    @pytest.mark.asyncio
     async def test_entrypoint_tts_fallback(self, monkeypatch):
         from app.core.livekit.livekit_models import RoomMetadataEnvelope
         from app.core.scenario.base import PromptData, Scenario
