@@ -31,6 +31,7 @@ import {
   CourseOverviewScreen,
   ListeningScreen,
   ProfileSettingsScreen,
+  ProgressScreen,
   ReactionsScreen,
   ReviewDetailsScreen,
   ScribeReviewDetailsScreen,
@@ -151,15 +152,11 @@ const NavigationContent = ({
     eventCallbacks: socketEventCallbacks,
   });
 
-  // There is deliberately NO app-wide socket on the microphone namespace. One
-  // used to live here, so every counselor held two connections to
-  // `/microphone-chat` at once — this one for the whole life of the app, plus
-  // the listening screen's — and the server opened a session for each. It bought
-  // only a faster pickup of a scribe session started on another device, which
-  // the foreground check in useCounselorChat already covers, and it cost a
-  // second session for the janitor and the disconnect handler to disagree over
-  // while a recording was live. Conference calls keep their app-wide socket
-  // above: they are answered from the phone with no screen already open.
+  useSocketConnection({
+    path: env.MICROPHONE_SOCKET_PATH,
+    userId: userData?.id,
+    eventCallbacks: socketEventCallbacks,
+  });
 
   useEffect(() => {
     const navigateToCallSummary = (callId: number) => {
@@ -359,6 +356,14 @@ const NavigationContent = ({
           <Stack.Screen
             name={SCREEN_NAMES.ACHIEVEMENTS}
             component={AchievementsScreen}
+          />
+          {/* Reached by tapping the persistent level ring in the shared header, which
+              is the entry point on every screen. Deliberately a stack screen rather
+              than a ninth bottom tab: the tab bar is already at eight, and the widget
+              is the one-tap route this feature is built around. */}
+          <Stack.Screen
+            name={SCREEN_NAMES.PROGRESS}
+            component={ProgressScreen}
           />
           <Stack.Screen
             name={SCREEN_NAMES.PROFILE_SETTINGS}

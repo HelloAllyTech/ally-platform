@@ -70,3 +70,6 @@ export * from './simulationSummary';
 
 // Courses (Track 2.0) types
 export * from './courses';
+
+// Learner progress (XP / levels) types
+export * from './progress';

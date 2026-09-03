@@ -35,6 +35,7 @@ export type RootStackParamList = {
     languageId?: number;
   };
   Achievements: undefined;
+  Progress: undefined;
   ProfileSettings: undefined;
   BugReport: undefined;
   Reactions: {reviewId: string | number; reviewType?: ReviewType};
