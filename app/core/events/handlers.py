@@ -305,6 +305,12 @@ def create_conversation_handler(
             start_time=start_time,
             end_time=end_time,
             interrupted=interrupted,
+            # This handler only ever carries the REAL generated reply: the
+            # filler and the interim are published by the worker directly (they
+            # never pass through the AgentSession's conversation items). Marking
+            # it is what lets a consumer tell the three apart — they are all
+            # CLIENT lines, and one turn can emit all three in a row.
+            utterance_kind="reply" if role == "CLIENT" else None,
         )
 
         start_time_str = "None" if start_time is None else f"{start_time:.2f}"

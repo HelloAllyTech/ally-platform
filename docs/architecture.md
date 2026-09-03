@@ -189,6 +189,17 @@ Per-turn provenance goes into `turn_metrics` as `fillerDecision`, `fillerLeadMs`
 `postFillerSilenceMs` and friends, so coverage and lead time are measurable
 rather than assumed. `scripts/filler-bench.py` exercises the same code offline.
 
+The transcript carries the other half. A filler, an interim reply and the real
+reply all reach Core as CLIENT lines, and a single turn can emit all three in a
+row — so `ChatMessage.utterance_kind` (`reply` | `filler` | `interim`) marks
+which is which. Position cannot substitute for it: the moment a continuation
+filler plays there are two fillers before the reply, and any consumer inferring
+kind from order gets it wrong. The values deliberately match the
+`metadata.firstAudioSource` vocabulary on the turn-metrics row so the transcript
+and the latency record join cleanly. `None` means an older worker, and is
+distinct from `reply` — reading that silence as a real reply would mislabel
+every filler already in the backlog.
+
 ---
 
 ## Key Source Files
