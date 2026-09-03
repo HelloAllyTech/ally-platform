@@ -305,25 +305,54 @@ class AgentWorker:
         # drive playback ourselves on the agent's "thinking" state so we know
         # which phrase plays and can record it in the transcript.
         self._bg_audio = None
-        self._filler_clips: list[tuple[str, str]] = []  # (phrase, wav_path)
         self._filler_handle = None
-        # Predictive fillers: LLM-generated, refreshed by a background job from
-        # the live conversation. Preferred over the static set when non-empty;
-        # the static clips above stay as the fallback.
-        self._dynamic_filler_clips: list[tuple[str, str]] = []  # (phrase, wav_path)
+        # ONE accumulating pool of in-memory clips for the whole session (static
+        # Studio phrases, the session-start seed batch, per-exchange batches and
+        # in-turn batches all land here). Accumulating rather than replacing is
+        # what stops a long session cycling through five phrases; selection
+        # applies the recency/type/duration rules. See filler_pool.FillerPool.
+        self._filler_pool = None
         self._predictor_task: Optional[asyncio.Task] = None
-        # Connection-isolated LLM client for the predictive-filler loop's own
-        # calls, so they can't contend with the real reply's in-flight call
-        # for the same connection — see _setup_predictive_filler_llm_client.
+        # Connection-isolated LLM client for filler generation, so those calls
+        # can't contend with the real reply's in-flight call on the same
+        # connection — see _setup_predictive_filler_llm_client.
         self._predictive_filler_llm_client = None
-        # Recently spoken filler phrases, so we don't repeat the same one on
-        # consecutive turns (random.choice has no memory). Kept short and capped
-        # below the clip count so there's always a candidate to pick.
-        self._recent_filler_phrases: list[str] = []
-        # Delay-gated playback: a filler only plays if the reply is still pending
-        # after FILLER_MIN_DELAY_MS, so fast turns get no (unnatural) filler.
-        self._filler_delay_task: Optional[asyncio.Task] = None
+        # Predicts this turn's reply latency from the session's own history, so
+        # playback decides immediately instead of waiting to find out.
+        self._gap_predictor = None
+        self._filler_enabled: bool = False
         self._agent_thinking: bool = False
+        # Per-turn playback bookkeeping: how many fillers have played this turn
+        # (capped), and the continuation watcher that fills a silence after one
+        # ends. Reset when the turn moves on.
+        self._filler_turn_count: int = 0
+        self._filler_consecutive_turns: int = 0
+        self._filler_played_this_turn: bool = False
+        self._filler_continuation_task: Optional[asyncio.Task] = None
+        # Set as soon as the filler decision for a turn resolves (played, or
+        # declined), so the interim reply chains on the actual event instead of
+        # sleeping out the old worst-case delay.
+        self._filler_decided = asyncio.Event()
+        # In-turn generation: fires once mid-utterance so the played filler has
+        # seen what the learner is actually saying.
+        self._filler_in_turn_task: Optional[asyncio.Task] = None
+        self._filler_in_turn_armed: bool = False
+        # Session counters, logged once at shutdown: how much work the layer did
+        # and how well the cache served it.
+        self._filler_stats: dict = {
+            "llm_calls": 0,
+            "clips_synthesized": 0,
+            "played": 0,
+            "continuations": 0,
+            "distinct_played": set(),
+            "first_clip_ready_s": None,
+        }
+        # Early trigger (experimental, off by default): start a filler at VAD
+        # end-of-speech rather than after endpointing completes.
+        self._filler_early_task: Optional[asyncio.Task] = None
+        # Raised when the character finishes speaking, which is when the pool may
+        # want refreshing — the pipeline is idle and a new turn just landed.
+        self._filler_regen_signal = asyncio.Event()
 
         # Comfort audio: a faint room tone played as the ambient sound on the
         # SAME BackgroundAudioPlayer track, looping for the whole session so the
@@ -338,12 +367,13 @@ class AgentWorker:
         # user-speaking state (see _on_backchannel_user_state / _backchannel_loop)
         # and kept sparse so it never interrupts. Clips are generated once at
         # session start in the scenario's language; deleted on shutdown.
-        self._backchannel_clips: list[tuple[str, str]] = []  # (phrase, wav_path)
+        # In-memory clips (see filler_clips.FillerClip) — no temp files.
+        self._backchannel_clips: list = []
         self._backchannel_task: Optional[asyncio.Task] = None
         self._backchannel_handle = None
         self._user_speaking: bool = False
         # Recent back-channel phrases, so consecutive emissions don't repeat
-        # (kept separate from the filler's list — different phrase pools).
+        # (kept separate from the filler's pool — different phrase sets).
         self._recent_backchannel_phrases: list[str] = []
 
         # Predictive interim reply: while the learner is still speaking on a long
@@ -369,10 +399,8 @@ class AgentWorker:
         self._user_turn_start_monotonic: Optional[float] = None
         self._interim_gen_task: Optional[asyncio.Task] = None
         self._interim_play_task: Optional[asyncio.Task] = None
-        self._interim_clip: Optional[tuple[str, str]] = None  # (text, wav_path)
+        self._interim_clip = None  # FillerClip, rendered in memory
         self._interim_handle = None
-        # All interim WAVs synthesized this session, deleted on shutdown.
-        self._interim_clip_paths: list[str] = []
 
         # ========== Termination Handling (for entrypoint context) ==========
         # Use asyncio.Event to signal termination from graph context
@@ -1125,12 +1153,16 @@ class AgentWorker:
                         turn_metrics.record(
                             metrics_room_name, llm_ttft_ms=int(ttft * 1000)
                         )
+                        # Same number the filler's gap predictor learns from: how
+                        # long this session's model actually takes to first token.
+                        self._observe_reply_latency(llm_ttft_ms=ttft * 1000)
                 elif metric_cls == "TTSMetrics":
                     ttfb = getattr(metric, "ttfb", None)
                     if ttfb is not None and ttfb >= 0:
                         turn_metrics.record(
                             metrics_room_name, tts_ttfb_ms=int(ttfb * 1000)
                         )
+                        self._observe_reply_latency(tts_ttfb_ms=ttfb * 1000)
                     # AI-cost: TTS billed per synthesized character.
                     chars = getattr(metric, "characters_count", None)
                     if chars:
@@ -1328,7 +1360,7 @@ class AgentWorker:
                     logger.debug(f"Error closing supervisor notes: {e}")
                 self._supervisor_notes = None
             # Tear down the background-audio track (comfort tone + filler +
-            # back-channel) and delete its temp clips.
+            # back-channel).
             if self._bg_audio is not None:
                 try:
                     await asyncio.wait_for(
@@ -1343,34 +1375,13 @@ class AgentWorker:
                 except Exception as e:  # noqa: BLE001
                     logger.debug(f"Error closing BackgroundAudioPlayer: {e}")
                 self._bg_audio = None
-            if self._filler_clips or self._dynamic_filler_clips:
-                try:
-                    from app.core.livekit.filler_audio import cleanup_clips
-
-                    cleanup_clips(
-                        [path for _, path in self._filler_clips]
-                        + [path for _, path in self._dynamic_filler_clips]
-                    )
-                except Exception:  # noqa: BLE001
-                    pass
-                self._filler_clips = []
-                self._dynamic_filler_clips = []
-            if self._backchannel_clips:
-                try:
-                    from app.core.livekit.filler_audio import cleanup_clips
-
-                    cleanup_clips([path for _, path in self._backchannel_clips])
-                except Exception:  # noqa: BLE001
-                    pass
-                self._backchannel_clips = []
-            if self._interim_clip_paths:
-                try:
-                    from app.core.livekit.filler_audio import cleanup_clips
-
-                    cleanup_clips(self._interim_clip_paths)
-                except Exception:  # noqa: BLE001
-                    pass
-                self._interim_clip_paths = []
+            # Filler / back-channel / interim clips are in-memory frames, so
+            # there are no temp files to delete — dropping the references is the
+            # whole of the cleanup. Log what the layer cost first.
+            self._log_filler_session_stats()
+            self._filler_pool = None
+            self._backchannel_clips = []
+            self._interim_clip = None
             if self._comfort_clip_path is not None:
                 try:
                     from app.core.livekit.comfort_audio import cleanup_clip
@@ -2174,56 +2185,84 @@ class AgentWorker:
             )
 
     async def _setup_deferred_naturalness(self) -> None:
-        """Synthesize the filler/back-channel clips and wire their handlers.
+        """Build the filler pool + back-channel clips and wire their handlers.
 
         Split out of _setup_background_audio and run as a background task so the
-        back-channel LLM call and the TTS syntheses never delay the opening
-        statement. The BackgroundAudioPlayer track is already published by the
-        caller; this only fills in the per-layer clips and registers the handlers
-        that drive them. Every playback handler guards on ``self._bg_audio`` /
-        empty clip lists, so if the first learner turn begins before this
-        finishes the only effect is no filler/back-channel on that turn (both are
-        delay-gated well past the opening window anyway). Best-effort: any failure
-        leaves the session running with whatever layers did resolve; never raises.
+        LLM calls and TTS syntheses never delay the opening statement. The
+        BackgroundAudioPlayer track is already published by the caller; this only
+        fills in the clips and registers the handlers that drive them.
+
+        Order matters for time-to-first-usable-clip: the STATIC Studio phrases
+        (no LLM call, and usually already in the worker's clip cache) are
+        rendered first so something is playable as early as possible, then the
+        seed batch — generated from the character alone, with no conversation —
+        makes context-free but in-character fillers available before the
+        learner's first turn. Previously nothing was playable until an exchange
+        had completed and a 10s timer had come round.
+
+        Every playback handler guards on ``self._bg_audio`` / an empty pool, so a
+        turn beginning before this finishes simply gets no filler. Best-effort:
+        any failure leaves the session running with whatever did resolve.
         """
         if self._bg_audio is None:
             return
         try:
+            import time as _time
+
+            from app.core.livekit.filler_clips import synthesize_clips
+            from app.core.livekit.filler_pool import FillerPool
             from app.core.livekit.fillers import (
                 is_filler_enabled,
                 resolve_filler_phrases,
             )
+            from app.core.livekit.gap_predictor import GapPredictor
 
             predictive_on = bool(getattr(settings, "PREDICTIVE_FILLER_ENABLED", False))
+            started = _time.monotonic()
 
-            # ---- Thinking filler (static clips) ----
-            # Static phrases may be empty (a scenario can rely purely on
-            # predictive fillers), so the feature flag is checked separately.
+            # ---- Thinking filler ----
             filler_on = False
             if is_filler_enabled(self.scenario):
-                from app.core.livekit.filler_audio import synthesize_filler_clips
+                self._filler_pool = FillerPool(
+                    max_clips=int(getattr(settings, "FILLER_POOL_MAX_CLIPS", 40)),
+                    repeat_window_plays=int(
+                        getattr(settings, "FILLER_REPEAT_WINDOW_PLAYS", 12)
+                    ),
+                )
+                self._gap_predictor = GapPredictor(
+                    prior_ms=float(getattr(settings, "FILLER_GAP_PRIOR_MS", 900.0))
+                )
+                language = self._filler_language()
 
                 phrases = resolve_filler_phrases(self.scenario)
                 if phrases:
-                    logger.info("[FILLER] resolved %d static phrase(s)", len(phrases))
-                    self._filler_clips = await synthesize_filler_clips(
-                        self.tts_client, phrases
+                    clips = await synthesize_clips(
+                        self.tts_client, phrases, language=language, source="static"
                     )
+                    self._filler_stats["clips_synthesized"] += len(clips)
+                    self._filler_pool.add(clips)
                     logger.info(
-                        "[FILLER] synthesized %d static clip(s)",
-                        len(self._filler_clips),
+                        "[FILLER] %d static clip(s) ready from %d Studio phrase(s)",
+                        len(clips),
+                        len(phrases),
                     )
-                # The filler can play if it has static clips now or will get
-                # predictive ones; otherwise there's nothing it could ever play.
-                filler_on = bool(self._filler_clips) or predictive_on
+
+                if predictive_on:
+                    self._setup_predictive_filler_llm_client()
+                    if getattr(settings, "FILLER_SEED_ON_START", True):
+                        await self._generate_fillers(source="seed")
+
+                filler_on = len(self._filler_pool) > 0 or predictive_on
+                if len(self._filler_pool):
+                    self._filler_stats["first_clip_ready_s"] = round(
+                        _time.monotonic() - started, 2
+                    )
                 if not filler_on:
                     logger.info(
                         "[FILLER] no static phrases and predictive disabled — no filler"
                     )
 
             # ---- Continuous back-channeling (listener affirmations) ----
-            # Brief "mm-hmm"/"yeah" clips played WHILE the learner speaks on a
-            # long turn (see _on_backchannel_user_state). Global flag, default on.
             backchannel_on = await self._resolve_backchannel_clips()
             if backchannel_on:
                 self.session.on("user_state_changed")(self._on_backchannel_user_state)
@@ -2233,30 +2272,33 @@ class AgentWorker:
                 )
 
             # ---- Predictive interim reply ----
-            # Build the dedicated fast LLM client and register its handlers.
-            # Independent of the filler gate (it has its own).
             if self._interim_enabled:
                 self._setup_interim_reply()
 
             if not filler_on:
-                # No thinking-filler: the comfort tone needs no per-turn driver,
-                # and back-channeling (if on) is driven by its own handler above.
                 return
 
+            self._filler_enabled = True
             self.session.on("agent_state_changed")(self._on_filler_agent_state)
+            # In-turn generation and the (experimental) early trigger both hang
+            # off the learner's own speech, not the agent's state.
+            self.session.on("user_state_changed")(self._on_filler_user_state)
+            if getattr(settings, "FILLER_IN_TURN_ENABLED", True) and predictive_on:
+                self.session.on("user_input_transcribed")(
+                    self._on_filler_input_transcribed
+                )
 
-            # Start the background predictive-filler job (best-effort). It reads
-            # the live conversation every interval and refreshes
-            # self._dynamic_filler_clips, which playback prefers over the static
-            # set. Tracked in _background_tasks so it's cancelled on shutdown.
+            # Regenerate per exchange (when the character finishes speaking and
+            # the pipeline is idle) instead of on a free-running timer, so the
+            # call never overlaps the real reply's request and skips entirely
+            # while the pool still holds unheard phrases.
             if predictive_on:
-                self._setup_predictive_filler_llm_client()
                 self._predictor_task = asyncio.create_task(
                     self._predictive_filler_loop()
                 )
                 self._background_tasks.add(self._predictor_task)
                 self._predictor_task.add_done_callback(self._background_tasks.discard)
-                logger.info("[FILLER] predictive filler loop started")
+                logger.info("[FILLER] exchange-driven regeneration armed")
         except Exception as e:  # noqa: BLE001 - must never break a session
             logger.warning(
                 "[BG_AUDIO] deferred naturalness setup failed (continuing "
@@ -2264,13 +2306,223 @@ class AgentWorker:
                 e,
             )
 
-    def _on_filler_agent_state(self, ev) -> None:
-        """Decide whether to play a filler when the agent starts "thinking".
+    def _log_filler_session_stats(self) -> None:
+        """Log what the filler layer cost and delivered this session.
 
-        Rather than firing on every turn (which sounds unnatural), we defer:
-        only if the reply is STILL pending after FILLER_MIN_DELAY_MS do we play a
-        filler — fast replies leave no gap to mask. Leaving "thinking" cancels a
-        pending wait and stops any filler already playing.
+        One line, at shutdown, carrying the numbers that say whether the layer is
+        working: how many LLM calls and TTS syntheses it actually made (versus
+        the up-to-six-per-minute the old timer made), how well the shared clip
+        cache served it, how many distinct phrases the learner heard, and how
+        soon the first clip was ready. Without these the cost side of the feature
+        is invisible — the per-turn metrics only describe playback.
+        """
+        try:
+            stats = self._filler_stats
+            if not stats.get("played") and not stats.get("llm_calls"):
+                return
+            from app.core.livekit.filler_clips import cache_stats
+
+            cache = cache_stats()
+            played = int(stats.get("played") or 0)
+            distinct = len(stats.get("distinct_played") or ())
+            logger.info(
+                "[FILLER] session totals: played=%d (distinct=%d, continuations=%d) "
+                "llm_calls=%d clips_synthesized=%d cache_hits=%d cache_misses=%d "
+                "cache_size=%d first_clip_ready=%ss",
+                played,
+                distinct,
+                int(stats.get("continuations") or 0),
+                int(stats.get("llm_calls") or 0),
+                int(stats.get("clips_synthesized") or 0),
+                cache.get("hits", 0),
+                cache.get("misses", 0),
+                cache.get("size", 0),
+                stats.get("first_clip_ready_s"),
+            )
+        except Exception:  # noqa: BLE001 - teardown must not raise
+            pass
+
+    def _observe_reply_latency(
+        self,
+        llm_ttft_ms: Optional[float] = None,
+        tts_ttfb_ms: Optional[float] = None,
+    ) -> None:
+        """Teach the gap predictor from a component timing as it arrives.
+
+        The two halves arrive as separate LiveKit metrics events, so they are
+        folded in separately rather than waiting to pair them up: each is a
+        genuine observation of part of the wait, and under-predicting is the safe
+        direction (the filler declines rather than talking over a fast reply).
+        """
+        predictor = self._gap_predictor
+        if predictor is None:
+            return
+        try:
+            predictor.observe_turn(llm_ttft_ms, tts_ttfb_ms)
+        except Exception:  # noqa: BLE001 - prediction must never break a turn
+            pass
+
+    def _pick_backchannel_clip(self):
+        """Pick a back-channel clip, avoiding the ones just used.
+
+        Kept separate from the filler pool: back-channels are a different set of
+        sounds for a different moment (listening, not thinking), and mixing the
+        two would let a hesitation play while the learner is mid-sentence.
+        """
+        import random as _random
+
+        clips = self._backchannel_clips
+        if not clips:
+            return None
+        recent = set(self._recent_backchannel_phrases)
+        candidates = [c for c in clips if c.phrase not in recent] or clips
+        choice = _random.choice(candidates)
+        max_remember = max(1, min(len(clips) - 1, 3))
+        self._recent_backchannel_phrases.append(choice.phrase)
+        self._recent_backchannel_phrases[:] = self._recent_backchannel_phrases[
+            -max_remember:
+        ]
+        return choice
+
+    def _filler_language(self) -> str:
+        """The session's BCP-47 code, used as part of the clip cache key."""
+        return (
+            getattr(
+                getattr(self.scenario, "language_config", None), "language_code", None
+            )
+            or "unknown"
+        )
+
+    async def _generate_fillers(
+        self,
+        source: str,
+        partial_text: Optional[str] = None,
+    ) -> int:
+        """Generate one batch of fillers and render it into the pool.
+
+        ``source`` selects which generation moment this is — "seed" (character
+        only, at session start), "exchange" (conversation so far, between turns)
+        or "in_turn" (the learner's partial transcript, mid-utterance). Returns
+        how many new clips reached the pool; 0 on any failure, which simply
+        leaves the pool as it was.
+        """
+        pool = self._filler_pool
+        if pool is None or self._predictive_filler_llm_client is None:
+            return 0
+        try:
+            from app.core.livekit.filler_clips import synthesize_clips
+            from app.core.livekit.predictive_filler import (
+                generate_in_turn_fillers,
+                generate_predictive_fillers,
+                generate_seed_fillers,
+            )
+
+            count = int(getattr(settings, "PREDICTIVE_FILLER_COUNT", 8))
+            if source == "seed":
+                options = await generate_seed_fillers(
+                    self._predictive_filler_llm_client, self.scenario, count
+                )
+            elif source == "in_turn":
+                options = await generate_in_turn_fillers(
+                    self._predictive_filler_llm_client,
+                    self.scenario,
+                    self._read_conversation_history(),
+                    partial_text or "",
+                    count=int(getattr(settings, "FILLER_IN_TURN_COUNT", 3)),
+                    timeout_s=float(
+                        getattr(settings, "FILLER_IN_TURN_TIMEOUT_MS", 2500.0)
+                    )
+                    / 1000.0,
+                )
+            else:
+                messages = self._read_conversation_history()
+                if not messages:
+                    return 0
+                options = await generate_predictive_fillers(
+                    self._predictive_filler_llm_client,
+                    self.scenario,
+                    messages,
+                    count,
+                    recent_fillers=pool.phrases,
+                )
+            self._filler_stats["llm_calls"] += 1
+            if not options:
+                return 0
+
+            requests = [(text, ftype, 0) for text, ftype in options]
+            # A phrase about to be heard a second time gets a second RENDERING,
+            # so the repeat is a different take rather than the same waveform.
+            if getattr(settings, "FILLER_RENDER_VARIANTS", True):
+                requests.extend(pool.variant_needed())
+
+            clips = await synthesize_clips(
+                self.tts_client,
+                requests,
+                language=self._filler_language(),
+                source=source,
+            )
+            self._filler_stats["clips_synthesized"] += len(clips)
+            added = pool.add(clips)
+            logger.info(
+                "[FILLER] %s batch: %d option(s) -> %d clip(s), %d new (pool=%d)",
+                source,
+                len(options),
+                len(clips),
+                added,
+                len(pool),
+            )
+            return added
+        except Exception as e:  # noqa: BLE001 - a filler must never break a session
+            logger.warning("[FILLER] %s generation failed: %s", source, e)
+            return 0
+
+    # ================================================================
+    # Thinking-filler playback
+    # ================================================================
+
+    def _predicted_gap_ms(self) -> float:
+        """How long the learner is about to wait for the real reply, in ms."""
+        if self._gap_predictor is None:
+            return float(getattr(settings, "FILLER_GAP_PRIOR_MS", 900.0))
+        return self._gap_predictor.predict_ms()
+
+    def _should_play_filler(self, predicted_ms: float) -> tuple[bool, str]:
+        """Decide whether this turn gets a filler. Returns (play, reason).
+
+        The predictor replaces the old "sleep and see": a turn whose reply will
+        land quickly has no gap worth masking, and a filler inserted into it
+        sounds like an affectation rather than thought. Above the certainty
+        threshold a filler always plays; in between, the probability gate keeps
+        it from being mechanical. A run of filler turns is capped regardless —
+        a character who hesitates before every single reply reads as broken,
+        however slow the turns genuinely are.
+        """
+        import random as _random
+
+        floor_ms = float(getattr(settings, "FILLER_PREDICTED_GAP_MS", 700.0))
+        certain_ms = float(getattr(settings, "FILLER_CERTAIN_GAP_MS", 1200.0))
+        if predicted_ms < floor_ms:
+            return False, "skipped_fast_turn"
+
+        max_run = int(getattr(settings, "FILLER_MAX_CONSECUTIVE_TURNS", 3))
+        if max_run > 0 and self._filler_consecutive_turns >= max_run:
+            return False, "skipped_probability"
+
+        if predicted_ms >= certain_ms:
+            return True, "played"
+        probability = float(getattr(settings, "FILLER_PLAY_PROBABILITY", 0.6))
+        if _random.random() > probability:
+            return False, "skipped_probability"
+        return True, "played"
+
+    def _on_filler_agent_state(self, ev) -> None:
+        """Start or stop filler playback on the agent's thinking state.
+
+        Entering "thinking" decides immediately from the predicted gap and, when
+        it plays, does so at once — the clip's first frame is the agent's first
+        audio, with no deliberate wait in front of it. Leaving "thinking" means
+        the real reply is taking over: stop anything still playing and flush the
+        buffered tail so it can't bleed over the reply on the other track.
 
         Best-effort: never raises into the session.
         """
@@ -2278,123 +2530,349 @@ class AgentWorker:
             if self._bg_audio is None:
                 return
             if getattr(ev, "new_state", None) == "thinking":
+                if self._filler_pool is None:
+                    return
                 self._agent_thinking = True
-                # Don't stack: a filler or a pending wait is already in flight.
                 if self._filler_handle is not None and not self._filler_handle.done():
                     return
-                if (
-                    self._filler_delay_task is not None
-                    and not self._filler_delay_task.done()
-                ):
+                if self._filler_turn_count > 0:
+                    # Already handled this turn (e.g. the early trigger fired).
                     return
-                created_at = getattr(ev, "created_at", None)
-                self._filler_delay_task = asyncio.create_task(
-                    self._delayed_filler_play(created_at)
+                predicted_ms = self._predicted_gap_ms()
+                play, reason = self._should_play_filler(predicted_ms)
+                if not play:
+                    self._filler_consecutive_turns = 0
+                    turn_metrics.note_filler_decision(
+                        self.ctx.room.name,
+                        reason,
+                        fillerPredictedGapMs=int(predicted_ms),
+                    )
+                    logger.info(
+                        "[FILLER] %s (predicted gap %.0fms)", reason, predicted_ms
+                    )
+                    self._filler_decided.set()
+                    return
+                task = asyncio.create_task(
+                    self._play_filler(
+                        getattr(ev, "created_at", None), predicted_ms, first=True
+                    )
                 )
-                self._background_tasks.add(self._filler_delay_task)
-                self._filler_delay_task.add_done_callback(
-                    self._background_tasks.discard
-                )
+                self._background_tasks.add(task)
+                task.add_done_callback(self._background_tasks.discard)
             else:
-                # Reply is ready / turn moved on.
+                if getattr(ev, "new_state", None) == "listening":
+                    # The character has stopped speaking: the pipeline is idle and
+                    # the conversation has just gained a turn, so this is the
+                    # cheapest possible moment to refresh the pool.
+                    self._filler_regen_signal.set()
                 self._agent_thinking = False
-                if (
-                    self._filler_delay_task is not None
-                    and not self._filler_delay_task.done()
-                ):
-                    self._filler_delay_task.cancel()
-                if self._filler_handle is not None and not self._filler_handle.done():
-                    self._filler_handle.stop()
-                    # Flush the source queue too: stop() halts the feeder but the
-                    # filler's already-buffered tail would otherwise bleed over
-                    # the real reply (separate track). See bg_audio.flush().
-                    self._bg_audio.flush()
-                    self._filler_handle = None
+                self._stop_filler()
+                self._filler_consecutive_turns = (
+                    self._filler_consecutive_turns + 1
+                    if self._filler_played_this_turn
+                    else 0
+                )
+                self._filler_turn_count = 0
+                self._filler_played_this_turn = False
+                self._filler_decided.set()
         except Exception as e:  # noqa: BLE001 - filler must never break a session
             logger.warning("[FILLER] agent-state handler error: %s", e)
 
-    async def _delayed_filler_play(self, created_at) -> None:
-        """Play a filler only if the reply is still pending after a short wait.
+    def _stop_filler(self) -> None:
+        """Cut any filler still playing, plus its pending continuation."""
+        if (
+            self._filler_continuation_task is not None
+            and not self._filler_continuation_task.done()
+        ):
+            self._filler_continuation_task.cancel()
+        self._filler_continuation_task = None
+        if self._filler_handle is not None and not self._filler_handle.done():
+            self._filler_handle.stop()
+            # stop() halts the feeder only; the already-buffered tail would
+            # otherwise keep playing over the real reply on the separate agent
+            # track. See bg_audio.flush().
+            self._bg_audio.flush()
+        self._filler_handle = None
 
-        Waits a randomized delay in [FILLER_MIN_DELAY_MS, FILLER_MAX_DELAY_MS],
-        then bails if the agent already left "thinking" (reply ready → no gap to
-        mask). Even when there is a gap, plays only FILLER_PLAY_PROBABILITY of
-        the time so fillers aren't used on every turn. Best-effort; cancelled
-        when the agent stops thinking.
+    async def _play_filler(self, created_at, predicted_ms: float, first: bool) -> None:
+        """Play one filler chosen to fit the remaining gap, and watch for silence.
+
+        The clip is picked from the duration tier nearest
+        ``predicted_ms - FILLER_TIER_MARGIN_MS``, so it ends about when the reply
+        begins rather than leaving dead air behind it. First-audio is credited at
+        the moment the FIRST FRAME IS ACTUALLY HANDED TO THE MIXER, not an
+        estimate — the old code credited ``created_at + delay``, which was the
+        one number the metric could not verify.
         """
         try:
-            import random as _random
-
-            lo = float(getattr(settings, "FILLER_MIN_DELAY_MS", 300.0))
-            hi = float(getattr(settings, "FILLER_MAX_DELAY_MS", 600.0))
-            if hi < lo:
-                lo, hi = hi, lo
-            delay_s = max(0.0, _random.uniform(lo, hi) / 1000.0)
-            await asyncio.sleep(delay_s)
-
-            # Reply became ready within the delay — no awkward gap, no filler.
-            if not self._agent_thinking or self._bg_audio is None:
-                return
-            if self._filler_handle is not None and not self._filler_handle.done():
-                return
-            clips = self._dynamic_filler_clips or self._filler_clips
-            if not clips:
-                return
-
-            # There's a real pause — but don't fill on every one. Roll the dice.
-            probability = float(getattr(settings, "FILLER_PLAY_PROBABILITY", 0.6))
-            if _random.random() > probability:
-                logger.info("[FILLER] skipped this turn (probability gate)")
-                return
+            import time as _time
 
             from livekit.agents import AudioConfig
 
-            phrase, path = self._pick_filler_clip(clips)
-            self._filler_handle = self._bg_audio.play(AudioConfig(path))
-            # The filler becomes audible now (after the wait); report that time
-            # as first-audio for response_latency_ms and the transcript.
-            play_ts = (created_at + delay_s) if created_at is not None else None
-            self._emit_filler_transcript(phrase, play_ts)
-            if play_ts is not None:
+            from app.core.livekit.filler_clips import clip_audio_source
+
+            pool = self._filler_pool
+            if pool is None or self._bg_audio is None or not self._agent_thinking:
+                return
+            if self._filler_turn_count >= int(
+                getattr(settings, "FILLER_MAX_PER_TURN", 2)
+            ):
+                return
+            margin = float(getattr(settings, "FILLER_TIER_MARGIN_MS", 150.0))
+            clip = pool.choose(target_ms=max(0.0, predicted_ms - margin))
+            if clip is None:
+                if first:
+                    turn_metrics.note_filler_decision(
+                        self.ctx.room.name, "skipped_no_clips"
+                    )
+                    self._filler_decided.set()
+                return
+
+            age = pool.age_turns(clip)
+            pool.mark_played(clip)
+            play_ts = _time.time()
+            source = clip_audio_source(clip)
+            self._filler_handle = self._bg_audio.play(AudioConfig(source))
+            self._filler_turn_count += 1
+            self._filler_played_this_turn = True
+            self._filler_stats["played"] += 1
+            self._filler_stats["distinct_played"].add(clip.key)
+
+            self._emit_filler_transcript(clip.phrase, play_ts)
+            if first:
                 turn_metrics.note_filler_started(self.ctx.room.name, play_ts)
+                lead_ms = (
+                    (play_ts - created_at) * 1000.0 if created_at is not None else None
+                )
+                turn_metrics.note_filler_decision(
+                    self.ctx.room.name,
+                    "played",
+                    fillerLeadMs=int(lead_ms) if lead_ms is not None else None,
+                    fillerDurationMs=int(clip.duration_ms),
+                    fillerClipSource=clip.source,
+                    fillerType=clip.filler_type,
+                    fillerPhraseAgeTurns=age,
+                    fillerPredictedGapMs=int(predicted_ms),
+                )
+                self._filler_decided.set()
+            else:
+                self._filler_stats["continuations"] += 1
+                turn_metrics.note_filler_continuation(self.ctx.room.name)
             logger.info(
-                "[FILLER] playing %r after %.0fms wait (reply still pending)",
-                phrase,
-                delay_s * 1000,
+                "[FILLER] playing %r (%s, %.0fms, tier=%s) for a predicted %.0fms gap",
+                clip.phrase,
+                clip.filler_type,
+                clip.duration_ms,
+                clip.tier,
+                predicted_ms,
             )
+
+            # Render a SECOND take of this phrase now, in the background, so if
+            # it comes round again the learner hears a different rendering rather
+            # than the identical waveform. This has to be driven by playback, not
+            # by regeneration: regeneration is deliberately skipped while the pool
+            # is still fresh, which is most of a short session — so hanging
+            # variants off it meant they were almost never produced.
+            self._ensure_variant(clip)
+
+            if getattr(settings, "FILLER_CONTINUATION_ENABLED", True):
+                self._filler_continuation_task = asyncio.create_task(
+                    self._filler_continuation(clip.duration_ms, predicted_ms)
+                )
+                self._background_tasks.add(self._filler_continuation_task)
+                self._filler_continuation_task.add_done_callback(
+                    self._background_tasks.discard
+                )
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:  # noqa: BLE001 - filler must never break a session
+            logger.warning("[FILLER] play error: %s", e)
+            if first:
+                self._filler_decided.set()
+
+    def _ensure_variant(self, clip) -> None:
+        """Queue a second rendering of ``clip``'s phrase, if it has only one.
+
+        Fire-and-forget and strictly off the turn's critical path: the clip being
+        played is already chosen, and the variant is only wanted for a LATER
+        turn. Skipped when the phrase already has more than one take, so this
+        costs at most one extra synthesis per phrase per session — and usually
+        zero, because the shared cache will already hold the variant from an
+        earlier session on this worker.
+        """
+        pool = self._filler_pool
+        if pool is None or not getattr(settings, "FILLER_RENDER_VARIANTS", True):
+            return
+        if not any(
+            (p, t, v)
+            for p, t, v in pool.variant_needed()
+            if p.strip().lower() == clip.phrase.strip().lower()
+        ):
+            return
+
+        async def _render() -> None:
+            try:
+                from app.core.livekit.filler_clips import synthesize_clips
+
+                clips = await synthesize_clips(
+                    self.tts_client,
+                    [(clip.phrase, clip.filler_type, clip.variant + 1)],
+                    language=self._filler_language(),
+                    source=clip.source,
+                )
+                self._filler_stats["clips_synthesized"] += len(clips)
+                pool.add(clips)
+            except Exception as e:  # noqa: BLE001 - never break a turn
+                logger.debug("[FILLER] variant render failed: %s", e)
+
+        task = asyncio.create_task(_render())
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
+
+    async def _filler_continuation(self, played_ms: float, predicted_ms: float) -> None:
+        """After a filler ends, fill a lingering silence with one more.
+
+        A filler that stops into dead air is worse than no filler: it draws
+        attention to the wait it was meant to cover. So if the clip finishes and
+        neither the interim reply nor the real reply has started within a natural
+        pause, play one more — of a different type, because two hums in a row is
+        the sound of a stuck machine, not a thinking person. Capped at
+        FILLER_MAX_PER_TURN; a third silence is left alone, since a character who
+        keeps muttering reads as stalling.
+        """
+        try:
+            remaining_s = max(0.0, played_ms / 1000.0)
+            await asyncio.sleep(remaining_s)
+            gap_s = (
+                float(getattr(settings, "FILLER_CONTINUATION_GAP_MS", 450.0)) / 1000.0
+            )
+            await asyncio.sleep(max(0.0, gap_s))
+
+            if not self._agent_thinking or self._bg_audio is None:
+                return
+            if self._interim_handle is not None and not self._interim_handle.done():
+                return
+            if self._interim_state in ("ready", "playing"):
+                # The interim reply is the better continuation — it says
+                # something, where a second filler only makes more noise.
+                return
+            if self._filler_handle is not None and not self._filler_handle.done():
+                return
+            remaining_gap = max(0.0, predicted_ms - played_ms - (gap_s * 1000.0))
+            await self._play_filler(None, remaining_gap or predicted_ms, first=False)
         except asyncio.CancelledError:
             pass
-        except Exception as e:  # noqa: BLE001 - filler must never break a session
-            logger.warning("[FILLER] delayed play error: %s", e)
+        except Exception as e:  # noqa: BLE001 - must never break a session
+            logger.warning("[FILLER] continuation error: %s", e)
 
-    def _pick_filler_clip(self, clips: list, recent: Optional[list] = None) -> tuple:
-        """Pick a clip, avoiding phrases played recently.
+    # ---- in-turn generation + experimental early trigger ----
 
-        random.choice alone can land on the same phrase back-to-back, which
-        sounds like the agent is stuck. We exclude recently spoken phrases when
-        alternatives exist, and remember the last few (capped below the clip
-        count so there's always a candidate). With a single clip it necessarily
-        repeats. Phrase text is the key, so this also suppresses repeats across
-        predictive regenerations.
+    def _on_filler_user_state(self, ev) -> None:
+        """Track the learner's turn for in-turn generation and the early trigger."""
+        try:
+            if getattr(ev, "new_state", None) == "speaking":
+                import time as _time
 
-        ``recent`` is the list to read/update in place (defaults to the
-        thinking-filler's; the back-channel loop passes its own so the two
-        phrase pools don't cross-contaminate).
+                self._user_speaking = True
+                self._filler_in_turn_armed = False
+                # A new learner turn: the previous turn's filler verdict no
+                # longer applies, so the interim must wait for this turn's.
+                self._filler_decided.clear()
+                if self._user_turn_start_monotonic is None or not self._interim_enabled:
+                    self._user_turn_start_monotonic = _time.monotonic()
+                if (
+                    self._filler_early_task is not None
+                    and not self._filler_early_task.done()
+                ):
+                    self._filler_early_task.cancel()
+                    self._filler_early_task = None
+            else:
+                self._user_speaking = False
+                if getattr(settings, "FILLER_EARLY_TRIGGER_ENABLED", False):
+                    self._filler_early_task = asyncio.create_task(
+                        self._early_trigger_filler()
+                    )
+                    self._background_tasks.add(self._filler_early_task)
+                    self._filler_early_task.add_done_callback(
+                        self._background_tasks.discard
+                    )
+        except Exception as e:  # noqa: BLE001 - must never break a session
+            logger.warning("[FILLER] user-state handler error: %s", e)
+
+    async def _early_trigger_filler(self) -> None:
+        """EXPERIMENTAL: start a filler before endpointing completes.
+
+        The endpointing delay (0.5-3.0s) sits BEFORE the agent's thinking state,
+        so it is silence the post-turn filler structurally cannot cover. Starting
+        here masks it — at the risk that the learner was only pausing mid-thought
+        and now hears the character talk over them, which is why this is off by
+        default and gated on an A/B. Only a micro clip is used, and the learner
+        resuming cancels it immediately.
         """
-        import random as _random
+        try:
+            delay_s = (
+                float(getattr(settings, "FILLER_EARLY_TRIGGER_DELAY_MS", 250.0))
+                / 1000.0
+            )
+            await asyncio.sleep(max(0.0, delay_s))
+            if self._user_speaking or self._agent_thinking:
+                return
+            if self._bg_audio is None or self._filler_pool is None:
+                return
+            if self._filler_turn_count > 0:
+                return
+            predicted_ms = self._predicted_gap_ms()
+            play, _reason = self._should_play_filler(predicted_ms)
+            if not play:
+                return
+            self._agent_thinking = True  # so _play_filler's guards pass
+            await self._play_filler(None, 600.0, first=True)
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:  # noqa: BLE001 - must never break a session
+            logger.warning("[FILLER] early trigger error: %s", e)
 
-        recent_list = recent if recent is not None else self._recent_filler_phrases
-        recent_set = set(recent_list)
-        candidates = [c for c in clips if c[0] not in recent_set] or clips
-        choice = _random.choice(candidates)
+    def _on_filler_input_transcribed(self, ev) -> None:
+        """Fire in-turn filler generation once the learner is mid-utterance.
 
-        # Remember up to (clip_count - 1) recent phrases, max 3, so the exclusion
-        # can never empty the candidate pool. Mutate in place so the caller's
-        # list (an instance attribute) stays updated.
-        max_remember = max(1, min(len(clips) - 1, 3))
-        recent_list.append(choice[0])
-        recent_list[:] = recent_list[-max_remember:]
-        return choice
+        This is the only generation path that can see the CURRENT turn: an
+        exchange batch is produced before the learner speaks, so the filler it
+        yields necessarily answers the previous exchange. Firing here — early
+        enough that synthesis finishes inside the endpointing delay — is what
+        makes the played filler fit what was actually just said.
+        """
+        try:
+            if not getattr(settings, "FILLER_IN_TURN_ENABLED", True):
+                return
+            if self._filler_pool is None or self._filler_in_turn_armed:
+                return
+            if bool(getattr(ev, "is_final", False)):
+                # A final at the endpoint is too late to be useful this turn.
+                return
+            if self._user_turn_start_monotonic is None:
+                return
+
+            import time as _time
+
+            text = (getattr(ev, "transcript", "") or "").strip()
+            trigger_s = (
+                float(getattr(settings, "FILLER_IN_TURN_TRIGGER_MS", 2000.0)) / 1000.0
+            )
+            if _time.monotonic() - self._user_turn_start_monotonic < trigger_s:
+                return
+            if len(text.split()) < int(
+                getattr(settings, "FILLER_IN_TURN_MIN_WORDS", 4)
+            ):
+                return
+
+            self._filler_in_turn_armed = True
+            self._filler_in_turn_task = asyncio.create_task(
+                self._generate_fillers(source="in_turn", partial_text=text)
+            )
+            self._background_tasks.add(self._filler_in_turn_task)
+            self._filler_in_turn_task.add_done_callback(self._background_tasks.discard)
+        except Exception as e:  # noqa: BLE001 - must never break a session
+            logger.warning("[FILLER] in-turn handler error: %s", e)
 
     def _emit_filler_transcript(self, phrase: str, created_at) -> None:
         """Send the spoken filler phrase to Core as a CLIENT transcript line so
@@ -2464,10 +2942,13 @@ class AgentWorker:
                 logger.info("[BACKCHANNEL] no phrases generated — no back-channel")
                 return False
 
-            from app.core.livekit.filler_audio import synthesize_filler_clips
+            from app.core.livekit.filler_clips import synthesize_clips
 
-            self._backchannel_clips = await synthesize_filler_clips(
-                self.tts_client, phrases
+            self._backchannel_clips = await synthesize_clips(
+                self.tts_client,
+                phrases,
+                language=self._filler_language(),
+                source="backchannel",
             )
             logger.info(
                 "[BACKCHANNEL] synthesized %d clip(s) from %d phrase(s)",
@@ -2548,6 +3029,8 @@ class AgentWorker:
 
             from livekit.agents import AudioConfig
 
+            from app.core.livekit.filler_clips import clip_audio_source
+
             min_utterance_s = (
                 float(getattr(settings, "BACKCHANNEL_MIN_UTTERANCE_MS", 4000.0))
                 / 1000.0
@@ -2581,14 +3064,15 @@ class AgentWorker:
                 if not self._backchannel_clips:
                     break
 
-                phrase, path = self._pick_filler_clip(
-                    self._backchannel_clips,
-                    recent=self._recent_backchannel_phrases,
-                )
+                clip = self._pick_backchannel_clip()
+                if clip is None:
+                    break
                 self._backchannel_handle = self._bg_audio.play(
-                    AudioConfig(path, volume=volume)
+                    AudioConfig(clip_audio_source(clip), volume=volume)
                 )
-                logger.info("[BACKCHANNEL] emitted %r while learner speaking", phrase)
+                logger.info(
+                    "[BACKCHANNEL] emitted %r while learner speaking", clip.phrase
+                )
         except asyncio.CancelledError:
             pass
         except Exception as e:  # noqa: BLE001 - back-channel must never break a session
@@ -2763,10 +3247,7 @@ class AgentWorker:
         leaves no interim for the turn (state -> "idle"). Best-effort.
         """
         try:
-            from app.core.livekit.filler_audio import (
-                cleanup_clips,
-                synthesize_filler_clips,
-            )
+            from app.core.livekit.filler_clips import synthesize_clips
             from app.core.livekit.interim_reply import generate_interim_reply
 
             messages = self._read_conversation_history()
@@ -2783,7 +3264,16 @@ class AgentWorker:
                 / 1000.0
             )
             clips = await asyncio.wait_for(
-                synthesize_filler_clips(self.tts_client, [reply]),
+                synthesize_clips(
+                    self.tts_client,
+                    [reply],
+                    language=self._filler_language(),
+                    source="interim",
+                    # An interim reply is written for one moment in one turn, so
+                    # it will never be asked for again — caching it would only
+                    # evict fillers that do repeat.
+                    use_cache=False,
+                ),
                 timeout=tts_timeout_s,
             )
             if not clips:
@@ -2792,15 +3282,14 @@ class AgentWorker:
                 return
 
             # The turn may have ended/reset while we synthesized — only commit if
-            # still generating for this turn; otherwise discard the fresh clip.
+            # still generating for this turn; otherwise drop the fresh clip (it
+            # is in memory, so there is nothing to clean up).
             if self._interim_state != "generating":
-                cleanup_clips([p for _, p in clips])
                 return
 
             self._interim_clip = clips[0]
-            self._interim_clip_paths.append(clips[0][1])
             self._interim_state = "ready"
-            logger.info("[INTERIM] ready: %r", clips[0][0])
+            logger.info("[INTERIM] ready: %r", clips[0].phrase)
         except asyncio.CancelledError:
             if self._interim_state == "generating":
                 self._interim_state = "idle"
@@ -2845,23 +3334,28 @@ class AgentWorker:
     async def _interim_play_after_filler(self, thinking_ts) -> None:
         """Play the ready interim on the background track, chained after the filler.
 
-        Waits out the thinking-filler's decision/playback so the two never
-        overlap on the single track, waits (bounded) for the clip to be ready if
-        generation is still finishing, then plays it — unless the real reply has
-        started, the learner resumed, or generation failed. Best-effort;
-        cancelled at cutover.
+        Waits for the filler's decision so the two never overlap on the single
+        track, waits (bounded) for the clip to be ready if generation is still
+        finishing, then plays it — unless the real reply has started, the learner
+        resumed, or generation failed. Best-effort; cancelled at cutover.
         """
         try:
             import time
 
             from livekit.agents import AudioConfig
 
+            from app.core.livekit.filler_clips import clip_audio_source
+
             start_wait = time.monotonic()
-            # Let the filler's randomized delayed-play decision resolve first.
-            filler_max_s = (
-                float(getattr(settings, "FILLER_MAX_DELAY_MS", 600.0)) / 1000.0
-            )
-            await asyncio.sleep(max(0.0, filler_max_s) + 0.05)
+            # Wait for the filler to actually DECIDE, rather than sleeping out
+            # its old worst-case delay. The event fires as soon as a filler
+            # starts or is declined, so on a turn with no filler the interim
+            # begins immediately instead of paying a wait it never needed.
+            if self._filler_enabled:
+                try:
+                    await asyncio.wait_for(self._filler_decided.wait(), timeout=1.5)
+                except asyncio.TimeoutError:
+                    pass
 
             # Wait for the clip to be ready (generation may finish just after the
             # endpoint) AND any thinking-filler to finish. Bounded backstop; the
@@ -2886,9 +3380,11 @@ class AgentWorker:
             clip = self._interim_clip
             if clip is None:
                 return
-            text, path = clip
+            text = clip.phrase
             volume = float(getattr(settings, "INTERIM_REPLY_VOLUME", 0.9))
-            self._interim_handle = self._bg_audio.play(AudioConfig(path, volume=volume))
+            self._interim_handle = self._bg_audio.play(
+                AudioConfig(clip_audio_source(clip), volume=volume)
+            )
             self._interim_state = "playing"
 
             waited = time.monotonic() - start_wait
@@ -2937,7 +3433,7 @@ class AgentWorker:
             # Drop the buffered tail too (see _interim_cutover / bg_audio.flush).
             self._bg_audio.flush()
         self._interim_handle = None
-        # The clip's temp WAV is cleaned at shutdown via _interim_clip_paths.
+        # The clip is in-memory; dropping the reference is all the cleanup there is.
         self._interim_clip = None
         self._interim_armed = False
         self._interim_final_segments = []
@@ -3002,71 +3498,53 @@ class AgentWorker:
         return []
 
     async def _predictive_filler_loop(self) -> None:
-        """Periodically regenerate predictive fillers from the live conversation.
+        """Regenerate fillers per EXCHANGE, not on a clock.
 
-        Every PREDICTIVE_FILLER_INTERVAL_SECONDS: read the conversation, ask the
-        LLM for fresh short fillers, synthesize them, and atomically replace
-        self._dynamic_filler_clips (deleting the prior generation one cycle later
-        so a clip can't be removed while it's still playing). Skips the LLM/TTS
-        work when no new turns have arrived since the last refresh. Fully
-        best-effort — on any failure it keeps the previous (or static) fillers.
+        The old loop ran on a free-running 10s timer for the whole session. That
+        cost an LLM call and five TTS calls every cycle whether or not anything
+        had changed, and — because the timer knows nothing about turn boundaries
+        — its request could land in the middle of the real reply's, which is the
+        connection contention the isolated client exists to hide.
+
+        Instead, wake when the character has FINISHED speaking: the pipeline is
+        idle, the next filler is seconds away, and the conversation has just
+        gained the turn worth conditioning on. Then skip the call entirely while
+        the pool still holds enough unheard phrases, which in a short session is
+        most of the time. A minimum gap keeps a rapid exchange from generating on
+        every turn.
+
+        Best-effort throughout — on any failure the pool keeps what it has.
         """
-        from app.core.livekit.filler_audio import cleanup_clips, synthesize_filler_clips
-        from app.core.livekit.predictive_filler import generate_predictive_fillers
-
-        interval = float(getattr(settings, "PREDICTIVE_FILLER_INTERVAL_SECONDS", 10.0))
-        count = int(getattr(settings, "PREDICTIVE_FILLER_COUNT", 5))
-        last_msg_count = -1
-        # Clips replaced last cycle — deleted one cycle later, after any play
-        # handle referencing them has long finished (fillers play for ~1-2s,
-        # cycles are ~10s apart).
-        pending_cleanup: list[tuple[str, str]] = []
+        min_gap_s = float(getattr(settings, "FILLER_REGEN_MIN_GAP_S", 8.0))
+        min_fresh = int(getattr(settings, "FILLER_REGEN_MIN_FRESH", 5))
+        last_run = 0.0
 
         try:
             while True:
-                await asyncio.sleep(interval)
+                await self._filler_regen_signal.wait()
+                self._filler_regen_signal.clear()
 
-                cleanup_clips([p for _, p in pending_cleanup])
-                pending_cleanup = []
-
-                messages = self._read_conversation_history()
-                # Need at least one exchange, and skip if nothing new was said.
-                if len(messages) < 1 or len(messages) == last_msg_count:
+                pool = self._filler_pool
+                if pool is None:
                     continue
 
-                phrases = await generate_predictive_fillers(
-                    self._predictive_filler_llm_client,
-                    self.scenario,
-                    messages,
-                    count,
-                    recent_fillers=self._recent_filler_phrases,
-                )
-                if not phrases:
+                now = time.monotonic()
+                if now - last_run < min_gap_s:
+                    continue
+                fresh = pool.fresh_count()
+                if fresh >= min_fresh:
+                    logger.debug(
+                        "[FILLER] regeneration skipped — %d fresh clip(s) in pool",
+                        fresh,
+                    )
                     continue
 
-                clips = await synthesize_filler_clips(self.tts_client, phrases)
-                if not clips:
-                    continue
-
-                # Atomic swap (single-threaded event loop): playback picks up the
-                # new clips on the next "thinking". Old clips are cleaned next cycle.
-                pending_cleanup = self._dynamic_filler_clips
-                self._dynamic_filler_clips = clips
-                last_msg_count = len(messages)
-                logger.info(
-                    "[FILLER] predictive: refreshed %d clip(s) from %d message(s)",
-                    len(clips),
-                    len(messages),
-                )
+                last_run = now
+                await self._generate_fillers(source="exchange")
         except asyncio.CancelledError:
             pass
-        finally:
-            # Best-effort cleanup of the deferred set on exit; the current
-            # dynamic clips are cleaned in shutdown_with_cleanup.
-            try:
-                cleanup_clips([p for _, p in pending_cleanup])
-            except Exception:  # noqa: BLE001
-                pass
+        except Exception as e:  # noqa: BLE001 - must never break a session
+            logger.warning("[FILLER] regeneration loop error: %s", e)
 
     async def start(self):
         """

@@ -1,14 +1,66 @@
 # Thinking fillers: 10x performance plan
 
-**Status:** proposal, revision 2 (2026-09-02). Nothing here is implemented yet.
+**Status:** IMPLEMENTED (2026-09-03) for the v1 worker. Revision 2 of the plan is
+kept below as the rationale and the measurement contract; see
+[What shipped](#what-shipped) for the delta between plan and code.
 **Scope:** the thinking-filler layer in `app/worker.py`, `app/core/livekit/fillers.py`,
-`filler_audio.py`, `predictive_filler.py`, the `filler/predictive_filler` prompt, and the
-interim-reply chain that waits on the filler. Back-channel and comfort audio are touched
-only where they share code.
+`filler_clips.py`, `filler_pool.py`, `gap_predictor.py`, `predictive_filler.py`, the
+`filler/predictive_filler` prompt, and the interim-reply chain that waits on the
+filler. Back-channel and comfort audio are touched only where they share code.
 
-> Stacks was not reachable from the session that wrote this plan. The product judgements
-> below (probability gate, cadence limits, continuation chain, early trigger, judge rubric)
-> are flagged for a Stacks check before they ship rather than decided here.
+> Stacks was not reachable from the sessions that wrote and built this. The
+> product judgements (probability gate, cadence caps, continuation rule, early
+> trigger, judge rubric) still need a Stacks check; the thresholds below ship as
+> tunable settings precisely so that check can move them without a code change.
+
+---
+
+## What shipped
+
+| Plan phase | State |
+|---|---|
+| **0 — measure** | Per-turn `fillerDecision` / `fillerLeadMs` / `postFillerSilenceMs` and session counters are in. `scripts/filler-bench.py` runs the real decision, selection and cache code offline. The offline **judge rubric for character/context fit is NOT built** — it needs real sessions and ally-ai work, and is the remaining Phase 0 item. |
+| **1 — kill the wait, bridge the gap** | Done. Predicted-gap gate, duration-tiered selection, bounded continuation, event-based interim hand-off, in-memory clips. |
+| **2 — in character, in context, cheaper** | Done. Persona voice block and typed output in the prompt, in-turn generation from the partial transcript, accumulating pool with type rotation and rendering variants, worker-wide clip cache, dedicated small model, exchange-driven regeneration, session-start seed batch. |
+| **3 — early trigger** | Built behind `FILLER_EARLY_TRIGGER_ENABLED`, **default off**. Not A/B tested; do not enable without one. |
+| **4 — cleanup and docs** | Done for the v1 path. `filler_audio.py` is **retained**: the v2 controller (`naturalness.py`, used by `worker_v2.py`) still uses the temp-file path. Consolidating v2 is a follow-up. |
+
+### What the offline bench actually shows
+
+`python scripts/filler-bench.py --sessions 5 --turns 25` (autocorrelated latency,
+30-phrase vocabulary) on this branch:
+
+| Metric | Target | Bench result |
+|---|---|---|
+| Lead time p50/p95 | ≤ 40 ms | ~0 ms (the 300–600 ms wait is gone by construction) |
+| Post-filler silence p50/p95 | ≤ 300 / ≤ 800 ms | 184 ms / 612 ms |
+| "Filler then > 1 s gap" | ≤ 5 % | 0 % |
+| TTS syntheses per session | ≥ 10x fewer | ~23 on a cold worker, ~4 once warm (cache ~63 % hit) |
+| LLM calls per session | ≥ 10x cheaper | ~1.8 calls, on a small model, versus up to 6/minute on the roleplay model |
+| Slow-turn coverage | ≥ 90 % | **77 %** — short of target |
+| Diversity | 0 in-window repeats | **not met in the bench** |
+
+Two targets are not met and should not be reported as if they were:
+
+- **Coverage (77 %).** The predictor cannot beat per-turn variance; the residual
+  misses are turns whose actual latency ran well above the session's recent mean.
+  Raising it means lowering `FILLER_PREDICTED_GAP_MS` and accepting more
+  cut-off fillers — a trade to make against real `fillerCutEarlyMs` data, not
+  against a synthetic profile.
+- **Diversity.** The bench's synthetic phrase catalog and its stubbed
+  regeneration are a poor stand-in for real generation, so its repeat counts say
+  more about the harness than the product. This needs live measurement.
+
+**Character fit and context fit are not measured at all yet.** They need the
+judge rubric on real sessions. Until that exists, the claim for those two
+dimensions is a mechanism claim (the prompt now receives the character's voice
+and the current utterance) and not a measured one.
+
+Three bugs were found by writing the tests and the bench, and fixed:
+never-played clips were being treated as stale; the repeat window was counted in
+plays while being read as turns, making it half as wide as intended; and
+rendering variants were produced only as a side effect of regeneration, which is
+skipped most of the time, so repeats reused the identical waveform.
 
 ---
 

@@ -147,6 +147,37 @@ synthesis: several TTS providers treat a fully-uppercase token as an acronym
 and spell it out letter by letter (an "MMM" hesitation heard as "M, M, M"
 instead of a hum) even for plain English text.
 
+## In-memory clips (`filler_clips`)
+
+**File:** `app/core/livekit/filler_clips.py`
+
+The v1 worker no longer renders naturalness clips to temp WAVs. `filler_clips`
+synthesizes a phrase once into pre-decoded 48 kHz mono int16 frames held in
+memory — the same shape `comfort_audio.comfort_ambient_source` already feeds the
+ambient slot — and keeps the measured duration with it. Three consequences:
+
+- **Playback is a list traversal.** No per-play open/decode/resample inside the
+  mixer pull, and no file-backed source that can exceed the mixer's per-stream
+  timeout and be dropped.
+- **Duration is known at selection time**, so the player can pick a clip that
+  ends about when the real reply starts instead of leaving dead air.
+- **Clips are cacheable.** A worker-wide LRU keyed on
+  `(provider + every stored voice parameter, language, phrase, variant)` means a
+  phrase rendered for one session is free for the next. The key must cover all
+  voice parameters, not just the voice id: serving a clip in the wrong voice is
+  worse than no filler. `voice_fingerprint()` hashes the client class, both
+  parameter dicts and every scalar attribute for that reason.
+
+Providers return whatever rate they like (Sarvam 22.05 kHz, others 24 kHz) and
+the mixer runs at 48 kHz, so clips are resampled and downmixed to mono once at
+synthesis rather than on every play. Both isolation rules above still apply:
+rendering uses `create_clip_tts()`, and when isolation is impossible nothing is
+synthesized.
+
+`filler_audio` remains for the v2 controller (`app/core/livekit/naturalness.py`,
+used by `app/worker_v2.py`), which still uses the temp-file path. Consolidating
+v2 onto `filler_clips` is a follow-up, not part of this change.
+
 ## Isolated synthesis failures (`_register_tts_error_fallback`)
 
 **File:** `app/worker.py`

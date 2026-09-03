@@ -434,6 +434,13 @@ class TestCutover:
         assert started == []
 
 
+def _clip(phrase: str, duration_ms: float = 3000.0):
+    """An in-memory interim clip with no real audio (playback is mocked)."""
+    from app.core.livekit.filler_clips import FillerClip
+
+    return FillerClip(phrase=phrase, frames=[], duration_ms=duration_ms)
+
+
 class TestInterimGenerate:
     """The worker's generate pipeline: text -> TTS -> ready clip."""
 
@@ -446,19 +453,18 @@ class TestInterimGenerate:
         async def fake_generate(*_a, **_k):
             return "Mm, I'm with you."
 
-        async def fake_synth(_tts, phrases):
-            return [(phrases[0], "/tmp/interim_x.wav")]
+        async def fake_synth(_tts, phrases, **_kw):
+            return [_clip(phrases[0])]
 
         monkeypatch.setattr(interim_reply, "generate_interim_reply", fake_generate)
         monkeypatch.setattr(
-            "app.core.livekit.filler_audio.synthesize_filler_clips", fake_synth
+            "app.core.livekit.filler_clips.synthesize_clips", fake_synth
         )
 
         await w._interim_generate("I have been feeling low about everything lately")
 
         assert w._interim_state == "ready"
-        assert w._interim_clip == ("Mm, I'm with you.", "/tmp/interim_x.wav")
-        assert "/tmp/interim_x.wav" in w._interim_clip_paths
+        assert w._interim_clip.phrase == "Mm, I'm with you."
 
     @pytest.mark.unit
     async def test_empty_reply_returns_to_idle(self, monkeypatch):
@@ -482,29 +488,25 @@ class TestInterimGenerate:
         w = _interim_worker(monkeypatch)
         w._interim_state = "generating"
         w._read_conversation_history = lambda: []
-        cleaned = []
 
         async def fake_generate(*_a, **_k):
             return "held reply"
 
-        async def fake_synth(_tts, phrases):
+        async def fake_synth(_tts, phrases, **_kw):
             # Simulate the turn being reset while we were synthesizing.
             w._interim_state = "idle"
-            return [(phrases[0], "/tmp/interim_y.wav")]
+            return [_clip(phrases[0])]
 
         monkeypatch.setattr(interim_reply, "generate_interim_reply", fake_generate)
         monkeypatch.setattr(
-            "app.core.livekit.filler_audio.synthesize_filler_clips", fake_synth
-        )
-        monkeypatch.setattr(
-            "app.core.livekit.filler_audio.cleanup_clips",
-            lambda paths: cleaned.extend(paths),
+            "app.core.livekit.filler_clips.synthesize_clips", fake_synth
         )
 
         await w._interim_generate("some partial transcript text here for testing")
 
+        # The clip is in-memory, so "discarding" it is simply never committing it
+        # — there is no temp file left behind to clean up any more.
         assert w._interim_clip is None
-        assert cleaned == ["/tmp/interim_y.wav"]
 
 
 class TestResetTurn:

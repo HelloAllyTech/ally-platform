@@ -148,6 +148,47 @@ LangGraph provides:
 
 Both types are sent to Core (SQS). Only ACTIVE events generate `BranchingAndFeedbackData` with feedback objects.
 
+### How the thinking filler decides what to play, and when
+
+The filler is the character's first sound after the learner stops, played on the
+shared `BackgroundAudioPlayer` track so it can never preempt the real reply. Four
+decisions sit behind it, each in its own module:
+
+- **Whether to play at all** — `gap_predictor.GapPredictor` keeps a session EMA of
+  `llm_ttft_ms + tts_ttfb_ms`, the same timings the latency dashboard uses. At the
+  agent's "thinking" state the worker predicts the wait and decides immediately.
+  Fast turns get no filler and, crucially, no delay: the previous design *waited*
+  300-600 ms to discover whether a gap existed, spending the latency it existed
+  to mask.
+- **Which clip** — `filler_pool.FillerPool` holds every phrase accumulated this
+  session (static Studio words, the session-start seed batch, per-exchange
+  batches, in-turn batches) with its type, duration tier and last-played index.
+  Selection wants three things at once: a length that fits the predicted gap, a
+  phrase not heard recently, and a different type from the previous filler. The
+  filters relax in priority order, so a small pool still plays something.
+- **What to say** — `predictive_filler` generates at three moments. A *seed* batch
+  at session start (character only) means fillers exist before turn one. An
+  *exchange* batch when the character finishes speaking refreshes them without
+  contending with the reply's own LLM request. An *in-turn* batch, fired from the
+  learner's partial transcript mid-utterance, is the only one that can fit the
+  turn it answers — a timer-driven batch necessarily predates it. The prompt
+  carries the character's linguistic style samples and allowed discourse
+  particles, so fillers sound like this character rather than generic.
+- **Whether one is enough** — if a filler ends and neither the interim reply nor
+  the real reply has started within a natural pause, one more plays, of a
+  different type, capped at two per turn. A filler followed by silence draws
+  attention to the wait it was meant to cover.
+
+Every played filler is safety-checked in code as well as by the prompt
+(`is_safe_filler`): no questions, no digits, nothing long enough to be a
+statement, and nothing echoing a content word from the partial transcript — a
+cut-off sentence can mean something quite different from how it started.
+
+Per-turn provenance goes into `turn_metrics` as `fillerDecision`, `fillerLeadMs`
+(stamped when the first frame actually reaches the mixer, not estimated),
+`postFillerSilenceMs` and friends, so coverage and lead time are measurable
+rather than assumed. `scripts/filler-bench.py` exercises the same code offline.
+
 ---
 
 ## Key Source Files
@@ -158,3 +199,6 @@ Both types are sent to Core (SQS). Only ACTIVE events generate `BranchingAndFeed
 - `app/core/agent/factory.py` -- `parse_room_metadata()`, client configuration, agent creation
 - `app/core/config.py` -- Settings from environment
 - `app/core/constants.py` -- Enums and constants
+- `app/core/livekit/filler_clips.py` -- in-memory clip rendering + worker-wide cache
+- `app/core/livekit/filler_pool.py` -- per-session phrase pool and selection rules
+- `app/core/livekit/gap_predictor.py` -- predicted reply latency for filler timing
