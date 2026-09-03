@@ -46,6 +46,8 @@ export enum USER_PERMISSIONS {
   // === COMMUNITY ===
   VIEW_COMMUNITY = 'view:community',
   VIEW_COMMUNITY_LEADERBOARD = 'view:community:leaderboard',
+  // Personal engagement data — the streak, rank and progress surfaces all carry it.
+  VIEW_USER_RANK = 'view:user:rank',
 
   // === BADGES ===
   VIEW_USER_BADGES = 'view:user:badges',

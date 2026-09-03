@@ -23,3 +23,4 @@ export * from './scribeGeneralCommentsApi';
 export * from './userApi';
 export * from './coursesApi';
 export * from './bugReportApi';
+export * from './progressApi';

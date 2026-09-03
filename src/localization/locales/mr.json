@@ -1,4 +1,34 @@
 {
+  "progress": {
+    "title": "तुमची प्रगती",
+    "hero": {
+      "level": "स्तर {{level}}",
+      "toNextLevel_one": "स्तर {{level}} पर्यंत {{count}} XP",
+      "toNextLevel_other": "स्तर {{level}} पर्यंत {{count}} XP",
+      "maxLevel": "तुम्ही सर्वोच्च स्तरावर पोहोचला आहात",
+      "xpTotal_one": "एकूण {{count}} XP मिळवले",
+      "xpTotal_other": "एकूण {{count}} XP मिळवले"
+    },
+    "stats": {
+      "lifetimeMinutes": "सरावाची मिनिटे",
+      "sessions": "पूर्ण झालेली सत्रे",
+      "trackItems": "पूर्ण झालेले अभ्यासक्रम घटक"
+    },
+    "rank": {
+      "link": "तुमचा क्रमांक पहा"
+    },
+    "badges": {
+      "link": "तुमचे सर्व बॅज पहा"
+    },
+    "errors": {
+      "title": "तुमची प्रगती लोड होऊ शकली नाही",
+      "description": "प्रगती मिळवताना काहीतरी चूक झाली. पुन्हा प्रयत्न करण्यासाठी खाली ओढा."
+    },
+    "a11y": {
+      "level": "स्तर {{level}}, एकूण {{xp}} XP मिळवले",
+      "navLevel": "तुमची प्रगती, स्तर {{level}}. तुमची प्रगती स्क्रीन उघडते."
+    }
+  },
   "achievements": {
     "title": "कामगिरी",
     "badges": "बॅजेस्",
