@@ -13,14 +13,27 @@ type FakeSocket = {
   removeAllListeners: jest.Mock;
   connected: boolean;
   handlers: Record<string, (...args: any[]) => void>;
+  // What the real socket.io-client would have sent as the auth payload for
+  // the most recent connect()/reconnect — a plain object is captured once at
+  // `io(...)` time and resent verbatim on every later attempt, a function is
+  // invoked fresh each time. Recorded here so a test can tell which happened.
+  lastAuthToken: unknown;
 };
 
 const mockSockets: FakeSocket[] = [];
 
-const mockMakeSocket = (): FakeSocket => {
+const mockMakeSocket = (opts: any): FakeSocket => {
   const socket: FakeSocket = {
     connect: jest.fn(() => {
-      socket.connected = true;
+      const applyAuth = (authData: any) => {
+        socket.lastAuthToken = authData?.token;
+        socket.connected = true;
+      };
+      if (typeof opts?.auth === 'function') {
+        opts.auth(applyAuth);
+      } else {
+        applyAuth(opts?.auth);
+      }
     }),
     disconnect: jest.fn(() => {
       socket.connected = false;
@@ -33,13 +46,14 @@ const mockMakeSocket = (): FakeSocket => {
     removeAllListeners: jest.fn(),
     connected: false,
     handlers: {},
+    lastAuthToken: undefined,
   };
   return socket;
 };
 
 jest.mock('socket.io-client', () => ({
-  io: jest.fn(() => {
-    const socket = mockMakeSocket();
+  io: jest.fn((_url: string, opts: any) => {
+    const socket = mockMakeSocket(opts);
     mockSockets.push(socket);
     return socket;
   }),
@@ -51,6 +65,7 @@ jest.mock('@/config/env', () => ({env: {API_BASE_URL: 'https://api'}}));
 // token await — the window in which the old implementation lost a socket.
 let mockReleaseToken: ((token: string | null) => void) | undefined;
 let mockTokenDeferred = false;
+let mockTokenValue = 'token';
 
 jest.mock('@/utils', () => ({
   getItem: jest.fn(
@@ -59,7 +74,7 @@ jest.mock('@/utils', () => ({
         if (mockTokenDeferred) {
           mockReleaseToken = resolve as any;
         } else {
-          resolve('token');
+          resolve(mockTokenValue);
         }
       }),
   ),
@@ -109,6 +124,7 @@ describe('useSocket', () => {
     mockSockets.length = 0;
     mockTokenDeferred = false;
     mockReleaseToken = undefined;
+    mockTokenValue = 'token';
   });
 
   it('connects, emits and disconnects', async () => {
@@ -177,6 +193,30 @@ describe('useSocket', () => {
     // permanent no-op and the screen sat on "Connecting…" forever.
     expect(mockSockets).toHaveLength(7);
     expect(mockSockets[6].connect).toHaveBeenCalled();
+  });
+
+  it('resumes a dropped socket with a rotated token instead of replaying the stale one', async () => {
+    const {getByTestId} = render(<Test />);
+    act(() => getByTestId('connect').props.onPress());
+    await flush();
+
+    expect(mockSockets).toHaveLength(1);
+    expect(mockSockets[0].lastAuthToken).toBe('token');
+
+    // The transport dropped (screen locked, network blip) without our own
+    // disconnect() running — e.g. `disconnectOnBackground: false` on the
+    // listening screen keeps the socket alive across backgrounding — and the
+    // login token rotated while the connection was down.
+    mockSockets[0].connected = false;
+    mockTokenValue = 'new-token';
+
+    act(() => getByTestId('connect').props.onPress());
+    await flush();
+
+    // The same socket instance is resumed (never replaced), but it must pick
+    // up the rotated token rather than resending the one it was created with.
+    expect(mockSockets).toHaveLength(1);
+    expect(mockSockets[0].lastAuthToken).toBe('new-token');
   });
 
   it('dispatches events to the current callback, not the one bound at connect', async () => {

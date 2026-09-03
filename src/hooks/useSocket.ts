@@ -136,8 +136,19 @@ export const useSocket = ({
       const socket = io(`${baseUrl}${path}`, {
         path: '/socket.io',
         transports: ['websocket', 'polling'],
-        auth: {
-          token: accessToken,
+        // A plain object here is captured once and resent verbatim on every
+        // reconnection attempt — automatic or via our own `connect()` below —
+        // so a token that rotates while this socket is alive would otherwise
+        // be replayed stale forever. A function is invoked fresh each time.
+        auth: cb => {
+          getItem(AsyncStorageKeys.ACCESS_TOKEN)
+            .then(token => cb({token}))
+            .catch(error => {
+              logger.error(
+                `Failed to refresh access token for socket auth: ${error}`,
+              );
+              cb({token: accessToken});
+            });
         },
         reconnection: true,
         reconnectionAttempts: 5,
