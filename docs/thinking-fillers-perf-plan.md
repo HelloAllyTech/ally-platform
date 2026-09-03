@@ -19,7 +19,7 @@ filler. Back-channel and comfort audio are touched only where they share code.
 
 | Plan phase | State |
 |---|---|
-| **0 — measure** | Per-turn `fillerDecision` / `fillerLeadMs` / `postFillerSilenceMs` and session counters are in. `scripts/filler-bench.py` runs the real decision, selection and cache code offline. The offline **judge rubric for character/context fit is NOT built** — it needs real sessions and ally-ai work, and is the remaining Phase 0 item. |
+| **0 — measure** | Done. Per-turn `fillerDecision` / `fillerLeadMs` / `postFillerSilenceMs` and session counters are in; `scripts/filler-bench.py` runs the real decision, selection and cache code offline; and the judge rubric for character/context fit ships as ally-ai's `filler_quality` module ([ally-ai#99](https://github.com/HelloAllyTech/ally-ai/pull/99)). It emits FINDINGS, not the 1-5 scores §1 proposed — every judge on this platform emits labels, booleans and counts and never a score, rate or rating, so M7/M8 surface as finding rates computed downstream. ally-be must still build the observations and persist the rows before real numbers exist. |
 | **1 — kill the wait, bridge the gap** | Done. Predicted-gap gate, duration-tiered selection, bounded continuation, event-based interim hand-off, in-memory clips. |
 | **2 — in character, in context, cheaper** | Done. Persona voice block and typed output in the prompt, in-turn generation from the partial transcript, accumulating pool with type rotation and rendering variants, worker-wide clip cache, dedicated small model, exchange-driven regeneration, session-start seed batch. |
 | **3 — early trigger** | Built behind `FILLER_EARLY_TRIGGER_ENABLED`, **default off**. Not A/B tested; do not enable without one. |
@@ -51,10 +51,13 @@ Two targets are not met and should not be reported as if they were:
   regeneration are a poor stand-in for real generation, so its repeat counts say
   more about the harness than the product. This needs live measurement.
 
-**Character fit and context fit are not measured at all yet.** They need the
-judge rubric on real sessions. Until that exists, the claim for those two
-dimensions is a mechanism claim (the prompt now receives the character's voice
-and the current utterance) and not a measured one.
+**Character fit and context fit are not measured yet, though they now CAN be.**
+The judge that scores them ships in [ally-ai#99](https://github.com/HelloAllyTech/ally-ai/pull/99);
+what remains is the ally-be half — selecting sessions, building the observations
+from the per-turn filler metadata above, and persisting the rows. Until that
+runs, the claim for those two dimensions is a mechanism claim (the prompt now
+receives the character's voice and the learner's current utterance) rather than
+a measured one.
 
 Three bugs were found by writing the tests and the bench, and fixed:
 never-played clips were being treated as stale; the repeat window was counted in
