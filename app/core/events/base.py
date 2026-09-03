@@ -29,6 +29,23 @@ class ChatMessage(BaseModel):
             "deliberately distinct from False."
         ),
     )
+    utterance_kind: Optional[str] = Field(
+        None,
+        description=(
+            "Which KIND of client utterance this line is: 'reply' (the real, "
+            "generated reply), 'filler' (a thinking filler — a short "
+            "back-channel spoken while the reply was still forming) or "
+            "'interim' (a non-committal holding reply). All three arrive as "
+            "CLIENT lines and a single turn can produce all three in a row, so "
+            "without this a consumer cannot tell them apart except by guessing "
+            "from position — and position is ambiguous the moment a "
+            "continuation filler plays. Values match the "
+            "`metadata.firstAudioSource` vocabulary on the turn-metrics row, so "
+            "the transcript and the latency record can be joined. "
+            "None means unknown (an older worker, or a COUNSELOR turn), "
+            "deliberately distinct from 'reply'."
+        ),
+    )
 
     class Config:
         json_schema_extra = {
@@ -38,6 +55,7 @@ class ChatMessage(BaseModel):
                 "start_time": 0.5,
                 "end_time": 5.7,
                 "interrupted": False,
+                "utterance_kind": None,
             }
         }
 

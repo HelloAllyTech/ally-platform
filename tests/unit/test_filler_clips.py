@@ -325,3 +325,58 @@ class TestTiers:
     )
     def test_tier_boundaries(self, duration_ms, expected):
         assert tier_for_duration(duration_ms) == expected
+
+
+class TestTranscriptMarker:
+    """A filler, an interim and a real reply all arrive as CLIENT lines.
+
+    One turn can emit all three in a row, so a consumer that tries to tell them
+    apart by position guesses wrong the moment a continuation filler plays.
+    `utterance_kind` is what makes them distinguishable downstream.
+    """
+
+    def test_chat_message_defaults_to_unknown(self):
+        """None is deliberately distinct from 'reply' — an older worker sent
+        neither, and reading that silence as a real reply would mislabel every
+        filler in the backlog."""
+        from app.core.events.base import ChatMessage
+
+        message = ChatMessage(role="CLIENT", content="Hmm")
+        assert message.utterance_kind is None
+
+    def test_the_three_kinds_round_trip(self):
+        from app.core.events.base import ChatMessage
+
+        for kind in ("reply", "filler", "interim"):
+            message = ChatMessage(role="CLIENT", content="x", utterance_kind=kind)
+            assert message.model_dump()["utterance_kind"] == kind
+
+    async def test_worker_marks_a_filler_line(self, monkeypatch):
+        """End to end through the real emitter, not just the model.
+
+        Async because the emitter schedules the send with create_task; run
+        synchronously it raises, the emitter swallows it (a filler must never
+        break a turn), and the test would pass on a payload that never left.
+        """
+        import asyncio as _asyncio
+        import types as _types
+
+        from app import worker as worker_module
+
+        sent = []
+
+        async def _capture(payload):
+            sent.append(payload)
+
+        monkeypatch.setattr("app.core.events.handlers.send_event_to_queue", _capture)
+        ctx = _types.SimpleNamespace(
+            room=_types.SimpleNamespace(name="room-1"),
+            proc=_types.SimpleNamespace(userdata={}),
+        )
+        w = worker_module.AgentWorker(ctx)
+        w.joined_iso = None
+        w._emit_filler_transcript("Hmm", None)
+        await _asyncio.sleep(0)  # let the scheduled send run
+
+        assert sent, "the filler transcript was never sent"
+        assert '"utterance_kind":"filler"' in sent[0].replace(" ", "")

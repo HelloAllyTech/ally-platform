@@ -2895,6 +2895,7 @@ class AgentWorker:
                 content=phrase,
                 start_time=start_time,
                 end_time=start_time,
+                utterance_kind="filler",
             )
             core_event = CoreEventMessageType.create(
                 room_id=self.ctx.room.name, chat_message=chat_message
@@ -3467,6 +3468,7 @@ class AgentWorker:
                 content=text,
                 start_time=start_time,
                 end_time=start_time,
+                utterance_kind="interim",
             )
             core_event = CoreEventMessageType.create(
                 room_id=self.ctx.room.name, chat_message=chat_message
