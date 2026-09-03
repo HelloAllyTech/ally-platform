@@ -10,6 +10,8 @@ import app.worker as worker
 from app.core.agent import factory as agent_utils
 from app.core.events import handlers as event_handler
 from app.core.graph import agent_graph
+from app.core.livekit.filler_clips import FillerClip
+from app.core.livekit.filler_pool import FillerPool
 
 
 def _create_test_scenario(prompt_data, events=None):
@@ -824,9 +826,7 @@ class TestWorker:
             if "Opening statement playout did not complete" in r.getMessage()
         ]
         assert timeout_records, "expected the opener-stall message to be logged"
-        assert all(
-            r.levelname != "ERROR" for r in timeout_records
-        ), (
+        assert all(r.levelname != "ERROR" for r in timeout_records), (
             "opener-stall is an anticipated, self-recovering condition and "
             "must not log at ERROR severity (it would page like a real "
             "internal failure)"
@@ -2245,6 +2245,13 @@ class _RecordingSession:
         return decorator
 
 
+def _clip(phrase: str, duration_ms: float, ftype: str = "hesitation"):
+    """A FillerClip with no real audio — playback is mocked in these tests."""
+    return FillerClip(
+        phrase=phrase, frames=[], duration_ms=duration_ms, filler_type=ftype
+    )
+
+
 class TestBackgroundAudioDeferral:
     """The opening statement must not wait on filler/back-channel synthesis.
 
@@ -2349,9 +2356,7 @@ class TestBackgroundAudioDeferral:
         def _boom(*a, **k):
             raise RuntimeError("tts down")
 
-        monkeypatch.setattr(
-            "app.core.livekit.filler_audio.synthesize_filler_clips", _boom
-        )
+        monkeypatch.setattr("app.core.livekit.filler_clips.synthesize_clips", _boom)
 
         # Must swallow the failure — never raises into the session.
         assert await w._setup_deferred_naturalness() is None
@@ -2371,8 +2376,8 @@ class TestBackgroundAudioDeferral:
             "app.core.livekit.fillers.resolve_filler_phrases", lambda s: ["um"]
         )
         monkeypatch.setattr(
-            "app.core.livekit.filler_audio.synthesize_filler_clips",
-            AsyncMock(return_value=[("um", "/tmp/um.wav")]),
+            "app.core.livekit.filler_clips.synthesize_clips",
+            AsyncMock(return_value=[_clip("um", 500.0)]),
         )
         # Back-channel resolves to True (its own synthesis is exercised elsewhere).
         monkeypatch.setattr(
@@ -2384,7 +2389,126 @@ class TestBackgroundAudioDeferral:
         # Filler drives off agent "thinking"; back-channel off user "speaking".
         assert "agent_state_changed" in w.session.handlers
         assert "user_state_changed" in w.session.handlers
-        assert w._filler_clips == [("um", "/tmp/um.wav")]
+        # The rendered clip lands in the session pool, not a bare list.
+        assert len(w._filler_pool) == 1
+        assert w._filler_pool.phrases == ["um"]
+
+
+class TestFillerPlaybackDecision:
+    """The predicted-gap gate replaces the old fixed 300-600ms wait.
+
+    The wait was the largest single term in the filler's lead time, and it was
+    spent finding out something the session's own history already implies.
+    """
+
+    def _worker(self, monkeypatch, predicted_ms):
+        ctx = types.SimpleNamespace(
+            room=types.SimpleNamespace(name="room-1"),
+            proc=types.SimpleNamespace(userdata={}),
+        )
+        w = worker.AgentWorker(ctx)
+        w.scenario = types.SimpleNamespace(prompt_data=types.SimpleNamespace())
+        w.session = _RecordingSession()
+        w._bg_audio = Mock()
+        w._filler_pool = FillerPool()
+        monkeypatch.setattr(w, "_predicted_gap_ms", lambda: predicted_ms)
+        return w
+
+    def test_fast_turn_gets_no_filler(self, monkeypatch):
+        w = self._worker(monkeypatch, predicted_ms=200.0)
+        monkeypatch.setattr(worker.settings, "FILLER_PREDICTED_GAP_MS", 700.0)
+        play, reason = w._should_play_filler(200.0)
+        assert play is False
+        assert reason == "skipped_fast_turn"
+
+    def test_clearly_slow_turn_always_gets_one(self, monkeypatch):
+        """Above the certainty threshold the probability gate is bypassed.
+
+        A 2s silence is exactly the case the feature exists for; leaving it to a
+        coin flip is what kept coverage near half.
+        """
+        w = self._worker(monkeypatch, predicted_ms=2000.0)
+        monkeypatch.setattr(worker.settings, "FILLER_CERTAIN_GAP_MS", 1200.0)
+        monkeypatch.setattr(worker.settings, "FILLER_PLAY_PROBABILITY", 0.0)
+        play, reason = w._should_play_filler(2000.0)
+        assert play is True
+        assert reason == "played"
+
+    def test_run_of_filler_turns_is_capped(self, monkeypatch):
+        """However slow the turns are, hesitating before every reply reads as broken."""
+        w = self._worker(monkeypatch, predicted_ms=3000.0)
+        monkeypatch.setattr(worker.settings, "FILLER_MAX_CONSECUTIVE_TURNS", 3)
+        w._filler_consecutive_turns = 3
+        play, reason = w._should_play_filler(3000.0)
+        assert play is False
+        assert reason == "skipped_probability"
+
+    @pytest.mark.asyncio
+    async def test_played_filler_is_credited_at_the_real_first_frame(self, monkeypatch):
+        """response_latency_ms must use when audio actually started.
+
+        The old code credited created_at + the randomized sleep — an estimate the
+        metric itself could not verify.
+        """
+        w = self._worker(monkeypatch, predicted_ms=2000.0)
+        w._agent_thinking = True
+        w._filler_pool.add([FillerClip(phrase="hmm", frames=[], duration_ms=500.0)])
+        monkeypatch.setattr(worker.settings, "FILLER_CONTINUATION_ENABLED", False)
+        monkeypatch.setattr(w, "_emit_filler_transcript", Mock())
+        started = {}
+        monkeypatch.setattr(
+            worker.turn_metrics,
+            "note_filler_started",
+            lambda room, ts, **kw: started.update(room=room, ts=ts),
+        )
+        decisions = {}
+        monkeypatch.setattr(
+            worker.turn_metrics,
+            "note_filler_decision",
+            lambda room, decision, **kw: decisions.update(decision=decision, **kw),
+        )
+
+        await w._play_filler(created_at=None, predicted_ms=2000.0, first=True)
+
+        assert decisions["decision"] == "played"
+        assert decisions["fillerDurationMs"] == 500
+        assert started["ts"] > 0
+        assert w._filler_decided.is_set()
+
+    @pytest.mark.asyncio
+    async def test_no_clips_is_recorded_not_silent(self, monkeypatch):
+        """An empty pool is a distinct outcome from a fast turn, and must show."""
+        w = self._worker(monkeypatch, predicted_ms=2000.0)
+        w._agent_thinking = True
+        decisions = {}
+        monkeypatch.setattr(
+            worker.turn_metrics,
+            "note_filler_decision",
+            lambda room, decision, **kw: decisions.update(decision=decision),
+        )
+
+        await w._play_filler(created_at=None, predicted_ms=2000.0, first=True)
+
+        assert decisions["decision"] == "skipped_no_clips"
+
+    @pytest.mark.asyncio
+    async def test_filler_is_capped_per_turn(self, monkeypatch):
+        """Two fillers can bridge a long gap; a third reads as stalling."""
+        w = self._worker(monkeypatch, predicted_ms=3000.0)
+        w._agent_thinking = True
+        w._filler_pool.add(
+            [FillerClip(phrase=f"p{i}", frames=[], duration_ms=400.0) for i in range(5)]
+        )
+        monkeypatch.setattr(worker.settings, "FILLER_CONTINUATION_ENABLED", False)
+        monkeypatch.setattr(worker.settings, "FILLER_MAX_PER_TURN", 2)
+        monkeypatch.setattr(w, "_emit_filler_transcript", Mock())
+        w._filler_handle = None
+
+        for _ in range(4):
+            w._filler_handle = None
+            await w._play_filler(None, 3000.0, first=False)
+
+        assert w._filler_turn_count == 2
 
 
 class TestStartUsesPrewarmedBVC:
@@ -2788,41 +2912,58 @@ class TestPredictiveFillerLlmIsolation:
         assert w._predictive_filler_llm_client is shared
 
     @pytest.mark.asyncio
-    async def test_predictive_filler_loop_calls_the_dedicated_client(self, monkeypatch):
-        from app.core.livekit import filler_audio as filler_audio_module
+    async def test_regeneration_calls_the_dedicated_client(self, monkeypatch):
         from app.core.livekit import predictive_filler as predictive_filler_module
 
         shared = Mock(name="shared-llm-client")
         dedicated = Mock(name="dedicated-llm-client")
 
-        generate_mock = AsyncMock(return_value=["hmm…"])
+        generate_mock = AsyncMock(return_value=[("hmm…", "hesitation")])
         monkeypatch.setattr(
             predictive_filler_module, "generate_predictive_fillers", generate_mock
         )
         monkeypatch.setattr(
-            filler_audio_module,
-            "synthesize_filler_clips",
-            AsyncMock(return_value=[("hmm…", "/tmp/hmm.wav")]),
+            "app.core.livekit.filler_clips.synthesize_clips",
+            AsyncMock(return_value=[_clip("hmm…", 400.0)]),
         )
-        monkeypatch.setattr(filler_audio_module, "cleanup_clips", Mock())
-
-        # First sleep lets the loop enter its body once; the second raises
-        # CancelledError so it exits cleanly after exactly one iteration.
-        sleep_mock = AsyncMock(side_effect=[None, asyncio.CancelledError()])
-        monkeypatch.setattr(asyncio, "sleep", sleep_mock)
 
         w = self._worker()
         w.scenario = types.SimpleNamespace()
         w.llm_client = shared
         w._predictive_filler_llm_client = dedicated
+        w._filler_pool = FillerPool()
         w._read_conversation_history = Mock(return_value=["turn one"])
 
-        await w._predictive_filler_loop()
+        await w._generate_fillers(source="exchange")
 
         generate_mock.assert_awaited_once()
         called_client = generate_mock.await_args.args[0]
         assert called_client is dedicated
         assert called_client is not shared
+
+    @pytest.mark.asyncio
+    async def test_regeneration_skips_while_pool_still_fresh(self, monkeypatch):
+        """The old loop paid an LLM + 5 TTS calls every 10s regardless.
+
+        Exchange-driven regeneration must SKIP entirely while the pool still
+        holds unheard phrases — that skip is where most of the cost saving comes
+        from, so it is worth pinning rather than trusting.
+        """
+        w = self._worker()
+        w.scenario = types.SimpleNamespace()
+        w._predictive_filler_llm_client = Mock()
+        w._filler_pool = FillerPool()
+        w._filler_pool.add([_clip(f"p{i}", 400.0) for i in range(6)])
+        generate = AsyncMock(return_value=0)
+        monkeypatch.setattr(w, "_generate_fillers", generate)
+        monkeypatch.setattr(worker.settings, "FILLER_REGEN_MIN_FRESH", 5)
+
+        w._filler_regen_signal.set()
+        task = asyncio.create_task(w._predictive_filler_loop())
+        await asyncio.sleep(0.05)
+        task.cancel()
+
+        generate.assert_not_awaited()
 
 
 class TestStartupFailureShutsDownJob:

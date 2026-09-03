@@ -114,6 +114,65 @@ def note_filler_started(
     turn["first_audio_kind"] = kind
 
 
+#: Decisions the filler layer can reach on a turn, recorded as
+#: ``metadata.fillerDecision``. Without this a turn with no filler is
+#: indistinguishable from a turn where the feature is off, so coverage — the
+#: share of SLOW turns that actually got masked — cannot be measured at all,
+#: only the share of all turns, which moves when turn speed moves.
+FILLER_DECISIONS = frozenset(
+    {
+        "played",
+        "skipped_fast_turn",  # predicted gap too small to be worth masking
+        "skipped_probability",  # real gap, but the cadence/probability gate declined
+        "skipped_no_clips",  # nothing synthesized yet for this session
+        "skipped_reply_ready",  # reply arrived before the filler could start
+        "disabled",  # feature off globally or for this scenario
+    }
+)
+
+
+def note_filler_decision(room_id: str, decision: str, **details: Any) -> None:
+    """Record what the filler layer decided this turn, and why.
+
+    Written into the turn's ``metadata`` (merged, so it can't clobber another
+    call site's keys) alongside whichever details apply:
+    ``fillerLeadMs`` (thinking -> the first audio frame ACTUALLY captured, not an
+    estimate), ``fillerDurationMs``, ``fillerClipSource``, ``fillerPhraseAgeTurns``,
+    ``postFillerSilenceMs`` and ``fillerCutEarlyMs``.
+
+    Only the FIRST decision of a turn is kept: a continuation filler must not
+    overwrite the record of the one that opened the turn. No-op for an unknown
+    decision so a typo can't silently create a phantom bucket in the dashboard.
+    """
+    if not room_id or decision not in FILLER_DECISIONS:
+        return
+    turn = _turns.setdefault(room_id, {})
+    existing = turn.get("metadata")
+    meta = dict(existing) if isinstance(existing, dict) else {}
+    if "fillerDecision" not in meta:
+        meta["fillerDecision"] = decision
+    for key, value in details.items():
+        if value is not None:
+            meta[key] = value
+    turn["metadata"] = meta
+
+
+def note_filler_continuation(room_id: str) -> None:
+    """Count an extra filler played later in the same turn (the continuation).
+
+    Kept separate from the opening decision so ``fillerDecision`` stays a clean
+    one-per-turn bucket while still showing when a turn needed more than one
+    filler to reach the reply.
+    """
+    if not room_id:
+        return
+    turn = _turns.setdefault(room_id, {})
+    existing = turn.get("metadata")
+    meta = dict(existing) if isinstance(existing, dict) else {}
+    meta["fillerCount"] = int(meta.get("fillerCount") or 1) + 1
+    turn["metadata"] = meta
+
+
 def record(room_id: str, **fields: Any) -> None:
     """Merge component/framework timings into the in-flight turn.
 

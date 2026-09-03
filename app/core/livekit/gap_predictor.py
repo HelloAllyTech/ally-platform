@@ -1,0 +1,113 @@
+"""Predict how long this turn's reply will take, before it takes it.
+
+WHY THIS EXISTS
+---------------
+The filler used to decide whether a turn had a gap by WAITING to find out:
+sleep a random 300-600 ms after the agent starts thinking, then play only if the
+reply still hadn't arrived. That works, but it spends the very latency it exists
+to mask — the filler lands half a second after the moment it was supposed to
+cover, which is the single largest term in its lead time.
+
+The wait is unnecessary because the answer is predictable. Every turn already
+records ``llm_ttft_ms`` (time to the model's first token) and ``tts_ttfb_ms``
+(time to the first audio byte) into ``turn_metrics``; their sum is, within noise,
+how long the learner will wait for the reply. A session's own recent history is a
+far better predictor of its next turn than a fixed timer, because the dominant
+terms — model, provider, region, prompt size — are constant within a session.
+
+So: keep an exponential moving average of that sum, seeded from a prior until
+enough real turns exist, and at "thinking" decide immediately. Fast turns get no
+filler and no delay; slow turns get one straight away.
+
+The EMA is deliberately simple and defensive — a predictor that throws, or that
+needs tuning per language, would be worse than the timer it replaces.
+"""
+
+from __future__ import annotations
+
+from typing import Optional
+
+from app.core.logger import get_logger
+
+logger = get_logger(__name__)
+
+
+class GapPredictor:
+    """Exponential moving average of observed reply latency, in milliseconds.
+
+    ``alpha`` weights the newest observation; 0.4 tracks a session that warms up
+    or degrades within a handful of turns without chasing a single outlier.
+    ``prior_ms`` is used until ``min_samples`` real turns have been seen, so the
+    first turns of a session behave sensibly rather than randomly.
+    """
+
+    def __init__(
+        self,
+        prior_ms: float = 900.0,
+        alpha: float = 0.4,
+        min_samples: int = 2,
+    ) -> None:
+        self._prior = max(0.0, float(prior_ms))
+        self._alpha = min(1.0, max(0.01, float(alpha)))
+        self._min_samples = max(0, int(min_samples))
+        self._value: Optional[float] = None
+        self._samples = 0
+
+    @property
+    def samples(self) -> int:
+        return self._samples
+
+    @property
+    def is_warm(self) -> bool:
+        """Whether enough real turns have been observed to trust the estimate."""
+        return self._samples >= self._min_samples
+
+    def observe(self, latency_ms: Optional[float]) -> None:
+        """Fold one turn's observed reply latency into the average.
+
+        Ignores None and non-positive values (a turn that never reached the
+        model, or a clock artefact) and clamps absurd values, so one pathological
+        turn — a 30 s LLM timeout, say — can't poison the estimate for the rest
+        of the session.
+        """
+        if latency_ms is None:
+            return
+        try:
+            value = float(latency_ms)
+        except (TypeError, ValueError):
+            return
+        if value <= 0:
+            return
+        value = min(value, 10_000.0)
+        self._value = (
+            value
+            if self._value is None
+            else (self._alpha * value + (1.0 - self._alpha) * self._value)
+        )
+        self._samples += 1
+
+    def observe_turn(
+        self, llm_ttft_ms: Optional[float], tts_ttfb_ms: Optional[float]
+    ) -> None:
+        """Fold in a turn from its two component timings.
+
+        Either component may be missing (a cached reply, a provider that doesn't
+        report TTFB); the sum of what IS present is still a usable lower bound,
+        which is the safe direction — it under-predicts the gap, so the filler
+        errs toward not playing rather than talking over the reply.
+        """
+        total = 0.0
+        for part in (llm_ttft_ms, tts_ttfb_ms):
+            try:
+                if part is not None and float(part) > 0:
+                    total += float(part)
+            except (TypeError, ValueError):
+                continue
+        if total > 0:
+            self.observe(total)
+
+    def predict_ms(self) -> float:
+        """Best estimate of the coming turn's time to first reply audio."""
+        if self._value is None or not self.is_warm:
+            return self._prior
+        return self._value

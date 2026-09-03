@@ -21,9 +21,7 @@ import pytest
 from app.core.logger import BenignNoiseCancellationFilter
 
 
-def _ffi_bridged_record(
-    message: str, level: int = logging.ERROR
-) -> logging.LogRecord:
+def _ffi_bridged_record(message: str, level: int = logging.ERROR) -> logging.LogRecord:
     """A record shaped like ffi_event_callback's ``logger.log(level, ...)``."""
     return logging.LogRecord(
         name="livekit",

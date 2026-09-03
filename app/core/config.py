@@ -475,6 +475,202 @@ class Settings(BaseSettings):
         ),
     )
 
+    # ---- Predicted-gap playback (replaces the fixed wait) ----
+    # The filler used to WAIT 300-600ms to find out whether a turn had a gap,
+    # spending the very latency it exists to mask. Instead predict it: a session
+    # EMA of (llm_ttft_ms + tts_ttfb_ms) from turns already recorded says how
+    # long the reply will take, so the decision is immediate — fast turns get no
+    # filler and no delay, slow turns get one at once. FILLER_MIN/MAX_DELAY_MS
+    # above remain the fallback for when the predictor has no data yet.
+    FILLER_GAP_PREDICTION_ENABLED: bool = Field(
+        default=True,
+        description=(
+            "Decide filler playback from the predicted reply latency instead of "
+            "waiting out FILLER_MIN/MAX_DELAY_MS. Set False to restore the wait."
+        ),
+    )
+    FILLER_PREDICTED_GAP_MS: float = Field(
+        default=700.0,
+        description=(
+            "Minimum predicted time-to-reply (ms) for a filler to be worth "
+            "playing. Below this the turn is fast enough that a filler would "
+            "sound inserted rather than natural."
+        ),
+    )
+    FILLER_CERTAIN_GAP_MS: float = Field(
+        default=1200.0,
+        description=(
+            "Predicted gap (ms) above which a filler ALWAYS plays. Between "
+            "FILLER_PREDICTED_GAP_MS and this, FILLER_PLAY_PROBABILITY applies."
+        ),
+    )
+    FILLER_GAP_PRIOR_MS: float = Field(
+        default=900.0,
+        description=(
+            "Assumed reply latency (ms) for the first turns of a session, before "
+            "enough real turns exist to estimate from."
+        ),
+    )
+    FILLER_MAX_CONSECUTIVE_TURNS: int = Field(
+        default=3,
+        description=(
+            "Cap on filler turns in a row. A character who hesitates before every "
+            "single reply reads as broken, however slow the turns are."
+        ),
+    )
+    # Aim the clip to END about when the reply starts: choose from the duration
+    # tier nearest (predicted_gap - this margin). Overshooting means the reply
+    # cuts the filler off mid-word, so the margin errs short.
+    FILLER_TIER_MARGIN_MS: float = Field(
+        default=150.0,
+        description=(
+            "Subtracted from the predicted gap when picking a clip's duration "
+            "tier, so the filler finishes just before the real reply begins."
+        ),
+    )
+    # A filler that ends into silence is worse than no filler: play one more, of
+    # a DIFFERENT type, if nothing else has started by then. Bounded at two per
+    # turn — a third reads as stalling rather than thinking.
+    FILLER_CONTINUATION_ENABLED: bool = Field(
+        default=True,
+        description=(
+            "Play a second, different-type filler when the first ends and "
+            "neither the interim reply nor the real reply has started."
+        ),
+    )
+    FILLER_CONTINUATION_GAP_MS: float = Field(
+        default=450.0,
+        description=(
+            "Silence (ms) after a filler ends before a continuation filler "
+            "plays. Roughly a natural intra-turn pause."
+        ),
+    )
+    FILLER_MAX_PER_TURN: int = Field(
+        default=2,
+        description="Hard cap on fillers played within a single turn.",
+    )
+
+    # ---- Filler pool, cache and generation cadence ----
+    FILLER_POOL_MAX_CLIPS: int = Field(
+        default=40,
+        description=(
+            "Clips kept in the per-session pool. Accumulating rather than "
+            "replacing is what keeps a long session from cycling through five "
+            "phrases; the least recently played are evicted first."
+        ),
+    )
+    FILLER_REPEAT_WINDOW_PLAYS: int = Field(
+        default=12,
+        description=(
+            "A phrase played within this many FILLER PLAYS is not reused while "
+            "any alternative exists. Counted in plays, not turns, because a turn "
+            "can play two (the continuation) — so this covers ~6 turns."
+        ),
+    )
+    FILLER_CLIP_CACHE_MAX: int = Field(
+        default=200,
+        description=(
+            "Rendered clips held in the worker-wide audio cache (~96KB each). "
+            "Fillers repeat heavily, so this removes most TTS calls once warm."
+        ),
+    )
+    FILLER_RENDER_VARIANTS: bool = Field(
+        default=True,
+        description=(
+            "Render a second take of a phrase before repeating it, so the same "
+            "waveform never plays twice in a session."
+        ),
+    )
+    FILLER_SEED_ON_START: bool = Field(
+        default=True,
+        description=(
+            "Generate a filler batch from the character at session start, so "
+            "fillers exist before the learner's first turn."
+        ),
+    )
+    FILLER_REGEN_MIN_GAP_S: float = Field(
+        default=8.0,
+        description=("Minimum seconds between exchange-driven filler regenerations."),
+    )
+    FILLER_REGEN_MIN_FRESH: int = Field(
+        default=5,
+        description=(
+            "Skip regeneration while at least this many pool clips are still "
+            "unplayed inside the repeat window — most short sessions never "
+            "need a second call."
+        ),
+    )
+    # Generating five two-word phrases does not need the roleplay model. A small
+    # dedicated model is ~10-20x cheaper per call and reaches first token sooner,
+    # so the batch is ready earlier too. Empty provider = use the scenario's own
+    # model (the prior behaviour).
+    PREDICTIVE_FILLER_MODEL_PROVIDER: str = Field(
+        default="openai",
+        description=(
+            "Provider for the dedicated small model that generates fillers. "
+            "Empty string falls back to the scenario's main LLM."
+        ),
+    )
+    PREDICTIVE_FILLER_MODEL: str = Field(
+        default="gpt-4o-mini",
+        description="Model id for the dedicated filler-generation model.",
+    )
+    # In-turn generation: the only path that can see what the learner is saying
+    # NOW. A timer-driven batch necessarily predates the turn it answers.
+    FILLER_IN_TURN_ENABLED: bool = Field(
+        default=True,
+        description=(
+            "Generate fillers from the learner's partial transcript while they "
+            "are still speaking, so the played filler fits the current turn."
+        ),
+    )
+    FILLER_IN_TURN_TRIGGER_MS: float = Field(
+        default=2000.0,
+        description=(
+            "How long (ms) the learner must have been speaking before in-turn "
+            "filler generation fires."
+        ),
+    )
+    FILLER_IN_TURN_MIN_WORDS: int = Field(
+        default=4,
+        description=(
+            "Minimum words in the partial transcript before in-turn generation "
+            "fires — guards against firing on garbage STT."
+        ),
+    )
+    FILLER_IN_TURN_COUNT: int = Field(
+        default=3,
+        description="How many fillers the in-turn call asks for.",
+    )
+    FILLER_IN_TURN_TIMEOUT_MS: float = Field(
+        default=2500.0,
+        description=(
+            "Timeout (ms) for in-turn generation. On timeout the turn simply "
+            "uses the existing pool."
+        ),
+    )
+
+    # ---- Early trigger (experimental) ----
+    # The largest gap the filler does NOT cover is the endpointing delay itself
+    # (0.5-3.0s between VAD end-of-speech and "thinking"). Starting there would
+    # mask it — but talking during a mid-thought pause can read as interrupting,
+    # so this is off by default and needs an A/B before it goes further.
+    FILLER_EARLY_TRIGGER_ENABLED: bool = Field(
+        default=False,
+        description=(
+            "EXPERIMENTAL. Start a very short filler at VAD end-of-speech, "
+            "before endpointing completes, instead of at the agent's thinking "
+            "state. Cancelled if the learner resumes. Off by default."
+        ),
+    )
+    FILLER_EARLY_TRIGGER_DELAY_MS: float = Field(
+        default=250.0,
+        description=(
+            "Wait (ms) after the learner stops before an early-trigger filler "
+            "plays, so a brief mid-sentence pause doesn't get talked over."
+        ),
+    )
+
     # ---- Comfort audio (ambient room tone) ----
     # Perceived-latency lever: play a faint, constant room tone on the shared
     # background-audio track for the whole session, so the dead-silent gap before
