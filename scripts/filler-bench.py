@@ -448,9 +448,10 @@ async def main() -> int:
         if len(per_session_synths) > 1
         else f"    first session {per_session_synths[0]} syntheses"
     )
+    lookups = max(1, cache["hits"] + cache["misses"])
     print(
         f"    cache hits {cache['hits']} misses {cache['misses']} "
-        f"({cache['hits'] / max(1, cache['hits'] + cache['misses']) * 100:.0f}% hit rate)"
+        f"({cache['hits'] / lookups * 100:.0f}% hit rate)"
     )
     print()
     return 0
