@@ -334,6 +334,14 @@ export const API_ROUTES = {
     LEADERBOARD: '/community/leaderboard',
     MY_RANK: '/community/leaderboard/my-rank',
   },
+  PROGRESS: {
+    // Full dashboard payload: level state, lifetime totals and the ladder.
+    GET_PROGRESS: '/progress/me',
+    // Level state only — for the persistent header widget, which mounts on every screen.
+    GET_PROGRESS_SUMMARY: '/progress/me/summary',
+    // One boolean about the caller's own org; readable by any authenticated user.
+    GET_PROGRESS_ENABLED: '/progress/me/enabled',
+  },
   SIMULATION_SUMMARY: {
     GET_SKILLS: (scenarioSessionId: string) =>
       `/learn/scenario-session/${scenarioSessionId}/skills`,

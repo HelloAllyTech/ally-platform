@@ -15,6 +15,7 @@ import {useTabScreenHeader} from '@/hooks';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
 
 import {InfoTooltip} from '../InfoTooltip';
+import {ProgressHeaderWidget} from '../ProgressHeaderWidget';
 
 interface TabScreenHeaderProps {
   title: string;
@@ -87,7 +88,16 @@ export const TabScreenHeader: React.FC<TabScreenHeaderProps> = ({
           </InfoTooltip>
         )}
       </View>
-      {rightContent && <View style={styles.rightContent}>{rightContent}</View>}
+      <View style={styles.trailingGroup}>
+        {/* Rendered here rather than passed in per screen so it is genuinely on every
+            header, and so it does not compete with `rightContent`, which the busiest
+            screens already use for credits and badge counts. Returns null until the
+            org gate resolves true. */}
+        <ProgressHeaderWidget />
+        {rightContent && (
+          <View style={styles.rightContent}>{rightContent}</View>
+        )}
+      </View>
     </View>
   );
 };
@@ -129,6 +139,12 @@ const styles = ScaledSheet.create({
     fontStyle: Platform.OS === 'ios' ? 'italic' : 'normal',
   },
   rightContent: {
+    flexShrink: 0,
+  },
+  trailingGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: '10@ms',
     flexShrink: 0,
   },
   tooltipIcon: {

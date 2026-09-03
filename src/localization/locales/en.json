@@ -1,4 +1,34 @@
 {
+  "progress": {
+    "title": "Your progress",
+    "hero": {
+      "level": "Level {{level}}",
+      "toNextLevel_one": "{{count}} XP to level {{level}}",
+      "toNextLevel_other": "{{count}} XP to level {{level}}",
+      "maxLevel": "You've reached the top level",
+      "xpTotal_one": "{{count}} XP earned in total",
+      "xpTotal_other": "{{count}} XP earned in total"
+    },
+    "stats": {
+      "lifetimeMinutes": "Practice minutes",
+      "sessions": "Sessions completed",
+      "trackItems": "Course items done"
+    },
+    "rank": {
+      "link": "See where you rank"
+    },
+    "badges": {
+      "link": "See all your badges"
+    },
+    "errors": {
+      "title": "Couldn't load your progress",
+      "description": "Something went wrong fetching your progress. Pull down to try again."
+    },
+    "a11y": {
+      "level": "Level {{level}}, {{xp}} XP earned in total",
+      "navLevel": "Your progress, level {{level}}. Opens your progress screen."
+    }
+  },
   "achievements": {
     "title": "Achievements",
     "badges": "Badges",

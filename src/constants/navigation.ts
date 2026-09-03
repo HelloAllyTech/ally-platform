@@ -18,6 +18,7 @@ export const SCREEN_NAMES = {
   SIMULATION_ASSISTANT: 'SimulationAssistant',
   SIMULATION_FEEDBACK: 'SimulationFeedback',
   ACHIEVEMENTS: 'Achievements',
+  PROGRESS: 'Progress',
   PROFILE_SETTINGS: 'ProfileSettings',
   BUG_REPORT: 'BugReport',
   REVIEW_DETAILS: 'ReviewDetails',
