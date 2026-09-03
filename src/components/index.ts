@@ -53,6 +53,8 @@ export {TabScreenHeader} from './TabScreenHeader';
 export {VideoPreview} from './VideoPreview';
 export type {VideoPreviewProps} from './VideoPreview';
 export {CircularProgress} from './CircularProgress';
+export {LevelIndicator} from './LevelIndicator';
+export {ProgressHeaderWidget} from './ProgressHeaderWidget';
 export {RichText} from './RichText';
 export type {RichTextProps} from './RichText';
 export {SimulationCard} from './SimulationCard';

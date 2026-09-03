@@ -25,6 +25,13 @@ import {fireEvent, render} from '@testing-library/react-native';
 
 import {TabScreenHeader} from '../TabScreenHeader';
 
+// The header renders the persistent progress widget. Mocked out here: it is a separate
+// unit with its own tests, and it needs navigation and the progress API that this test
+// has no reason to wire up.
+jest.mock('../../ProgressHeaderWidget', () => ({
+  ProgressHeaderWidget: () => null,
+}));
+
 const mockOpenDrawer = jest.fn();
 let mockShowHamburger = true;
 

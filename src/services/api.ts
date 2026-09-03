@@ -202,6 +202,7 @@ export const api = createApi({
     'LearnTrackDetail',
     'LearnTrackNext',
     'LearnTrackLanguages',
+    'Progress',
   ],
   endpoints: () => ({}),
 });
