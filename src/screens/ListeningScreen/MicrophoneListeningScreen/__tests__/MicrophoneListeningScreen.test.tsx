@@ -1,9 +1,15 @@
 import React from 'react';
-import {fireEvent, render} from '@testing-library/react-native';
+import {act, fireEvent, render} from '@testing-library/react-native';
 
 jest.mock('react-i18next', () => ({
   useTranslation: () => ({t: (key: string) => key}),
 }));
+
+const mockEmitSocketEvent = jest.fn();
+let mockPermissionGranted = true;
+let mockPermissionStatus = 'granted';
+
+jest.mock('@/utils/version', () => ({getAppVersion: () => '1.23.19'}));
 
 jest.mock('@/hooks', () => ({
   useTranslate: () => ({t: (key: string) => key}),
@@ -17,10 +23,11 @@ jest.mock('@/hooks', () => ({
   useLiveAudioStream: () => ({
     startStreaming: jest.fn(),
     stopStreaming: jest.fn(),
-    isPermissionGranted: true,
+    isPermissionGranted: mockPermissionGranted,
+    permissionStatus: mockPermissionStatus,
   }),
   useNetworkConnectivity: () => ({isOffline: false}),
-  useSocketConnection: () => ({emitSocketEvent: jest.fn()}),
+  useSocketConnection: () => ({emitSocketEvent: mockEmitSocketEvent}),
   useUser: () => ({userData: {id: 'user-1'}}),
 }));
 
@@ -138,6 +145,8 @@ describe('MicrophoneListeningScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseListeningCommon.mockReturnValue({...defaultCommon});
+    mockPermissionGranted = true;
+    mockPermissionStatus = 'granted';
     // reset to scribe by default
   });
 
@@ -273,5 +282,107 @@ describe('MicrophoneListeningScreen', () => {
 
     const {getByText} = render(<MicrophoneListeningScreen />);
     expect(getByText('Hello World')).toBeTruthy();
+  });
+});
+
+describe('scribe start diagnostic', () => {
+  const diagnosticCalls = () =>
+    mockEmitSocketEvent.mock.calls.filter(
+      ([event]) => event === 'SCRIBE_START_DIAGNOSTIC',
+    );
+
+  // Rendering this screen under fake timers and walking them forward has to be
+  // cleaned up precisely, or it takes the whole suite down with it. Every timer
+  // here drives a state update, so advancing outside act() leaves React work
+  // queued; leaving the screen mounted keeps its effects alive; and handing the
+  // process back with fake timers still installed poisons whatever file jest
+  // runs next in the same worker. That combination hung the full run for 46
+  // minutes while this file on its own passed in under two seconds.
+  let unmountScreen: (() => void) | undefined;
+
+  const renderScreen = () => {
+    const utils = render(<MicrophoneListeningScreen />);
+    unmountScreen = utils.unmount;
+    return utils;
+  };
+
+  const advance = (ms: number) => {
+    act(() => {
+      jest.advanceTimersByTime(ms);
+    });
+  };
+
+  beforeEach(() => {
+    // This describe is a sibling of the one above, so its beforeEach does not
+    // run here — clear explicitly or calls leak between tests.
+    jest.clearAllMocks();
+    jest.useFakeTimers();
+    mockPermissionGranted = true;
+    mockPermissionStatus = 'granted';
+    mockUseListeningCommon.mockReturnValue({...defaultCommon});
+  });
+
+  afterEach(() => {
+    act(() => {
+      unmountScreen?.();
+    });
+    unmountScreen = undefined;
+    // Drain anything the unmount scheduled before handing the timers back.
+    act(() => {
+      jest.runOnlyPendingTimers();
+    });
+    jest.useRealTimers();
+  });
+
+  it('reports the unmet gates when no session has started', () => {
+    mockPermissionGranted = false;
+    mockPermissionStatus = 'denied';
+
+    renderScreen();
+    advance(5000);
+
+    const [[, payload]] = diagnosticCalls();
+    expect(payload).toMatchObject({
+      afterMs: 5000,
+      appVersion: '1.23.19',
+      isPermissionGranted: false,
+      permissionStatus: 'denied',
+      isMicrophoneModeSessionCreated: false,
+      isWebMicrophoneMode: false,
+      hasChatId: false,
+    });
+  });
+
+  it('reports again at 15s for a counsellor who keeps waiting', () => {
+    renderScreen();
+    advance(15000);
+
+    expect(diagnosticCalls().map(([, p]) => p.afterMs)).toEqual([5000, 15000]);
+  });
+
+  it('stays quiet once the session actually starts', () => {
+    mockUseListeningCommon.mockReturnValue({
+      ...defaultCommon,
+      chatData: {chatId: 'chat-123'},
+    });
+
+    renderScreen();
+    advance(15000);
+
+    // A working session needs no explanation, and this must never become
+    // routine traffic on every recording.
+    expect(diagnosticCalls()).toHaveLength(0);
+  });
+
+  it('stays quiet in web-microphone mode, which has no recorder to gate', () => {
+    mockUseListeningCommon.mockReturnValue({
+      ...defaultCommon,
+      isWebMicrophoneMode: true,
+    });
+
+    renderScreen();
+    advance(15000);
+
+    expect(diagnosticCalls()).toHaveLength(0);
   });
 });

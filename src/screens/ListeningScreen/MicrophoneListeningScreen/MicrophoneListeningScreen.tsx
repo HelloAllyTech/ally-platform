@@ -29,6 +29,7 @@ import {
   SocketEvent,
   SocketMessage,
 } from '@/types';
+import {getAppVersion} from '@/utils/version';
 
 import {CallTranscriptItem} from '../../CallSummaryScreen/components/CallTranscriptItem';
 import {
@@ -331,7 +332,7 @@ export const MicrophoneListeningScreen = () => {
   );
 
   // Live audio stream
-  const {startStreaming, stopStreaming, isPermissionGranted} =
+  const {startStreaming, stopStreaming, isPermissionGranted, permissionStatus} =
     useLiveAudioStream({
       onAudioData: handleAudioData,
       enableLiveAudio: !isWebMicrophoneMode,
@@ -368,6 +369,71 @@ export const MicrophoneListeningScreen = () => {
       });
     }
   }, [isAudioSessionReady, emitSocketEvent, isAudioChatEmitted]);
+
+  /**
+   * Why a recording never starts is currently invisible.
+   *
+   * Production shows counsellors connecting to /microphone-chat, the server
+   * emitting SESSION_CREATED, and START_AUDIO_CHAT then never arriving — the
+   * screen sits on "Connecting…". Server logs cannot say which of the three
+   * conditions in `isAudioSessionReady` is false, and neither can we, because
+   * nothing on this screen reports its state anywhere.
+   *
+   * So when the session has not started by the time the failure view is due,
+   * emit the gate values over the socket we already hold. The server logs one
+   * line and does nothing with it, which puts the answer next to that socket's
+   * own connect line in CloudWatch, keyed by the same client id. Carries no
+   * transcript, no chat content, no PII — booleans, a permission status string
+   * and the app version, which is the other thing we could not determine.
+   *
+   * Delete this once the cause is known.
+   */
+  const diagnosticSentRef = useRef<Record<string, boolean>>({});
+  const gatesRef = useRef({
+    isPermissionGranted,
+    permissionStatus,
+    isMicrophoneModeSessionCreated,
+    isWebMicrophoneMode,
+    isAudioChatEmitted,
+    hasChatId: Boolean(chatData?.chatId),
+    isOffline,
+  });
+  gatesRef.current = {
+    isPermissionGranted,
+    permissionStatus,
+    isMicrophoneModeSessionCreated,
+    isWebMicrophoneMode,
+    isAudioChatEmitted,
+    hasChatId: Boolean(chatData?.chatId),
+    isOffline,
+  };
+
+  useEffect(() => {
+    if (isWebMicrophoneMode) return;
+
+    const send = (afterMs: number) => {
+      if (diagnosticSentRef.current[afterMs]) return;
+      // A session that got going needs no explanation.
+      if (gatesRef.current.hasChatId) return;
+      diagnosticSentRef.current[afterMs] = true;
+
+      emitSocketEvent(SocketEvent.SCRIBE_START_DIAGNOSTIC, {
+        afterMs,
+        appVersion: getAppVersion(),
+        ...gatesRef.current,
+      });
+    };
+
+    // 5s matches when the microphone-failure view appears; 15s catches the
+    // counsellors who sit and wait rather than backing out.
+    const first = setTimeout(() => send(5000), 5000);
+    const second = setTimeout(() => send(15000), 15000);
+
+    return () => {
+      clearTimeout(first);
+      clearTimeout(second);
+    };
+  }, [emitSocketEvent, isWebMicrophoneMode]);
 
   const handleEndCall = useCallback(() => {
     handleEndCallCommon(() => {

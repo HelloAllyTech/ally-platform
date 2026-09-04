@@ -116,6 +116,13 @@ export enum SocketEvent {
   AUDIO_CHAT_RESUMED = 'AUDIO_CHAT_RESUMED',
   SESSION_CREATED = 'SESSION_CREATED',
   AUDIO_CHAT_ENDED = 'AUDIO_CHAT_ENDED',
+  /**
+   * Diagnostic only, client -> server, never acted on. Reports why the
+   * recording screen has not started a session yet. The server logs one line
+   * and does nothing else; if it is running a build without the handler,
+   * socket.io drops the event silently.
+   */
+  SCRIBE_START_DIAGNOSTIC = 'SCRIBE_START_DIAGNOSTIC',
 }
 
 export interface WaitingClientChat {
