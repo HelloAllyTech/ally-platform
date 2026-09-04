@@ -328,6 +328,12 @@ class AgentWorker:
         self._filler_turn_count: int = 0
         self._filler_consecutive_turns: int = 0
         self._filler_played_this_turn: bool = False
+        # Guards the run-length accounting below from firing twice per turn:
+        # LiveKit's AgentState cycles listening->thinking->speaking->listening,
+        # so leaving "thinking" is followed by a second non-thinking event
+        # (speaking->listening) before the next turn's "thinking". Settle once
+        # per turn, on the first of those, then wait for the next "thinking".
+        self._filler_turn_settled: bool = True
         self._filler_continuation_task: Optional[asyncio.Task] = None
         # Set as soon as the filler decision for a turn resolves (played, or
         # declined), so the interim reply chains on the actual event instead of
@@ -2577,6 +2583,7 @@ class AgentWorker:
             if self._bg_audio is None:
                 return
             if getattr(ev, "new_state", None) == "thinking":
+                self._filler_turn_settled = False
                 if self._filler_pool is None:
                     return
                 self._agent_thinking = True
@@ -2622,13 +2629,15 @@ class AgentWorker:
                     self._filler_regen_signal.set()
                 self._agent_thinking = False
                 self._stop_filler()
-                self._filler_consecutive_turns = (
-                    self._filler_consecutive_turns + 1
-                    if self._filler_played_this_turn
-                    else 0
-                )
-                self._filler_turn_count = 0
-                self._filler_played_this_turn = False
+                if not self._filler_turn_settled:
+                    self._filler_turn_settled = True
+                    self._filler_consecutive_turns = (
+                        self._filler_consecutive_turns + 1
+                        if self._filler_played_this_turn
+                        else 0
+                    )
+                    self._filler_turn_count = 0
+                    self._filler_played_this_turn = False
                 self._filler_decided.set()
         except Exception as e:  # noqa: BLE001 - filler must never break a session
             logger.warning("[FILLER] agent-state handler error: %s", e)

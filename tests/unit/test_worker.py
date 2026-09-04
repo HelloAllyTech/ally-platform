@@ -2443,6 +2443,47 @@ class TestFillerPlaybackDecision:
         assert play is False
         assert reason == "skipped_probability"
 
+    def test_consecutive_run_survives_the_speaking_to_listening_event(
+        self, monkeypatch
+    ):
+        """The run-length counter must not be undone by the turn's own trailing event.
+
+        LiveKit's AgentState cycles listening->thinking->speaking->listening per
+        turn, so _on_filler_agent_state's non-thinking branch fires twice for the
+        same turn: once leaving "thinking" (where the run-length count should
+        settle) and again moments later entering "listening". If the second
+        firing re-ran that bookkeeping too, it would always see
+        ``_filler_played_this_turn`` already reset to False by the first firing
+        and zero the counter right back out — so the cap in
+        ``_should_play_filler`` would never see a run long enough to trigger.
+        """
+        w = self._worker(monkeypatch, predicted_ms=3000.0)
+        monkeypatch.setattr(worker.settings, "FILLER_MAX_CONSECUTIVE_TURNS", 3)
+
+        def play_a_turn():
+            # A filler already played earlier this turn (e.g. the early
+            # trigger), so entering "thinking" here just confirms state
+            # without exercising the async playback path.
+            w._filler_turn_count = 1
+            w._filler_played_this_turn = True
+            w._on_filler_agent_state(
+                types.SimpleNamespace(old_state="listening", new_state="thinking")
+            )
+            w._on_filler_agent_state(
+                types.SimpleNamespace(old_state="thinking", new_state="speaking")
+            )
+            w._on_filler_agent_state(
+                types.SimpleNamespace(old_state="speaking", new_state="listening")
+            )
+
+        for _ in range(3):
+            play_a_turn()
+
+        assert w._filler_consecutive_turns == 3
+        play, reason = w._should_play_filler(3000.0)
+        assert play is False
+        assert reason == "skipped_probability"
+
     @pytest.mark.asyncio
     async def test_played_filler_is_credited_at_the_real_first_frame(self, monkeypatch):
         """response_latency_ms must use when audio actually started.
