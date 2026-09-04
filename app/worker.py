@@ -2515,6 +2515,49 @@ class AgentWorker:
             return False, "skipped_probability"
         return True, "played"
 
+    async def _delayed_filler_decision(self, created_at) -> None:
+        """Decide filler playback the old way: wait, then see if it's still needed.
+
+        Used only when FILLER_GAP_PREDICTION_ENABLED=False. Sleeps a randomized
+        FILLER_MIN/MAX_DELAY_MS window — spending exactly the latency the
+        predictor exists to avoid — and only then checks whether the reply is
+        still pending. FILLER_PLAY_PROBABILITY alone gates the decision, since
+        there is no predicted gap here to compare against a certainty threshold.
+        """
+        try:
+            import random as _random
+
+            lo = float(getattr(settings, "FILLER_MIN_DELAY_MS", 300.0))
+            hi = float(getattr(settings, "FILLER_MAX_DELAY_MS", 600.0))
+            if hi < lo:
+                lo, hi = hi, lo
+            await asyncio.sleep(max(0.0, _random.uniform(lo, hi) / 1000.0))
+
+            if (
+                not self._agent_thinking
+                or self._bg_audio is None
+                or self._filler_turn_count > 0
+            ):
+                self._filler_decided.set()
+                return
+
+            probability = float(getattr(settings, "FILLER_PLAY_PROBABILITY", 0.6))
+            if _random.random() > probability:
+                self._filler_consecutive_turns = 0
+                turn_metrics.note_filler_decision(
+                    self.ctx.room.name, "skipped_probability"
+                )
+                logger.info("[FILLER] skipped this turn (probability gate)")
+                self._filler_decided.set()
+                return
+
+            await self._play_filler(created_at, hi, first=True)
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:  # noqa: BLE001 - filler must never break a session
+            logger.warning("[FILLER] delayed decision error: %s", e)
+            self._filler_decided.set()
+
     def _on_filler_agent_state(self, ev) -> None:
         """Start or stop filler playback on the agent's thinking state.
 
@@ -2523,6 +2566,10 @@ class AgentWorker:
         audio, with no deliberate wait in front of it. Leaving "thinking" means
         the real reply is taking over: stop anything still playing and flush the
         buffered tail so it can't bleed over the reply on the other track.
+
+        FILLER_GAP_PREDICTION_ENABLED=False is the rollback lever: it skips the
+        predictor entirely and falls back to waiting out FILLER_MIN/MAX_DELAY_MS
+        before deciding, exactly as the feature worked before prediction existed.
 
         Best-effort: never raises into the session.
         """
@@ -2537,6 +2584,16 @@ class AgentWorker:
                     return
                 if self._filler_turn_count > 0:
                     # Already handled this turn (e.g. the early trigger fired).
+                    return
+                created_at = getattr(ev, "created_at", None)
+                if not bool(
+                    getattr(settings, "FILLER_GAP_PREDICTION_ENABLED", True)
+                ):
+                    task = asyncio.create_task(
+                        self._delayed_filler_decision(created_at)
+                    )
+                    self._background_tasks.add(task)
+                    task.add_done_callback(self._background_tasks.discard)
                     return
                 predicted_ms = self._predicted_gap_ms()
                 play, reason = self._should_play_filler(predicted_ms)
@@ -2553,9 +2610,7 @@ class AgentWorker:
                     self._filler_decided.set()
                     return
                 task = asyncio.create_task(
-                    self._play_filler(
-                        getattr(ev, "created_at", None), predicted_ms, first=True
-                    )
+                    self._play_filler(created_at, predicted_ms, first=True)
                 )
                 self._background_tasks.add(task)
                 task.add_done_callback(self._background_tasks.discard)

@@ -2510,6 +2510,49 @@ class TestFillerPlaybackDecision:
 
         assert w._filler_turn_count == 2
 
+    @pytest.mark.asyncio
+    async def test_gap_prediction_disabled_falls_back_to_fixed_wait(self, monkeypatch):
+        """FILLER_GAP_PREDICTION_ENABLED=False must be a working rollback lever.
+
+        Before prediction existed, the filler waited out FILLER_MIN/MAX_DELAY_MS
+        and then checked whether the reply was still pending. Flipping the flag
+        off must restore exactly that, not leave the predictor running.
+        """
+        w = self._worker(monkeypatch, predicted_ms=2000.0)
+        monkeypatch.setattr(worker.settings, "FILLER_GAP_PREDICTION_ENABLED", False)
+        monkeypatch.setattr(worker.settings, "FILLER_MIN_DELAY_MS", 300.0)
+        monkeypatch.setattr(worker.settings, "FILLER_MAX_DELAY_MS", 600.0)
+        monkeypatch.setattr(worker.settings, "FILLER_PLAY_PROBABILITY", 1.0)
+        monkeypatch.setattr(worker.settings, "FILLER_CONTINUATION_ENABLED", False)
+        w._filler_pool.add([FillerClip(phrase="hmm", frames=[], duration_ms=500.0)])
+        monkeypatch.setattr(w, "_emit_filler_transcript", Mock())
+
+        def _predictor_must_not_run():
+            raise AssertionError(
+                "the gap predictor must not run when "
+                "FILLER_GAP_PREDICTION_ENABLED=False"
+            )
+
+        monkeypatch.setattr(w, "_predicted_gap_ms", _predictor_must_not_run)
+
+        sleeps = []
+
+        async def _fake_sleep(seconds):
+            sleeps.append(seconds)
+
+        monkeypatch.setattr(worker.asyncio, "sleep", _fake_sleep)
+
+        w._on_filler_agent_state(
+            types.SimpleNamespace(new_state="thinking", created_at=None)
+        )
+        assert len(w._background_tasks) == 1
+        await next(iter(w._background_tasks))
+
+        assert sleeps, "must wait out FILLER_MIN/MAX_DELAY_MS instead of predicting"
+        assert 0.3 <= sleeps[0] <= 0.6
+        assert w._filler_handle is not None
+        assert w._filler_turn_count == 1
+
 
 class TestStartUsesPrewarmedBVC:
     @pytest.mark.asyncio
