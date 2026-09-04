@@ -101,10 +101,12 @@ jest.mock('react-redux', () => ({
   useStore: jest.fn(),
 }));
 
+const mockUseSocketConnection = jest.fn();
+
 jest.mock('@/hooks', () => ({
   useCounselorChat: () => ({checkCounselorChat: jest.fn()}),
   useNavigationAwareCounselorChat: jest.fn(),
-  useSocketConnection: jest.fn(),
+  useSocketConnection: (...args: unknown[]) => mockUseSocketConnection(...args),
   useUser: () => ({userData: {id: 1}, isAuthenticated: true}),
   useLeaderboardNotification: () => ({
     leaderboardNotifEnabled: false,
@@ -181,5 +183,13 @@ describe('RootNavigator', () => {
   it('renders Splash screen', () => {
     const {getByTestId} = render(<RootNavigator />);
     expect(getByTestId('screen-Splash')).toBeTruthy();
+  });
+
+  it('does not open an app-wide socket on the microphone namespace', () => {
+    render(<RootNavigator />);
+    const microphoneConnections = mockUseSocketConnection.mock.calls.filter(
+      ([options]) => options?.path === '/mic',
+    );
+    expect(microphoneConnections).toHaveLength(0);
   });
 });
