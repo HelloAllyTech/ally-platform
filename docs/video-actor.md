@@ -88,6 +88,44 @@ misconfiguration renders them a coloured blob, which is worse than no video.
 
   (`hedra` was dropped: its LiveKit plugin is deprecated upstream.)
 
+### The guard that stops a silent session
+
+A vendor's `start()` returning successfully means only that it **accepted the
+job**. It is not a promise that a face ever arrives — and by the time it
+returns, the agent's speech has already been routed to that avatar.
+
+Tavus's own audio output is built with `wait_remote_track=KIND_VIDEO`: the
+plugin will not send the agent's speech anywhere until the avatar's video track
+exists. So a vendor that starts and then never publishes leaves the agent's
+audio both **suppressed** (we handed it to the avatar) and **undelivered** (the
+avatar never became ready). The learner gets silence *and* no picture — strictly
+worse than never enabling the feature.
+
+That is not hypothetical. Against a live Tavus account on 2026-09-07:
+conversation `active`, replica valid and trained, avatar joined the room, **zero
+tracks published**, and an opening statement that took **25.8s** to "play out"
+against ~3s without the avatar.
+
+So `_start_hosted` waits for the avatar to actually publish video
+(`VIDEO_ACTOR_PUBLISH_TIMEOUT_S`, default 8s) before accepting it. If it does
+not, the avatar is torn down and the session runs audio-only. Verified live: the
+guard fires, `roomio_audio` returns, and playout drops back to 3.7s.
+
+Two things that make this correct rather than merely present:
+
+* **The overall budget covers both phases.** An earlier version wrapped
+  everything in `VIDEO_ACTOR_START_TIMEOUT_S` alone, so the verification was
+  cancelled before it could finish — dead code, and the cancellation landed
+  mid-flight where cleanup had not run.
+* **`start_video_actor` guarantees the audio output is restored on every
+  abandonment path**, timeout included. Restoring only inside the inner
+  functions is not enough, because a timeout cancels them. This matters because
+  `AgentSession.start()` inspects `output.audio`: finding a non-None value it
+  quietly disables room audio, assuming something else delivers the speech. Left
+  pointing at a dead avatar, that assumption is false and the learner hears
+  nothing. **If this function returns `None`, the session's audio output is
+  exactly as it found it** — that invariant is the whole safety story.
+
 ### Vendors disagree about their own arguments
 
 `HOSTED_PROVIDER_KWARGS` maps each provider to a builder that constructs its

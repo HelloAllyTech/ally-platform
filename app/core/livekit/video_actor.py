@@ -222,13 +222,35 @@ def _vendor_livekit_url(provider: str, job_url: Optional[str]) -> Optional[str]:
     return registration_url
 
 
-def is_avatar_participant(identity: Optional[str]) -> bool:
-    """Whether a room participant is a rendering avatar rather than a person.
+def _is_agent_kind(participant) -> bool:
+    """Whether LiveKit itself classifies this participant as an agent.
 
-    Used by every "is anyone still here?" check in the worker. Errs toward
-    calling something an avatar ONLY on an exact known identity or the shared
-    ``-avatar-agent`` suffix, so a real learner can never be mistaken for one
-    and silently stripped from a headcount.
+    The vendor plugins mint their avatar's token with ``.with_kind("agent")``,
+    so the server reports these as AGENT-kind participants. That is a far
+    stronger signal than any name: it comes from the token, not a convention.
+
+    Safe as a "not a human" test because the worker's own agent is the LOCAL
+    participant — it never appears in ``remote_participants`` — so an
+    agent-kind participant in that map is always something the session
+    commissioned, never a learner.
+    """
+    kind = getattr(participant, "kind", None)
+    if kind is None:
+        return False
+    agent_kind = getattr(rtc.ParticipantKind, "PARTICIPANT_KIND_AGENT", 4)
+    try:
+        return int(kind) == int(agent_kind)
+    except (TypeError, ValueError):
+        return False
+
+
+def is_avatar_participant(identity: Optional[str]) -> bool:
+    """Whether a participant identity belongs to a rendering avatar.
+
+    The name-based half of the test, for callers that only have an identity
+    string. Errs toward calling something an avatar ONLY on an exact known
+    identity or the shared ``-avatar-agent`` suffix, so a real learner is never
+    mistaken for one and silently stripped from a headcount.
     """
     if not identity:
         return False
@@ -240,14 +262,70 @@ def is_avatar_participant(identity: Optional[str]) -> bool:
 def human_participants(room) -> list:
     """Remote participants that are actual people.
 
-    The avatar the agent itself commissioned does not count as company.
+    The avatar the agent itself commissioned does not count as company. Kind
+    first (authoritative, it comes from the token), name second (covers a
+    vendor whose token does not carry the agent kind).
     """
     remote = getattr(room, "remote_participants", None) or {}
     return [
         p
         for p in remote.values()
-        if not is_avatar_participant(getattr(p, "identity", None))
+        if not _is_agent_kind(p)
+        and not is_avatar_participant(getattr(p, "identity", None))
     ]
+
+
+def _avatar_video_is_live(room) -> bool:
+    """Whether a rendering avatar has actually published video into the room.
+
+    Accepts the track on EITHER attribution deliberately. Vendors mint the
+    avatar's token with a publish-on-behalf attribute naming our agent, so the
+    video can be attributed to the avatar participant or to the agent it
+    publishes for depending on who is looking.
+    """
+    remote = getattr(room, "remote_participants", None) or {}
+    for participant in remote.values():
+        if not (
+            _is_agent_kind(participant)
+            or is_avatar_participant(getattr(participant, "identity", None))
+        ):
+            continue
+        publications = getattr(participant, "track_publications", None) or {}
+        for publication in publications.values():
+            if getattr(publication, "kind", None) == rtc.TrackKind.KIND_VIDEO:
+                return True
+    return False
+
+
+async def _await_avatar_video(room, timeout: float) -> bool:
+    """Block until the avatar publishes video, or the budget runs out.
+
+    THIS IS THE GUARD THAT STOPS A SILENT SESSION, and it closes a hole the
+    handle contract alone cannot.
+
+    A vendor's ``start()`` returning successfully only means it accepted the
+    job. Tavus's own audio output is constructed with
+    ``wait_remote_track=KIND_VIDEO`` — the plugin will not send the agent's
+    speech anywhere until the avatar's video track exists. So a vendor that
+    starts and then never publishes leaves the agent's audio both SUPPRESSED
+    (we routed it to the avatar) and UNDELIVERED (the avatar never became
+    ready): the learner gets silence and no picture, which is strictly worse
+    than never enabling the feature at all.
+
+    Observed exactly that against a live Tavus account on 2026-09-07:
+    conversation active, avatar joined, zero tracks published, and an opening
+    statement that took 25.8s to "play out" against ~3s without the avatar.
+
+    Polls rather than subscribing to track_published: the caller wants a plain
+    bounded wait it can abandon, and at this point in startup a 250ms tick
+    costs nothing beside the network round-trips happening around it.
+    """
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if _avatar_video_is_live(room):
+            return True
+        await asyncio.sleep(0.25)
+    return _avatar_video_is_live(room)
 
 
 def _tavus_kwargs(plugin, *, avatar_id, api_key, character_name) -> dict:
@@ -396,8 +474,29 @@ async def start_video_actor(
         return None
 
     provider = str(getattr(settings, "VIDEO_ACTOR_PROVIDER", PROVIDER_TEST_PATTERN))
-    timeout = float(getattr(settings, "VIDEO_ACTOR_START_TIMEOUT_S", 6.0))
+    start_timeout = float(getattr(settings, "VIDEO_ACTOR_START_TIMEOUT_S", 6.0))
+    publish_timeout = float(getattr(settings, "VIDEO_ACTOR_PUBLISH_TIMEOUT_S", 8.0))
+    # The overall budget has to cover BOTH phases. An earlier version wrapped
+    # everything in the start timeout alone, so the publish verification could
+    # never finish before being cancelled — the guard was dead code, and the
+    # cancellation landed mid-flight where cleanup had not run yet.
+    timeout = start_timeout + publish_timeout
     t0 = time.monotonic()
+
+    # Snapshot the session's audio output. A vendor's start() replaces this with
+    # its own data-stream output, and if we then abandon the avatar for ANY
+    # reason we must hand the session back exactly what it had — otherwise
+    # AgentSession.start() sees a non-None output.audio, quietly disables room
+    # audio, and the learner gets a session with no voice at all. Restoring on
+    # the inner paths alone is not enough: the timeout below cancels mid-flight,
+    # which is precisely when cleanup has not run.
+    audio_output_before = getattr(getattr(session, "output", None), "audio", None)
+
+    def _restore_audio_output() -> None:
+        try:
+            session.output.audio = audio_output_before
+        except Exception as e:  # noqa: BLE001 - never worsen a fallback
+            logger.debug("[VIDEO_ACTOR] could not restore audio output: %s", e)
 
     try:
         handle = await asyncio.wait_for(
@@ -420,6 +519,7 @@ async def start_video_actor(
             provider,
             timeout,
         )
+        _restore_audio_output()
         return None
     except Exception as e:  # noqa: BLE001 - must never break a session
         logger.warning(
@@ -428,9 +528,15 @@ async def start_video_actor(
             provider,
             e,
         )
+        _restore_audio_output()
         return None
 
     if handle is None:
+        # Includes the publish verification declining the avatar. Restoring here
+        # too is deliberate belt-and-braces: this invariant — "returning None
+        # means the session's audio output is untouched" — is the single thing
+        # standing between a vendor hiccup and a silent session.
+        _restore_audio_output()
         return None
 
     logger.info(
@@ -566,12 +672,10 @@ async def _start_hosted(
     if ws_url:
         start_kwargs["livekit_url"] = ws_url
 
-    try:
-        await avatar.start(session, room=room, **start_kwargs)
-    except TypeError:
-        # A plugin whose start() does not accept livekit_url — fall back to its
-        # own env resolution rather than failing the session over a kwarg.
-        await avatar.start(session, room=room)
+    # The vendor's start() sets session.output.audio to its own data-stream
+    # output. Remember what was there so a failed verification below can put it
+    # back exactly as found.
+    previous_audio_output = getattr(session.output, "audio", None)
 
     async def _close() -> None:
         closer = getattr(avatar, "aclose", None)
@@ -579,6 +683,44 @@ async def _start_hosted(
             await closer()
         if provider == PROVIDER_TAVUS:
             await _end_tavus_conversation(avatar)
+
+    try:
+        await avatar.start(session, room=room, **start_kwargs)
+    except TypeError:
+        # A plugin whose start() does not accept livekit_url — fall back to its
+        # own env resolution rather than failing the session over a kwarg.
+        await avatar.start(session, room=room)
+
+    # PUBLISH VERIFICATION. A successful start() only means the vendor accepted
+    # the job; it is not a promise that a face ever arrives. See
+    # _await_avatar_video for why an unverified start is the one failure mode
+    # that leaves the learner in silence.
+    publish_timeout = float(getattr(settings, "VIDEO_ACTOR_PUBLISH_TIMEOUT_S", 8.0))
+    if not await _await_avatar_video(room, publish_timeout):
+        logger.warning(
+            "[VIDEO_ACTOR] provider=%s started but published no video within "
+            "%ss — tearing it down and running audio-only. The vendor accepted "
+            "the job but never rendered; check the vendor dashboard for this "
+            "conversation.",
+            provider,
+            publish_timeout,
+        )
+        # Order matters: drop the vendor first so nothing can publish into a
+        # session we have already decided is audio-only, then hand the session
+        # its own audio output back so session.start() installs normal room
+        # audio. Both are best-effort — a failure to tidy up must not turn a
+        # recoverable degradation into a dead session.
+        try:
+            await _close()
+        except Exception as e:  # noqa: BLE001
+            logger.debug("[VIDEO_ACTOR] teardown after failed verify: %s", e)
+        try:
+            session.output.audio = (
+                previous_audio_output if previous_audio_output is not None else None
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.debug("[VIDEO_ACTOR] could not restore audio output: %s", e)
+        return None
 
     return VideoActorHandle(provider=provider, publishes_audio=True, _closer=_close)
 
