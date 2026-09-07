@@ -384,12 +384,29 @@ class TestVendorConstructorMapping:
     the wheel is the only trustworthy source.
     """
 
-    @staticmethod
-    def _bind(provider, module_path):
+    # Only the vendors we actually depend on can be bound in CI. anam and simli
+    # are mapped but their plugins are deliberately NOT in pyproject.toml —
+    # shipping four vendor SDKs to run one would be silly — so their tests skip
+    # unless someone has installed the plugin, which is exactly when the binding
+    # starts to matter. Installed-but-undeclared is what broke this first: the
+    # tests passed locally and failed in CI.
+    INSTALLED = {"tavus", "bey"}
+
+    @classmethod
+    def _bind(cls, provider, module_path):
         import importlib
         import inspect
 
-        plugin = importlib.import_module(module_path)
+        if provider in cls.INSTALLED:
+            plugin = importlib.import_module(module_path)
+        else:
+            plugin = pytest.importorskip(
+                module_path,
+                reason=(
+                    f"livekit-plugins-{provider} is not a dependency; this binding "
+                    f"is verified when the plugin is installed to use it"
+                ),
+            )
         build = video_actor.HOSTED_PROVIDER_KWARGS[provider]
         kwargs = build(
             plugin, avatar_id="face-123", api_key="test-key", character_name="Asha"
@@ -397,6 +414,24 @@ class TestVendorConstructorMapping:
         # Raises TypeError on any wrong or missing argument name.
         inspect.signature(plugin.AvatarSession.__init__).bind(None, **kwargs)
         return kwargs
+
+    @pytest.mark.unit
+    def test_declared_dependencies_match_what_is_hard_bound(self):
+        """Keeps INSTALLED honest against pyproject.toml.
+
+        If someone adds a vendor plugin as a dependency without moving it here,
+        its binding silently degrades to a skip and stops protecting anything.
+        """
+        import pathlib
+        import re
+
+        pyproject = pathlib.Path(__file__).parents[2] / "pyproject.toml"
+        declared = set(re.findall(r"livekit-plugins-(\w+) = ", pyproject.read_text()))
+        vendors = declared & set(video_actor.HOSTED_PROVIDER_MODULES)
+        assert vendors == self.INSTALLED, (
+            f"declared avatar plugins {sorted(vendors)} != hard-bound "
+            f"{sorted(self.INSTALLED)}"
+        )
 
     @pytest.mark.unit
     def test_tavus_binds_and_uses_replica_id(self):
