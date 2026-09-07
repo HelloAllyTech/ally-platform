@@ -1049,3 +1049,77 @@ class TestVendorLiveKitUrl:
         )
         chosen = video_actor._vendor_livekit_url("tavus", "wss://regional.example")
         assert video_actor._as_websocket_url(chosen) == "wss://proj.livekit.cloud"
+
+
+class TestProviderResolution:
+    """Which vendor a session renders with, and whose key it uses.
+
+    The choice is per-roleplay because it is editorial — which face suits a
+    character, and whose lip-sync holds up in the language it is played in —
+    while the env var stays the deployment default so nothing that predates
+    the field changed behaviour.
+    """
+
+    @pytest.mark.unit
+    def test_roleplay_choice_wins(self, monkeypatch):
+        monkeypatch.setattr(video_actor.settings, "VIDEO_ACTOR_PROVIDER", "tavus")
+        scenario = SimpleNamespace(
+            prompt_data=SimpleNamespace(video_actor_provider="bey")
+        )
+        assert video_actor._resolve_provider(scenario) == "bey"
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("absent", [None, ""])
+    def test_falls_back_to_the_deployment_default(self, monkeypatch, absent):
+        """A roleplay that named no vendor behaves exactly as it did before."""
+        monkeypatch.setattr(video_actor.settings, "VIDEO_ACTOR_PROVIDER", "bey")
+        scenario = SimpleNamespace(
+            prompt_data=SimpleNamespace(video_actor_provider=absent)
+        )
+        assert video_actor._resolve_provider(scenario) == "bey"
+
+    @pytest.mark.unit
+    def test_no_scenario_at_all_uses_the_default(self, monkeypatch):
+        monkeypatch.setattr(video_actor.settings, "VIDEO_ACTOR_PROVIDER", "tavus")
+        assert video_actor._resolve_provider(None) == "tavus"
+
+    @pytest.mark.unit
+    def test_stored_value_is_normalised(self, monkeypatch):
+        """The runtime compares lower-case provider ids, and Studio is not the
+        only thing that can write this field."""
+        scenario = SimpleNamespace(
+            prompt_data=SimpleNamespace(video_actor_provider="  TAVUS  ")
+        )
+        assert video_actor._resolve_provider(scenario) == "tavus"
+
+    @pytest.mark.unit
+    def test_each_vendor_reads_its_own_key(self, monkeypatch):
+        monkeypatch.setattr(
+            video_actor.settings, "VIDEO_ACTOR_BEY_API_KEY", "bey-key", raising=False
+        )
+        monkeypatch.setattr(
+            video_actor.settings,
+            "VIDEO_ACTOR_TAVUS_API_KEY",
+            "tavus-key",
+            raising=False,
+        )
+        monkeypatch.setattr(
+            video_actor.settings, "VIDEO_ACTOR_API_KEY", "shared-key", raising=False
+        )
+        assert video_actor._resolve_api_key("bey") == "bey-key"
+        assert video_actor._resolve_api_key("tavus") == "tavus-key"
+
+    @pytest.mark.unit
+    def test_single_key_deployment_still_works(self, monkeypatch):
+        """The fallback is the whole reason this is not a breaking change."""
+        monkeypatch.setattr(
+            video_actor.settings, "VIDEO_ACTOR_BEY_API_KEY", None, raising=False
+        )
+        monkeypatch.setattr(
+            video_actor.settings, "VIDEO_ACTOR_TAVUS_API_KEY", None, raising=False
+        )
+        monkeypatch.setattr(
+            video_actor.settings, "VIDEO_ACTOR_API_KEY", "shared-key", raising=False
+        )
+        for provider in ("bey", "tavus"):
+            assert video_actor._resolve_api_key(provider) == "shared-key"

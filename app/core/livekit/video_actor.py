@@ -60,7 +60,12 @@ the learner is never shown an error about a face they did not ask for.
 
 ## Providers
 
-``settings.VIDEO_ACTOR_PROVIDER`` selects one:
+A roleplay picks its own vendor via ``prompt_data.video_actor_provider``
+(Studio: videoActorProvider); ``settings.VIDEO_ACTOR_PROVIDER`` is the
+deployment default for every roleplay that names none. Each vendor reads its
+own key — ``VIDEO_ACTOR_BEY_API_KEY`` / ``VIDEO_ACTOR_TAVUS_API_KEY``, falling
+back to the single ``VIDEO_ACTOR_API_KEY`` — because one deployment can now
+need both vendors live at once. The selectable ones are:
 
 * ``tavus`` (default) — real AI-generated video, and the vendor this platform
   is wired for. Needs ``VIDEO_ACTOR_API_KEY`` (or ``TAVUS_API_KEY``) and a
@@ -473,7 +478,7 @@ async def start_video_actor(
     if not is_video_actor_enabled(scenario):
         return None
 
-    provider = str(getattr(settings, "VIDEO_ACTOR_PROVIDER", PROVIDER_TEST_PATTERN))
+    provider = _resolve_provider(scenario)
     start_timeout = float(getattr(settings, "VIDEO_ACTOR_START_TIMEOUT_S", 6.0))
     publish_timeout = float(getattr(settings, "VIDEO_ACTOR_PUBLISH_TIMEOUT_S", 8.0))
     # The overall budget has to cover BOTH phases. An earlier version wrapped
@@ -654,7 +659,7 @@ async def _start_hosted(
         **build_kwargs(
             plugin,
             avatar_id=avatar_id,
-            api_key=getattr(settings, "VIDEO_ACTOR_API_KEY", None),
+            api_key=_resolve_api_key(provider),
             character_name=getattr(prompt_data, "name", None) if prompt_data else None,
         )
     )
@@ -749,9 +754,7 @@ async def _end_tavus_conversation(avatar: Any) -> None:
     if not conversation_id:
         return
 
-    api_key = getattr(settings, "VIDEO_ACTOR_API_KEY", None) or os.getenv(
-        "TAVUS_API_KEY"
-    )
+    api_key = _resolve_api_key(PROVIDER_TAVUS) or os.getenv("TAVUS_API_KEY")
     if not api_key:
         # The plugin resolved a key we cannot see. Say so rather than failing
         # silently: the leak is the thing that breaks the NEXT session.
@@ -777,6 +780,44 @@ async def _end_tavus_conversation(avatar: Any) -> None:
                 )
                 return
     logger.info("[VIDEO_ACTOR] ended tavus conversation %s", conversation_id)
+
+
+def _resolve_provider(scenario=None) -> str:
+    """Which vendor renders this session, per-roleplay first.
+
+    A roleplay names its own vendor because the choice is editorial, not
+    operational: which face suits a character, and whose lip-sync holds up in
+    the language it is played in. The env var stays the deployment default for
+    every roleplay that names none, so this field arriving changed nothing for
+    anything that already existed.
+    """
+    prompt_data = getattr(scenario, "prompt_data", None)
+    per_sim = (
+        getattr(prompt_data, "video_actor_provider", None) if prompt_data else None
+    )
+    if per_sim:
+        return str(per_sim).strip().lower()
+    return str(getattr(settings, "VIDEO_ACTOR_PROVIDER", PROVIDER_TEST_PATTERN))
+
+
+def _resolve_api_key(provider: str) -> Optional[str]:
+    """This vendor's key, falling back to the single-vendor setting.
+
+    Once a roleplay can pick its vendor, one deployment can need both vendors'
+    keys at the same time, which ``VIDEO_ACTOR_API_KEY`` alone cannot express.
+    The fallback is what keeps a deployment that configured only that one
+    working untouched — and a vendor with no key reachable at all still degrades
+    to audio-only rather than failing the session.
+    """
+    per_provider = {
+        PROVIDER_TAVUS: "VIDEO_ACTOR_TAVUS_API_KEY",
+        "bey": "VIDEO_ACTOR_BEY_API_KEY",
+    }.get(provider)
+    if per_provider:
+        key = getattr(settings, per_provider, None)
+        if key:
+            return key
+    return getattr(settings, "VIDEO_ACTOR_API_KEY", None)
 
 
 def _resolve_avatar_id(scenario=None) -> Optional[str]:

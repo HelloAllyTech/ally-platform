@@ -317,6 +317,19 @@ class PromptData(BaseModel):
             "name instead."
         ),
     )
+    video_actor_provider: Optional[str] = Field(
+        default=None,
+        description=(
+            "Per-roleplay video-actor vendor (Studio: videoActorProvider) — "
+            "'bey' or 'tavus'. When None, falls back to "
+            "settings.VIDEO_ACTOR_PROVIDER, so a roleplay that never picked one "
+            "behaves exactly as it did before this field existed. A face id is "
+            "NOT portable between vendors, so this and video_actor_avatar_id "
+            "have to be set together or not at all: a Tavus replica id handed "
+            "to Beyond Presence resolves to nothing and the session runs "
+            "audio-only."
+        ),
+    )
     continuous_backchanneling: bool = Field(
         default=False,
         description=(
@@ -887,6 +900,8 @@ class Scenario(BaseModel):
                 ),
                 "video_actor_avatar_id": prompt_data_dict.get("videoActorAvatarId")
                 or prompt_data_dict.get("video_actor_avatar_id"),
+                "video_actor_provider": prompt_data_dict.get("videoActorProvider")
+                or prompt_data_dict.get("video_actor_provider"),
                 "continuous_backchanneling": bool(
                     prompt_data_dict.get("continuousBackchanneling") or False
                 ),

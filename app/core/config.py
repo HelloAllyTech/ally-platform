@@ -843,6 +843,24 @@ class Settings(BaseSettings):
             "(TAVUS_API_KEY for Tavus)."
         ),
     )
+    VIDEO_ACTOR_BEY_API_KEY: Optional[str] = Field(
+        default=None,
+        description=(
+            "Beyond Presence API key. Takes precedence over VIDEO_ACTOR_API_KEY "
+            "when the session's provider is 'bey'. Exists because a roleplay now "
+            "picks its own vendor, so one deployment can need both vendors' keys "
+            "live at once — the single VIDEO_ACTOR_API_KEY could only ever serve "
+            "one. Left unset, VIDEO_ACTOR_API_KEY is used, which is what keeps a "
+            "single-vendor deployment working untouched."
+        ),
+    )
+    VIDEO_ACTOR_TAVUS_API_KEY: Optional[str] = Field(
+        default=None,
+        description=(
+            "Tavus API key. Same contract as VIDEO_ACTOR_BEY_API_KEY above, for "
+            "provider 'tavus'."
+        ),
+    )
     VIDEO_ACTOR_TAVUS_PERSONA_ID: Optional[str] = Field(
         default=None,
         description=(
