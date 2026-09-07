@@ -592,3 +592,229 @@ class TestLiveKitUrlScheme:
     def test_empty_passes_through(self, empty):
         """No URL means "let the plugin read its own env", not a broken string."""
         assert video_actor._as_websocket_url(empty) == empty
+
+
+class TestTavusConversationTeardown:
+    """Ending the Tavus conversation, which the vendor plugin never does.
+
+    The leak is not cosmetic. A conversation left open counts against the
+    account's concurrent-conversation cap, and past the cap Tavus still
+    returns a conversation_id and still joins the room — it publishes no
+    track. So a conversation this worker fails to end is a silent session
+    later, not a stray row in a dashboard.
+    """
+
+    @pytest.mark.unit
+    async def test_no_conversation_id_is_a_no_op(self):
+        """Nothing to end, and nothing to complain about."""
+        await video_actor._end_tavus_conversation(SimpleNamespace())
+
+    @pytest.mark.unit
+    async def test_missing_key_warns_rather_than_failing_silently(
+        self, monkeypatch, caplog
+    ):
+        """The plugin can resolve a key this worker cannot see.
+
+        That is the one case where we know a conversation is leaking and
+        cannot stop it, so it earns a warning: the cost lands on the NEXT
+        session, which will look healthy and be silent.
+        """
+        monkeypatch.setattr(video_actor.settings, "VIDEO_ACTOR_API_KEY", None)
+        monkeypatch.delenv("TAVUS_API_KEY", raising=False)
+
+        with caplog.at_level("WARNING"):
+            await video_actor._end_tavus_conversation(
+                SimpleNamespace(conversation_id="c00318f5a463545b")
+            )
+
+        assert "cannot be ended" in caplog.text
+        assert "c00318f5a463545b" in caplog.text
+
+    @pytest.mark.unit
+    async def test_ends_the_conversation_it_opened(self, monkeypatch):
+        """The end call carries the id and the key, as Tavus wants them."""
+        seen: dict = {}
+
+        class _Response:
+            status = 200
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *_):
+                return False
+
+        class _Session:
+            def __init__(self, *_, **kwargs):
+                seen["timeout"] = kwargs.get("timeout")
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *_):
+                return False
+
+            def post(self, url, headers=None):
+                seen["url"] = url
+                seen["headers"] = headers
+                return _Response()
+
+        monkeypatch.setattr(video_actor.settings, "VIDEO_ACTOR_API_KEY", "sk-test")
+        monkeypatch.setattr(video_actor.aiohttp, "ClientSession", _Session)
+
+        await video_actor._end_tavus_conversation(
+            SimpleNamespace(conversation_id="conv_1")
+        )
+
+        assert seen["url"] == "https://tavusapi.com/v2/conversations/conv_1/end"
+        assert seen["headers"] == {"x-api-key": "sk-test"}
+        # Teardown runs during shutdown: it must be time-boxed, not best-effort
+        # forever, or a slow vendor holds a worker slot behind a dead session.
+        assert seen["timeout"] is not None
+
+    @pytest.mark.unit
+    async def test_vendor_error_is_reported_not_raised(self, monkeypatch, caplog):
+        """Shutdown must survive a vendor that refuses the end call."""
+
+        class _Response:
+            status = 500
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *_):
+                return False
+
+        class _Session:
+            def __init__(self, *_, **__):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *_):
+                return False
+
+            def post(self, *_, **__):
+                return _Response()
+
+        monkeypatch.setattr(video_actor.settings, "VIDEO_ACTOR_API_KEY", "sk-test")
+        monkeypatch.setattr(video_actor.aiohttp, "ClientSession", _Session)
+
+        with caplog.at_level("WARNING"):
+            await video_actor._end_tavus_conversation(
+                SimpleNamespace(conversation_id="conv_2")
+            )
+
+        assert "failed to end tavus conversation conv_2" in caplog.text
+
+    @pytest.mark.unit
+    async def test_handle_close_never_raises_when_teardown_breaks(self, monkeypatch):
+        """The handle's aclose is the shutdown guard; teardown sits behind it."""
+
+        async def _boom():
+            raise RuntimeError("tavus unreachable")
+
+        handle = video_actor.VideoActorHandle(
+            provider="tavus", publishes_audio=True, _closer=_boom
+        )
+        await handle.aclose()
+
+    @pytest.mark.unit
+    async def test_only_tavus_gets_the_end_call(self, monkeypatch):
+        """Bey's session dies with the room; Tavus's does not.
+
+        Routing this by provider rather than calling it for everyone keeps a
+        vendor-specific HTTP call out of every other vendor's shutdown path.
+        """
+        ended: list = []
+
+        async def _record(avatar):
+            ended.append(getattr(avatar, "conversation_id", None))
+
+        monkeypatch.setattr(video_actor, "_end_tavus_conversation", _record)
+
+        class _Avatar:
+            conversation_id = "conv_9"
+
+            def __init__(self, **_):
+                pass
+
+            async def start(self, *_, **__):
+                return None
+
+        for provider in ("tavus", "bey"):
+            plugin = SimpleNamespace(
+                AvatarSession=_Avatar,
+                PersonaConfig=None,
+                SimliConfig=None,
+            )
+            monkeypatch.setattr(
+                video_actor.importlib, "import_module", lambda _p, _m=plugin: _m
+            )
+            monkeypatch.setattr(
+                video_actor.settings, "VIDEO_ACTOR_AVATAR_ID", "a1", raising=False
+            )
+            handle = await video_actor._start_hosted(
+                provider=provider,
+                module_path="fake",
+                session=SimpleNamespace(),
+                room=SimpleNamespace(name="r"),
+                scenario=None,
+                livekit_url="wss://example",
+            )
+            await handle.aclose()
+
+        assert ended == ["conv_9"]
+
+
+class TestVendorLiveKitUrl:
+    """Which LiveKit URL each vendor is told to dial.
+
+    Tavus cannot publish into a room that already has participants when it is
+    pointed at a regional media host — it joins and publishes nothing, which
+    reads as a healthy start here and leaves the session silent. Measured
+    2026-09-07 across the full matrix; only regional+occupied fails.
+    """
+
+    @pytest.mark.unit
+    def test_tavus_gets_the_registration_url(self, monkeypatch):
+        monkeypatch.setattr(
+            video_actor.settings, "LIVEKIT_URL", "wss://proj.livekit.cloud"
+        )
+        assert (
+            video_actor._vendor_livekit_url(
+                "tavus", "wss://proj.ohyderabad1a.production.livekit.cloud"
+            )
+            == "wss://proj.livekit.cloud"
+        )
+
+    @pytest.mark.unit
+    def test_other_vendors_keep_the_job_url(self, monkeypatch):
+        """Beyond Presence handles the regional host, and the job URL is what
+        keeps a vendor on the same media server as the learner."""
+        monkeypatch.setattr(
+            video_actor.settings, "LIVEKIT_URL", "wss://proj.livekit.cloud"
+        )
+        regional = "wss://proj.ohyderabad1a.production.livekit.cloud"
+        for provider in ("bey", "anam", "simli"):
+            assert video_actor._vendor_livekit_url(provider, regional) == regional
+
+    @pytest.mark.unit
+    def test_falls_back_to_the_job_url_when_unconfigured(self, monkeypatch):
+        """A vendor dialling the wrong host may still work; none at all cannot."""
+        monkeypatch.setattr(video_actor.settings, "LIVEKIT_URL", None)
+        assert (
+            video_actor._vendor_livekit_url("tavus", "wss://regional.example")
+            == "wss://regional.example"
+        )
+
+    @pytest.mark.unit
+    def test_scheme_coercion_still_applies_to_the_substituted_url(self, monkeypatch):
+        """The registration URL is not exempt from the ws:// contract that
+        Beyond Presence rejects an https:// form for."""
+        monkeypatch.setattr(
+            video_actor.settings, "LIVEKIT_URL", "https://proj.livekit.cloud"
+        )
+        chosen = video_actor._vendor_livekit_url("tavus", "wss://regional.example")
+        assert video_actor._as_websocket_url(chosen) == "wss://proj.livekit.cloud"

@@ -87,10 +87,12 @@ from __future__ import annotations
 
 import asyncio
 import importlib
+import os
 import time
 from dataclasses import dataclass
 from typing import Any, Mapping, Optional
 
+import aiohttp
 from livekit import rtc
 
 from app.core.config import settings
@@ -100,6 +102,40 @@ logger = get_logger(__name__)
 
 # Provider id for the dependency-free in-process renderer.
 PROVIDER_TEST_PATTERN = "test_pattern"
+
+# Tavus needs naming because it is the one vendor with a teardown obligation of
+# its own — see _end_tavus_conversation.
+PROVIDER_TAVUS = "tavus"
+
+_TAVUS_API_URL = "https://tavusapi.com/v2"
+
+# Providers that must be handed the project's REGISTRATION url rather than the
+# per-job regional media url.
+#
+# Tavus cannot publish into a room that already has participants when it is
+# pointed at a regional media host. It connects, joins as its participant, and
+# then publishes no track at all — which this worker cannot tell apart from a
+# healthy start, so the session goes silent for its whole duration (agent audio
+# rides the avatar track and the avatar never arrives).
+#
+# It needs BOTH conditions, which is why it survived every isolated test.
+# Measured 2026-09-07, same replica / same echo PAL / same token shape:
+#
+#   regional url + occupied room -> NEVER published   <- every real session
+#   regional url + empty room    -> published in 11.8s
+#   project url  + occupied room -> published in  5.3s
+#   project url  + empty room    -> published in  8.4s
+#
+# So this is not the scheme bug that _as_websocket_url fixes, and not the room:
+# it is the host. Beyond Presence handles the regional host fine, hence a
+# per-provider set rather than reverting the job-url change for everyone — that
+# change is right, and passing the registration url would send a vendor to a
+# different media server than the learner on a self-hosted deployment.
+PROVIDERS_NEEDING_REGISTRATION_URL = frozenset({PROVIDER_TAVUS})
+
+# Teardown runs on the shutdown path, so it gets a short leash: a slow vendor
+# must not hold a worker slot open behind a session that is already over.
+_TAVUS_END_TIMEOUT_S = 5.0
 
 # Hosted providers -> the module that carries their ``AvatarSession``. Kept as
 # data rather than a chain of imports so an unavailable vendor is a lookup miss
@@ -156,6 +192,34 @@ def _as_websocket_url(url: Optional[str]) -> Optional[str]:
     if url.startswith("http://"):
         return "ws://" + url[len("http://") :]
     return url
+
+
+def _vendor_livekit_url(provider: str, job_url: Optional[str]) -> Optional[str]:
+    """Which LiveKit URL to hand this vendor to dial in on.
+
+    The job URL by default — see the comment in ``_start_hosted`` for why that
+    matters. For the providers in ``PROVIDERS_NEEDING_REGISTRATION_URL`` it is
+    the registration URL instead, because they cannot publish into an
+    established room from a regional media host.
+
+    Falls back to the job URL when no registration URL is configured: a vendor
+    dialling the wrong host still has a chance of working, whereas handing it
+    nothing means it reads ``LIVEKIT_URL`` from our env, which is the same value
+    and would silently defeat the point on a deployment that has none.
+    """
+    if provider not in PROVIDERS_NEEDING_REGISTRATION_URL:
+        return job_url
+    registration_url = getattr(settings, "LIVEKIT_URL", None)
+    if not registration_url:
+        return job_url
+    if registration_url != job_url:
+        logger.info(
+            "[VIDEO_ACTOR] provider=%s dials the registration URL, not this "
+            "job's media host — it cannot publish into an established room "
+            "from a regional host",
+            provider,
+        )
+    return registration_url
 
 
 def is_avatar_participant(identity: Optional[str]) -> bool:
@@ -498,7 +562,7 @@ async def _start_hosted(
     # registration URL would send the avatar to a different server than the
     # learner, and the failure looks like "video never arrives" with no error.
     start_kwargs: dict[str, Any] = {}
-    ws_url = _as_websocket_url(livekit_url)
+    ws_url = _as_websocket_url(_vendor_livekit_url(provider, livekit_url))
     if ws_url:
         start_kwargs["livekit_url"] = ws_url
 
@@ -513,8 +577,64 @@ async def _start_hosted(
         closer = getattr(avatar, "aclose", None)
         if closer is not None:
             await closer()
+        if provider == PROVIDER_TAVUS:
+            await _end_tavus_conversation(avatar)
 
     return VideoActorHandle(provider=provider, publishes_audio=True, _closer=_close)
+
+
+async def _end_tavus_conversation(avatar: Any) -> None:
+    """End the Tavus conversation this session opened. The plugin never does.
+
+    ``livekit-plugins-tavus`` has no ``aclose`` on its ``AvatarSession`` — not
+    in the 1.3.12 we pin, and not in 1.5.6 either — so the conversation it
+    creates with ``POST /v2/conversations`` outlives the room. It stays open,
+    metered, and counting against the account's concurrent-conversation cap.
+
+    That cap is the suspected cause of "Tavus joins and publishes nothing".
+    Once it is reached Tavus still answers the create call with 200 and a
+    conversation_id, and the replica still joins the LiveKit room — it just
+    never publishes a track. From this worker's side that is indistinguishable
+    from a healthy start, which is why 11 of 12 test conversations on
+    2026-09-07 produced silence with nothing in the logs. Beyond Presence never
+    showed it because their session ends with the room.
+
+    Best-effort by construction: this runs during shutdown, the handle's
+    ``aclose`` swallows what it raises, and a conversation we fail to end is
+    the status quo rather than a regression.
+    """
+    conversation_id = getattr(avatar, "conversation_id", None)
+    if not conversation_id:
+        return
+
+    api_key = getattr(settings, "VIDEO_ACTOR_API_KEY", None) or os.getenv(
+        "TAVUS_API_KEY"
+    )
+    if not api_key:
+        # The plugin resolved a key we cannot see. Say so rather than failing
+        # silently: the leak is the thing that breaks the NEXT session.
+        logger.warning(
+            "[VIDEO_ACTOR] tavus conversation %s cannot be ended (no API key "
+            "visible to this worker) — it stays open against the account's "
+            "concurrent-conversation cap",
+            conversation_id,
+        )
+        return
+
+    url = f"{_TAVUS_API_URL}/conversations/{conversation_id}/end"
+    timeout = aiohttp.ClientTimeout(total=_TAVUS_END_TIMEOUT_S)
+    async with aiohttp.ClientSession(timeout=timeout) as http:
+        async with http.post(url, headers={"x-api-key": api_key}) as response:
+            if response.status >= 400:
+                logger.warning(
+                    "[VIDEO_ACTOR] failed to end tavus conversation %s "
+                    "(HTTP %s) — it stays open against the account's "
+                    "concurrent-conversation cap",
+                    conversation_id,
+                    response.status,
+                )
+                return
+    logger.info("[VIDEO_ACTOR] ended tavus conversation %s", conversation_id)
 
 
 def _resolve_avatar_id(scenario=None) -> Optional[str]:

@@ -172,6 +172,62 @@ genuinely arrives, so an audio-only fallback simply leaves the call card
 showing. A learner who never knew a face was coming is not shown its absence
 mid-conversation.
 
+## Vendor traps found in live testing (2026-09-07)
+
+Three of these cost a full day of debugging between them, because every one of
+them presents as the same thing: a clean `[VIDEO_ACTOR] started provider=…`
+line followed by a session that is **completely silent**. Agent audio rides the
+avatar track, `DataStreamAudioOutput` withholds every frame until the avatar
+publishes a *video* track, so a vendor that starts but never renders takes the
+voice with it. Read `## The one dangerous edge` above, then this.
+
+### Tavus must be given the registration URL, not the job URL
+
+Tavus cannot publish into a room that **already has participants** when it is
+pointed at a regional media host. It connects, joins as `tavus-avatar-agent`,
+publishes nothing, and leaves ~25s later. It needs both conditions at once,
+which is why it survives every single-variable test. Measured with one replica,
+one echo PAL and one token shape:
+
+| URL handed to Tavus | Room | Result |
+|---|---|---|
+| regional job url | occupied | **never publishes** |
+| regional job url | empty | publishes in 11.8s |
+| project url | occupied | publishes in 5.3s |
+| project url | empty | publishes in 8.4s |
+
+`PROVIDERS_NEEDING_REGISTRATION_URL` carries this. It is a per-provider set
+rather than a revert of the job-url change, because that change is right for
+the reason it was made — a vendor has to land on the same media server as the
+learner — and Beyond Presence handles the regional host fine. Every real
+session before this fix fell in the failing cell.
+
+### The Tavus conversation is ours to end
+
+`livekit-plugins-tavus` has no `aclose()` on its `AvatarSession` — not in the
+1.3.12 we pin, and not in 1.5.6 either — so the conversation it opens with
+`POST /v2/conversations` outlives the room, metered, until Tavus's own timeout.
+`_end_tavus_conversation` ends it. This is billing, not rendering: conversations
+do get cleaned up eventually, so a leak here never blocked a later session.
+
+### Pin one echo PAL rather than letting the plugin create one per session
+
+With `persona_id` unset the plugin calls `create_persona` on **every** session:
+one throwaway PAL each time (12 sessions produced 12 of them), plus an HTTP
+round trip in front of `session.start`. Setting
+`VIDEO_ACTOR_TAVUS_PERSONA_ID` to one reusable PAL cut time-to-tracks from
+9.08s to 6.33s. It must be `pipeline_mode: "echo"` with a `livekit` transport
+layer — those two are mandatory for the LiveKit path, and echo mode is also
+what keeps the vendor from contributing a personality of its own, which is the
+property the unset default was reaching for anyway.
+
+### Vendors differ on when they publish
+
+Tavus publishes on join. Beyond Presence waits for audio to lip-sync before it
+publishes anything. Neither is wrong, but it means "joined but no track yet" is
+not diagnostic on its own, and a probe that sends no audio will look like a bey
+failure when bey is healthy.
+
 ## What to measure before rolling this anywhere
 
 Latency is the product here, so the questions worth answering before a wider
