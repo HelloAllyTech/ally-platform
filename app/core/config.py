@@ -784,6 +784,22 @@ class Settings(BaseSettings):
             "warning line, not a slow session."
         ),
     )
+    VIDEO_ACTOR_PUBLISH_TIMEOUT_S: float = Field(
+        default=8.0,
+        description=(
+            "Max seconds to wait for a hosted avatar to actually PUBLISH video "
+            "after its start() returned, before giving up on it and running the "
+            "session audio-only. A vendor accepting the job is not a promise it "
+            "renders: observed live with Tavus — conversation active, avatar "
+            "joined, zero tracks published — and because the agent's speech has "
+            "by then been routed to that avatar, an unverified start leaves the "
+            "learner with silence AND no picture, which is worse than never "
+            "enabling the feature. Counts on top of VIDEO_ACTOR_START_TIMEOUT_S, "
+            "so the worst case a learner waits before the character speaks is "
+            "roughly the sum of the two; keep both tight, because that wait is "
+            "the feature's real cost."
+        ),
+    )
     VIDEO_ACTOR_WIDTH: int = Field(
         default=480,
         description=(

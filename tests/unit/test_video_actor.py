@@ -12,7 +12,13 @@ from types import SimpleNamespace
 
 import pytest
 
+from livekit import rtc
+
 from app.core.livekit import video_actor
+
+_AGENT_KIND = int(getattr(rtc.ParticipantKind, "PARTICIPANT_KIND_AGENT", 4))
+_VIDEO_KIND = rtc.TrackKind.KIND_VIDEO
+_AUDIO_KIND = rtc.TrackKind.KIND_AUDIO
 
 
 def _scenario(enabled=None, avatar_id=None, name="Asha"):
@@ -479,3 +485,221 @@ class TestAvatarParticipantFiltering:
     @pytest.mark.unit
     def test_missing_room_attribute_is_survivable(self):
         assert video_actor.human_participants(SimpleNamespace()) == []
+
+
+def _participant(identity, kind=0, video=False, audio=False):
+    pubs = {}
+    if video:
+        pubs["v"] = SimpleNamespace(kind=_VIDEO_KIND)
+    if audio:
+        pubs["a"] = SimpleNamespace(kind=_AUDIO_KIND)
+    return SimpleNamespace(identity=identity, kind=kind, track_publications=pubs)
+
+
+def _room(*participants):
+    return SimpleNamespace(
+        remote_participants={str(i): p for i, p in enumerate(participants)}
+    )
+
+
+class TestAgentKindFiltering:
+    """Kind comes from the token, so it beats any naming convention."""
+
+    @pytest.mark.unit
+    def test_agent_kind_is_not_a_human_whatever_it_is_called(self):
+        # A vendor that renames its default identity is still caught.
+        room = _room(_participant("something-unexpected", kind=_AGENT_KIND))
+        assert video_actor.human_participants(room) == []
+
+    @pytest.mark.unit
+    def test_a_learner_is_never_stripped(self):
+        room = _room(_participant("user-42", kind=0))
+        assert [p.identity for p in video_actor.human_participants(room)] == ["user-42"]
+
+    @pytest.mark.unit
+    def test_a_participant_with_no_kind_falls_back_to_the_name_test(self):
+        room = _room(
+            SimpleNamespace(identity="tavus-avatar-agent"),
+            SimpleNamespace(identity="user-42"),
+        )
+        assert [p.identity for p in video_actor.human_participants(room)] == ["user-42"]
+
+
+class TestPublishVerification:
+    """The guard against a vendor that starts and then renders nothing.
+
+    Reproduces what a live Tavus account actually did on 2026-09-07:
+    conversation active, avatar joined the room, zero tracks published. Because
+    the agent's speech is routed to the avatar the moment start() returns, an
+    unverified start leaves the learner with silence AND no picture — worse
+    than never enabling the feature.
+    """
+
+    @pytest.mark.unit
+    def test_video_is_seen_on_the_avatar_participant(self):
+        room = _room(_participant("tavus-avatar-agent", kind=_AGENT_KIND, video=True))
+        assert video_actor._avatar_video_is_live(room) is True
+
+    @pytest.mark.unit
+    def test_video_is_also_seen_under_publish_on_behalf(self):
+        """Vendors publish on behalf of our agent, so attribution varies."""
+        room = _room(_participant("agent-AJ_xyz", kind=_AGENT_KIND, video=True))
+        assert video_actor._avatar_video_is_live(room) is True
+
+    @pytest.mark.unit
+    def test_the_observed_tavus_failure_reads_as_not_live(self):
+        """Joined, agent-kind, zero publications — the exact live symptom."""
+        room = _room(_participant("tavus-avatar-agent", kind=_AGENT_KIND))
+        assert video_actor._avatar_video_is_live(room) is False
+
+    @pytest.mark.unit
+    def test_audio_only_publication_does_not_count_as_video(self):
+        room = _room(_participant("tavus-avatar-agent", kind=_AGENT_KIND, audio=True))
+        assert video_actor._avatar_video_is_live(room) is False
+
+    @pytest.mark.unit
+    def test_a_learners_own_camera_is_not_mistaken_for_the_avatar(self):
+        """Otherwise a learner with video on would vouch for a dead avatar."""
+        room = _room(_participant("user-42", kind=0, video=True))
+        assert video_actor._avatar_video_is_live(room) is False
+
+    @pytest.mark.unit
+    async def test_wait_returns_true_as_soon_as_video_appears(self):
+        room = _room(_participant("tavus-avatar-agent", kind=_AGENT_KIND, video=True))
+        assert await video_actor._await_avatar_video(room, timeout=1.0) is True
+
+    @pytest.mark.unit
+    async def test_wait_gives_up_and_reports_failure(self):
+        import time as _time
+
+        room = _room(_participant("tavus-avatar-agent", kind=_AGENT_KIND))
+        started = _time.monotonic()
+        assert await video_actor._await_avatar_video(room, timeout=0.6) is False
+        # Bounded: it must not hang, because this sits in front of session.start
+        # and every second here is a second before the character speaks.
+        assert _time.monotonic() - started < 2.0
+
+    @pytest.mark.unit
+    async def test_wait_notices_video_that_arrives_late(self):
+        import asyncio
+
+        participant = _participant("tavus-avatar-agent", kind=_AGENT_KIND)
+        room = _room(participant)
+
+        async def publish_soon():
+            await asyncio.sleep(0.3)
+            participant.track_publications["v"] = SimpleNamespace(kind=_VIDEO_KIND)
+
+        task = asyncio.create_task(publish_soon())
+        assert await video_actor._await_avatar_video(room, timeout=3.0) is True
+        await task
+
+
+class TestAudioOutputInvariant:
+    """Returning None must leave session.output.audio exactly as found.
+
+    This is the single invariant standing between a vendor hiccup and a session
+    with no voice at all. It matters because AgentSession.start() inspects
+    output.audio: finding a non-None value it quietly disables room audio,
+    assuming something else will deliver the speech. If we abandoned a vendor
+    but left its dead output in place, that assumption is false and the learner
+    hears nothing.
+
+    Caught live: the overall budget originally covered only the start phase, so
+    the publish verification was cancelled mid-flight — before any inner cleanup
+    ran — and the agent published no speech track at all.
+    """
+
+    @staticmethod
+    def _session():
+        return SimpleNamespace(output=SimpleNamespace(audio=None))
+
+    @pytest.mark.unit
+    async def test_restored_after_a_start_timeout(self, monkeypatch):
+        import asyncio
+
+        monkeypatch.setattr(video_actor.settings, "VIDEO_ACTOR_ENABLED", True)
+        monkeypatch.setattr(video_actor.settings, "VIDEO_ACTOR_START_TIMEOUT_S", 0.05)
+        monkeypatch.setattr(video_actor.settings, "VIDEO_ACTOR_PUBLISH_TIMEOUT_S", 0.05)
+
+        session = self._session()
+        sentinel = object()
+
+        async def _hang(**kwargs):
+            # Stand in for a vendor: replaces output.audio, then stalls.
+            session.output.audio = sentinel
+            await asyncio.sleep(10)
+
+        monkeypatch.setattr(video_actor, "_start_provider", _hang)
+
+        assert (
+            await video_actor.start_video_actor(
+                session=session, room=object(), scenario=_scenario(True)
+            )
+            is None
+        )
+        assert session.output.audio is None, "dead vendor output left in place"
+
+    @pytest.mark.unit
+    async def test_restored_after_a_provider_exception(self, monkeypatch):
+        monkeypatch.setattr(video_actor.settings, "VIDEO_ACTOR_ENABLED", True)
+        session = self._session()
+
+        async def _raise(**kwargs):
+            session.output.audio = object()
+            raise RuntimeError("vendor said no")
+
+        monkeypatch.setattr(video_actor, "_start_provider", _raise)
+
+        await video_actor.start_video_actor(
+            session=session, room=object(), scenario=_scenario(True)
+        )
+        assert session.output.audio is None
+
+    @pytest.mark.unit
+    async def test_restored_when_verification_declines_the_avatar(self, monkeypatch):
+        """The observed Tavus case: started fine, never published."""
+        monkeypatch.setattr(video_actor.settings, "VIDEO_ACTOR_ENABLED", True)
+        session = self._session()
+
+        async def _started_but_mute(**kwargs):
+            session.output.audio = object()
+            return None  # what _start_hosted returns when verification fails
+
+        monkeypatch.setattr(video_actor, "_start_provider", _started_but_mute)
+
+        assert (
+            await video_actor.start_video_actor(
+                session=session, room=object(), scenario=_scenario(True)
+            )
+            is None
+        )
+        assert session.output.audio is None
+
+    @pytest.mark.unit
+    async def test_a_live_avatar_keeps_its_output(self, monkeypatch):
+        """The success path must NOT restore — the avatar owns the audio now."""
+        monkeypatch.setattr(video_actor.settings, "VIDEO_ACTOR_ENABLED", True)
+        session = self._session()
+        vendor_output = object()
+
+        async def _ok(**kwargs):
+            session.output.audio = vendor_output
+            return video_actor.VideoActorHandle(provider="tavus", publishes_audio=True)
+
+        monkeypatch.setattr(video_actor, "_start_provider", _ok)
+
+        handle = await video_actor.start_video_actor(
+            session=session, room=object(), scenario=_scenario(True)
+        )
+        assert handle is not None
+        assert session.output.audio is vendor_output
+
+    @pytest.mark.unit
+    def test_the_overall_budget_covers_both_phases(self):
+        """Otherwise the publish verification is unreachable dead code."""
+        from app.core.config import Settings
+
+        start = Settings.model_fields["VIDEO_ACTOR_START_TIMEOUT_S"].default
+        publish = Settings.model_fields["VIDEO_ACTOR_PUBLISH_TIMEOUT_S"].default
+        assert publish > 0 and start > 0
