@@ -87,10 +87,12 @@ from __future__ import annotations
 
 import asyncio
 import importlib
+import os
 import time
 from dataclasses import dataclass
 from typing import Any, Mapping, Optional
 
+import aiohttp
 from livekit import rtc
 
 from app.core.config import settings
@@ -100,6 +102,40 @@ logger = get_logger(__name__)
 
 # Provider id for the dependency-free in-process renderer.
 PROVIDER_TEST_PATTERN = "test_pattern"
+
+# Tavus needs naming because it is the one vendor with a teardown obligation of
+# its own — see _end_tavus_conversation.
+PROVIDER_TAVUS = "tavus"
+
+_TAVUS_API_URL = "https://tavusapi.com/v2"
+
+# Providers that must be handed the project's REGISTRATION url rather than the
+# per-job regional media url.
+#
+# Tavus cannot publish into a room that already has participants when it is
+# pointed at a regional media host. It connects, joins as its participant, and
+# then publishes no track at all — which this worker cannot tell apart from a
+# healthy start, so the session goes silent for its whole duration (agent audio
+# rides the avatar track and the avatar never arrives).
+#
+# It needs BOTH conditions, which is why it survived every isolated test.
+# Measured 2026-09-07, same replica / same echo PAL / same token shape:
+#
+#   regional url + occupied room -> NEVER published   <- every real session
+#   regional url + empty room    -> published in 11.8s
+#   project url  + occupied room -> published in  5.3s
+#   project url  + empty room    -> published in  8.4s
+#
+# So this is not the scheme bug that _as_websocket_url fixes, and not the room:
+# it is the host. Beyond Presence handles the regional host fine, hence a
+# per-provider set rather than reverting the job-url change for everyone — that
+# change is right, and passing the registration url would send a vendor to a
+# different media server than the learner on a self-hosted deployment.
+PROVIDERS_NEEDING_REGISTRATION_URL = frozenset({PROVIDER_TAVUS})
+
+# Teardown runs on the shutdown path, so it gets a short leash: a slow vendor
+# must not hold a worker slot open behind a session that is already over.
+_TAVUS_END_TIMEOUT_S = 5.0
 
 # Hosted providers -> the module that carries their ``AvatarSession``. Kept as
 # data rather than a chain of imports so an unavailable vendor is a lookup miss
@@ -133,6 +169,57 @@ AVATAR_PARTICIPANT_IDENTITIES: Mapping[str, str] = {
 }
 
 _AVATAR_IDENTITY_SUFFIX = "-avatar-agent"
+
+
+def _as_websocket_url(url: Optional[str]) -> Optional[str]:
+    """Coerce a LiveKit URL to the ws/wss scheme a vendor can dial.
+
+    The job URL the SDK hands us (``RunningJobInfo.url``) can carry an http(s)
+    scheme — that is the API form, not the client form. Vendors differ in how
+    forgiving they are: Tavus normalises it silently, while Beyond Presence
+    rejects it outright with
+
+        400 Invalid LiveKit URL. Expected format: ws[s]://<host>[:<port>].
+
+    which surfaces here only as "failed to start" and an audio-only session.
+    The host is never the problem — a regional media host dials fine — so this
+    rewrites the scheme and leaves everything else alone.
+    """
+    if not url:
+        return url
+    if url.startswith("https://"):
+        return "wss://" + url[len("https://") :]
+    if url.startswith("http://"):
+        return "ws://" + url[len("http://") :]
+    return url
+
+
+def _vendor_livekit_url(provider: str, job_url: Optional[str]) -> Optional[str]:
+    """Which LiveKit URL to hand this vendor to dial in on.
+
+    The job URL by default — see the comment in ``_start_hosted`` for why that
+    matters. For the providers in ``PROVIDERS_NEEDING_REGISTRATION_URL`` it is
+    the registration URL instead, because they cannot publish into an
+    established room from a regional media host.
+
+    Falls back to the job URL when no registration URL is configured: a vendor
+    dialling the wrong host still has a chance of working, whereas handing it
+    nothing means it reads ``LIVEKIT_URL`` from our env, which is the same value
+    and would silently defeat the point on a deployment that has none.
+    """
+    if provider not in PROVIDERS_NEEDING_REGISTRATION_URL:
+        return job_url
+    registration_url = getattr(settings, "LIVEKIT_URL", None)
+    if not registration_url:
+        return job_url
+    if registration_url != job_url:
+        logger.info(
+            "[VIDEO_ACTOR] provider=%s dials the registration URL, not this "
+            "job's media host — it cannot publish into an established room "
+            "from a regional host",
+            provider,
+        )
+    return registration_url
 
 
 def _is_agent_kind(participant) -> bool:
@@ -241,15 +328,19 @@ async def _await_avatar_video(room, timeout: float) -> bool:
     return _avatar_video_is_live(room)
 
 
-def _tavus_kwargs(avatar_id: Optional[str]) -> dict:
+def _tavus_kwargs(plugin, *, avatar_id, api_key, character_name) -> dict:
     """Tavus names its two ids `replica_id` (the face) and `persona_id`.
 
     `replica_id` takes the resolved per-roleplay/deployment avatar id, so one
     setting means the same thing across vendors. `persona_id` is optional and
-    Tavus falls back to a stock persona without it — which is what we want:
-    the character's personality comes from OUR prompt and OUR LLM, and letting
-    a vendor persona speak for it would put a second, unversioned character
+    Tavus falls back to a stock persona without it — which is what we want: the
+    character's personality comes from OUR prompt and OUR LLM, and letting a
+    vendor persona speak for it would put a second, unversioned character
     definition in the loop.
+
+    NOTE the replica must be a **phoenix-3** model. A phoenix-4 replica is
+    accepted by the API, joins the room, and then publishes nothing at all
+    (observed 2026-09-07).
     """
     kwargs: dict[str, Any] = {}
     if avatar_id:
@@ -257,24 +348,67 @@ def _tavus_kwargs(avatar_id: Optional[str]) -> dict:
     persona = getattr(settings, "VIDEO_ACTOR_TAVUS_PERSONA_ID", None)
     if persona:
         kwargs["persona_id"] = persona
+    if api_key:
+        kwargs["api_key"] = api_key
     return kwargs
 
 
-def _single_avatar_id_kwargs(avatar_id: Optional[str]) -> dict:
-    """The common shape: one `avatar_id` naming which face to render."""
-    return {"avatar_id": avatar_id} if avatar_id else {}
+def _bey_kwargs(plugin, *, avatar_id, api_key, character_name) -> dict:
+    """Beyond Presence: a plain `avatar_id`, key alongside it."""
+    kwargs: dict[str, Any] = {"avatar_id": avatar_id}
+    if api_key:
+        kwargs["api_key"] = api_key
+    return kwargs
 
 
-# Per-vendor constructor arguments. Vendors genuinely disagree on what the id
-# is called, so this maps rather than guesses — an earlier version passed
-# `avatar_id` to everything, which Tavus rejects outright (it wants
-# `replica_id`), and the failure was invisible because the module falls back to
-# audio-only on any error.
+def _anam_kwargs(plugin, *, avatar_id, api_key, character_name) -> dict:
+    """Anam wants a `PersonaConfig(name, avatarId)`, not a bare id.
+
+    The name is cosmetic — it labels the session in Anam's own dashboard — so
+    it carries the character's name, which is what someone debugging a specific
+    roleplay from that end would search for.
+    """
+    kwargs: dict[str, Any] = {
+        "persona_config": plugin.PersonaConfig(
+            name=character_name or "ally-roleplay", avatarId=avatar_id
+        )
+    }
+    if api_key:
+        kwargs["api_key"] = api_key
+    return kwargs
+
+
+def _simli_kwargs(plugin, *, avatar_id, api_key, character_name) -> dict:
+    """Simli wants a `SimliConfig`, and its key goes INSIDE that config.
+
+    Note there is no top-level `api_key` on Simli's AvatarSession, so passing
+    one the way every other vendor takes it is a TypeError.
+    """
+    return {
+        "simli_config": plugin.SimliConfig(api_key=api_key or "", face_id=avatar_id)
+    }
+
+
+# Per-vendor constructor arguments. Vendors genuinely disagree on what the id is
+# called AND on its shape, so this maps rather than guesses.
+#
+# This is the third time that mattered. The first version passed `avatar_id` to
+# everything: Tavus wants `replica_id`, Anam wants a `PersonaConfig` object and
+# Simli a `SimliConfig`, so three of four vendors raised TypeError — which this
+# module converts into a clean audio-only fallback, meaning they would have been
+# permanently broken with nothing in the logs but "failed to start". Only Beyond
+# Presence happened to match. The builders take the imported plugin module
+# precisely so they can construct the vendor's own config types, and they own
+# the api_key placement too, because Simli's belongs inside its config.
+#
+# Adding a vendor: read its real AvatarSession signature (download the wheel and
+# look — the published docs track a newer livekit-agents than we pin), add a
+# builder, and add a test that binds the kwargs against the installed signature.
 HOSTED_PROVIDER_KWARGS = {
     "tavus": _tavus_kwargs,
-    "bey": _single_avatar_id_kwargs,
-    "anam": _single_avatar_id_kwargs,
-    "simli": _single_avatar_id_kwargs,
+    "bey": _bey_kwargs,
+    "anam": _anam_kwargs,
+    "simli": _simli_kwargs,
 }
 
 
@@ -498,16 +632,32 @@ async def _start_hosted(
         )
         return None
 
-    build_kwargs = HOSTED_PROVIDER_KWARGS.get(provider, _single_avatar_id_kwargs)
-    kwargs: dict[str, Any] = dict(build_kwargs(avatar_id))
-    # Passed explicitly when configured so the key lives with the rest of this
-    # feature's settings; every plugin also reads its own <VENDOR>_API_KEY from
-    # the environment, which stays the fallback.
-    api_key = getattr(settings, "VIDEO_ACTOR_API_KEY", None)
-    if api_key:
-        kwargs["api_key"] = api_key
+    build_kwargs = HOSTED_PROVIDER_KWARGS.get(provider)
+    if build_kwargs is None:
+        # A provider in the module map with no kwargs builder. Refusing loudly
+        # beats sending a guessed `avatar_id`: a wrong kwarg name raises
+        # TypeError, which this module turns into a silent audio-only fallback,
+        # and the vendor then looks broken for reasons nothing logs.
+        logger.warning(
+            "[VIDEO_ACTOR] provider=%s has no constructor mapping — refusing to "
+            "guess its arguments; session continues audio-only",
+            provider,
+        )
+        return None
 
-    avatar = avatar_session_cls(**kwargs)
+    # The key is passed explicitly when configured so it lives with the rest of
+    # this feature's settings; every plugin also reads its own <VENDOR>_API_KEY
+    # from the environment, which stays the fallback. Placement is the builder's
+    # job — Simli's belongs inside its config object, not beside it.
+    prompt_data = getattr(scenario, "prompt_data", None)
+    avatar = avatar_session_cls(
+        **build_kwargs(
+            plugin,
+            avatar_id=avatar_id,
+            api_key=getattr(settings, "VIDEO_ACTOR_API_KEY", None),
+            character_name=getattr(prompt_data, "name", None) if prompt_data else None,
+        )
+    )
 
     # A hosted avatar is dispatched into the room SERVER-SIDE: the vendor dials
     # LiveKit itself using a URL we hand it, and defaults to reading LIVEKIT_URL
@@ -518,8 +668,9 @@ async def _start_hosted(
     # registration URL would send the avatar to a different server than the
     # learner, and the failure looks like "video never arrives" with no error.
     start_kwargs: dict[str, Any] = {}
-    if livekit_url:
-        start_kwargs["livekit_url"] = livekit_url
+    ws_url = _as_websocket_url(_vendor_livekit_url(provider, livekit_url))
+    if ws_url:
+        start_kwargs["livekit_url"] = ws_url
 
     # The vendor's start() sets session.output.audio to its own data-stream
     # output. Remember what was there so a failed verification below can put it
@@ -530,6 +681,8 @@ async def _start_hosted(
         closer = getattr(avatar, "aclose", None)
         if closer is not None:
             await closer()
+        if provider == PROVIDER_TAVUS:
+            await _end_tavus_conversation(avatar)
 
     try:
         await avatar.start(session, room=room, **start_kwargs)
@@ -570,6 +723,60 @@ async def _start_hosted(
         return None
 
     return VideoActorHandle(provider=provider, publishes_audio=True, _closer=_close)
+
+
+async def _end_tavus_conversation(avatar: Any) -> None:
+    """End the Tavus conversation this session opened. The plugin never does.
+
+    ``livekit-plugins-tavus`` has no ``aclose`` on its ``AvatarSession`` — not
+    in the 1.3.12 we pin, and not in 1.5.6 either — so the conversation it
+    creates with ``POST /v2/conversations`` outlives the room. It stays open,
+    metered, and counting against the account's concurrent-conversation cap.
+
+    That cap is the suspected cause of "Tavus joins and publishes nothing".
+    Once it is reached Tavus still answers the create call with 200 and a
+    conversation_id, and the replica still joins the LiveKit room — it just
+    never publishes a track. From this worker's side that is indistinguishable
+    from a healthy start, which is why 11 of 12 test conversations on
+    2026-09-07 produced silence with nothing in the logs. Beyond Presence never
+    showed it because their session ends with the room.
+
+    Best-effort by construction: this runs during shutdown, the handle's
+    ``aclose`` swallows what it raises, and a conversation we fail to end is
+    the status quo rather than a regression.
+    """
+    conversation_id = getattr(avatar, "conversation_id", None)
+    if not conversation_id:
+        return
+
+    api_key = getattr(settings, "VIDEO_ACTOR_API_KEY", None) or os.getenv(
+        "TAVUS_API_KEY"
+    )
+    if not api_key:
+        # The plugin resolved a key we cannot see. Say so rather than failing
+        # silently: the leak is the thing that breaks the NEXT session.
+        logger.warning(
+            "[VIDEO_ACTOR] tavus conversation %s cannot be ended (no API key "
+            "visible to this worker) — it stays open against the account's "
+            "concurrent-conversation cap",
+            conversation_id,
+        )
+        return
+
+    url = f"{_TAVUS_API_URL}/conversations/{conversation_id}/end"
+    timeout = aiohttp.ClientTimeout(total=_TAVUS_END_TIMEOUT_S)
+    async with aiohttp.ClientSession(timeout=timeout) as http:
+        async with http.post(url, headers={"x-api-key": api_key}) as response:
+            if response.status >= 400:
+                logger.warning(
+                    "[VIDEO_ACTOR] failed to end tavus conversation %s "
+                    "(HTTP %s) — it stays open against the account's "
+                    "concurrent-conversation cap",
+                    conversation_id,
+                    response.status,
+                )
+                return
+    logger.info("[VIDEO_ACTOR] ended tavus conversation %s", conversation_id)
 
 
 def _resolve_avatar_id(scenario=None) -> Optional[str]:
