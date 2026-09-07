@@ -135,6 +135,29 @@ AVATAR_PARTICIPANT_IDENTITIES: Mapping[str, str] = {
 _AVATAR_IDENTITY_SUFFIX = "-avatar-agent"
 
 
+def _as_websocket_url(url: Optional[str]) -> Optional[str]:
+    """Coerce a LiveKit URL to the ws/wss scheme a vendor can dial.
+
+    The job URL the SDK hands us (``RunningJobInfo.url``) can carry an http(s)
+    scheme — that is the API form, not the client form. Vendors differ in how
+    forgiving they are: Tavus normalises it silently, while Beyond Presence
+    rejects it outright with
+
+        400 Invalid LiveKit URL. Expected format: ws[s]://<host>[:<port>].
+
+    which surfaces here only as "failed to start" and an audio-only session.
+    The host is never the problem — a regional media host dials fine — so this
+    rewrites the scheme and leaves everything else alone.
+    """
+    if not url:
+        return url
+    if url.startswith("https://"):
+        return "wss://" + url[len("https://") :]
+    if url.startswith("http://"):
+        return "ws://" + url[len("http://") :]
+    return url
+
+
 def is_avatar_participant(identity: Optional[str]) -> bool:
     """Whether a room participant is a rendering avatar rather than a person.
 
@@ -163,15 +186,19 @@ def human_participants(room) -> list:
     ]
 
 
-def _tavus_kwargs(avatar_id: Optional[str]) -> dict:
+def _tavus_kwargs(plugin, *, avatar_id, api_key, character_name) -> dict:
     """Tavus names its two ids `replica_id` (the face) and `persona_id`.
 
     `replica_id` takes the resolved per-roleplay/deployment avatar id, so one
     setting means the same thing across vendors. `persona_id` is optional and
-    Tavus falls back to a stock persona without it — which is what we want:
-    the character's personality comes from OUR prompt and OUR LLM, and letting
-    a vendor persona speak for it would put a second, unversioned character
+    Tavus falls back to a stock persona without it — which is what we want: the
+    character's personality comes from OUR prompt and OUR LLM, and letting a
+    vendor persona speak for it would put a second, unversioned character
     definition in the loop.
+
+    NOTE the replica must be a **phoenix-3** model. A phoenix-4 replica is
+    accepted by the API, joins the room, and then publishes nothing at all
+    (observed 2026-09-07).
     """
     kwargs: dict[str, Any] = {}
     if avatar_id:
@@ -179,24 +206,67 @@ def _tavus_kwargs(avatar_id: Optional[str]) -> dict:
     persona = getattr(settings, "VIDEO_ACTOR_TAVUS_PERSONA_ID", None)
     if persona:
         kwargs["persona_id"] = persona
+    if api_key:
+        kwargs["api_key"] = api_key
     return kwargs
 
 
-def _single_avatar_id_kwargs(avatar_id: Optional[str]) -> dict:
-    """The common shape: one `avatar_id` naming which face to render."""
-    return {"avatar_id": avatar_id} if avatar_id else {}
+def _bey_kwargs(plugin, *, avatar_id, api_key, character_name) -> dict:
+    """Beyond Presence: a plain `avatar_id`, key alongside it."""
+    kwargs: dict[str, Any] = {"avatar_id": avatar_id}
+    if api_key:
+        kwargs["api_key"] = api_key
+    return kwargs
 
 
-# Per-vendor constructor arguments. Vendors genuinely disagree on what the id
-# is called, so this maps rather than guesses — an earlier version passed
-# `avatar_id` to everything, which Tavus rejects outright (it wants
-# `replica_id`), and the failure was invisible because the module falls back to
-# audio-only on any error.
+def _anam_kwargs(plugin, *, avatar_id, api_key, character_name) -> dict:
+    """Anam wants a `PersonaConfig(name, avatarId)`, not a bare id.
+
+    The name is cosmetic — it labels the session in Anam's own dashboard — so
+    it carries the character's name, which is what someone debugging a specific
+    roleplay from that end would search for.
+    """
+    kwargs: dict[str, Any] = {
+        "persona_config": plugin.PersonaConfig(
+            name=character_name or "ally-roleplay", avatarId=avatar_id
+        )
+    }
+    if api_key:
+        kwargs["api_key"] = api_key
+    return kwargs
+
+
+def _simli_kwargs(plugin, *, avatar_id, api_key, character_name) -> dict:
+    """Simli wants a `SimliConfig`, and its key goes INSIDE that config.
+
+    Note there is no top-level `api_key` on Simli's AvatarSession, so passing
+    one the way every other vendor takes it is a TypeError.
+    """
+    return {
+        "simli_config": plugin.SimliConfig(api_key=api_key or "", face_id=avatar_id)
+    }
+
+
+# Per-vendor constructor arguments. Vendors genuinely disagree on what the id is
+# called AND on its shape, so this maps rather than guesses.
+#
+# This is the third time that mattered. The first version passed `avatar_id` to
+# everything: Tavus wants `replica_id`, Anam wants a `PersonaConfig` object and
+# Simli a `SimliConfig`, so three of four vendors raised TypeError — which this
+# module converts into a clean audio-only fallback, meaning they would have been
+# permanently broken with nothing in the logs but "failed to start". Only Beyond
+# Presence happened to match. The builders take the imported plugin module
+# precisely so they can construct the vendor's own config types, and they own
+# the api_key placement too, because Simli's belongs inside its config.
+#
+# Adding a vendor: read its real AvatarSession signature (download the wheel and
+# look — the published docs track a newer livekit-agents than we pin), add a
+# builder, and add a test that binds the kwargs against the installed signature.
 HOSTED_PROVIDER_KWARGS = {
     "tavus": _tavus_kwargs,
-    "bey": _single_avatar_id_kwargs,
-    "anam": _single_avatar_id_kwargs,
-    "simli": _single_avatar_id_kwargs,
+    "bey": _bey_kwargs,
+    "anam": _anam_kwargs,
+    "simli": _simli_kwargs,
 }
 
 
@@ -392,16 +462,32 @@ async def _start_hosted(
         )
         return None
 
-    build_kwargs = HOSTED_PROVIDER_KWARGS.get(provider, _single_avatar_id_kwargs)
-    kwargs: dict[str, Any] = dict(build_kwargs(avatar_id))
-    # Passed explicitly when configured so the key lives with the rest of this
-    # feature's settings; every plugin also reads its own <VENDOR>_API_KEY from
-    # the environment, which stays the fallback.
-    api_key = getattr(settings, "VIDEO_ACTOR_API_KEY", None)
-    if api_key:
-        kwargs["api_key"] = api_key
+    build_kwargs = HOSTED_PROVIDER_KWARGS.get(provider)
+    if build_kwargs is None:
+        # A provider in the module map with no kwargs builder. Refusing loudly
+        # beats sending a guessed `avatar_id`: a wrong kwarg name raises
+        # TypeError, which this module turns into a silent audio-only fallback,
+        # and the vendor then looks broken for reasons nothing logs.
+        logger.warning(
+            "[VIDEO_ACTOR] provider=%s has no constructor mapping — refusing to "
+            "guess its arguments; session continues audio-only",
+            provider,
+        )
+        return None
 
-    avatar = avatar_session_cls(**kwargs)
+    # The key is passed explicitly when configured so it lives with the rest of
+    # this feature's settings; every plugin also reads its own <VENDOR>_API_KEY
+    # from the environment, which stays the fallback. Placement is the builder's
+    # job — Simli's belongs inside its config object, not beside it.
+    prompt_data = getattr(scenario, "prompt_data", None)
+    avatar = avatar_session_cls(
+        **build_kwargs(
+            plugin,
+            avatar_id=avatar_id,
+            api_key=getattr(settings, "VIDEO_ACTOR_API_KEY", None),
+            character_name=getattr(prompt_data, "name", None) if prompt_data else None,
+        )
+    )
 
     # A hosted avatar is dispatched into the room SERVER-SIDE: the vendor dials
     # LiveKit itself using a URL we hand it, and defaults to reading LIVEKIT_URL
@@ -412,8 +498,9 @@ async def _start_hosted(
     # registration URL would send the avatar to a different server than the
     # learner, and the failure looks like "video never arrives" with no error.
     start_kwargs: dict[str, Any] = {}
-    if livekit_url:
-        start_kwargs["livekit_url"] = livekit_url
+    ws_url = _as_websocket_url(livekit_url)
+    if ws_url:
+        start_kwargs["livekit_url"] = ws_url
 
     try:
         await avatar.start(session, room=room, **start_kwargs)
