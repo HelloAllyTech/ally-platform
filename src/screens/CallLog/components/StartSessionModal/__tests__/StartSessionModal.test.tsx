@@ -79,7 +79,12 @@ describe('StartSessionModal', () => {
     // roleplay pre-start warning about an unresponsive "bot", which has nothing
     // to do with scribe.
     expect(onListenLive).toHaveBeenCalledTimes(1);
-    expect(onClose).toHaveBeenCalledTimes(1);
+
+    // The sheet must NOT close itself. Microphone permission has to resolve
+    // first, and closing here left the counsellor staring at the call log with
+    // nothing happening — the "stuck on the blue button" report. The caller
+    // closes it once it knows whether it is navigating or showing an error.
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it('offers dictation mode only when the tenant toggle allows it', () => {

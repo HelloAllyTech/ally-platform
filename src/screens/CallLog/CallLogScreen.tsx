@@ -72,6 +72,37 @@ import {
 // Number of items to fetch per page for pagination
 const ITEMS_PER_PAGE = 10;
 
+// Long enough that a counsellor reading the OS permission dialog is never cut
+// off — the request only resolves once they answer it — and short enough that a
+// call which is never going to answer stops pretending to work.
+const PERMISSION_TIMEOUT_MS = 30000;
+
+/**
+ * Rejects if a permission call has not settled in time. `react-native-permissions`
+ * resolves against native state, and a native side that never replies leaves the
+ * promise pending for the life of the process with nothing to show for it.
+ */
+const withPermissionTimeout = <T,>(
+  promise: Promise<T>,
+  stage: string,
+): Promise<T> => {
+  let timer: ReturnType<typeof setTimeout>;
+  return Promise.race([
+    promise,
+    new Promise<T>((_resolve, reject) => {
+      timer = setTimeout(
+        () =>
+          reject(
+            new Error(
+              `microphone permission ${stage}() did not settle in time`,
+            ),
+          ),
+        PERMISSION_TIMEOUT_MS,
+      );
+    }),
+  ]).finally(() => clearTimeout(timer));
+};
+
 /**
  * CallLogScreen Component
  *
@@ -108,6 +139,7 @@ export const CallLogScreen: React.FC = () => {
   const currentChat = useAppSelector(state => state.chat.currentChat);
   const {userData, checkAuth} = useUser();
   const [showStartSession, setShowStartSession] = useState(false);
+  const [isStartingScribe, setIsStartingScribe] = useState(false);
 
   const stackNavigation = useAppNavigation();
   const tabNavigation = useNavigation<NavigationProp<ParamListBase>>();
@@ -117,8 +149,10 @@ export const CallLogScreen: React.FC = () => {
     useLazyGetCallLogsQuery();
   const [getSimulationLogs, {isFetching: isFetchingSimulationLogs}] =
     useLazyGetSimulationLogsQuery();
-  const [getVisibleChatTypes, {data: enabledChatTypes}] =
-    useLazyGetVisibleChatTypesQuery();
+  const [
+    getVisibleChatTypes,
+    {data: enabledChatTypes, isFetching: isFetchingChatTypes},
+  ] = useLazyGetVisibleChatTypesQuery();
   const {checkCounselorChat} = useCounselorChat();
 
   const canViewCallLogs = permissions?.includes(
@@ -172,11 +206,26 @@ export const CallLogScreen: React.FC = () => {
     permissions?.includes(permission),
   );
 
-  useEffect(() => {
-    if (canStartCall) {
-      getVisibleChatTypes();
-    }
-  }, [canStartCall, getVisibleChatTypes]);
+  /**
+   * Re-ask on every focus, not once per mount.
+   *
+   * This drove the "the blue button does nothing" reports. Both of the flags the
+   * start button is gated on come from settings requests, and when the access
+   * token rotates every request in flight returns 401 at once — production shows
+   * `/settings/chat-types`, `/settings/scribe-note-creation-enabled`,
+   * `/users/me` and `/chats/call-logs` all failing in the same millisecond. This
+   * effect's dependencies are both stable, so it fired once, and nothing ever
+   * retried it. `canStartCall` comes from persisted permissions, so the button
+   * still rendered — visible, blue, and permanently inert until the app was
+   * restarted. Refetching on focus recovers it once the token does.
+   */
+  useFocusEffect(
+    useCallback(() => {
+      if (canStartCall) {
+        getVisibleChatTypes();
+      }
+    }, [canStartCall, getVisibleChatTypes]),
+  );
 
   const hasMicrophoneChatType = useMemo(
     () =>
@@ -528,18 +577,68 @@ export const CallLogScreen: React.FC = () => {
     }
   };
 
+  /**
+   * Starting a scribe session used to be able to stop dead here with nothing on
+   * screen at all.
+   *
+   * The counsellor taps "Start Scribe Mode", the sheet closes, and the two
+   * permission calls below are awaited with no timeout and no visible state. If
+   * either never settles, this function simply never reaches `navigate`: no
+   * screen, no socket, no error, no log — the app looks frozen, and the only way
+   * out is to force-quit it. Production bears that out. Across three days of the
+   * reported failures the listening screen never once opened its socket, so the
+   * tap was never getting past this point.
+   *
+   * So: bound both calls, keep the sheet up with a spinner while they run, and
+   * fail loudly if they don't answer. That does not identify which call is at
+   * fault, but it converts a silent freeze into a bounded wait the counsellor
+   * can act on — and the toast tells us it happened at all, which nothing did
+   * before.
+   */
+  /**
+   * True when neither session type is on offer, and false-because-we-do-not-know
+   * is kept separate from false-because-the-tenant-disabled-it. The first is a
+   * failed settings request and must not present as a disabled control.
+   */
+  const canOfferAnySessionType = hasMicrophoneChatType || canCreateNote;
+  const isSessionTypeUnknown = !enabledChatTypes;
+
+  const handleStartSessionPress = () => {
+    if (isSessionTypeUnknown) {
+      // Never a dead tap: re-ask, and say so rather than doing nothing.
+      if (!isFetchingChatTypes) {
+        getVisibleChatTypes();
+      }
+      if (!canOfferAnySessionType) {
+        showToast(t('common.somethingWentWrong'), 'error');
+        return;
+      }
+    }
+    setShowStartSession(true);
+  };
+
   const handleVoiceRecording = async () => {
+    // A second tap while the first is still resolving must not start a parallel
+    // flow — that is how two sessions got created seconds apart before.
+    if (isStartingScribe) return;
+    setIsStartingScribe(true);
+
     try {
       const micPermission = MICROPHONE_PERMISSION;
 
       // Check existing status
-      const status = await check(micPermission);
+      const status = await withPermissionTimeout(check(micPermission), 'check');
       let finalStatus = status;
 
       // Request if not granted yet
       if (status !== RESULTS.GRANTED) {
-        finalStatus = await request(micPermission);
+        finalStatus = await withPermissionTimeout(
+          request(micPermission),
+          'request',
+        );
       }
+
+      setShowStartSession(false);
 
       if (finalStatus === RESULTS.GRANTED) {
         checkCounselorChat();
@@ -556,6 +655,10 @@ export const CallLogScreen: React.FC = () => {
       showMicrophoneSettingsAlert();
     } catch (error) {
       logger.error(`Mic permission flow failed: ${error}`);
+      setShowStartSession(false);
+      showToast(t('common.somethingWentWrong'), 'error');
+    } finally {
+      setIsStartingScribe(false);
     }
   };
 
@@ -677,11 +780,19 @@ export const CallLogScreen: React.FC = () => {
           style={[
             styles.fab,
             {bottom: insets.bottom + ms(100)},
-            !(hasMicrophoneChatType || canCreateNote) && styles.bgAshGray,
+            !canOfferAnySessionType && styles.bgAshGray,
           ]}
-          disabled={!(hasMicrophoneChatType || canCreateNote)}
+          /*
+           * Only inert when we actually KNOW there is nothing to offer. While
+           * the settings answer is missing — the usual cause being a 401 burst
+           * on token rotation — the button stays live and the press retries the
+           * request, because a blue button that silently does nothing is the bug
+           * being reported.
+           */
+          disabled={!canOfferAnySessionType && !isSessionTypeUnknown}
           activeOpacity={0.9}
-          onPress={() => setShowStartSession(true)}>
+          testID="start-session-fab"
+          onPress={handleStartSessionPress}>
           <TranscribeIcon />
         </TouchableOpacity>
       )}
@@ -693,6 +804,7 @@ export const CallLogScreen: React.FC = () => {
         showCreateNote={canCreateNote}
         onCreateNote={handleCreateNote}
         isCreatingNote={isCreatingNote}
+        isStartingScribe={isStartingScribe}
       />
       <CallLogFilterSheet
         visible={showFilterSheet}
