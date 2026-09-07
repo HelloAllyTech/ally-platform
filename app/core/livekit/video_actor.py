@@ -135,6 +135,29 @@ AVATAR_PARTICIPANT_IDENTITIES: Mapping[str, str] = {
 _AVATAR_IDENTITY_SUFFIX = "-avatar-agent"
 
 
+def _as_websocket_url(url: Optional[str]) -> Optional[str]:
+    """Coerce a LiveKit URL to the ws/wss scheme a vendor can dial.
+
+    The job URL the SDK hands us (``RunningJobInfo.url``) can carry an http(s)
+    scheme — that is the API form, not the client form. Vendors differ in how
+    forgiving they are: Tavus normalises it silently, while Beyond Presence
+    rejects it outright with
+
+        400 Invalid LiveKit URL. Expected format: ws[s]://<host>[:<port>].
+
+    which surfaces here only as "failed to start" and an audio-only session.
+    The host is never the problem — a regional media host dials fine — so this
+    rewrites the scheme and leaves everything else alone.
+    """
+    if not url:
+        return url
+    if url.startswith("https://"):
+        return "wss://" + url[len("https://") :]
+    if url.startswith("http://"):
+        return "ws://" + url[len("http://") :]
+    return url
+
+
 def is_avatar_participant(identity: Optional[str]) -> bool:
     """Whether a room participant is a rendering avatar rather than a person.
 
@@ -475,8 +498,9 @@ async def _start_hosted(
     # registration URL would send the avatar to a different server than the
     # learner, and the failure looks like "video never arrives" with no error.
     start_kwargs: dict[str, Any] = {}
-    if livekit_url:
-        start_kwargs["livekit_url"] = livekit_url
+    ws_url = _as_websocket_url(livekit_url)
+    if ws_url:
+        start_kwargs["livekit_url"] = ws_url
 
     try:
         await avatar.start(session, room=room, **start_kwargs)

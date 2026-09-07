@@ -123,7 +123,7 @@ who closes the tab before connecting leaves an agent that never notices it is
 alone, holding a worker slot **and a metered vendor conversation** open until
 the max-duration cap fires.
 
-**It dials LiveKit server-side, so it needs the job's URL, not ours.** The
+**It dials LiveKit server-side, so it needs the job's URL — in client form.** The
 plugin defaults to reading `LIVEKIT_URL` from our environment. That is the wrong
 value for the same reason the Krisp gate cares (see `audio_filters.py`): a
 worker registers with `settings.LIVEKIT_URL`, but each job's room lives on
@@ -131,6 +131,14 @@ whatever media URL the server assigned *that job*. Hand over the registration
 URL and the avatar can join a different server than the learner — which looks
 like "video never arrives", with no error anywhere. `_start_hosted` passes the
 job URL explicitly.
+
+The scheme matters as much as the host. That job URL can arrive as `https://`
+— the API form, not the client form — and vendors disagree about it. Tavus
+normalises silently; Beyond Presence returns
+`400 Invalid LiveKit URL. Expected format: ws[s]://<host>[:<port>]`, which
+reaches the worker only as "failed to start" and a session that quietly runs
+audio-only. `_as_websocket_url` rewrites the scheme and leaves the host alone;
+a regional media host dials fine once it is `wss://`.
 
 Adding a hosted provider means adding its row to
 `ally-be/src/llm/constants/ai-task-registry.constants.ts` in the same change —

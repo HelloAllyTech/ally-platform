@@ -551,3 +551,44 @@ class TestAvatarParticipantFiltering:
     @pytest.mark.unit
     def test_missing_room_attribute_is_survivable(self):
         assert video_actor.human_participants(SimpleNamespace()) == []
+
+
+class TestLiveKitUrlScheme:
+    """A vendor dials LiveKit itself, and wants the client-form URL.
+
+    The job URL the SDK hands us can carry an http(s) scheme — the API form.
+    Tavus normalises it silently; Beyond Presence returns
+    "400 Invalid LiveKit URL. Expected format: ws[s]://<host>[:<port>]", which
+    reaches us only as "failed to start" and a session that quietly runs
+    audio-only. Found by replaying the vendor's own HTTP call by hand.
+    """
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize(
+        "given,expected",
+        [
+            ("https://h.livekit.cloud", "wss://h.livekit.cloud"),
+            ("http://h:7880", "ws://h:7880"),
+            # Already client-form: left exactly alone.
+            ("wss://h.livekit.cloud", "wss://h.livekit.cloud"),
+            ("ws://h:7880", "ws://h:7880"),
+        ],
+    )
+    def test_scheme_is_coerced_to_websocket(self, given, expected):
+        assert video_actor._as_websocket_url(given) == expected
+
+    @pytest.mark.unit
+    def test_the_regional_host_is_preserved(self):
+        """The host was never the problem — only the scheme."""
+        assert (
+            video_actor._as_websocket_url(
+                "https://proj-abc.ohyderabad1a.production.livekit.cloud"
+            )
+            == "wss://proj-abc.ohyderabad1a.production.livekit.cloud"
+        )
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("empty", [None, ""])
+    def test_empty_passes_through(self, empty):
+        """No URL means "let the plugin read its own env", not a broken string."""
+        assert video_actor._as_websocket_url(empty) == empty
