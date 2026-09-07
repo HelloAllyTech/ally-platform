@@ -294,6 +294,29 @@ class PromptData(BaseModel):
             "settings.COMFORT_AUDIO_VOLUME."
         ),
     )
+    video_actor_enabled: bool = Field(
+        default=False,
+        description=(
+            "Per-roleplay toggle (Studio: videoActorEnabled) for the EXPERIMENTAL "
+            "AI video actor — a synchronized video track published alongside the "
+            "character's voice, so the learner sees a face instead of a static "
+            "call card. Default False (opt-in) so every roleplay that predates "
+            "the feature is byte-for-byte unchanged. Gated by "
+            "settings.VIDEO_ACTOR_ENABLED (a global kill-switch, itself default "
+            "False): both must be on. Any failure to start the actor falls back "
+            "to today's audio-only session. See app/core/livekit/video_actor.py."
+        ),
+    )
+    video_actor_avatar_id: Optional[str] = Field(
+        default=None,
+        description=(
+            "Per-roleplay avatar id (Studio: videoActorAvatarId) naming which "
+            "face a hosted video-actor provider should render. When None, falls "
+            "back to settings.VIDEO_ACTOR_AVATAR_ID. Ignored by the in-process "
+            "'test_pattern' provider, which derives its tint from the character "
+            "name instead."
+        ),
+    )
     continuous_backchanneling: bool = Field(
         default=False,
         description=(
@@ -852,6 +875,18 @@ class Scenario(BaseModel):
                     if prompt_data_dict.get("comfortAudioVolume") is not None
                     else prompt_data_dict.get("comfort_audio_volume")
                 ),
+                # Video actor: strictly opt-in, and unlike comfort audio above
+                # ABSENT and EXPLICITLY FALSE mean the same thing. Every roleplay
+                # in existence today omits this key, and every one of them must
+                # keep running audio-only, so there is no "never expressed a
+                # preference" default to reach for — absence IS the preference.
+                "video_actor_enabled": bool(
+                    prompt_data_dict.get("videoActorEnabled")
+                    or prompt_data_dict.get("video_actor_enabled")
+                    or False
+                ),
+                "video_actor_avatar_id": prompt_data_dict.get("videoActorAvatarId")
+                or prompt_data_dict.get("video_actor_avatar_id"),
                 "continuous_backchanneling": bool(
                     prompt_data_dict.get("continuousBackchanneling") or False
                 ),

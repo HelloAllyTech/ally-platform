@@ -730,6 +730,99 @@ class Settings(BaseSettings):
         ),
     )
 
+    # ---- AI video actor (EXPERIMENTAL, off for every roleplay) ----
+    # Publishes a synchronized video track alongside the character's voice, so
+    # the learner sees a face rather than a static call card. Same shape as
+    # comfort audio above — this GLOBAL kill-switch AND the per-roleplay
+    # videoActorEnabled must both be on — plus a third gate in ally-be
+    # (the `video_actor` admin toggle) deciding which platform admins can even
+    # see the per-roleplay switch in Studio.
+    #
+    # This one defaults ON and the other two default OFF. That is deliberate:
+    # the kill-switch's job is to be the thing an operator flips to stop video
+    # everywhere in one restart, and it can only do that job if the interesting
+    # decision lives in the per-roleplay flag. No roleplay sets that flag, so
+    # every session today is byte-for-byte audio-only.
+    # Full contract: app/core/livekit/video_actor.py.
+    VIDEO_ACTOR_ENABLED: bool = Field(
+        default=True,
+        description=(
+            "Global kill-switch for the AI video actor. Default True — but the "
+            "feature is still off everywhere, because the two gates BELOW it "
+            "are what actually turn video on and both default off: a roleplay's "
+            "own videoActorEnabled (false for every roleplay), and the "
+            "video_actor admin toggle that decides who can even see that switch "
+            "in Studio (granted to nobody). On means 'the platform permits "
+            "video where a roleplay asks for it', not 'video is on'. Set False "
+            "to kill it everywhere in one restart without touching a roleplay."
+        ),
+    )
+    VIDEO_ACTOR_PROVIDER: str = Field(
+        default="test_pattern",
+        description=(
+            "Which renderer serves the video actor. 'test_pattern' (default) "
+            "renders in-process with numpy — no extra dependency, no vendor "
+            "account, no per-minute cost, and NOT AI-generated video: it exists "
+            "to prove the publish/subscribe path and measure what a second track "
+            "costs. 'bey', 'tavus', 'hedra', 'anam' and 'simli' are real "
+            "AI-generated streaming avatars, each needing its livekit-plugins-* "
+            "package (imported lazily) and a vendor key."
+        ),
+    )
+    VIDEO_ACTOR_START_TIMEOUT_S: float = Field(
+        default=6.0,
+        description=(
+            "Max seconds to get the video actor live before giving up and running "
+            "the session audio-only. This is the feature's latency guard: avatar "
+            "start sits in front of session.start, so an unbounded wait would "
+            "delay the opening statement — the one thing sim-start latency work "
+            "exists to protect. A hosted vendor that misses this budget costs a "
+            "warning line, not a slow session."
+        ),
+    )
+    VIDEO_ACTOR_WIDTH: int = Field(
+        default=480,
+        description=(
+            "Video actor frame width in pixels. Kept small deliberately: the "
+            "learner sees it in a call card, not full-screen, and every extra "
+            "pixel is egress on a self-hosted SFU."
+        ),
+    )
+    VIDEO_ACTOR_HEIGHT: int = Field(
+        default=480,
+        description="Video actor frame height in pixels. See VIDEO_ACTOR_WIDTH.",
+    )
+    VIDEO_ACTOR_FPS: float = Field(
+        default=15.0,
+        description=(
+            "Video actor frame rate. 15 is enough for a talking head and roughly "
+            "halves the bitrate of 30."
+        ),
+    )
+    VIDEO_ACTOR_SAMPLE_RATE: int = Field(
+        default=24000,
+        description=(
+            "Sample rate (Hz) of the audio the video actor republishes in sync "
+            "with its video. Only used by the in-process 'test_pattern' renderer; "
+            "hosted providers negotiate their own."
+        ),
+    )
+    VIDEO_ACTOR_AVATAR_ID: Optional[str] = Field(
+        default=None,
+        description=(
+            "Deployment-wide fallback avatar id for hosted providers, used when a "
+            "roleplay does not name its own videoActorAvatarId. Ignored by "
+            "'test_pattern'. A hosted provider with neither runs audio-only."
+        ),
+    )
+    VIDEO_ACTOR_API_KEY: Optional[str] = Field(
+        default=None,
+        description=(
+            "Vendor API key for the hosted video-actor provider. Left unset, the "
+            "plugin falls back to whatever env var it reads itself."
+        ),
+    )
+
     # ---- Live supervisor notes (in-session coaching hints) ----
     # A second, cheap LLM reads each committed learner turn alongside the actor
     # and occasionally sends the learner a one-line coaching hint, which the
