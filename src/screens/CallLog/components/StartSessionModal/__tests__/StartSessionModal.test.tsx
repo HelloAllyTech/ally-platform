@@ -80,11 +80,11 @@ describe('StartSessionModal', () => {
     // to do with scribe.
     expect(onListenLive).toHaveBeenCalledTimes(1);
 
-    // The sheet must NOT close itself. Microphone permission has to resolve
-    // first, and closing here left the counsellor staring at the call log with
-    // nothing happening — the "stuck on the blue button" report. The caller
-    // closes it once it knows whether it is navigating or showing an error.
-    expect(onClose).not.toHaveBeenCalled();
+    // The sheet MUST close itself here, synchronously. Holding it open until the
+    // caller knew where it was going put its unmount in the same tick as
+    // navigate(), which froze Android in 1.23.21. Closing first leaves the
+    // permission await between the dismissal and the navigation.
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it('offers dictation mode only when the tenant toggle allows it', () => {

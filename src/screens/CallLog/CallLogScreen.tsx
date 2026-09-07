@@ -638,8 +638,9 @@ export const CallLogScreen: React.FC = () => {
         );
       }
 
-      setShowStartSession(false);
-
+      // NOTE: the sheet already closed itself on tap. Do not close it here —
+      // that put its unmount in the same synchronous block as navigate() and
+      // froze Android. See StartSessionModal.handleStartScribe.
       if (finalStatus === RESULTS.GRANTED) {
         checkCounselorChat();
         stackNavigation.navigate('Listening', {isMicrophoneMode: true});
@@ -655,7 +656,6 @@ export const CallLogScreen: React.FC = () => {
       showMicrophoneSettingsAlert();
     } catch (error) {
       logger.error(`Mic permission flow failed: ${error}`);
-      setShowStartSession(false);
       showToast(t('common.somethingWentWrong'), 'error');
     } finally {
       setIsStartingScribe(false);

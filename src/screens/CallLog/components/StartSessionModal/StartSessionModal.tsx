@@ -45,15 +45,20 @@ export const StartSessionModal: React.FC<StartSessionModalProps> = ({
   const {t} = useTranslate();
 
   /**
-   * Deliberately does NOT close the sheet. Starting scribe has to resolve the
-   * microphone permission first, and closing here meant the sheet vanished the
-   * instant it was tapped and the counsellor was left looking at the call log
-   * with nothing happening — indistinguishable from a frozen app if the
-   * permission call never came back. The sheet now stays up, showing the tap was
-   * received, and the caller closes it once it knows where it is going.
+   * Closes the sheet here, synchronously, and this ordering is load-bearing on
+   * Android.
+   *
+   * Holding the sheet open until the caller knew where it was going read better,
+   * but it put the sheet's unmount in the same synchronous block as
+   * `navigation.navigate` — tearing down a native Modal window while a screen
+   * transition starts. 1.23.21 shipped that and Android counsellors got a frozen
+   * app with no sheet and no recording screen, where 1.23.20 reached the screen.
+   * Closing first leaves `onListenLive`'s first `await` between the dismissal
+   * and the navigation, which is the gap that makes it safe.
    */
   const handleStartScribe = () => {
     onListenLive();
+    onClose();
   };
 
   if (!visible) return null;
