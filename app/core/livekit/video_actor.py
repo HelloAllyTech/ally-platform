@@ -62,18 +62,21 @@ the learner is never shown an error about a face they did not ask for.
 
 ``settings.VIDEO_ACTOR_PROVIDER`` selects one:
 
-* ``test_pattern`` (default) — renders IN THIS PROCESS with numpy. No new
-  dependency, no vendor account, no per-minute bill, and explicitly NOT
-  AI-generated video: it is an audio-reactive placeholder whose job is to prove
-  the publish -> subscribe -> render path end to end. Use it to test the
-  plumbing — but NOT to estimate bandwidth: it is a static image while the
-  character is silent, so the encoder skips frames a real talking head would
-  have to send.
-* ``bey`` / ``tavus`` / ``hedra`` / ``anam`` / ``simli`` — real AI-generated
-  streaming avatars. Each needs its ``livekit-plugins-<name>`` package and a
-  vendor key. The package is imported LAZILY, so a deployment that has not
-  installed it gets a log line and an audio-only session rather than an
-  ImportError at worker boot.
+* ``tavus`` (default) — real AI-generated video, and the vendor this platform
+  is wired for. Needs ``VIDEO_ACTOR_API_KEY`` (or ``TAVUS_API_KEY``) and a
+  replica id; without either it falls back to audio-only, which is exactly why
+  it is the default rather than the placeholder below — a misconfiguration
+  should cost the learner nothing, not render them a coloured blob.
+* ``test_pattern`` — an audio-reactive placeholder rendered IN THIS PROCESS
+  with numpy. No dependency, no vendor account, no bill, and explicitly NOT
+  AI-generated video. Kept as an explicit opt-in for proving the
+  publish -> subscribe -> render path without a vendor account; never point it
+  at a real cohort. Also not a bandwidth estimate: it is a static image while
+  the character is silent, so the encoder skips frames a real talking head
+  would have to send.
+* ``bey`` / ``anam`` / ``simli`` — same abstraction, plugins not installed.
+  Imports are LAZY, so an absent one gets a log line and an audio-only session
+  rather than an ImportError at worker boot.
 
 Adding a hosted provider here means adding its row to the AI task registry
 (``ally-be/src/llm/constants/ai-task-registry.constants.ts``) — a rendered
@@ -102,11 +105,98 @@ PROVIDER_TEST_PATTERN = "test_pattern"
 # data rather than a chain of imports so an unavailable vendor is a lookup miss
 # instead of a crash, and so adding one is a one-line change.
 HOSTED_PROVIDER_MODULES: Mapping[str, str] = {
-    "bey": "livekit.plugins.bey",
     "tavus": "livekit.plugins.tavus",
-    "hedra": "livekit.plugins.hedra",
+    "bey": "livekit.plugins.bey",
     "anam": "livekit.plugins.anam",
     "simli": "livekit.plugins.simli",
+}
+
+# Identities the hosted providers give the participant they add to the room.
+#
+# This is not cosmetic bookkeeping. A hosted avatar joins as a SECOND remote
+# participant, and this worker has two "is anyone still here?" checks that read
+# ``room.remote_participants`` — the orphan deadline and the pause guard. Left
+# unfiltered, the avatar counts as company: a learner who closes the tab before
+# connecting leaves an agent that never notices it is alone, holding a worker
+# slot and a metered vendor conversation open until the max-duration cap fires.
+# ``is_avatar_participant`` is what keeps those checks counting humans.
+#
+# Tavus's own default (``_AVATAR_AGENT_IDENTITY`` in its avatar.py) is
+# "tavus-avatar-agent"; the rest follow the same ``<vendor>-avatar-agent``
+# shape. The suffix check below is the real guard, so a vendor that renames its
+# default is still caught.
+AVATAR_PARTICIPANT_IDENTITIES: Mapping[str, str] = {
+    "tavus": "tavus-avatar-agent",
+    "bey": "bey-avatar-agent",
+    "anam": "anam-avatar-agent",
+    "simli": "simli-avatar-agent",
+}
+
+_AVATAR_IDENTITY_SUFFIX = "-avatar-agent"
+
+
+def is_avatar_participant(identity: Optional[str]) -> bool:
+    """Whether a room participant is a rendering avatar rather than a person.
+
+    Used by every "is anyone still here?" check in the worker. Errs toward
+    calling something an avatar ONLY on an exact known identity or the shared
+    ``-avatar-agent`` suffix, so a real learner can never be mistaken for one
+    and silently stripped from a headcount.
+    """
+    if not identity:
+        return False
+    return identity in AVATAR_PARTICIPANT_IDENTITIES.values() or identity.endswith(
+        _AVATAR_IDENTITY_SUFFIX
+    )
+
+
+def human_participants(room) -> list:
+    """Remote participants that are actual people.
+
+    The avatar the agent itself commissioned does not count as company.
+    """
+    remote = getattr(room, "remote_participants", None) or {}
+    return [
+        p
+        for p in remote.values()
+        if not is_avatar_participant(getattr(p, "identity", None))
+    ]
+
+
+def _tavus_kwargs(avatar_id: Optional[str]) -> dict:
+    """Tavus names its two ids `replica_id` (the face) and `persona_id`.
+
+    `replica_id` takes the resolved per-roleplay/deployment avatar id, so one
+    setting means the same thing across vendors. `persona_id` is optional and
+    Tavus falls back to a stock persona without it — which is what we want:
+    the character's personality comes from OUR prompt and OUR LLM, and letting
+    a vendor persona speak for it would put a second, unversioned character
+    definition in the loop.
+    """
+    kwargs: dict[str, Any] = {}
+    if avatar_id:
+        kwargs["replica_id"] = avatar_id
+    persona = getattr(settings, "VIDEO_ACTOR_TAVUS_PERSONA_ID", None)
+    if persona:
+        kwargs["persona_id"] = persona
+    return kwargs
+
+
+def _single_avatar_id_kwargs(avatar_id: Optional[str]) -> dict:
+    """The common shape: one `avatar_id` naming which face to render."""
+    return {"avatar_id": avatar_id} if avatar_id else {}
+
+
+# Per-vendor constructor arguments. Vendors genuinely disagree on what the id
+# is called, so this maps rather than guesses — an earlier version passed
+# `avatar_id` to everything, which Tavus rejects outright (it wants
+# `replica_id`), and the failure was invisible because the module falls back to
+# audio-only on any error.
+HOSTED_PROVIDER_KWARGS = {
+    "tavus": _tavus_kwargs,
+    "bey": _single_avatar_id_kwargs,
+    "anam": _single_avatar_id_kwargs,
+    "simli": _single_avatar_id_kwargs,
 }
 
 
@@ -160,6 +250,7 @@ async def start_video_actor(
     session,
     room: rtc.Room,
     scenario=None,
+    livekit_url: Optional[str] = None,
 ) -> Optional[VideoActorHandle]:
     """Start the video actor for this session, or return ``None``.
 
@@ -177,7 +268,11 @@ async def start_video_actor(
     try:
         handle = await asyncio.wait_for(
             _start_provider(
-                provider=provider, session=session, room=room, scenario=scenario
+                provider=provider,
+                session=session,
+                room=room,
+                scenario=scenario,
+                livekit_url=livekit_url,
             ),
             timeout=timeout,
         )
@@ -214,7 +309,12 @@ async def start_video_actor(
 
 
 async def _start_provider(
-    *, provider: str, session, room: rtc.Room, scenario=None
+    *,
+    provider: str,
+    session,
+    room: rtc.Room,
+    scenario=None,
+    livekit_url: Optional[str] = None,
 ) -> Optional[VideoActorHandle]:
     """Dispatch to the configured provider. Raises; the caller converts."""
     if provider == PROVIDER_TEST_PATTERN:
@@ -236,6 +336,7 @@ async def _start_provider(
         session=session,
         room=room,
         scenario=scenario,
+        livekit_url=livekit_url,
     )
 
 
@@ -245,15 +346,20 @@ async def _start_provider(
 
 
 async def _start_hosted(
-    *, provider: str, module_path: str, session, room: rtc.Room, scenario=None
+    *,
+    provider: str,
+    module_path: str,
+    session,
+    room: rtc.Room,
+    scenario=None,
+    livekit_url: Optional[str] = None,
 ) -> Optional[VideoActorHandle]:
     """Start a vendor avatar that joins the room and publishes its own tracks.
 
-    The import is lazy on purpose. These packages are not in ``pyproject.toml``
-    — a deployment that wants a hosted avatar installs the one it pays for. An
-    installation that has not gets a log line here rather than an ImportError
-    at worker boot, which would take down every session including the ones with
-    the feature off.
+    The import is lazy on purpose. Only the vendor a deployment actually pays
+    for needs to be installed; an absent one gets a log line here rather than
+    an ImportError at worker boot, which would take down every session
+    including the ones with the feature off.
     """
     try:
         plugin = importlib.import_module(module_path)
@@ -280,29 +386,41 @@ async def _start_hosted(
     if not avatar_id:
         logger.warning(
             "[VIDEO_ACTOR] provider=%s needs an avatar id (roleplay "
-            "videoActorAvatarId, else VIDEO_ACTOR_AVATAR_ID) — session "
-            "continues audio-only",
+            "videoActorAvatarId, else VIDEO_ACTOR_AVATAR_ID; for Tavus this is "
+            "the replica id) — session continues audio-only",
             provider,
         )
         return None
 
-    # Vendors disagree on the kwarg name for "which face", and on whether the
-    # key comes from the constructor or the environment. Offer what we have and
-    # let the plugin take what it understands, rather than encoding one
-    # vendor's signature as if it were the shared one.
-    kwargs: dict[str, Any] = {"avatar_id": avatar_id}
+    build_kwargs = HOSTED_PROVIDER_KWARGS.get(provider, _single_avatar_id_kwargs)
+    kwargs: dict[str, Any] = dict(build_kwargs(avatar_id))
+    # Passed explicitly when configured so the key lives with the rest of this
+    # feature's settings; every plugin also reads its own <VENDOR>_API_KEY from
+    # the environment, which stays the fallback.
     api_key = getattr(settings, "VIDEO_ACTOR_API_KEY", None)
     if api_key:
         kwargs["api_key"] = api_key
 
-    try:
-        avatar = avatar_session_cls(**kwargs)
-    except TypeError:
-        # Signature mismatch on the optional key — retry with the id alone,
-        # which every plugin in the family accepts.
-        avatar = avatar_session_cls(avatar_id=avatar_id)
+    avatar = avatar_session_cls(**kwargs)
 
-    await avatar.start(session, room=room)
+    # A hosted avatar is dispatched into the room SERVER-SIDE: the vendor dials
+    # LiveKit itself using a URL we hand it, and defaults to reading LIVEKIT_URL
+    # from our environment. That default is wrong here for the same reason the
+    # Krisp gate is (see app/core/livekit/audio_filters.py): a worker registers
+    # with settings.LIVEKIT_URL but each job's room lives on whatever media URL
+    # the server assigned that job, which can differ. Handing over the
+    # registration URL would send the avatar to a different server than the
+    # learner, and the failure looks like "video never arrives" with no error.
+    start_kwargs: dict[str, Any] = {}
+    if livekit_url:
+        start_kwargs["livekit_url"] = livekit_url
+
+    try:
+        await avatar.start(session, room=room, **start_kwargs)
+    except TypeError:
+        # A plugin whose start() does not accept livekit_url — fall back to its
+        # own env resolution rather than failing the session over a kwarg.
+        await avatar.start(session, room=room)
 
     async def _close() -> None:
         closer = getattr(avatar, "aclose", None)

@@ -758,15 +758,19 @@ class Settings(BaseSettings):
         ),
     )
     VIDEO_ACTOR_PROVIDER: str = Field(
-        default="test_pattern",
+        default="tavus",
         description=(
-            "Which renderer serves the video actor. 'test_pattern' (default) "
-            "renders in-process with numpy — no extra dependency, no vendor "
-            "account, no per-minute cost, and NOT AI-generated video: it exists "
-            "to prove the publish/subscribe path and measure what a second track "
-            "costs. 'bey', 'tavus', 'hedra', 'anam' and 'simli' are real "
-            "AI-generated streaming avatars, each needing its livekit-plugins-* "
-            "package (imported lazily) and a vendor key."
+            "Which renderer serves the video actor. Defaults to 'tavus', the "
+            "vendor this platform is wired for: real AI-generated video, needing "
+            "VIDEO_ACTOR_API_KEY (or TAVUS_API_KEY) and a replica id. Missing "
+            "either, the session falls back to audio-only — which is the point "
+            "of defaulting here rather than to the placeholder: a "
+            "misconfiguration should cost a learner nothing, not render them a "
+            "coloured blob. 'test_pattern' is that placeholder, kept as an "
+            "explicit opt-in for exercising the publish path with no vendor "
+            "account; it is NOT AI-generated video and must never be pointed at "
+            "a real cohort. 'bey', 'anam' and 'simli' work through the same "
+            "abstraction but their plugins are not installed."
         ),
     )
     VIDEO_ACTOR_START_TIMEOUT_S: float = Field(
@@ -819,7 +823,20 @@ class Settings(BaseSettings):
         default=None,
         description=(
             "Vendor API key for the hosted video-actor provider. Left unset, the "
-            "plugin falls back to whatever env var it reads itself."
+            "plugin falls back to whatever env var it reads itself "
+            "(TAVUS_API_KEY for Tavus)."
+        ),
+    )
+    VIDEO_ACTOR_TAVUS_PERSONA_ID: Optional[str] = Field(
+        default=None,
+        description=(
+            "Optional Tavus persona id. Normally leave this UNSET. Tavus falls "
+            "back to a stock persona, which is what we want: the character's "
+            "personality comes from our own prompt and LLM, and a vendor "
+            "persona would put a second, unversioned character definition in "
+            "the loop where nobody would think to look for it. Tavus's other "
+            "id, the replica (which face to render), comes from the roleplay's "
+            "videoActorAvatarId or VIDEO_ACTOR_AVATAR_ID."
         ),
     )
 
