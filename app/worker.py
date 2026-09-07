@@ -51,6 +51,7 @@ from app.core.livekit.audio_filters import (
     supports_noise_cancellation,
 )
 from app.core.livekit.video_actor import (
+    human_participants,
     is_video_actor_enabled,
     start_video_actor,
 )
@@ -1561,7 +1562,13 @@ class AgentWorker:
         when the user closes the tab after room creation but before connecting.
         """
         await asyncio.sleep(timeout)
-        if not self.ctx.room.remote_participants:
+        # Count PEOPLE, not participants. A hosted video actor joins the room
+        # as its own participant, so a bare remote_participants check would
+        # read the avatar we commissioned as company and leave an abandoned
+        # session running — holding a worker slot and a metered vendor
+        # conversation open until the max-duration cap. See
+        # app/core/livekit/video_actor.py.
+        if not human_participants(self.ctx.room):
             logger.warning(
                 "[AgentWorker] No human participant joined within %.0fs — "
                 "orphaned agent, shutting down.",
@@ -1609,7 +1616,8 @@ class AgentWorker:
         if clock is None or clock.is_paused:
             logger.info("[PAUSE] Ignored — no clock or already paused")
             return
-        if not self.ctx.room.remote_participants:
+        # Humans only, for the same reason as the orphan deadline above.
+        if not human_participants(self.ctx.room):
             logger.warning("[PAUSE] Ignored — no remote participant in room")
             return
         # Defense-in-depth: pause is opt-in per scenario. Ignore the packet
@@ -3722,6 +3730,11 @@ class AgentWorker:
                     session=self.session,
                     room=self.ctx.room,
                     scenario=self.scenario,
+                    # The URL this job's room actually lives on, not the one
+                    # the worker registered with — a hosted avatar dials in
+                    # server-side and must reach the same media server as the
+                    # learner. Same distinction the Krisp gate above draws.
+                    livekit_url=_lk_url,
                 )
 
             # The actor republishes the agent's speech in sync with its video,

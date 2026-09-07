@@ -40,7 +40,13 @@ switch on for a live cohort on a whim.
 
 ## Providers
 
-`VIDEO_ACTOR_PROVIDER`:
+`VIDEO_ACTOR_PROVIDER` — defaults to `tavus`.
+
+That default is a safety choice, not a convenience one. An unconfigured
+deployment (no key, no replica id) falls back to **audio-only**, which costs the
+learner nothing. Defaulting to `test_pattern` instead would mean a
+misconfiguration renders them a coloured blob, which is worse than no video.
+
 
 * **`test_pattern`** (default) — renders in this process with numpy. No extra
   dependency, no vendor account, no per-minute bill, and **not AI-generated
@@ -55,14 +61,44 @@ switch on for a live cohort on a whim.
   holds ~14fps of its configured 15, but received frame rate swings with
   whether the character is speaking. Use it for path validation and worker CPU,
   and get bandwidth from a vendor trial.
-* **`bey` / `tavus` / `hedra` / `anam` / `simli`** — real AI-generated streaming
-  avatars. Each needs its `livekit-plugins-<name>` package (deliberately not in
-  `pyproject.toml` — install the one you pay for) and a vendor key in
-  `VIDEO_ACTOR_API_KEY`, plus an avatar id in `VIDEO_ACTOR_AVATAR_ID` or the
-  roleplay's own `videoActorAvatarId`. The import is lazy: a provider whose
-  package is missing logs a line and runs the session audio-only, rather than
-  failing worker boot and taking down every session including the ones with the
-  feature off.
+* **`tavus`** — real AI-generated streaming video, and the vendor this
+  platform is wired for. `livekit-plugins-tavus` is pinned in `pyproject.toml`
+  to the same version as `livekit-agents`, deliberately: the plugin's
+  `AvatarSession` signature changed across minors (`replica_id`/`persona_id`
+  here, `face_id`/`pal_id` from 1.5), so it must not float independently of the
+  runtime it plugs into. Needs `VIDEO_ACTOR_API_KEY` (or `TAVUS_API_KEY`) and a
+  **replica id** — the face — in the roleplay's `videoActorAvatarId` or
+  `VIDEO_ACTOR_AVATAR_ID`.
+
+  Leave `VIDEO_ACTOR_TAVUS_PERSONA_ID` unset. Tavus falls back to a stock
+  persona, which is what we want: the character's personality comes from our
+  prompt and our LLM, and a vendor persona would put a second, unversioned
+  character definition in the loop where nobody would think to look for it.
+* **`bey` / `anam` / `simli`** — supported by the same abstraction but not
+  installed. Each takes a single `avatar_id`. Add its `livekit-plugins-<name>`
+  package to use it; the import is lazy, so an absent one logs a line and runs
+  audio-only rather than failing worker boot for every session.
+
+  (`hedra` was dropped: its LiveKit plugin is deprecated upstream.)
+
+### Two traps specific to a hosted avatar
+
+**It joins as its own participant.** `tavus-avatar-agent` shows up in
+`room.remote_participants` alongside the learner. This worker has two "is anyone
+still here?" checks — the orphan deadline and the pause guard — and both now go
+through `human_participants()`, which filters avatars out. Unfiltered, a learner
+who closes the tab before connecting leaves an agent that never notices it is
+alone, holding a worker slot **and a metered vendor conversation** open until
+the max-duration cap fires.
+
+**It dials LiveKit server-side, so it needs the job's URL, not ours.** The
+plugin defaults to reading `LIVEKIT_URL` from our environment. That is the wrong
+value for the same reason the Krisp gate cares (see `audio_filters.py`): a
+worker registers with `settings.LIVEKIT_URL`, but each job's room lives on
+whatever media URL the server assigned *that job*. Hand over the registration
+URL and the avatar can join a different server than the learner — which looks
+like "video never arrives", with no error anywhere. `_start_hosted` passes the
+job URL explicitly.
 
 Adding a hosted provider means adding its row to
 `ally-be/src/llm/constants/ai-task-registry.constants.ts` in the same change —

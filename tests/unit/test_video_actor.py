@@ -90,7 +90,10 @@ class TestIsVideoActorEnabled:
         from app.core.scenario.base import PromptData
 
         assert Settings.model_fields["VIDEO_ACTOR_ENABLED"].default is True
-        assert Settings.model_fields["VIDEO_ACTOR_PROVIDER"].default == "test_pattern"
+        # Defaults to the real vendor, not the placeholder: an unconfigured
+        # deployment then falls back to audio-only rather than rendering a
+        # learner a coloured blob.
+        assert Settings.model_fields["VIDEO_ACTOR_PROVIDER"].default == "tavus"
         # The gate that actually decides, and the one that must never drift.
         assert PromptData.model_fields["video_actor_enabled"].default is False
 
@@ -363,3 +366,116 @@ class TestFrameCadence:
         # so a loaded CI box cannot make this flap.
         assert video >= 10, f"video starved: {video} frames, {audio} audio"
         assert audio > 0, "audio passthrough stopped"
+
+
+class TestTavusWiring:
+    """Bind our kwargs against the REAL installed plugin, not a mock.
+
+    The first version of the hosted path passed `avatar_id` to every vendor.
+    Tavus takes `replica_id`, so it raised TypeError, which the module turns
+    into a clean audio-only fallback — meaning Tavus would have been silently,
+    permanently broken with nothing in the logs but "failed to start". A mocked
+    AvatarSession would have accepted anything and proved nothing, so these
+    tests introspect the installed signature instead.
+    """
+
+    @pytest.mark.unit
+    def test_tavus_kwargs_use_replica_id(self, monkeypatch):
+        monkeypatch.setattr(
+            video_actor.settings, "VIDEO_ACTOR_TAVUS_PERSONA_ID", None, raising=False
+        )
+        kwargs = video_actor._tavus_kwargs("r_abc123")
+        assert kwargs == {"replica_id": "r_abc123"}
+        assert "avatar_id" not in kwargs
+
+    @pytest.mark.unit
+    def test_persona_id_is_omitted_unless_configured(self, monkeypatch):
+        """Unset by design — the character comes from our prompt, not a vendor."""
+        monkeypatch.setattr(
+            video_actor.settings, "VIDEO_ACTOR_TAVUS_PERSONA_ID", None, raising=False
+        )
+        assert "persona_id" not in video_actor._tavus_kwargs("r_abc123")
+
+        monkeypatch.setattr(
+            video_actor.settings, "VIDEO_ACTOR_TAVUS_PERSONA_ID", "p_xyz", raising=False
+        )
+        assert video_actor._tavus_kwargs("r_abc123")["persona_id"] == "p_xyz"
+
+    @pytest.mark.unit
+    def test_our_constructor_kwargs_bind_to_the_real_tavus_signature(self):
+        import inspect
+
+        from livekit.plugins import tavus
+
+        kwargs = dict(video_actor._tavus_kwargs("r_abc123"))
+        kwargs["api_key"] = "test-key"
+        # Raises TypeError if any name is wrong — the exact failure that made
+        # `avatar_id` a silent dead end.
+        inspect.signature(tavus.AvatarSession.__init__).bind(None, **kwargs)
+
+    @pytest.mark.unit
+    def test_start_accepts_the_livekit_url_we_pass(self):
+        """We override the vendor's env default so the avatar dials the same
+        media server as the learner — see the comment in _start_hosted."""
+        import inspect
+
+        from livekit.plugins import tavus
+
+        inspect.signature(tavus.AvatarSession.start).bind(
+            None, object(), room=object(), livekit_url="wss://example"
+        )
+
+    @pytest.mark.unit
+    def test_every_hosted_provider_has_a_kwargs_builder(self):
+        for provider in video_actor.HOSTED_PROVIDER_MODULES:
+            assert provider in video_actor.HOSTED_PROVIDER_KWARGS, provider
+
+
+class TestAvatarParticipantFiltering:
+    """The avatar must never be counted as company.
+
+    A hosted avatar joins as its own participant. The worker's orphan deadline
+    and pause guard both ask "is anyone still here?" — unfiltered, an abandoned
+    session would hold a worker slot and a metered vendor conversation open
+    until the max-duration cap.
+    """
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize(
+        "identity", ["tavus-avatar-agent", "bey-avatar-agent", "anam-avatar-agent"]
+    )
+    def test_known_avatar_identities_are_not_people(self, identity):
+        assert video_actor.is_avatar_participant(identity) is True
+
+    @pytest.mark.unit
+    def test_suffix_catches_a_renamed_vendor_default(self):
+        assert video_actor.is_avatar_participant("newvendor-avatar-agent") is True
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("identity", ["user-42", "v2v-tester", "", None])
+    def test_people_and_testers_are_never_stripped(self, identity):
+        # Erring the other way would silently remove a real learner from a
+        # headcount, which is worse than leaving a session running.
+        assert video_actor.is_avatar_participant(identity) is False
+
+    @pytest.mark.unit
+    def test_human_participants_excludes_only_the_avatar(self):
+        room = SimpleNamespace(
+            remote_participants={
+                "a": SimpleNamespace(identity="user-42"),
+                "b": SimpleNamespace(identity="tavus-avatar-agent"),
+            }
+        )
+        assert [p.identity for p in video_actor.human_participants(room)] == ["user-42"]
+
+    @pytest.mark.unit
+    def test_a_room_holding_only_the_avatar_reads_as_empty(self):
+        """The orphan case: learner never connected, avatar did."""
+        room = SimpleNamespace(
+            remote_participants={"b": SimpleNamespace(identity="tavus-avatar-agent")}
+        )
+        assert video_actor.human_participants(room) == []
+
+    @pytest.mark.unit
+    def test_missing_room_attribute_is_survivable(self):
+        assert video_actor.human_participants(SimpleNamespace()) == []
