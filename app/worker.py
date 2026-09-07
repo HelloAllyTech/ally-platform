@@ -7,7 +7,13 @@ import time
 from typing import Optional, Set
 
 from livekit import agents, rtc
-from livekit.agents import Agent, AgentSession, JobProcess, RoomInputOptions
+from livekit.agents import (
+    Agent,
+    AgentSession,
+    JobProcess,
+    RoomInputOptions,
+    RoomOutputOptions,
+)
 from livekit.plugins import noise_cancellation, silero
 
 from app.core.agent.factory import (
@@ -43,6 +49,10 @@ from app.core.fallback_lines import tts_failure_fallback_line
 from app.core.livekit.audio_filters import (
     session_livekit_url,
     supports_noise_cancellation,
+)
+from app.core.livekit.video_actor import (
+    is_video_actor_enabled,
+    start_video_actor,
 )
 from app.core.logger import (
     get_logger,
@@ -157,6 +167,10 @@ MAX_DURATION_GRACE_SECONDS = settings.MAX_DURATION_GRACE_SECONDS
 # seconds, never the rest of the shutdown window.
 SUPERVISOR_NOTES_CLOSE_TIMEOUT = 3.0
 BG_AUDIO_CLOSE_TIMEOUT = 3.0
+# Video-actor teardown budget. Shorter than the audio one: its tracks are
+# cosmetic, so a renderer that will not let go must not eat into the shutdown
+# deadline that the session's own finalization needs.
+VIDEO_ACTOR_CLOSE_TIMEOUT = 2.0
 BACKGROUND_TASKS_CLEANUP_TIMEOUT = 3.0
 
 
@@ -306,6 +320,11 @@ class AgentWorker:
         # which phrase plays and can record it in the transcript.
         self._bg_audio = None
         self._filler_handle = None
+        # EXPERIMENTAL AI video actor (app/core/livekit/video_actor.py). Stays
+        # None for every session that has not opted in at BOTH gates, which is
+        # every session today. Non-None is the only thing that lets the session
+        # suppress its own audio output, so nothing else may assign it.
+        self._video_actor = None
         # ONE accumulating pool of in-memory clips for the whole session (static
         # Studio phrases, the session-start seed batch, per-exchange batches and
         # in-turn batches all land here). Accumulating rather than replacing is
@@ -1381,6 +1400,23 @@ class AgentWorker:
                 except Exception as e:  # noqa: BLE001
                     logger.debug(f"Error closing BackgroundAudioPlayer: {e}")
                 self._bg_audio = None
+            # Tear down the video actor's tracks. aclose() swallows its own
+            # errors, so this cannot stall or fail a shutdown that is already
+            # under a deadline.
+            if getattr(self, "_video_actor", None) is not None:
+                try:
+                    await asyncio.wait_for(
+                        self._video_actor.aclose(), timeout=VIDEO_ACTOR_CLOSE_TIMEOUT
+                    )
+                except asyncio.TimeoutError:
+                    logger.warning(
+                        "Video actor aclose() did not finish within %ss; "
+                        "continuing shutdown",
+                        VIDEO_ACTOR_CLOSE_TIMEOUT,
+                    )
+                except Exception as e:  # noqa: BLE001
+                    logger.debug(f"Error closing video actor: {e}")
+                self._video_actor = None
             # Filler / back-channel / interim clips are in-memory frames, so
             # there are no temp files to delete — dropping the references is the
             # whole of the cleanup. Log what the layer cost first.
@@ -3662,6 +3698,44 @@ class AgentWorker:
             _is_v2v_room = any(p.identity == "v2v-tester" for p in _remote.values())
             if _is_v2v_room:
                 logger.info("[AgentWorker] v2v test room — noise cancellation off")
+            # EXPERIMENTAL AI video actor, off at two independent gates (the
+            # global settings.VIDEO_ACTOR_ENABLED and this roleplay's own
+            # videoActorEnabled), both defaulting False. For a session that has
+            # not opted in — every session today — this is one boolean read and
+            # the ordering below is exactly what it has always been.
+            _video_actor_wanted = is_video_actor_enabled(self.scenario)
+
+            async def _join_room() -> None:
+                logger.info("[AgentWorker] Phase 3: Joining room...")
+                await self.ctx.connect()
+                self._timing["connect_ms"] = (time.monotonic() - _connect_t0) * 1000
+
+            if _video_actor_wanted:
+                # Connect BEFORE the actor and the session start: a hosted
+                # avatar is dispatched into the room by name and needs a room
+                # that exists, and the in-process runner can only publish once
+                # we are connected. Deliberately inside the gate — reordering
+                # connect for every session to serve an opt-in experiment is
+                # precisely the blast radius this feature is built to avoid.
+                await _join_room()
+                self._video_actor = await start_video_actor(
+                    session=self.session,
+                    room=self.ctx.room,
+                    scenario=self.scenario,
+                )
+
+            # The actor republishes the agent's speech in sync with its video,
+            # so the session must not ALSO publish it — that would put two
+            # copies of the same voice in the room, one lip-synced and one not.
+            # Only a live handle earns the suppression: every failure path in
+            # start_video_actor returns None, leaving this empty and the
+            # session publishing audio exactly as it does today.
+            _output_options = (
+                {"room_output_options": RoomOutputOptions(audio_enabled=False)}
+                if self._video_actor is not None and self._video_actor.publishes_audio
+                else {}
+            )
+
             await self.session.start(
                 # ... (rest of the args identical)
                 room=self.ctx.room,
@@ -3669,12 +3743,12 @@ class AgentWorker:
                 room_input_options=RoomInputOptions(
                     noise_cancellation=None if _is_v2v_room else bvc,
                 ),
+                **_output_options,
             )
 
-            # Connect to room with timeout
-            logger.info("[AgentWorker] Phase 3: Joining room...")
-            await self.ctx.connect()
-            self._timing["connect_ms"] = (time.monotonic() - _connect_t0) * 1000
+            if not _video_actor_wanted:
+                # Connect to room with timeout
+                await _join_room()
             logger.info("[AgentWorker] Phase 3: Started and joined room.")
 
             # Arm orphan deadline: if no human joins within 30s the agent was
@@ -4288,11 +4362,12 @@ if __name__ == "__main__":
             # that ~19s, shutdown_with_cleanup's own supervisor-notes/
             # background-audio/background-task teardown adds up to
             # SUPERVISOR_NOTES_CLOSE_TIMEOUT + BG_AUDIO_CLOSE_TIMEOUT +
-            # BACKGROUND_TASKS_CLEANUP_TIMEOUT (3s each, ~9s) — those used to
-            # be unbounded awaits, which is what let a single stalled one
-            # (e.g. a slow BVC track teardown) push the whole chain past this
-            # ceiling and reproduce the same kill days after this timeout was
-            # first raised.
+            # BACKGROUND_TASKS_CLEANUP_TIMEOUT (3s each, ~9s), plus
+            # VIDEO_ACTOR_CLOSE_TIMEOUT (2s) on the opted-in sessions that have
+            # one — those used to be unbounded awaits, which is what let a
+            # single stalled one (e.g. a slow BVC track teardown) push the whole
+            # chain past this ceiling and reproduce the same kill days after
+            # this timeout was first raised.
             shutdown_process_timeout=30,
         )
     )
