@@ -22,6 +22,8 @@ import {
   useUser,
 } from '@/hooks';
 import {useGetNudgeStatusQuery} from '@/services';
+import {useAppDispatch} from '@/store/hooks';
+import {setCurrentChatId} from '@/store/slices/chatSlice';
 import {colors, globalStyles} from '@/theme';
 import {
   DisconnectedType,
@@ -54,6 +56,7 @@ export const MicrophoneListeningScreen = () => {
   const {isOffline} = useNetworkConnectivity();
   const {data: nudgeStatus} = useGetNudgeStatusQuery();
   const {userData} = useUser();
+  const dispatch = useAppDispatch();
 
   const [isFocusModeLocal, setIsFocusModeLocal] = useState(true);
   const [isCallPaused, setIsCallPaused] = useState(true);
@@ -244,7 +247,23 @@ export const MicrophoneListeningScreen = () => {
           }, 500);
         }
       },
-      [SocketEvent.USER_JOINED]: async () => {
+      /**
+       * The event already carries the chat id — the server puts it there when it
+       * creates the chat. Use it, then hydrate the rest.
+       *
+       * This used to only call checkCounselorChat(), throwing the id away and
+       * depending entirely on a GET round trip to learn it. Production caught
+       * that failing: chat 2580 was created and broadcast at 08:19:36, and the
+       * client still reported hasChatId false at 5s AND 15s, so the screen timed
+       * out into "Microphone failure" on a session the server had already
+       * started. Tapping "Try again" won the race, which is what made it look
+       * intermittent.
+       */
+      [SocketEvent.USER_JOINED]: async (data: SocketMessage) => {
+        const joinedChatId = data?.payload?.chatId;
+        if (joinedChatId) {
+          dispatch(setCurrentChatId(joinedChatId));
+        }
         await checkCounselorChat();
       },
       [SocketEvent.MESSAGE_RECEIVED]: data => {
@@ -266,6 +285,7 @@ export const MicrophoneListeningScreen = () => {
       },
     }),
     [
+      dispatch,
       handleCallEndRedirection,
       checkCounselorChat,
       setIsLoading,

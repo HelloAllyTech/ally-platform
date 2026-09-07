@@ -1,4 +1,8 @@
-import reducer, {clearCurrentChat, setCurrentChat} from '@/store/slices/chatSlice';
+import reducer, {
+  clearCurrentChat,
+  setCurrentChat,
+  setCurrentChatId,
+} from '@/store/slices/chatSlice';
 import {AllyPlatforms} from '@/constants';
 import {Chat, ChatProvider, ChatStatus, MessageType, User, UserRole} from '@/types';
 
@@ -52,4 +56,33 @@ describe('chatSlice reducers', () => {
   });
 });
 
+describe('chatSlice setCurrentChatId', () => {
+  it('records a chat id when nothing is stored yet', () => {
+    const state = reducer(undefined, setCurrentChatId(2580));
+    expect(state.currentChat?.chatId).toBe(2580);
+  });
 
+  it('leaves the rest of an existing chat alone', () => {
+    const withChat = reducer(undefined, setCurrentChat(mockChat));
+    const next = reducer(withChat, setCurrentChatId(2580));
+    expect(next.currentChat?.chatId).toBe(2580);
+    expect(next.currentChat?.startedAt).toBe(mockChat.startedAt);
+    expect(next.currentChat?.messages).toEqual(mockChat.messages);
+  });
+
+  it('lets the full chat hydrate an id-only start', () => {
+    // The order production produces: USER_JOINED carries the id the instant the
+    // server creates the chat, and GET /chats/counsellor-chat fills in the rest
+    // afterwards. The screen only needs the id to stop saying "Connecting…".
+    let state = reducer(undefined, setCurrentChatId(mockChat.chatId));
+    expect(state.currentChat?.startedAt).toBeUndefined();
+
+    state = reducer(state, setCurrentChat(mockChat));
+    expect(state.currentChat).toEqual(mockChat);
+  });
+
+  it('is still cleared by clearCurrentChat', () => {
+    const withId = reducer(undefined, setCurrentChatId(2580));
+    expect(reducer(withId, clearCurrentChat()).currentChat).toBeNull();
+  });
+});

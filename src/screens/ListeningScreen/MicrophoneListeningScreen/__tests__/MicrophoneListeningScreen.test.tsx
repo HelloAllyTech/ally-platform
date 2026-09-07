@@ -6,6 +6,14 @@ jest.mock('react-i18next', () => ({
 }));
 
 const mockEmitSocketEvent = jest.fn();
+const mockDispatch = jest.fn();
+// Captures the socket handlers the screen registers, so a test can deliver a
+// USER_JOINED exactly as the gateway broadcasts it.
+let mockSocketCallbacks: Record<string, (data?: any) => void> = {};
+
+jest.mock('@/store/hooks', () => ({
+  useAppDispatch: () => mockDispatch,
+}));
 let mockPermissionGranted = true;
 let mockPermissionStatus = 'granted';
 
@@ -27,7 +35,10 @@ jest.mock('@/hooks', () => ({
     permissionStatus: mockPermissionStatus,
   }),
   useNetworkConnectivity: () => ({isOffline: false}),
-  useSocketConnection: () => ({emitSocketEvent: mockEmitSocketEvent}),
+  useSocketConnection: (opts: any) => {
+    mockSocketCallbacks = opts?.eventCallbacks || {};
+    return {emitSocketEvent: mockEmitSocketEvent};
+  },
   useUser: () => ({userData: {id: 'user-1'}}),
 }));
 
@@ -384,5 +395,61 @@ describe('scribe start diagnostic', () => {
     advance(15000);
 
     expect(diagnosticCalls()).toHaveLength(0);
+  });
+});
+
+describe('MicrophoneListeningScreen USER_JOINED', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockPermissionGranted = true;
+    mockPermissionStatus = 'granted';
+    mockUseListeningCommon.mockReturnValue({...defaultCommon});
+  });
+
+  it('takes the chat id straight from the event', async () => {
+    render(<MicrophoneListeningScreen />);
+
+    // Exactly what the gateway broadcasts once it has created the chat.
+    await act(async () => {
+      await mockSocketCallbacks.USER_JOINED?.({
+        type: 'USER_JOINED',
+        payload: {userId: 156, chatId: 2580, content: 'User joined audio chat'},
+      });
+    });
+
+    // The screen used to ignore this and rely solely on a GET round trip to
+    // learn the id. Production caught that failing: chat 2580 was created and
+    // broadcast, and the client still had no id 15s later, so the screen timed
+    // out into microphone failure on a live session.
+    expect(mockDispatch).toHaveBeenCalledWith(
+      expect.objectContaining({payload: 2580}),
+    );
+  });
+
+  it('still refetches, so the rest of the chat gets hydrated', async () => {
+    render(<MicrophoneListeningScreen />);
+
+    await act(async () => {
+      await mockSocketCallbacks.USER_JOINED?.({
+        type: 'USER_JOINED',
+        payload: {userId: 156, chatId: 2580},
+      });
+    });
+
+    expect(defaultCommon.checkCounselorChat).toHaveBeenCalled();
+  });
+
+  it('does not dispatch an id when the event carries none', async () => {
+    render(<MicrophoneListeningScreen />);
+
+    await act(async () => {
+      await mockSocketCallbacks.USER_JOINED?.({
+        type: 'USER_JOINED',
+        payload: {userId: 156},
+      });
+    });
+
+    expect(mockDispatch).not.toHaveBeenCalled();
+    expect(defaultCommon.checkCounselorChat).toHaveBeenCalled();
   });
 });

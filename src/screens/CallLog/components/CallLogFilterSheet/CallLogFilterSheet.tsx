@@ -1,5 +1,6 @@
 import React, {useEffect, useState} from 'react';
-import {ScrollView, Text, TouchableOpacity, View} from 'react-native';
+import {BottomSheetScrollView} from '@gorhom/bottom-sheet';
+import {Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {BottomSheet, Button, LineTextInput} from '@/components';
@@ -161,7 +162,15 @@ export const CallLogFilterSheet: React.FC<CallLogFilterSheetProps> = ({
         {fields.length === 0 ? (
           <Text style={styles.empty}>{t('calls.filters.noFields')}</Text>
         ) : (
-          <ScrollView
+          /*
+           * BottomSheetScrollView, not ScrollView. @gorhom/bottom-sheet drives
+           * the sheet from a pan gesture, and it only yields a vertical drag to
+           * inner content that registers with it. A plain RN ScrollView never
+           * does, so the sheet swallowed every drag and the filter list could
+           * not be scrolled at all — the Apply button was unreachable on any
+           * tenant with more than a screenful of tags.
+           */
+          <BottomSheetScrollView
             style={styles.scroll}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}>
@@ -171,7 +180,7 @@ export const CallLogFilterSheet: React.FC<CallLogFilterSheetProps> = ({
                 {renderControl(field)}
               </View>
             ))}
-          </ScrollView>
+          </BottomSheetScrollView>
         )}
         <View style={styles.footer}>
           <View style={styles.footerButton}>
