@@ -42,7 +42,17 @@ export const useListeningCommon = ({
   const navigation = useAppNavigation();
   const dispatch = useAppDispatch();
   const isFocused = useIsFocused();
-  const {checkCounselorChat} = useCounselorChat();
+  /**
+   * `getCurrentRoute` matters here. Without it, `useCounselorChat` treats an
+   * empty response as "no chat anywhere" and dispatches clearCurrentChat — so a
+   * refetch that lands a moment before the chat is visible wipes the id the
+   * USER_JOINED event just gave us, and the screen falls back to "Connecting…"
+   * and then microphone failure. This hook only ever runs on the listening
+   * screen, which is one of the routes that preserves the chat.
+   */
+  const {checkCounselorChat} = useCounselorChat({
+    getCurrentRoute: () => SCREEN_NAMES.LISTENING,
+  });
   const [getCounsellorChat] = useLazyGetCounsellorChatQuery();
   const [endCall, {isSuccess: isEndCallSuccess, isError: isEndCallError}] =
     useEndCallMutation();
