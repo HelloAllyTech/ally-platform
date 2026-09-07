@@ -16,6 +16,8 @@ interface StartSessionModalProps {
   showCreateNote?: boolean;
   onCreateNote?: () => void;
   isCreatingNote?: boolean;
+  /** Microphone permission is being resolved; the sheet stays up meanwhile. */
+  isStartingScribe?: boolean;
 }
 
 /**
@@ -38,12 +40,20 @@ export const StartSessionModal: React.FC<StartSessionModalProps> = ({
   showCreateNote,
   onCreateNote,
   isCreatingNote,
+  isStartingScribe,
 }) => {
   const {t} = useTranslate();
 
+  /**
+   * Deliberately does NOT close the sheet. Starting scribe has to resolve the
+   * microphone permission first, and closing here meant the sheet vanished the
+   * instant it was tapped and the counsellor was left looking at the call log
+   * with nothing happening — indistinguishable from a frozen app if the
+   * permission call never came back. The sheet now stays up, showing the tap was
+   * received, and the caller closes it once it knows where it is going.
+   */
   const handleStartScribe = () => {
     onListenLive();
-    onClose();
   };
 
   if (!visible) return null;
@@ -79,6 +89,8 @@ export const StartSessionModal: React.FC<StartSessionModalProps> = ({
               testID="start-session-scribe-mode"
               label={t('calls.dialog.startSession.startScribeMode')}
               onPress={handleStartScribe}
+              isLoading={isStartingScribe}
+              isDisabled={isStartingScribe || isCreatingNote}
               customContainerStyle={styles.ctaBtn}
             />
           )}
@@ -89,6 +101,7 @@ export const StartSessionModal: React.FC<StartSessionModalProps> = ({
               label={t('calls.dialog.startSession.startDictationMode')}
               onPress={() => onCreateNote?.()}
               isLoading={isCreatingNote}
+              isDisabled={isStartingScribe || isCreatingNote}
               customContainerStyle={[
                 styles.ctaBtn,
                 hasMicrophoneChatType

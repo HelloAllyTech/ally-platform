@@ -62,7 +62,7 @@ jest.mock('@/hooks', () => ({
 }));
 
 import React from 'react';
-import {render} from '@testing-library/react-native';
+import {fireEvent, render} from '@testing-library/react-native';
 
 import {CallLogScreen} from '../CallLogScreen';
 
@@ -121,8 +121,15 @@ jest.mock('@/services/simulationsApi', () => ({
 jest.mock('@/services/scribeNoteApi', () => ({
   useCreateNoteMutation: () => [jest.fn(), { isLoading: false }],
 }));
+// Mutable so a test can reproduce the state a 401 burst leaves behind:
+// the chat-types request never answered, so `data` is undefined.
+const mockGetChatTypes = jest.fn();
+let mockChatTypesData: string[] | undefined = ['MIC'];
 jest.mock('@/services/settingsApi', () => ({
-  useLazyGetVisibleChatTypesQuery: () => [jest.fn(), { data: ['MIC'] }],
+  useLazyGetVisibleChatTypesQuery: () => [
+    mockGetChatTypes,
+    { data: mockChatTypesData, isFetching: false },
+  ],
   useGetSummaryFieldsQuery: () => ({ data: ['field1'], isLoading: false }),
 }));
 
@@ -180,5 +187,41 @@ describe('CallLogScreen', () => {
     }));
     const {toJSON} = render(<CallLogScreen />);
     expect(toJSON()).toBeTruthy();
+  });
+});
+
+describe('CallLogScreen start-session button', () => {
+  beforeEach(() => {
+    mockGetChatTypes.mockClear();
+    mockChatTypesData = ['MIC'];
+  });
+
+  it('stays pressable and retries when the chat-types request never answered', () => {
+    // A rotated access token 401s every settings request at once, which left
+    // both start-session flags false. The button rendered (permissions are
+    // persisted) but was disabled — visible, blue and completely inert until the
+    // app was restarted. That is the "clicking the blue button does nothing"
+    // report.
+    mockChatTypesData = undefined;
+
+    const {getByTestId} = render(<CallLogScreen />);
+    const fab = getByTestId('start-session-fab');
+
+    expect(fab.props.accessibilityState?.disabled).not.toBe(true);
+
+    mockGetChatTypes.mockClear();
+    fireEvent.press(fab);
+
+    // The press re-asks rather than doing nothing.
+    expect(mockGetChatTypes).toHaveBeenCalled();
+  });
+
+  it('is disabled only when we actually know no session type is on offer', () => {
+    mockChatTypesData = [];
+
+    const {getByTestId} = render(<CallLogScreen />);
+    expect(
+      getByTestId('start-session-fab').props.accessibilityState?.disabled,
+    ).toBe(true);
   });
 });
