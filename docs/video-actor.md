@@ -74,12 +74,44 @@ misconfiguration renders them a coloured blob, which is worse than no video.
   persona, which is what we want: the character's personality comes from our
   prompt and our LLM, and a vendor persona would put a second, unversioned
   character definition in the loop where nobody would think to look for it.
-* **`bey` / `anam` / `simli`** — supported by the same abstraction but not
-  installed. Each takes a single `avatar_id`. Add its `livekit-plugins-<name>`
-  package to use it; the import is lazy, so an absent one logs a line and runs
-  audio-only rather than failing worker boot for every session.
+* **`bey`** — Beyond Presence. Installed and pinned alongside Tavus. Takes a
+  plain `avatar_id` plus `VIDEO_ACTOR_API_KEY`. Worth reaching for when the
+  requirement is "English, working, now": it claims ~100ms speech-to-video and
+  1000+ concurrent sessions against Tavus's 15, and Tavus measured a **4.7s**
+  start here. The trade is expressiveness — it renders from a single still
+  image, so it carries less of the facial nuance that the nonverbal-cue use
+  case depends on.
+* **`anam` / `simli`** — mapped but their plugins are not installed. Add the
+  `livekit-plugins-<name>` package to use one; the import is lazy, so an absent
+  one logs a line and runs audio-only rather than failing worker boot for every
+  session.
 
   (`hedra` was dropped: its LiveKit plugin is deprecated upstream.)
+
+### Vendors disagree about their own arguments
+
+`HOSTED_PROVIDER_KWARGS` maps each provider to a builder that constructs its
+constructor arguments. That indirection is not ceremony — every vendor wants
+something different, and three of four reject the obvious guess:
+
+| Provider | Argument | API key |
+|---|---|---|
+| `bey` | `avatar_id="..."` | alongside |
+| `tavus` | `replica_id="..."` (+ optional `persona_id`) | alongside |
+| `anam` | `persona_config=PersonaConfig(name, avatarId)` | alongside |
+| `simli` | `simli_config=SimliConfig(api_key, face_id)` | **inside the config** |
+
+The first implementation sent `avatar_id` to all of them. A wrong kwarg raises
+`TypeError`, which this module turns into a clean audio-only fallback — so
+those vendors would have been permanently broken with nothing in the logs but
+"failed to start". A provider in the module map with no builder is now refused
+loudly rather than guessed at.
+
+**Adding a vendor:** download the wheel and read the real `AvatarSession`
+signature. Published vendor docs track a newer `livekit-agents` than we pin and
+describe different argument names — Tavus's docs say `face_id`/`pal_id`, which
+is 1.5+; at our 1.3.12 it is `replica_id`/`persona_id`. Then add a builder and a
+test that binds it against the installed signature.
 
 ### Two traps specific to a hosted avatar
 

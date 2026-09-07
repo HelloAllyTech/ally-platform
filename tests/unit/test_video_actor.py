@@ -368,50 +368,91 @@ class TestFrameCadence:
         assert audio > 0, "audio passthrough stopped"
 
 
-class TestTavusWiring:
-    """Bind our kwargs against the REAL installed plugin, not a mock.
+class TestVendorConstructorMapping:
+    """Bind every vendor's kwargs against its REAL installed signature.
 
-    The first version of the hosted path passed `avatar_id` to every vendor.
-    Tavus takes `replica_id`, so it raised TypeError, which the module turns
-    into a clean audio-only fallback — meaning Tavus would have been silently,
-    permanently broken with nothing in the logs but "failed to start". A mocked
-    AvatarSession would have accepted anything and proved nothing, so these
-    tests introspect the installed signature instead.
+    This is the test that keeps being needed. The first implementation sent
+    `avatar_id` to every vendor; three of the four reject it — Tavus wants
+    `replica_id`, Anam a `PersonaConfig`, Simli a `SimliConfig` — and a wrong
+    kwarg raises TypeError, which the module converts into a clean audio-only
+    fallback. The vendors would have been permanently broken with nothing in
+    the logs but "failed to start".
+
+    A mocked AvatarSession accepts anything and proves none of this, so these
+    bind against the installed plugin instead. Published vendor docs track a
+    newer livekit-agents than we pin and describe different argument names, so
+    the wheel is the only trustworthy source.
     """
 
-    @pytest.mark.unit
-    def test_tavus_kwargs_use_replica_id(self, monkeypatch):
-        monkeypatch.setattr(
-            video_actor.settings, "VIDEO_ACTOR_TAVUS_PERSONA_ID", None, raising=False
+    @staticmethod
+    def _bind(provider, module_path):
+        import importlib
+        import inspect
+
+        plugin = importlib.import_module(module_path)
+        build = video_actor.HOSTED_PROVIDER_KWARGS[provider]
+        kwargs = build(
+            plugin, avatar_id="face-123", api_key="test-key", character_name="Asha"
         )
-        kwargs = video_actor._tavus_kwargs("r_abc123")
-        assert kwargs == {"replica_id": "r_abc123"}
+        # Raises TypeError on any wrong or missing argument name.
+        inspect.signature(plugin.AvatarSession.__init__).bind(None, **kwargs)
+        return kwargs
+
+    @pytest.mark.unit
+    def test_tavus_binds_and_uses_replica_id(self):
+        kwargs = self._bind("tavus", "livekit.plugins.tavus")
+        assert kwargs["replica_id"] == "face-123"
         assert "avatar_id" not in kwargs
+
+    @pytest.mark.unit
+    def test_bey_binds_and_uses_avatar_id(self):
+        kwargs = self._bind("bey", "livekit.plugins.bey")
+        assert kwargs["avatar_id"] == "face-123"
+
+    @pytest.mark.unit
+    def test_anam_binds_and_builds_a_persona_config(self):
+        kwargs = self._bind("anam", "livekit.plugins.anam")
+        assert kwargs["persona_config"].avatarId == "face-123"
+        # Cosmetic in Anam's dashboard, but it is what someone debugging one
+        # roleplay from that end would search for.
+        assert kwargs["persona_config"].name == "Asha"
+
+    @pytest.mark.unit
+    def test_simli_binds_and_keeps_its_key_inside_the_config(self):
+        kwargs = self._bind("simli", "livekit.plugins.simli")
+        assert kwargs["simli_config"].face_id == "face-123"
+        assert kwargs["simli_config"].api_key == "test-key"
+        # Simli has no top-level api_key; passing one is a TypeError.
+        assert "api_key" not in kwargs
+
+    @pytest.mark.unit
+    def test_every_module_in_the_map_has_a_kwargs_builder(self):
+        """A provider without one must not fall through to a guess."""
+        for provider in video_actor.HOSTED_PROVIDER_MODULES:
+            assert provider in video_actor.HOSTED_PROVIDER_KWARGS, provider
 
     @pytest.mark.unit
     def test_persona_id_is_omitted_unless_configured(self, monkeypatch):
         """Unset by design — the character comes from our prompt, not a vendor."""
+        import livekit.plugins.tavus as tavus
+
         monkeypatch.setattr(
             video_actor.settings, "VIDEO_ACTOR_TAVUS_PERSONA_ID", None, raising=False
         )
-        assert "persona_id" not in video_actor._tavus_kwargs("r_abc123")
+        build = video_actor.HOSTED_PROVIDER_KWARGS["tavus"]
+        assert "persona_id" not in build(
+            tavus, avatar_id="r1", api_key=None, character_name=None
+        )
 
         monkeypatch.setattr(
             video_actor.settings, "VIDEO_ACTOR_TAVUS_PERSONA_ID", "p_xyz", raising=False
         )
-        assert video_actor._tavus_kwargs("r_abc123")["persona_id"] == "p_xyz"
-
-    @pytest.mark.unit
-    def test_our_constructor_kwargs_bind_to_the_real_tavus_signature(self):
-        import inspect
-
-        from livekit.plugins import tavus
-
-        kwargs = dict(video_actor._tavus_kwargs("r_abc123"))
-        kwargs["api_key"] = "test-key"
-        # Raises TypeError if any name is wrong — the exact failure that made
-        # `avatar_id` a silent dead end.
-        inspect.signature(tavus.AvatarSession.__init__).bind(None, **kwargs)
+        assert (
+            build(tavus, avatar_id="r1", api_key=None, character_name=None)[
+                "persona_id"
+            ]
+            == "p_xyz"
+        )
 
     @pytest.mark.unit
     def test_start_accepts_the_livekit_url_we_pass(self):
@@ -419,16 +460,12 @@ class TestTavusWiring:
         media server as the learner — see the comment in _start_hosted."""
         import inspect
 
-        from livekit.plugins import tavus
+        from livekit.plugins import bey, tavus
 
-        inspect.signature(tavus.AvatarSession.start).bind(
-            None, object(), room=object(), livekit_url="wss://example"
-        )
-
-    @pytest.mark.unit
-    def test_every_hosted_provider_has_a_kwargs_builder(self):
-        for provider in video_actor.HOSTED_PROVIDER_MODULES:
-            assert provider in video_actor.HOSTED_PROVIDER_KWARGS, provider
+        for mod in (tavus, bey):
+            inspect.signature(mod.AvatarSession.start).bind(
+                None, object(), room=object(), livekit_url="wss://example"
+            )
 
 
 class TestAvatarParticipantFiltering:

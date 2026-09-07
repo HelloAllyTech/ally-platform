@@ -38,6 +38,10 @@ livekit-plugins-hume = "^1.2.18"
 # minors (replica_id/persona_id here, face_id/pal_id from 1.5), so it must not
 # float independently of the agents runtime it plugs into.
 livekit-plugins-tavus = "1.3.12"
+# Beyond Presence video avatar. Pinned to the livekit-agents version for the
+# same reason as Tavus above: these plugins' AvatarSession signatures change
+# across minors and must not float independently of the runtime.
+livekit-plugins-bey = "1.3.12"
 sarvamai = "^0.1.21"
 deepgram-sdk = "^5.2.0"
 elevenlabs = "^2.20.0"
