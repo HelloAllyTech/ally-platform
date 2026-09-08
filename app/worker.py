@@ -2605,6 +2605,13 @@ class AgentWorker:
         """
         import random as _random
 
+        # First, because it is the only reason that is not about this turn's
+        # gap at all. Deciding it later would record a suppressed turn as
+        # "skipped_fast_turn" or "skipped_probability" and quietly bend the
+        # filler-decision distribution the dashboards read.
+        if self._voice_on_avatar():
+            return False, "skipped_video_actor"
+
         floor_ms = float(getattr(settings, "FILLER_PREDICTED_GAP_MS", 700.0))
         certain_ms = float(getattr(settings, "FILLER_CERTAIN_GAP_MS", 1200.0))
         if predicted_ms < floor_ms:
@@ -2740,6 +2747,35 @@ class AgentWorker:
         except Exception as e:  # noqa: BLE001 - filler must never break a session
             logger.warning("[FILLER] agent-state handler error: %s", e)
 
+    def _voice_on_avatar(self) -> bool:
+        """Whether the character's voice is currently coming out of its face.
+
+        True only while a video actor is actually carrying the speech —
+        ``publishes_audio`` flips at the moment of the swap, not when an avatar
+        was merely requested.
+
+        The three voiced naturalness layers (thinking filler, back-channel,
+        interim reply) all play through BackgroundAudioPlayer's OWN published
+        track, which never reaches the avatar renderer. So while this is True
+        they would put the character's voice in the room with a motionless
+        mouth to look at — the one contradiction video cannot absorb, and one a
+        learner reads as a broken session rather than as naturalness. They are
+        also least needed here: a present, visibly listening face already does
+        a filler's job of stopping a pause from feeling dead.
+
+        Deliberately dynamic rather than decided at setup. A deferred session
+        has no face for its first 5-12s, and those are exactly the seconds the
+        layers are worth most, so they run normally until the avatar arrives.
+
+        The comfort room tone is not gated by this: it is the player's
+        ``ambient_sound``, not a ``play()`` call, and ambient sound has no mouth
+        to disagree with.
+        """
+        if not getattr(settings, "VIDEO_ACTOR_MUTE_VOICE_LAYERS", True):
+            return False
+        actor = getattr(self, "_video_actor", None)
+        return actor is not None and actor.publishes_audio
+
     def _stop_filler(self) -> None:
         """Cut any filler still playing, plus its pending continuation."""
         if (
@@ -2775,6 +2811,18 @@ class AgentWorker:
 
             pool = self._filler_pool
             if pool is None or self._bg_audio is None or not self._agent_thinking:
+                return
+            # Backstop. _should_play_filler already declines these turns, but
+            # the avatar can attach in the window between that decision and
+            # this coroutine being scheduled — and it is checked BEFORE
+            # pool.choose/mark_played below, so a suppressed turn cannot burn a
+            # clip's recency budget on audio nobody hears.
+            if self._voice_on_avatar():
+                logger.info(
+                    "[FILLER] suppressed — the character has a face and this "
+                    "track is not lip-synced"
+                )
+                self._filler_decided.set()
                 return
             if self._filler_turn_count >= int(
                 getattr(settings, "FILLER_MAX_PER_TURN", 2)
@@ -3215,6 +3263,13 @@ class AgentWorker:
                 # Learner may have stopped during the gap.
                 if not self._user_speaking or self._bg_audio is None:
                     break
+                # Re-checked per iteration: the avatar can attach mid-loop.
+                if self._voice_on_avatar():
+                    logger.info(
+                        "[BACKCHANNEL] suppressed — the character has a face "
+                        "and this track is not lip-synced"
+                    )
+                    break
                 # Keep it sparse: don't emit on every gap.
                 if _random.random() > probability:
                     continue
@@ -3413,6 +3468,15 @@ class AgentWorker:
             from app.core.livekit.filler_clips import synthesize_clips
             from app.core.livekit.interim_reply import generate_interim_reply
 
+            # Nothing downstream will play this once the character has a face,
+            # so generating it would be an LLM call plus a TTS synthesis per
+            # learner turn for audio that is discarded. Checked here rather
+            # than only at playback so the cost goes away too, not just the
+            # sound.
+            if self._voice_on_avatar():
+                self._interim_state = "idle"
+                return
+
             messages = self._read_conversation_history()
             reply = await generate_interim_reply(
                 self._interim_llm_client, self.scenario, messages, partial_text
@@ -3542,6 +3606,15 @@ class AgentWorker:
 
             clip = self._interim_clip
             if clip is None:
+                return
+            if self._voice_on_avatar():
+                # The longest of the three — a whole spoken sentence — so the
+                # worst one to play against a motionless mouth.
+                logger.info(
+                    "[INTERIM] suppressed — the character has a face and this "
+                    "track is not lip-synced"
+                )
+                self._interim_state = "idle"
                 return
             text = clip.phrase
             volume = float(getattr(settings, "INTERIM_REPLY_VOLUME", 0.9))
@@ -3691,6 +3764,15 @@ class AgentWorker:
                 pool = self._filler_pool
                 if pool is None:
                     continue
+                # The character has a face now, so nothing will play what this
+                # loop generates. Exit rather than continue: the avatar cannot
+                # detach, so there is no state to wait for.
+                if self._voice_on_avatar():
+                    logger.info(
+                        "[FILLER] regeneration stopped — the character has a "
+                        "face and this track is not lip-synced"
+                    )
+                    return
 
                 now = time.monotonic()
                 if now - last_run < min_gap_s:

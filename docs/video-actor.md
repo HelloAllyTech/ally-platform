@@ -272,6 +272,74 @@ says its first word. A vendor that fails pays the most — the full
 `VIDEO_ACTOR_START_TIMEOUT_S + VIDEO_ACTOR_PUBLISH_TIMEOUT_S` before the
 session starts at all.
 
+### The character's voice comes out of its face, or not at all
+
+The thinking filler, the back-channel and the interim reply do NOT go through
+`session.output.audio`. All three play through `BackgroundAudioPlayer`'s own
+published track — deliberately, so none of them can race or preempt the agent's
+real reply the way `session.say()` on the shared speech channel would.
+
+That separate track never reaches the avatar renderer. So with video on, those
+layers put the character's **voice** in the room while the learner watches a
+**motionless mouth** — audio and video plainly disagreeing, which reads as a
+broken session rather than as naturalness. It is the one contradiction video
+cannot absorb, because audio-visual agreement is the entire thing the feature
+was added for. Stacks' *Natural Dialogue Preserves Immersion in Simulations*
+makes the general point for dialogue that feels artificial; a voice with no
+matching mouth is the audio-visual form of it.
+
+So `VIDEO_ACTOR_MUTE_VOICE_LAYERS` (default on) suppresses all three **while the
+avatar is actually carrying the speech**. Two things about the scope:
+
+* **The comfort room tone is untouched.** It is the player's `ambient_sound`,
+  not a `play()` call, and ambient sound has no mouth to disagree with. The line
+  still never sounds dead.
+* **It is dynamic, not decided at setup.** A deferred session has no face for
+  its first 5-12s, and those are exactly the seconds a filler is worth most, so
+  the layers run normally until the swap commits. `_voice_on_avatar()` reads
+  `publishes_audio`, which is true only after the swap.
+
+These layers are also less needed here, which is why suppression rather than
+some cleverer routing is the right trade: a present, visibly listening face
+already does a filler's job of stopping a pause from feeling dead.
+
+Routing them *through* the avatar instead — so they would be lip-synced — was
+considered and rejected. `DataStreamAudioOutput` has a single `_stream_writer`,
+so a filler and a reply writing concurrently would interleave PCM into one
+stream and produce garbage; avoiding exactly that race is why these layers got
+their own track in the first place.
+
+A suppressed turn records `fillerDecision = skipped_video_actor`, its own
+bucket in `turn_metrics.FILLER_DECISIONS`. It must not be folded into
+`skipped_probability`: that would make the cadence gate look like it declined
+turns it never saw, and `fillerDecision` is how filler coverage — the share of
+*slow* turns actually masked — is measured. Note `note_filler_decision` is a
+deliberate no-op for an unregistered decision, so a new reason that skips the
+allow-list records nothing at all.
+
+#### The timing bug this also closes
+
+`agent_state == "speaking"` is **not** "the learner can hear the character" when
+an avatar is in the path. The state flips off `AudioOutput.on_playback_started`,
+and the two outputs mean different things by it:
+
+* the room output fires it when the first frame is actually captured into the
+  published audio source — accurate;
+* `DataStreamAudioOutput` fires it when the first frame is written into the byte
+  stream *to the vendor*, carrying livekit's own comment: *"Not ideal since
+  frame isn't actually playing yet / potentially we need another RPC for this"*.
+
+The filler stop is timed off that transition (`_stop_filler` cuts the clip and
+flushes its buffered tail), so on a video session the filler was cut at
+frame-handover and the learner then heard **silence** for the vendor's whole
+transport-plus-render time before the reply arrived. Suppression removes that
+too: post-attach there is no filler to mis-time, and pre-attach the room output
+reports the transition accurately.
+
+The same skew still makes `response_latency_ms` optimistic on video turns —
+tracked separately; it needs a per-turn record of which transport carried the
+speech.
+
 ### Either way, the client is told nothing
 
 Every failure — bad config, missing plugin, vendor timeout, exception

@@ -126,6 +126,12 @@ FILLER_DECISIONS = frozenset(
         "skipped_probability",  # real gap, but the cadence/probability gate declined
         "skipped_no_clips",  # nothing synthesized yet for this session
         "skipped_reply_ready",  # reply arrived before the filler could start
+        # The character has a face and this layer's track is not lip-synced, so
+        # a filler here would be a voice from a motionless mouth. Its own
+        # bucket because it is the one decision that says nothing about the
+        # turn's gap: folding it into skipped_probability would make the
+        # cadence gate look like it declined turns it never saw.
+        "skipped_video_actor",
         "disabled",  # feature off globally or for this scenario
     }
 )

@@ -773,6 +773,27 @@ class Settings(BaseSettings):
             "abstraction but their plugins are not installed."
         ),
     )
+    VIDEO_ACTOR_MUTE_VOICE_LAYERS: bool = Field(
+        default=True,
+        description=(
+            "Once the character has a face, keep its VOICE on that face. The "
+            "thinking filler, the back-channel and the interim reply all play "
+            "on the BackgroundAudioPlayer's own published track, which never "
+            "reaches the avatar renderer — so with video on, the learner hears "
+            "the character speak while watching a motionless mouth. That is "
+            "the one contradiction video cannot absorb: it breaks the very "
+            "audio-visual agreement the feature exists to create, and it reads "
+            "to a learner as the session being broken rather than as a "
+            "naturalness lever. The layers are also less needed here — a "
+            "present, visibly listening face already covers a pause, which is "
+            "the whole job of a filler. The comfort room tone is NOT affected: "
+            "ambient sound has no mouth to disagree with. Applies only while "
+            "the avatar is actually carrying the speech, so the layers work "
+            "normally for the first 5-12s of a deferred session, when the "
+            "character genuinely has no face yet. False keeps every layer "
+            "playing regardless."
+        ),
+    )
     VIDEO_ACTOR_DEFER_ATTACH: bool = Field(
         default=True,
         description=(
