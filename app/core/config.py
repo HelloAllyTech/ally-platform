@@ -773,15 +773,45 @@ class Settings(BaseSettings):
             "abstraction but their plugins are not installed."
         ),
     )
+    VIDEO_ACTOR_DEFER_ATTACH: bool = Field(
+        default=True,
+        description=(
+            "Bring the avatar up AFTER the session starts talking, instead of "
+            "in front of it. A hosted vendor takes 5-12s to render, and in the "
+            "blocking order every second of that is a second before the "
+            "character says its first word — so the session starts audio-only "
+            "and the speech moves onto the avatar once its video is verified "
+            "live, the way a video call lets you join with the camera off. It "
+            "also removes a failure mode rather than mitigating it: the agent's "
+            "audio is never suppressed on the strength of a vendor promise, so "
+            "a vendor that accepts the job and renders nothing costs a faceless "
+            "session instead of a silent one. Set False to restore the blocking "
+            "order in one restart. Does not apply to test_pattern, which "
+            "renders in-process in milliseconds."
+        ),
+    )
+    VIDEO_ACTOR_ATTACH_PUBLISH_TIMEOUT_S: float = Field(
+        default=30.0,
+        description=(
+            "Max seconds a DEFERRED attach waits for a hosted avatar to publish "
+            "video before giving up and leaving the session faceless. Far more "
+            "generous than VIDEO_ACTOR_PUBLISH_TIMEOUT_S because nobody is "
+            "waiting on it: the learner is mid-conversation and hearing the "
+            "character throughout, so the only cost of a long wait is a face "
+            "that arrives late. Only the blocking path needs a tight budget."
+        ),
+    )
     VIDEO_ACTOR_START_TIMEOUT_S: float = Field(
         default=6.0,
         description=(
             "Max seconds to get the video actor live before giving up and running "
-            "the session audio-only. This is the feature's latency guard: avatar "
-            "start sits in front of session.start, so an unbounded wait would "
-            "delay the opening statement — the one thing sim-start latency work "
-            "exists to protect. A hosted vendor that misses this budget costs a "
-            "warning line, not a slow session."
+            "the session audio-only. Applies to the BLOCKING path only "
+            "(VIDEO_ACTOR_DEFER_ATTACH=false, and test_pattern), where it is the "
+            "feature's latency guard: avatar start sits in front of "
+            "session.start, so an unbounded wait would delay the opening "
+            "statement — the one thing sim-start latency work exists to "
+            "protect. A hosted vendor that misses this budget costs a warning "
+            "line, not a slow session."
         ),
     )
     VIDEO_ACTOR_PUBLISH_TIMEOUT_S: float = Field(
@@ -789,7 +819,9 @@ class Settings(BaseSettings):
         description=(
             "Max seconds to wait for a hosted avatar to actually PUBLISH video "
             "after its start() returned, before giving up on it and running the "
-            "session audio-only. A vendor accepting the job is not a promise it "
+            "session audio-only. Applies to the BLOCKING path only; the deferred "
+            "one uses VIDEO_ACTOR_ATTACH_PUBLISH_TIMEOUT_S. A vendor accepting "
+            "the job is not a promise it "
             "renders: observed live with Tavus — conversation active, avatar "
             "joined, zero tracks published — and because the agent's speech has "
             "by then been routed to that avatar, an unverified start leaves the "

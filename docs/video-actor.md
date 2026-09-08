@@ -106,10 +106,18 @@ conversation `active`, replica valid and trained, avatar joined the room, **zero
 tracks published**, and an opening statement that took **25.8s** to "play out"
 against ~3s without the avatar.
 
-So `_start_hosted` waits for the avatar to actually publish video
-(`VIDEO_ACTOR_PUBLISH_TIMEOUT_S`, default 8s) before accepting it. If it does
-not, the avatar is torn down and the session runs audio-only. Verified live: the
+So both start paths wait for the avatar to actually publish video before
+accepting it — `VIDEO_ACTOR_PUBLISH_TIMEOUT_S` (default 8s) on the blocking
+path, `VIDEO_ACTOR_ATTACH_PUBLISH_TIMEOUT_S` (default 30s) on the deferred one,
+which can afford to be generous because the learner is mid-conversation and
+hearing the character while it runs. If the avatar does not publish, it is torn
+down and the session runs audio-only. Verified live on the blocking path: the
 guard fires, `roomio_audio` returns, and playout drops back to 3.7s.
+
+On the deferred path the same vendor failure is milder by construction: the
+speech never left the room track, so there is nothing to restore and no window
+in which the learner could have heard silence. See **The one dangerous edge**
+below.
 
 Two things that make this correct rather than merely present:
 
@@ -190,8 +198,63 @@ audio (`RoomOutputOptions(audio_enabled=False)`), because the avatar
 republishes it in sync with the video. If the avatar is half-started, **the
 learner hears nothing** — which is worse than any missing face.
 
-So the ordering in `AgentWorker.start()` is deliberate and must not be
-rearranged:
+There are two orderings, and which one you get decides how bad that edge is.
+
+### Deferred attach — the default
+
+The session starts audio-only and the face arrives later, the way a video call
+lets you join with the camera off and turn it on once it is ready. This is
+`attach_video_actor`, selected by `VIDEO_ACTOR_DEFER_ATTACH` (default on) for
+every hosted vendor:
+
+1. Gates checked first, same as ever. Off → nothing is imported, allocated or
+   connected.
+2. `session.start()` runs with the agent publishing its **own** audio track, so
+   the opening statement is spoken on time. The learner's session is
+   indistinguishable from an audio-only one at this point.
+3. A background task starts the vendor. Its `start()` ends by pointing
+   `session.output.audio` at its own data stream, which is built with
+   `wait_remote_track=KIND_VIDEO` and withholds every frame until the avatar's
+   video exists — so this path takes that back **immediately**, with no `await`
+   in between, and the learner stays on the track they are already hearing.
+4. Once the avatar's video is verified live (`VIDEO_ACTOR_ATTACH_PUBLISH_TIMEOUT_S`,
+   default 30s), the speech moves onto it at a gap between utterances.
+
+That removes the dangerous edge rather than mitigating it. **The agent's audio
+is never suppressed on the strength of a vendor promise**, so a vendor that
+accepts the job and renders nothing — which both Tavus and Beyond Presence have
+done in live testing — costs a faceless session instead of a silent one. The
+learner has been hearing the character throughout.
+
+Two library facts make the swap safe rather than clever, both verified against
+the pinned `livekit-agents` 1.3.12:
+
+* `AgentActivity` re-reads `session.output.audio` at the start of each speech
+  task and holds it for that task's duration. A swap between turns is total; a
+  swap mid-utterance leaves that utterance to finish on the track it started
+  on, so the worst case is one line that is heard but not lip-synced.
+* The room's audio output stays published after the swap and simply stops
+  receiving frames. Nothing is torn down, nothing is re-established, and no
+  client hears a second voice.
+
+Deferred sessions pass `RoomOutputOptions(sync_transcription=False)`. RoomIO
+would otherwise wrap the room's audio output in a transcript synchronizer and
+pace the agent's captions against audio that had stopped flowing through it.
+Nothing in this platform consumes LiveKit room transcriptions — the transcript
+is built from the events this worker emits — so unsynchronised captions cost
+nothing, whereas a half-swapped output chain would be a puzzle for whoever met
+it next.
+
+A side benefit worth knowing when reading client telemetry: a deferred session
+publishes real agent audio within the normal startup window, so the helpline
+client's first-audio timings mean the same thing they do for an audio-only
+session. In the blocking order the agent has no audio track of its own at all.
+
+### Blocking start — `VIDEO_ACTOR_DEFER_ATTACH=false`
+
+The original ordering, kept as the one-restart revert if the swap ever
+misbehaves, and used unconditionally by `test_pattern` (which renders
+in-process in milliseconds and has no delay to hide):
 
 1. Gates checked first. Off → `start_video_actor` returns `None` before
    importing, allocating or connecting anything. A session that has not opted
@@ -203,12 +266,21 @@ rearranged:
    to serve an opt-in experiment is exactly the blast radius this avoids.
 3. Only a live handle earns `audio_enabled=False`.
 
+The cost of this path is the reason the other one exists: a hosted vendor takes
+5–12s to render, and here every second of that is a second before the character
+says its first word. A vendor that fails pays the most — the full
+`VIDEO_ACTOR_START_TIMEOUT_S + VIDEO_ACTOR_PUBLISH_TIMEOUT_S` before the
+session starts at all.
+
+### Either way, the client is told nothing
+
 Every failure — bad config, missing plugin, vendor timeout, exception
-mid-start — returns `None` and the session runs exactly as it does today. The
-client is told nothing: `ActorVideo` in ally-web renders `null` until a track
-genuinely arrives, so an audio-only fallback simply leaves the call card
-showing. A learner who never knew a face was coming is not shown its absence
-mid-conversation.
+mid-start — leaves the session running on plain voice. `ActorVideo` in ally-web
+renders `null` until a track genuinely arrives, so "no face" is an ordinary
+resting state there, never an error or a spinner. That is also what makes the
+deferred path need no client change at all: a face that appears 8s in looks the
+same to that component as one that was there from the start. A learner who
+never knew a face was coming is not shown its absence mid-conversation.
 
 ## Vendor traps found in live testing (2026-09-07)
 
@@ -272,9 +344,13 @@ Latency is the product here, so the questions worth answering before a wider
 pilot are:
 
 * **Time to first word**, against the audio-only baseline for the *same*
-  roleplay. Avatar start sits in front of `session.start`, and hosted vendors
-  round-trip the TTS audio through a renderer. This is the biggest risk to the
-  sim-start latency work.
+  roleplay. With the deferred attach this should now be flat — the avatar is no
+  longer in front of `session.start` — so a difference here is a finding, not a
+  known cost. What remains is the per-turn cost: hosted vendors round-trip the
+  TTS audio through a renderer, and that only starts once the face attaches.
+* **Time to first face**, from the `[VIDEO_ACTOR] provider=… attached …ms into
+  the session` log line. This is what the deferred path traded the startup
+  delay for, and it is the number to watch per vendor.
 * **Egress.** Our LiveKit is self-hosted; video is roughly 10–30× Opus audio
   per session. `VIDEO_ACTOR_WIDTH`/`HEIGHT`/`FPS` default low (480×480 @ 15fps)
   for that reason. Measure this against a hosted provider, not `test_pattern`

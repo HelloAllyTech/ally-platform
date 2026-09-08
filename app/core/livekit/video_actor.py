@@ -58,6 +58,48 @@ returns ``None``, and the caller starts the session exactly as it does today.
 The feature degrades to plain voice, which is the product we already ship, and
 the learner is never shown an error about a face they did not ask for.
 
+## Deferred attach — the session starts, THEN the face arrives
+
+The ordering above is safe but slow, and the slowness is the whole cost of the
+feature: the vendor sits in front of ``session.start()``, so the learner waits
+out the render before the character says a word. Measured against live
+accounts, that is 5-12s of nothing, and up to
+``VIDEO_ACTOR_START_TIMEOUT_S + VIDEO_ACTOR_PUBLISH_TIMEOUT_S`` when the vendor
+fails — a session that never gets a face pays the most.
+
+``attach_video_actor`` inverts it, the way a video call lets you join with the
+camera off and turn it on later:
+
+1. The session starts audio-only, exactly as it does with the feature off. The
+   agent publishes its own audio track and speaks its opening statement on time.
+2. A background task starts the vendor. Its ``start()`` ends by pointing
+   ``session.output.audio`` at its data stream, which withholds every frame
+   until the avatar's video exists — so this path takes that back IMMEDIATELY
+   and keeps the learner on the room track they are already hearing.
+3. Only once the avatar's video is verified live does the agent's speech move
+   onto it, at a gap between utterances.
+
+The safety contract survives intact, and one hazard it guards against is gone
+rather than mitigated: the agent's audio is never suppressed on the strength of
+a vendor promise, so a vendor that accepts the job and renders nothing costs a
+faceless session instead of a silent one. The learner has been hearing the
+character throughout.
+
+Two things make the swap safe rather than clever. ``AgentActivity`` re-reads
+``session.output.audio`` at the start of each speech task, so a swap between
+turns is total and a swap mid-utterance leaves that utterance to finish on the
+track it started on. And the room's audio output stays published (silent) after
+the swap, so nothing has to be torn down and re-established.
+
+The client needs no changes for any of this: ``ActorVideo`` in ally-web already
+renders nothing until a remote camera track exists and overlays the call card
+when one arrives, deliberately treating "no track" as a resting state rather
+than a spinner.
+
+``VIDEO_ACTOR_DEFER_ATTACH`` (default **True**) selects this path; setting it
+False restores the blocking order in one restart. ``test_pattern`` is always
+eager — it renders in-process in milliseconds, so it has no delay to hide.
+
 ## Providers
 
 A roleplay picks its own vendor via ``prompt_data.video_actor_provider``
@@ -141,6 +183,21 @@ PROVIDERS_NEEDING_REGISTRATION_URL = frozenset({PROVIDER_TAVUS})
 # Teardown runs on the shutdown path, so it gets a short leash: a slow vendor
 # must not hold a worker slot open behind a session that is already over.
 _TAVUS_END_TIMEOUT_S = 5.0
+
+# How long a deferred attach waits for a gap between utterances before moving
+# the agent's speech onto the avatar anyway.
+#
+# A courtesy, not a correctness requirement. AgentActivity resolves
+# session.output.audio once per speech task and holds it for the duration, so an
+# utterance already in flight finishes on the room track regardless — the cost
+# of swapping mid-speech is one line that is heard but not lip-synced. Hence a
+# bound: waiting out a monologue to spare that would delay the face for longer
+# than the seam is worth.
+_ATTACH_QUIET_TIMEOUT_S = 15.0
+
+# Poll interval for the quiet-moment wait. Nothing is blocked on it, so this is
+# just "fine enough to land in a real gap between turns".
+_ATTACH_QUIET_POLL_S = 0.1
 
 # Hosted providers -> the module that carries their ``AvatarSession``. Kept as
 # data rather than a chain of imports so an unavailable vendor is a lookup miss
@@ -444,6 +501,14 @@ class VideoActorHandle:
     ``publishes_audio`` is the whole reason this object is returned rather than
     a bool: it is the caller's authority to pass
     ``RoomOutputOptions(audio_enabled=False)``. No handle, no suppression.
+
+    It is True for the whole life of a handle from ``start_video_actor``, which
+    only ever returns one after verifying the avatar. A handle from the deferred
+    ``attach_video_actor`` starts False and flips True at the moment the swap
+    commits, so it reads as "the character's voice is on the avatar track right
+    now" rather than "an avatar was requested". A caller that has already
+    started its session has nothing to suppress and does not consult it; the
+    field stays honest for the sake of anyone who later does.
     """
 
     provider: str
@@ -553,6 +618,88 @@ async def start_video_actor(
     return handle
 
 
+def defers_attach(scenario=None) -> bool:
+    """Whether this session brings the avatar up AFTER it starts talking.
+
+    The default, and the reason is latency: a hosted vendor takes 5-12s to
+    render, and in the blocking order every second of that is a second before
+    the character says its first word. See the module docstring.
+
+    ``test_pattern`` is excluded because it publishes in-process in
+    milliseconds — there is no delay to hide, and deferring it would be
+    plumbing for nothing.
+    """
+    if not getattr(settings, "VIDEO_ACTOR_DEFER_ATTACH", True):
+        return False
+    return _resolve_provider(scenario) != PROVIDER_TEST_PATTERN
+
+
+async def attach_video_actor(
+    *,
+    session,
+    room: rtc.Room,
+    scenario=None,
+    livekit_url: Optional[str] = None,
+    on_vendor_session=None,
+) -> Optional[VideoActorHandle]:
+    """Bring the avatar up beside a session that is already running.
+
+    The deferred counterpart to ``start_video_actor``. Call it from a background
+    task AFTER ``session.start()``, having passed no ``audio_enabled=False``:
+    the learner is already hearing the character on the agent's own room track
+    when this begins, keeps hearing it there for however long the vendor takes,
+    and the speech only moves onto the avatar once its video is verified live.
+
+    Returns a handle once that swap is committed, or ``None`` if the vendor
+    never rendered. Like ``start_video_actor`` it does not raise — but unlike it
+    there is no audio-only fallback to arrange, because the session was never
+    taken off its own audio in the first place.
+
+    ``on_vendor_session`` is called with the handle as soon as the vendor has a
+    session that would need ending, BEFORE video is verified, so a learner who
+    leaves during the render wait does not strand a metered conversation. Its
+    ``publishes_audio`` is False until the swap commits.
+    """
+    if not is_video_actor_enabled(scenario):
+        return None
+
+    provider = _resolve_provider(scenario)
+    module_path = HOSTED_PROVIDER_MODULES.get(provider)
+    if module_path is None:
+        logger.warning(
+            "[VIDEO_ACTOR] unknown VIDEO_ACTOR_PROVIDER=%r (known: %s) — "
+            "session continues audio-only",
+            provider,
+            ", ".join(sorted(HOSTED_PROVIDER_MODULES)),
+        )
+        return None
+
+    t0 = time.monotonic()
+    try:
+        return await _attach_hosted(
+            provider=provider,
+            module_path=module_path,
+            session=session,
+            room=room,
+            scenario=scenario,
+            livekit_url=livekit_url,
+            on_vendor_session=on_vendor_session,
+            t0=t0,
+        )
+    except asyncio.CancelledError:
+        # The session is shutting down. Propagate so the worker's task cleanup
+        # completes; the handle was already registered for teardown.
+        raise
+    except Exception as e:  # noqa: BLE001 - must never break a live session
+        logger.warning(
+            "[VIDEO_ACTOR] provider=%s failed to attach (%s) — the session "
+            "keeps its own audio track and stays faceless",
+            provider,
+            e,
+        )
+        return None
+
+
 async def _start_provider(
     *,
     provider: str,
@@ -590,16 +737,30 @@ async def _start_provider(
 # ---------------------------------------------------------------------------
 
 
-async def _start_hosted(
+@dataclass
+class _PreparedAvatar:
+    """A constructed vendor AvatarSession that has not dialled out yet.
+
+    Split out so the eager and deferred paths share every validation and every
+    vendor quirk, and differ only in WHEN the agent's speech moves onto the
+    avatar. ``handle`` arrives with ``publishes_audio=False`` — it becomes True
+    at the moment the swap is actually committed, so the flag never overstates
+    what the learner is hearing.
+    """
+
+    avatar: Any
+    start_kwargs: dict
+    handle: VideoActorHandle
+
+
+def _prepare_hosted(
     *,
     provider: str,
     module_path: str,
-    session,
-    room: rtc.Room,
     scenario=None,
     livekit_url: Optional[str] = None,
-) -> Optional[VideoActorHandle]:
-    """Start a vendor avatar that joins the room and publishes its own tracks.
+) -> Optional[_PreparedAvatar]:
+    """Import the vendor plugin and build its AvatarSession. Dials nothing.
 
     The import is lazy on purpose. Only the vendor a deployment actually pays
     for needs to be installed; an absent one gets a log line here rather than
@@ -677,11 +838,6 @@ async def _start_hosted(
     if ws_url:
         start_kwargs["livekit_url"] = ws_url
 
-    # The vendor's start() sets session.output.audio to its own data-stream
-    # output. Remember what was there so a failed verification below can put it
-    # back exactly as found.
-    previous_audio_output = getattr(session.output, "audio", None)
-
     async def _close() -> None:
         closer = getattr(avatar, "aclose", None)
         if closer is not None:
@@ -689,12 +845,54 @@ async def _start_hosted(
         if provider == PROVIDER_TAVUS:
             await _end_tavus_conversation(avatar)
 
+    return _PreparedAvatar(
+        avatar=avatar,
+        start_kwargs=start_kwargs,
+        handle=VideoActorHandle(
+            provider=provider, publishes_audio=False, _closer=_close
+        ),
+    )
+
+
+async def _call_avatar_start(prepared: _PreparedAvatar, session, room) -> None:
+    """Dial the vendor in. Raises whatever the plugin raises."""
     try:
-        await avatar.start(session, room=room, **start_kwargs)
+        await prepared.avatar.start(session, room=room, **prepared.start_kwargs)
     except TypeError:
         # A plugin whose start() does not accept livekit_url — fall back to its
         # own env resolution rather than failing the session over a kwarg.
-        await avatar.start(session, room=room)
+        await prepared.avatar.start(session, room=room)
+
+
+async def _start_hosted(
+    *,
+    provider: str,
+    module_path: str,
+    session,
+    room: rtc.Room,
+    scenario=None,
+    livekit_url: Optional[str] = None,
+) -> Optional[VideoActorHandle]:
+    """Start a vendor avatar IN FRONT of ``session.start`` — the blocking path.
+
+    Kept behind ``VIDEO_ACTOR_DEFER_ATTACH=false`` as the one-restart revert for
+    the deferred path below, and used unconditionally by ``test_pattern``.
+    """
+    prepared = _prepare_hosted(
+        provider=provider,
+        module_path=module_path,
+        scenario=scenario,
+        livekit_url=livekit_url,
+    )
+    if prepared is None:
+        return None
+
+    # The vendor's start() sets session.output.audio to its own data-stream
+    # output. Remember what was there so a failed verification below can put it
+    # back exactly as found.
+    previous_audio_output = getattr(session.output, "audio", None)
+
+    await _call_avatar_start(prepared, session, room)
 
     # PUBLISH VERIFICATION. A successful start() only means the vendor accepted
     # the job; it is not a promise that a face ever arrives. See
@@ -715,10 +913,7 @@ async def _start_hosted(
         # its own audio output back so session.start() installs normal room
         # audio. Both are best-effort — a failure to tidy up must not turn a
         # recoverable degradation into a dead session.
-        try:
-            await _close()
-        except Exception as e:  # noqa: BLE001
-            logger.debug("[VIDEO_ACTOR] teardown after failed verify: %s", e)
+        await prepared.handle.aclose()
         try:
             session.output.audio = (
                 previous_audio_output if previous_audio_output is not None else None
@@ -727,7 +922,143 @@ async def _start_hosted(
             logger.debug("[VIDEO_ACTOR] could not restore audio output: %s", e)
         return None
 
-    return VideoActorHandle(provider=provider, publishes_audio=True, _closer=_close)
+    prepared.handle.publishes_audio = True
+    return prepared.handle
+
+
+async def _attach_hosted(
+    *,
+    provider: str,
+    module_path: str,
+    session,
+    room: rtc.Room,
+    scenario=None,
+    livekit_url: Optional[str] = None,
+    on_vendor_session=None,
+    t0: float,
+) -> Optional[VideoActorHandle]:
+    """Bring a vendor avatar up BESIDE a session that is already talking."""
+    prepared = _prepare_hosted(
+        provider=provider,
+        module_path=module_path,
+        scenario=scenario,
+        livekit_url=livekit_url,
+    )
+    if prepared is None:
+        return None
+
+    # Whatever the running session is currently speaking through — RoomIO's own
+    # participant audio output, which the learner is already subscribed to and
+    # hearing. This is the thing we must NOT lose hold of.
+    room_audio = getattr(session.output, "audio", None)
+
+    # Hand the vendor its teardown obligation before it can incur one. A learner
+    # who hangs up during the render wait would otherwise leave a Tavus
+    # conversation open, metered, and counting against the account's concurrent
+    # cap. publishes_audio is still False, so this handle cannot be mistaken for
+    # authority to suppress the session's own audio.
+    if on_vendor_session is not None:
+        on_vendor_session(prepared.handle)
+
+    try:
+        await _call_avatar_start(prepared, session, room)
+    finally:
+        # THE POINT OF THIS WHOLE PATH. The vendor's start() ends by pointing
+        # session.output.audio at its data stream, and that output is built with
+        # wait_remote_track=KIND_VIDEO — it withholds every frame until the
+        # avatar's video track exists. Leaving it in place would mute the
+        # character for the 5-12s the vendor takes to render, which is exactly
+        # the delay we are removing. Take it back before anything can speak
+        # through it; in a finally so a raising start() cannot leave the session
+        # pointed at a dead output either.
+        avatar_audio = getattr(session.output, "audio", None)
+        if avatar_audio is not room_audio:
+            try:
+                session.output.audio = room_audio
+            except Exception as e:  # noqa: BLE001 - never worsen a live session
+                logger.debug("[VIDEO_ACTOR] could not hold the room track: %s", e)
+
+    if avatar_audio is None or avatar_audio is room_audio:
+        # The plugin accepted start() without installing an output. There is
+        # nothing to move the speech onto, so there is no avatar.
+        logger.warning(
+            "[VIDEO_ACTOR] provider=%s start() installed no audio output — "
+            "nothing to attach; session stays on its own audio track",
+            provider,
+        )
+        await prepared.handle.aclose()
+        return None
+
+    # The learner is mid-conversation and hearing everything, so this wait can
+    # be far more generous than the blocking path's: nobody is sitting in
+    # silence while it runs.
+    publish_timeout = float(
+        getattr(settings, "VIDEO_ACTOR_ATTACH_PUBLISH_TIMEOUT_S", 30.0)
+    )
+    if not await _await_avatar_video(room, publish_timeout):
+        logger.warning(
+            "[VIDEO_ACTOR] provider=%s published no video within %ss — the "
+            "session keeps its own audio track and stays faceless. The vendor "
+            "accepted the job but never rendered; check the vendor dashboard "
+            "for this conversation.",
+            provider,
+            publish_timeout,
+        )
+        # Nothing to restore: the agent's speech never left the room track, so
+        # a vendor that never renders costs a face rather than a voice. That is
+        # the whole reason this path exists.
+        await prepared.handle.aclose()
+        return None
+
+    if not await _await_quiet(session, _ATTACH_QUIET_TIMEOUT_S):
+        logger.debug(
+            "[VIDEO_ACTOR] no gap between utterances within %ss — attaching "
+            "mid-speech; the line in flight finishes on the room track",
+            _ATTACH_QUIET_TIMEOUT_S,
+        )
+
+    # Commit. AgentActivity resolves session.output.audio once per speech task,
+    # so from the next utterance on the character's voice rides the avatar and
+    # is lip-synced. The room's audio output stays published and simply stops
+    # receiving frames — nothing to unpublish, and nothing a client renders as
+    # a second voice.
+    #
+    # Expect one benign line from livekit-agents here: resume_false_interruption
+    # defaults on and the vendor's data-stream output cannot pause, so it logs
+    # that the option is ignored. The blocking path logs the same thing at
+    # session start.
+    session.output.audio = avatar_audio
+    prepared.handle.publishes_audio = True
+    logger.info(
+        "[VIDEO_ACTOR] provider=%s attached %.0fms into the session — the "
+        "character's speech now rides the avatar track",
+        provider,
+        (time.monotonic() - t0) * 1000,
+    )
+    return prepared.handle
+
+
+async def _await_quiet(session, timeout: float) -> bool:
+    """Wait for a gap between utterances. False means the budget ran out.
+
+    Only ``current_speech`` is consulted, because that is the thing a swap
+    could seam: the agent's state can be "thinking" with nothing yet flowing to
+    an audio output, and waiting that out would be waiting for nothing.
+    """
+    deadline = time.monotonic() + timeout
+    while True:
+        speech = getattr(session, "current_speech", None)
+        if speech is None:
+            return True
+        done = getattr(speech, "done", None)
+        try:
+            if done is not None and done():
+                return True
+        except Exception:  # noqa: BLE001 - a stub without a real handle
+            return True
+        if time.monotonic() >= deadline:
+            return False
+        await asyncio.sleep(_ATTACH_QUIET_POLL_S)
 
 
 async def _end_tavus_conversation(avatar: Any) -> None:

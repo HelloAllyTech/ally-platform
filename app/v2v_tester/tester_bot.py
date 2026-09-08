@@ -32,6 +32,7 @@ from livekit.agents import stt as lk_stt
 from openai import AsyncOpenAI
 
 from app.core.config import settings
+from app.core.livekit.video_actor import is_avatar_participant
 from app.core.logger import get_logger
 
 logger = get_logger(__name__)
@@ -89,6 +90,28 @@ async def _pick_google_voice(language: str) -> Optional[str]:
     return await asyncio.get_event_loop().run_in_executor(
         None, _pick_google_voice_sync, language
     )
+
+
+def should_take_over_stt(
+    *, current_sid: Optional[str], current_is_avatar: bool, new_identity: str
+) -> bool:
+    """Whether a newly subscribed audio track should replace the STT source.
+
+    ONE STT pipeline per run is the rule — transcribing every audio track ran a
+    duplicate streaming recognizer for the whole session. The single exception
+    is a video actor attaching mid-session.
+
+    A video-enabled roleplay starts audio-only and moves the character's speech
+    onto the avatar's track once it renders (see
+    app/core/livekit/video_actor.py), which leaves the agent's own track
+    published and silent. A tester that keeps listening to it goes deaf from
+    the attach onward and reports utterances_heard=1 and an idle timeout — a
+    failure indistinguishable from a broken agent. So the avatar takes over,
+    once, and nothing takes over from the avatar.
+    """
+    if current_sid is None:
+        return True
+    return is_avatar_participant(new_identity) and not current_is_avatar
 
 
 async def _make_tts(language: str, http_session: aiohttp.ClientSession):
@@ -202,6 +225,10 @@ class V2VTesterBot:
         # The single audio track the STT pipeline is attached to (the agent
         # publishes more than one; transcribing each doubled the pipelines).
         self._stt_track_sid: Optional[str] = None
+        # The task running STT over _stt_track_sid, so a video actor attaching
+        # mid-session can take the pipeline over from the agent's own track.
+        self._stt_task: Optional[asyncio.Task] = None
+        self._stt_on_avatar = False
 
     # ── Public entry point ────────────────────────────────────────────────────
 
@@ -246,10 +273,14 @@ class V2VTesterBot:
                     participant.identity,
                 )
                 return
-            # ONE STT pipeline per run: transcribing every audio track ran a
-            # duplicate Google streaming recognizer for the whole session —
-            # double memory/cost and occasional duplicate utterances.
-            if self._stt_track_sid is not None:
+            # ONE STT pipeline per run, except when a video actor attaches
+            # mid-session and takes the character's speech with it — see
+            # should_take_over_stt.
+            if not should_take_over_stt(
+                current_sid=self._stt_track_sid,
+                current_is_avatar=self._stt_on_avatar,
+                new_identity=participant.identity,
+            ):
                 logger.info(
                     "[V2V] ignoring extra audio track from %s (STT already "
                     "attached to %s)",
@@ -257,15 +288,28 @@ class V2VTesterBot:
                     self._stt_track_sid,
                 )
                 return
+            if self._stt_track_sid is not None:
+                logger.info(
+                    "[V2V] video actor attached — moving STT from %s to %s's "
+                    "track %s, where the character's speech now is",
+                    self._stt_track_sid,
+                    participant.identity,
+                    track.sid,
+                )
+                if self._stt_task is not None and not self._stt_task.done():
+                    self._stt_task.cancel()
+            else:
+                logger.info(
+                    "[V2V] subscribed to audio from participant=%s",
+                    participant.identity,
+                )
             self._stt_track_sid = track.sid
-            logger.info(
-                "[V2V] subscribed to audio from participant=%s",
-                participant.identity,
-            )
+            self._stt_on_avatar = is_avatar_participant(participant.identity)
             task = asyncio.create_task(
                 self._stream_and_transcribe(track, self._http_session),
                 name=f"v2v-stt-{participant.identity}",
             )
+            self._stt_task = task
             self._bg_tasks.add(task)
             task.add_done_callback(self._bg_tasks.discard)
 

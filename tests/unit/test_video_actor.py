@@ -11,7 +11,6 @@ exactly as it does now.
 from types import SimpleNamespace
 
 import pytest
-
 from livekit import rtc
 
 from app.core.livekit import video_actor
@@ -1123,3 +1122,306 @@ class TestProviderResolution:
         )
         for provider in ("bey", "tavus"):
             assert video_actor._resolve_api_key(provider) == "shared-key"
+
+
+class TestDeferralGate:
+    """Which sessions bring the avatar up after they start talking."""
+
+    @pytest.mark.unit
+    def test_hosted_providers_defer_by_default(self, monkeypatch):
+        monkeypatch.setattr(video_actor.settings, "VIDEO_ACTOR_PROVIDER", "bey")
+        assert video_actor.defers_attach(None) is True
+
+    @pytest.mark.unit
+    def test_test_pattern_never_defers(self, monkeypatch):
+        """It renders in-process in milliseconds — no delay to hide."""
+        monkeypatch.setattr(
+            video_actor.settings, "VIDEO_ACTOR_PROVIDER", "test_pattern"
+        )
+        assert video_actor.defers_attach(None) is False
+
+    @pytest.mark.unit
+    def test_the_flag_restores_the_blocking_order(self, monkeypatch):
+        monkeypatch.setattr(video_actor.settings, "VIDEO_ACTOR_PROVIDER", "bey")
+        monkeypatch.setattr(
+            video_actor.settings, "VIDEO_ACTOR_DEFER_ATTACH", False, raising=False
+        )
+        assert video_actor.defers_attach(None) is False
+
+    @pytest.mark.unit
+    def test_the_roleplays_own_provider_decides(self, monkeypatch):
+        monkeypatch.setattr(
+            video_actor.settings, "VIDEO_ACTOR_PROVIDER", "test_pattern"
+        )
+        scenario = SimpleNamespace(
+            prompt_data=SimpleNamespace(video_actor_provider="tavus")
+        )
+        assert video_actor.defers_attach(scenario) is True
+
+
+class TestDeferredAttach:
+    """The learner must be hearing the character the whole time.
+
+    In the blocking order the agent's audio is suppressed on the strength of a
+    vendor promise, and a vendor that accepts the job and renders nothing leaves
+    the session silent — observed live, twice. Deferring removes that rather
+    than mitigating it: the speech never leaves the agent's own room track until
+    an avatar is verifiably rendering, so the worst a vendor can do is leave the
+    session faceless.
+    """
+
+    ROOM_AUDIO = "room-audio-output"
+    VENDOR_AUDIO = "vendor-data-stream-output"
+
+    def _session(self, current_speech=None):
+        return SimpleNamespace(
+            output=SimpleNamespace(audio=self.ROOM_AUDIO),
+            current_speech=current_speech,
+        )
+
+    def _install_vendor(self, monkeypatch, *, start=None, published=True):
+        """A plugin whose start() hijacks output.audio, as every real one does."""
+        vendor_audio = self.VENDOR_AUDIO
+
+        class _Avatar:
+            conversation_id = "conv_1"
+            started = []
+
+            def __init__(self, **_):
+                pass
+
+            async def start(self, session, **kwargs):
+                if start is not None:
+                    await start(session, **kwargs)
+                type(self).started.append(kwargs)
+                # Exactly what livekit-plugins-bey/tavus do as the last
+                # statement of start(): point the session at their data stream,
+                # which withholds every frame until video exists.
+                session.output.audio = vendor_audio
+
+        _Avatar.started = []
+        plugin = SimpleNamespace(
+            AvatarSession=_Avatar, PersonaConfig=None, SimliConfig=None
+        )
+        monkeypatch.setattr(
+            video_actor.importlib, "import_module", lambda _p, _m=plugin: _m
+        )
+        monkeypatch.setattr(video_actor.settings, "VIDEO_ACTOR_ENABLED", True)
+        monkeypatch.setattr(video_actor.settings, "VIDEO_ACTOR_PROVIDER", "bey")
+        monkeypatch.setattr(
+            video_actor.settings, "VIDEO_ACTOR_AVATAR_ID", "a1", raising=False
+        )
+        room = _room(
+            _participant("bey-avatar-agent", kind=_AGENT_KIND, video=published)
+        )
+        room.name = "r"
+        return _Avatar, room
+
+    @pytest.mark.unit
+    async def test_the_room_track_is_taken_back_before_the_render_wait(
+        self, monkeypatch
+    ):
+        """The invariant. The vendor's output is installed by its start() and
+        mutes the character until video arrives, so it must not survive the
+        return of that call — the learner is mid-sentence."""
+        _, room = self._install_vendor(monkeypatch)
+        session = self._session()
+        seen = []
+
+        async def _record(room_, timeout):
+            seen.append(session.output.audio)
+            return True
+
+        monkeypatch.setattr(video_actor, "_await_avatar_video", _record)
+
+        handle = await video_actor.attach_video_actor(
+            session=session, room=room, scenario=_scenario(enabled=True)
+        )
+
+        assert seen == [self.ROOM_AUDIO]
+        assert handle is not None
+
+    @pytest.mark.unit
+    async def test_the_swap_commits_once_video_is_live(self, monkeypatch):
+        _, room = self._install_vendor(monkeypatch)
+        session = self._session()
+
+        handle = await video_actor.attach_video_actor(
+            session=session, room=room, scenario=_scenario(enabled=True)
+        )
+
+        assert session.output.audio == self.VENDOR_AUDIO
+        assert handle is not None
+        # True only from the moment the swap lands, so the flag means "the
+        # character's voice is on the avatar track" and not "an avatar was
+        # requested".
+        assert handle.publishes_audio is True
+
+    @pytest.mark.unit
+    async def test_a_vendor_that_never_renders_costs_a_face_not_a_voice(
+        self, monkeypatch
+    ):
+        monkeypatch.setattr(
+            video_actor.settings,
+            "VIDEO_ACTOR_ATTACH_PUBLISH_TIMEOUT_S",
+            0.05,
+            raising=False,
+        )
+        _, room = self._install_vendor(monkeypatch, published=False)
+        session = self._session()
+
+        handle = await video_actor.attach_video_actor(
+            session=session, room=room, scenario=_scenario(enabled=True)
+        )
+
+        assert handle is None
+        assert session.output.audio == self.ROOM_AUDIO
+
+    @pytest.mark.unit
+    async def test_a_raising_start_leaves_the_session_on_its_own_audio(
+        self, monkeypatch
+    ):
+        """The vendor may install its output and then fail; the finally clause
+        is what stops that muting a live session."""
+
+        async def _boom(session, **kwargs):
+            session.output.audio = self.VENDOR_AUDIO
+            raise RuntimeError("vendor down")
+
+        _, room = self._install_vendor(monkeypatch, start=_boom)
+        session = self._session()
+
+        handle = await video_actor.attach_video_actor(
+            session=session, room=room, scenario=_scenario(enabled=True)
+        )
+
+        assert handle is None
+        assert session.output.audio == self.ROOM_AUDIO
+
+    @pytest.mark.unit
+    async def test_teardown_is_registered_before_the_render_wait(self, monkeypatch):
+        """A learner who leaves mid-render must not strand a metered vendor
+        conversation, so the handle is handed over before video is verified."""
+        monkeypatch.setattr(
+            video_actor.settings,
+            "VIDEO_ACTOR_ATTACH_PUBLISH_TIMEOUT_S",
+            0.05,
+            raising=False,
+        )
+        _, room = self._install_vendor(monkeypatch, published=False)
+        held = []
+
+        handle = await video_actor.attach_video_actor(
+            session=self._session(),
+            room=room,
+            scenario=_scenario(enabled=True),
+            on_vendor_session=held.append,
+        )
+
+        assert handle is None  # the vendor never rendered
+        assert len(held) == 1  # but we were given something to close
+        assert held[0].publishes_audio is False
+
+    @pytest.mark.unit
+    async def test_a_start_that_installs_no_output_is_not_an_avatar(self, monkeypatch):
+        class _Avatar:
+            def __init__(self, **_):
+                pass
+
+            async def start(self, session, **kwargs):
+                return None
+
+        plugin = SimpleNamespace(
+            AvatarSession=_Avatar, PersonaConfig=None, SimliConfig=None
+        )
+        monkeypatch.setattr(
+            video_actor.importlib, "import_module", lambda _p, _m=plugin: _m
+        )
+        monkeypatch.setattr(video_actor.settings, "VIDEO_ACTOR_ENABLED", True)
+        monkeypatch.setattr(video_actor.settings, "VIDEO_ACTOR_PROVIDER", "bey")
+        monkeypatch.setattr(
+            video_actor.settings, "VIDEO_ACTOR_AVATAR_ID", "a1", raising=False
+        )
+        room = _room(_participant("bey-avatar-agent", kind=_AGENT_KIND, video=True))
+        room.name = "r"
+        session = self._session()
+
+        handle = await video_actor.attach_video_actor(
+            session=session, room=room, scenario=_scenario(enabled=True)
+        )
+
+        assert handle is None
+        assert session.output.audio == self.ROOM_AUDIO
+
+    @pytest.mark.unit
+    async def test_inert_when_the_roleplay_has_not_opted_in(self, monkeypatch):
+        def _explode(_):
+            raise AssertionError("nothing may be imported for an opted-out session")
+
+        monkeypatch.setattr(video_actor.importlib, "import_module", _explode)
+        monkeypatch.setattr(video_actor.settings, "VIDEO_ACTOR_ENABLED", True)
+
+        assert (
+            await video_actor.attach_video_actor(
+                session=self._session(), room=_room(), scenario=_scenario()
+            )
+            is None
+        )
+
+    @pytest.mark.unit
+    async def test_an_unknown_provider_is_declined(self, monkeypatch):
+        monkeypatch.setattr(video_actor.settings, "VIDEO_ACTOR_ENABLED", True)
+        monkeypatch.setattr(video_actor.settings, "VIDEO_ACTOR_PROVIDER", "nope")
+        session = self._session()
+
+        assert (
+            await video_actor.attach_video_actor(
+                session=session, room=_room(), scenario=_scenario(enabled=True)
+            )
+            is None
+        )
+        assert session.output.audio == self.ROOM_AUDIO
+
+
+class TestQuietMomentWait:
+    """When the swap lands. A seam mid-utterance is safe but audible."""
+
+    @pytest.mark.unit
+    async def test_idle_session_is_immediately_quiet(self):
+        session = SimpleNamespace(current_speech=None)
+        assert await video_actor._await_quiet(session, timeout=1.0) is True
+
+    @pytest.mark.unit
+    async def test_a_finished_handle_counts_as_quiet(self):
+        session = SimpleNamespace(current_speech=SimpleNamespace(done=lambda: True))
+        assert await video_actor._await_quiet(session, timeout=1.0) is True
+
+    @pytest.mark.unit
+    async def test_it_gives_up_rather_than_waiting_out_a_monologue(self):
+        import time as _time
+
+        session = SimpleNamespace(current_speech=SimpleNamespace(done=lambda: False))
+        started = _time.monotonic()
+        assert await video_actor._await_quiet(session, timeout=0.3) is False
+        # Bounded: swapping mid-speech only costs one un-lip-synced line, so
+        # waiting longer than this delays the face for less than it saves.
+        assert _time.monotonic() - started < 2.0
+
+    @pytest.mark.unit
+    async def test_it_waits_for_speech_to_finish(self):
+        speaking = {"done": False}
+        session = SimpleNamespace(
+            current_speech=SimpleNamespace(done=lambda: speaking["done"])
+        )
+
+        async def finish_soon():
+            import asyncio
+
+            await asyncio.sleep(0.2)
+            speaking["done"] = True
+
+        import asyncio
+
+        task = asyncio.create_task(finish_soon())
+        assert await video_actor._await_quiet(session, timeout=3.0) is True
+        await task

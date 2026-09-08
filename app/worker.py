@@ -51,6 +51,8 @@ from app.core.livekit.audio_filters import (
     supports_noise_cancellation,
 )
 from app.core.livekit.video_actor import (
+    attach_video_actor,
+    defers_attach,
     human_participants,
     is_video_actor_enabled,
     start_video_actor,
@@ -323,9 +325,13 @@ class AgentWorker:
         self._filler_handle = None
         # EXPERIMENTAL AI video actor (app/core/livekit/video_actor.py). Stays
         # None for every session that has not opted in at BOTH gates, which is
-        # every session today. Non-None is the only thing that lets the session
-        # suppress its own audio output, so nothing else may assign it.
+        # every session today. Its `publishes_audio` is the only thing that lets
+        # the session suppress its own audio output, so nothing else may set it.
         self._video_actor = None
+        # The deferred attach runs while the session is already talking, so the
+        # handle lands here mid-session rather than before session.start. Held
+        # separately so shutdown can cancel the wait before closing the vendor.
+        self._video_actor_task: Optional[asyncio.Task] = None
         # ONE accumulating pool of in-memory clips for the whole session (static
         # Studio phrases, the session-start seed batch, per-exchange batches and
         # in-turn batches all land here). Accumulating rather than replacing is
@@ -1401,6 +1407,14 @@ class AgentWorker:
                 except Exception as e:  # noqa: BLE001
                     logger.debug(f"Error closing BackgroundAudioPlayer: {e}")
                 self._bg_audio = None
+            # Stop a deferred attach that is still waiting on its vendor, so it
+            # cannot swap the session's audio onto an avatar during teardown.
+            # The handle it registered before dialling out is already in
+            # _video_actor, so cancelling here does not orphan the vendor
+            # conversation — the close below still ends it.
+            if self._video_actor_task is not None and not self._video_actor_task.done():
+                self._video_actor_task.cancel()
+            self._video_actor_task = None
             # Tear down the video actor's tracks. aclose() swallows its own
             # errors, so this cannot stall or fail a shutdown that is already
             # under a deadline.
@@ -1553,6 +1567,48 @@ class AgentWorker:
             )
         except Exception:  # noqa: BLE001 - includes TimeoutError
             logger.debug("[TTS] could not signal the synthesis failure to client")
+
+    async def _attach_video_actor(self, livekit_url: Optional[str]) -> None:
+        """Bring the video actor up while the session is already talking.
+
+        Runs as a background task so nothing about it is on the startup path.
+        The learner hears the character on the agent's own audio track from the
+        first word; the speech moves onto the avatar only once its video is
+        verified live, and stays where it is if the vendor never renders.
+
+        See app/core/livekit/video_actor.py for why the swap is safe and why the
+        vendor's own output has to be taken back the instant its start()
+        returns.
+        """
+
+        def _hold(handle) -> None:
+            # Registered before the avatar is verified, so a learner who leaves
+            # mid-render still gets the vendor conversation ended by shutdown.
+            # The handle says publishes_audio=False until the swap commits.
+            self._video_actor = handle
+
+        try:
+            handle = await attach_video_actor(
+                session=self.session,
+                room=self.ctx.room,
+                scenario=self.scenario,
+                # The URL this job's room actually lives on, not the one the
+                # worker registered with. Same distinction the Krisp gate draws.
+                livekit_url=livekit_url,
+                on_vendor_session=_hold,
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:  # noqa: BLE001 - a live session must not care
+            logger.warning(f"[AgentWorker] Video actor attach failed: {e}")
+            return
+
+        if handle is None:
+            # attach_video_actor has already logged why and torn the vendor
+            # down. self._video_actor may still hold the closed handle; its
+            # aclose() is idempotent, so shutdown is unaffected.
+            return
+        self._video_actor = handle
 
     async def _arm_orphan_deadline(self, timeout: float = 30.0) -> None:
         """Shut down if no human participant joins within `timeout` seconds
@@ -2637,9 +2693,7 @@ class AgentWorker:
                     # Already handled this turn (e.g. the early trigger fired).
                     return
                 created_at = getattr(ev, "created_at", None)
-                if not bool(
-                    getattr(settings, "FILLER_GAP_PREDICTION_ENABLED", True)
-                ):
+                if not bool(getattr(settings, "FILLER_GAP_PREDICTION_ENABLED", True)):
                     task = asyncio.create_task(
                         self._delayed_filler_decision(created_at)
                     )
@@ -3712,13 +3766,20 @@ class AgentWorker:
             # not opted in — every session today — this is one boolean read and
             # the ordering below is exactly what it has always been.
             _video_actor_wanted = is_video_actor_enabled(self.scenario)
+            # Deferred is the default: the session starts audio-only and the
+            # avatar attaches itself once it is actually rendering, so the
+            # learner never waits out a 5-12s vendor render before the character
+            # speaks. VIDEO_ACTOR_DEFER_ATTACH=false restores the blocking order
+            # below in one restart.
+            _video_actor_deferred = _video_actor_wanted and defers_attach(self.scenario)
+            _video_actor_eager = _video_actor_wanted and not _video_actor_deferred
 
             async def _join_room() -> None:
                 logger.info("[AgentWorker] Phase 3: Joining room...")
                 await self.ctx.connect()
                 self._timing["connect_ms"] = (time.monotonic() - _connect_t0) * 1000
 
-            if _video_actor_wanted:
+            if _video_actor_eager:
                 # Connect BEFORE the actor and the session start: a hosted
                 # avatar is dispatched into the room by name and needs a room
                 # that exists, and the in-process runner can only publish once
@@ -3737,17 +3798,34 @@ class AgentWorker:
                     livekit_url=_lk_url,
                 )
 
-            # The actor republishes the agent's speech in sync with its video,
-            # so the session must not ALSO publish it — that would put two
-            # copies of the same voice in the room, one lip-synced and one not.
-            # Only a live handle earns the suppression: every failure path in
-            # start_video_actor returns None, leaving this empty and the
-            # session publishing audio exactly as it does today.
-            _output_options = (
-                {"room_output_options": RoomOutputOptions(audio_enabled=False)}
-                if self._video_actor is not None and self._video_actor.publishes_audio
-                else {}
-            )
+            if _video_actor_deferred:
+                # DEFERRED. The session publishes its own audio exactly as an
+                # audio-only session does, and keeps it for the whole render
+                # wait. sync_transcription is off because the swap replaces
+                # session.output.audio wholesale: RoomIO would otherwise have
+                # wrapped the room's audio output in a transcript synchronizer
+                # and paced the agent's captions against audio that had stopped
+                # flowing through it. Nothing in this platform consumes LiveKit
+                # room transcriptions — the transcript is built from the events
+                # this worker emits — so unsynchronised captions cost nothing,
+                # whereas a half-swapped output chain would be a puzzle for
+                # whoever met it next.
+                _output_options = {
+                    "room_output_options": RoomOutputOptions(sync_transcription=False)
+                }
+            elif self._video_actor is not None and self._video_actor.publishes_audio:
+                # The actor republishes the agent's speech in sync with its
+                # video, so the session must not ALSO publish it — that would
+                # put two copies of the same voice in the room, one lip-synced
+                # and one not. Only a live handle earns the suppression: every
+                # failure path in start_video_actor returns None, leaving this
+                # empty and the session publishing audio exactly as it does
+                # today.
+                _output_options = {
+                    "room_output_options": RoomOutputOptions(audio_enabled=False)
+                }
+            else:
+                _output_options = {}
 
             await self.session.start(
                 # ... (rest of the args identical)
@@ -3759,10 +3837,20 @@ class AgentWorker:
                 **_output_options,
             )
 
-            if not _video_actor_wanted:
+            if not _video_actor_eager:
                 # Connect to room with timeout
                 await _join_room()
             logger.info("[AgentWorker] Phase 3: Started and joined room.")
+
+            if _video_actor_deferred:
+                # Off the startup path entirely: the session is live, audible
+                # and about to speak its opening statement while the vendor
+                # renders in the background.
+                self._video_actor_task = asyncio.create_task(
+                    self._attach_video_actor(_lk_url)
+                )
+                self._background_tasks.add(self._video_actor_task)
+                self._video_actor_task.add_done_callback(self._background_tasks.discard)
 
             # Arm orphan deadline: if no human joins within 30s the agent was
             # dispatched proactively but the user never connected — exit cleanly.
