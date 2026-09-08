@@ -41,6 +41,43 @@ _turn_counters: Dict[str, int] = {}
 # room_id -> True once finalize() has closed a turn and no new one has begun.
 # See _POST_FINALIZE_FIELDS.
 _closed: Dict[str, bool] = {}
+# room_id -> which audio output is carrying the agent's speech right now.
+# SESSION state, not turn state: it changes at most once, when a video actor
+# attaches mid-session, so it must outlive _turns (cleared every turn).
+_transports: Dict[str, Dict[str, Any]] = {}
+
+#: The audio outputs the agent's speech can ride, recorded per turn as
+#: ``metadata.speechTransport``.
+#:
+#: This exists because ``response_latency_ms`` does NOT mean the same thing on
+#: both. The metric is derived from the ``agent_state == "speaking"``
+#: transition, which livekit drives off ``AudioOutput.on_playback_started``:
+#:
+#:  - ``room``   — the agent publishes its own track, and the room output fires
+#:                 that callback when the first frame is actually captured into
+#:                 the published audio source. Accurate.
+#:  - ``avatar`` — the speech is routed to a vendor's renderer, and
+#:                 ``DataStreamAudioOutput`` fires the callback when the first
+#:                 frame is written into the byte stream TO THE VENDOR, carrying
+#:                 livekit's own comment "Not ideal since frame isn't actually
+#:                 playing yet / potentially we need another RPC for this". The
+#:                 vendor's transport, render and republish time is therefore
+#:                 EXCLUDED, so the number is optimistic by an unmeasured
+#:                 amount. bey took 12.7-16.7s just to publish its first video
+#:                 locally, so the per-utterance lag is not a rounding error.
+#:
+#: There is no "playback started" signal from any vendor (only
+#: ``RPC_PLAYBACK_FINISHED``), so an avatar turn's latency cannot be made
+#: correct here. Recording which transport carried the turn is the honest
+#: alternative: dashboards can segment or exclude those turns instead of
+#: silently mixing two different measurements into one trend — the same reason
+#: the ``source`` column separates 'pipeline' from 'transcript' rows.
+#:
+#: Written on EVERY turn, including plain audio ones. A value that appeared
+#: only for avatar turns would make NULL mean "room output" and "emitted by a
+#: build from before this shipped" at the same time, which is exactly the
+#: ambiguity it exists to remove.
+SPEECH_TRANSPORTS = frozenset({"room", "avatar"})
 
 # Fields carried verbatim into the finalized record.
 _RECORD_FIELDS = {
@@ -92,6 +129,32 @@ def note_user_speech_end(room_id: str, user_speech_end_ts: float) -> None:
     _turn_counters[room_id] = turn["turn_index"] + 1
 
 
+def note_speech_transport(
+    room_id: str, transport: str, provider: Optional[str] = None
+) -> None:
+    """Record which audio output carries the agent's speech from now on.
+
+    Called when the transport is established and again if it changes — which
+    happens exactly once, when a video actor attaches mid-session. Every turn
+    finalized afterwards reports the new value, and turns before it keep the
+    old one, so a single session's rows can legitimately carry both.
+
+    ``provider`` is the vendor rendering the speech ('bey', 'tavus'), recorded
+    only for ``avatar``: two vendors have very different lag, so an aggregate
+    over 'avatar' that cannot tell them apart is not worth much.
+
+    Ignores an unknown transport rather than storing it, for the same reason
+    ``note_filler_decision`` does: a typo must not create a phantom bucket that
+    a dashboard then reports on.
+    """
+    if not room_id or transport not in SPEECH_TRANSPORTS:
+        return
+    entry: Dict[str, Any] = {"speechTransport": transport}
+    if provider:
+        entry["speechTransportProvider"] = provider
+    _transports[room_id] = entry
+
+
 def note_filler_started(
     room_id: str, filler_start_ts: float, kind: str = "filler"
 ) -> None:
@@ -100,9 +163,15 @@ def note_filler_started(
     ``response_latency_ms`` is measured to the FIRST audio the learner hears, so
     when the agent speaks a thinking-filler or a predictive interim reply (both
     on the agent's "thinking" state, before the real reply) that start time —
-    not the reply's — is the response time. Only the EARLIEST such audio in a
-    turn is kept, along with ``kind`` ('filler' | 'interim') so finalize can
-    report which one the learner actually heard first. No-op if there's no
+    not the reply's — is the response time. ("The first audio the learner hears"
+    holds exactly on the ``room`` transport; see SPEECH_TRANSPORTS for why an
+    ``avatar`` turn's reply timestamp is early, and note that masking audio
+    plays on the agent's own track either way, so a MASKED avatar turn's
+    headline number is still sound while its ``replyLatencyMs`` is not.)
+
+    Only the EARLIEST such audio in a turn is kept, along with ``kind``
+    ('filler' | 'interim') so finalize can report which one the learner
+    actually heard first. No-op if there's no
     in-flight turn yet.
     """
     if not room_id:
@@ -257,6 +326,10 @@ def finalize(room_id: str, agent_speech_start_ts: float) -> Optional[Dict[str, A
     # separable at query time.
     first_audio_source = turn.get("first_audio_kind", "filler") if masked else "reply"
     provenance: Dict[str, Any] = {"firstAudioSource": first_audio_source}
+    # Which output carried the speech, so a turn whose latency EXCLUDES a
+    # vendor's render time is identifiable rather than silently averaged in
+    # with turns that measured the real thing. See SPEECH_TRANSPORTS.
+    provenance.update(_transports.get(room_id, {}))
     if masked:
         provenance["replyLatencyMs"] = max(
             0, round((agent_speech_start_ts - user_end) * 1000.0)
@@ -275,6 +348,10 @@ def discard(room_id: str) -> None:
     _turns.pop(room_id, None)
     _turn_counters.pop(room_id, None)
     _closed.pop(room_id, None)
+    # Session-scoped, so it goes only when the session does — NOT in
+    # discard_inflight, which drops a paused turn while the session continues
+    # on the same transport.
+    _transports.pop(room_id, None)
 
 
 def discard_inflight(room_id: str) -> None:

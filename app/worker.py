@@ -1609,6 +1609,10 @@ class AgentWorker:
             # aclose() is idempotent, so shutdown is unaffected.
             return
         self._video_actor = handle
+        # The transport just changed under the metrics. Every turn from here
+        # measures latency to the moment audio is handed to the VENDOR rather
+        # than to the moment it is audible, so the rows have to say so.
+        self._note_speech_transport()
 
     async def _arm_orphan_deadline(self, timeout: float = 30.0) -> None:
         """Shut down if no human participant joins within `timeout` seconds
@@ -2747,12 +2751,47 @@ class AgentWorker:
         except Exception as e:  # noqa: BLE001 - filler must never break a session
             logger.warning("[FILLER] agent-state handler error: %s", e)
 
+    def _speech_on_avatar(self) -> bool:
+        """Whether a video actor is carrying the character's speech right now.
+
+        The literal transport question, and nothing else. ``publishes_audio``
+        flips at the moment of the swap, not when an avatar was merely
+        requested, so this is False for the whole of a deferred session's
+        pre-attach window.
+
+        Kept separate from ``_voice_on_avatar`` below because that one also
+        consults a preference. Reporting the transport must not depend on a
+        setting about fillers: turning VIDEO_ACTOR_MUTE_VOICE_LAYERS off would
+        otherwise relabel every avatar turn as a plain audio one and quietly
+        corrupt the latency segmentation.
+        """
+        actor = getattr(self, "_video_actor", None)
+        return actor is not None and actor.publishes_audio
+
+    def _note_speech_transport(self) -> None:
+        """Tell the turn metrics which output is carrying the speech now.
+
+        Called once the session is running and again when a video actor
+        attaches, which is the only time the answer changes. Turns finalized
+        before the attach keep 'room' and turns after get 'avatar', so a single
+        deferred session's rows legitimately carry both — see
+        turn_metrics.SPEECH_TRANSPORTS for why the distinction is not cosmetic.
+        """
+        try:
+            on_avatar = self._speech_on_avatar()
+            turn_metrics.note_speech_transport(
+                self.ctx.room.name,
+                "avatar" if on_avatar else "room",
+                getattr(self._video_actor, "provider", None) if on_avatar else None,
+            )
+        except Exception as e:  # noqa: BLE001 - metrics must never break a turn
+            logger.debug("[VIDEO_ACTOR] could not note speech transport: %s", e)
+
     def _voice_on_avatar(self) -> bool:
         """Whether the character's voice is currently coming out of its face.
 
-        True only while a video actor is actually carrying the speech —
-        ``publishes_audio`` flips at the moment of the swap, not when an avatar
-        was merely requested.
+        True only while a video actor is actually carrying the speech AND the
+        preference to keep the voice on the face is on.
 
         The three voiced naturalness layers (thinking filler, back-channel,
         interim reply) all play through BackgroundAudioPlayer's OWN published
@@ -2773,8 +2812,7 @@ class AgentWorker:
         """
         if not getattr(settings, "VIDEO_ACTOR_MUTE_VOICE_LAYERS", True):
             return False
-        actor = getattr(self, "_video_actor", None)
-        return actor is not None and actor.publishes_audio
+        return self._speech_on_avatar()
 
     def _stop_filler(self) -> None:
         """Cut any filler still playing, plus its pending continuation."""
@@ -3923,6 +3961,11 @@ class AgentWorker:
                 # Connect to room with timeout
                 await _join_room()
             logger.info("[AgentWorker] Phase 3: Started and joined room.")
+
+            # Which output is carrying the speech, recorded before any turn can
+            # finalize. Covers plain audio sessions and the eager avatar path;
+            # the deferred one re-notes it when the swap commits.
+            self._note_speech_transport()
 
             if _video_actor_deferred:
                 # Off the startup path entirely: the session is live, audible

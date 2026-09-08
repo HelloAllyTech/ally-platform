@@ -336,9 +336,21 @@ transport-plus-render time before the reply arrived. Suppression removes that
 too: post-attach there is no filler to mis-time, and pre-attach the room output
 reports the transition accurately.
 
-The same skew still makes `response_latency_ms` optimistic on video turns —
-tracked separately; it needs a per-turn record of which transport carried the
-speech.
+The same skew still makes `response_latency_ms` optimistic on video turns, and
+that cannot be fixed from here: no vendor exposes a "playback started" signal,
+only `RPC_PLAYBACK_FINISHED`. So the turn is **identified** instead. Every turn
+records `metadata.speechTransport` (`room` | `avatar`, plus
+`speechTransportProvider`), written on plain audio turns too so that a missing
+value means "a build from before this shipped" and nothing else. A deferred
+session legitimately reports both, since it swaps mid-session.
+
+Any latency chart must split on it, for the same reason it must split on
+`source`: on `room` the number is timed to the first frame actually published,
+on `avatar` it is timed to the first frame handed to the vendor. See
+`turn_metrics.SPEECH_TRANSPORTS`, and note the transport is derived from
+`_speech_on_avatar()` — deliberately NOT `_voice_on_avatar()`, which folds in
+the filler preference and would relabel avatar turns as plain audio ones if
+that preference were turned off.
 
 ### Either way, the client is told nothing
 
