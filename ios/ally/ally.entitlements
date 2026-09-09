@@ -11,5 +11,7 @@
 		<string>applinks:app.dev.helloally.ai</string>
 		<string>applinks:app.helloally.ai</string>
 	</array>
+	<key>aps-environment</key>
+	<string>development</string>
 </dict>
 </plist>

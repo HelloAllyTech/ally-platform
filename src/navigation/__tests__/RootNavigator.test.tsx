@@ -147,6 +147,25 @@ jest.mock('@/services/settingsApi', () => ({
   ],
 }));
 
+// Avoids pulling in the real `@/services/api` (and, via it, `@/store/store`)
+// from this unrelated navigation test — same reason `settingsApi` above is
+// mocked rather than left real.
+jest.mock('@/services/pushNotificationService', () => ({
+  createRemindersChannel: jest.fn(),
+  registerDeviceForPush: jest.fn().mockResolvedValue(null),
+  subscribeToForegroundMessages: jest.fn(() => jest.fn()),
+  subscribeToTokenRefresh: jest.fn(() => jest.fn()),
+}));
+
+// RootNavigator now imports the real `store` value (not just the
+// `AppRootState` type) to pass `store.dispatch` into the (mocked, above)
+// push-registration calls — that's the only use, so a bare dispatch stub is
+// enough. Loading the real store would pull in `@/services/api`, which needs
+// far more of `@/constants` than this test's mock above provides.
+jest.mock('@/store/store', () => ({
+  store: {dispatch: jest.fn()},
+}));
+
 jest.mock('@/types', () => ({
   SocketEvent: {USER_JOINED: 'user_joined'},
 }));

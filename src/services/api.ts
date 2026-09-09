@@ -203,6 +203,8 @@ export const api = createApi({
     'LearnTrackNext',
     'LearnTrackLanguages',
     'Progress',
+    'Notifications',
+    'UnreadNotificationCount',
   ],
   endpoints: () => ({}),
 });

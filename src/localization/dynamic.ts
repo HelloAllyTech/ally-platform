@@ -21,7 +21,12 @@ type StartDynamicI18nOptions = {
 };
 
 const MANIFEST_RECHECK_MS = 30_000;
-const DEFAULT_FALLBACK_LNG = LanguageCode.EN;
+// Resolved lazily, not at module load: this file sits behind `@/constants`'s
+// barrel in a cycle reachable from several service modules, and reading
+// LanguageCode.EN at top level can observe the barrel mid-evaluation
+// (undefined) depending on which module requires it first — see the
+// module-load-time gotcha in CLAUDE.md.
+const getDefaultFallbackLng = () => LanguageCode.EN;
 
 const getResourceCacheKey = (version: string, language: string) =>
   `ally:i18n:${version}:${language}`;
@@ -41,7 +46,7 @@ const resolveLanguage = (
   const lang = (
     i18n.resolvedLanguage ??
     i18n.language ??
-    DEFAULT_FALLBACK_LNG
+    getDefaultFallbackLng()
   ).toLowerCase();
   const base = lang.split('-')[0];
   const available = manifest?.languages ?? [];
@@ -49,7 +54,7 @@ const resolveLanguage = (
   if (available.includes(lang)) return lang;
   if (available.includes(base)) return base;
   if ((SUPPORTED_LANGUAGES as readonly string[]).includes(base)) return base;
-  return DEFAULT_FALLBACK_LNG;
+  return getDefaultFallbackLng();
 };
 
 const readCachedResource = async (

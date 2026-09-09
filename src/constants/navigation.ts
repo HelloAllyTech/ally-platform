@@ -26,6 +26,7 @@ export const SCREEN_NAMES = {
   REACTIONS: 'Reactions',
   SHARE_CALL_LOG: 'ShareCallLog',
   SHARE_SIMULATION: 'ShareSimulation',
+  NOTIFICATIONS: 'Notifications',
   // Tab Screens
   HOME_TAB: 'HomeTab',
   COMMUNITY: 'Community',

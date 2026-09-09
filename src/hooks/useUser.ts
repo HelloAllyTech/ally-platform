@@ -7,6 +7,7 @@ import {
   useLazyGetPermissionsQuery,
   useLazyGetUserQuery,
 } from '@/services/authApi';
+import {unregisterDeviceForPush} from '@/services/pushNotificationService';
 import {
   handleLogout,
   setAuthenticated,
@@ -30,6 +31,9 @@ export const useUser = () => {
   const [getPermissions] = useLazyGetPermissionsQuery();
 
   const handleUserLogout = async () => {
+    // Best-effort: remove this device's push token server-side while the auth
+    // token is still valid, so a logged-out device stops receiving reminders.
+    await unregisterDeviceForPush(store.dispatch);
     await store.dispatch(handleLogout());
     store.dispatch(api.util.resetApiState());
   };

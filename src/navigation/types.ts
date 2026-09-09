@@ -55,6 +55,7 @@ export type RootStackParamList = {
     isEditNote?: boolean;
     note?: string;
   };
+  Notifications: undefined;
 };
 
 export type DrawerParamList = {

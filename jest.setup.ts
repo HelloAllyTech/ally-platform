@@ -252,6 +252,27 @@ jest.mock('@react-native-firebase/crashlytics', () => ({
   }),
 }));
 
+// Engagement-reminder push: keeps native FCM/Notifee registration out of the
+// module-load path for any test that transitively imports pushNotificationService.
+jest.mock('@react-native-firebase/messaging', () => ({
+  __esModule: true,
+  default: () => ({
+    getToken: jest.fn().mockResolvedValue('mock-fcm-token'),
+    deleteToken: jest.fn().mockResolvedValue(undefined),
+    onTokenRefresh: jest.fn(() => jest.fn()),
+    onMessage: jest.fn(() => jest.fn()),
+  }),
+}));
+
+jest.mock('@notifee/react-native', () => ({
+  __esModule: true,
+  default: {
+    createChannel: jest.fn().mockResolvedValue('reminders'),
+    displayNotification: jest.fn().mockResolvedValue(undefined),
+  },
+  AndroidImportance: {HIGH: 4},
+}));
+
 jest.mock('@/components', () => {
   const React = require('react');
   return {
