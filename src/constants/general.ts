@@ -344,6 +344,15 @@ export const API_ROUTES = {
     // One boolean about the caller's own org; readable by any authenticated user.
     GET_PROGRESS_ENABLED: '/progress/me/enabled',
   },
+  NOTIFICATIONS: {
+    LIST: '/notifications',
+    UNREAD_COUNT: '/notifications/unread-count',
+    MARK_READ: (id: string) => `/notifications/${id}/read`,
+    MARK_ALL_READ: '/notifications/read-all',
+    DEVICE_TOKENS: '/notifications/device-tokens',
+    DEVICE_TOKEN_BY_VALUE: (token: string) =>
+      `/notifications/device-tokens/${encodeURIComponent(token)}`,
+  },
   SIMULATION_SUMMARY: {
     GET_SKILLS: (scenarioSessionId: string) =>
       `/learn/scenario-session/${scenarioSessionId}/skills`,

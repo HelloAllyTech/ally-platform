@@ -7,6 +7,7 @@ export * from './simulations';
 export * from './chat';
 export * from './dates';
 export * from './leaderboard';
+export * from './notifications';
 export * from './summary';
 export * from './navigation';
 export * from './feedback';

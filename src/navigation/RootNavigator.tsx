@@ -30,6 +30,7 @@ import {
   CourseItemPlayerScreen,
   CourseOverviewScreen,
   ListeningScreen,
+  NotificationsScreen,
   ProfileSettingsScreen,
   ProgressScreen,
   ReactionsScreen,
@@ -51,8 +52,14 @@ import {
   requestNotificationPermission,
   scheduleWeeklyLeaderboardNotification,
 } from '@/services/notificationService';
+import {
+  createRemindersChannel,
+  registerDeviceForPush,
+  subscribeToForegroundMessages,
+  subscribeToTokenRefresh,
+} from '@/services/pushNotificationService';
 import {useLazyGetSummaryFieldsQuery} from '@/services/settingsApi';
-import {AppRootState} from '@/store/store';
+import {AppRootState, store} from '@/store/store';
 import {SocketEvent} from '@/types';
 import {logger} from '@/utils';
 import {getItem, setItem} from '@/utils/asyncStorage';
@@ -61,6 +68,10 @@ import {
   isSupportedDeepLink,
   navigateToCallSummaryOrLog,
 } from '@/utils/deeplink';
+import {
+  handleReminderNavigation,
+  isReminderNotification,
+} from '@/utils/notificationNavigation';
 
 import {DrawerNavigator} from './DrawerNavigator';
 import type {RootStackParamList, RouteNames} from './types';
@@ -236,22 +247,55 @@ const NavigationContent = ({
     })();
   }, [isAuthenticated, permissions]);
 
+  // Server push (FCM engagement reminders): register the device token once
+  // authenticated, re-register on token rotation, and render foreground
+  // data-only messages through Notifee.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let unsubscribeTokenRefresh: (() => void) | undefined;
+    let unsubscribeForeground: (() => void) | undefined;
+    (async () => {
+      await createRemindersChannel();
+      await requestNotificationPermission();
+      await registerDeviceForPush(store.dispatch);
+      unsubscribeTokenRefresh = subscribeToTokenRefresh(store.dispatch);
+      unsubscribeForeground = subscribeToForegroundMessages();
+    })();
+    return () => {
+      unsubscribeTokenRefresh?.();
+      unsubscribeForeground?.();
+    };
+  }, [isAuthenticated]);
+
   // Handle notification press when app is in the foreground
   useEffect(() => {
     return notifee.onForegroundEvent(({type, detail}) => {
-      if (
-        type === EventType.PRESS &&
-        detail.notification?.id === LEADERBOARD_NOTIFICATION_ID
-      ) {
+      if (type !== EventType.PRESS) return;
+      if (detail.notification?.id === LEADERBOARD_NOTIFICATION_ID) {
         navigateToLeaderboard();
+        return;
+      }
+      if (isReminderNotification(detail.notification?.data)) {
+        handleReminderNavigation(navigationRef, detail.notification?.data);
       }
     });
-  }, [navigateToLeaderboard]);
+  }, [navigateToLeaderboard, navigationRef]);
 
   // Handle notification press when app was killed (initial notification)
   useEffect(() => {
     if (!isAuthenticated) return;
     notifee.getInitialNotification().then(async initialNotification => {
+      if (!initialNotification) return;
+
+      // Engagement reminders (server push, rendered via Notifee).
+      if (isReminderNotification(initialNotification.notification?.data)) {
+        handleReminderNavigation(
+          navigationRef,
+          initialNotification.notification?.data,
+        );
+        return;
+      }
+
       if (
         initialNotification?.notification?.id !== LEADERBOARD_NOTIFICATION_ID
       ) {
@@ -396,6 +440,10 @@ const NavigationContent = ({
           <Stack.Screen
             name={SCREEN_NAMES.SHARE_SIMULATION}
             component={ShareSimulationScreen}
+          />
+          <Stack.Screen
+            name={SCREEN_NAMES.NOTIFICATIONS}
+            component={NotificationsScreen}
           />
         </>
       ) : (

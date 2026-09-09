@@ -30,3 +30,4 @@ export {
   ShareCallLogScreen,
 } from './ShareForReviewScreen';
 export {ProgressScreen} from './ProgressScreen';
+export {NotificationsScreen} from './NotificationsScreen';
