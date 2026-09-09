@@ -229,6 +229,42 @@ export interface QuizAnswerInput {
   text?: string;
 }
 
+// ---------------------------------------------------------------------------
+// Video interjections (learner playback only — trainer authoring is
+// web-only). Only ever populated for `source === 's3'` items; empty
+// otherwise. Mirrors ally-be's `VideoInterjection` learner contract.
+// ---------------------------------------------------------------------------
+
+/** Locally/server-tracked outcome of an already-answered interjection. */
+export interface VideoInterjectionAnsweredState {
+  passed: boolean;
+  pointsAwarded?: number;
+}
+
+export interface VideoInterjection {
+  id: string;
+  timestampSeconds: number;
+  /** Sanitized — no answer key. */
+  question: SanitizedQuizQuestion;
+  answered?: VideoInterjectionAnsweredState;
+}
+
+export interface VideoInterjectionAnswerGrading {
+  questionId: string;
+  /** null = pending LLM grading (not expected here — see `llm`). */
+  correct: boolean | null;
+  pointsAwarded: number;
+  pointsPossible: number;
+  llm?: {
+    feedback?: string;
+  };
+}
+
+export interface VideoInterjectionAnswerResult {
+  correct: boolean | null;
+  grading: VideoInterjectionAnswerGrading;
+}
+
 export type QuizAttemptStatus = 'GRADED' | 'PENDING_GRADING';
 
 export interface QuizQuestionResult {
@@ -317,6 +353,12 @@ export interface StartVideoItemPayload extends StartTrackItemBase {
   durationSeconds: number;
   requiredWatchPct: number;
   maxWatchedPct: number;
+  /**
+   * Quiz questions embedded at specific timestamps. Empty when the source
+   * isn't `s3` or none were authored; optional so a released build still
+   * parses a payload from a backend that predates this field.
+   */
+  interjections?: VideoInterjection[];
 }
 
 export interface StartJournalItemPayload extends StartTrackItemBase {

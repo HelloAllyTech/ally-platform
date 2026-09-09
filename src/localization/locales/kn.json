@@ -1702,7 +1702,13 @@
     "video": {
       "markWatched": "ನೋಡಲಾಗಿದೆ ಎಂದು ಗುರುತಿಸಿ",
       "watched": "ನೋಡಲಾಗಿದೆ",
-      "openVideo": "ವೀಡಿಯೋ ತೆರೆಯಿರಿ"
+      "openVideo": "ವೀಡಿಯೋ ತೆರೆಯಿರಿ",
+      "interjection": {
+        "title": "ತ್ವರಿತ ಪರಿಶೀಲನೆ",
+        "submit": "ಸಲ್ಲಿಸಿ",
+        "continue": "ಮುಂದುವರಿಸಿ",
+        "continueBody": "ವೀಡಿಯೋದೊಂದಿಗೆ ಮುಂದುವರಿಯಿರಿ."
+      }
     },
     "journal": {
       "submit": "ಸಲ್ಲಿಸಿ",

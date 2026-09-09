@@ -752,7 +752,13 @@
     "video": {
       "markWatched": "Mark as watched",
       "watched": "Watched",
-      "openVideo": "Open video"
+      "openVideo": "Open video",
+      "interjection": {
+        "title": "Quick check",
+        "submit": "Submit",
+        "continue": "Continue",
+        "continueBody": "Keep going with the video."
+      }
     },
     "journal": {
       "submit": "Submit",
