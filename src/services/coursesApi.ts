@@ -10,6 +10,7 @@ import {
   TrackDetail,
   TrackItemCompletionResult,
   TrackListItem,
+  VideoInterjectionAnswerResult,
   VideoProgressResult,
 } from '@/types';
 
@@ -128,6 +129,24 @@ export const coursesApi = api.injectEndpoints({
       },
     }),
 
+    /**
+     * Answers a single video interjection (a quiz question embedded at a
+     * timestamp inside an s3-hosted video item). One answer per call — not
+     * batched like `submitQuizAttempt` — so it invalidates nothing: the
+     * interjection's own outcome is tracked locally by the video player,
+     * and it carries no track-wide completion result to reconcile.
+     */
+    submitInterjectionAnswer: builder.mutation<
+      VideoInterjectionAnswerResult,
+      {itemId: string; interjectionId: string; answer: QuizAnswerInput}
+    >({
+      query: ({itemId, interjectionId, answer}) => ({
+        url: API_ROUTES.TRACKS.INTERJECTION_ANSWER(itemId, interjectionId),
+        method: API_METHODS.POST,
+        body: answer,
+      }),
+    }),
+
     submitQuizAttempt: builder.mutation<
       QuizAttemptResult,
       {itemId: string; answers: QuizAnswerInput[]}
@@ -228,6 +247,7 @@ export const {
   useStartTrackItemMutation,
   useMarkArticleReadMutation,
   useReportVideoProgressMutation,
+  useSubmitInterjectionAnswerMutation,
   useSubmitQuizAttemptMutation,
   useRegradeQuizAttemptMutation,
   useSaveJournalDraftMutation,

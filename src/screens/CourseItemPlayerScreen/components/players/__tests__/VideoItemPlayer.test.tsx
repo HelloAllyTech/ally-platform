@@ -49,8 +49,24 @@ const mockReportVideoProgress = jest.fn(() => ({
   }),
 }));
 
+const mockSubmitInterjectionAnswer = jest.fn(() => ({
+  unwrap: jest.fn().mockResolvedValue({
+    correct: true,
+    grading: {
+      questionId: 'q1',
+      correct: true,
+      pointsAwarded: 1,
+      pointsPossible: 1,
+    },
+  }),
+}));
+
 jest.mock('@/services', () => ({
   useReportVideoProgressMutation: jest.fn(() => [mockReportVideoProgress]),
+  useSubmitInterjectionAnswerMutation: jest.fn(() => [
+    mockSubmitInterjectionAnswer,
+    {isLoading: false},
+  ]),
 }));
 
 const buildPayload = (source: 's3' | 'youtube' | 'loom' = 's3') => ({

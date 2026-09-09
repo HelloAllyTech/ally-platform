@@ -1702,7 +1702,13 @@
     "video": {
       "markWatched": "पाहिले असे चिन्हांकित करा",
       "watched": "पाहिले",
-      "openVideo": "व्हिडिओ उघडा"
+      "openVideo": "व्हिडिओ उघडा",
+      "interjection": {
+        "title": "त्वरित तपासणी",
+        "submit": "सबमिट करा",
+        "continue": "सुरू ठेवा",
+        "continueBody": "व्हिडिओसह पुढे सुरू ठेवा."
+      }
     },
     "journal": {
       "submit": "सबमिट करा",

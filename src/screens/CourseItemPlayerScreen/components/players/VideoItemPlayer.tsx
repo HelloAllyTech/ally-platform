@@ -1,14 +1,20 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
+import {VideoRef} from 'react-native-video';
 
 import {TickRoundIcon} from '@/assets';
 import {useTranslate, useVideoWatchProgress} from '@/hooks';
 import {useReportVideoProgressMutation} from '@/services';
 import {colors} from '@/theme';
-import {StartVideoItemPayload} from '@/types';
+import {
+  StartVideoItemPayload,
+  VideoInterjection,
+  VideoInterjectionAnsweredState,
+} from '@/types';
 
 import {VideoFallbackCard} from './VideoFallbackCard';
+import {VideoInterjectionModal} from './VideoInterjectionModal';
 import {VideoPlayer} from './VideoPlayer';
 
 export interface VideoItemPlayerProps {
@@ -32,6 +38,31 @@ export const VideoItemPlayer: React.FC<VideoItemPlayerProps> = ({
   const {t} = useTranslate();
   const [reportVideoProgress] = useReportVideoProgressMutation();
   const [completed, setCompleted] = useState(alreadyCompleted);
+  const videoRef = useRef<VideoRef>(null);
+
+  // Sorted once per payload so crossing-detection can assume ascending order.
+  const interjections = useMemo(
+    () =>
+      [...(payload.interjections ?? [])].sort(
+        (a, b) => a.timestampSeconds - b.timestampSeconds,
+      ),
+    [payload.interjections],
+  );
+  const [answeredMap, setAnsweredMap] = useState<
+    Record<string, VideoInterjectionAnsweredState>
+  >(() => {
+    const seed: Record<string, VideoInterjectionAnsweredState> = {};
+    (payload.interjections ?? []).forEach(i => {
+      if (i.answered) seed[i.id] = i.answered;
+    });
+    return seed;
+  });
+  const [activeInterjection, setActiveInterjection] =
+    useState<VideoInterjection | null>(null);
+  // Playhead position as of the last progress check — used to detect a
+  // forward crossing of an interjection's timestamp (a seek backward past
+  // one should not retrigger it).
+  const lastCheckedTimeRef = useRef(0);
 
   const {recordTime, flush, watchedPct} = useVideoWatchProgress({
     durationSeconds: payload.durationSeconds,
@@ -66,12 +97,60 @@ export const VideoItemPlayer: React.FC<VideoItemPlayerProps> = ({
     }
   };
 
+  /**
+   * Feeds the watch-progress tracker as before, and additionally checks for
+   * a forward crossing of the next unanswered interjection. While the modal
+   * is up the video is already paused, so no further crossing is checked
+   * until it is dismissed. On a crossing, `lastCheckedTimeRef` is rewound to
+   * that interjection's own timestamp (not the raw playhead) so any further
+   * interjections between it and the current position are still caught once
+   * the learner resumes.
+   */
+  const handleProgressTime = (timeSeconds: number) => {
+    recordTime(timeSeconds);
+
+    if (activeInterjection) return;
+
+    const last = lastCheckedTimeRef.current;
+    const crossed = interjections.find(
+      i =>
+        !answeredMap[i.id] &&
+        i.timestampSeconds > last &&
+        i.timestampSeconds <= timeSeconds,
+    );
+
+    if (crossed) {
+      lastCheckedTimeRef.current = crossed.timestampSeconds;
+      videoRef.current?.pause();
+      setActiveInterjection(crossed);
+    } else {
+      lastCheckedTimeRef.current = timeSeconds;
+    }
+  };
+
+  const handleInterjectionAnswered = (
+    interjectionId: string,
+    passed: boolean,
+    pointsAwarded?: number,
+  ) => {
+    setAnsweredMap(prev => ({
+      ...prev,
+      [interjectionId]: {passed, pointsAwarded},
+    }));
+  };
+
+  const handleInterjectionContinue = () => {
+    setActiveInterjection(null);
+    videoRef.current?.resume();
+  };
+
   return (
     <View style={styles.container}>
       {payload.source === 's3' ? (
         <VideoPlayer
+          ref={videoRef}
           url={payload.url}
-          onProgressTime={recordTime}
+          onProgressTime={handleProgressTime}
           onPauseOrEnd={flush}
         />
       ) : (
@@ -99,6 +178,15 @@ export const VideoItemPlayer: React.FC<VideoItemPlayerProps> = ({
           </View>
         )}
       </View>
+
+      {payload.source === 's3' && (
+        <VideoInterjectionModal
+          interjection={activeInterjection}
+          itemId={itemId}
+          onAnswered={handleInterjectionAnswered}
+          onContinue={handleInterjectionContinue}
+        />
+      )}
     </View>
   );
 };

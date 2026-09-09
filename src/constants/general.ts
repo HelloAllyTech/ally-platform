@@ -222,6 +222,8 @@ export const API_ROUTES = {
       `/learn/tracks/items/${itemId}/article-read`,
     VIDEO_PROGRESS: (itemId: string) =>
       `/learn/tracks/items/${itemId}/video-progress`,
+    INTERJECTION_ANSWER: (itemId: string, interjectionId: string) =>
+      `/learn/tracks/items/${itemId}/interjections/${interjectionId}/answer`,
     QUIZ_ATTEMPTS: (itemId: string) =>
       `/learn/tracks/items/${itemId}/quiz-attempts`,
     QUIZ_REGRADE: (itemId: string, attemptId: string) =>
