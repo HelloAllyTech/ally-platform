@@ -15,6 +15,7 @@ export const SCREEN_NAMES = {
   CASE_DETAILS: 'CaseDetails',
   COURSE_OVERVIEW: 'CourseOverview',
   COURSE_ITEM_PLAYER: 'CourseItemPlayer',
+  COURSE_PROGRESS: 'CourseProgress',
   SIMULATION_ASSISTANT: 'SimulationAssistant',
   SIMULATION_FEEDBACK: 'SimulationFeedback',
   ACHIEVEMENTS: 'Achievements',

@@ -15,6 +15,7 @@ export {SimulationPathDetailsScreen} from './SimulationPathDetailsScreen';
 export {CaseDetailsScreen} from './CaseDetailsScreen';
 export {CourseOverviewScreen} from './CourseOverviewScreen';
 export {CourseItemPlayerScreen} from './CourseItemPlayerScreen';
+export {CourseProgressScreen} from './CourseProgressScreen';
 export {SimulationAssistantScreen} from './SimulationAssistantScreen';
 export {SimulationFeedbackScreen} from './SimulationFeedbackScreen';
 export {LeaderboardScreen} from './LeaderboardScreen';

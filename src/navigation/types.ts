@@ -20,6 +20,7 @@ export type RootStackParamList = {
   CaseDetails: {caseId: string};
   CourseOverview: {trackId: string};
   CourseItemPlayer: {trackId: string; itemId: string};
+  CourseProgress: {trackId: string};
   SimulationAssistant: {
     sessionData: SessionData;
     scenario?: Scenario;
