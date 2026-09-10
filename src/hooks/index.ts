@@ -44,6 +44,7 @@ export * from './useToggleReviewPrivacy';
 export * from './useShareScreenLogic';
 export * from './useHideReviewDetails';
 export * from './useScribeNoteCreationEnabled';
+export * from './useIsEvaluator';
 export * from './useVoiceNoteRecorder';
 export * from './useScribeVoiceNoteEnabled';
 export {useProgressSummary} from './useProgressSummary';

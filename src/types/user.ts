@@ -21,6 +21,16 @@ export enum UserRole {
   REVIEWER = 'REVIEWER',
   SIMULATION_REVIEWER = 'SIMULATION_REVIEWER',
   SCRIBE_REVIEWER = 'SCRIBE_REVIEWER',
+  /**
+   * Additive role marking the account as an evaluator — it is shown the extra
+   * evaluation questions attached to particular screens and events, on top of
+   * whatever its real app role (LEARNER, COUNSELOR, ...) already shows it.
+   *
+   * It never arrives as the collapsed `role` for an account holding anything
+   * else, so gate the evaluation surfaces on the `evaluator:access` permission
+   * rather than on this name.
+   */
+  EVALUATOR = 'EVALUATOR',
   ADMIN = 'ADMIN',
   SUPER_ADMIN = 'SUPER_ADMIN',
 }
