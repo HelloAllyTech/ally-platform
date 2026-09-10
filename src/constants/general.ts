@@ -75,6 +75,7 @@ export const ALLOWED_ROLES = [
   UserRole.LEARNER,
   UserRole.SIMULATION_REVIEWER,
   UserRole.SCRIBE_REVIEWER,
+  UserRole.EVALUATOR,
 ];
 
 export enum AllyPlatforms {
