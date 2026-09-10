@@ -58,6 +58,12 @@ export enum USER_PERMISSIONS {
 
   // === COUNSELLOR ===
   COUNSELOR_ACCESS = 'counselor:access',
+
+  // === EVALUATION ===
+  // Held only by the EVALUATOR role, which is layered on top of a normal app
+  // role. Gates the extra evaluation questions and nothing else, so it can
+  // never be the reason an account reaches something it otherwise could not.
+  EVALUATOR_ACCESS = 'evaluator:access',
 }
 
 export const MICROPHONE_PERMISSION =
