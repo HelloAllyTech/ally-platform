@@ -25,7 +25,7 @@ import {
   useGetLearnTrackDetailQuery,
   useLazyGetNextTrackItemQuery,
 } from '@/services';
-import {colors, fontFamily, typography} from '@/theme';
+import {colors, fontFamily, fontWeights, typography} from '@/theme';
 import {TrackDetailItem, TrackItemStatus, TrackSection} from '@/types';
 import {findNextItemId, navigateToLearnTab} from '@/utils';
 
@@ -213,6 +213,21 @@ export const CourseOverviewScreen: React.FC<
             <>
               {renderLanguageRow()}
               {renderListHeaderComponent()}
+              {!!track?.enrolled && (
+                <TouchableOpacity
+                  onPress={() =>
+                    navigation.navigate(SCREEN_NAMES.COURSE_PROGRESS, {
+                      trackId,
+                    })
+                  }
+                  style={styles.viewProgressLink}
+                  accessibilityRole="button"
+                  testID="course-view-progress">
+                  <Text style={styles.viewProgressLinkText}>
+                    {t('courses.viewProgress')}
+                  </Text>
+                </TouchableOpacity>
+              )}
             </>
           }
           contentContainerStyle={styles.scrollContent}
@@ -266,6 +281,15 @@ const styles = ScaledSheet.create({
   languageRowAction: {
     ...typography.body.small,
     ...fontFamily.ROBOTO.REGULAR,
+    color: colors.ds.theme.primary,
+  },
+  viewProgressLink: {
+    paddingVertical: '8@mvs',
+  },
+  viewProgressLinkText: {
+    ...typography.body.small,
+    ...fontFamily.ROBOTO.REGULAR,
+    fontWeight: fontWeights.medium,
     color: colors.ds.theme.primary,
   },
 });
