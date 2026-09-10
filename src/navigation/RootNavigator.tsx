@@ -29,6 +29,7 @@ import {
   CompleteProfileScreen,
   CourseItemPlayerScreen,
   CourseOverviewScreen,
+  CourseProgressScreen,
   ListeningScreen,
   NotificationsScreen,
   ProfileSettingsScreen,
@@ -384,6 +385,10 @@ const NavigationContent = ({
             name={SCREEN_NAMES.COURSE_ITEM_PLAYER}
             component={CourseItemPlayerScreen}
             options={{gestureEnabled: false}}
+          />
+          <Stack.Screen
+            name={SCREEN_NAMES.COURSE_PROGRESS}
+            component={CourseProgressScreen}
           />
           <Stack.Screen name={SCREEN_NAMES.SPLASH} component={SplashScreen} />
           <Stack.Screen
