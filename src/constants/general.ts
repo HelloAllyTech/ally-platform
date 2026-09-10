@@ -215,6 +215,7 @@ export const API_ROUTES = {
   TRACKS: {
     LIST: '/learn/tracks',
     DETAIL: (trackId: string) => `/learn/tracks/${trackId}`,
+    PROGRESS: (trackId: string) => `/learn/tracks/${trackId}/progress`,
     NEXT_ITEM: (trackId: string) => `/learn/tracks/${trackId}/next-item`,
     ENROLL: (trackId: string) => `/learn/tracks/${trackId}/enroll`,
     START_ITEM: (itemId: string) => `/learn/tracks/items/${itemId}/start`,
