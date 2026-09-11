@@ -1650,6 +1650,24 @@
     "courseCompleted": "படிப்பு முடிந்தது",
     "lockedTooltip": "இதைத் திறக்க முந்தைய உருப்படிகளை முடிக்கவும்",
     "notFound": "படிப்பு கிடைக்கவில்லை",
+    "viewProgress": "முன்னேற்றத்தைப் பார்க்க",
+    "progressDashboard": {
+      "title": "முன்னேற்றம்",
+      "notFound": "இந்த படிப்பின் முன்னேற்றம் கிடைக்கவில்லை",
+      "feedbackHeading": "ஒருங்கிணைந்த கருத்து",
+      "feedbackSubheading_one": "{{count}} மதிப்பிடப்பட்ட பயிற்சி அமர்வின் அடிப்படையில்",
+      "feedbackSubheading_other": "{{count}} மதிப்பிடப்பட்ட பயிற்சி அமர்வுகளின் அடிப்படையில்",
+      "feedbackEmpty": "இங்கே ஒருங்கிணைந்த கருத்தைப் பார்க்க இந்த படிப்பில் ஒரு பயிற்சி ரோல்-ப்ளேவை முடிக்கவும்.",
+      "sessionsHeading": "பயிற்சி அமர்வுகள்",
+      "sessionScore": "மதிப்பெண் {{score}}",
+      "sessionPending": "மதிப்பீடு நிலுவையில்",
+      "untitledSession": "பயிற்சி அமர்வு",
+      "classification": {
+        "demonstrated": "வெளிப்படுத்தப்பட்டது",
+        "needs_practice": "பயிற்சி தேவை",
+        "insufficient_data": "இன்னும் போதிய பயிற்சி இல்லை"
+      }
+    },
     "status": {
       "completed": "முடிந்தது",
       "inProgress": "நடந்து கொண்டிருக்கிறது"

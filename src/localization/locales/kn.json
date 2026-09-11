@@ -1650,6 +1650,24 @@
     "courseCompleted": "ಕೋರ್ಸ್ ಪೂರ್ಣಗೊಂಡಿದೆ",
     "lockedTooltip": "ಇದನ್ನು ಅನ್‌ಲಾಕ್ ಮಾಡಲು ಹಿಂದಿನ ಐಟಂಗಳನ್ನು ಪೂರ್ಣಗೊಳಿಸಿ",
     "notFound": "ಕೋರ್ಸ್ ಕಂಡುಬಂದಿಲ್ಲ",
+    "viewProgress": "ಪ್ರಗತಿ ವೀಕ್ಷಿಸಿ",
+    "progressDashboard": {
+      "title": "ಪ್ರಗತಿ",
+      "notFound": "ಈ ಕೋರ್ಸ್‌ನ ಪ್ರಗತಿ ಕಂಡುಬಂದಿಲ್ಲ",
+      "feedbackHeading": "ಸಂಗ್ರಹಿತ ಪ್ರತಿಕ್ರಿಯೆ",
+      "feedbackSubheading_one": "{{count}} ಮೌಲ್ಯಮಾಪನಗೊಂಡ ಅಭ್ಯಾಸ ಸೆಷನ್ ಆಧಾರದ ಮೇಲೆ",
+      "feedbackSubheading_other": "{{count}} ಮೌಲ್ಯಮಾಪನಗೊಂಡ ಅಭ್ಯಾಸ ಸೆಷನ್‌ಗಳ ಆಧಾರದ ಮೇಲೆ",
+      "feedbackEmpty": "ಇಲ್ಲಿ ಸಂಗ್ರಹಿತ ಪ್ರತಿಕ್ರಿಯೆ ನೋಡಲು ಈ ಕೋರ್ಸ್‌ನಲ್ಲಿ ಒಂದು ಅಭ್ಯಾಸ ರೋಲ್-ಪ್ಲೇ ಪೂರ್ಣಗೊಳಿಸಿ.",
+      "sessionsHeading": "ಅಭ್ಯಾಸ ಸೆಷನ್‌ಗಳು",
+      "sessionScore": "ಸ್ಕೋರ್ {{score}}",
+      "sessionPending": "ಮೌಲ್ಯಮಾಪನ ಬಾಕಿ ಇದೆ",
+      "untitledSession": "ಅಭ್ಯಾಸ ಸೆಷನ್",
+      "classification": {
+        "demonstrated": "ಪ್ರದರ್ಶಿಸಲಾಗಿದೆ",
+        "needs_practice": "ಅಭ್ಯಾಸ ಅಗತ್ಯವಿದೆ",
+        "insufficient_data": "ಇನ್ನೂ ಸಾಕಷ್ಟು ಅಭ್ಯಾಸ ಆಗಿಲ್ಲ"
+      }
+    },
     "status": {
       "completed": "ಪೂರ್ಣಗೊಂಡಿದೆ",
       "inProgress": "ಪ್ರಗತಿಯಲ್ಲಿದೆ"
