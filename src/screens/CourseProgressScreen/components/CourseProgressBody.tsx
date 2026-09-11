@@ -7,13 +7,18 @@ import {useTranslate} from '@/hooks';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
 import {TrackProgressDashboard, TrackRoleplaySessionFeedback} from '@/types';
 
+import {LatestFeedbackPreview} from './LatestFeedbackPreview';
+import {PracticeNudge} from './PracticeNudge';
 import {RoleplaySessionRow} from './RoleplaySessionRow';
+import {ScoreTrendSparkline} from './ScoreTrendSparkline';
 import {SectionProgressRow} from './SectionProgressRow';
 import {SkillCategoryRow} from './SkillCategoryRow';
 
 interface CourseProgressBodyProps {
   dashboard: TrackProgressDashboard;
   onSessionPress: (session: TrackRoleplaySessionFeedback) => void;
+  /** Continues the learner into the next unlocked item in this course. */
+  onContinuePress: () => void;
 }
 
 /**
@@ -26,11 +31,14 @@ interface CourseProgressBodyProps {
 export const CourseProgressBody: React.FC<CourseProgressBodyProps> = ({
   dashboard,
   onSessionPress,
+  onContinuePress,
 }) => {
   const {t} = useTranslate();
   const sortedSections = [...dashboard.sections].sort(
     (a, b) => a.order - b.order,
   );
+  const latestSession =
+    dashboard.roleplaySessions[dashboard.roleplaySessions.length - 1];
 
   return (
     <>
@@ -47,6 +55,11 @@ export const CourseProgressBody: React.FC<CourseProgressBodyProps> = ({
         </View>
       )}
 
+      <PracticeNudge
+        skillCategories={dashboard.skillCategories}
+        onContinuePress={onContinuePress}
+      />
+
       <View style={styles.block}>
         <Text style={styles.heading}>
           {t('courses.progressDashboard.feedbackHeading')}
@@ -59,6 +72,10 @@ export const CourseProgressBody: React.FC<CourseProgressBodyProps> = ({
           </Text>
         )}
 
+        <View style={styles.sparklineContainer}>
+          <ScoreTrendSparkline sessions={dashboard.roleplaySessions} />
+        </View>
+
         {dashboard.skillCategories.length === 0 ? (
           <View style={styles.emptyFeedback}>
             <Text style={styles.emptyFeedbackText}>
@@ -70,6 +87,15 @@ export const CourseProgressBody: React.FC<CourseProgressBodyProps> = ({
             {dashboard.skillCategories.map(skill => (
               <SkillCategoryRow key={skill.category} skill={skill} />
             ))}
+          </View>
+        )}
+
+        {latestSession && (
+          <View style={styles.latestFeedback}>
+            <LatestFeedbackPreview
+              session={latestSession}
+              onPress={onSessionPress}
+            />
           </View>
         )}
       </View>
@@ -132,8 +158,14 @@ const styles = ScaledSheet.create({
     color: colors.ds.typography.mediumEmphasis,
     textAlign: 'center',
   },
+  sparklineContainer: {
+    marginBottom: '12@ms',
+  },
   skillList: {
     gap: '10@ms',
+  },
+  latestFeedback: {
+    marginTop: '12@ms',
   },
   sessionList: {
     gap: '8@ms',

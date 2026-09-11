@@ -253,6 +253,10 @@ export const CourseOverviewScreen: React.FC<
         onClose={() => setIsProgressSheetVisible(false)}
         trackId={trackId}
         onSessionPress={handleSessionPress}
+        onContinuePress={() => {
+          setIsProgressSheetVisible(false);
+          void handleStartOrContinue();
+        }}
       />
     </View>
   );

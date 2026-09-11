@@ -8,7 +8,10 @@ import {EmptyState, LearningPathHeader} from '@/components';
 import {SCREEN_NAMES} from '@/constants';
 import {useHardwareBackPressHandler, useTranslate} from '@/hooks';
 import type {RootStackScreenProps} from '@/navigation/types';
-import {useGetLearnTrackProgressQuery} from '@/services';
+import {
+  useGetLearnTrackProgressQuery,
+  useLazyGetNextTrackItemQuery,
+} from '@/services';
 import {colors} from '@/theme';
 import {TrackRoleplaySessionFeedback} from '@/types';
 
@@ -32,6 +35,7 @@ export const CourseProgressScreen: React.FC<
     isLoading,
     error,
   } = useGetLearnTrackProgressQuery({trackId}, {skip: !trackId});
+  const [getNextItem] = useLazyGetNextTrackItemQuery();
 
   const handleBack = () => {
     if (navigation.canGoBack()) {
@@ -48,6 +52,22 @@ export const CourseProgressScreen: React.FC<
     navigation.navigate(SCREEN_NAMES.SIMULATION_FEEDBACK, {
       scenarioSessionId: session.scenarioSessionId,
     });
+  };
+
+  // Reaching this screen at all means the learner is enrolled (the endpoint
+  // 403s otherwise), so — unlike CourseOverviewScreen's Start/Continue —
+  // there is no enroll branch here.
+  const handleContinuePress = async () => {
+    try {
+      const nextResult = await getNextItem({trackId}).unwrap();
+      if (nextResult.trackCompleted || !nextResult.nextItem) return;
+      navigation.navigate(SCREEN_NAMES.COURSE_ITEM_PLAYER, {
+        trackId,
+        itemId: nextResult.nextItem.id,
+      });
+    } catch {
+      // Swallow — the learner stays on the dashboard and can retry.
+    }
   };
 
   return (
@@ -79,6 +99,7 @@ export const CourseProgressScreen: React.FC<
           <CourseProgressBody
             dashboard={dashboard}
             onSessionPress={handleSessionPress}
+            onContinuePress={() => void handleContinuePress()}
           />
         </ScrollView>
       )}

@@ -19,6 +19,9 @@ jest.mock('@/hooks', () => ({
       if (key === 'courses.progressDashboard.sessionScore') {
         return `Score ${params?.score}`;
       }
+      if (key === 'courses.progressDashboard.practiceNudge') {
+        return `${params?.category} could use more practice.`;
+      }
       const translations: Record<string, string> = {
         'courses.progressDashboard.title': 'Progress',
         'courses.progressDashboard.notFound': 'Progress not found',
@@ -31,6 +34,9 @@ jest.mock('@/hooks', () => ({
           'Needs practice',
         'courses.progressDashboard.classification.insufficient_data':
           'Not enough practice yet',
+        'courses.progressDashboard.latestFeedbackHeading': 'Latest feedback',
+        'courses.progressDashboard.readFullFeedback': 'Read full feedback',
+        'common.continue': 'Continue',
       };
       return translations[key] || key;
     },
@@ -62,10 +68,16 @@ jest.mock('@/components', () => {
 });
 
 const mockUseGetLearnTrackProgressQuery = jest.fn();
+const mockGetNextItem = jest.fn(() => ({
+  unwrap: jest
+    .fn()
+    .mockResolvedValue({trackCompleted: false, nextItem: {id: 'item-2'}}),
+}));
 
 jest.mock('@/services', () => ({
   useGetLearnTrackProgressQuery: (args: any) =>
     mockUseGetLearnTrackProgressQuery(args),
+  useLazyGetNextTrackItemQuery: () => [mockGetNextItem],
 }));
 
 const mockNavigate = jest.fn();
@@ -196,6 +208,7 @@ describe('CourseProgressScreen', () => {
             scenarioSessionId: 'sess-1',
             compositeScore: 80,
             occurredAt: '2026-08-02T00:00:00.000Z',
+            evaluationMarkdown: null,
           },
         ],
       },
@@ -211,5 +224,72 @@ describe('CourseProgressScreen', () => {
       SCREEN_NAMES.SIMULATION_FEEDBACK,
       {scenarioSessionId: 'sess-1'},
     );
+  });
+
+  it('shows a preview of the latest session feedback and reads the full feedback on press', () => {
+    mockUseGetLearnTrackProgressQuery.mockReturnValue({
+      data: {
+        ...baseDashboard,
+        evaluatedRoleplaySessionCount: 1,
+        roleplaySessions: [
+          {
+            trackItemId: 'item-1',
+            trackItemTitle: 'Session 1',
+            scenarioSessionId: 'sess-1',
+            compositeScore: 70,
+            occurredAt: '2026-08-02T00:00:00.000Z',
+            evaluationMarkdown: '## What worked\nGreat rapport building.',
+          },
+        ],
+      },
+      isLoading: false,
+      error: undefined,
+    });
+
+    renderScreen();
+
+    expect(screen.getByText(/Great rapport building/)).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('latest-feedback-read-more'));
+
+    expect(mockNavigate).toHaveBeenCalledWith(
+      SCREEN_NAMES.SIMULATION_FEEDBACK,
+      {scenarioSessionId: 'sess-1'},
+    );
+  });
+
+  it('nudges toward the weakest needs_practice category and continues into the next item on press', async () => {
+    mockUseGetLearnTrackProgressQuery.mockReturnValue({
+      data: {
+        ...baseDashboard,
+        evaluatedRoleplaySessionCount: 2,
+        skillCategories: [
+          {
+            category: 'Listening Engagement',
+            averagePercentage: 90,
+            sampleSize: 2,
+            classification: 'demonstrated',
+          },
+          {
+            category: 'Emotional Attunement',
+            averagePercentage: 40,
+            sampleSize: 2,
+            classification: 'needs_practice',
+          },
+        ],
+      },
+      isLoading: false,
+      error: undefined,
+    });
+
+    renderScreen();
+
+    expect(
+      screen.getByText('Emotional Attunement could use more practice.'),
+    ).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('practice-nudge-continue'));
+
+    expect(mockGetNextItem).toHaveBeenCalledWith({trackId: 'track-1'});
   });
 });
