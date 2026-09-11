@@ -15,6 +15,7 @@ interface CourseProgressSheetProps {
   onClose: () => void;
   trackId: string;
   onSessionPress: (session: TrackRoleplaySessionFeedback) => void;
+  onContinuePress: () => void;
 }
 
 /**
@@ -28,6 +29,7 @@ export const CourseProgressSheet: React.FC<CourseProgressSheetProps> = ({
   onClose,
   trackId,
   onSessionPress,
+  onContinuePress,
 }) => {
   const {t} = useTranslate();
 
@@ -70,6 +72,7 @@ export const CourseProgressSheet: React.FC<CourseProgressSheetProps> = ({
             <CourseProgressBody
               dashboard={dashboard}
               onSessionPress={onSessionPress}
+              onContinuePress={onContinuePress}
             />
           </BottomSheetScrollView>
         )}
