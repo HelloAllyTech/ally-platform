@@ -396,15 +396,33 @@ def _select_salient(
     # The stance the update just decided, not the one it started from — recall
     # should be congruent with where the client now IS.
     stance = update.stance or memory.stance
-    selected, _scored = select(
+    last_learner_text = _last_learner_text(new_messages)
+    selected, scored = select(
         corpus.facts,
         turn_index=memory.turn_index,
         stance=stance,
         cues=update.retrieve_cues,
-        last_learner_text=_last_learner_text(new_messages),
+        last_learner_text=last_learner_text,
         scenario_context=scenario_context,
         vectors=corpus.vectors or None,
         query_vec=query_vec,
+    )
+
+    # Ship what recall CONSIDERED, not only what it chose. `select` has always returned
+    # this
+    # and every call site has thrown it away, which left the weights on cue hits,
+    # similarity,
+    # encoding strength and decay tunable only by argument — the thing its own docstring
+    # said
+    # the return value was for.
+    _report_recall(
+        update=update,
+        memory=memory,
+        stance=stance,
+        last_learner_text=last_learner_text,
+        scenario_context=scenario_context,
+        selected=selected,
+        scored=scored,
     )
 
     # Recalling a memory re-encodes it (§7.4): the spacing effect counts
@@ -418,6 +436,67 @@ def _select_salient(
             fact.stances_seen.append(stance)
 
     return selected
+
+
+def _cue_tier(
+    update: ValidatedUpdate,
+    last_learner_text: Optional[str],
+    scenario_context: Optional[str],
+) -> str:
+    """Which SOURCE supplied this turn's cues, mirroring recall's own fallback ladder.
+
+    Recorded on its own because it is the difference between recall responding to the
+    conversation and recall running on encoding strength while appearing to. The first
+    v2v run
+    had cue_hits at 0 on every turn; a tier distribution makes that visible without
+    anyone
+    reading a transcript.
+
+    Derived here rather than returned by `select` so that function keeps its signature
+    and its
+    single responsibility — the ladder is three conditions, and duplicating them is
+    cheaper
+    than threading a new return value through a hot path.
+    """
+    if any((cue or "").strip() for cue in (update.retrieve_cues or [])):
+        return "nominated"
+    if (last_learner_text or "").strip():
+        return "learner_text"
+    if (scenario_context or "").strip():
+        return "scenario"
+    return "none"
+
+
+def _report_recall(
+    *,
+    update: ValidatedUpdate,
+    memory: ClientWorkingMemory,
+    stance: str,
+    last_learner_text: Optional[str],
+    scenario_context: Optional[str],
+    selected: List[Fact],
+    scored,
+) -> None:
+    """Best-effort telemetry for one recall. Never affects the update."""
+    try:
+        from app.core.graph.instrumentation import get_room_id
+        from app.core.working_memory.recall_log import emit_recall
+        from app.core.working_memory.state import SALIENT_BACKSTORY_CAP
+
+        emit_recall(
+            room_id=get_room_id(),
+            turn_index=memory.turn_index,
+            stance=stance,
+            cue_tier=_cue_tier(update, last_learner_text, scenario_context),
+            cue_count=len(
+                [c for c in (update.retrieve_cues or []) if (c or "").strip()]
+            ),
+            scored=scored,
+            selected_texts=[f.text for f in selected],
+            cap=SALIENT_BACKSTORY_CAP,
+        )
+    except Exception:  # noqa: BLE001
+        logger.debug("[working-memory] recall telemetry skipped", exc_info=True)
 
 
 def schedule_update(
