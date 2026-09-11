@@ -1650,6 +1650,24 @@
     "courseCompleted": "कोर्स पूर्ण हुआ",
     "lockedTooltip": "इसे अनलॉक करने के लिए पिछले आइटम पूरे करें",
     "notFound": "कोर्स नहीं मिला",
+    "viewProgress": "प्रगति देखें",
+    "progressDashboard": {
+      "title": "प्रगति",
+      "notFound": "इस कोर्स की प्रगति नहीं मिली",
+      "feedbackHeading": "समेकित प्रतिक्रिया",
+      "feedbackSubheading_one": "{{count}} मूल्यांकित अभ्यास सत्र के आधार पर",
+      "feedbackSubheading_other": "{{count}} मूल्यांकित अभ्यास सत्रों के आधार पर",
+      "feedbackEmpty": "यहाँ समेकित प्रतिक्रिया देखने के लिए इस कोर्स में एक अभ्यास रोल-प्ले पूरा करें।",
+      "sessionsHeading": "अभ्यास सत्र",
+      "sessionScore": "स्कोर {{score}}",
+      "sessionPending": "मूल्यांकन लंबित",
+      "untitledSession": "अभ्यास सत्र",
+      "classification": {
+        "demonstrated": "प्रदर्शित",
+        "needs_practice": "अभ्यास की आवश्यकता है",
+        "insufficient_data": "अभी पर्याप्त अभ्यास नहीं"
+      }
+    },
     "status": {
       "completed": "पूर्ण",
       "inProgress": "जारी है"

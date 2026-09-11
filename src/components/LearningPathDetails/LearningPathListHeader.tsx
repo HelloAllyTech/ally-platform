@@ -1,5 +1,5 @@
 import React from 'react';
-import {Image, Text, View} from 'react-native';
+import {Image, Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {Button} from '@/components';
@@ -18,6 +18,12 @@ interface LearningPathListHeaderProps {
   onStartPress: () => void;
   isStartDisabled: boolean;
   isCreatingSession: boolean;
+  /**
+   * Opens the progress + consolidated feedback sheet. Omitted on screens
+   * that have no such drill-down (SimulationPathDetails, CaseDetails) — the
+   * bar then renders inert, same as before this prop existed.
+   */
+  onProgressPress?: () => void;
 }
 
 export const LearningPathListHeader: React.FC<LearningPathListHeaderProps> = ({
@@ -31,6 +37,7 @@ export const LearningPathListHeader: React.FC<LearningPathListHeaderProps> = ({
   onStartPress,
   isStartDisabled,
   isCreatingSession,
+  onProgressPress,
 }) => {
   const showProgressBar = !!completedScenarios && totalScenarios > 0;
 
@@ -47,11 +54,27 @@ export const LearningPathListHeader: React.FC<LearningPathListHeaderProps> = ({
         <Text style={styles.pathTitle}>{title}</Text>
         <Text style={styles.pathDescription}>{description ?? ''}</Text>
 
-        {showProgressBar && completedScenarios !== undefined && (
-          <View style={styles.progressBarContainer}>
-            <ProgressBar current={completedScenarios} total={totalScenarios} />
-          </View>
-        )}
+        {showProgressBar &&
+          completedScenarios !== undefined &&
+          (onProgressPress ? (
+            <TouchableOpacity
+              style={styles.progressBarContainer}
+              onPress={onProgressPress}
+              accessibilityRole="button"
+              testID="learning-path-progress-bar">
+              <ProgressBar
+                current={completedScenarios}
+                total={totalScenarios}
+              />
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.progressBarContainer}>
+              <ProgressBar
+                current={completedScenarios}
+                total={totalScenarios}
+              />
+            </View>
+          ))}
 
         {!isCompleted && (
           <Button

@@ -1650,6 +1650,24 @@
     "courseCompleted": "कोर्स पूर्ण झाला",
     "lockedTooltip": "हे अनलॉक करण्यासाठी आधीचे आयटम पूर्ण करा",
     "notFound": "कोर्स सापडला नाही",
+    "viewProgress": "प्रगती पहा",
+    "progressDashboard": {
+      "title": "प्रगती",
+      "notFound": "या कोर्सची प्रगती सापडली नाही",
+      "feedbackHeading": "एकत्रित अभिप्राय",
+      "feedbackSubheading_one": "{{count}} मूल्यांकित सराव सत्रावर आधारित",
+      "feedbackSubheading_other": "{{count}} मूल्यांकित सराव सत्रांवर आधारित",
+      "feedbackEmpty": "येथे एकत्रित अभिप्राय पाहण्यासाठी या कोर्समध्ये एक सराव रोल-प्ले पूर्ण करा.",
+      "sessionsHeading": "सराव सत्रे",
+      "sessionScore": "स्कोअर {{score}}",
+      "sessionPending": "मूल्यांकन प्रलंबित",
+      "untitledSession": "सराव सत्र",
+      "classification": {
+        "demonstrated": "दाखवले",
+        "needs_practice": "सरावाची गरज आहे",
+        "insufficient_data": "अजून पुरेसा सराव नाही"
+      }
+    },
     "status": {
       "completed": "पूर्ण",
       "inProgress": "सुरू आहे"

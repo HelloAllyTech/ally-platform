@@ -1,20 +1,18 @@
 import React from 'react';
-import {ActivityIndicator, ScrollView, Text, View} from 'react-native';
+import {ActivityIndicator, ScrollView, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {DataUnavailableIcon} from '@/assets';
-import {EmptyState, LearningPathHeader, ProgressBar} from '@/components';
+import {EmptyState, LearningPathHeader} from '@/components';
 import {SCREEN_NAMES} from '@/constants';
 import {useHardwareBackPressHandler, useTranslate} from '@/hooks';
 import type {RootStackScreenProps} from '@/navigation/types';
 import {useGetLearnTrackProgressQuery} from '@/services';
-import {colors, fontFamily, fontWeights, typography} from '@/theme';
+import {colors} from '@/theme';
 import {TrackRoleplaySessionFeedback} from '@/types';
 
-import {RoleplaySessionRow} from './components/RoleplaySessionRow';
-import {SectionProgressRow} from './components/SectionProgressRow';
-import {SkillCategoryRow} from './components/SkillCategoryRow';
+import {CourseProgressBody} from './components/CourseProgressBody';
 
 /**
  * A learner's progress-and-feedback screen for one course: percent complete
@@ -52,10 +50,6 @@ export const CourseProgressScreen: React.FC<
     });
   };
 
-  const sortedSections = [...(dashboard?.sections ?? [])].sort(
-    (a, b) => a.order - b.order,
-  );
-
   return (
     <View
       style={[
@@ -82,62 +76,10 @@ export const CourseProgressScreen: React.FC<
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}>
-          <ProgressBar
-            current={dashboard.completedItems}
-            total={dashboard.totalItems}
+          <CourseProgressBody
+            dashboard={dashboard}
+            onSessionPress={handleSessionPress}
           />
-
-          {sortedSections.length > 0 && (
-            <View style={styles.sectionList}>
-              {sortedSections.map(section => (
-                <SectionProgressRow key={section.id} section={section} />
-              ))}
-            </View>
-          )}
-
-          <View style={styles.block}>
-            <Text style={styles.heading}>
-              {t('courses.progressDashboard.feedbackHeading')}
-            </Text>
-            {dashboard.evaluatedRoleplaySessionCount > 0 && (
-              <Text style={styles.subheading}>
-                {t('courses.progressDashboard.feedbackSubheading', {
-                  count: dashboard.evaluatedRoleplaySessionCount,
-                })}
-              </Text>
-            )}
-
-            {dashboard.skillCategories.length === 0 ? (
-              <View style={styles.emptyFeedback}>
-                <Text style={styles.emptyFeedbackText}>
-                  {t('courses.progressDashboard.feedbackEmpty')}
-                </Text>
-              </View>
-            ) : (
-              <View style={styles.skillList}>
-                {dashboard.skillCategories.map(skill => (
-                  <SkillCategoryRow key={skill.category} skill={skill} />
-                ))}
-              </View>
-            )}
-          </View>
-
-          {dashboard.roleplaySessions.length > 0 && (
-            <View style={styles.block}>
-              <Text style={styles.heading}>
-                {t('courses.progressDashboard.sessionsHeading')}
-              </Text>
-              <View style={styles.sessionList}>
-                {[...dashboard.roleplaySessions].reverse().map(session => (
-                  <RoleplaySessionRow
-                    key={`${session.trackItemId}-${session.scenarioSessionId}`}
-                    session={session}
-                    onPress={handleSessionPress}
-                  />
-                ))}
-              </View>
-            </View>
-          )}
         </ScrollView>
       )}
     </View>
@@ -157,48 +99,5 @@ const styles = ScaledSheet.create({
   scrollContent: {
     paddingHorizontal: '21@ms',
     paddingBottom: '32@ms',
-  },
-  sectionList: {
-    marginTop: '16@ms',
-    borderWidth: 1,
-    borderColor: colors.ds.stroke.primary,
-    borderRadius: '12@ms',
-    paddingHorizontal: '12@ms',
-  },
-  block: {
-    marginTop: '24@ms',
-  },
-  heading: {
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    ...typography.body.large,
-    fontWeight: fontWeights.medium,
-    color: colors.ds.typography.highEmphasis,
-    marginBottom: '4@ms',
-  },
-  subheading: {
-    ...fontFamily.ROBOTO.REGULAR,
-    ...typography.body.small,
-    color: colors.ds.typography.mediumEmphasis,
-    marginBottom: '12@ms',
-  },
-  emptyFeedback: {
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: colors.ds.stroke.primary,
-    borderRadius: '12@ms',
-    padding: '20@ms',
-    alignItems: 'center',
-  },
-  emptyFeedbackText: {
-    ...fontFamily.ROBOTO.REGULAR,
-    ...typography.body.small,
-    color: colors.ds.typography.mediumEmphasis,
-    textAlign: 'center',
-  },
-  skillList: {
-    gap: '10@ms',
-  },
-  sessionList: {
-    gap: '8@ms',
   },
 });

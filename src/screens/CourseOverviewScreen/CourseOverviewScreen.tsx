@@ -25,11 +25,17 @@ import {
   useGetLearnTrackDetailQuery,
   useLazyGetNextTrackItemQuery,
 } from '@/services';
-import {colors, fontFamily, fontWeights, typography} from '@/theme';
-import {TrackDetailItem, TrackItemStatus, TrackSection} from '@/types';
+import {colors, fontFamily, typography} from '@/theme';
+import {
+  TrackDetailItem,
+  TrackItemStatus,
+  TrackRoleplaySessionFeedback,
+  TrackSection,
+} from '@/types';
 import {findNextItemId, navigateToLearnTab} from '@/utils';
 
 import {CourseLanguageSheet} from './components/CourseLanguageSheet';
+import {CourseProgressSheet} from './components/CourseProgressSheet';
 import {CourseSectionBlock} from './components/CourseSectionBlock';
 
 export const CourseOverviewScreen: React.FC<
@@ -51,6 +57,7 @@ export const CourseOverviewScreen: React.FC<
   const [isStarting, setIsStarting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [isLanguageSheetVisible, setIsLanguageSheetVisible] = useState(false);
+  const [isProgressSheetVisible, setIsProgressSheetVisible] = useState(false);
 
   const handleBack = () => {
     if (navigation.canGoBack()) {
@@ -165,8 +172,18 @@ export const CourseOverviewScreen: React.FC<
         onStartPress={handleStartOrContinue}
         isStartDisabled={isStarting}
         isCreatingSession={isStarting}
+        onProgressPress={
+          track.enrolled ? () => setIsProgressSheetVisible(true) : undefined
+        }
       />
     );
+  };
+
+  const handleSessionPress = (session: TrackRoleplaySessionFeedback) => {
+    setIsProgressSheetVisible(false);
+    navigation.navigate(SCREEN_NAMES.SIMULATION_FEEDBACK, {
+      scenarioSessionId: session.scenarioSessionId,
+    });
   };
 
   const renderSection = ({
@@ -213,21 +230,6 @@ export const CourseOverviewScreen: React.FC<
             <>
               {renderLanguageRow()}
               {renderListHeaderComponent()}
-              {!!track?.enrolled && (
-                <TouchableOpacity
-                  onPress={() =>
-                    navigation.navigate(SCREEN_NAMES.COURSE_PROGRESS, {
-                      trackId,
-                    })
-                  }
-                  style={styles.viewProgressLink}
-                  accessibilityRole="button"
-                  testID="course-view-progress">
-                  <Text style={styles.viewProgressLinkText}>
-                    {t('courses.viewProgress')}
-                  </Text>
-                </TouchableOpacity>
-              )}
             </>
           }
           contentContainerStyle={styles.scrollContent}
@@ -246,6 +248,12 @@ export const CourseOverviewScreen: React.FC<
           currentLanguageCode={track.languageCode ?? 'en'}
         />
       )}
+      <CourseProgressSheet
+        visible={isProgressSheetVisible}
+        onClose={() => setIsProgressSheetVisible(false)}
+        trackId={trackId}
+        onSessionPress={handleSessionPress}
+      />
     </View>
   );
 };
@@ -281,15 +289,6 @@ const styles = ScaledSheet.create({
   languageRowAction: {
     ...typography.body.small,
     ...fontFamily.ROBOTO.REGULAR,
-    color: colors.ds.theme.primary,
-  },
-  viewProgressLink: {
-    paddingVertical: '8@mvs',
-  },
-  viewProgressLinkText: {
-    ...typography.body.small,
-    ...fontFamily.ROBOTO.REGULAR,
-    fontWeight: fontWeights.medium,
     color: colors.ds.theme.primary,
   },
 });

@@ -104,6 +104,13 @@ jest.mock('@/services', () => ({
     mockSetTrackLanguage,
     {isLoading: false},
   ]),
+  // Used by CourseProgressSheet, which the screen always renders (mounted
+  // closed; the query is skipped until it opens).
+  useGetLearnTrackProgressQuery: jest.fn(() => ({
+    data: undefined,
+    isLoading: false,
+    error: undefined,
+  })),
 }));
 
 const {useGetLearnTrackDetailQuery} = require('@/services');
