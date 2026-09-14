@@ -1653,6 +1653,7 @@
     "viewProgress": "प्रगती पहा",
     "progressDashboard": {
       "title": "प्रगती",
+      "tapHint": "तुमची प्रगती आणि अभिप्राय पाहण्यासाठी टॅप करा",
       "notFound": "या कोर्सची प्रगती सापडली नाही",
       "feedbackHeading": "एकत्रित अभिप्राय",
       "feedbackSubheading_one": "{{count}} मूल्यांकित सराव सत्रावर आधारित",

@@ -2,7 +2,9 @@ import React from 'react';
 import {Image, Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
+import {ChevronRight} from '@/assets';
 import {Button} from '@/components';
+import {useTranslate} from '@/hooks/useTranslate';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
 
 import {ProgressBar} from './ProgressBar';
@@ -39,6 +41,7 @@ export const LearningPathListHeader: React.FC<LearningPathListHeaderProps> = ({
   isCreatingSession,
   onProgressPress,
 }) => {
+  const {t} = useTranslate();
   const showProgressBar = !!completedScenarios && totalScenarios > 0;
 
   return (
@@ -58,14 +61,22 @@ export const LearningPathListHeader: React.FC<LearningPathListHeaderProps> = ({
           completedScenarios !== undefined &&
           (onProgressPress ? (
             <TouchableOpacity
-              style={styles.progressBarContainer}
+              style={styles.progressBarTappable}
               onPress={onProgressPress}
               accessibilityRole="button"
               testID="learning-path-progress-bar">
-              <ProgressBar
-                current={completedScenarios}
-                total={totalScenarios}
-              />
+              <View style={styles.progressBarRow}>
+                <View style={styles.progressBarFlex}>
+                  <ProgressBar
+                    current={completedScenarios}
+                    total={totalScenarios}
+                  />
+                </View>
+                <ChevronRight />
+              </View>
+              <Text style={styles.progressTapHint}>
+                {t('courses.progressDashboard.tapHint')}
+              </Text>
             </TouchableOpacity>
           ) : (
             <View style={styles.progressBarContainer}>
@@ -121,5 +132,28 @@ const styles = ScaledSheet.create({
     marginVertical: '12@ms',
     width: '60%',
     alignSelf: 'center',
+  },
+  progressBarTappable: {
+    marginVertical: '12@ms',
+    width: '100%',
+    borderWidth: 1,
+    borderColor: colors.ds.stroke.primary,
+    borderRadius: '12@ms',
+    padding: '12@ms',
+  },
+  progressBarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: '8@ms',
+  },
+  progressBarFlex: {
+    flex: 1,
+  },
+  progressTapHint: {
+    ...fontFamily.ROBOTO.REGULAR,
+    ...typography.body.tiny,
+    fontWeight: fontWeights.medium,
+    color: colors.ds.theme.primary,
+    marginTop: '6@mvs',
   },
 });

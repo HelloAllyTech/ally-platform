@@ -124,4 +124,37 @@ describe('LearningPathListHeader', () => {
 
     expect(onStartPress).toHaveBeenCalledTimes(1);
   });
+
+  it('shows a tap hint and calls onProgressPress when the bar is tappable', () => {
+    const onProgressPress = jest.fn();
+    const {getByTestId, getByText} = render(
+      <LearningPathListHeader
+        {...defaultProps}
+        completedScenarios={2}
+        totalScenarios={5}
+        onProgressPress={onProgressPress}
+      />,
+    );
+
+    // useTranslate isn't mocked here (unlike screen-level tests), so it
+    // falls back to the raw key — asserting on the key confirms the hint
+    // text renders at all, which is what this test is about.
+    expect(getByText('courses.progressDashboard.tapHint')).toBeTruthy();
+
+    fireEvent.press(getByTestId('learning-path-progress-bar'));
+
+    expect(onProgressPress).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows no tap hint when the bar has no drill-down', () => {
+    const {queryByText} = render(
+      <LearningPathListHeader
+        {...defaultProps}
+        completedScenarios={2}
+        totalScenarios={5}
+      />,
+    );
+
+    expect(queryByText('courses.progressDashboard.tapHint')).toBeNull();
+  });
 });
