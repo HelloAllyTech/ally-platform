@@ -33,8 +33,14 @@ const mockMarkArticleRead = jest.fn(() => ({
   }),
 }));
 
+const mockSubmitArticleQuestionAnswer = jest.fn();
+
 jest.mock('@/services', () => ({
   useMarkArticleReadMutation: jest.fn(() => [mockMarkArticleRead, {isLoading: false}]),
+  useSubmitArticleQuestionAnswerMutation: jest.fn(() => [
+    mockSubmitArticleQuestionAnswer,
+    {isLoading: false},
+  ]),
 }));
 
 const buildPayload = () => ({
