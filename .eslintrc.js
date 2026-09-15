@@ -1,6 +1,6 @@
 module.exports = {
   root: true,
-  ignorePatterns: ['**/__mocks__/**', '**/__tests__/**'],
+  ignorePatterns: ['**/__mocks__/**', '**/__tests__/**', 'coverage/**'],
   extends: ['@react-native', 'prettier'],
   plugins: ['prettier', 'import', 'unused-imports'],
 
