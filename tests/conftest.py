@@ -32,6 +32,8 @@ def _set_test_env_vars():
         "ELEVEN_API_KEY": "test-eleven-key",
         "SARVAM_API_KEY": "test-sarvam-key",
         "HUME_API_KEY": "test-hume-key",
+        "CARTESIA_API_KEY": "test-cartesia-key",
+        "SMALLEST_API_KEY": "test-smallest-key",
         # LLM settings
         "LLM_TEMPERATURE": "0.7",
         # Voice model settings

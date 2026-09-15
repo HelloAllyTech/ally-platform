@@ -58,6 +58,8 @@ for _key, _value in {
     "ELEVEN_API_KEY": "bench",
     "SARVAM_API_KEY": "bench",
     "HUME_API_KEY": "bench",
+    "CARTESIA_API_KEY": "bench",
+    "SMALLEST_API_KEY": "bench",
     "LLM_TEMPERATURE": "0.7",
     "DEFAULT_MALE_VOICE_MODEL": "bench",
     "DEFAULT_FEMALE_VOICE_MODEL": "bench",

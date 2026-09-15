@@ -108,6 +108,8 @@ class TTSProvider(str, Enum):
     SARVAM = "sarvam"
     GOOGLE = "google"
     HUME = "hume"
+    CARTESIA = "cartesia"
+    SMALLESTAI = "smallestai"
 
 
 class STTProvider(str, Enum):

@@ -33,6 +33,8 @@ livekit-plugins-silero = "^1.3.10"
 livekit-plugins-elevenlabs = "^1.3.10"
 livekit-plugins-google = ">=1.3.6,<1.4.0"
 livekit-plugins-hume = "^1.2.18"
+livekit-plugins-cartesia = "1.3.12"
+livekit-plugins-smallestai = "1.3.12"
 # Tavus video avatar for the video-actor feature. Pinned to the livekit-agents
 # version above: the plugin's AvatarSession signature has changed across
 # minors (replica_id/persona_id here, face_id/pal_id from 1.5), so it must not

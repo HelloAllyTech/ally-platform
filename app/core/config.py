@@ -185,6 +185,8 @@ class Settings(BaseSettings):
         ),
     )
     HUME_API_KEY: str = Field(...)
+    CARTESIA_API_KEY: str = Field(...)
+    SMALLEST_API_KEY: str = Field(...)
 
     # Stream the agent's reply token-by-token to TTS instead of waiting for the
     # full LLM response. The LiveKit LLMAdapter already streams (stream_mode=

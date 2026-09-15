@@ -1,12 +1,12 @@
 # TTS Providers
 
-**Purpose.** This document describes the TTS provider abstraction layer, the `BaseTTSClient` interface, the five supported providers, and the factory that instantiates them.
+**Purpose.** This document describes the TTS provider abstraction layer, the `BaseTTSClient` interface, the seven supported providers, and the factory that instantiates them.
 
 ---
 
 ## Overview
 
-TTS (Text-to-Speech) converts the AI client's text responses into audio. The system supports five providers, each implemented as a subclass of `BaseTTSClient`. The factory selects the provider based on scenario metadata.
+TTS (Text-to-Speech) converts the AI client's text responses into audio. The system supports seven providers, each implemented as a subclass of `BaseTTSClient`. The factory selects the provider based on scenario metadata.
 
 ## BaseTTSClient Interface
 
@@ -57,6 +57,8 @@ Providers optionally define two class constants:
 | Sarvam | `SarvamTTSClient` | `TTSProvider.SARVAM` | No | No |
 | Google Cloud | `GoogleTTSClient` | `TTSProvider.GOOGLE` | Yes (speed, pitch, volume_gain_db) | No |
 | Hume | `HumeTTSClient` | `TTSProvider.HUME` | Yes (speed, description) | No |
+| Cartesia | `CartesiaTTSClient` | `TTSProvider.CARTESIA` | No | No |
+| Smallest.ai | `SmallestAITTSClient` | `TTSProvider.SMALLESTAI` | No | No |
 
 ### Provider Details
 
@@ -69,6 +71,10 @@ Providers optionally define two class constants:
 **Google Cloud** -- Uses `voice_name` and `gender` for voice selection. Supports voice cloning via `voice_cloning_key`. Voice parameters only (no SSML) when streaming is enabled.
 
 **Hume** -- Emotion-aware TTS. Uses `voice_id` with optional `voice_provider` (HUME_AI for pre-existing, CUSTOM_VOICE for custom). Supports `instant_mode` for lower latency. Voice parameters include a text `description` of desired emotional expression.
+
+**Cartesia** -- Uses `voice` (a Cartesia voice-library UUID) for voice selection, `model` (default `sonic-3`). Keeps a single WebSocket open and reuses it across turns instead of reconnecting per synthesis.
+
+**Smallest.ai** -- Uses `voice_id` for voice selection, `model` (default `lightning_v3.1_pro`). Broad Indian-language coverage (Hindi plus 9 Indian languages with code-switching on the Pro model).
 
 ## Factory
 
@@ -214,4 +220,6 @@ only a label and the exception, never the failed text.
 - `app/tts/sarvam.py` -- `SarvamTTSClient`
 - `app/tts/google.py` -- `GoogleTTSClient`
 - `app/tts/hume.py` -- `HumeTTSClient`
+- `app/tts/cartesia.py` -- `CartesiaTTSClient`
+- `app/tts/smallestai.py` -- `SmallestAITTSClient`
 - `app/core/constants.py` -- `TTSProvider` enum

@@ -32,6 +32,8 @@ SQS_MESSAGE_EVENT_QUEUE_NAME=<YOUR_SQS_MESSAGE_EVENT_QUEUE_NAME>
 
 ELEVEN_API_KEY=<YOUR_ELEVEN_LABS_API_KEY>
 HUME_API_KEY=<YOUR_HUME_API_KEY>
+CARTESIA_API_KEY=<YOUR_CARTESIA_API_KEY>
+SMALLEST_API_KEY=<YOUR_SMALLEST_API_KEY>
 
 # Google Gemini LLM (optional - for using Gemini as conversation LLM provider)
 # Option 1 (recommended, no gcloud needed): plain API key from

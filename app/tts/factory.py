@@ -17,11 +17,13 @@ logger = get_logger(__name__)
 # every worker's baseline memory. When the flag is disabled, import all of them
 # eagerly here to restore the old behavior exactly.
 if not settings.LAZY_PROVIDER_IMPORTS_ENABLED:
+    from app.tts.cartesia import CartesiaTTSClient  # noqa: F401
     from app.tts.deepgram import DeepgramTTSClient  # noqa: F401
     from app.tts.elevenlabs import ElevenLabsTTSClient  # noqa: F401
     from app.tts.google import GoogleTTSClient  # noqa: F401
     from app.tts.hume import HumeTTSClient  # noqa: F401
     from app.tts.sarvam import SarvamTTSClient  # noqa: F401
+    from app.tts.smallestai import SmallestAITTSClient  # noqa: F401
 
 
 class Gender(str, Enum):
@@ -188,6 +190,22 @@ def create_tts_client(
             from app.tts.hume import HumeTTSClient  # noqa: F811
 
             return HumeTTSClient.from_config(
+                config=config_dict,
+                language_code=language_code,
+            )
+
+        elif provider == TTSProvider.CARTESIA:
+            from app.tts.cartesia import CartesiaTTSClient  # noqa: F811
+
+            return CartesiaTTSClient.from_config(
+                config=config_dict,
+                language_code=language_code,
+            )
+
+        elif provider == TTSProvider.SMALLESTAI:
+            from app.tts.smallestai import SmallestAITTSClient  # noqa: F811
+
+            return SmallestAITTSClient.from_config(
                 config=config_dict,
                 language_code=language_code,
             )
