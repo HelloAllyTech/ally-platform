@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   LayoutChangeEvent,
   NativeScrollEvent,
@@ -14,7 +14,14 @@ import {Button, RichText} from '@/components';
 import {useTranslate} from '@/hooks';
 import {useMarkArticleReadMutation} from '@/services';
 import {colors} from '@/theme';
-import {StartArticleItemPayload, TrackItemCompletionResult} from '@/types';
+import {
+  StartArticleItemPayload,
+  SubmitArticleQuestionAnswerResult,
+  TrackItemCompletionResult,
+} from '@/types';
+import {splitArticleHtml} from '@/utils';
+
+import {ArticleQuestionCard} from './ArticleQuestionCard';
 
 export interface ArticlePlayerProps {
   payload: StartArticleItemPayload;
@@ -35,6 +42,13 @@ const NO_SCROLL_READY_MS = 3000;
  * or after a few seconds if the content is too short to scroll. Mirrors
  * ally-web's `ArticleItemPlayer` (the font-size stepper is a deliberate v1
  * scope-cut — `RichText` has no scale knob to hook it into).
+ *
+ * An article may also carry inline questions, anchored between its prose
+ * blocks. Those are the article's completion rule when present: the server
+ * completes the item on the last answer (and refuses mark-as-read while any
+ * are outstanding), so the reader has to work through them rather than
+ * scrolling past. The body is split on their placeholders and the segments
+ * rendered in order.
  */
 export const ArticlePlayer: React.FC<ArticlePlayerProps> = ({
   payload,
@@ -47,6 +61,50 @@ export const ArticlePlayer: React.FC<ArticlePlayerProps> = ({
   const [reachedEnd, setReachedEnd] = useState(false);
   const [marked, setMarked] = useState(alreadyCompleted);
   const [markArticleRead, {isLoading}] = useMarkArticleReadMutation();
+
+  const segments = useMemo(
+    () => splitArticleHtml(payload.html, payload.questions ?? []),
+    [payload.html, payload.questions],
+  );
+  /**
+   * Only the questions the article actually shows. Counting
+   * `payload.questions` instead would hold the footer shut forever on a
+   * translated body that lost a placeholder — the server counts the rendered
+   * set for the same reason.
+   */
+  const shownQuestions = useMemo(
+    () =>
+      segments.flatMap(segment =>
+        segment.kind === 'question' ? [segment.question] : [],
+      ),
+    [segments],
+  );
+  // Seeded from the payload so a resumed article counts what was answered
+  // before, then advanced locally as each card reports back.
+  const [answeredIds, setAnsweredIds] = useState<Set<string>>(
+    () =>
+      new Set(
+        (payload.questions ?? [])
+          .filter(question => question.answered)
+          .map(question => question.id),
+      ),
+  );
+  const unansweredCount = shownQuestions.filter(
+    question => !answeredIds.has(question.id),
+  ).length;
+
+  const handleQuestionAnswered = (
+    questionId: string,
+    result: SubmitArticleQuestionAnswerResult,
+  ) => {
+    setAnsweredIds(prev => new Set(prev).add(questionId));
+    // The last answer completes the article server-side; mirror that here so
+    // the outline and the footer move without a round trip.
+    if (result.completion?.completed) {
+      setMarked(true);
+      onCompleted(result.completion);
+    }
+  };
 
   const contentHeightRef = useRef(0);
   const layoutHeightRef = useRef(0);
@@ -96,7 +154,9 @@ export const ArticlePlayer: React.FC<ArticlePlayerProps> = ({
     evaluateScrollability();
   };
 
-  const canMark = reachedEnd || scrollPct >= READ_SCROLL_THRESHOLD * 100;
+  const canMark =
+    (reachedEnd || scrollPct >= READ_SCROLL_THRESHOLD * 100) &&
+    unansweredCount === 0;
 
   const handleMarkRead = async () => {
     if (marked || isLoading) return;
@@ -123,7 +183,20 @@ export const ArticlePlayer: React.FC<ArticlePlayerProps> = ({
         scrollEventThrottle={16}
         onContentSizeChange={handleContentSizeChange}
         onLayout={handleLayout}>
-        <RichText html={payload.html} />
+        {segments.map(segment =>
+          segment.kind === 'html' ? (
+            <RichText key={segment.key} html={segment.html} />
+          ) : (
+            <ArticleQuestionCard
+              key={segment.key}
+              itemId={itemId}
+              question={segment.question}
+              onAnswered={result =>
+                handleQuestionAnswered(segment.question.id, result)
+              }
+            />
+          ),
+        )}
       </ScrollView>
 
       <View style={styles.footer}>
@@ -140,9 +213,15 @@ export const ArticlePlayer: React.FC<ArticlePlayerProps> = ({
           <Button
             testID="article-mark-read"
             label={
-              canMark
-                ? t('courses.article.markRead')
-                : t('courses.article.keepReading')
+              unansweredCount > 0
+                ? t(
+                    unansweredCount === 1
+                      ? 'courses.article.answerQuestionToContinue'
+                      : 'courses.article.answerQuestionsToContinue',
+                  )
+                : canMark
+                  ? t('courses.article.markRead')
+                  : t('courses.article.keepReading')
             }
             onPress={handleMarkRead}
             isDisabled={!canMark}

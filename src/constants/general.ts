@@ -222,6 +222,8 @@ export const API_ROUTES = {
     START_ITEM: (itemId: string) => `/learn/tracks/items/${itemId}/start`,
     ARTICLE_READ: (itemId: string) =>
       `/learn/tracks/items/${itemId}/article-read`,
+    ARTICLE_QUESTION_ANSWER: (itemId: string, questionId: string) =>
+      `/learn/tracks/items/${itemId}/article-questions/${questionId}/answer`,
     VIDEO_PROGRESS: (itemId: string) =>
       `/learn/tracks/items/${itemId}/video-progress`,
     INTERJECTION_ANSWER: (itemId: string, interjectionId: string) =>

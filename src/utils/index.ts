@@ -20,3 +20,4 @@ export * from './trackNavigation';
 export * from './trackItemMeta';
 export * from './quizHelpers';
 export * from './quizAnswerState';
+export * from './articleSegments';

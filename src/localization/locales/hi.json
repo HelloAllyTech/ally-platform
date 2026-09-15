@@ -1721,7 +1721,17 @@
     "article": {
       "markRead": "पढ़ा गया चिह्नित करें",
       "keepReading": "पढ़ना जारी रखें",
-      "read": "पढ़ा गया"
+      "read": "पढ़ा गया",
+      "answerQuestionToContinue": "आगे बढ़ने के लिए प्रश्न का उत्तर दें",
+      "answerQuestionsToContinue": "आगे बढ़ने के लिए प्रश्नों के उत्तर दें",
+      "question": {
+        "title": "त्वरित जाँच",
+        "submit": "उत्तर जाँचें",
+        "correct": "सही",
+        "incorrect": "गलत",
+        "correctAnswerIs": "सही उत्तर नीचे चिह्नित है।",
+        "answeredHint": "आप इसका उत्तर दे चुके हैं — इसे बदला नहीं जा सकता।"
+      }
     },
     "video": {
       "markWatched": "देखा गया चिह्नित करें",

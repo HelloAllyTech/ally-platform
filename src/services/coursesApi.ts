@@ -7,6 +7,7 @@ import {
   QuizAnswerInput,
   QuizAttemptResult,
   StartTrackItemResponse,
+  SubmitArticleQuestionAnswerResult,
   TrackDetail,
   TrackItemCompletionResult,
   TrackListItem,
@@ -103,6 +104,30 @@ export const coursesApi = api.injectEndpoints({
         method: API_METHODS.POST,
       }),
       invalidatesTags: ALL_TRACK_TAGS,
+    }),
+
+    /**
+     * Answers one inline article question. Final — the server refuses a
+     * second answer to the same question. Invalidates the track tags only
+     * when the answer completed the article, which is the one case where the
+     * outline's completion state has actually moved; answering mid-article
+     * moves nothing it shows, and this fires on every question.
+     */
+    submitArticleQuestionAnswer: builder.mutation<
+      SubmitArticleQuestionAnswerResult,
+      {itemId: string; questionId: string; selectedOptionId: string}
+    >({
+      query: ({itemId, questionId, selectedOptionId}) => ({
+        url: API_ROUTES.TRACKS.ARTICLE_QUESTION_ANSWER(itemId, questionId),
+        method: API_METHODS.POST,
+        body: {selectedOptionId},
+      }),
+      onQueryStarted: async (_arg, {dispatch, queryFulfilled}) => {
+        const {data} = await queryFulfilled;
+        if (data.completion?.completed) {
+          dispatch(api.util.invalidateTags([...ALL_TRACK_TAGS]));
+        }
+      },
     }),
 
     reportVideoProgress: builder.mutation<
@@ -265,6 +290,7 @@ export const {
   useEnrollTrackMutation,
   useStartTrackItemMutation,
   useMarkArticleReadMutation,
+  useSubmitArticleQuestionAnswerMutation,
   useReportVideoProgressMutation,
   useSubmitInterjectionAnswerMutation,
   useSubmitQuizAttemptMutation,
