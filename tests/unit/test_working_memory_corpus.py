@@ -5,6 +5,7 @@ rendered "(nothing from your own life is on your mind this turn)" every turn.
 The claim under test is §7.1's: a persona should be RECALLED, not dumped.
 """
 
+import pytest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
@@ -178,14 +179,15 @@ class TestFoldIntoTheUpdate:
             AIMessage(content="not much to say"),
         ]
 
-    def test_selects_using_this_turn_cues(self):
+    @pytest.mark.asyncio
+    async def test_selects_using_this_turn_cues(self):
         corpus = build_corpus(
             character_profile_text=(
                 "She lost the job in March.\n\nHer flat is near the river."
             )
         )
         update = ValidatedUpdate(retrieve_cues=["job"])
-        selected = mod._select_salient(
+        selected = await mod._select_salient(
             corpus,
             update=update,
             memory=ClientWorkingMemory(turn_index=3),
@@ -193,11 +195,12 @@ class TestFoldIntoTheUpdate:
         )
         assert selected[0].text == "She lost the job in March."
 
-    def test_no_corpus_returns_none_not_empty(self):
+    @pytest.mark.asyncio
+    async def test_no_corpus_returns_none_not_empty(self):
         # None means "not part of this update"; [] would assert the client is
         # thinking about nothing, which a scenario with no profile cannot know.
         assert (
-            mod._select_salient(
+            await mod._select_salient(
                 None,
                 update=ValidatedUpdate(),
                 memory=ClientWorkingMemory(turn_index=1),
@@ -206,9 +209,10 @@ class TestFoldIntoTheUpdate:
             is None
         )
 
-    def test_recall_re_encodes_the_fact(self):
+    @pytest.mark.asyncio
+    async def test_recall_re_encodes_the_fact(self):
         corpus = build_corpus(character_profile_text="She lost the job in March.")
-        mod._select_salient(
+        await mod._select_salient(
             corpus,
             update=ValidatedUpdate(stance="testing", retrieve_cues=["job"]),
             memory=ClientWorkingMemory(turn_index=4),
@@ -219,11 +223,12 @@ class TestFoldIntoTheUpdate:
         # The stance the update just DECIDED, not the one it started from.
         assert fact.stances_seen == ["testing"]
 
-    def test_same_stance_twice_counts_once(self):
+    @pytest.mark.asyncio
+    async def test_same_stance_twice_counts_once(self):
         # The spacing effect counts DISTINCT phases, not raw recurrences.
         corpus = build_corpus(character_profile_text="She lost the job in March.")
         for turn in (1, 2):
-            mod._select_salient(
+            await mod._select_salient(
                 corpus,
                 update=ValidatedUpdate(retrieve_cues=["job"]),
                 memory=ClientWorkingMemory(turn_index=turn),
@@ -231,6 +236,7 @@ class TestFoldIntoTheUpdate:
             )
         assert corpus.facts[0].stances_seen == ["guarded"]
 
+    @pytest.mark.asyncio
     async def test_commits_in_one_write_with_the_state(self, monkeypatch):
         # commit() rejects a turn index at or below the last committed, so a
         # second write for the same turn would be silently discarded.

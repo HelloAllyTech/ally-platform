@@ -80,7 +80,7 @@ def _fact_row(scored: Any, selected: bool) -> Dict[str, Any]:
     }
 
 
-def emit_recall(
+async def emit_recall(
     *,
     room_id: Optional[str],
     turn_index: int,
@@ -142,6 +142,6 @@ def emit_recall(
             }
         )
 
-        asyncio.create_task(msg_event_queue.send_message(body))
+        await msg_event_queue.send_message(body)
     except Exception:
         logger.debug("wm_recall emit skipped (best-effort)", exc_info=True)

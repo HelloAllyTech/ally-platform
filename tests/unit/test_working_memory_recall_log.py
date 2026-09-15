@@ -1,25 +1,4 @@
-"""Unit tests for recall telemetry: the emitter's payload and the cue-tier ladder.
-
-Why these are worth holding. `recall.select` has always returned every score it
-considered,
-and its docstring says the return value exists so "the coefficients above [are] tunable
-from
-production rather than from argument" — but the only call site threw it away, so they
-never
-were. These tests are about that data arriving intact, and in particular about the two
-things
-a reader cannot reconstruct afterwards:
-
-  - the PASSED-OVER candidates. A fact that scored just under the cap is the evidence
-  that the
-    cap or a weight is wrong, and the selection alone cannot show it.
-  - the CUE TIER. The first v2v run had cue_hits at 0 on every turn, meaning recall was
-  running
-    on encoding strength and decay while appearing to respond to the conversation.
-    Recording
-    which source supplied the cues makes that visible without reading a transcript.
-"""
-
+import pytest
 import json
 from dataclasses import dataclass, field
 from typing import List, Optional
@@ -53,7 +32,7 @@ def _sent(send):
     return json.loads(body)["data"]["wm_recall"]
 
 
-def _emit(scored, selected_texts, **over):
+async def _emit(scored, selected_texts, **over):
     args = {
         "room_id": "ss_room-1",
         "turn_index": 7,
@@ -65,26 +44,25 @@ def _emit(scored, selected_texts, **over):
         "cap": 5,
     }
     args.update(over)
-    with (
-        patch.object(recall_log.msg_event_queue, "send_message") as send,
-        patch.object(recall_log.asyncio, "create_task", side_effect=lambda coro: coro),
-    ):
-        emit_recall(**args)
-    return send
+    with patch.object(recall_log.msg_event_queue, "send_message") as send:
+        await emit_recall(**args)
+        return send
 
 
 class TestPayload:
-    def test_reports_what_was_passed_over_as_well_as_what_was_chosen(self):
+    @pytest.mark.asyncio
+    async def test_reports_what_was_passed_over_as_well_as_what_was_chosen(self):
         chosen = _Scored(_Fact("she ran a tailoring shop"), score=1.9, cue_hits=3)
         missed = _Scored(_Fact("her son moved abroad last year"), score=1.7, cue_hits=2)
-        body = _sent(_emit([chosen, missed], ["she ran a tailoring shop"]))
+        body = _sent(await _emit([chosen, missed], ["she ran a tailoring shop"]))
 
         assert [row["text"] for row in body["selected"]] == ["she ran a tailoring shop"]
         assert [row["text"] for row in body["passed_over"]] == [
             "her son moved abroad last year"
         ]
 
-    def test_carries_every_term_that_decided_a_candidate(self):
+    @pytest.mark.asyncio
+    async def test_carries_every_term_that_decided_a_candidate(self):
         # A score with no components is a number nobody can act on: it cannot say
         # whether the
         # cue weighting or the decay curve produced it.
@@ -101,7 +79,7 @@ class TestPayload:
             mood_congruent=True,
             spread=True,
         )
-        row = _sent(_emit([scored], []))["passed_over"][0]
+        row = _sent(await _emit([scored], []))["passed_over"][0]
 
         assert row["score"] == 2.2
         assert row["cue_hits"] == 2
@@ -112,61 +90,65 @@ class TestPayload:
         assert row["last_recalled_turn"] == 3
         assert row["stances_seen"] == 2
 
-    def test_orders_the_near_misses_first_and_caps_them(self):
+    @pytest.mark.asyncio
+    async def test_orders_the_near_misses_first_and_caps_them(self):
         # The tail of the pool carries no information; the fact that just missed does.
         scored = [_Scored(_Fact(f"fact {i}"), score=i / 10) for i in range(30)]
-        body = _sent(_emit(scored, []))
+        body = _sent(await _emit(scored, []))
 
         assert len(body["passed_over"]) == MAX_PASSED_OVER
         scores = [row["score"] for row in body["passed_over"]]
         assert scores == sorted(scores, reverse=True)
 
-    def test_records_the_pool_it_chose_from_and_the_cap(self):
+    @pytest.mark.asyncio
+    async def test_records_the_pool_it_chose_from_and_the_cap(self):
         scored = [_Scored(_Fact(f"fact {i}"), score=0.5) for i in range(12)]
-        body = _sent(_emit(scored, []))
+        body = _sent(await _emit(scored, []))
         assert body["pool_size"] == 12
         assert body["cap"] == 5
 
-    def test_truncates_a_long_fact_rather_than_shipping_a_paragraph(self):
+    @pytest.mark.asyncio
+    async def test_truncates_a_long_fact_rather_than_shipping_a_paragraph(self):
         scored = [_Scored(_Fact("x" * 900), score=1.0)]
-        body = _sent(_emit(scored, []))
+        body = _sent(await _emit(scored, []))
         assert len(body["passed_over"][0]["text"]) == 240
 
-    def test_travels_as_its_own_message_type(self):
-        send = _emit([_Scored(_Fact("a"), score=1.0)], [])
+    @pytest.mark.asyncio
+    async def test_travels_as_its_own_message_type(self):
+        send = await _emit([_Scored(_Fact("a"), score=1.0)], [])
         assert json.loads(send.call_args[0][0])["message_type"] == "wm_recall"
 
-    def test_says_which_source_supplied_the_cues(self):
-        body = _sent(_emit([_Scored(_Fact("a"), score=1.0)], [], cue_tier="scenario"))
+    @pytest.mark.asyncio
+    async def test_says_which_source_supplied_the_cues(self):
+        body = _sent(await _emit([_Scored(_Fact("a"), score=1.0)], [], cue_tier="scenario"))
         assert body["cue_tier"] == "scenario"
 
 
 class TestNeverInTheWay:
-    def test_says_nothing_for_a_preview_room(self):
-        send = _emit([_Scored(_Fact("a"), score=1.0)], [], room_id="preview-abc")
+    @pytest.mark.asyncio
+    async def test_says_nothing_for_a_preview_room(self):
+        send = await _emit([_Scored(_Fact("a"), score=1.0)], [], room_id="preview-abc")
         send.assert_not_called()
 
-    def test_says_nothing_without_a_room(self):
-        send = _emit([_Scored(_Fact("a"), score=1.0)], [], room_id=None)
+    @pytest.mark.asyncio
+    async def test_says_nothing_without_a_room(self):
+        send = await _emit([_Scored(_Fact("a"), score=1.0)], [], room_id=None)
         send.assert_not_called()
 
-    def test_says_nothing_when_there_was_no_pool(self):
-        send = _emit([], [])
+    @pytest.mark.asyncio
+    async def test_says_nothing_when_there_was_no_pool(self):
+        send = await _emit([], [])
         send.assert_not_called()
 
-    def test_swallows_a_queue_failure(self):
+    @pytest.mark.asyncio
+    async def test_swallows_a_queue_failure(self):
         # Telemetry must never cost a turn its working-memory update.
-        with (
-            patch.object(
-                recall_log.msg_event_queue,
-                "send_message",
-                side_effect=RuntimeError("sqs"),
-            ),
-            patch.object(
-                recall_log.asyncio, "create_task", side_effect=RuntimeError("no loop")
-            ),
+        with patch.object(
+            recall_log.msg_event_queue,
+            "send_message",
+            side_effect=RuntimeError("sqs"),
         ):
-            emit_recall(
+            await emit_recall(
                 room_id="ss_room-1",
                 turn_index=1,
                 stance="guarded",

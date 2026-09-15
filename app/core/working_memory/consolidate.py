@@ -372,7 +372,7 @@ async def _embed_query(embed_query, cues, last_learner_text) -> Optional[list]:
         return None
 
 
-def _select_salient(
+async def _select_salient(
     corpus,
     *,
     update: ValidatedUpdate,
@@ -415,7 +415,7 @@ def _select_salient(
     # encoding strength and decay tunable only by argument — the thing its own docstring
     # said
     # the return value was for.
-    _report_recall(
+    await _report_recall(
         update=update,
         memory=memory,
         stance=stance,
@@ -467,7 +467,7 @@ def _cue_tier(
     return "none"
 
 
-def _report_recall(
+async def _report_recall(
     *,
     update: ValidatedUpdate,
     memory: ClientWorkingMemory,
@@ -483,7 +483,7 @@ def _report_recall(
         from app.core.working_memory.recall_log import emit_recall
         from app.core.working_memory.state import SALIENT_BACKSTORY_CAP
 
-        emit_recall(
+        await emit_recall(
             room_id=get_room_id(),
             turn_index=memory.turn_index,
             stance=stance,
@@ -632,7 +632,7 @@ def schedule_update(
                     turn_index,
                     timeout,
                 )
-        salient = _select_salient(
+        salient = await _select_salient(
             store.corpus,
             update=update,
             memory=memory,
