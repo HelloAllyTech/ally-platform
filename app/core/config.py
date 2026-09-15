@@ -60,7 +60,11 @@ class Settings(BaseSettings):
         ),
     )
 
-    OPENAI_API_KEY: str = Field(...)
+    OPENAI_API_KEY: Optional[str] = Field(
+        default=None,
+        description="OpenAI API key. Optional — omit to fall back to Ollama "
+        "(see OLLAMA_BASE_URL) for the conversation LLM.",
+    )
     OPENAI_MODEL: str = Field(
         default="gpt-4o-mini", description="OpenAI model to use for LLM responses"
     )

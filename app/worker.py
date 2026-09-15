@@ -472,18 +472,28 @@ class AgentWorker:
         - self.scenario
         - self.stt_client, self.tts_client, self.llm_client, self.embedding_client
         """
-        # Setup embedding client (needed for metadata parsing)
-        self.embedding_client = OpenAIEmbeddingClient(
-            model=settings.OPENAI_EMBEDDING_MODEL, api_key=settings.OPENAI_API_KEY
-        )
-        logger.debug("Created shared embedding client for semantic similarity events")
-        # Set once at session start so per-turn _prepare_event_context doesn't
-        # mutate a class attribute on every graph invocation.
-        from app.core.events.event_types.semantic_similarity.semantic_similarity_event import (  # noqa: E501
-            SemanticSimilarityEvent,
-        )
+        # Setup embedding client (needed for metadata parsing). Semantic-similarity/
+        # paraphrase-detection events only run with an OpenAI key configured;
+        # self.embedding_client is already Optional and null-checked at every
+        # consumption site, so leaving it None here safely disables just those
+        # events for an Ollama-only (no OpenAI key) session.
+        if settings.OPENAI_API_KEY:
+            self.embedding_client = OpenAIEmbeddingClient(
+                model=settings.OPENAI_EMBEDDING_MODEL, api_key=settings.OPENAI_API_KEY
+            )
+            logger.debug("Created shared embedding client for semantic similarity events")
+            # Set once at session start so per-turn _prepare_event_context doesn't
+            # mutate a class attribute on every graph invocation.
+            from app.core.events.event_types.semantic_similarity.semantic_similarity_event import (  # noqa: E501
+                SemanticSimilarityEvent,
+            )
 
-        SemanticSimilarityEvent._EMBEDDING_CLIENT = self.embedding_client
+            SemanticSimilarityEvent._EMBEDDING_CLIENT = self.embedding_client
+        else:
+            logger.info(
+                "No OPENAI_API_KEY configured — semantic-similarity/paraphrase-detection "
+                "events are disabled for this session."
+            )
 
         # Resolve then parse metadata. Slim dispatches (metadataFetch pointer)
         # are fetched from ally-be here — after assignment, off LiveKit's 3s

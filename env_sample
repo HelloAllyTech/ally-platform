@@ -15,7 +15,10 @@ LIVEKIT_API_KEY=<YOUR_LIVEKIT_API_KEY>
 LIVEKIT_API_SECRET=<YOUR_LIVEKIT_API_SECRET>
 LIVEKIT_URL=<YOUR_LIVEKIT_URL>
 
-OPENAI_API_KEY=<YOUR_OPENAI_API_KEY>
+# Optional — omit to fall back to Ollama automatically (see the Ollama section
+# below). Required only if you want OpenAI as the LLM provider, or want
+# semantic-similarity/paraphrase-detection events (they use OpenAI embeddings).
+# OPENAI_API_KEY=<YOUR_OPENAI_API_KEY>
 OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 
 SEMANTIC_SIMILARITY_THRESHOLD=0.6

@@ -47,6 +47,19 @@ docker compose -f docker-compose.local.yml up -d
 - **ally-ai-learn API**: http://localhost:8002
 - **ally-ai-learn health**: http://localhost:8002/api/health
 
+## Running without an OpenAI key
+
+`OPENAI_API_KEY` is optional (see [`docs/07-llm-providers.md`](07-llm-providers.md)).
+Leave it commented out in `.env` and install Ollama instead:
+
+```bash
+brew install ollama && ollama serve && ollama pull llama3.2
+```
+
+The worker automatically falls back to Ollama for the conversation LLM. Only
+semantic-similarity/paraphrase-detection events are disabled in this mode — a
+basic simulation session runs end-to-end with zero API key.
+
 ## Notes
 
 - **host.docker.internal**: Works on Mac and Windows. On Linux, `extra_hosts: host-gateway` in the compose adds it.

@@ -33,11 +33,14 @@ The interface is minimal: a single `llm_instance` property that returns the unde
 ### OpenAI
 
 Default provider. Uses `ChatOpenAI` from LangChain. Default model: `gpt-4o-mini`.
-
-OpenAI is **always required** even when using other providers because:
-- `OpenAIEmbeddingClient` is used for semantic similarity and paraphrase detection
-- Default branching LLM config uses OpenAI for structured output support
-- Fallback provider when others fail
+`OPENAI_API_KEY` is **optional** — if it's unset, `create_llm_client()` automatically
+redirects any `"openai"`-provider role (conversation, branching, chat-summary, ...)
+to Ollama instead, provided `OLLAMA_BASE_URL` is reachable (see below). Without a
+key:
+- `OpenAIEmbeddingClient` is skipped entirely — semantic similarity and paraphrase
+  detection events are disabled for the session (they have no Ollama equivalent
+  wired up yet)
+- Everything else (the actual conversation) runs on Ollama with no degradation
 
 ### Gemini
 

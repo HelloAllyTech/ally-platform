@@ -139,6 +139,29 @@ def create_llm_client(
 
     # Map provider to class and instantiate using from_config
     provider = provider.lower()
+
+    # No OpenAI key configured: redirect every OpenAI-provider role (conversation,
+    # branching, chat-summary, ...) to the local Ollama server instead of failing.
+    # Centralized here so no caller/DEFAULT_*_CONFIG needs its own fallback logic.
+    if provider == LLMProvider.OPENAI and not settings.OPENAI_API_KEY:
+        if settings.OLLAMA_BASE_URL:
+            logger.warning(
+                "OPENAI_API_KEY not set; falling back to Ollama at %s for this LLM call.",
+                settings.OLLAMA_BASE_URL,
+            )
+            provider = LLMProvider.OLLAMA
+            # config_dict may already carry DEFAULT_LLM_CONFIG's OpenAI model
+            # name (e.g. "gpt-4o-mini") from the resolution above — that model
+            # doesn't exist on Ollama. Drop it so the Ollama branch below falls
+            # through to LOCAL_LLM_MODEL (or its own default) instead of 404ing.
+            if config_dict.get("model") == DEFAULT_LLM_CONFIG["model"]:
+                config_dict.pop("model", None)
+        else:
+            raise ValueError(
+                "No OPENAI_API_KEY and no OLLAMA_BASE_URL configured — set one of "
+                "them to run the LLM (see docs/07-llm-providers.md)."
+            )
+
     logger.info(f"Creating LLM client with provider: {provider}, config: {config_dict}")
 
     if provider == LLMProvider.OPENAI:
