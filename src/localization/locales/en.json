@@ -771,7 +771,17 @@
     "article": {
       "markRead": "Mark as read",
       "keepReading": "Keep reading",
-      "read": "Read"
+      "read": "Read",
+      "answerQuestionToContinue": "Answer the question to continue",
+      "answerQuestionsToContinue": "Answer the questions to continue",
+      "question": {
+        "title": "Quick check",
+        "submit": "Check answer",
+        "correct": "Correct",
+        "incorrect": "Incorrect",
+        "correctAnswerIs": "The correct answer is marked below.",
+        "answeredHint": "You've answered this one — it can't be changed."
+      }
     },
     "video": {
       "markWatched": "Mark as watched",

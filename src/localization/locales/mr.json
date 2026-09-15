@@ -1721,7 +1721,17 @@
     "article": {
       "markRead": "वाचले असे चिन्हांकित करा",
       "keepReading": "वाचन सुरू ठेवा",
-      "read": "वाचले"
+      "read": "वाचले",
+      "answerQuestionToContinue": "पुढे जाण्यासाठी प्रश्नाचे उत्तर द्या",
+      "answerQuestionsToContinue": "पुढे जाण्यासाठी प्रश्नांची उत्तरे द्या",
+      "question": {
+        "title": "त्वरित तपासणी",
+        "submit": "उत्तर तपासा",
+        "correct": "बरोबर",
+        "incorrect": "चुकीचे",
+        "correctAnswerIs": "बरोबर उत्तर खाली चिन्हांकित केले आहे.",
+        "answeredHint": "तुम्ही याचे उत्तर दिले आहे — ते बदलता येणार नाही."
+      }
     },
     "video": {
       "markWatched": "पाहिले असे चिन्हांकित करा",
