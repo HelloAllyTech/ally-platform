@@ -1,6 +1,6 @@
 import React from 'react';
 import {ActivityIndicator, TouchableOpacity} from 'react-native';
-import {fireEvent, render, waitFor} from '@testing-library/react-native';
+import {act, fireEvent, render, waitFor} from '@testing-library/react-native';
 
 jest.mock('react-native-audio-api', () => {
   class MockAudioContext {
@@ -138,7 +138,7 @@ describe('SimulationAudioPlayer', () => {
     await waitFor(() => expect(getByTestId('play-icon')).toBeTruthy());
 
     const playBtn = UNSAFE_getAllByType(TouchableOpacity)[0];
-    fireEvent.press(playBtn);
+    await act(async () => fireEvent.press(playBtn));
 
     expect(queryByTestId('pause-icon')).toBeTruthy();
   });
@@ -160,17 +160,17 @@ describe('SimulationAudioPlayer', () => {
     const speedBtn = UNSAFE_getAllByType(TouchableOpacity)[1];
     expect(getByText('1x')).toBeTruthy();
 
-    fireEvent.press(speedBtn);
+    await act(async () => fireEvent.press(speedBtn));
     expect(getByText('1.5x')).toBeTruthy();
 
-    fireEvent.press(speedBtn);
+    await act(async () => fireEvent.press(speedBtn));
     expect(getByText('2x')).toBeTruthy();
 
-    fireEvent.press(speedBtn);
+    await act(async () => fireEvent.press(speedBtn));
     expect(getByText('2.5x')).toBeTruthy();
 
     // wraps back around
-    fireEvent.press(speedBtn);
+    await act(async () => fireEvent.press(speedBtn));
     expect(getByText('1x')).toBeTruthy();
   });
 
@@ -181,7 +181,7 @@ describe('SimulationAudioPlayer', () => {
     );
     await waitFor(() => expect(getByTestId('play-icon')).toBeTruthy());
 
-    fireEvent.press(UNSAFE_getAllByType(TouchableOpacity)[1]);
+    await act(async () => fireEvent.press(UNSAFE_getAllByType(TouchableOpacity)[1]));
 
     expect(setItem).toHaveBeenCalledWith('ally:audio:playback-rate', 1.5);
   });
@@ -216,14 +216,14 @@ describe('SimulationAudioPlayer', () => {
     const [playBtn, speedBtn] = UNSAFE_getAllByType(TouchableOpacity);
 
     // 1x -> 1.5x while paused, so playback starts already pitch-corrected.
-    fireEvent.press(speedBtn);
-    fireEvent.press(playBtn);
+    await act(async () => fireEvent.press(speedBtn));
+    await act(async () => fireEvent.press(playBtn));
     expect(sources()).toHaveLength(1);
     expect(sources()[0].pitchCorrection).toBe(true);
     expect(sources()[0].playbackRate.value).toBe(1.5);
 
     // 1.5x -> 2x keeps the same mode, so the node is retuned, not rebuilt.
-    fireEvent.press(speedBtn);
+    await act(async () => fireEvent.press(speedBtn));
     expect(sources()).toHaveLength(1);
     expect(sources()[0].playbackRate.value).toBe(2);
   });
@@ -236,12 +236,12 @@ describe('SimulationAudioPlayer', () => {
 
     const [playBtn, speedBtn] = UNSAFE_getAllByType(TouchableOpacity);
 
-    fireEvent.press(playBtn);
+    await act(async () => fireEvent.press(playBtn));
     expect(sources()).toHaveLength(1);
     expect(sources()[0].pitchCorrection).toBe(false);
 
     // 1x -> 1.5x turns pitch correction on, which is fixed at construction.
-    fireEvent.press(speedBtn);
+    await act(async () => fireEvent.press(speedBtn));
     expect(sources()).toHaveLength(2);
     expect(sources()[1].pitchCorrection).toBe(true);
     expect(sources()[1].playbackRate.value).toBe(1.5);
