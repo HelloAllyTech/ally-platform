@@ -71,6 +71,16 @@ async def run_actor_evaluation(request: ActorEvaluationRequest) -> None:
             not_applicable=result["not_applicable"],
             report_markdown=result["report_markdown"],
         )
+    except KeyError:
+        logger.warning(
+            "Actor evaluation failed for session=%s due to a missing key in the evaluation result. "
+            "This is expected if the LLM judge returns a malformed response.",
+            request.scenario_session_id,
+        )
+        payload = ActorEvaluationWebhookPayload(
+            status="FAILED",
+            error_message="Evaluation failed due to a missing key in the result.",
+        )
     except Exception as e:  # noqa: BLE001 — report the failure to ally-be
         logger.exception(
             "Actor evaluation failed for session=%s", request.scenario_session_id
