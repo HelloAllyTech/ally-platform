@@ -42,6 +42,7 @@ import {
 import {colors, typography} from '@/theme';
 import {SummaryFormData} from '@/types';
 import {FieldType} from '@/types/fields';
+import {spokenDateToCustomFieldDate} from '@/utils/customFieldDate';
 
 import {VoiceNotePanel} from './VoiceNotePanel';
 
@@ -121,11 +122,10 @@ export const encodeVoiceCustomValue = (
       if (['no', 'false', 'n'].includes(v)) return 'false';
       return null;
     }
-    case CustomFieldType.DATE: {
-      const date = new Date(trimmed);
-      if (Number.isNaN(date.getTime())) return null;
-      return date.toISOString().slice(0, 10);
-    }
+    case CustomFieldType.DATE:
+      // Encoding this via `toISOString()` converted a locally-parsed date to
+      // UTC and rolled the day back one in IST.
+      return spokenDateToCustomFieldDate(trimmed);
     default:
       return trimmed;
   }
