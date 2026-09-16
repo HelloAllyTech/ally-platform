@@ -418,14 +418,33 @@ async function main() {
 
   const { versionId, versionString } = await ensureSubmittableVersion(appId, token);
 
+  // Pinned to the version being submitted. Unfiltered, this matched ANY valid build and took
+  // the most recently processed one — which during a release is the PREVIOUS version, since the
+  // build just uploaded is still processing. That is a silent, unrecoverable mis-ship here:
+  // releaseType is forced to AFTER_APPROVAL below, so attaching the wrong binary means Apple's
+  // approval publishes it to every App Store user with no further human step.
+  //
+  // `filter[preReleaseVersion.version]` is the marketing version ("1.23.28"). A Build's own
+  // `attributes.version` is the BUILD NUMBER (CFBundleVersion) — a different field, which
+  // silently matches nothing if filtered on by mistake.
   const buildsResponse = await appleApi(
-    `/builds?filter[app]=${appId}&sort=-uploadedDate&limit=1&filter[processingState]=VALID`,
+    `/builds?filter[app]=${appId}&filter[preReleaseVersion.version]=${encodeURIComponent(versionString)}` +
+      "&filter[processingState]=VALID&sort=-uploadedDate&limit=1",
     token,
   );
-  const buildId = buildsResponse.data?.[0]?.id;
-  if (!buildId) {
-    throw new Error("No processed (VALID) build found to attach to the App Store version.");
+  const build = buildsResponse.data?.[0];
+  if (!build) {
+    throw new Error(
+      `No processed (VALID) build found for version ${versionString} to attach to the App Store version. ` +
+        "If the build was only just uploaded, Apple is probably still processing it — check " +
+        "TestFlight -> Builds and retry once it shows as ready. Refusing to fall back to an " +
+        "older build: this submission auto-releases on approval.",
+    );
   }
+  const buildId = build.id;
+  console.log(
+    `Attaching build ${buildId} — marketing version ${versionString}, build number ${build.attributes?.version ?? "(unknown)"}.`,
+  );
 
   // Attach the build to the version. Fails clearly if the version isn't actually in an editable
   // state (e.g. already under review) despite matching one of EDITABLE_STATES above.
