@@ -73,8 +73,9 @@ async def run_actor_evaluation(request: ActorEvaluationRequest) -> None:
         )
     except KeyError:
         logger.warning(
-            "Actor evaluation failed for session=%s due to a missing key in the evaluation result. "
-            "This is expected if the LLM judge returns a malformed response.",
+            "Actor evaluation failed for session=%s due to a missing key in the "
+            "evaluation result. This is expected if the LLM judge returns a "
+            "malformed response.",
             request.scenario_session_id,
         )
         payload = ActorEvaluationWebhookPayload(
