@@ -14,13 +14,12 @@
  *        TESTFLIGHT_EXTERNAL_GROUP_NAME — must exactly match an existing external group's name
  *        in App Store Connect (this script looks it up by name, it does not create one).
  */
-import crypto from "node:crypto";
-import fs from "node:fs/promises";
+import crypto from 'node:crypto';
+import fs from 'node:fs/promises';
+import jwt from 'jsonwebtoken';
 
-import jwt from "jsonwebtoken";
-
-const BUNDLE_ID = "com.helloally.app";
-const API_BASE = "https://api.appstoreconnect.apple.com/v1";
+const BUNDLE_ID = 'com.helloally.app';
+const API_BASE = 'https://api.appstoreconnect.apple.com/v1';
 
 const {
   APPSTORE_ISSUER_ID,
@@ -52,11 +51,13 @@ function normalizePrivateKey(raw) {
   // "-----BEGIN EC PRIVATE KEY-----", which does NOT contain the literal substring
   // "BEGIN PRIVATE KEY" (there's "EC " in between) — the previous, stricter check would have
   // silently misrouted a SEC1 key into the base64-decode branch instead of using it as-is.
-  let key = raw.includes("PRIVATE KEY") ? raw : Buffer.from(raw, "base64").toString("utf-8");
-  key = key.includes("\\n") ? key.replace(/\\n/g, "\n") : key;
+  let key = raw.includes('PRIVATE KEY')
+    ? raw
+    : Buffer.from(raw, 'base64').toString('utf-8');
+  key = key.includes('\\n') ? key.replace(/\\n/g, '\n') : key;
   // Strip carriage returns unconditionally: a \r\n-terminated PEM (e.g. saved/copied on
   // Windows) parses fine by eye but can trip OpenSSL's PEM decoder on the base64 body lines.
-  key = key.replace(/\r/g, "");
+  key = key.replace(/\r/g, '');
   key = key.trim();
   if (
     (key.startsWith('"') && key.endsWith('"')) ||
@@ -69,7 +70,7 @@ function normalizePrivateKey(raw) {
   // when running e.g. `cat AuthKey_XXXXX.p8` in zsh) — someone copied that terminal display,
   // including the artifact, instead of the file's raw bytes, when the secret was originally set.
   // No valid PEM ever legitimately ends in "%", so stripping it is safe unconditionally.
-  if (key.endsWith("%")) {
+  if (key.endsWith('%')) {
     key = key.slice(0, -1).trimEnd();
   }
   return key;
@@ -89,20 +90,20 @@ function normalizePrivateKey(raw) {
 // this script's own source, and reporting only which candidate matched, sidesteps that: nothing
 // printed here is ever a substring of the secret itself.
 const KNOWN_HEADERS = [
-  "-----BEGIN PRIVATE KEY-----", // PKCS8 — what App Store Connect's .p8 download normally is
-  "-----BEGIN EC PRIVATE KEY-----", // SEC1
-  "-----BEGIN RSA PRIVATE KEY-----", // wrong key type entirely
-  "-----BEGIN ENCRYPTED PRIVATE KEY-----", // password-protected — createPrivateKey needs a passphrase option for this, which nothing here provides
+  '-----BEGIN PRIVATE KEY-----', // PKCS8 — what App Store Connect's .p8 download normally is
+  '-----BEGIN EC PRIVATE KEY-----', // SEC1
+  '-----BEGIN RSA PRIVATE KEY-----', // wrong key type entirely
+  '-----BEGIN ENCRYPTED PRIVATE KEY-----', // password-protected — createPrivateKey needs a passphrase option for this, which nothing here provides
 ];
 const KNOWN_FOOTERS = [
-  "-----END PRIVATE KEY-----",
-  "-----END EC PRIVATE KEY-----",
-  "-----END RSA PRIVATE KEY-----",
-  "-----END ENCRYPTED PRIVATE KEY-----",
+  '-----END PRIVATE KEY-----',
+  '-----END EC PRIVATE KEY-----',
+  '-----END RSA PRIVATE KEY-----',
+  '-----END ENCRYPTED PRIVATE KEY-----',
 ];
 
 function describePemShape(pem) {
-  const lines = pem.split("\n");
+  const lines = pem.split('\n');
   // Report the matched candidate's INDEX, not the string itself — GitHub masks any log output
   // that matches a registered secret substring regardless of where that text came from, so even
   // a hardcoded candidate string gets redacted to "***" once it happens to equal one of the
@@ -114,15 +115,15 @@ function describePemShape(pem) {
   // Character codes are likewise never a substring match of the secret's own text — this is the
   // part that actually pins down *what* is different, e.g. a smart-dash or duplicated character
   // introduced by copying the secret through a rich-text tool that mangled a run of hyphens.
-  const lastLine = lines.at(-1) ?? "";
+  const lastLine = lines.at(-1) ?? '';
   const lastLineCharCodes = [...lastLine].map(c => c.charCodeAt(0));
-  const firstLineCharCodes = [...(lines[0] ?? "")].map(c => c.charCodeAt(0));
+  const firstLineCharCodes = [...(lines[0] ?? '')].map(c => c.charCodeAt(0));
   return (
-    `total length ${pem.length}, ${lines.length} line(s) (lengths: ${lines.map(l => l.length).join(",")}), ` +
+    `total length ${pem.length}, ${lines.length} line(s) (lengths: ${lines.map(l => l.length).join(',')}), ` +
     `header candidate index: ${headerIndex} (-1 = no known header matched), ` +
     `footer candidate index: ${footerIndex} (-1 = no known footer matched), ` +
-    `first line char codes: [${firstLineCharCodes.join(",")}], ` +
-    `last line char codes: [${lastLineCharCodes.join(",")}]`
+    `first line char codes: [${firstLineCharCodes.join(',')}], ` +
+    `last line char codes: [${lastLineCharCodes.join(',')}]`
   );
 }
 
@@ -130,7 +131,7 @@ function loadPrivateKey() {
   const pem = normalizePrivateKey(APPSTORE_API_PRIVATE_KEY);
   let keyObject;
   try {
-    keyObject = crypto.createPrivateKey({ key: pem, format: "pem" });
+    keyObject = crypto.createPrivateKey({key: pem, format: 'pem'});
   } catch (error) {
     throw new Error(
       `APPSTORE_API_PRIVATE_KEY could not be parsed as a PEM private key at all ` +
@@ -139,14 +140,14 @@ function loadPrivateKey() {
         `nothing added, removed, or re-wrapped.`,
     );
   }
-  if (keyObject.asymmetricKeyType !== "ec") {
+  if (keyObject.asymmetricKeyType !== 'ec') {
     throw new Error(
       `APPSTORE_API_PRIVATE_KEY parsed as a "${keyObject.asymmetricKeyType}" key, not "ec" — ` +
         `App Store Connect API keys are EC (P-256) keys, so this looks like the wrong secret.`,
     );
   }
   const curve = keyObject.asymmetricKeyDetails?.namedCurve;
-  if (curve && curve !== "prime256v1") {
+  if (curve && curve !== 'prime256v1') {
     throw new Error(
       `APPSTORE_API_PRIVATE_KEY is an EC key on curve "${curve}", but ES256 requires P-256 ` +
         `(prime256v1) — this doesn't look like a valid App Store Connect API key.`,
@@ -162,20 +163,22 @@ function mintToken() {
       iss: APPSTORE_ISSUER_ID,
       iat: now,
       exp: now + 19 * 60, // Apple caps this at 20 minutes; stay comfortably under it.
-      aud: "appstoreconnect-v1",
+      aud: 'appstoreconnect-v1',
     },
     loadPrivateKey(),
-    { algorithm: "ES256", keyid: APPSTORE_API_KEY_ID },
+    {algorithm: 'ES256', keyid: APPSTORE_API_KEY_ID},
   );
 }
 
 async function appleApi(path, token) {
   const res = await fetch(`${API_BASE}${path}`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: {Authorization: `Bearer ${token}`},
   });
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`App Store Connect API ${path} failed: ${res.status} ${body}`);
+    throw new Error(
+      `App Store Connect API ${path} failed: ${res.status} ${body}`,
+    );
   }
   return res.json();
 }
@@ -184,10 +187,15 @@ async function appleApi(path, token) {
  * value the build being released was made with, and the field scheduled-mobile-release.yml
  * writes during its version bump. */
 async function readLocalMarketingVersion() {
-  const pbxproj = await fs.readFile("ios/ally.xcodeproj/project.pbxproj", "utf-8");
+  const pbxproj = await fs.readFile(
+    'ios/ally.xcodeproj/project.pbxproj',
+    'utf-8',
+  );
   const match = pbxproj.match(/MARKETING_VERSION\s*=\s*([\d.]+)\s*;/);
   if (!match) {
-    throw new Error("Could not find MARKETING_VERSION in ios/ally.xcodeproj/project.pbxproj");
+    throw new Error(
+      'Could not find MARKETING_VERSION in ios/ally.xcodeproj/project.pbxproj',
+    );
   }
   return match[1];
 }
@@ -211,27 +219,31 @@ async function readLocalMarketingVersion() {
 async function waitForValidBuild(
   appId,
   marketingVersion,
-  { timeoutMinutes = 25, intervalSeconds = 60 } = {},
+  {timeoutMinutes = 25, intervalSeconds = 60} = {},
 ) {
   const deadline = Date.now() + timeoutMinutes * 60 * 1000;
   for (let attempt = 1; ; attempt += 1) {
     const token = mintToken();
     const buildsResponse = await appleApi(
       `/builds?filter[app]=${appId}&filter[preReleaseVersion.version]=${encodeURIComponent(marketingVersion)}` +
-        "&filter[processingState]=VALID&sort=-uploadedDate&limit=1",
+        '&filter[processingState]=VALID&sort=-uploadedDate&limit=1',
       token,
     );
     const build = buildsResponse.data?.[0];
     if (build) {
       console.log(
-        `Selected build ${build.id} — marketing version ${marketingVersion}, build number ${build.attributes?.version ?? "(unknown)"}.`,
+        `Selected build ${build.id} — marketing version ${marketingVersion}, build number ${build.attributes?.version ?? '(unknown)'}.`,
       );
-      return { buildId: build.id, buildVersion: build.attributes?.version, token };
+      return {
+        buildId: build.id,
+        buildVersion: build.attributes?.version,
+        token,
+      };
     }
     if (Date.now() >= deadline) {
       throw new Error(
         `No processed (VALID) build found for version ${marketingVersion} after waiting ${timeoutMinutes} minutes (${attempt} attempts). ` +
-          "TestFlight processing is taking longer than usual this time — check App Store Connect directly and retry.",
+          'TestFlight processing is taking longer than usual this time — check App Store Connect directly and retry.',
       );
     }
     console.log(
@@ -254,9 +266,13 @@ async function main() {
 
   const timeoutMinutes = Number(process.env.TESTFLIGHT_WAIT_MINUTES) || 25;
   const marketingVersion = await readLocalMarketingVersion();
-  const { buildId, buildVersion, token } = await waitForValidBuild(appId, marketingVersion, {
-    timeoutMinutes,
-  });
+  const {buildId, buildVersion, token} = await waitForValidBuild(
+    appId,
+    marketingVersion,
+    {
+      timeoutMinutes,
+    },
+  );
 
   const groupsResponse = await appleApi(
     `/betaGroups?filter[app]=${appId}&filter[name]=${encodeURIComponent(TESTFLIGHT_EXTERNAL_GROUP_NAME)}`,
@@ -269,17 +285,22 @@ async function main() {
     );
   }
 
-  const assignRes = await fetch(`${API_BASE}/betaGroups/${groupId}/relationships/builds`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
+  const assignRes = await fetch(
+    `${API_BASE}/betaGroups/${groupId}/relationships/builds`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({data: [{type: 'builds', id: buildId}]}),
     },
-    body: JSON.stringify({ data: [{ type: "builds", id: buildId }] }),
-  });
+  );
   if (!assignRes.ok) {
     const body = await assignRes.text();
-    throw new Error(`Failed to assign build ${buildId} to group ${groupId}: ${assignRes.status} ${body}`);
+    throw new Error(
+      `Failed to assign build ${buildId} to group ${groupId}: ${assignRes.status} ${body}`,
+    );
   }
 
   // Assigning a build to an external group only associates the two — it does NOT submit the
@@ -287,16 +308,16 @@ async function main() {
   // the build sits at "Ready to Submit" in App Store Connect indefinitely (confirmed live: this
   // step was missing on the first real run, and the build never left that state).
   const submissionRes = await fetch(`${API_BASE}/betaAppReviewSubmissions`, {
-    method: "POST",
+    method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify({
       data: {
-        type: "betaAppReviewSubmissions",
+        type: 'betaAppReviewSubmissions',
         relationships: {
-          build: { data: { type: "builds", id: buildId } },
+          build: {data: {type: 'builds', id: buildId}},
         },
       },
     }),
@@ -316,16 +337,19 @@ async function main() {
   console.log(
     `Build ${buildVersion} (${buildId}) submitted for Beta App Review under TestFlight group ` +
       `"${TESTFLIGHT_EXTERNAL_GROUP_NAME}". Apple's review still needs to clear before external ` +
-      "testers can install it.",
+      'testers can install it.',
   );
 
   const githubOutput = process.env.GITHUB_OUTPUT;
   if (githubOutput) {
-    await fs.appendFile(githubOutput, `build_version=${buildVersion ?? ""}\n`);
+    await fs.appendFile(githubOutput, `build_version=${buildVersion ?? ''}\n`);
   }
 }
 
 main().catch(error => {
-  console.error("Failed to submit iOS build to TestFlight external group:", error.message ?? error);
+  console.error(
+    'Failed to submit iOS build to TestFlight external group:',
+    error.message ?? error,
+  );
   process.exit(1);
 });

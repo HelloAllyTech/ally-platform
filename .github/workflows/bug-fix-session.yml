@@ -44,19 +44,19 @@ on:
       finding_id:
         required: true
         type: string
-        description: "bug_findings.id this session is for"
+        description: 'bug_findings.id this session is for'
       run_id:
         required: true
         type: string
-        description: "bug_hunt_runs.id to report progress against"
+        description: 'bug_hunt_runs.id to report progress against'
       repo:
         required: true
         type: string
-        description: "Repo slug, e.g. ally-mobile (used to pick test/lint commands)"
+        description: 'Repo slug, e.g. ally-mobile (used to pick test/lint commands)'
       api_base_url:
         required: true
         type: string
-        description: "Base URL of ally-be, for the pipeline callbacks"
+        description: 'Base URL of ally-be, for the pipeline callbacks'
 
 concurrency:
   # One session per bug. A double-click in the admin tab, or a retry while the
@@ -84,8 +84,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
-          cache: "npm"
+          node-version: '22'
+          cache: 'npm'
 
       - name: Install dependencies
         run: npm ci

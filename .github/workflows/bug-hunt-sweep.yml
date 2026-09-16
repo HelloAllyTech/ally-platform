@@ -53,7 +53,7 @@ on:
   # Nightly, staggered per repo so five sweeps do not hit ally-be's pipeline
   # endpoints and the Anthropic API in the same minute. ally-be: 02:15 UTC.
   schedule:
-    - cron: "35 3 * * *"
+    - cron: '35 3 * * *'
 
   workflow_dispatch:
     inputs:
@@ -71,7 +71,7 @@ on:
       deep:
         required: false
         type: string
-        default: "false"
+        default: 'false'
         description: >
           "true" reads the whole repo instead of the last day of commits. Much
           more expensive — the nightly cron leaves this false and a human opts
@@ -79,7 +79,7 @@ on:
       api_base_url:
         required: false
         type: string
-        description: "Base URL of ally-be. Defaults to the ALLY_BE_API_URL variable."
+        description: 'Base URL of ally-be. Defaults to the ALLY_BE_API_URL variable.'
 
 concurrency:
   # One sweep per repo. A cron firing while a human-triggered sweep is still
@@ -107,8 +107,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "24"
-          cache: "npm"
+          node-version: '24'
+          cache: 'npm'
 
       - name: Install dependencies
         run: npm ci

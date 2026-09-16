@@ -37,7 +37,6 @@ export const ReviewComment: React.FC<ReviewCommentProps> = ({
   showActionsMenu = false,
 }) => {
   const {t} = useTranslate();
-  const initials = name ? name.charAt(0).toUpperCase() : '';
 
   const getRepliesText = () => {
     if (replyCount === 1) {

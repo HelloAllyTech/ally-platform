@@ -38,7 +38,7 @@ export function getFieldValue(
 export function formatFieldValue(
   field: SummaryField,
   value: unknown,
-  t?: (key: string, params?: any) => string,
+  t?: (key: string, params?: Record<string, unknown>) => string,
 ): string {
   // Use custom formatter if provided
   if (field.formatDisplay) {
@@ -60,7 +60,7 @@ export interface RenderFieldExtraProps {
   openDropdown?: SummaryFieldKey | null;
   onDropdownToggle?: (field: SummaryFieldKey, open: boolean) => void;
   onDropdownSelect?: (field: SummaryFieldKey) => (value: string) => void;
-  t?: (key: string, params?: any) => string;
+  t?: (key: string, params?: Record<string, unknown>) => string;
   canEdit?: boolean;
 }
 

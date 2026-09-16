@@ -49,4 +49,13 @@ export const styles = ScaledSheet.create({
   marginB16: {
     marginBottom: '16@mvs',
   },
+  secondaryButton: {
+    backgroundColor: 'white',
+    borderWidth: 1,
+    borderColor: '#007AFF',
+    marginTop: 10,
+  },
+  secondaryButtonText: {
+    color: '#007AFF',
+  },
 });

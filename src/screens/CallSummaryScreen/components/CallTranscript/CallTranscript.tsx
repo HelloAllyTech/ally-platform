@@ -39,7 +39,7 @@ export const CallTranscript = ({chatId}: {chatId: number}) => {
           time=""
           message={formattedMessages.map(m => m.message).join(' ')}
           speakerLabel=""
-          isDictation={true}
+          isDictation
         />
       ) : (
         <FlatList

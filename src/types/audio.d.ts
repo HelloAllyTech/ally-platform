@@ -1,3 +1,5 @@
+import {RemoteParticipant, Track, TrackPublication} from 'livekit-client';
+
 declare module '*.mp3' {
   const value: string;
   export default value;
@@ -14,9 +16,9 @@ export interface CircleConfig {
 }
 
 export interface AudioTrackRef {
-  participant?: any;
-  source?: any;
-  publication?: any;
+  participant?: RemoteParticipant;
+  source?: Track.Source;
+  publication?: TrackPublication;
 }
 
 export interface CircleProps {

@@ -46,27 +46,27 @@
  *        does fill in on its own, same idea as build-android-production.yml's single-locale
  *        (en-US) Play Store release notes.
  */
-import crypto from "node:crypto";
-import fs from "node:fs/promises";
+import crypto from 'node:crypto';
+import fs from 'node:fs/promises';
+import jwt from 'jsonwebtoken';
 
-import jwt from "jsonwebtoken";
-
-const BUNDLE_ID = "com.helloally.app";
-const API_BASE = "https://api.appstoreconnect.apple.com/v1";
+const BUNDLE_ID = 'com.helloally.app';
+const API_BASE = 'https://api.appstoreconnect.apple.com/v1';
 // States in which an App Store version has never successfully reached Apple's review queue —
 // the only states this script will treat as "the version to submit". Anything else (already
 // in review, already released, etc.) is left alone; Apple's own error on the build-attach step
 // will explain why if this picks the wrong one.
 const EDITABLE_STATES = [
-  "PREPARE_FOR_SUBMISSION",
-  "REJECTED",
-  "DEVELOPER_REJECTED",
-  "METADATA_REJECTED",
-  "INVALID_BINARY",
-  "WAITING_FOR_EXPORT_COMPLIANCE",
+  'PREPARE_FOR_SUBMISSION',
+  'REJECTED',
+  'DEVELOPER_REJECTED',
+  'METADATA_REJECTED',
+  'INVALID_BINARY',
+  'WAITING_FOR_EXPORT_COMPLIANCE',
 ];
 
-const { APPSTORE_ISSUER_ID, APPSTORE_API_KEY_ID, APPSTORE_API_PRIVATE_KEY } = process.env;
+const {APPSTORE_ISSUER_ID, APPSTORE_API_KEY_ID, APPSTORE_API_PRIVATE_KEY} =
+  process.env;
 
 for (const [name, value] of Object.entries({
   APPSTORE_ISSUER_ID,
@@ -83,9 +83,11 @@ for (const [name, value] of Object.entries({
 // corruption modes already found and fixed there (flattened "\n", CRLF, wrapping quotes, and a
 // trailing zsh "%" left over from a `cat file.p8` terminal copy instead of the raw file bytes).
 function normalizePrivateKey(raw) {
-  let key = raw.includes("PRIVATE KEY") ? raw : Buffer.from(raw, "base64").toString("utf-8");
-  key = key.includes("\\n") ? key.replace(/\\n/g, "\n") : key;
-  key = key.replace(/\r/g, "");
+  let key = raw.includes('PRIVATE KEY')
+    ? raw
+    : Buffer.from(raw, 'base64').toString('utf-8');
+  key = key.includes('\\n') ? key.replace(/\\n/g, '\n') : key;
+  key = key.replace(/\r/g, '');
   key = key.trim();
   if (
     (key.startsWith('"') && key.endsWith('"')) ||
@@ -93,7 +95,7 @@ function normalizePrivateKey(raw) {
   ) {
     key = key.slice(1, -1).trim();
   }
-  if (key.endsWith("%")) {
+  if (key.endsWith('%')) {
     key = key.slice(0, -1).trimEnd();
   }
   return key;
@@ -106,10 +108,10 @@ function mintToken() {
       iss: APPSTORE_ISSUER_ID,
       iat: now,
       exp: now + 19 * 60,
-      aud: "appstoreconnect-v1",
+      aud: 'appstoreconnect-v1',
     },
     normalizePrivateKey(APPSTORE_API_PRIVATE_KEY),
-    { algorithm: "ES256", keyid: APPSTORE_API_KEY_ID },
+    {algorithm: 'ES256', keyid: APPSTORE_API_KEY_ID},
   );
 }
 
@@ -118,13 +120,15 @@ async function appleApi(path, token, init = {}) {
     ...init,
     headers: {
       Authorization: `Bearer ${token}`,
-      ...(init.body ? { "Content-Type": "application/json" } : {}),
+      ...(init.body ? {'Content-Type': 'application/json'} : {}),
       ...init.headers,
     },
   });
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`App Store Connect API ${init.method ?? "GET"} ${path} failed: ${res.status} ${body}`);
+    throw new Error(
+      `App Store Connect API ${init.method ?? 'GET'} ${path} failed: ${res.status} ${body}`,
+    );
   }
   return res.status === 204 ? null : res.json();
 }
@@ -133,10 +137,15 @@ async function appleApi(path, token, init = {}) {
  * value the live build was made with, and the source of truth scheduled-mobile-release.yml
  * already writes/reads for this exact field. */
 async function readLocalMarketingVersion() {
-  const pbxproj = await fs.readFile("ios/ally.xcodeproj/project.pbxproj", "utf-8");
+  const pbxproj = await fs.readFile(
+    'ios/ally.xcodeproj/project.pbxproj',
+    'utf-8',
+  );
   const match = pbxproj.match(/MARKETING_VERSION\s*=\s*([\d.]+)\s*;/);
   if (!match) {
-    throw new Error("Could not find MARKETING_VERSION in ios/ally.xcodeproj/project.pbxproj");
+    throw new Error(
+      'Could not find MARKETING_VERSION in ios/ally.xcodeproj/project.pbxproj',
+    );
   }
   return match[1];
 }
@@ -150,7 +159,8 @@ async function fetchAllExistingVersions(appId, token) {
     token,
   );
   const versions = response.data ?? [];
-  const parse = v => (v.attributes?.versionString ?? "0").split(".").map(n => Number(n) || 0);
+  const parse = v =>
+    (v.attributes?.versionString ?? '0').split('.').map(n => Number(n) || 0);
   return versions.sort((a, b) => {
     const [pa, pb] = [parse(a), parse(b)];
     for (let i = 0; i < Math.max(pa.length, pb.length); i += 1) {
@@ -170,50 +180,74 @@ async function fetchAllExistingVersions(appId, token) {
  * ENTITY_ERROR.ATTRIBUTE.INVALID.DUPLICATE ("Entity with locale: en-US already exists"). So this
  * checks for an existing one on the new version first and PATCHes it, only falling back to POST
  * if genuinely none exists (e.g. a primary locale other than en-US). */
-async function copyEnUsLocalizationForward(sourceVersionId, newVersionId, token) {
+async function copyEnUsLocalizationForward(
+  sourceVersionId,
+  newVersionId,
+  token,
+) {
   const sourceLocsResponse = await appleApi(
     `/appStoreVersions/${sourceVersionId}/appStoreVersionLocalizations`,
     token,
   );
-  const sourceLoc = sourceLocsResponse.data?.find(loc => loc?.attributes?.locale === "en-US");
+  const sourceLoc = sourceLocsResponse.data?.find(
+    loc => loc?.attributes?.locale === 'en-US',
+  );
   if (!sourceLoc) return null;
 
-  const { description, keywords, marketingUrl, promotionalText, supportUrl } =
+  const {description, keywords, marketingUrl, promotionalText, supportUrl} =
     sourceLoc.attributes ?? {};
-  const fields = { description, keywords, marketingUrl, promotionalText, supportUrl };
+  const fields = {
+    description,
+    keywords,
+    marketingUrl,
+    promotionalText,
+    supportUrl,
+  };
 
   const newVersionLocsResponse = await appleApi(
     `/appStoreVersions/${newVersionId}/appStoreVersionLocalizations`,
     token,
   );
-  const existingLoc = newVersionLocsResponse.data?.find(loc => loc?.attributes?.locale === "en-US");
+  const existingLoc = newVersionLocsResponse.data?.find(
+    loc => loc?.attributes?.locale === 'en-US',
+  );
 
   let newLocalizationId;
   if (existingLoc) {
     await appleApi(`/appStoreVersionLocalizations/${existingLoc.id}`, token, {
-      method: "PATCH",
+      method: 'PATCH',
       body: JSON.stringify({
-        data: { type: "appStoreVersionLocalizations", id: existingLoc.id, attributes: fields },
+        data: {
+          type: 'appStoreVersionLocalizations',
+          id: existingLoc.id,
+          attributes: fields,
+        },
       }),
     });
     newLocalizationId = existingLoc.id;
   } else {
-    const newLocResponse = await appleApi("/appStoreVersionLocalizations", token, {
-      method: "POST",
-      body: JSON.stringify({
-        data: {
-          type: "appStoreVersionLocalizations",
-          attributes: { locale: "en-US", ...fields },
-          relationships: {
-            appStoreVersion: { data: { type: "appStoreVersions", id: newVersionId } },
+    const newLocResponse = await appleApi(
+      '/appStoreVersionLocalizations',
+      token,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          data: {
+            type: 'appStoreVersionLocalizations',
+            attributes: {locale: 'en-US', ...fields},
+            relationships: {
+              appStoreVersion: {
+                data: {type: 'appStoreVersions', id: newVersionId},
+              },
+            },
           },
-        },
-      }),
-    });
+        }),
+      },
+    );
     newLocalizationId = newLocResponse.data.id;
   }
 
-  return { newLocalizationId, sourceLocalizationId: sourceLoc.id };
+  return {newLocalizationId, sourceLocalizationId: sourceLoc.id};
 }
 
 /** Apple's asset CDN URLs are templates with {w}/{h}/{f} placeholders, filled in from the same
@@ -222,9 +256,9 @@ async function copyEnUsLocalizationForward(sourceVersionId, newVersionId, token)
 function resolveImageAssetUrl(imageAsset) {
   if (!imageAsset?.templateUrl) return null;
   return imageAsset.templateUrl
-    .replace("{w}", String(imageAsset.width))
-    .replace("{h}", String(imageAsset.height))
-    .replace("{f}", "png");
+    .replace('{w}', String(imageAsset.width))
+    .replace('{h}', String(imageAsset.height))
+    .replace('{f}', 'png');
 }
 
 /** Downloads every screenshot on the source localization and re-uploads each as a new asset on
@@ -232,10 +266,20 @@ function resolveImageAssetUrl(imageAsset) {
  * 12.9", etc.). Best-effort per screenshot: one failing to download/upload is logged and skipped
  * rather than aborting the whole submission — Apple's own review-readiness check will surface
  * anything still missing far more precisely than this script could. */
-async function copyScreenshotsForward(sourceLocalizationId, targetLocalizationId, token) {
+async function copyScreenshotsForward(
+  sourceLocalizationId,
+  targetLocalizationId,
+  token,
+) {
   const [sourceSetsResponse, targetSetsResponse] = await Promise.all([
-    appleApi(`/appStoreVersionLocalizations/${sourceLocalizationId}/appScreenshotSets`, token),
-    appleApi(`/appStoreVersionLocalizations/${targetLocalizationId}/appScreenshotSets`, token),
+    appleApi(
+      `/appStoreVersionLocalizations/${sourceLocalizationId}/appScreenshotSets`,
+      token,
+    ),
+    appleApi(
+      `/appStoreVersionLocalizations/${targetLocalizationId}/appScreenshotSets`,
+      token,
+    ),
   ]);
 
   // Apple auto-creates an empty screenshot set for some display types on the newly-created
@@ -279,15 +323,18 @@ async function copyScreenshotsForward(sourceLocalizationId, targetLocalizationId
       }
       newSetId = existingTargetSet.id;
     } else {
-      const newSetResponse = await appleApi("/appScreenshotSets", token, {
-        method: "POST",
+      const newSetResponse = await appleApi('/appScreenshotSets', token, {
+        method: 'POST',
         body: JSON.stringify({
           data: {
-            type: "appScreenshotSets",
-            attributes: { screenshotDisplayType: displayType },
+            type: 'appScreenshotSets',
+            attributes: {screenshotDisplayType: displayType},
             relationships: {
               appStoreVersionLocalization: {
-                data: { type: "appStoreVersionLocalizations", id: targetLocalizationId },
+                data: {
+                  type: 'appStoreVersionLocalizations',
+                  id: targetLocalizationId,
+                },
               },
             },
           },
@@ -298,39 +345,54 @@ async function copyScreenshotsForward(sourceLocalizationId, targetLocalizationId
 
     for (const screenshot of sourceScreenshots) {
       try {
-        const fileName = screenshot.attributes?.fileName ?? "screenshot.png";
-        const downloadUrl = resolveImageAssetUrl(screenshot.attributes?.imageAsset);
+        const fileName = screenshot.attributes?.fileName ?? 'screenshot.png';
+        const downloadUrl = resolveImageAssetUrl(
+          screenshot.attributes?.imageAsset,
+        );
         if (!downloadUrl) {
-          console.warn(`Skipping screenshot "${fileName}" — source asset isn't ready to copy yet.`);
+          console.warn(
+            `Skipping screenshot "${fileName}" — source asset isn't ready to copy yet.`,
+          );
           continue;
         }
 
         const imageRes = await fetch(downloadUrl);
         if (!imageRes.ok) {
-          console.warn(`Skipping screenshot "${fileName}" — download failed: ${imageRes.status}`);
+          console.warn(
+            `Skipping screenshot "${fileName}" — download failed: ${imageRes.status}`,
+          );
           continue;
         }
         const imageBuffer = Buffer.from(await imageRes.arrayBuffer());
 
-        const newScreenshotResponse = await appleApi("/appScreenshots", token, {
-          method: "POST",
+        const newScreenshotResponse = await appleApi('/appScreenshots', token, {
+          method: 'POST',
           body: JSON.stringify({
             data: {
-              type: "appScreenshots",
-              attributes: { fileName, fileSize: imageBuffer.length },
-              relationships: { appScreenshotSet: { data: { type: "appScreenshotSets", id: newSetId } } },
+              type: 'appScreenshots',
+              attributes: {fileName, fileSize: imageBuffer.length},
+              relationships: {
+                appScreenshotSet: {
+                  data: {type: 'appScreenshotSets', id: newSetId},
+                },
+              },
             },
           }),
         });
         const newScreenshotId = newScreenshotResponse.data.id;
-        const uploadOperations = newScreenshotResponse.data.attributes?.uploadOperations ?? [];
+        const uploadOperations =
+          newScreenshotResponse.data.attributes?.uploadOperations ?? [];
 
         for (const op of uploadOperations) {
           const headers = Object.fromEntries(
             (op.requestHeaders ?? []).map(h => [h.name, h.value]),
           );
           const chunk = imageBuffer.subarray(op.offset, op.offset + op.length);
-          const uploadRes = await fetch(op.url, { method: op.method ?? "PUT", headers, body: chunk });
+          const uploadRes = await fetch(op.url, {
+            method: op.method ?? 'PUT',
+            headers,
+            body: chunk,
+          });
           if (!uploadRes.ok) {
             throw new Error(`upload chunk failed: ${uploadRes.status}`);
           }
@@ -341,19 +403,24 @@ async function copyScreenshotsForward(sourceLocalizationId, targetLocalizationId
         // so this is the one piece of this flow not verifiable against the spec directly. If a
         // copied screenshot ends up in a FAILED assetDeliveryState in App Store Connect despite
         // the upload itself succeeding, a checksum mismatch here is the first thing to check.
-        const checksum = crypto.createHash("md5").update(imageBuffer).digest("hex");
+        const checksum = crypto
+          .createHash('md5')
+          .update(imageBuffer)
+          .digest('hex');
         await appleApi(`/appScreenshots/${newScreenshotId}`, token, {
-          method: "PATCH",
+          method: 'PATCH',
           body: JSON.stringify({
             data: {
-              type: "appScreenshots",
+              type: 'appScreenshots',
               id: newScreenshotId,
-              attributes: { uploaded: true, sourceFileChecksum: checksum },
+              attributes: {uploaded: true, sourceFileChecksum: checksum},
             },
           }),
         });
       } catch (error) {
-        console.warn(`Skipping a screenshot in ${displayType} — ${error.message ?? error}`);
+        console.warn(
+          `Skipping a screenshot in ${displayType} — ${error.message ?? error}`,
+        );
       }
     }
   }
@@ -364,59 +431,80 @@ async function copyScreenshotsForward(sourceLocalizationId, targetLocalizationId
  * why this is a deliberate, bounded amount of automation — not a substitute for a human updating
  * the listing when it actually needs to change. */
 async function ensureSubmittableVersion(appId, token) {
-  const stateFilter = EDITABLE_STATES.join(",");
+  const stateFilter = EDITABLE_STATES.join(',');
   const existingResponse = await appleApi(
     `/apps/${appId}/appStoreVersions?filter[platform]=IOS&filter[appVersionState]=${stateFilter}&limit=1`,
     token,
   );
   const existing = existingResponse.data?.[0];
   if (existing) {
-    return { versionId: existing.id, versionString: existing.attributes?.versionString ?? "(unknown version)" };
+    return {
+      versionId: existing.id,
+      versionString: existing.attributes?.versionString ?? '(unknown version)',
+    };
   }
 
-  console.log("No submittable App Store version found — creating the next one and carrying the previous listing forward.");
+  console.log(
+    'No submittable App Store version found — creating the next one and carrying the previous listing forward.',
+  );
 
   const allVersions = await fetchAllExistingVersions(appId, token);
   const previousVersion = allVersions[0] ?? null;
   const versionString = await readLocalMarketingVersion();
 
-  const newVersionResponse = await appleApi("/appStoreVersions", token, {
-    method: "POST",
+  const newVersionResponse = await appleApi('/appStoreVersions', token, {
+    method: 'POST',
     body: JSON.stringify({
       data: {
-        type: "appStoreVersions",
-        attributes: { platform: "IOS", versionString },
-        relationships: { app: { data: { type: "apps", id: appId } } },
+        type: 'appStoreVersions',
+        attributes: {platform: 'IOS', versionString},
+        relationships: {app: {data: {type: 'apps', id: appId}}},
       },
     }),
   });
   const versionId = newVersionResponse.data.id;
 
   if (previousVersion) {
-    const copied = await copyEnUsLocalizationForward(previousVersion.id, versionId, token);
+    const copied = await copyEnUsLocalizationForward(
+      previousVersion.id,
+      versionId,
+      token,
+    );
     if (copied) {
-      await copyScreenshotsForward(copied.sourceLocalizationId, copied.newLocalizationId, token);
+      await copyScreenshotsForward(
+        copied.sourceLocalizationId,
+        copied.newLocalizationId,
+        token,
+      );
     } else {
       console.warn(
-        `Previous version ${previousVersion.attributes?.versionString ?? "(unknown)"} had no ` +
-          "en-US localization to copy — the new version has no listing text or screenshots yet.",
+        `Previous version ${previousVersion.attributes?.versionString ?? '(unknown)'} had no ` +
+          'en-US localization to copy — the new version has no listing text or screenshots yet.',
       );
     }
   } else {
-    console.warn("No previous App Store version exists to copy a listing from — this looks like a first-ever submission, which this script doesn't set up from scratch.");
+    console.warn(
+      "No previous App Store version exists to copy a listing from — this looks like a first-ever submission, which this script doesn't set up from scratch.",
+    );
   }
 
-  return { versionId, versionString };
+  return {versionId, versionString};
 }
 
 async function main() {
   const token = mintToken();
 
-  const appsResponse = await appleApi(`/apps?filter[bundleId]=${encodeURIComponent(BUNDLE_ID)}`, token);
+  const appsResponse = await appleApi(
+    `/apps?filter[bundleId]=${encodeURIComponent(BUNDLE_ID)}`,
+    token,
+  );
   const appId = appsResponse.data?.[0]?.id;
   if (!appId) throw new Error(`No app found for bundle id ${BUNDLE_ID}`);
 
-  const { versionId, versionString } = await ensureSubmittableVersion(appId, token);
+  const {versionId, versionString} = await ensureSubmittableVersion(
+    appId,
+    token,
+  );
 
   // Pinned to the version being submitted. Unfiltered, this matched ANY valid build and took
   // the most recently processed one — which during a release is the PREVIOUS version, since the
@@ -429,28 +517,28 @@ async function main() {
   // silently matches nothing if filtered on by mistake.
   const buildsResponse = await appleApi(
     `/builds?filter[app]=${appId}&filter[preReleaseVersion.version]=${encodeURIComponent(versionString)}` +
-      "&filter[processingState]=VALID&sort=-uploadedDate&limit=1",
+      '&filter[processingState]=VALID&sort=-uploadedDate&limit=1',
     token,
   );
   const build = buildsResponse.data?.[0];
   if (!build) {
     throw new Error(
       `No processed (VALID) build found for version ${versionString} to attach to the App Store version. ` +
-        "If the build was only just uploaded, Apple is probably still processing it — check " +
-        "TestFlight -> Builds and retry once it shows as ready. Refusing to fall back to an " +
-        "older build: this submission auto-releases on approval.",
+        'If the build was only just uploaded, Apple is probably still processing it — check ' +
+        'TestFlight -> Builds and retry once it shows as ready. Refusing to fall back to an ' +
+        'older build: this submission auto-releases on approval.',
     );
   }
   const buildId = build.id;
   console.log(
-    `Attaching build ${buildId} — marketing version ${versionString}, build number ${build.attributes?.version ?? "(unknown)"}.`,
+    `Attaching build ${buildId} — marketing version ${versionString}, build number ${build.attributes?.version ?? '(unknown)'}.`,
   );
 
   // Attach the build to the version. Fails clearly if the version isn't actually in an editable
   // state (e.g. already under review) despite matching one of EDITABLE_STATES above.
   await appleApi(`/appStoreVersions/${versionId}/relationships/build`, token, {
-    method: "PATCH",
-    body: JSON.stringify({ data: { type: "builds", id: buildId } }),
+    method: 'PATCH',
+    body: JSON.stringify({data: {type: 'builds', id: buildId}}),
   });
 
   // Optional: overwrite the "What's New in This Version" text for the en-US listing — the same
@@ -466,7 +554,7 @@ async function main() {
       token,
     );
     const enUsLocalization = localizationsResponse.data?.find(
-      loc => loc?.attributes?.locale === "en-US",
+      loc => loc?.attributes?.locale === 'en-US',
     );
     if (!enUsLocalization) {
       throw new Error(
@@ -474,67 +562,77 @@ async function main() {
           `on App Store version ${versionString}. Add an en-US localization in App Store Connect first.`,
       );
     }
-    await appleApi(`/appStoreVersionLocalizations/${enUsLocalization.id}`, token, {
-      method: "PATCH",
-      body: JSON.stringify({
-        data: {
-          type: "appStoreVersionLocalizations",
-          id: enUsLocalization.id,
-          attributes: { whatsNew },
-        },
-      }),
-    });
+    await appleApi(
+      `/appStoreVersionLocalizations/${enUsLocalization.id}`,
+      token,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({
+          data: {
+            type: 'appStoreVersionLocalizations',
+            id: enUsLocalization.id,
+            attributes: {whatsNew},
+          },
+        }),
+      },
+    );
   }
 
   // Force automatic release regardless of whatever was previously configured — the moment Apple
   // approves this version, it goes live to every real App Store user, no further click needed.
   await appleApi(`/appStoreVersions/${versionId}`, token, {
-    method: "PATCH",
+    method: 'PATCH',
     body: JSON.stringify({
       data: {
-        type: "appStoreVersions",
+        type: 'appStoreVersions',
         id: versionId,
-        attributes: { releaseType: "AFTER_APPROVAL" },
+        attributes: {releaseType: 'AFTER_APPROVAL'},
       },
     }),
   });
 
-  const reviewSubmissionResponse = await appleApi("/reviewSubmissions", token, {
-    method: "POST",
+  const reviewSubmissionResponse = await appleApi('/reviewSubmissions', token, {
+    method: 'POST',
     body: JSON.stringify({
       data: {
-        type: "reviewSubmissions",
-        attributes: { platform: "IOS" },
-        relationships: { app: { data: { type: "apps", id: appId } } },
+        type: 'reviewSubmissions',
+        attributes: {platform: 'IOS'},
+        relationships: {app: {data: {type: 'apps', id: appId}}},
       },
     }),
   });
   const reviewSubmissionId = reviewSubmissionResponse.data.id;
 
-  await appleApi("/reviewSubmissionItems", token, {
-    method: "POST",
+  await appleApi('/reviewSubmissionItems', token, {
+    method: 'POST',
     body: JSON.stringify({
       data: {
-        type: "reviewSubmissionItems",
+        type: 'reviewSubmissionItems',
         relationships: {
-          reviewSubmission: { data: { type: "reviewSubmissions", id: reviewSubmissionId } },
-          appStoreVersion: { data: { type: "appStoreVersions", id: versionId } },
+          reviewSubmission: {
+            data: {type: 'reviewSubmissions', id: reviewSubmissionId},
+          },
+          appStoreVersion: {data: {type: 'appStoreVersions', id: versionId}},
         },
       },
     }),
   });
 
   await appleApi(`/reviewSubmissions/${reviewSubmissionId}`, token, {
-    method: "PATCH",
+    method: 'PATCH',
     body: JSON.stringify({
-      data: { type: "reviewSubmissions", id: reviewSubmissionId, attributes: { submitted: true } },
+      data: {
+        type: 'reviewSubmissions',
+        id: reviewSubmissionId,
+        attributes: {submitted: true},
+      },
     }),
   });
 
   console.log(
     `Submitted App Store version ${versionString} (build ${buildId}) for Apple's full App Store review. ` +
-      "Release type forced to AFTER_APPROVAL: the moment Apple approves it, it goes live to every " +
-      "real App Store user automatically — no further action needed.",
+      'Release type forced to AFTER_APPROVAL: the moment Apple approves it, it goes live to every ' +
+      'real App Store user automatically — no further action needed.',
   );
 
   const githubOutput = process.env.GITHUB_OUTPUT;
@@ -544,6 +642,9 @@ async function main() {
 }
 
 main().catch(error => {
-  console.error("Failed to submit for App Store review:", error.message ?? error);
+  console.error(
+    'Failed to submit for App Store review:',
+    error.message ?? error,
+  );
   process.exit(1);
 });

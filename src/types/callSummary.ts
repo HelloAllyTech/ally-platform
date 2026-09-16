@@ -62,7 +62,7 @@ export interface SummaryField {
   // Optional: For fields that need special display formatting (e.g., percentage, dates)
   formatDisplay?: (
     value: unknown,
-    t?: (key: string, params?: any) => string,
+    t?: (key: string, params?: Record<string, unknown>) => string,
   ) => string;
 }
 

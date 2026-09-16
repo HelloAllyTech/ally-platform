@@ -39,7 +39,7 @@ const i18nInit = i18n.use(initReactI18next).init({
 });
 
 // After init resolves: restore the user's saved language, then start dynamic system
-void i18nInit.then(async () => {
+i18nInit.then(async () => {
   try {
     const stored = await AsyncStorage.getItem(AsyncStorageKeys.UI_LANGUAGE);
     if (stored && SUPPORTED_LANGUAGE_CODES.includes(stored)) {

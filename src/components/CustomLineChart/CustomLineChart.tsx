@@ -41,7 +41,7 @@ export const CustomLineChart: React.FC<Props> = ({
   xAxisSplitNumber = 4,
   yAxisSplitNumber = 4,
 }) => {
-  const skiaRef = useRef<any>(null);
+  const skiaRef = useRef<SkiaChart>(null);
   const chartRef = useRef<echarts.EChartsType | null>(null);
 
   const {seriesData, maxX} = useMemo(() => {

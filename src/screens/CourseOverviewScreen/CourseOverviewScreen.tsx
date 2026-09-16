@@ -255,7 +255,7 @@ export const CourseOverviewScreen: React.FC<
         onSessionPress={handleSessionPress}
         onContinuePress={() => {
           setIsProgressSheetVisible(false);
-          void handleStartOrContinue();
+          handleStartOrContinue();
         }}
       />
     </View>

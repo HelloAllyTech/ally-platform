@@ -81,7 +81,7 @@ export const CourseLanguageSheet: React.FC<CourseLanguageSheetProps> = ({
             <TouchableOpacity
               key={option.languageCode}
               style={styles.option}
-              onPress={() => void handleSelect(option.languageCode)}
+              onPress={() => handleSelect(option.languageCode)}
               activeOpacity={0.7}
               disabled={isLoading}
               accessibilityRole="button"

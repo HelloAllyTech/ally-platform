@@ -102,7 +102,9 @@ export const CallLogItem = ({
 
               <View style={styles.statusAndEyeContainer}>
                 <StatusBadge
-                  status={item.summaryStatus || (item.status as any)}
+                  status={
+                    item.summaryStatus || (item.status as ChatSummaryStatus)
+                  }
                 />
                 {!disabled && (
                   <EyeIcon width={16} height={16} style={styles.eyeIcon} />

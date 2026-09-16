@@ -12,7 +12,7 @@ interface DebounceOptions {
  * @param options.leading Whether to call the function on the leading edge (default: false)
  * @returns A debounced version of the callback
  */
-export const useDebounce = <T extends (...args: any[]) => any>(
+export const useDebounce = <T extends (...args: unknown[]) => unknown>(
   callback: T,
   options: DebounceOptions = {},
 ) => {

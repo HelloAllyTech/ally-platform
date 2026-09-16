@@ -61,18 +61,15 @@ jest.mock('react-native', () => {
   };
 
   // Mock basic React Native components
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  RN.TouchableOpacity = (props: any) =>
+  RN.TouchableOpacity = (props: {children: React.ReactNode}) =>
     React.createElement('TouchableOpacity', props, props.children);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  RN.View = (props: any) => React.createElement('View', props, props.children);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  RN.Text = ({children, ...props}: any) =>
+  RN.View = (props: {children: React.ReactNode}) =>
+    React.createElement('View', props, props.children);
+  RN.Text = ({children, ...props}: {children: React.ReactNode}) =>
     React.createElement('Text', props, children);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  RN.Image = (props: any) => React.createElement('Image', props);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  RN.ActivityIndicator = ({...props}: any) =>
+  RN.Image = (props: Record<string, unknown>) =>
+    React.createElement('Image', props);
+  RN.ActivityIndicator = ({...props}: Record<string, unknown>) =>
     React.createElement('ActivityIndicator', props);
 
   return RN;
@@ -90,35 +87,44 @@ jest.mock('react-native-reanimated', () =>
 require('react-native-gesture-handler/jestSetup');
 
 // Mock react-native-svg
-/* eslint-disable @typescript-eslint/no-explicit-any */
 jest.mock('react-native-svg', () => {
   const React = require('react');
   return {
     __esModule: true,
-    default: (props: any) => React.createElement('Svg', props, props.children),
-    Svg: (props: any) => React.createElement('Svg', props, props.children),
-    Circle: (props: any) => React.createElement('Circle', props),
-    Rect: (props: any) => React.createElement('Rect', props),
-    Path: (props: any) => React.createElement('Path', props),
-    Line: (props: any) => React.createElement('Line', props),
-    G: (props: any) => React.createElement('G', props, props.children),
-    Text: (props: any) => React.createElement('SvgText', props, props.children),
-    Defs: (props: any) => React.createElement('Defs', props, props.children),
-    LinearGradient: (props: any) =>
+    default: (props: React.PropsWithChildren<unknown>) =>
+      React.createElement('Svg', props, props.children),
+    Svg: (props: React.PropsWithChildren<unknown>) =>
+      React.createElement('Svg', props, props.children),
+    Circle: (props: Record<string, unknown>) =>
+      React.createElement('Circle', props),
+    Rect: (props: Record<string, unknown>) =>
+      React.createElement('Rect', props),
+    Path: (props: Record<string, unknown>) =>
+      React.createElement('Path', props),
+    Line: (props: Record<string, unknown>) =>
+      React.createElement('Line', props),
+    G: (props: React.PropsWithChildren<unknown>) =>
+      React.createElement('G', props, props.children),
+    Text: (props: React.PropsWithChildren<unknown>) =>
+      React.createElement('SvgText', props, props.children),
+    Defs: (props: React.PropsWithChildren<unknown>) =>
+      React.createElement('Defs', props, props.children),
+    LinearGradient: (props: React.PropsWithChildren<unknown>) =>
       React.createElement('LinearGradient', props, props.children),
-    Stop: (props: any) => React.createElement('Stop', props),
-    SvgXml: (props: any) => React.createElement('SvgXml', props),
-    SvgUri: (props: any) => React.createElement('SvgUri', props),
+    Stop: (props: Record<string, unknown>) =>
+      React.createElement('Stop', props),
+    SvgXml: (props: Record<string, unknown>) =>
+      React.createElement('SvgXml', props),
+    SvgUri: (props: Record<string, unknown>) =>
+      React.createElement('SvgUri', props),
   };
 });
-/* eslint-enable @typescript-eslint/no-explicit-any */
 
 // Note: NativeAnimatedHelper mock is not needed on RN 0.79
 
 // Mock @livekit/react-native
 jest.mock('@livekit/react-native', () => {
   const React = require('react');
-
   // Mock AudioSession
   const AudioSession = {
     configureAudio: jest.fn(),
@@ -149,7 +155,7 @@ jest.mock('@livekit/react-native', () => {
     useRoomContext: jest.fn(() => new MockRoom()),
     RoomContext: {
       Provider: ({children}: {children: React.ReactNode}) => children,
-      Consumer: ({children}: {children: (room: any) => React.ReactNode}) =>
+      Consumer: ({children}: {children: (room: MockRoom) => React.ReactNode}) =>
         children(new MockRoom()),
     },
     useParticipant: jest.fn(() => ({
@@ -191,7 +197,7 @@ jest.mock('react-native-config', () => {
 jest.mock('@invertase/react-native-apple-authentication', () => {
   const React = require('react');
   const {Text} = require('react-native');
-  const AppleButton: any = ({onPress}: {onPress: () => void}) =>
+  const AppleButton = ({onPress}: {onPress: () => void}) =>
     React.createElement(Text, {onPress}, 'Continue with Apple');
   AppleButton.Style = {BLACK: 'BLACK', WHITE: 'WHITE'};
   AppleButton.Type = {CONTINUE: 'CONTINUE', SIGN_IN: 'SIGN_IN'};
@@ -276,7 +282,7 @@ jest.mock('@notifee/react-native', () => ({
 jest.mock('@/components', () => {
   const React = require('react');
   return {
-    ErrorBoundary: ({children}: any) => children,
+    ErrorBoundary: ({children}: {children: React.ReactNode}) => children,
     Button: jest.fn(({label, onPress, isDisabled}) =>
       React.createElement(
         'TouchableOpacity',
@@ -350,8 +356,10 @@ jest.mock('@/components/EmptyState/EmptyState', () => ({
 jest.mock('react-native-webview', () => {
   const React = require('react');
   return {
-    WebView: (props: any) => React.createElement('WebView', props),
-    default: (props: any) => React.createElement('WebView', props),
+    WebView: (props: Record<string, unknown>) =>
+      React.createElement('WebView', props),
+    default: (props: Record<string, unknown>) =>
+      React.createElement('WebView', props),
   };
 });
 

@@ -109,16 +109,11 @@ export const StartSessionModal: React.FC<StartSessionModalProps> = ({
               isDisabled={isStartingScribe || isCreatingNote}
               customContainerStyle={[
                 styles.ctaBtn,
-                hasMicrophoneChatType
-                  ? {
-                      backgroundColor: 'white',
-                      borderWidth: 1,
-                      borderColor: '#007AFF',
-                      marginTop: 10,
-                    }
-                  : {},
+                hasMicrophoneChatType ? styles.secondaryButton : {},
               ]}
-              customTextStyle={hasMicrophoneChatType ? {color: '#007AFF'} : {}}
+              customTextStyle={
+                hasMicrophoneChatType ? styles.secondaryButtonText : {}
+              }
             />
           )}
         </View>

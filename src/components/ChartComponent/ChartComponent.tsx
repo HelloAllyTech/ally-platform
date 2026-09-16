@@ -1,6 +1,7 @@
 import React from 'react';
 import {Dimensions, StyleSheet, View} from 'react-native';
 import {LineChart} from 'react-native-chart-kit';
+import {ChartConfig} from 'react-native-chart-kit/dist/AbstractChart';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {colors, fontFamily} from '@/theme';
@@ -28,7 +29,7 @@ export interface ChartComponentProps {
   /** Legend labels */
   legendLabels?: string[];
   /** Chart configuration */
-  chartConfig?: any;
+  chartConfig?: ChartConfig;
 }
 
 const defaultChartConfig = {
