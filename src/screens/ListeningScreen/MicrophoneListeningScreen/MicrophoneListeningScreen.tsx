@@ -429,12 +429,22 @@ export const MicrophoneListeningScreen = () => {
   };
 
   useEffect(() => {
-    if (isWebMicrophoneMode) return;
-
     const send = (afterMs: number) => {
       if (diagnosticSentRef.current[afterMs]) return;
-      // A session that got going needs no explanation.
-      if (gatesRef.current.hasChatId) return;
+      // The ONLY suppression: a session that actually started needs no
+      // explanation. Deliberately not gated on `hasChatId` or on
+      // `isWebMicrophoneMode` any more.
+      //
+      // It used to skip on both, and that blinded us exactly where it mattered.
+      // Production showed 1.23.21+ clients opening the recording screen,
+      // receiving SESSION_CREATED, and then emitting neither START_AUDIO_CHAT
+      // nor a diagnostic — and the only client states that explain the silence
+      // are a true `isWebMicrophoneMode` or a stale `hasChatId`, i.e. precisely
+      // the two flags the old gate refused to report on. Instrumentation must
+      // not go quiet on the conditions it exists to reveal.
+      if (gatesRef.current.isAudioChatEmitted && gatesRef.current.hasChatId) {
+        return;
+      }
       diagnosticSentRef.current[afterMs] = true;
 
       emitSocketEvent(SocketEvent.SCRIBE_START_DIAGNOSTIC, {
@@ -453,7 +463,7 @@ export const MicrophoneListeningScreen = () => {
       clearTimeout(first);
       clearTimeout(second);
     };
-  }, [emitSocketEvent, isWebMicrophoneMode]);
+  }, [emitSocketEvent]);
 
   const handleEndCall = useCallback(() => {
     handleEndCallCommon(() => {

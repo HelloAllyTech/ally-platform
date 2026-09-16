@@ -378,6 +378,17 @@ describe('scribe start diagnostic', () => {
     });
 
     renderScreen();
+
+    // A genuinely started session means BOTH: the client emitted
+    // START_AUDIO_CHAT and it holds a chat id. Drive SESSION_CREATED so the
+    // emit effect runs, which is what sets isAudioChatEmitted.
+    act(() => {
+      mockSocketCallbacks.SESSION_CREATED?.();
+    });
+    // Two advances on purpose: each is its own act(), so the state set by the
+    // zero-delay START_AUDIO_CHAT timer is rendered — and therefore visible in
+    // gatesRef — before the 5s diagnostic timer reads it.
+    advance(1);
     advance(15000);
 
     // A working session needs no explanation, and this must never become
@@ -385,16 +396,35 @@ describe('scribe start diagnostic', () => {
     expect(diagnosticCalls()).toHaveLength(0);
   });
 
-  it('stays quiet in web-microphone mode, which has no recorder to gate', () => {
+  it('STILL reports in web-microphone mode', () => {
+    // This used to be suppressed. Production then produced clients that were
+    // silent on both START_AUDIO_CHAT and the diagnostic, and a true
+    // isWebMicrophoneMode is one of only two states that explains it — so the
+    // flag under suspicion must not be the flag that silences the report.
     mockUseListeningCommon.mockReturnValue({
       ...defaultCommon,
       isWebMicrophoneMode: true,
     });
 
     renderScreen();
-    advance(15000);
+    advance(5000);
 
-    expect(diagnosticCalls()).toHaveLength(0);
+    const [[, payload]] = diagnosticCalls();
+    expect(payload).toMatchObject({isWebMicrophoneMode: true, afterMs: 5000});
+  });
+
+  it('STILL reports when a chat id is present but nothing was emitted', () => {
+    // A stale chatId in the store is the other explanation for the silence.
+    mockUseListeningCommon.mockReturnValue({
+      ...defaultCommon,
+      chatData: {chatId: 987},
+    });
+
+    renderScreen();
+    advance(5000);
+
+    const [[, payload]] = diagnosticCalls();
+    expect(payload).toMatchObject({hasChatId: true, isAudioChatEmitted: false});
   });
 });
 
