@@ -9,7 +9,6 @@ import pytest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
 from app.core.working_memory import consolidate as mod
