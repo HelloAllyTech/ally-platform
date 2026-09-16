@@ -5,6 +5,10 @@ import {ScaledSheet} from 'react-native-size-matters';
 import {CustomDropdown} from '@/components';
 import {useTranslate} from '@/hooks/useTranslate';
 import {colors, fontFamily, typography} from '@/theme';
+import {
+  formatCustomFieldDate,
+  normalizeCustomFieldDate,
+} from '@/utils/customFieldDate';
 
 import {
   CustomFieldDefinition,
@@ -277,11 +281,16 @@ export const CustomFieldsSection: React.FC<CustomFieldsSectionProps> = ({
           }
 
           case CustomFieldType.DATE:
+            // A DATE value is a calendar date stored as YYYY-MM-DD. Values
+            // written by the old web build are full ISO instants at local
+            // midnight, i.e. 18:30 the previous day in UTC — rendering those
+            // raw is what showed the day before the one the user picked, so
+            // they are resolved back to the org calendar date here.
             return (
               <FieldRow
                 key={def.id}
                 label={def.name}
-                value={value ?? '-'}
+                value={formatCustomFieldDate(value)}
                 renderEdit={
                   isEditing && fieldIsEditable
                     ? () => (
@@ -289,7 +298,7 @@ export const CustomFieldsSection: React.FC<CustomFieldsSectionProps> = ({
                           <EditableField
                             fieldKey={def.id as any}
                             label={def.name}
-                            value={value}
+                            value={normalizeCustomFieldDate(value) ?? value}
                             onChangeText={text =>
                               onValueChange(def.id, text || null)
                             }
