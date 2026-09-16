@@ -114,5 +114,13 @@ class CartesiaTTSClient(BaseTTSClient):
                 speed=self._speed,
                 emotion=self._emotion,
                 api_key=self._api_key,
+                # Cartesia only supports word-level timestamps for en/de/es/fr
+                # on `sonic` models (all other languages, e.g. hi, fall back
+                # to degraded alignment/synthesis quality if requested — see
+                # https://docs.cartesia.ai/api-reference/tts/compare-tts-endpoints).
+                # The streaming path defaults this True and nothing in this
+                # codebase consumes word timestamps, so disable it outright
+                # rather than only for the unsupported languages.
+                word_timestamps=False,
             )
         return self._tts_instance
