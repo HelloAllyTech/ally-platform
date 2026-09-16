@@ -99,7 +99,8 @@ export const useCallSummaryForm = () => {
         return acc;
       }
       if (field.key in summary) {
-        (acc as any)[field.key] = summary[field.key] ?? null;
+        acc[field.key] =
+          (summary[field.key as keyof SummaryDetails] as string) ?? null;
       }
       return acc;
     }, {} as Partial<SummaryFormData>);

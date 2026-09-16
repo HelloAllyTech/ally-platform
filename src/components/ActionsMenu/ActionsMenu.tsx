@@ -66,7 +66,6 @@ export const ActionsMenu: React.FC<ActionsMenuProps> = ({
             style={[
               styles.menu,
               {
-                position: 'absolute',
                 left: menuPosition.x,
                 top: menuPosition.y,
               },
@@ -103,6 +102,7 @@ const styles = ScaledSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0)',
   },
   menu: {
+    position: 'absolute',
     backgroundColor: colors.white,
     borderRadius: radius.lg,
     paddingVertical: '8@s',

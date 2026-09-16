@@ -26,7 +26,7 @@ const buildApiTestStore = <T extends Record<string, Reducer>>(
 // Untyped on the dispatched action so a store with any extra reducers can be tracked
 // here regardless of its exact shape; the only thing ever dispatched to a tracked
 // store is `api.util.resetApiState()`.
-const liveStores: Array<{dispatch: (action: any) => any}> = [];
+const liveStores: Array<{dispatch: (action: unknown) => unknown}> = [];
 
 /**
  * Builds a throwaway store wired to the RTK Query `api` slice, with the two

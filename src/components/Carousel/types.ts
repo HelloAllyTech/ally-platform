@@ -38,7 +38,7 @@ export interface CarouselProps {
   onSnapToItem?: (index: number) => void;
   onScrollBegin?: () => void;
   onScrollEnd?: () => void;
-  mode?: any;
+  mode?: 'parallax' | 'horizontal-stack' | 'vertical-stack';
   accessibilityLabel?: string;
   testID?: string;
 }

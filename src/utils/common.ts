@@ -36,6 +36,7 @@ export const uint8ToString = (bytes: Uint8Array): string => {
 export const stringToUint8 = (str: string): Uint8Array => {
   const bytes = new Uint8Array(str.length);
   for (let i = 0; i < str.length; i += 1) {
+    // eslint-disable-next-line no-bitwise
     bytes[i] = str.charCodeAt(i) & 0xff;
   }
   return bytes;

@@ -17,7 +17,7 @@ on:
   workflow_dispatch:
     inputs:
       whats_new:
-        description: "\"What's New in This Version\" text (optional - leave blank to keep whatever is already set in App Store Connect)"
+        description: '"What''s New in This Version" text (optional - leave blank to keep whatever is already set in App Store Connect)'
         required: false
         type: string
 

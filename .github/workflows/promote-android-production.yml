@@ -15,7 +15,7 @@ on:
         type: string
         default: '20'
       whats_new:
-        description: "\"What's New\" text for the production listing (optional - leave blank to promote with no release notes)"
+        description: '"What''s New" text for the production listing (optional - leave blank to promote with no release notes)'
         required: false
         type: string
 

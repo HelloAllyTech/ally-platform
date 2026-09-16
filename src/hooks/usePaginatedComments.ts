@@ -1,5 +1,7 @@
 import {useCallback, useRef, useState} from 'react';
 
+import {MessageThreadComment} from '@/types/reviews';
+
 import {CommentsState} from './useCommentActions';
 
 const DEFAULT_LIMIT = 20;
@@ -17,7 +19,9 @@ export function usePaginatedComments(options: UsePaginatedCommentsOptions) {
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
   const appendData = useCallback(
-    (responseData: {data: any[]; count: number} | undefined) => {
+    (
+      responseData: {data: MessageThreadComment[]; count: number} | undefined,
+    ) => {
       if (!responseData) return;
 
       setComments(prev => {
@@ -26,7 +30,7 @@ export function usePaginatedComments(options: UsePaginatedCommentsOptions) {
               data: [...prev.data, ...responseData.data],
               count: responseData.count,
             }
-          : responseData;
+          : {data: responseData.data, count: responseData.count};
         setHasMore(updated.data.length < responseData.count);
         return updated;
       });

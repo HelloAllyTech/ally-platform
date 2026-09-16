@@ -4,7 +4,7 @@ import {api} from './api';
 
 export interface UserPreferences {
   default_language_id?: number;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export const userApi = api.injectEndpoints({
@@ -27,7 +27,7 @@ export const userApi = api.injectEndpoints({
      */
     updateUserPreferences: builder.mutation<
       {success: boolean},
-      Record<string, any>
+      Record<string, unknown>
     >({
       query: preferences => ({
         url: API_ROUTES.USERS.UPDATE_USER_PREFERENCES,

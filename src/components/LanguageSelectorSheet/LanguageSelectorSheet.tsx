@@ -75,7 +75,7 @@ export const LanguageSelectorSheet: React.FC<LanguageSelectorSheetProps> = ({
             <TouchableOpacity
               key={option.code}
               style={styles.option}
-              onPress={() => void handleSelect(option.code)}
+              onPress={() => handleSelect(option.code)}
               activeOpacity={0.7}
               accessibilityRole="button"
               accessibilityState={{selected: isSelected}}

@@ -45,12 +45,16 @@ const bytesToBase64 = (bytes: Uint8Array): string => {
     const b0 = bytes[i];
     const b1 = i + 1 < bytes.length ? bytes[i + 1] : 0;
     const b2 = i + 2 < bytes.length ? bytes[i + 2] : 0;
+    // eslint-disable-next-line no-bitwise
     output += BASE64_ALPHABET[b0 >> 2];
+    // eslint-disable-next-line no-bitwise
     output += BASE64_ALPHABET[((b0 & 3) << 4) | (b1 >> 4)];
     output +=
       i + 1 < bytes.length
-        ? BASE64_ALPHABET[((b1 & 15) << 2) | (b2 >> 6)]
+        ? // eslint-disable-next-line no-bitwise
+          BASE64_ALPHABET[((b1 & 15) << 2) | (b2 >> 6)]
         : '=';
+    // eslint-disable-next-line no-bitwise
     output += i + 2 < bytes.length ? BASE64_ALPHABET[b2 & 63] : '=';
   }
   return output;
@@ -129,7 +133,7 @@ export const useVoiceNoteRecorder = (): UseVoiceNoteRecorderResult => {
       });
     if (dataBytesRef.current >= MAX_RECORDING_BYTES) {
       // Hit the upload cap — finish the recording instead of dropping audio.
-      void stopRef.current();
+      stopRef.current();
     }
   }, []);
 

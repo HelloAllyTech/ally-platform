@@ -27,7 +27,7 @@ export const Header: React.FC<HeaderProps> = ({
   onBackPress,
   onMenuPress,
   summaryName = '',
-  mode,
+  mode: _mode,
   showShareSwitch = false,
   isSharedForReview = false,
   onShareToggle,

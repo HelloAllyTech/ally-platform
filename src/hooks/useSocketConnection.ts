@@ -9,7 +9,7 @@ import {useSocket} from './useSocket';
 interface UseSocketConnectionOptions {
   path?: string;
   userId?: number;
-  eventCallbacks?: Partial<Record<SocketEvent, (params?: any) => void>>;
+  eventCallbacks?: Partial<Record<SocketEvent, (params?: unknown) => void>>;
   onConnect?: () => void;
   onDisconnect?: (reason?: string) => void;
   onConnectionError?: (error?: Error) => void;

@@ -1,17 +1,21 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
-import {ParticipantEvent, TrackPublication} from 'livekit-client';
+import {
+  ParticipantEvent,
+  RemoteParticipant,
+  TrackPublication,
+} from 'livekit-client';
 
 // Custom hook for real-time audio level detection from remote participant
 export const useAudioLevel = (trackRef: {
-  participant?: any;
+  participant?: RemoteParticipant;
   publication?: TrackPublication;
 }) => {
   const [audioLevel, setAudioLevel] = useState(0);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const participantRef = useRef<any>(null);
+  const participantRef = useRef<RemoteParticipant | null>(null);
 
   // Helper function to get audio level from participant
-  const getParticipantAudioLevel = (participant: any): number => {
+  const getParticipantAudioLevel = (participant: RemoteParticipant): number => {
     const participantAudioLevel = participant?.audioLevel || 0;
     return participantAudioLevel > 0 ? Math.min(participantAudioLevel, 1) : 0;
   };

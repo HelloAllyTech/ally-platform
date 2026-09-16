@@ -34,94 +34,100 @@
  * server, so it exits with a message naming the fix. Silence here would produce a
  * session that has quietly lost the library and does not know it.
  */
-import { spawnSync } from 'node:child_process'
-import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { homedir, hostname } from 'node:os'
-import { dirname, join } from 'node:path'
-import { createInterface } from 'node:readline'
+import {spawnSync} from 'node:child_process';
+import {chmodSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
+import {homedir, hostname} from 'node:os';
+import {dirname, join} from 'node:path';
+import {createInterface} from 'node:readline';
 
 const ENDPOINT =
-  process.env.STACKS_MCP_URL || 'https://product-management-rag-mcp-orcin.vercel.app/api/mcp'
-const CACHE = join(homedir(), '.claude', '.stacks-key')
+  process.env.STACKS_MCP_URL ||
+  'https://product-management-rag-mcp-orcin.vercel.app/api/mcp';
+const CACHE = join(homedir(), '.claude', '.stacks-key');
 
 /** Diagnostics go to stderr: stdout is the JSON-RPC channel and must stay clean. */
-const log = (msg) => process.stderr.write(`[stacks-bridge] ${msg}\n`)
+const log = msg => process.stderr.write(`[stacks-bridge] ${msg}\n`);
 
 function die(msg) {
-  log(msg)
-  process.exit(1)
+  log(msg);
+  process.exit(1);
 }
 
 function readCache() {
   try {
-    const key = readFileSync(CACHE, 'utf8').trim()
-    return key.startsWith('sk_stacks_') ? key : null
+    const key = readFileSync(CACHE, 'utf8').trim();
+    return key.startsWith('sk_stacks_') ? key : null;
   } catch {
-    return null
+    return null;
   }
 }
 
 function writeCache(key) {
   try {
-    mkdirSync(dirname(CACHE), { recursive: true })
-    writeFileSync(CACHE, `${key}\n`, { mode: 0o600 })
-    chmodSync(CACHE, 0o600) // explicit: writeFileSync's mode is ignored if the file existed
+    mkdirSync(dirname(CACHE), {recursive: true});
+    writeFileSync(CACHE, `${key}\n`, {mode: 0o600});
+    chmodSync(CACHE, 0o600); // explicit: writeFileSync's mode is ignored if the file existed
   } catch (e) {
     // Not fatal — we have a usable key, we just could not save it. The next
     // session will exchange again.
-    log(`warning: could not write ${CACHE} (${e.message}); will re-exchange next time`)
+    log(
+      `warning: could not write ${CACHE} (${e.message}); will re-exchange next time`,
+    );
   }
 }
 
 function githubToken() {
   // `gh` resolves its own auth (keyring, env, config) far more reliably than
   // guessing at GH_TOKEN ourselves.
-  const r = spawnSync('gh', ['auth', 'token'], { encoding: 'utf8' })
-  if (r.error || r.status !== 0) return null
-  return r.stdout.trim() || null
+  const r = spawnSync('gh', ['auth', 'token'], {encoding: 'utf8'});
+  if (r.error || r.status !== 0) return null;
+  return r.stdout.trim() || null;
 }
 
 async function exchange() {
-  const token = githubToken()
+  const token = githubToken();
   if (!token) {
     die(
       'No Stacks key and no GitHub login to derive one from.\n' +
         '  Fix: run `gh auth login` (once per machine), then start a new session.\n' +
         '  Or:  set STACKS_API_KEY in your environment.',
-    )
+    );
   }
 
-  let res
+  let res;
   try {
-    res = await fetch(`${ENDPOINT.replace(/\/api\/mcp$/, '')}/api/mcp/exchange`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ github_token: token, hostname: hostname() }),
-    })
+    res = await fetch(
+      `${ENDPOINT.replace(/\/api\/mcp$/, '')}/api/mcp/exchange`,
+      {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({github_token: token, hostname: hostname()}),
+      },
+    );
   } catch (e) {
-    die(`Could not reach the Stacks server to get a key: ${e.message}`)
+    die(`Could not reach the Stacks server to get a key: ${e.message}`);
   }
 
-  const payload = await res.json().catch(() => ({}))
+  const payload = await res.json().catch(() => ({}));
   if (!res.ok) {
     die(
       `Stacks refused to issue a key (${res.status}): ${payload.error ?? 'no detail'}` +
         (payload.hint ? `\n  ${payload.hint}` : ''),
-    )
+    );
   }
-  if (!payload.key) die('Stacks returned no key.')
+  if (!payload.key) die('Stacks returned no key.');
 
-  log(`issued a key for ${payload.name}`)
-  writeCache(payload.key)
-  return payload.key
+  log(`issued a key for ${payload.name}`);
+  writeCache(payload.key);
+  return payload.key;
 }
 
 async function resolveKey() {
-  if (process.env.STACKS_API_KEY) return process.env.STACKS_API_KEY
-  return readCache() ?? (await exchange())
+  if (process.env.STACKS_API_KEY) return process.env.STACKS_API_KEY;
+  return readCache() ?? (await exchange());
 }
 
-const KEY = await resolveKey()
+const KEY = await resolveKey();
 
 /**
  * Forward one JSON-RPC message and return the server's reply, or null.
@@ -139,7 +145,7 @@ async function forward(message) {
       Accept: 'application/json, text/event-stream',
     },
     body: JSON.stringify(message),
-  })
+  });
 
   if (res.status === 401) {
     // The cached key was revoked or rotated. Nothing useful can follow, and a
@@ -147,60 +153,60 @@ async function forward(message) {
     die(
       'Stacks rejected the cached key (401). It was probably revoked.\n' +
         `  Fix: rm ${CACHE} and start a new session to get a fresh one.`,
-    )
+    );
   }
 
-  const text = await res.text()
-  if (!text.trim()) return null
+  const text = await res.text();
+  if (!text.trim()) return null;
 
   // SSE frames the JSON-RPC envelope on `data:` lines; a plain JSON reply has none.
   const data = text
     .split('\n')
-    .filter((l) => l.startsWith('data: '))
-    .map((l) => l.slice(6))
-    .join('')
-  return (data || text).trim() || null
+    .filter(l => l.startsWith('data: '))
+    .map(l => l.slice(6))
+    .join('');
+  return (data || text).trim() || null;
 }
 
-const rl = createInterface({ input: process.stdin })
+const rl = createInterface({input: process.stdin});
 
 // Serialised deliberately. MCP over stdio permits concurrent in-flight requests,
 // but this server is stateless per request and ordering bugs here would be
 // miserable to diagnose from inside a session; retrieval is not throughput-bound.
-let queue = Promise.resolve()
+let queue = Promise.resolve();
 
-rl.on('line', (line) => {
-  const trimmed = line.trim()
-  if (!trimmed) return
+rl.on('line', line => {
+  const trimmed = line.trim();
+  if (!trimmed) return;
 
-  let message
+  let message;
   try {
-    message = JSON.parse(trimmed)
+    message = JSON.parse(trimmed);
   } catch {
-    log(`ignoring unparseable line: ${trimmed.slice(0, 120)}`)
-    return
+    log(`ignoring unparseable line: ${trimmed.slice(0, 120)}`);
+    return;
   }
 
   queue = queue.then(async () => {
     try {
-      const reply = await forward(message)
-      if (reply) process.stdout.write(`${reply}\n`)
+      const reply = await forward(message);
+      if (reply) process.stdout.write(`${reply}\n`);
     } catch (e) {
-      log(`request failed: ${e.message}`)
+      log(`request failed: ${e.message}`);
       // Answer the client rather than hanging it, but only where a reply is owed.
       if (message.id !== undefined && message.id !== null) {
         process.stdout.write(
           `${JSON.stringify({
             jsonrpc: '2.0',
             id: message.id,
-            error: { code: -32603, message: `stacks-bridge: ${e.message}` },
+            error: {code: -32603, message: `stacks-bridge: ${e.message}`},
           })}\n`,
-        )
+        );
       }
     }
-  })
-})
+  });
+});
 
 rl.on('close', () => {
-  queue.then(() => process.exit(0))
-})
+  queue.then(() => process.exit(0));
+});

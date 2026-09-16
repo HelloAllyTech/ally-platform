@@ -111,7 +111,7 @@ export const startDynamicI18n = (
   ): void => {
     applyingResource = true;
     i18n.addResourceBundle(language, 'translation', resource, true, true);
-    void i18n.changeLanguage(i18n.language).finally(() => {
+    i18n.changeLanguage(i18n.language).finally(() => {
       applyingResource = false;
     });
   };
@@ -170,7 +170,7 @@ export const startDynamicI18n = (
   };
 
   // Apply cached bundle immediately (zero-delay on first paint), then check for updates
-  void (async () => {
+  (async () => {
     try {
       const version = await AsyncStorage.getItem(AsyncStorageKeys.I18N_VERSION);
       const language = resolveLanguage(i18n);
@@ -179,19 +179,19 @@ export const startDynamicI18n = (
     } catch {
       // No cache yet — static bundle handles first render
     }
-    void refresh();
+    refresh();
   })();
 
   if (!options.disablePolling) {
     AppState.addEventListener('change', (nextState: AppStateStatus) => {
-      if (nextState === 'active') void refresh();
+      if (nextState === 'active') refresh();
     });
 
-    setInterval(() => void refresh(), MANIFEST_RECHECK_MS);
+    setInterval(() => refresh(), MANIFEST_RECHECK_MS);
   }
 
   i18n.on('languageChanged', () => {
     if (applyingResource) return; // prevents infinite loop
-    void refresh();
+    refresh();
   });
 };

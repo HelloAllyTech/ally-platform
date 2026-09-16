@@ -99,7 +99,7 @@ export const CourseProgressScreen: React.FC<
           <CourseProgressBody
             dashboard={dashboard}
             onSessionPress={handleSessionPress}
-            onContinuePress={() => void handleContinuePress()}
+            onContinuePress={() => handleContinuePress()}
           />
         </ScrollView>
       )}

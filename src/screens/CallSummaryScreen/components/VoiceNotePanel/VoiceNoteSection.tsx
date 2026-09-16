@@ -274,7 +274,7 @@ export const VoiceNoteSection: React.FC<VoiceNoteSectionProps> = ({
     if (isGenerating) return;
     setVoiceOpen(true);
     if (recorder.status === 'idle') {
-      void recorder.start();
+      recorder.start();
     }
   };
 
@@ -427,8 +427,8 @@ export const VoiceNoteSection: React.FC<VoiceNoteSectionProps> = ({
       ]}
       onPause={recorder.pause}
       onResume={recorder.resume}
-      onStop={() => void recorder.stop()}
-      onGenerate={() => void handleGenerate()}
+      onStop={() => recorder.stop()}
+      onGenerate={() => handleGenerate()}
       onDiscard={handleDiscard}
     />
   );

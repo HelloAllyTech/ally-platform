@@ -1,7 +1,13 @@
 import {useMemo} from 'react';
 import {View} from 'react-native';
 import Animated, {useAnimatedProps} from 'react-native-reanimated';
-import Svg, {Defs, Path, RadialGradient, Stop} from 'react-native-svg';
+import Svg, {
+  Defs,
+  Path,
+  PathProps,
+  RadialGradient,
+  Stop,
+} from 'react-native-svg';
 
 interface FlowerPetalProps {
   // Reanimated shared value between 0 and 1
@@ -39,7 +45,7 @@ export const FlowerPetal = ({bloomProgress, size = 350}: FlowerPetalProps) => {
         C ${transform(35, -100)} ${transform(35, -40)} ${centerX},${centerY}
         Z`;
       const opacity = 0.2 + Math.min(progress, 0.6);
-      return {d, opacity} as any;
+      return {d, opacity} as Partial<PathProps>;
     });
 
   // Create stem path

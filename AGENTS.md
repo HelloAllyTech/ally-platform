@@ -29,17 +29,17 @@ this file and a second copy here just goes stale.
 
 ## What am I doing?
 
-| Task | Read first |
-|---|---|
-| Any screen or user-facing flow | `src/screens/` — one directory per flow; check `src/navigation/` for how it's reached |
-| Calling the backend | `src/services/` — all API access lives here, nowhere else |
-| Shared UI | `src/components/`, with tokens from `src/theme/` — never hardcode colours or spacing |
-| App state | `src/store/`, plus `src/contexts/` for cross-screen state |
-| Translations, or a new language | `src/localization/` — and read the fonts gotcha below |
-| Anything that must survive a restart | `src/config/`, `src/constants/` |
-| Releasing | [`CONTRIBUTING.md`](CONTRIBUTING.md), then the shared [release process](https://tech.helloally.ai/#/wiki/contributing/release-process.md) |
-| What the backend actually returns | ally-be's `DATA_SCHEMA.md` — the app is a client, the schema is not defined here |
-| Anything else | [the wiki routing index](https://tech.helloally.ai/#/wiki/ROUTING.md) — one line per page, so you can pick one before spending a fetch |
+| Task                                 | Read first                                                                                                                                |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Any screen or user-facing flow       | `src/screens/` — one directory per flow; check `src/navigation/` for how it's reached                                                     |
+| Calling the backend                  | `src/services/` — all API access lives here, nowhere else                                                                                 |
+| Shared UI                            | `src/components/`, with tokens from `src/theme/` — never hardcode colours or spacing                                                      |
+| App state                            | `src/store/`, plus `src/contexts/` for cross-screen state                                                                                 |
+| Translations, or a new language      | `src/localization/` — and read the fonts gotcha below                                                                                     |
+| Anything that must survive a restart | `src/config/`, `src/constants/`                                                                                                           |
+| Releasing                            | [`CONTRIBUTING.md`](CONTRIBUTING.md), then the shared [release process](https://tech.helloally.ai/#/wiki/contributing/release-process.md) |
+| What the backend actually returns    | ally-be's `DATA_SCHEMA.md` — the app is a client, the schema is not defined here                                                          |
+| Anything else                        | [the wiki routing index](https://tech.helloally.ai/#/wiki/ROUTING.md) — one line per page, so you can pick one before spending a fetch    |
 
 ## Repo shape
 
@@ -68,7 +68,7 @@ this file and a second copy here just goes stale.
   iOS build number both move.
 - **iOS under Xcode 26 needs the fmt/consteval Podfile patch.** fmt 11.0.2's consteval format
   strings fail to compile otherwise. The `post_install` hook needs both halves: the
-  `-DFMT_USE_CONSTEVAL=0` define *and* an `#ifndef` guard on `base.h`, which otherwise
+  `-DFMT_USE_CONSTEVAL=0` define _and_ an `#ifndef` guard on `base.h`, which otherwise
   re-defines the macro from its own compiler sniffing and clobbers the define alone. `Pods/`
   is gitignored, so the header patch has to live in the hook, not a commit.
 

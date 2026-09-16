@@ -3,6 +3,7 @@ import {Modal, Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {CustomDropdown} from '@/components';
+import {SummaryFieldKey} from '@/constants/summary';
 import {useTranslate} from '@/hooks/useTranslate';
 import {colors, fontFamily, typography} from '@/theme';
 import {
@@ -149,7 +150,7 @@ export const CustomFieldsSection: React.FC<CustomFieldsSectionProps> = ({
                     ? () => (
                         <View style={styles.editFieldContainer}>
                           <EditableField
-                            fieldKey={def.id as any}
+                            fieldKey={def.id as SummaryFieldKey}
                             label={def.name}
                             value={value}
                             onChangeText={text =>
@@ -182,7 +183,7 @@ export const CustomFieldsSection: React.FC<CustomFieldsSectionProps> = ({
                     ? () => (
                         <View style={styles.editFieldContainer}>
                           <EditableField
-                            fieldKey={def.id as any}
+                            fieldKey={def.id as SummaryFieldKey}
                             label={def.name}
                             value={value}
                             onChangeText={text =>
@@ -296,7 +297,7 @@ export const CustomFieldsSection: React.FC<CustomFieldsSectionProps> = ({
                     ? () => (
                         <View style={styles.editFieldContainer}>
                           <EditableField
-                            fieldKey={def.id as any}
+                            fieldKey={def.id as SummaryFieldKey}
                             label={def.name}
                             value={normalizeCustomFieldDate(value) ?? value}
                             onChangeText={text =>

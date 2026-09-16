@@ -456,9 +456,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
         if (agentPaused && !isPausedRef.current) {
           pauseStartedAtRef.current = pauseStartedAtRef.current ?? Date.now();
           setIsPaused(true);
-          void room.localParticipant
-            .setMicrophoneEnabled(false)
-            .catch(() => {});
+          room.localParticipant.setMicrophoneEnabled(false).catch(() => {});
         } else if (!agentPaused && isPausedRef.current) {
           if (pauseStartedAtRef.current !== null) {
             const banked = Date.now() - pauseStartedAtRef.current;
@@ -466,7 +464,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
             pauseStartedAtRef.current = null;
           }
           setIsPaused(false);
-          void room.localParticipant
+          room.localParticipant
             .setMicrophoneEnabled(isMicEnabledRef.current)
             .catch(() => {});
         }
@@ -667,7 +665,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
       const revert = () => {
         pauseStartedAtRef.current = null;
         setIsPaused(false);
-        void setMic(isMicEnabled);
+        setMic(isMicEnabled);
       };
       await setMic(false);
       pauseStartedAtRef.current = Date.now();
@@ -683,7 +681,7 @@ export const SimulationAssistantScreen: React.FC<Props> = ({route}) => {
         setPausedOffsetMs(prevOffset);
         pauseStartedAtRef.current = pausedAt ?? Date.now();
         setIsPaused(true);
-        void setMic(false);
+        setMic(false);
       };
       await setMic(isMicEnabled);
       if (pausedAt !== null) {

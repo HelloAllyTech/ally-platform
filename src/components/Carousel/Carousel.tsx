@@ -1,6 +1,6 @@
 import {forwardRef, useImperativeHandle, useRef, useState} from 'react';
 import {View} from 'react-native';
-import CarouselLib from 'react-native-reanimated-carousel';
+import CarouselLib, {ICarouselInstance} from 'react-native-reanimated-carousel';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {SCREEN_WIDTH} from '@/constants';
@@ -31,7 +31,7 @@ export const Carousel = forwardRef<CarouselRef, CarouselProps>(
     },
     ref,
   ) => {
-    const carouselRef = useRef<any>(null);
+    const carouselRef = useRef<ICarouselInstance>(null);
     const [currentIndex, setCurrentIndex] = useState(0);
 
     useImperativeHandle(

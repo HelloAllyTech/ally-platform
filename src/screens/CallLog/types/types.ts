@@ -36,7 +36,7 @@ export interface SimulationLog {
   scenarioId?: number;
   counselorId?: number;
   score?: number | null;
-  metadata?: any;
+  metadata?: unknown;
   scenario?: {
     createdAt: string;
     updatedAt: string;
@@ -46,8 +46,8 @@ export interface SimulationLog {
     description: string;
     coverImageUrl: string;
     status: string;
-    prompt: any;
-    metadata: any;
+    prompt: unknown;
+    metadata: unknown;
   };
   counselor?: {
     createdAt: string;
@@ -59,9 +59,9 @@ export interface SimulationLog {
     role: string;
     status: string;
     username: string;
-    metadata: any;
+    metadata: unknown;
     phone: string;
-    externalId: any;
+    externalId: unknown;
   };
 }
 
@@ -77,7 +77,7 @@ export type LogItem = {
   scenarioId?: number;
   counselorId?: number;
   score?: number | null;
-  metadata?: any;
+  metadata?: unknown;
   scenario?: {
     createdAt: string;
     updatedAt: string;
@@ -87,8 +87,8 @@ export type LogItem = {
     description: string;
     coverImageUrl: string;
     status: string;
-    prompt: any;
-    metadata: any;
+    prompt: unknown;
+    metadata: unknown;
   };
   counselor?: {
     createdAt: string;
@@ -100,9 +100,9 @@ export type LogItem = {
     role: string;
     status: string;
     username: string;
-    metadata: any;
+    metadata: unknown;
     phone: string;
-    externalId: any;
+    externalId: unknown;
   };
   summaryStatus?: ChatSummaryStatus;
   details?: {

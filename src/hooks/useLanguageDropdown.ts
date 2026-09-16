@@ -62,11 +62,11 @@ export const useLanguageDropdown = (
   // Initialize languages options and map
   useEffect(() => {
     if (languagesData && Array.isArray(languagesData)) {
-      const options = languagesData.map(lang => lang.label);
+      const langOptions = languagesData.map(lang => lang.label);
       const map = new Map(
         languagesData.map(lang => [lang.label, lang.language_id]),
       );
-      setLanguageOptions(options);
+      setLanguageOptions(langOptions);
       setLanguageMap(map);
     }
   }, [languagesData]);

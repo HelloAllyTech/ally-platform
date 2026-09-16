@@ -9,7 +9,7 @@ import {getItem, logger} from '@/utils';
 interface UseSocketOptions {
   path?: string;
   userId?: number;
-  eventCallbacks?: Partial<Record<SocketEvent, (params?: any) => void>>;
+  eventCallbacks?: Partial<Record<SocketEvent, (params?: unknown) => void>>;
   onConnect?: () => void;
   onDisconnect?: (reason?: string) => void;
   onConnectionError?: (error?: Error) => void;
@@ -95,8 +95,12 @@ export const useSocket = ({
     });
 
     Object.keys(eventCallbacksRef.current || {}).forEach(key => {
-      socket.on(key, (...args: any[]) =>
-        (eventCallbacksRef.current as any)?.[key]?.(...args),
+      socket.on(key, (...args: unknown[]) =>
+        (
+          eventCallbacksRef.current as Partial<
+            Record<SocketEvent, (...args: unknown[]) => void>
+          >
+        )?.[key as SocketEvent]?.(...args),
       );
     });
   }, []);
@@ -197,7 +201,7 @@ export const useSocket = ({
   }, []);
 
   const emitSocketEvent = useCallback(
-    (socketEvent: SocketEvent, message: Record<string, any>) => {
+    (socketEvent: SocketEvent, message: Record<string, unknown>) => {
       if (!socketRef.current) {
         logger.error('Socket not connected');
         return;
@@ -212,7 +216,7 @@ export const useSocket = ({
   }, []);
 
   const setListenerForEvent = useCallback(
-    (socketEvent: SocketEvent, callback: (data: any) => void) => {
+    (socketEvent: SocketEvent, callback: (data: unknown) => void) => {
       if (!socketRef.current) {
         logger.error('Socket not connected');
         return;

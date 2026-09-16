@@ -1,3 +1,5 @@
+import {TFunction} from 'i18next';
+
 import {
   AssessmentIcon,
   BrightnessAlertIcon,
@@ -66,7 +68,7 @@ const formatLanguages = (value: unknown) => {
     .join(', ');
 };
 
-export const formatSessionMode = (value: unknown, t: any) => {
+export const formatSessionMode = (value: unknown, t: TFunction) => {
   if (!value) return '-';
   const mode = value.toString().toUpperCase();
   return mode === ScribeSessionMode.DICTATION
