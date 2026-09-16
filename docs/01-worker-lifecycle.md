@@ -80,7 +80,8 @@ The prewarmed VAD is retrieved in `_create_session()` via `ctx.proc.userdata.get
 Termination can be triggered by:
 
 - A **termination event** detected by the EventOrchestrator
-- The **user disconnecting** from the room
+- The **agent's own room connection** dropping (`connection_state_changed` -> `CONN_DISCONNECTED`)
+- The **last human participant leaving** while the agent's own connection stays healthy (`room.on("participant_disconnected")` -> `AgentWorker._shutdown_if_room_emptied_of_humans()`, `app/worker.py`). The bot (and any commissioned avatar) is still a room participant in this case, so the room never goes empty and the connection-state path above never fires on its own -- without this second path the job (and the backend's session record) would keep running until a scenario TIME/SCORE termination or `max_duration_exceeded`, and a learner who left mid-session could not start a fresh one.
 
 ```mermaid
 sequenceDiagram

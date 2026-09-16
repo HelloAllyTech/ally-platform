@@ -1120,6 +1120,61 @@ class TestWorker:
 
         assert ctx.shutdown_calls == []
 
+    # -------------------- _shutdown_if_room_emptied_of_humans --------------------
+    def test_shutdown_if_room_emptied_of_humans_shuts_down_when_last_human_leaves(
+        self,
+    ):
+        """If the participant that just disconnected was the last human in
+        the room, the agent shuts down immediately so the session finalizes
+        (sends end-of-session) instead of staying ACTIVE on the backend
+        until some later termination condition — reproduces "Leave" mid-
+        session not letting the learner start afresh."""
+
+        class MockCtx:
+            def __init__(self):
+                # No humans left — simulates the last human disconnecting.
+                self.room = types.SimpleNamespace(name="room-1", remote_participants={})
+                self.shutdown_calls = []
+
+            def shutdown(self, reason):
+                self.shutdown_calls.append(reason)
+
+        ctx = MockCtx()
+        worker_instance = worker.AgentWorker(ctx)
+        leaving_participant = types.SimpleNamespace(identity="user-1")
+
+        worker_instance._shutdown_if_room_emptied_of_humans(leaving_participant)
+
+        assert ctx.shutdown_calls == ["human_left_session"]
+
+    def test_shutdown_if_room_emptied_of_humans_does_not_shut_down_when_human_remains(
+        self,
+    ):
+        """If another human is still in the room, one participant leaving
+        (e.g. the commissioned avatar, or one of several learners) must not
+        end the session."""
+
+        class MockCtx:
+            def __init__(self):
+                self.room = types.SimpleNamespace(
+                    name="room-1",
+                    remote_participants={
+                        "user-2": types.SimpleNamespace(identity="user-2")
+                    },
+                )
+                self.shutdown_calls = []
+
+            def shutdown(self, reason):
+                self.shutdown_calls.append(reason)
+
+        ctx = MockCtx()
+        worker_instance = worker.AgentWorker(ctx)
+        leaving_participant = types.SimpleNamespace(identity="user-1")
+
+        worker_instance._shutdown_if_room_emptied_of_humans(leaving_participant)
+
+        assert ctx.shutdown_calls == []
+
     # -------------------- publish_termination_audio --------------------
     # NOTE: publish_termination_audio was removed - termination handling
     # is now done in worker._handle_termination_in_entrypoint_context

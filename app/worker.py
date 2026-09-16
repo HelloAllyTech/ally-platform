@@ -1301,6 +1301,20 @@ class AgentWorker:
                     self._room_disconnected_event.set()
                     logger.info("Room disconnected event signaled to entrypoint")
 
+        # The agent's own connection to LiveKit can stay healthy after the
+        # human leaves — the bot (and any commissioned avatar) is still a
+        # participant, so the room never goes empty and
+        # connection_state_changed never fires CONN_DISCONNECTED. Without
+        # this, a learner who clicks "Leave" mid-session leaves the job (and
+        # the backend's session record) running until a scenario TIME/SCORE
+        # termination or max_duration_exceeded eventually closes it — during
+        # which "start afresh" reconnects to this same still-ACTIVE session.
+        # React the moment the room empties of humans, the same way
+        # _arm_orphan_deadline reacts when no human ever joins.
+        @self.ctx.room.on("participant_disconnected")
+        def on_participant_disconnected(participant: rtc.RemoteParticipant):
+            self._shutdown_if_room_emptied_of_humans(participant)
+
         # Pause/resume control channel: the client publishes reliable data
         # packets ({"type": "pause"|"resume"}). The handler is sync (LiveKit
         # requirement) so it schedules the async work as a tracked task.
@@ -1645,6 +1659,30 @@ class AgentWorker:
                 timeout,
             )
             self.ctx.shutdown("orphaned_no_human")
+
+    def _shutdown_if_room_emptied_of_humans(
+        self, participant: "rtc.RemoteParticipant"
+    ) -> None:
+        """Room callback for "participant_disconnected": if that was the
+        last human in the room, end the session now.
+
+        Without this, a learner who leaves mid-session (e.g. the "Leave"
+        confirmation) leaves the job running — the bot (and any commissioned
+        avatar) is still a participant, so the room never empties and
+        connection_state_changed never fires CONN_DISCONNECTED — until a
+        scenario TIME/SCORE termination or max_duration_exceeded eventually
+        closes it. Until then the backend's session record stays ACTIVE, so
+        starting afresh reconnects to this same session instead of a new one.
+        """
+        if human_participants(self.ctx.room):
+            return
+        logger.info(
+            "[AgentWorker] Last human participant (%s) left the room — "
+            "shutting down so the session finalizes instead of staying "
+            "ACTIVE.",
+            getattr(participant, "identity", None),
+        )
+        self.ctx.shutdown("human_left_session")
 
     # ================================================================
     # Pause / Resume control
