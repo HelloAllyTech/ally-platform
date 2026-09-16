@@ -180,31 +180,63 @@ async function appleApi(path, token) {
   return res.json();
 }
 
+/** Reads the app's current marketing version straight from the checked-out repo — the same
+ * value the build being released was made with, and the field scheduled-mobile-release.yml
+ * writes during its version bump. */
+async function readLocalMarketingVersion() {
+  const pbxproj = await fs.readFile("ios/ally.xcodeproj/project.pbxproj", "utf-8");
+  const match = pbxproj.match(/MARKETING_VERSION\s*=\s*([\d.]+)\s*;/);
+  if (!match) {
+    throw new Error("Could not find MARKETING_VERSION in ios/ally.xcodeproj/project.pbxproj");
+  }
+  return match[1];
+}
+
 // Apple processes an uploaded build asynchronously — it's not immediately queryable as
 // processingState=VALID right after upload, and can take anywhere from a couple of minutes to
 // (rarely) tens of minutes. Polls rather than failing on the first miss, since this script now
 // also runs automatically right after build-ios-production.yml's upload step, where the build
 // is essentially guaranteed not to be processed yet. Re-mints the JWT on every attempt: a single
 // token is only valid for ~19 minutes (see mintToken), which a long wait can outlive.
-async function waitForValidBuild(appId, { timeoutMinutes = 25, intervalSeconds = 60 } = {}) {
+//
+// The query is pinned to `marketingVersion`. Without that filter it matched ANY valid build, so
+// the PREVIOUS release — long since processed — satisfied it on the first attempt and the poll
+// returned in seconds having waited for nothing. Observed on 2026-09-16: the 1.23.28 binary
+// finished uploading at 07:18:07 and this returned a build 12 seconds later, which was 1.23.27.
+// Filtering here is what makes the wait above mean what its comment says.
+//
+// `filter[preReleaseVersion.version]` is the marketing version ("1.23.28"). Note that a Build's
+// own `attributes.version` is the BUILD NUMBER (CFBundleVersion), not the marketing version —
+// they are different fields and filtering on the wrong one silently matches nothing.
+async function waitForValidBuild(
+  appId,
+  marketingVersion,
+  { timeoutMinutes = 25, intervalSeconds = 60 } = {},
+) {
   const deadline = Date.now() + timeoutMinutes * 60 * 1000;
   for (let attempt = 1; ; attempt += 1) {
     const token = mintToken();
     const buildsResponse = await appleApi(
-      `/builds?filter[app]=${appId}&sort=-uploadedDate&limit=1&filter[processingState]=VALID`,
+      `/builds?filter[app]=${appId}&filter[preReleaseVersion.version]=${encodeURIComponent(marketingVersion)}` +
+        "&filter[processingState]=VALID&sort=-uploadedDate&limit=1",
       token,
     );
     const build = buildsResponse.data?.[0];
     if (build) {
+      console.log(
+        `Selected build ${build.id} — marketing version ${marketingVersion}, build number ${build.attributes?.version ?? "(unknown)"}.`,
+      );
       return { buildId: build.id, buildVersion: build.attributes?.version, token };
     }
     if (Date.now() >= deadline) {
       throw new Error(
-        `No processed (VALID) build found after waiting ${timeoutMinutes} minutes (${attempt} attempts). ` +
+        `No processed (VALID) build found for version ${marketingVersion} after waiting ${timeoutMinutes} minutes (${attempt} attempts). ` +
           "TestFlight processing is taking longer than usual this time — check App Store Connect directly and retry.",
       );
     }
-    console.log(`Attempt ${attempt}: build not processed yet, waiting ${intervalSeconds}s...`);
+    console.log(
+      `Attempt ${attempt}: no processed build for ${marketingVersion} yet, waiting ${intervalSeconds}s...`,
+    );
     await new Promise(resolve => setTimeout(resolve, intervalSeconds * 1000));
   }
 }
@@ -221,7 +253,10 @@ async function main() {
   })();
 
   const timeoutMinutes = Number(process.env.TESTFLIGHT_WAIT_MINUTES) || 25;
-  const { buildId, buildVersion, token } = await waitForValidBuild(appId, { timeoutMinutes });
+  const marketingVersion = await readLocalMarketingVersion();
+  const { buildId, buildVersion, token } = await waitForValidBuild(appId, marketingVersion, {
+    timeoutMinutes,
+  });
 
   const groupsResponse = await appleApi(
     `/betaGroups?filter[app]=${appId}&filter[name]=${encodeURIComponent(TESTFLIGHT_EXTERNAL_GROUP_NAME)}`,
