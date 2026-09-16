@@ -338,7 +338,7 @@ describe('SimulationAssistantScreen', () => {
     await act(async () => connectedHandlers.forEach(fn => fn()));
     await waitFor(() => expect(mockSetMic).toHaveBeenCalledWith(true));
 
-    fireEvent.press(getByLabelText('mic'));
+    await act(async () => fireEvent.press(getByLabelText('mic')));
     expect(mockSetMic).toHaveBeenCalledWith(false);
   });
 
@@ -420,7 +420,7 @@ describe('SimulationAssistantScreen', () => {
       return undefined;
     });
 
-    const {getByLabelText} = await renderWithProviders(
+    const {getByLabelText, getByText} = await renderWithProviders(
       <SimulationAssistantScreen route={{params: baseRouteParams} as any} />,
     );
 
@@ -432,10 +432,13 @@ describe('SimulationAssistantScreen', () => {
     expect(focusButton).toBeDefined();
 
     // Press focus button (toggles focus mode on)
-    fireEvent.press(focusButton);
-    
+    await act(async () => fireEvent.press(focusButton));
+    expect(getByText('focused')).toBeDefined(); // Expecting it to be 'focused' after first press
+
     // Press again to toggle back off
-    fireEvent.press(focusButton);
+    await act(async () => fireEvent.press(focusButton));
+    expect(getByText('unfocused')).toBeDefined(); // Expecting it to be 'unfocused' after second press
+
 
     // Button should still be pressable after toggling
     expect(focusButton).toBeDefined();
