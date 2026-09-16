@@ -439,6 +439,15 @@ class PromptData(BaseModel):
 class VoiceConfig(BaseModel):
     model: Optional[str] = Field(default=None)
     voice_id: Optional[str] = Field(default=None)
+    # Cartesia keeps its voice id under `voice`, not `voice_id` — that is what
+    # ally-be's VOICE_CONFIG_SCHEMA stores and what the preview endpoint reads.
+    # This model is a fixed whitelist, so a key that is missing here is dropped
+    # on the way to the TTS factory; the provider then fails its required-field
+    # check and create_tts_client() silently falls back to the default English
+    # Deepgram voice, which reads the scenario's Hindi text in English.
+    voice: Optional[str] = Field(default=None)
+    speed: Optional[Any] = Field(default=None)  # Cartesia, Smallest.ai
+    emotion: Optional[Any] = Field(default=None)  # Cartesia
     speaker: Optional[str] = Field(default=None)
     voice_name: Optional[str] = Field(default=None)  # For Google TTS
     # Google TTS only: optional override for livekit.plugins.google.TTS model_name
@@ -777,6 +786,9 @@ class Scenario(BaseModel):
         voice_config = VoiceConfig(
             model=config_meta.get("model"),
             voice_id=config_meta.get("voice_id") or config_meta.get("voiceId"),
+            voice=config_meta.get("voice"),
+            speed=config_meta.get("speed"),
+            emotion=config_meta.get("emotion"),
             speaker=config_meta.get("speaker"),
             voice_name=config_meta.get("voice_name"),
             model_name=config_meta.get("model_name"),

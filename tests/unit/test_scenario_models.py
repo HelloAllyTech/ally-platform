@@ -51,6 +51,39 @@ class TestVoiceConfig:
         assert config.voice_id is None
         assert config.speaker is None
 
+    @pytest.mark.unit
+    def test_build_voice_carries_cartesia_keys_through(self):
+        """Cartesia's voice id survives the metadata -> VoiceConfig hop.
+
+        Regression: VoiceConfig is a fixed whitelist and `_build_voice` maps
+        keys one by one, so Cartesia's `voice` (ally-be stores it under that
+        key, not `voice_id`) used to be dropped here. The TTS factory then hit
+        Cartesia's required-field check, swallowed the error and fell back to
+        the default English Deepgram voice — a Hindi scenario spoken by
+        aura-2-helena-en, with only a WARNING to show for it.
+        """
+        voice = Scenario._build_voice(
+            {
+                "voice": {
+                    "name": "Kavya",
+                    "provider": "CARTESIA",
+                    "config": {
+                        "voice": "voice-uuid-123",
+                        "model": "sonic-3",
+                        "speed": "slow",
+                        "emotion": "positivity:high",
+                    },
+                }
+            }
+        )
+
+        assert voice is not None
+        assert voice.provider == "cartesia"
+        assert voice.config.voice == "voice-uuid-123"
+        assert voice.config.model == "sonic-3"
+        assert voice.config.speed == "slow"
+        assert voice.config.emotion == "positivity:high"
+
 
 class TestScenarioVoice:
     """Test cases for ScenarioVoice model."""
