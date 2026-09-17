@@ -23,6 +23,28 @@ from app.core.working_memory.store import ClientWorkingMemoryStore
 pytestmark = pytest.mark.unit
 
 
+@pytest.fixture(autouse=True)
+def _recall_telemetry_stays_off_the_wire(monkeypatch):
+    """Keep `emit_recall`'s SQS send out of these tests.
+
+    `_report_recall` swallows its own exceptions, so an unstubbed call never
+    fails an assertion — it just spends however long the AWS SDK takes to give
+    up before it does. On a machine where credentials resolve, that is seconds,
+    and the tests here that assert a background task finishes inside a budget
+    measure the SDK's retry schedule instead of the code under test.
+
+    Autouse rather than per-test: only the recall-carrying paths reach this
+    today, but which ones they are is an implementation detail, and a test
+    added later should not have to know it makes a network call.
+    """
+    from app.core.working_memory import recall_log
+
+    async def _noop(**kwargs):
+        return None
+
+    monkeypatch.setattr(recall_log, "emit_recall", _noop)
+
+
 def _turns():
     return [HumanMessage(content="what happened?"), AIMessage(content="not much")]
 
