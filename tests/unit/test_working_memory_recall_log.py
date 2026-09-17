@@ -120,7 +120,9 @@ class TestPayload:
 
     @pytest.mark.asyncio
     async def test_says_which_source_supplied_the_cues(self):
-        body = _sent(await _emit([_Scored(_Fact("a"), score=1.0)], [], cue_tier="scenario"))
+        body = _sent(
+            await _emit([_Scored(_Fact("a"), score=1.0)], [], cue_tier="scenario")
+        )
         assert body["cue_tier"] == "scenario"
 
 

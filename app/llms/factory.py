@@ -146,7 +146,8 @@ def create_llm_client(
     if provider == LLMProvider.OPENAI and not settings.OPENAI_API_KEY:
         if settings.OLLAMA_BASE_URL:
             logger.warning(
-                "OPENAI_API_KEY not set; falling back to Ollama at %s for this LLM call.",
+                "OPENAI_API_KEY not set; falling back to Ollama at %s for "
+                "this LLM call.",
                 settings.OLLAMA_BASE_URL,
             )
             provider = LLMProvider.OLLAMA
