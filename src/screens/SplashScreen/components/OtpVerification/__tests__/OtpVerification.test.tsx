@@ -76,6 +76,24 @@ describe('OtpVerification', () => {
     jest.useRealTimers();
   });
 
+  it('renders Trans-based copy without an uninitialized-i18next warning', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    render(
+      <OtpVerification
+        email="user@example.com"
+        onOtpVerificationSuccess={mockOnSuccess}
+      />,
+    );
+
+    const i18nWarning = warnSpy.mock.calls.find(call =>
+      String(call[0]).includes('i18next instance'),
+    );
+    expect(i18nWarning).toBeUndefined();
+
+    warnSpy.mockRestore();
+  });
+
   it('disables verify button until OTP complete then calls verify', () => {
     const {UNSAFE_getAllByType, getByTestId} = render(
       <OtpVerification
