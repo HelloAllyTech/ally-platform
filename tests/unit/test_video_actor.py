@@ -472,6 +472,32 @@ class TestVendorConstructorMapping:
             assert provider in video_actor.HOSTED_PROVIDER_KWARGS, provider
 
     @pytest.mark.unit
+    @pytest.mark.unit
+    def test_bey_gets_a_single_attempt_not_the_plugin_default(self):
+        """One attempt, because a retry is one more avatar joining and leaving.
+
+        The plugin's `_start_agent` loops `max_retry` times and each pass
+        commissions an avatar that joins the room and drops when the attempt
+        fails. In prod that rendered as a participant flickering in and out of
+        the learner's session three times in 13 seconds, against a 400 the
+        vendor had already flagged `retryable=False` — its loop does not read
+        that flag, so the retries could never have helped.
+
+        Pinned on the VALUE, not just the keyword: the signature binding in
+        `_bind` proves `conn_options` is accepted, which would stay true if the
+        budget drifted back to the default.
+        """
+        import livekit.plugins.bey as bey
+
+        build = video_actor.HOSTED_PROVIDER_KWARGS["bey"]
+        kwargs = build(bey, avatar_id="face-123", api_key="k", character_name="Asha")
+        assert kwargs["conn_options"].max_retry == 1
+        # The rest of the budget stays whatever livekit-agents ships.
+        from livekit.agents.types import DEFAULT_API_CONNECT_OPTIONS as default
+
+        assert kwargs["conn_options"].timeout == default.timeout
+        assert kwargs["conn_options"].retry_interval == default.retry_interval
+
     def test_persona_id_is_omitted_unless_configured(self, monkeypatch):
         """Unset by design — the character comes from our prompt, not a vendor."""
         import livekit.plugins.tavus as tavus
