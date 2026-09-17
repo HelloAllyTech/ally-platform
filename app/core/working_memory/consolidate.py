@@ -77,10 +77,16 @@ def _digest(memory: ClientWorkingMemory) -> str:
     client.
     """
     lines = [
-        f"stance: {memory.stance} (for {memory.turns_in_stance} turn(s))",
+        # Labelled in the prompt-facing vocabulary, not the store's.
+        # `memory.stance` is the store's mirror of the author's resolved
+        # state, and the template calls that `{current_state}`; a
+        # digest labelling it `stance` made the model read two names for
+        # one thing. Same for `register`, which is what the template asks
+        # for and what the actor prompt renders.
+        f"state: {memory.stance} (for {memory.turns_in_stance} turn(s))",
         f"affect: {memory.affect or '(unset)'}",
         f"appraisal: {memory.appraisal or '(unset)'}",
-        f"voice_register: {memory.register or '(unset)'}",
+        f"register: {memory.register or '(unset)'}",
     ]
     if memory.disclosed:
         # Bounded for the same reason the rendered block is: the first v2v run
@@ -220,7 +226,7 @@ async def consolidate(
         for st in (getattr(prompt_data, "states", None) or [])
         if isinstance(st, dict)
     }
-    stance_ladder = "\n".join(
+    state_ladder = "\n".join(
         f"  {i + 1}. {name}"
         + (f" — {_guidance_by_name[name]}" if _guidance_by_name.get(name) else "")
         for i, name in enumerate(_ladder)
@@ -239,8 +245,8 @@ async def consolidate(
         # an absence of data. A scenario with no states has no progression for
         # anyone to adjudicate, and the closing instruction already tells the
         # model what to do then — judge from the turns.
-        stance_ladder=stance_ladder or NO_AUTHORED_STAGES,
-        current_stance=authored_stance or NO_CURRENT_STAGE,
+        state_ladder=state_ladder or NO_AUTHORED_STAGES,
+        current_state=authored_stance or NO_CURRENT_STAGE,
     )
     if not system_text:
         logger.warning("[working-memory] updater template resolved empty; skipping")

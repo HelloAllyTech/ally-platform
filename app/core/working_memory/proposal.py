@@ -21,7 +21,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, List, Optional, Sequence, Tuple
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.logger import get_logger
 from app.core.working_memory.state import STANCES, ClientWorkingMemory, Stance
@@ -75,16 +75,33 @@ def _capped(value: Optional[str], limit: int) -> Optional[str]:
 class ProposedUpdate(BaseModel):
     """The updater's structured output. Untrusted; see ``validate``."""
 
+    #: `populate_by_name` so the alias below is not the ONLY accepted spelling.
+    #: A model that answers with the attribute name instead of the alias is
+    #: still parsed rather than silently dropped to None — the failure mode
+    #: this whole module exists to prevent, one layer down.
+    model_config = ConfigDict(populate_by_name=True)
+
     #: No `events` and no `stance`. The updater reports what the client's
     #: inner state IS; where the client is in the conversation is the author's
     #: states, resolved from the simulation score, and taken verbatim.
     affect: Optional[str] = None
     appraisal: Optional[str] = None
-    #: Named `voice_register` rather than `register`, which shadows an attribute
-    #: on pydantic's BaseModel — the model still loads with the shadowing name
-    #: but warns, and a field that quietly collides with framework internals is
-    #: not worth the tidier spelling. The stored field stays `register`.
-    voice_register: Optional[str] = None
+    #: One name on the wire, a different one in Python, and both deliberate.
+    #:
+    #: The MODEL is asked for `register`, because that is what every other
+    #: layer a human reads calls it: the store's field, the `"register"` key
+    #: in the monologue payload, and the `{working_memory_register}` section
+    #: the actor prompt renders. The updater prompt and the main-agent prompt
+    #: naming the same thing differently was a real complaint from people
+    #: curating both, and the prompt text is where it was felt.
+    #:
+    #: The ATTRIBUTE stays `voice_register`, because a field literally named
+    #: `register` shadows an attribute on pydantic's ``BaseModel`` — it loads,
+    #: but it warns, and a field that quietly collides with framework
+    #: internals is not worth the tidier spelling. The alias buys the shared
+    #: name without the collision, and puts both spellings on one line where
+    #: a reader sees the link instead of having to find it.
+    voice_register: Optional[str] = Field(default=None, alias="register")
     speech_fragments: List[str] = Field(default_factory=list)
     disclosed: List[str] = Field(default_factory=list)
     withheld_topics: List[str] = Field(default_factory=list)

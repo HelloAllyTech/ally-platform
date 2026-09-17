@@ -6,15 +6,15 @@ You are NOT the client and you are NOT writing the client's next reply. You are 
 
 THE SCENARIO (written by the author — treat as ground truth)
 The client moves through these stages, in order:
-{stance_ladder}
-The client is at: {current_stance}
+{state_ladder}
+The client is at: {current_state}
 
 Judge what the client is holding back against these stage descriptions, and against the turns wherever the descriptions do not speak to a subject. Do not record a subject the current stage invites as withheld.
 
 REPORT THE STATE
 - affect: what the client feels now, in a few words.
 - appraisal: why they feel it — their private reading of the counsellor's intent. This is never shown to anyone; it explains the affect.
-- voice_register: how they are speaking now (clipped, rambling, formal, flat, warm).
+- register: how they are speaking now (clipped, rambling, formal, flat, warm).
 - speech_fragments: at most 3 short phrases in the client's own voice, each under 120 characters — a verbal habit, a phrase they keep returning to. Not sentences to say next.
 
 REPORT THE LEDGER
