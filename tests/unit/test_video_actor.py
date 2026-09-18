@@ -191,6 +191,23 @@ class TestStartVideoActor:
         )
         assert result is None
 
+    @pytest.mark.unit
+    async def test_bey_missing_api_key_degrades_to_audio_only(
+        self, monkeypatch, caplog
+    ):
+        monkeypatch.setattr(video_actor.settings, "VIDEO_ACTOR_ENABLED", True)
+        monkeypatch.setattr(video_actor.settings, "VIDEO_ACTOR_PROVIDER", "bey")
+        monkeypatch.setattr(video_actor.settings, "VIDEO_ACTOR_AVATAR_ID", "face-1")
+        monkeypatch.setattr(video_actor.settings, "VIDEO_ACTOR_BEY_API_KEY", None)
+
+        with caplog.at_level("WARNING"):
+            result = await video_actor.start_video_actor(
+                session=object(), room=object(), scenario=_scenario(True)
+            )
+        assert result is None
+        assert "provider=bey" in caplog.text
+        assert "needs an API key" in caplog.text
+
 
 class TestAvatarIdResolution:
     """Per-roleplay id wins; the deployment default is the fallback."""
@@ -1019,7 +1036,8 @@ class TestTavusConversationTeardown:
                 scenario=None,
                 livekit_url="wss://example",
             )
-            await handle.aclose()
+            if handle:
+                await handle.aclose()
 
         assert ended == ["conv_9"]
 
@@ -1241,6 +1259,9 @@ class TestDeferredAttach:
             _participant("bey-avatar-agent", kind=_AGENT_KIND, video=published)
         )
         room.name = "r"
+        monkeypatch.setattr(
+            video_actor.settings, "VIDEO_ACTOR_BEY_API_KEY", "dummy-api-key"
+        )
         return _Avatar, room
 
     @pytest.mark.unit
