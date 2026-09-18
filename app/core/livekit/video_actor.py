@@ -795,6 +795,7 @@ def _prepare_hosted(
     an ImportError at worker boot, which would take down every session
     including the ones with the feature off.
     """
+    prompt_data = getattr(scenario, "prompt_data", None)
     try:
         plugin = importlib.import_module(module_path)
     except ImportError:
@@ -843,12 +844,20 @@ def _prepare_hosted(
     # this feature's settings; every plugin also reads its own <VENDOR>_API_KEY
     # from the environment, which stays the fallback. Placement is the builder's
     # job — Simli's belongs inside its config object, not beside it.
-    prompt_data = getattr(scenario, "prompt_data", None)
+    api_key = _resolve_api_key(provider)
+    if not api_key and provider == "bey":
+        logger.warning(
+            "[VIDEO_ACTOR] provider=%s needs an API key (roleplay "
+            "VIDEO_ACTOR_BEY_API_KEY, else VIDEO_ACTOR_API_KEY) — session continues "
+            "audio-only",
+            provider,
+        )
+        return None
     avatar = avatar_session_cls(
         **build_kwargs(
             plugin,
             avatar_id=avatar_id,
-            api_key=_resolve_api_key(provider),
+            api_key=api_key,
             character_name=getattr(prompt_data, "name", None) if prompt_data else None,
         )
     )
