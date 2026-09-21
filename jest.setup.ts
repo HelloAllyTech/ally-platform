@@ -145,6 +145,7 @@ jest.mock('react-native-svg', () => {
 
 // Mock @livekit/react-native
 jest.mock('@livekit/react-native', () => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const React = require('react');
   // Mock AudioSession
   const AudioSession = {
