@@ -8,6 +8,8 @@ import {useSubmitArticleQuestionAnswerMutation} from '@/services';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
 import {ArticleQuestion, SubmitArticleQuestionAnswerResult} from '@/types';
 
+import {QuestionMedia} from './QuestionMedia';
+
 export interface ArticleQuestionCardProps {
   itemId: string;
   question: ArticleQuestion;
@@ -91,6 +93,7 @@ export const ArticleQuestionCard: React.FC<ArticleQuestionCardProps> = ({
     <View testID={`article-question-${question.id}`} style={styles.card}>
       <Text style={styles.title}>{t('courses.article.question.title')}</Text>
       <Text style={styles.prompt}>{question.prompt}</Text>
+      <QuestionMedia media={question.media} />
 
       <View style={styles.list}>
         {(question.options ?? []).map(option => {
