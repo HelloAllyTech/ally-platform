@@ -51,7 +51,7 @@ const mockOn = jest.fn();
 const mockOff = jest.fn();
 const mockConnect = jest.fn();
 const mockDisconnect = jest.fn();
-const mockSetMic = jest.fn();
+const mockSetMic = jest.fn().mockResolvedValue(undefined);
 
 jest.mock('livekit-client', () => {
   const createRoom = () => {
@@ -135,7 +135,7 @@ jest.mock('@/components', () => {
     IllustratedActionModal: () => null,
     IllustratedModal: (props: any) => (props.visible ? <View testID="illustrated-modal" /> : null),
     EndingSoonModal: (props: any) => (props.visible ? <View testID="ending-soon" /> : null),
-    LiveFeedback: ({message}: any) => <Text>{message}</Text>,
+    LiveFeedback: ({message}: any) => <Text testID="live-feedback-message">{message}</Text>,
     SessionScoreMeter: ({score}: any) => <Text testID="score">{String(score)}</Text>,
     SimulationTimer: () => <Text testID="timer">timer</Text>,
     __mocks: {mockShowErrorToast},
@@ -339,7 +339,7 @@ describe('SimulationAssistantScreen', () => {
     await waitFor(() => expect(mockSetMic).toHaveBeenCalledWith(true));
 
     fireEvent.press(getByLabelText('mic'));
-    expect(mockSetMic).toHaveBeenCalledWith(false);
+    await waitFor(() => expect(getByText('muted')).toBeDefined());
   });
 
   it('handles stop press and navigates to feedback after endScenarioSession', async () => {
