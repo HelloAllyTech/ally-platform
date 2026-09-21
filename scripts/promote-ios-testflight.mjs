@@ -274,6 +274,60 @@ async function ensureBetaAppDescription(appId, token) {
   console.log(`Created a ${BETA_LOCALE} Beta App Description.`);
 }
 
+/**
+ * Prints exactly which external-testing prerequisites Apple is missing.
+ *
+ * Apple's rejection for this is `MISSING_REQUIRED_DATA` with the detail
+ * "Missing requied data." — their typo, and no indication of *which* data.
+ * Guessing costs a round trip through CI each time, so when the submission
+ * fails we read the three resources Apple actually checks and say which
+ * fields are blank. Read-only, and it never fails the run on its own: it
+ * runs on a path that is already failing.
+ */
+async function reportExternalTestingReadiness(appId, buildId, token) {
+  const has = value => (String(value ?? '').trim() ? 'set' : 'MISSING');
+  try {
+    const localizations = await appleApi(
+      `/apps/${appId}/betaAppLocalizations`,
+      token,
+    );
+    for (const l of localizations.data ?? []) {
+      console.error(
+        `  betaAppLocalizations[${l.attributes?.locale}]: description=${has(
+          l.attributes?.description,
+        )} feedbackEmail=${has(l.attributes?.feedbackEmail)}`,
+      );
+    }
+  } catch (error) {
+    console.error(`  betaAppLocalizations: could not read (${error.message})`);
+  }
+
+  try {
+    const detail = await appleApi(`/apps/${appId}/betaAppReviewDetail`, token);
+    const a = detail.data?.attributes ?? {};
+    console.error(
+      `  betaAppReviewDetail: contactFirstName=${has(a.contactFirstName)} ` +
+        `contactLastName=${has(a.contactLastName)} contactEmail=${has(a.contactEmail)} ` +
+        `contactPhone=${has(a.contactPhone)} demoAccountRequired=${a.demoAccountRequired} ` +
+        `demoAccountName=${has(a.demoAccountName)} demoAccountPassword=${has(
+          a.demoAccountPassword,
+        )}`,
+    );
+  } catch (error) {
+    console.error(`  betaAppReviewDetail: could not read (${error.message})`);
+  }
+
+  try {
+    const build = await appleApi(`/builds/${buildId}`, token);
+    console.error(
+      `  build.usesNonExemptEncryption=${build.data?.attributes?.usesNonExemptEncryption}` +
+        ' (null means export compliance has not been answered for this build)',
+    );
+  } catch (error) {
+    console.error(`  build: could not read (${error.message})`);
+  }
+}
+
 /** Reads the app's current marketing version straight from the checked-out repo — the same
  * value the build being released was made with, and the field scheduled-mobile-release.yml
  * writes during its version bump. */
@@ -420,15 +474,20 @@ async function main() {
   });
   if (!submissionRes.ok) {
     const body = await submissionRes.text();
+    console.error(
+      'External testing prerequisites, as App Store Connect currently has them:',
+    );
+    await reportExternalTestingReadiness(appId, buildId, token);
     // Apple commonly rejects this specific call for missing export-compliance info on the
     // build — surface the raw response rather than a generic message, since that's the most
     // likely real cause and the response body names it explicitly.
     throw new Error(
       `Build ${buildId} was assigned to the group, but submitting it for Beta App Review ` +
-        `failed: ${submissionRes.status} ${body}. The most common cause is missing export ` +
-        `compliance information for this build in App Store Connect — check ` +
-        `TestFlight -> Build Uploads. (A missing Beta App Description, the other common ` +
-        `cause, is filled in automatically by this script before it gets here.)`,
+        `failed: ${submissionRes.status} ${body}. Apple does not say which field is ` +
+        `missing; the readiness dump above does. Anything reported MISSING there has to be ` +
+        `filled in by a human in App Store Connect — contact details, a demo account for a ` +
+        `login-gated app, and the export-compliance answer are all judgement calls this ` +
+        `script will not invent.`,
     );
   }
 
