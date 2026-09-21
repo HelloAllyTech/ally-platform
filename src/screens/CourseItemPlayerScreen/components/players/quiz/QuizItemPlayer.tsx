@@ -26,6 +26,7 @@ import {
   toAnswerInput,
 } from '@/utils';
 
+import {QuestionMedia} from '../QuestionMedia';
 import {QuizIntro} from './QuizIntro';
 import {QuizResults} from './QuizResults';
 import {FillBlankQuestion} from './widgets/FillBlankQuestion';
@@ -275,6 +276,7 @@ export const QuizItemPlayer: React.FC<QuizItemPlayerProps> = ({
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <Text style={styles.prompt}>{question.prompt}</Text>
+        <QuestionMedia media={question.media} />
         {renderWidget()}
       </ScrollView>
 

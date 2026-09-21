@@ -951,6 +951,13 @@
           "visitorLADYBIRD": "ladybird"
         }
       }
+    },
+    "question": {
+      "media": {
+        "imageFailed": "This image couldn't load. Check your connection and try again.",
+        "viewLarger": "View larger",
+        "close": "Close"
+      }
     }
   },
   "nav": {

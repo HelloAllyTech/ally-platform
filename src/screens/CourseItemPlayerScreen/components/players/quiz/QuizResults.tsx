@@ -11,6 +11,8 @@ import {
   SanitizedQuizQuestion,
 } from '@/types';
 
+import {QuestionMedia} from '../QuestionMedia';
+
 export interface QuizResultsProps {
   result: QuizAttemptResult;
   questions: SanitizedQuizQuestion[];
@@ -56,6 +58,9 @@ const QuestionRow: React.FC<{
       </TouchableOpacity>
       {open && (
         <View style={styles.rowDetail}>
+          {/* A learner reviewing a wrong answer needs what they were
+              looking at, not just the words that framed it. */}
+          <QuestionMedia media={question?.media} />
           <Text style={styles.rowDetailStatus}>
             {isPending
               ? t('courses.quiz.results.pendingGrading')
