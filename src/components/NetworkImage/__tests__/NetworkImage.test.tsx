@@ -1,5 +1,5 @@
 import React from 'react';
-import {render, waitFor} from '@testing-library/react-native';
+import {render, waitFor, act} from '@testing-library/react-native';
 
 import {NetworkImage} from '../NetworkImage';
 
@@ -87,9 +87,11 @@ describe('NetworkImage', () => {
     // Simulate SvgUri error
     const {SvgUri} = require('react-native-svg');
     const svgUriComponent = UNSAFE_getByType(SvgUri);
-    if (svgUriComponent.props.onError) {
-      svgUriComponent.props.onError(new Error('Failed to load'));
-    }
+    act(() => {
+      if (svgUriComponent.props.onError) {
+        svgUriComponent.props.onError(new Error('Failed to load'));
+      }
+    });
 
     // Should fallback to SvgXml after error
     await waitFor(() => {
@@ -126,9 +128,11 @@ describe('NetworkImage', () => {
     // Simulate SvgUri error to trigger fallback
     const {SvgUri} = require('react-native-svg');
     const svgUriComponent = UNSAFE_getByType(SvgUri);
-    if (svgUriComponent.props.onError) {
-      svgUriComponent.props.onError(new Error('Failed to load'));
-    }
+    act(() => {
+      if (svgUriComponent.props.onError) {
+        svgUriComponent.props.onError(new Error('Failed to load'));
+      }
+    });
 
     // Wait for fallback to fail and show error view
     await waitFor(() => {
@@ -136,5 +140,35 @@ describe('NetworkImage', () => {
       const views = UNSAFE_getByType(View);
       expect(views).toBeTruthy();
     });
+  });
+
+  it('should log an act warning if state updates are not wrapped in act', async () => {
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      text: () => Promise.resolve('<svg><circle cx="50" cy="50" r="40" /></svg>'),
+    });
+
+    const { UNSAFE_getByType } = render(
+      <NetworkImage imageUrl="https://example.com/badge.svg" />,
+    );
+
+    // Simulate an error without act to trigger the warning
+    const {SvgUri} = require('react-native-svg');
+    const svgUriComponent = UNSAFE_getByType(SvgUri);
+    act(() => {
+      if (svgUriComponent.props.onError) {
+        svgUriComponent.props.onError(new Error('Simulated error'));
+      }
+    });
+
+    await waitFor(() => {
+      expect(errorSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining('An update to NetworkImage inside a test was not wrapped in act'),
+      );
+    });
+
+    errorSpy.mockRestore();
   });
 });
