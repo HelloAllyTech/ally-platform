@@ -1,0 +1,81 @@
+name: Promote iOS build to TestFlight external group
+#
+# Manual retry for the external-testing step that build-ios-production.yml already runs
+# automatically at the end of every production build.
+#
+# That step is `continue-on-error: true` on purpose — the build and the TestFlight upload have
+# already succeeded by the time it runs, and a hiccup in Apple's API should not retroactively
+# mark a good build as failed. The cost of that choice is that the run still shows green, and
+# the only signal is a Slack message telling you to retry here. Until this file existed, that
+# message pointed at a workflow that did not exist and an admin-dashboard button that only ever
+# read TestFlight status, so the sole recourse was rebuilding the whole app to re-run one API
+# call. That is what this fixes.
+#
+# Scope: TestFlight external testers only, and only Apple's Beta App Review. This is NOT the
+# App Store — see submit-ios-app-store-review.yml for that, which is a one-way door.
+#
+# Safe to re-run: the script assigns the already-uploaded build to the group and submits it,
+# both idempotent enough that a second run on an already-submitted build simply reports so.
+
+on:
+  workflow_dispatch:
+    inputs:
+      wait_minutes:
+        description: 'How long to wait for the build to finish processing on
+
+          Apple''s side before giving up (default 25).'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: promote-ios-testflight-external
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # master, because the script reads the marketing version out of the checked-out
+          # project to decide which build to promote — it has to match what was released.
+          ref: master
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install jsonwebtoken (CI-only tooling, not an app dependency)
+        run: npm install jsonwebtoken --no-save
+
+      - name: Submit to TestFlight external group
+        id: submit
+        env:
+          APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          APPSTORE_API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+          APPSTORE_API_PRIVATE_KEY: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+          TESTFLIGHT_EXTERNAL_GROUP_NAME: ${{ vars.TESTFLIGHT_EXTERNAL_GROUP_NAME }}
+          TESTFLIGHT_WAIT_MINUTES: ${{ inputs.wait_minutes }}
+        run: node scripts/promote-ios-testflight.mjs
+
+      - name: Notify Slack - submitted to TestFlight external group
+        if: success()
+        uses: tokorom/action-slack-incoming-webhook@main
+        env:
+          INCOMING_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          text: "iOS build ${{ steps.submit.outputs.build_version }} submitted to the TestFlight external group by ${{ github.actor }}. Apple's Beta App Review still needs to clear (typically ~24h) before external testers can install it."
+
+      - name: Notify Slack - retry failed
+        if: failure()
+        uses: tokorom/action-slack-incoming-webhook@main
+        env:
+          INCOMING_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          text: 'Manual TestFlight external submission FAILED (triggered by ${{ github.actor }}). <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run logs>'

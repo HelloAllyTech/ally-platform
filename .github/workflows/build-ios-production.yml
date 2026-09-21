@@ -205,6 +205,10 @@ jobs:
       # transient Apple API error, or missing export-compliance info on this specific build)
       # shouldn't retroactively mark the whole production build as failed. Its own Slack
       # notifications below carry the real signal either way.
+      #
+      # Know the cost of that: when this step fails the RUN STILL SHOWS GREEN, and external
+      # testers silently do not get the build. The Slack message is the only signal, and it
+      # points at promote-ios-testflight-external.yml for the retry.
       - name: Set up Node for TestFlight external submission
         if: success()
         uses: actions/setup-node@v4
@@ -240,4 +244,4 @@ jobs:
         env:
           INCOMING_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         with:
-          text: 'iOS build uploaded successfully, but automatic TestFlight external submission FAILED — needs a manual retry (promote-ios-testflight-external.yml, or the admin dashboard button). <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run logs>'
+          text: 'iOS build uploaded successfully, but automatic TestFlight external submission FAILED — external testers will NOT get this build until someone retries. Re-run the "Promote iOS build to TestFlight external group" workflow (promote-ios-testflight-external.yml). <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run logs>'
