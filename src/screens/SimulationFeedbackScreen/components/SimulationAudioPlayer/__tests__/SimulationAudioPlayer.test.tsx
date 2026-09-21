@@ -61,7 +61,8 @@ jest.mock('@/assets', () => {
     PausePlayerIcon: (props: any) => <View testID="pause-icon" {...props} />,
     PlayWhiteIcon: (props: any) => <View testID="play-icon" {...props} />,
   };
-});
+}
+);
 
 jest.mock('@/theme', () => ({
   colors: {
@@ -107,26 +108,42 @@ describe('SimulationAudioPlayer', () => {
   /** Source nodes the component built, in construction order. */
   const sources = () => (global as any).__createdSources as any[];
 
-  beforeEach(() => {
-    jest.clearAllMocks();
-    (global as any).__createdSources = [];
-    (global as any).fetch = jest.fn().mockResolvedValue({
-      ok: true,
-      arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)),
+    beforeEach(() => {
+
+      jest.useFakeTimers();
+
+      jest.clearAllMocks();
+
+      (global as any).__createdSources = [];
+
+      (global as any).fetch = jest.fn().mockResolvedValue({
+
+        ok: true,
+
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)),
+
+      });
+
     });
-  });
+
+  
 
   afterEach(() => {
     delete (global as any).fetch;
+    jest.runOnlyPendingTimers();
+    jest.useRealTimers();
   });
 
   it('shows loading indicator while audio is loading', () => {
     const {UNSAFE_getByType} = render(<SimulationAudioPlayer {...defaultProps} />);
     expect(UNSAFE_getByType(ActivityIndicator)).toBeTruthy();
+    jest.runAllTimers();
+    // await Promise.resolve(); // This is not needed with fake timers and act
   });
 
   it('shows play button after audio loads', async () => {
     const {getByTestId} = render(<SimulationAudioPlayer {...defaultProps} />);
+    jest.runAllTimers();
     await waitFor(() => expect(getByTestId('play-icon')).toBeTruthy());
   });
 
@@ -134,11 +151,13 @@ describe('SimulationAudioPlayer', () => {
     const {getByTestId, queryByTestId, UNSAFE_getAllByType} = render(
       <SimulationAudioPlayer {...defaultProps} />,
     );
-
+    jest.runAllTimers();
     await waitFor(() => expect(getByTestId('play-icon')).toBeTruthy());
 
     const playBtn = UNSAFE_getAllByType(TouchableOpacity)[0];
     fireEvent.press(playBtn);
+    // Advance timers for progress updates (200ms interval)
+    jest.advanceTimersByTime(200);
 
     expect(queryByTestId('pause-icon')).toBeTruthy();
   });
@@ -155,22 +174,27 @@ describe('SimulationAudioPlayer', () => {
     const {getByText, getByTestId, UNSAFE_getAllByType} = render(
       <SimulationAudioPlayer {...defaultProps} />,
     );
+    jest.runAllTimers();
     await waitFor(() => expect(getByTestId('play-icon')).toBeTruthy());
 
     const speedBtn = UNSAFE_getAllByType(TouchableOpacity)[1];
     expect(getByText('1x')).toBeTruthy();
 
     fireEvent.press(speedBtn);
+    jest.advanceTimersByTime(200);
     expect(getByText('1.5x')).toBeTruthy();
 
     fireEvent.press(speedBtn);
+    jest.advanceTimersByTime(200);
     expect(getByText('2x')).toBeTruthy();
 
     fireEvent.press(speedBtn);
+    jest.advanceTimersByTime(200);
     expect(getByText('2.5x')).toBeTruthy();
 
     // wraps back around
     fireEvent.press(speedBtn);
+    jest.advanceTimersByTime(200);
     expect(getByText('1x')).toBeTruthy();
   });
 
@@ -179,9 +203,11 @@ describe('SimulationAudioPlayer', () => {
     const {getByTestId, UNSAFE_getAllByType} = render(
       <SimulationAudioPlayer {...defaultProps} />,
     );
+    jest.runAllTimers();
     await waitFor(() => expect(getByTestId('play-icon')).toBeTruthy());
 
     fireEvent.press(UNSAFE_getAllByType(TouchableOpacity)[1]);
+    jest.advanceTimersByTime(200);
 
     expect(setItem).toHaveBeenCalledWith('ally:audio:playback-rate', 1.5);
   });
@@ -191,6 +217,7 @@ describe('SimulationAudioPlayer', () => {
     getItem.mockResolvedValueOnce(2);
 
     const {getByText} = render(<SimulationAudioPlayer {...defaultProps} />);
+    jest.runAllTimers();
 
     await waitFor(() => expect(getByText('2x')).toBeTruthy());
   });
@@ -202,6 +229,7 @@ describe('SimulationAudioPlayer', () => {
     const {getByText, getByTestId} = render(
       <SimulationAudioPlayer {...defaultProps} />,
     );
+    jest.runAllTimers();
     await waitFor(() => expect(getByTestId('play-icon')).toBeTruthy());
 
     expect(getByText('1x')).toBeTruthy();
@@ -211,19 +239,23 @@ describe('SimulationAudioPlayer', () => {
     const {getByTestId, UNSAFE_getAllByType} = render(
       <SimulationAudioPlayer {...defaultProps} />,
     );
+    jest.runAllTimers();
     await waitFor(() => expect(getByTestId('play-icon')).toBeTruthy());
 
     const [playBtn, speedBtn] = UNSAFE_getAllByType(TouchableOpacity);
 
     // 1x -> 1.5x while paused, so playback starts already pitch-corrected.
     fireEvent.press(speedBtn);
+    jest.advanceTimersByTime(200);
     fireEvent.press(playBtn);
+    jest.advanceTimersByTime(200);
     expect(sources()).toHaveLength(1);
     expect(sources()[0].pitchCorrection).toBe(true);
     expect(sources()[0].playbackRate.value).toBe(1.5);
 
     // 1.5x -> 2x keeps the same mode, so the node is retuned, not rebuilt.
     fireEvent.press(speedBtn);
+    jest.advanceTimersByTime(200);
     expect(sources()).toHaveLength(1);
     expect(sources()[0].playbackRate.value).toBe(2);
   });
@@ -232,16 +264,19 @@ describe('SimulationAudioPlayer', () => {
     const {getByTestId, UNSAFE_getAllByType} = render(
       <SimulationAudioPlayer {...defaultProps} />,
     );
+    jest.runAllTimers();
     await waitFor(() => expect(getByTestId('play-icon')).toBeTruthy());
 
     const [playBtn, speedBtn] = UNSAFE_getAllByType(TouchableOpacity);
 
     fireEvent.press(playBtn);
+    jest.advanceTimersByTime(200);
     expect(sources()).toHaveLength(1);
     expect(sources()[0].pitchCorrection).toBe(false);
 
     // 1x -> 1.5x turns pitch correction on, which is fixed at construction.
     fireEvent.press(speedBtn);
+    jest.advanceTimersByTime(200);
     expect(sources()).toHaveLength(2);
     expect(sources()[1].pitchCorrection).toBe(true);
     expect(sources()[1].playbackRate.value).toBe(1.5);
@@ -260,6 +295,7 @@ describe('SimulationAudioPlayer', () => {
         onPlaybackLoadError={onPlaybackLoadError}
       />,
     );
+    jest.runAllTimers();
     await waitFor(() => expect(onPlaybackLoadError).toHaveBeenCalled());
   });
 });
