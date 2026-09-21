@@ -8,6 +8,7 @@ import {
   EyeIcon,
 } from '@/assets/icons';
 import {
+  ChatSummaryStatus,
   DEFAULT_HIT_SLOP,
   formatSessionMode,
   LogType,

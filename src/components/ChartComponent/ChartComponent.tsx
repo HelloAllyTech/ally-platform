@@ -1,7 +1,9 @@
 import React from 'react';
 import {Dimensions, StyleSheet, View} from 'react-native';
 import {LineChart} from 'react-native-chart-kit';
-import {ChartConfig} from 'react-native-chart-kit/dist/AbstractChart';
+// ChartConfig is declared in HelperTypes; AbstractChart imports it but does
+// not re-export it, so the old path resolved to nothing.
+import type {ChartConfig} from 'react-native-chart-kit/dist/HelperTypes';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {colors, fontFamily} from '@/theme';

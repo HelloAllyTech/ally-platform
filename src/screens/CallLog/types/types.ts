@@ -77,7 +77,14 @@ export type LogItem = {
   scenarioId?: number;
   counselorId?: number;
   score?: number | null;
-  metadata?: unknown;
+  /**
+   * Session metadata as the backend sends it. Only the fields this app
+   * actually reads are named; the rest of the payload rides along untouched,
+   * which is what the index signature is for. Typed rather than left
+   * `unknown` because `CallLogItem` already reads `sessionName` off it —
+   * the claim was being made either way, just not checked.
+   */
+  metadata?: {sessionName?: string} & Record<string, unknown>;
   scenario?: {
     createdAt: string;
     updatedAt: string;

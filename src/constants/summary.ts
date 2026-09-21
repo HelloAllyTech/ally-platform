@@ -1,5 +1,3 @@
-import {TFunction} from 'i18next';
-
 import {
   AssessmentIcon,
   BrightnessAlertIcon,
@@ -68,12 +66,33 @@ const formatLanguages = (value: unknown) => {
     .join(', ');
 };
 
-export const formatSessionMode = (value: unknown, t: TFunction) => {
+/**
+ * Translator shape this module needs: a key lookup returning a string.
+ *
+ * Keyed on `TranslationType` rather than i18next's `TFunction` because the
+ * app does not use i18next's `t` directly — `useTranslate` returns its own
+ * narrower function, and `SummaryField.formatDisplay` declares a third shape
+ * again. `TranslationType` is the one key type all of them accept: it is
+ * assignable to the `string` that `formatDisplay` asks for, and narrow enough
+ * for `useTranslate`, which will not take a bare `string`.
+ *
+ * Optional, because `formatDisplay` may be called without a translator. In
+ * that case the raw mode is a better answer than a crash, which is what
+ * passing `undefined` into a required `TFunction` used to produce.
+ */
+type ModeTranslate = (
+  key: TranslationType,
+  params?: Record<string, unknown>,
+) => string;
+
+export const formatSessionMode = (value: unknown, t?: ModeTranslate) => {
   if (!value) return '-';
   const mode = value.toString().toUpperCase();
-  return mode === ScribeSessionMode.DICTATION
-    ? t('calls.mode.dictation')
-    : t('calls.mode.scribe');
+  const key =
+    mode === ScribeSessionMode.DICTATION
+      ? 'calls.mode.dictation'
+      : 'calls.mode.scribe';
+  return t ? t(key) : mode;
 };
 
 export enum ChatSummaryStatus {
