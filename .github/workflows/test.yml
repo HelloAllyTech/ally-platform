@@ -11,9 +11,11 @@
 # NOTE ON ENFORCEMENT: all three jobs are required checks as of 2026-09-21, via
 # the repo ruleset "master: tests, types and lint must pass".
 #
-# Required by the names GitHub reports them under — "Jest", "TypeScript" and
+# Required by the names GitHub reports them under — "Jest", "Typecheck" and
 # "Lint & format", i.e. each job's `name:`, NOT the job ids `test`, `typecheck`
-# and `lint`. Requiring a context nothing ever reports does not fail a merge, it
+# and `lint`. (This job was called "TypeScript" until 2026-09-22; renaming it
+# meant editing the ruleset in the same change, which is exactly the coupling
+# the next paragraph warns about.) Requiring a context nothing ever reports does not fail a merge, it
 # blocks it forever waiting for a check that will never arrive, so the strings
 # below and the strings in the ruleset have to move together. Renaming a job
 # here without updating the ruleset wedges master.
@@ -101,7 +103,7 @@ jobs:
         run: npm run lint
 
   typecheck:
-    name: TypeScript
+    name: Typecheck
     runs-on: ubuntu-22.04
     timeout-minutes: 15
 
