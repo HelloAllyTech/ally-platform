@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 import json
 import types
 
@@ -84,7 +85,7 @@ class TestEventHandler:
         # Capture create_task coroutine to run it deterministically
         created_tasks = []
 
-        def fake_create_task(coro):
+        def fake_create_task(coro, **_kwargs):
             created_tasks.append(coro)
 
             # return a dummy task-like object
@@ -92,9 +93,11 @@ class TestEventHandler:
                 def cancel(self):
                     pass
 
+                def add_done_callback(self, _cb):
+                    pass
+
             return _T()
 
-        # Fallback path should not be used if create_task works
         monkeypatch.setattr(asyncio, "create_task", fake_create_task)
 
         # Stub CoreEventMessageType.create to return object with model_dump_json
@@ -239,35 +242,17 @@ class TestEventHandler:
         assert sent, "transcript message was dropped by a garbage-collected task"
         assert not background_tasks, "done task should be discarded from the set"
 
-    @pytest.mark.asyncio
-    async def test_create_conversation_handler_fallback_loop(self, monkeypatch):
-        # Force RuntimeError on asyncio.create_task to hit fallback path
-        def boom_create_task(_):
-            raise RuntimeError("no loop")
+    def test_create_conversation_handler_without_a_running_loop(
+        self, monkeypatch, caplog
+    ):
+        """No running loop: log the drop, don't fake a send.
 
-        monkeypatch.setattr(asyncio, "create_task", boom_create_task)
+        This used to fall back to ``get_event_loop().create_task``, which
+        abandoned the coroutine built for the first (failed) create_task and
+        queued a second one onto a loop nobody runs — so it never sent
+        either, and the orphan resurfaced as a RuntimeWarning.
+        """
 
-        # Capture tasks created via get_event_loop().create_task
-        loop_created = {}
-
-        class DummyLoop:
-            def create_task(self, coro):
-                loop_created["coro"] = coro
-
-                class _T:
-                    def cancel(self):
-                        pass
-
-                return _T()
-
-        class DummyEventLoopPolicy:
-            def get_event_loop(self):
-                return DummyLoop()
-
-        # Monkeypatch asyncio.get_event_loop to return our dummy loop
-        monkeypatch.setattr(asyncio, "get_event_loop", lambda: DummyLoop())
-
-        # Minimal stubs
         class DummyCoreEvent:
             def model_dump_json(self):
                 return "{}"
@@ -284,16 +269,17 @@ class TestEventHandler:
 
         monkeypatch.setattr(eh, "msg_event_queue", DummyQueue())
 
-        handler, state_handlers, cleanup = eh.create_conversation_handler(
+        handler, _state_handlers, _cleanup = eh.create_conversation_handler(
             "room", "2024-01-01T00:00:00+00:00"
         )
-        handler(
-            DummyEvent(DummyItem(role="user", content="hey"), created_at=1704067205.0)
-        )
+        with caplog.at_level("ERROR"):
+            handler(
+                DummyEvent(
+                    DummyItem(role="user", content="hey"), created_at=1704067205.0
+                )
+            )
 
-        # ensure fallback scheduled something
-        assert "coro" in loop_created
-        await loop_created["coro"]
+        assert any("transcript-send" in r.getMessage() for r in caplog.records)
 
     @pytest.mark.asyncio
     async def test_create_conversation_handler_deduplicates_utterances(
@@ -302,9 +288,15 @@ class TestEventHandler:
         """Test that duplicate utterances are skipped."""
         created_tasks = []
 
-        def fake_create_task(coro):
+        def fake_create_task(coro, **_kwargs):
             created_tasks.append(coro)
-            return types.SimpleNamespace(cancel=lambda: None)
+            # This test only counts scheduling attempts and never runs them;
+            # close each coroutine so the stub doesn't leak the very
+            # "never awaited" RuntimeWarning the handler was fixed to avoid.
+            coro.close()
+            return types.SimpleNamespace(
+                cancel=lambda: None, add_done_callback=lambda _cb: None
+            )
 
         monkeypatch.setattr(asyncio, "create_task", fake_create_task)
 
@@ -471,7 +463,12 @@ class TestConversationHandlerTimestamps:
         monkeypatch.setattr(
             asyncio,
             "create_task",
-            lambda _: types.SimpleNamespace(cancel=lambda: None),
+            lambda coro, **_kwargs: (
+                coro.close(),
+                types.SimpleNamespace(
+                    cancel=lambda: None, add_done_callback=lambda _cb: None
+                ),
+            )[1],
         )
 
         class DummyQueue:
@@ -639,3 +636,97 @@ class TestShutdownHandlerBoundsInlineFinalize:
         await real_wait_for(handler(), timeout=2.0)
 
         assert finalize_started.is_set()
+
+
+class TestFireAndForgetSendsAreNeverAbandoned:
+    """Regression: a scheduled send must never leave its coroutine un-awaited.
+
+    The coroutine object is built *before* `asyncio.create_task` ever sees it
+    (`create_task(send_event_to_queue(payload))`). Called from a context with
+    no running loop, `create_task` raises and that coroutine is abandoned:
+    the transcript/metric is silently dropped, and Python only reports it
+    much later — at an arbitrary GC pass, usually inside an unrelated test —
+    as ``RuntimeWarning: coroutine 'send_event_to_queue' was never awaited``.
+    Whatever we do with the payload, the coroutine has to be disposed of.
+    """
+
+    @staticmethod
+    def _track_sends(monkeypatch):
+        """Replace send_event_to_queue with a factory that records its coros."""
+        created = []
+
+        async def _send(_payload):
+            return None
+
+        def _factory(payload):
+            coro = _send(payload)
+            created.append(coro)
+            return coro
+
+        monkeypatch.setattr(eh, "send_event_to_queue", _factory)
+
+        class DummyCoreEvent:
+            def model_dump_json(self):
+                return "{}"
+
+        monkeypatch.setattr(
+            eh,
+            "CoreEventMessageType",
+            types.SimpleNamespace(
+                create=lambda **_: DummyCoreEvent(),
+                create_turn_metrics=lambda *_a, **_k: DummyCoreEvent(),
+            ),
+        )
+        return created
+
+    @staticmethod
+    def _assert_all_disposed(created):
+        assert created, "handler never built a send coroutine"
+        abandoned = [
+            c for c in created if inspect.getcoroutinestate(c) == inspect.CORO_CREATED
+        ]
+        assert not abandoned, (
+            f"{len(abandoned)} of {len(created)} send coroutine(s) left un-awaited "
+            "— they will surface as a RuntimeWarning and the payload is lost"
+        )
+
+    def test_transcript_send_without_a_running_loop(self, monkeypatch):
+        """`on_conversation_item_added` runs sync; no loop must not leak."""
+        created = self._track_sends(monkeypatch)
+
+        handler, _state_handlers, _cleanup = eh.create_conversation_handler(
+            "room", "2024-01-01T00:00:00+00:00"
+        )
+        handler(
+            DummyEvent(DummyItem(role="user", content="hey"), created_at=1704067205.0)
+        )
+
+        self._assert_all_disposed(created)
+
+    def test_turn_metrics_send_without_a_running_loop(self, monkeypatch):
+        """Same defect on the turn-metrics emit off `agent_state_changed`."""
+        created = self._track_sends(monkeypatch)
+        monkeypatch.setattr(
+            eh,
+            "turn_metrics",
+            types.SimpleNamespace(
+                note_user_speech_end=lambda *_a, **_k: None,
+                finalize=lambda *_a, **_k: {"total_ms": 1200},
+            ),
+        )
+        monkeypatch.setattr(
+            eh, "TurnMetricsData", lambda **kw: types.SimpleNamespace(**kw)
+        )
+
+        _handler, state_handlers, _cleanup = eh.create_conversation_handler(
+            "room", "2024-01-01T00:00:00+00:00"
+        )
+        # user stops speaking, then the agent starts -> finalize + emit
+        state_handlers["user_state"](
+            DummyStateEvent(new_state="listening", created_at=1704067203.0)
+        )
+        state_handlers["agent_state"](
+            DummyStateEvent(new_state="speaking", created_at=1704067204.0)
+        )
+
+        self._assert_all_disposed(created)

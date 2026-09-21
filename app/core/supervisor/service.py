@@ -46,6 +46,7 @@ from app.core.llm_usage.emitter import emit_llm_usage
 from app.core.llm_usage.tasks import LLMTask
 from app.core.logger import get_logger
 from app.core.supervisor.schemas import SupervisorNoteVerdict
+from app.core.tasks import spawn_background_task
 from app.core.time_utils import get_current_iso_timestamp
 from app.prompts.resolver import load_and_format
 
@@ -506,9 +507,11 @@ class SupervisorNotesService:
             )
             from app.core.events.handlers import send_event_to_queue
 
-            task = asyncio.create_task(send_event_to_queue(message.model_dump_json()))
-            self._tasks.add(task)
-            task.add_done_callback(self._tasks.discard)
+            spawn_background_task(
+                send_event_to_queue(message.model_dump_json()),
+                name="supervisor-note-send",
+                background_tasks=self._tasks,
+            )
         except Exception:  # noqa: BLE001 - the learner already has the note
             logger.exception("[supervisor] failed to enqueue note for Core")
 
