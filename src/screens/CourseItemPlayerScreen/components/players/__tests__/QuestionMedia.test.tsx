@@ -79,6 +79,23 @@ describe('QuestionMedia', () => {
     expect(getByText('A swollen left ankle')).toBeTruthy();
   });
 
+  it('resets failure state when the media URL changes', () => {
+    const {getByTestId, queryByTestId, rerender} = render(
+      <QuestionMedia media={image} />,
+    );
+
+    // First image fails
+    fireEvent(getByTestId('question-media-image').children[0] as never, 'error');
+    expect(getByTestId('question-media-failed')).toBeTruthy();
+
+    // Rerender with a new URL
+    const newImage = {...image, url: 'https://example.com/new-image.png'};
+    rerender(<QuestionMedia media={newImage} />);
+
+    // The failure message should be gone
+    expect(queryByTestId('question-media-failed')).toBeNull();
+  });
+
   it('plays an uploaded video inline, paused until the learner starts it', () => {
     const {getByTestId} = render(
       <QuestionMedia
