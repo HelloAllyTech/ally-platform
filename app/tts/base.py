@@ -55,10 +55,25 @@ class BaseTTSClient(ABC):
 
         try:
             clone = copy.copy(self)
+            # Deep-copy the parameter dicts so the isolated instance gets the
+            # current voice settings but does not share any future changes. A
+            # shallow copy (the copy.copy default) shares the underlying dict,
+            # so a voice-expression change on the main instance mid-synthesis
+            # would change the clip's voice mid-utterance.
+            for attr in ("_current_params", "_default_params"):
+                if hasattr(clone, attr):
+                    setattr(clone, attr, copy.deepcopy(getattr(clone, attr)))
+
             if not hasattr(clone, "_tts_instance"):
                 return None
             clone._tts_instance = None
-            return clone.tts_instance
+            new_instance = clone.tts_instance
+            # Apply the current parameters to the new instance, because not all
+            # provider clients re-apply parameters from their internal state
+            # on instance creation. This ensures dynamic voice expression
+            # changes carry over to the isolated instance.
+            clone._apply_parameters_dict(clone._current_params)
+            return new_instance
         except Exception:  # noqa: BLE001 - isolation is best-effort
             return None
 
