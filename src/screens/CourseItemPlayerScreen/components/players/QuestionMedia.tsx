@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {Image, Modal, Pressable, Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 import Video from 'react-native-video';
@@ -50,6 +50,11 @@ export const QuestionMedia: React.FC<QuestionMediaProps> = ({media}) => {
   const {t} = useTranslate();
   const [expanded, setExpanded] = useState(false);
   const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setExpanded(false);
+    setFailed(false);
+  }, [media?.url]);
 
   if (!media?.url) return null;
 
