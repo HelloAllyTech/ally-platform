@@ -224,13 +224,16 @@ class PromptData(BaseModel):
             "grouped by the exact glossary a session ran with."
         ),
     )
-    knowledge_sources: Optional[List[Dict[str, str]]] = Field(
+    knowledge_sources: Optional[List[Dict[str, Any]]] = Field(
         default=None,
         description=(
-            "Key-description pairs for RAG-like retrieval. "
-            'Format: [{"key": "topic name", "description": "detailed info"}, ...]. '
-            "The system uses an LLM to identify relevant keys per utterance "
-            "and injects the corresponding descriptions into the prompt."
+            "The client's memories, for RAG-like retrieval. "
+            'Format: [{"id": ..., "title": "topic name", "content": "detailed info", '
+            '"unlocksFromStateId": <state id, optional>}, ...]. '
+            "The system uses an LLM to identify relevant titles per utterance "
+            "and injects the corresponding content into the prompt. A source with "
+            "unlocksFromStateId stays out of retrieval until the session reaches "
+            "that state (app/core/graph/knowledge_locks.py)."
         ),
     )
     filler_enabled: bool = Field(

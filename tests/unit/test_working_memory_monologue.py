@@ -246,3 +246,24 @@ def test_an_admin_preview_does_broadcast():
     assert published is True
     assert len(sent) == 1
     assert sent[0][0] == monologue.MONOLOGUE_TOPIC
+
+
+def test_sections_carry_trainer_locked_memory_titles():
+    """`sections` claims to be the literal text the actor was handed, so the
+    titles of trainer-locked memories must be in it — and nothing else of them."""
+    p = monologue.build_payload(
+        memory=ClientWorkingMemory(),
+        update=None,
+        turn_index=1,
+        score=0,
+        locked_topics=["Mother's health"],
+    )
+    withheld = p["sections"]["withheld"]
+    assert "Mother's health — you are not ready to talk about this yet" in withheld
+
+
+def test_sections_without_locks_drop_the_named_absence():
+    p = monologue.build_payload(
+        memory=ClientWorkingMemory(), update=None, turn_index=1, score=0
+    )
+    assert "withheld" not in p["sections"]

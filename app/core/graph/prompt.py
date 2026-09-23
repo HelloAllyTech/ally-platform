@@ -448,6 +448,7 @@ def _build_behavior_prompt(
     current_score: Optional[int] = None,
     embed_retrieved_context: bool = True,
     client_working_memory: Any = None,
+    locked_memory_topics: Optional[List[str]] = None,
 ) -> Tuple[SystemMessage, Optional[str]]:
     """Returns (system_message, effective_retrieved_context).
 
@@ -529,7 +530,9 @@ def _build_behavior_prompt(
 
         working_memory_sections = {
             **working_memory_sections,
-            **render_sections(client_working_memory),
+            **render_sections(
+                client_working_memory, locked_topics=locked_memory_topics or ()
+            ),
         }
         # The authored half needs the same named absence the derived half gets.
         #
@@ -954,6 +957,7 @@ def generate_system_message(
     rolling_summary: Optional[str] = None,
     defer_retrieved_context: bool = False,
     client_working_memory: Any = None,
+    locked_memory_topics: Optional[List[str]] = None,
 ) -> Tuple[SystemMessage, Optional[SystemMessage]]:
     """
     Generates a SystemMessage prompt for an AI roleplay assistant
@@ -1015,6 +1019,7 @@ def generate_system_message(
             current_score=current_score,
             embed_retrieved_context=not defer_retrieved_context,
             client_working_memory=client_working_memory,
+            locked_memory_topics=locked_memory_topics,
         )
         logger.info(
             "%s BUILT behavior prompt: language_code=%s",
@@ -1041,6 +1046,7 @@ def generate_system_message(
         current_score=current_score,
         embed_retrieved_context=not defer_retrieved_context,
         client_working_memory=client_working_memory,
+        locked_memory_topics=locked_memory_topics,
     )
     logger.info(
         "%s BUILT behavior prompt: language_code=%s",

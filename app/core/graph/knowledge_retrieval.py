@@ -33,9 +33,15 @@ class RetrievedContextStore:
     """
 
     def __init__(self) -> None:
+        from app.core.graph.knowledge_locks import KnowledgeUnlockTracker
+
         self.context = None
         self.turns_until_refresh = 0
         self._task = None
+        # Trainer-authored memory locks: the session's high-water state. Lives
+        # here because it is retrieval-side, per-session and off-checkpoint for
+        # the same barge-in reason as the countdown above.
+        self.unlocks = KnowledgeUnlockTracker()
 
     @property
     def in_flight(self) -> bool:
@@ -66,7 +72,7 @@ class RelevantKeys(BaseModel):
 
 
 def build_knowledge_map(
-    knowledge_sources: Optional[List[Dict[str, str]]],
+    knowledge_sources: Optional[List[Dict[str, Any]]],
 ) -> Dict[str, str]:
     """
     Convert a list of title-content dicts into a lookup map.

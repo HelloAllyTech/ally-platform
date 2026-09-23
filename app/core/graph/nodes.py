@@ -1,7 +1,7 @@
 import asyncio
 import json
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional, cast
+from typing import Any, Dict, List, Optional, cast
 
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
@@ -20,6 +20,10 @@ from app.core.graph.instrumentation import (
     instrumented_node,
     log_side_effect,
 )
+from app.core.graph.knowledge_locks import has_locks as has_memory_locks
+from app.core.graph.knowledge_locks import locked_topics as locked_memory_topics
+from app.core.graph.knowledge_locks import partition_sources as partition_memory_sources
+from app.core.graph.knowledge_locks import resolve_for_turn as resolve_memory_locks
 from app.core.graph.knowledge_retrieval import (
     build_knowledge_map,
     retrieve_relevant_knowledge,
@@ -1492,6 +1496,20 @@ async def generate_response(
         turn_score: Optional[int] = (
             score_keeper.get_total_score() if score_keeper else None
         )
+        # Locked memories' TITLES, for the working-memory withheld section.
+        # Content never comes this way — retrieval already dropped it.
+        _locked_memory_topics: List[str] = []
+        _ks = getattr(scenario.prompt_data, "knowledge_sources", None)
+        if has_memory_locks(_ks):
+            _ks_states = getattr(scenario.prompt_data, "states", None)
+            _rc = (config or {}).get("configurable", {}).get("retrieved_context_store")
+            _, _locked, _ = resolve_memory_locks(
+                _ks,
+                _ks_states,
+                _resolve_state_for_retrieval(_ks_states, turn_score),
+                getattr(_rc, "unlocks", None),
+            )
+            _locked_memory_topics = locked_memory_topics(_locked)
         system_message, retrieved_context_message = generate_system_message(
             prompt_data=scenario.prompt_data,
             next_instruction=next_instruction,
@@ -1504,6 +1522,7 @@ async def generate_response(
             rolling_summary=_rs_summary,
             defer_retrieved_context=settings.RETRIEVED_CONTEXT_DEFER_TO_SUFFIX,
             client_working_memory=_cwm_memory,
+            locked_memory_topics=_locked_memory_topics,
         )
 
         room_name = ""
@@ -2096,6 +2115,42 @@ async def retrieve_knowledge(
         )
         return {"retrieved_context": None}
 
+    # Trainer-authored memory locks (knowledge_locks.py): a locked source is
+    # dropped before the title selector ever sees it, so its content cannot be
+    # selected, cached or rendered. Resolved against the scenario's states
+    # whatever the selected prompt declares — a lock is the trainer's intent,
+    # and fail-closed beats a prompt swap quietly releasing every secret.
+    _rc_store_for_locks = (
+        (config or {}).get("configurable", {}).get("retrieved_context_store")
+    )
+    if has_memory_locks(knowledge_sources):
+        _lock_score_keeper = (
+            config["configurable"].get("score_keeper") if config else None
+        )
+        _lock_states = getattr(scenario.prompt_data, "states", None)
+        _lock_active = _resolve_state_for_retrieval(
+            _lock_states,
+            _lock_score_keeper.get_total_score() if _lock_score_keeper else None,
+        )
+        knowledge_sources, _locked_sources, _newly_unlocked = resolve_memory_locks(
+            knowledge_sources,
+            _lock_states,
+            _lock_active,
+            getattr(_rc_store_for_locks, "unlocks", None),
+        )
+        if _newly_unlocked and _rc_store_for_locks is not None:
+            # Don't make a memory that just opened up wait out the reuse
+            # countdown. The set only grows, so a reused context can never be
+            # holding something that is locked now — it can only be missing
+            # something that is unlocked now.
+            _rc_store_for_locks.turns_until_refresh = 0
+        logger.debug(
+            "[MEMORY_LOCK] retrieve_knowledge: state=%s unlocked=%d locked=%d",
+            _lock_active.get("name") if isinstance(_lock_active, dict) else None,
+            len(knowledge_sources),
+            len(_locked_sources),
+        )
+
     knowledge_map = build_knowledge_map(knowledge_sources)
     glossary_hints: dict[str, str] = {}
     if isinstance(glossary_sections, list):
@@ -2598,8 +2653,28 @@ async def update_working_memory(
             else None
         ),
         credited_behaviours=list(getattr(state, "advancing_behaviour_ids", None) or []),
+        locked_topics=_locked_topics_for_display(prompt_data, configurable),
     )
     return {}
+
+
+def _locked_topics_for_display(prompt_data: Any, configurable: dict) -> List[str]:
+    """The locked-memory titles the actor's prompt carried this turn.
+
+    Read from the session's high-water mark WITHOUT observing a new state: this
+    runs after the reply, and the prompt was built from the mark as it stands
+    now. Display only — for the internal-monologue panel.
+    """
+    sources = getattr(prompt_data, "knowledge_sources", None)
+    if not has_memory_locks(sources):
+        return []
+    tracker = getattr(configurable.get("retrieved_context_store"), "unlocks", None)
+    _, locked = partition_memory_sources(
+        sources,
+        getattr(prompt_data, "states", None),
+        tracker.highest_rung if tracker is not None else -1,
+    )
+    return locked_memory_topics(locked)
 
 
 @instrumented_node("clear_events_and_detected_data")

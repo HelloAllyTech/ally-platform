@@ -185,6 +185,28 @@ preserved identically whether the flag is on or off — both paths deliver the g
 `tests/unit/graph/test_prompt_with_retrieved_context.py` pins that in each mode. Default `True`;
 see the setting's docstring for the rollout plan.
 
+### Trainer-locked memories (`unlocksFromStateId`)
+
+A Knowledge Source may carry `unlocksFromStateId`: the scenario state from which the client may
+talk about it. `app/core/graph/knowledge_locks.py` owns the rule; the pipeline touches it in
+three places.
+
+- **`retrieve_knowledge`** drops locked sources before the title selector runs, so their content
+  is never selected, cached or rendered. The lock resolves against the scenario's `states`
+  whatever the selected prompt declares — it fails closed.
+- **The session's high-water mark** (`RetrievedContextStore.unlocks`) makes unlocks sticky: once
+  a state is reached, memories unlocked by it stay unlocked even if the score falls back. The
+  set only grows, so a reused `retrieved_context` can never hold something now locked. When the
+  mark rises, the reuse countdown is zeroed so a newly opened memory is selectable at once.
+- **`generate_response`** passes the locked TITLES (never content) to the working-memory
+  `{working_memory_withheld}` section as topics the client is not ready to discuss, and
+  `update_working_memory` passes the same list to the internal-monologue panel. Prompts without
+  working memory simply never see a locked memory.
+
+Unset means always available. A lock naming a state that doesn't exist keeps the memory locked
+and logs `[MEMORY_LOCK] ... unknown state`; ally-be rejects such a lock on save. Grep
+`[MEMORY_LOCK] reached rung` to see a session's unlocks.
+
 ## Node 3b: detect_behaviors
 
 **File:** `app/core/graph/nodes.py:detect_behaviors`
