@@ -7,6 +7,7 @@ evaluates an EXISTING transcript supplied by ally-be (no conversation is
 generated here).
 """
 
+import asyncio
 import httpx
 
 from app.core.config import settings
@@ -33,32 +34,49 @@ async def _send_webhook(
     logger.info(
         "Sending actor-evaluation webhook to %s (status=%s)", url, payload.status
     )
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.patch(
-                url,
-                json=payload.model_dump(),
-                headers={
-                    "Content-Type": "application/json",
-                    "x-api-key": settings.CORE_SERVICE_API_KEY,
-                },
+    headers = {
+        "Content-Type": "application/json",
+        "x-api-key": settings.CORE_SERVICE_API_KEY,
+    }
+    retries = 3
+    backoff_factor = 1.0
+    for attempt in range(retries):
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                resp = await client.patch(
+                    url,
+                    json=payload.model_dump(),
+                    headers=headers,
+                )
+                resp.raise_for_status()
+                logger.info(
+                    "Actor-evaluation webhook delivered (status=%d)", resp.status_code
+                )
+                return
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code >= 500 and attempt < retries - 1:
+                sleep_time = backoff_factor * (2**attempt)
+                logger.warning(
+                    "Actor-evaluation webhook failed with %d, retrying in %.1fs",
+                    e.response.status_code,
+                    sleep_time,
+                )
+                await asyncio.sleep(sleep_time)
+                continue
+
+            logger.error(
+                "Actor-evaluation webhook failed HTTP %d for session=%s: %s",
+                e.response.status_code,
+                scenario_session_id,
+                e.response.text,
             )
-            resp.raise_for_status()
-            logger.info(
-                "Actor-evaluation webhook delivered (status=%d)", resp.status_code
+            return
+        except Exception:
+            logger.exception(
+                "Unexpected error sending actor-evaluation webhook for session=%s",
+                scenario_session_id,
             )
-    except httpx.HTTPStatusError as e:
-        logger.error(
-            "Actor-evaluation webhook failed HTTP %d for session=%s: %s",
-            e.response.status_code,
-            scenario_session_id,
-            e.response.text,
-        )
-    except Exception:
-        logger.exception(
-            "Unexpected error sending actor-evaluation webhook for session=%s",
-            scenario_session_id,
-        )
+            return
 
 
 async def run_actor_evaluation(request: ActorEvaluationRequest) -> None:
