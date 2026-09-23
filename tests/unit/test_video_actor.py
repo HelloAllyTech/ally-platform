@@ -199,6 +199,9 @@ class TestStartVideoActor:
         monkeypatch.setattr(video_actor.settings, "VIDEO_ACTOR_PROVIDER", "bey")
         monkeypatch.setattr(video_actor.settings, "VIDEO_ACTOR_AVATAR_ID", "face-1")
         monkeypatch.setattr(video_actor.settings, "VIDEO_ACTOR_BEY_API_KEY", None)
+        # The fallback key too: a developer .env that sets it made "no key"
+        # untrue and sent this test down the start path.
+        monkeypatch.setattr(video_actor.settings, "VIDEO_ACTOR_API_KEY", None)
 
         with caplog.at_level("WARNING"):
             result = await video_actor.start_video_actor(
