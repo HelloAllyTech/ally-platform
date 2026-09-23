@@ -224,53 +224,91 @@ def _store_cached_retrieval(cache_key: str, value: str) -> None:
         _RETRIEVAL_CACHE.popitem(last=False)
 
 
+#: Characters of each memory's content shown to the selector next to its title.
+#: A bare title ("Arjun") says nothing about what the memory is; a one-line
+#: gist does. Bounded because a scenario may carry up to 50 sources and this
+#: call runs every refresh — at the cap that is ~2k extra tokens on the
+#: selector, which is off the reply path.
+_PREVIEW_CHARS = 160
+
+#: How the client's memories are framed to the selector. Measured on the
+#: real model (tests/integration/test_knowledge_selector_live.py): the old
+#: "directly relevant to what is being discussed" framing recalled a family
+#: memory on 0/9 family questions — gpt-4o-mini read "family at home" as not
+#: about "Mother's health" — while this framing recalled 9/9 with no false
+#: picks on work-only turns. Previews alone did not move it; the framing did.
+_MEMORY_FRAMING = (
+    "You pick which of the client's own memories are on their mind right now, "
+    "in a role-played conversation between a counselor and a client (the "
+    "client is an AI agent)."
+)
+_MEMORY_RULE = (
+    "Read the counselor's latest message. Return the title of every memory the "
+    "client would naturally draw on to answer it, including memories the "
+    "question reaches only indirectly. Leave out memories unrelated to what the "
+    "counselor is asking about now."
+)
+
+
+def _preview(content: str) -> str:
+    text = " ".join((content or "").split())
+    if len(text) <= _PREVIEW_CHARS:
+        return text
+    return text[:_PREVIEW_CHARS].rsplit(" ", 1)[0] + "…"
+
+
 def _build_selector_prompt(
-    available_titles: List[str], glossary_hints: Optional[Dict[str, str]]
+    available_titles: List[str],
+    glossary_hints: Optional[Dict[str, str]],
+    previews: Optional[Dict[str, str]] = None,
 ) -> str:
     """Build the title-selection system prompt.
 
-    Without glossary sections this is the original single-criterion prompt
-    (behavior-preserving). With them, the prompt carries a dual-framing
-    instruction (LANGUAGE_GLOSSARY_DESIGN.md §5.2): scenario topics are
-    selected for what is being DISCUSSED (content-side, backward-looking),
-    glossary sections for what the agent's NEXT reply needs (production-side,
-    forward-looking) — with a deliberate bias toward inclusion, since a
-    missed glossary section sends the agent into a vocabulary domain unarmed
-    while a false positive only spends cap budget. Each glossary section's
-    `retrievalHint` is rendered under its title as its trigger description.
-    """
-    if not glossary_hints:
-        return (
-            "You are a knowledge retrieval assistant. Given a conversation between "
-            "a counselor and a client, identify which knowledge topics are relevant "
-            "to the current conversation.\n\n"
-            f"Available topics: {available_titles}\n\n"
-            "Return ONLY the titles that are directly relevant to what is being "
-            "discussed. If none are relevant, return an empty list."
-        )
+    Scenario Knowledge Sources are the client's MEMORIES, and are framed that
+    way (see `_MEMORY_FRAMING`), each with a short content preview.
 
+    With glossary sections the prompt also carries a dual-framing instruction
+    (LANGUAGE_GLOSSARY_DESIGN.md §5.2): memories are selected for what the
+    counselor is asking about (content-side), glossary sections for what the
+    agent's NEXT reply needs (production-side, forward-looking) — with a
+    deliberate bias toward inclusion, since a missed glossary section sends
+    the agent into a vocabulary domain unarmed while a false positive only
+    spends cap budget. Each glossary section's `retrievalHint` is rendered
+    under its title as its trigger description.
+    """
+    glossary_hints = glossary_hints or {}
+    previews = previews or {}
     lines: List[str] = []
     for title in available_titles:
-        lines.append(f"- {title}")
         hint = glossary_hints.get(title)
         if hint:
+            lines.append(f"- {title}")
             lines.append(f"  when to retrieve: {hint}")
+            continue
+        gist = previews.get(title)
+        lines.append(f"- {title}: {gist}" if gist else f"- {title}")
     topics_block = "\n".join(lines)
 
+    if not glossary_hints:
+        return (
+            f"{_MEMORY_FRAMING}\n\n"
+            f"The client's memories (title: what it is about):\n{topics_block}\n\n"
+            f"{_MEMORY_RULE} Return exact titles only. If none apply, return an "
+            "empty list."
+        )
+
     return (
-        "You are a knowledge retrieval assistant for a role-played conversation "
-        "between a counselor and a client (the client is an AI agent).\n\n"
+        f"{_MEMORY_FRAMING}\n\n"
         f"Available topics:\n{topics_block}\n\n"
         "Two kinds of topics are listed:\n"
-        "- Scenario knowledge topics: return them only when they are directly "
-        "relevant to what is being discussed.\n"
+        f"- The client's memories (title: what it is about). {_MEMORY_RULE}\n"
         "- Language glossary sections (titles in [brackets]): these help the "
         "client character SPEAK its next reply in its language. Return a "
         "glossary section when the next reply is likely to enter that "
         "vocabulary domain, even if it has not been explicitly mentioned yet. "
         "When the conversation seems to be entering a new topic area, prefer "
         "including the matching glossary section.\n\n"
-        "Return ONLY relevant titles. If none are relevant, return an empty list."
+        "Return exact titles only. If none apply, return an empty list."
     )
 
 
@@ -318,7 +356,14 @@ async def retrieve_relevant_knowledge(
 
         available_titles = list(knowledge_map.keys())
 
-        system_prompt = _build_selector_prompt(available_titles, glossary_hints)
+        previews = {
+            title: _preview(content)
+            for title, content in knowledge_map.items()
+            if not (glossary_hints and title in glossary_hints)
+        }
+        system_prompt = _build_selector_prompt(
+            available_titles, glossary_hints, previews
+        )
 
         structured_llm = llm_client.llm_instance.with_structured_output(RelevantKeys)
         result = await structured_llm.ainvoke(

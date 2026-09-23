@@ -203,6 +203,15 @@ three places.
   `update_working_memory` passes the same list to the internal-monologue panel. Prompts without
   working memory simply never see a locked memory.
 
+An unlocked memory still has to be *selected*. The title selector frames Knowledge Sources as the
+client's own memories, each shown with a short content preview, and asks which the client would
+draw on to answer the counselor's latest message, including indirectly
+(`_MEMORY_FRAMING` / `_MEMORY_RULE` in `knowledge_retrieval.py`). The earlier "directly relevant to
+what is being discussed" wording recalled a family memory on 0/9 family questions with
+gpt-4o-mini. Change that prompt only against
+`tests/integration/test_knowledge_selector_live.py`, which scores the real model on a recorded
+v2v conversation (`LIVE_OPENAI_API_KEY=... -m openai_api`).
+
 Unset means always available. A lock naming a state that doesn't exist keeps the memory locked
 and logs `[MEMORY_LOCK] ... unknown state`; ally-be rejects such a lock on save. Grep
 `[MEMORY_LOCK] reached rung` to see a session's unlocks.
