@@ -69,10 +69,10 @@ export const NotificationsScreen: React.FC = () => {
       // Course discussion reply → open the track item player at the
       // replied-to item and (best-effort) scroll to / highlight the reply.
       if (item.type === COURSE_DISCUSSION_REPLY_NOTIFICATION_TYPE) {
-        const data = item.data ?? {};
-        const trackId = data.trackId as string | undefined;
-        const itemId = data.itemId as string | undefined;
-        const postId = data.postId as string | undefined;
+        const notificationData = item.data ?? {};
+        const trackId = notificationData.trackId as string | undefined;
+        const itemId = notificationData.itemId as string | undefined;
+        const postId = notificationData.postId as string | undefined;
         if (trackId && itemId) {
           navigation.navigate(SCREEN_NAMES.COURSE_ITEM_PLAYER, {
             trackId,
