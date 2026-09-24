@@ -1,4 +1,3 @@
-import asyncio
 from unittest.mock import AsyncMock, patch
 
 import httpx
@@ -34,17 +33,30 @@ async def test_send_webhook_retries_on_502():
     mock_client = AsyncMock()
     mock_client.patch.side_effect = [
         httpx.HTTPStatusError(
-            "Server Error", request=mock_response_502.request, response=mock_response_502
+            "Server Error",
+            request=mock_response_502.request,
+            response=mock_response_502,
         ),
         httpx.HTTPStatusError(
-            "Server Error", request=mock_response_502.request, response=mock_response_502
+            "Server Error",
+            request=mock_response_502.request,
+            response=mock_response_502,
         ),
         mock_response_200,
     ]
 
     payload = ActorEvaluationWebhookPayload(status="COMPLETED")
 
-    with patch("httpx.AsyncClient", return_value=AsyncContextManagerMock(mock_client)):
+    with (
+        patch(
+            "httpx.AsyncClient", return_value=AsyncContextManagerMock(mock_client)
+        ),
+        # The backoff is real seconds; the test only cares that it retries.
+        patch(
+            "app.core.scenario_session_evaluation.service.asyncio.sleep",
+            new_callable=AsyncMock,
+        ),
+    ):
         await _send_webhook("test-session-id", payload)
 
     assert mock_client.patch.call_count == 3
