@@ -240,6 +240,18 @@ export const API_ROUTES = {
     LANGUAGES: (trackId: string) => `/learn/tracks/${trackId}/languages`,
     SET_LANGUAGE: (trackId: string) => `/learn/tracks/${trackId}/language`,
   },
+  DISCUSSION: {
+    GET: (itemId: string) => `/learn/track-items/${itemId}/discussion`,
+    CREATE_POST: (itemId: string) =>
+      `/learn/track-items/${itemId}/discussion/posts`,
+    REPLY: (postId: string) => `/learn/discussion/posts/${postId}/replies`,
+    POST: (postId: string) => `/learn/discussion/posts/${postId}`,
+    LOCK_POST: (postId: string) => `/learn/discussion/posts/${postId}/lock`,
+    LOCK_DISCUSSION: (itemId: string) =>
+      `/learn/track-items/${itemId}/discussion/lock`,
+    TENANTS: (itemId: string) =>
+      `/learn/track-items/${itemId}/discussion/tenants`,
+  },
   SIMULATION_REVIEWS: {
     REVIEWS: '/scenario-session-reviews',
     CREATE_REVIEW: '/scenario-session-reviews',
