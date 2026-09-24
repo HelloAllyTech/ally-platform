@@ -234,10 +234,7 @@ async function appleApiWrite(path, token, method, body) {
  * clobbering a human's copy on every release would be its own bug.
  */
 async function ensureBetaAppDescription(appId, token) {
-  const existing = await appleApi(
-    `/apps/${appId}/betaAppLocalizations`,
-    token,
-  );
+  const existing = await appleApi(`/apps/${appId}/betaAppLocalizations`, token);
   const localizations = existing.data ?? [];
   const preferred =
     localizations.find(l => l.attributes?.locale === BETA_LOCALE) ??
@@ -251,13 +248,18 @@ async function ensureBetaAppDescription(appId, token) {
   }
 
   if (preferred) {
-    await appleApiWrite(`/betaAppLocalizations/${preferred.id}`, token, 'PATCH', {
-      data: {
-        type: 'betaAppLocalizations',
-        id: preferred.id,
-        attributes: {description: BETA_APP_DESCRIPTION},
+    await appleApiWrite(
+      `/betaAppLocalizations/${preferred.id}`,
+      token,
+      'PATCH',
+      {
+        data: {
+          type: 'betaAppLocalizations',
+          id: preferred.id,
+          attributes: {description: BETA_APP_DESCRIPTION},
+        },
       },
-    });
+    );
     console.log(
       `Filled the empty Beta App Description for locale ${preferred.attributes?.locale}.`,
     );
