@@ -74,7 +74,7 @@ export const NotificationsScreen: React.FC = () => {
         const itemId = notificationData.itemId as string | undefined;
         const postId = notificationData.postId as string | undefined;
         if (trackId && itemId) {
-          navigation.navigate(SCREEN_NAMES.COURSE_ITEM_PLAYER, {
+          navigation.push(SCREEN_NAMES.COURSE_ITEM_PLAYER, {
             trackId,
             itemId,
             highlightPostId: postId,

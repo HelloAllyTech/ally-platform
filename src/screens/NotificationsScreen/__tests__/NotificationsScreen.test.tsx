@@ -7,12 +7,13 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({top: 0, bottom: 0, left: 0, right: 0}),
 }));
 
-const mockNavigate = jest.fn();
+const mockPush = jest.fn();
 const mockGoBack = jest.fn();
 
 jest.mock('@/hooks', () => ({
   useAppNavigation: jest.fn(() => ({
-    navigate: mockNavigate,
+    navigate: jest.fn(),
+    push: mockPush,
     goBack: mockGoBack,
   })),
   useHardwareBackPressHandler: jest.fn(),
@@ -39,7 +40,7 @@ describe('NotificationsScreen', () => {
     jest.clearAllMocks();
   });
 
-  it('navigates to the course item player on a COURSE_DISCUSSION_REPLY tap', () => {
+  it('pushes the course item player on a COURSE_DISCUSSION_REPLY tap', () => {
     mockNotifications = [
       {
         id: 'notif-1',
@@ -61,7 +62,7 @@ describe('NotificationsScreen', () => {
     fireEvent.press(getByTestId('notification-item'));
 
     expect(mockMarkRead).toHaveBeenCalledWith('notif-1');
-    expect(mockNavigate).toHaveBeenCalledWith('CourseItemPlayer', {
+    expect(mockPush).toHaveBeenCalledWith('CourseItemPlayer', {
       trackId: 'track-1',
       itemId: 'item-1',
       highlightPostId: 'post-2',
@@ -84,6 +85,6 @@ describe('NotificationsScreen', () => {
     const {getByTestId} = render(<NotificationsScreen />);
     fireEvent.press(getByTestId('notification-item'));
 
-    expect(mockNavigate).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
   });
 });
