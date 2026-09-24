@@ -110,7 +110,9 @@ def _behaviour_labels(
     return out
 
 
-def _rendered_sections(memory: ClientWorkingMemory) -> Dict[str, str]:
+def _rendered_sections(
+    memory: ClientWorkingMemory, locked_topics: Optional[List[str]] = None
+) -> Dict[str, str]:
     """The exact `{working_memory_*}` values the actor was handed this turn.
 
     Re-rendered from the snapshot the prompt was built from, which is the same
@@ -122,7 +124,11 @@ def _rendered_sections(memory: ClientWorkingMemory) -> Dict[str, str]:
         from app.core.working_memory.render import render_sections
 
         out: Dict[str, str] = {}
-        for key, value in render_sections(memory).items():
+        # Trainer-locked memory titles go in exactly as the actor's prompt had
+        # them; without them this would silently differ from what it claims to
+        # be — the literal text the actor was handed.
+        rendered = render_sections(memory, locked_topics=locked_topics or ())
+        for key, value in rendered.items():
             text = (value or "").strip()
             # Drop named absences. `render.py` deliberately renders "(nothing
             # left hanging)" rather than a blank, because a blank reads to the
@@ -184,6 +190,7 @@ def build_payload(
     advancing_behaviours: Optional[List[str]] = None,
     messages: Any = None,
     missed: bool = False,
+    locked_topics: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """One turn of the monologue.
 
@@ -239,7 +246,7 @@ def build_payload(
         # For prompt tuning this is the ground truth: everything else on this
         # panel is a description of the client's state, while this is the text
         # that actually shaped the reply.
-        "sections": _rendered_sections(memory),
+        "sections": _rendered_sections(memory, locked_topics),
         # Health. A missed update means this turn ran on last turn's memory.
         "missed": bool(missed),
         "updatesMissed": memory.updates_missed,

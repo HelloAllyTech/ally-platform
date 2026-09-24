@@ -527,6 +527,10 @@ def schedule_update(
     room=None,
     score: Optional[int] = None,
     credited_behaviours: Optional[List[str]] = None,
+    # Titles of trainer-locked memories the actor's prompt carried this turn
+    # (knowledge_locks.py). Display only: they are authored, so they reach the
+    # panel's re-rendered sections and never the store.
+    locked_topics: Optional[List[str]] = None,
 ) -> bool:
     """Fire the consolidation as a DETACHED task writing into ``store``.
 
@@ -578,6 +582,7 @@ def schedule_update(
                     prompt_data=prompt_data,
                     messages=new_messages,
                     missed=True,
+                    locked_topics=locked_topics,
                 ),
             )
             return
@@ -602,6 +607,7 @@ def schedule_update(
                     prompt_data=prompt_data,
                     messages=new_messages,
                     missed=True,
+                    locked_topics=locked_topics,
                 ),
             )
             return
@@ -665,6 +671,7 @@ def schedule_update(
                     prompt_data=prompt_data,
                     advancing_behaviours=credited_behaviours,
                     messages=new_messages,
+                    locked_topics=locked_topics,
                 ),
             )
             logger.info(

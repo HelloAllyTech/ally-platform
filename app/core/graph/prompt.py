@@ -439,15 +439,29 @@ def _get_selected_prompt_has_states(prompt_data: PromptData) -> bool:
     ) or prompt_declares_client_working_memory(prompt_data)
 
 
+def _format_dialogue_length_instruction(dialogue_length: Optional[str]) -> str:
+    if not dialogue_length:
+        return ""
+    if dialogue_length == "short":
+        return "Keep the response short."
+    if dialogue_length == "medium":
+        return "Keep the response of medium length."
+    if dialogue_length == "long":
+        return "Make the response long and detailed."
+    return ""
+
+
 def _build_behavior_prompt(
     prompt_data: PromptData,
+    next_instruction: Optional[str],
+    language_code: Optional[str],
     behavior_instructions: List[SimulationBehaviorInstruction],
     current_state: Optional[SimulationStateInstruction] = None,
-    language_code: Optional[str] = None,
     retrieved_context: Optional[str] = None,
     current_score: Optional[int] = None,
     embed_retrieved_context: bool = True,
     client_working_memory: Any = None,
+    locked_memory_topics: Optional[List[str]] = None,
 ) -> Tuple[SystemMessage, Optional[str]]:
     """Returns (system_message, effective_retrieved_context).
 
@@ -529,7 +543,9 @@ def _build_behavior_prompt(
 
         working_memory_sections = {
             **working_memory_sections,
-            **render_sections(client_working_memory),
+            **render_sections(
+                client_working_memory, locked_topics=locked_memory_topics or ()
+            ),
         }
         # The authored half needs the same named absence the derived half gets.
         #
@@ -624,6 +640,12 @@ def _build_behavior_prompt(
     # Build kwargs once so we can route through either the default
     # main_agent_prompt or a per-simulation variant selected via
     # PromptData.selected_main_prompt_code without duplicating the call site.
+    dialogue_length_instruction = (
+        _format_dialogue_length_instruction(active_sim_state.get("dialogueLength"))
+        if active_sim_state
+        else ""
+    )
+
     template_kwargs = dict(
         title=_coerce_block_value(getattr(prompt_data, "title", None)),
         challenge_description=_coerce_block_value(
@@ -715,6 +737,7 @@ def _build_behavior_prompt(
         # prompt did not opt in). Variants without {state_x_guidelines} in
         # their text simply ignore this kwarg via SafeFormatter.
         state_x_guidelines=state_x_guidelines,
+        dialogue_length_instruction=dialogue_length_instruction,
         # Retired placeholder, still passed as "" on purpose. The single-block
         # form is gone (see `prompt_declares_client_working_memory`), but a
         # prompt row in the dashboard may still carry `{client_working_memory}`
@@ -954,6 +977,7 @@ def generate_system_message(
     rolling_summary: Optional[str] = None,
     defer_retrieved_context: bool = False,
     client_working_memory: Any = None,
+    locked_memory_topics: Optional[List[str]] = None,
 ) -> Tuple[SystemMessage, Optional[SystemMessage]]:
     """
     Generates a SystemMessage prompt for an AI roleplay assistant
@@ -1008,13 +1032,15 @@ def generate_system_message(
             )
         msg, effective_retrieved_context = _build_behavior_prompt(
             prompt_data,
-            behavior_instructions,
-            current_state,
+            next_instruction,
             language_code,
-            retrieved_context,
+            behavior_instructions,
+            current_state=current_state,
+            retrieved_context=retrieved_context,
             current_score=current_score,
             embed_retrieved_context=not defer_retrieved_context,
             client_working_memory=client_working_memory,
+            locked_memory_topics=locked_memory_topics,
         )
         logger.info(
             "%s BUILT behavior prompt: language_code=%s",
@@ -1034,13 +1060,15 @@ def generate_system_message(
     )
     msg, effective_retrieved_context = _build_behavior_prompt(
         prompt_data,
+        next_instruction,
+        language_code,
         [],
         current_state,
-        language_code,
         retrieved_context,
         current_score=current_score,
         embed_retrieved_context=not defer_retrieved_context,
         client_working_memory=client_working_memory,
+        locked_memory_topics=locked_memory_topics,
     )
     logger.info(
         "%s BUILT behavior prompt: language_code=%s",
@@ -1062,13 +1090,15 @@ def generate_prompt_content(
     behavior_instructions: Optional[List[SimulationBehaviorInstruction]] = None,
     current_state: Optional[SimulationStateInstruction] = None,
     retrieved_context: Optional[str] = None,
+    current_score: Optional[int] = None,
 ) -> str:
     system_message, _ = generate_system_message(
-        prompt_data,
-        next_instruction,
-        language_code,
+        prompt_data=prompt_data,
+        next_instruction=next_instruction,
+        language_code=language_code,
         behavior_instructions=behavior_instructions,
         current_state=current_state,
         retrieved_context=retrieved_context,
+        current_score=current_score,
     )
     return system_message.content

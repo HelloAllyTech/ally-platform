@@ -274,10 +274,32 @@ class TestGlossaryDualFramingSelector:
     GLOSSARY_TITLE = "[Tamil (India) glossary] Clinical terms"
     HINT = "Retrieve when the reply turns toward diagnosis or symptoms"
 
-    def test_selector_prompt_unchanged_without_glossary(self):
-        prompt = _build_selector_prompt(["school memories"], None)
-        assert "directly relevant to what is being discussed" in prompt
+    def test_selector_prompt_frames_sources_as_memories_without_glossary(self):
+        prompt = _build_selector_prompt(
+            ["school memories"], None, {"school memories": "Bullied in 8th grade"}
+        )
+        assert "the client's own memories" in prompt
+        assert "- school memories: Bullied in 8th grade" in prompt
+        assert "reaches only indirectly" in prompt
         assert "glossary" not in prompt.lower()
+
+    def test_glossary_titles_get_their_hint_not_a_preview(self):
+        prompt = _build_selector_prompt(
+            ["school memories", self.GLOSSARY_TITLE],
+            {self.GLOSSARY_TITLE: self.HINT},
+            {"school memories": "Bullied in 8th grade"},
+        )
+        assert "- school memories: Bullied in 8th grade" in prompt
+        assert f"- {self.GLOSSARY_TITLE}\n  when to retrieve: {self.HINT}" in prompt
+
+    def test_preview_is_bounded_and_ends_on_a_word(self):
+        from app.core.graph.knowledge_retrieval import _PREVIEW_CHARS, _preview
+
+        text = "word " * 100
+        out = _preview(text)
+        assert len(out) <= _PREVIEW_CHARS + 1
+        assert out.endswith("word…")
+        assert _preview("  short   text ") == "short text"
 
     def test_selector_prompt_dual_framing_with_hints(self):
         prompt = _build_selector_prompt(

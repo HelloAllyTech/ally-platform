@@ -67,4 +67,6 @@ How to use these rules:
 Behavior rules for this simulation:
 {behavior_instructions_json}
 
+{dialogue_length_instruction}
+
 Generate the next dialogue.
