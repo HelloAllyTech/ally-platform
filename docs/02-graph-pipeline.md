@@ -157,6 +157,16 @@ The system prompt has two modes:
 - **With branching instruction**: minimal directive-focused prompt (the instruction guides the conversation direction)
 - **Without branching instruction**: comprehensive prompt with full character details (name, age, context, personality, emotional needs, cultural context, speaking style, etc.)
 
+### Per-state dialogue length (`dialogueLength`)
+
+A scenario state may carry `dialogueLength`: `short`, `medium` or `long`. `_build_behavior_prompt`
+reads it off the active state (the score-band match, resolved only when the selected prompt has
+states) and renders it
+through `_format_dialogue_length_instruction` into a one-line `{dialogue_length_instruction}`
+("Keep the response short." etc.), which `main_agent_prompt.txt` places just before "Generate the
+next dialogue." Unset, unknown values, or no active state render an empty string, so prompts
+without the placeholder — and states without the setting — behave exactly as before.
+
 ### `messages_to_send` shape and provider prompt caching
 
 `generate_response` sends `messages_to_send = [system_message] + history` to the LLM. Because

@@ -29,6 +29,7 @@ def make_prompt_data(**overrides):
         agent_goal=None,
         custom_fields=[],
         previous_memory=None,
+        states=[],
     )
     base.update(overrides)
     return PromptData(**base)
@@ -847,3 +848,151 @@ class TestLanguageGlossary:
         )
         assert "## Language style guide" in msg.content
         assert msg.content.count('- worry: say "டென்ஷன்"; avoid "பதட்டம்"') == 1
+
+
+class TestDialogueLengthInstruction:
+    def test_dialogue_length_short(self):
+        pd = make_prompt_data(
+            states=[
+                {
+                    "id": "1",
+                    "name": "state1",
+                    "guidelines": "guideline1",
+                    "scoreLower": 0,
+                    "scoreUpper": 100,
+                    "ragEnabled": True,
+                    "dialogueLength": "short",
+                }
+            ],
+            prompts={
+                "ally_ai_learn_system_main_agent_prompt": {
+                    "prompt": "{state_x_guidelines}\n{dialogue_length_instruction}",
+                    "availableVariables": [
+                        "state_x_guidelines",
+                        "dialogue_length_instruction",
+                    ],
+                }
+            },
+            selected_main_prompt_code="ally_ai_learn_system_main_agent_prompt",
+        )
+        msg, _ = generate_system_message(
+            prompt_data=pd, behavior_instructions=[], current_score=50
+        )
+        assert "Keep the response short." in msg.content
+
+    def test_dialogue_length_medium(self):
+        pd = make_prompt_data(
+            states=[
+                {
+                    "id": "1",
+                    "name": "state1",
+                    "guidelines": "guideline1",
+                    "scoreLower": 0,
+                    "scoreUpper": 100,
+                    "ragEnabled": True,
+                    "dialogueLength": "medium",
+                }
+            ],
+            prompts={
+                "ally_ai_learn_system_main_agent_prompt": {
+                    "prompt": "{state_x_guidelines}\n{dialogue_length_instruction}",
+                    "availableVariables": [
+                        "state_x_guidelines",
+                        "dialogue_length_instruction",
+                    ],
+                }
+            },
+            selected_main_prompt_code="ally_ai_learn_system_main_agent_prompt",
+        )
+        msg, _ = generate_system_message(
+            prompt_data=pd, behavior_instructions=[], current_score=50
+        )
+        assert "Keep the response of medium length." in msg.content
+
+    def test_dialogue_length_long(self):
+        pd = make_prompt_data(
+            states=[
+                {
+                    "id": "1",
+                    "name": "state1",
+                    "guidelines": "guideline1",
+                    "scoreLower": 0,
+                    "scoreUpper": 100,
+                    "ragEnabled": True,
+                    "dialogueLength": "long",
+                }
+            ],
+            prompts={
+                "ally_ai_learn_system_main_agent_prompt": {
+                    "prompt": "{state_x_guidelines}\n{dialogue_length_instruction}",
+                    "availableVariables": [
+                        "state_x_guidelines",
+                        "dialogue_length_instruction",
+                    ],
+                }
+            },
+            selected_main_prompt_code="ally_ai_learn_system_main_agent_prompt",
+        )
+        msg, _ = generate_system_message(
+            prompt_data=pd, behavior_instructions=[], current_score=50
+        )
+        assert "Make the response long and detailed." in msg.content
+
+    def test_dialogue_length_none(self):
+        pd = make_prompt_data(
+            states=[
+                {
+                    "id": "1",
+                    "name": "state1",
+                    "guidelines": "guideline1",
+                    "scoreLower": 0,
+                    "scoreUpper": 100,
+                    "ragEnabled": True,
+                    "dialogueLength": None,
+                }
+            ],
+            prompts={
+                "ally_ai_learn_system_main_agent_prompt": {
+                    "prompt": "{state_x_guidelines}\n{dialogue_length_instruction}",
+                    "availableVariables": [
+                        "state_x_guidelines",
+                        "dialogue_length_instruction",
+                    ],
+                }
+            },
+            selected_main_prompt_code="ally_ai_learn_system_main_agent_prompt",
+        )
+        msg, _ = generate_system_message(
+            prompt_data=pd, behavior_instructions=[], current_score=50
+        )
+        assert "Keep the response" not in msg.content
+        assert "Make the response" not in msg.content
+
+    def test_dialogue_length_not_provided(self):
+        pd = make_prompt_data(
+            states=[
+                {
+                    "id": "1",
+                    "name": "state1",
+                    "guidelines": "guideline1",
+                    "scoreLower": 0,
+                    "scoreUpper": 100,
+                    "ragEnabled": True,
+                }
+            ],
+            prompts={
+                "ally_ai_learn_system_main_agent_prompt": {
+                    "prompt": "{state_x_guidelines}\n{dialogue_length_instruction}",
+                    "availableVariables": [
+                        "state_x_guidelines",
+                        "dialogue_length_instruction",
+                    ],
+                }
+            },
+            selected_main_prompt_code="ally_ai_learn_system_main_agent_prompt",
+        )
+        msg, _ = generate_system_message(
+            prompt_data=pd, behavior_instructions=[], current_score=50
+        )
+        assert "Keep the response" not in msg.content
+        assert "Make the response" not in msg.content
