@@ -205,6 +205,7 @@ export const api = createApi({
     'Progress',
     'Notifications',
     'UnreadNotificationCount',
+    'CourseDiscussion',
   ],
   endpoints: () => ({}),
 });
