@@ -123,6 +123,12 @@ export interface TrackDetailItem {
   score: number | null;
   attemptCount: number | null;
   maxWatchedPct: number | null;
+  /**
+   * Optional for the same released-build reason as `languageFallbackReason`
+   * above: a backend that predates course discussions omits it, and it
+   * should read as "no discussion" rather than breaking the card.
+   */
+  hasDiscussion?: boolean;
 }
 
 export interface TrackSection {
