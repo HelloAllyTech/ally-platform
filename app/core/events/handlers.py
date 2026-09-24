@@ -30,6 +30,7 @@ from app.core.logger import get_logger
 from app.core.metrics import turn_metrics
 from app.core.queue import msg_event_queue
 from app.core.queue.utils import finalize_session, send_deferred_termination_event
+from app.core.tasks import spawn_background_task
 
 logger = get_logger(__name__)
 
@@ -138,10 +139,11 @@ def create_conversation_handler(
             message = CoreEventMessageType.create_turn_metrics(
                 room, TurnMetricsData(**rec)
             )
-            task = asyncio.create_task(send_event_to_queue(message.model_dump_json()))
-            if background_tasks is not None:
-                background_tasks.add(task)
-                task.add_done_callback(background_tasks.discard)
+            spawn_background_task(
+                send_event_to_queue(message.model_dump_json()),
+                name="turn-metrics-send",
+                background_tasks=background_tasks,
+            )
         except Exception:  # noqa: BLE001 - metrics must never break a turn
             logger.exception("[turn-metrics] emit failed for room=%s", room)
 
@@ -327,19 +329,17 @@ def create_conversation_handler(
 
         logger.debug(f"Enqueuing {role} message to SQS")
 
-        # Schedule async send without blocking
-        try:
-            task = asyncio.create_task(
-                send_event_to_queue(core_event.model_dump_json())
-            )
-        except RuntimeError:
-            # Fallback for contexts without running loop
-            task = asyncio.get_event_loop().create_task(
-                send_event_to_queue(core_event.model_dump_json())
-            )
-        if background_tasks is not None:
-            background_tasks.add(task)
-            task.add_done_callback(background_tasks.discard)
+        # Schedule async send without blocking. There used to be a
+        # get_event_loop() fallback here for "contexts without a running
+        # loop": it abandoned the first coroutine (RuntimeWarning, message
+        # lost) and then queued the second one onto a loop nobody runs, so it
+        # never sent either. LiveKit invokes this handler from the loop, so
+        # the no-loop case is a real failure — log it, don't fake a send.
+        spawn_background_task(
+            send_event_to_queue(core_event.model_dump_json()),
+            name="transcript-send",
+            background_tasks=background_tasks,
+        )
 
     def cleanup():
         """Clean up the seen_utterances set."""

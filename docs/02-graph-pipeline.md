@@ -157,6 +157,16 @@ The system prompt has two modes:
 - **With branching instruction**: minimal directive-focused prompt (the instruction guides the conversation direction)
 - **Without branching instruction**: comprehensive prompt with full character details (name, age, context, personality, emotional needs, cultural context, speaking style, etc.)
 
+### Per-state dialogue length (`dialogueLength`)
+
+A scenario state may carry `dialogueLength`: `short`, `medium` or `long`. `_build_behavior_prompt`
+reads it off the active state (the score-band match, resolved only when the selected prompt has
+states) and renders it
+through `_format_dialogue_length_instruction` into a one-line `{dialogue_length_instruction}`
+("Keep the response short." etc.), which `main_agent_prompt.txt` places just before "Generate the
+next dialogue." Unset, unknown values, or no active state render an empty string, so prompts
+without the placeholder — and states without the setting — behave exactly as before.
+
 ### `messages_to_send` shape and provider prompt caching
 
 `generate_response` sends `messages_to_send = [system_message] + history` to the LLM. Because
@@ -184,6 +194,37 @@ preserved identically whether the flag is on or off — both paths deliver the g
 `effective_retrieved_context` that `_build_behavior_prompt` computes, never the raw parameter, and
 `tests/unit/graph/test_prompt_with_retrieved_context.py` pins that in each mode. Default `True`;
 see the setting's docstring for the rollout plan.
+
+### Trainer-locked memories (`unlocksFromStateId`)
+
+A Knowledge Source may carry `unlocksFromStateId`: the scenario state from which the client may
+talk about it. `app/core/graph/knowledge_locks.py` owns the rule; the pipeline touches it in
+three places.
+
+- **`retrieve_knowledge`** drops locked sources before the title selector runs, so their content
+  is never selected, cached or rendered. The lock resolves against the scenario's `states`
+  whatever the selected prompt declares — it fails closed.
+- **The session's high-water mark** (`RetrievedContextStore.unlocks`) makes unlocks sticky: once
+  a state is reached, memories unlocked by it stay unlocked even if the score falls back. The
+  set only grows, so a reused `retrieved_context` can never hold something now locked. When the
+  mark rises, the reuse countdown is zeroed so a newly opened memory is selectable at once.
+- **`generate_response`** passes the locked TITLES (never content) to the working-memory
+  `{working_memory_withheld}` section as topics the client is not ready to discuss, and
+  `update_working_memory` passes the same list to the internal-monologue panel. Prompts without
+  working memory simply never see a locked memory.
+
+An unlocked memory still has to be *selected*. The title selector frames Knowledge Sources as the
+client's own memories, each shown with a short content preview, and asks which the client would
+draw on to answer the counselor's latest message, including indirectly
+(`_MEMORY_FRAMING` / `_MEMORY_RULE` in `knowledge_retrieval.py`). The earlier "directly relevant to
+what is being discussed" wording recalled a family memory on 0/9 family questions with
+gpt-4o-mini. Change that prompt only against
+`tests/integration/test_knowledge_selector_live.py`, which scores the real model on a recorded
+v2v conversation (`LIVE_OPENAI_API_KEY=... -m openai_api`).
+
+Unset means always available. A lock naming a state that doesn't exist keeps the memory locked
+and logs `[MEMORY_LOCK] ... unknown state`; ally-be rejects such a lock on save. Grep
+`[MEMORY_LOCK] reached rung` to see a session's unlocks.
 
 ## Node 3b: detect_behaviors
 

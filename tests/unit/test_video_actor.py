@@ -191,6 +191,26 @@ class TestStartVideoActor:
         )
         assert result is None
 
+    @pytest.mark.unit
+    async def test_bey_missing_api_key_degrades_to_audio_only(
+        self, monkeypatch, caplog
+    ):
+        monkeypatch.setattr(video_actor.settings, "VIDEO_ACTOR_ENABLED", True)
+        monkeypatch.setattr(video_actor.settings, "VIDEO_ACTOR_PROVIDER", "bey")
+        monkeypatch.setattr(video_actor.settings, "VIDEO_ACTOR_AVATAR_ID", "face-1")
+        monkeypatch.setattr(video_actor.settings, "VIDEO_ACTOR_BEY_API_KEY", None)
+        # The fallback key too: a developer .env that sets it made "no key"
+        # untrue and sent this test down the start path.
+        monkeypatch.setattr(video_actor.settings, "VIDEO_ACTOR_API_KEY", None)
+
+        with caplog.at_level("WARNING"):
+            result = await video_actor.start_video_actor(
+                session=object(), room=object(), scenario=_scenario(True)
+            )
+        assert result is None
+        assert "provider=bey" in caplog.text
+        assert "needs an API key" in caplog.text
+
 
 class TestAvatarIdResolution:
     """Per-roleplay id wins; the deployment default is the fallback."""
@@ -472,6 +492,32 @@ class TestVendorConstructorMapping:
             assert provider in video_actor.HOSTED_PROVIDER_KWARGS, provider
 
     @pytest.mark.unit
+    @pytest.mark.unit
+    def test_bey_gets_a_single_attempt_not_the_plugin_default(self):
+        """One attempt, because a retry is one more avatar joining and leaving.
+
+        The plugin's `_start_agent` loops `max_retry` times and each pass
+        commissions an avatar that joins the room and drops when the attempt
+        fails. In prod that rendered as a participant flickering in and out of
+        the learner's session three times in 13 seconds, against a 400 the
+        vendor had already flagged `retryable=False` — its loop does not read
+        that flag, so the retries could never have helped.
+
+        Pinned on the VALUE, not just the keyword: the signature binding in
+        `_bind` proves `conn_options` is accepted, which would stay true if the
+        budget drifted back to the default.
+        """
+        import livekit.plugins.bey as bey
+
+        build = video_actor.HOSTED_PROVIDER_KWARGS["bey"]
+        kwargs = build(bey, avatar_id="face-123", api_key="k", character_name="Asha")
+        assert kwargs["conn_options"].max_retry == 1
+        # The rest of the budget stays whatever livekit-agents ships.
+        from livekit.agents.types import DEFAULT_API_CONNECT_OPTIONS as default
+
+        assert kwargs["conn_options"].timeout == default.timeout
+        assert kwargs["conn_options"].retry_interval == default.retry_interval
+
     def test_persona_id_is_omitted_unless_configured(self, monkeypatch):
         """Unset by design — the character comes from our prompt, not a vendor."""
         import livekit.plugins.tavus as tavus
@@ -993,7 +1039,8 @@ class TestTavusConversationTeardown:
                 scenario=None,
                 livekit_url="wss://example",
             )
-            await handle.aclose()
+            if handle:
+                await handle.aclose()
 
         assert ended == ["conv_9"]
 
@@ -1215,6 +1262,9 @@ class TestDeferredAttach:
             _participant("bey-avatar-agent", kind=_AGENT_KIND, video=published)
         )
         room.name = "r"
+        monkeypatch.setattr(
+            video_actor.settings, "VIDEO_ACTOR_BEY_API_KEY", "dummy-api-key"
+        )
         return _Avatar, room
 
     @pytest.mark.unit

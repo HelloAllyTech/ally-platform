@@ -2979,6 +2979,44 @@ class TestEmitStartMetrics:
         w._emit_start_metrics()
         await asyncio.sleep(0)
 
+    def test_send_coroutine_is_never_abandoned_without_a_running_loop(
+        self, monkeypatch
+    ):
+        """Regression: the emit coroutine must not be left un-awaited.
+
+        `asyncio.create_task(send_event_to_queue(payload))` builds the
+        coroutine before create_task sees it. Off the loop, create_task
+        raises, the broad `except Exception` logs it, and the coroutine is
+        abandoned — the metric is lost and Python reports it later, from an
+        unrelated test, as ``RuntimeWarning: coroutine 'send_event_to_queue'
+        was never awaited``.
+        """
+        created = []
+
+        async def _send(_payload):
+            return None
+
+        def _factory(payload):
+            coro = _send(payload)
+            created.append(coro)
+            return coro
+
+        monkeypatch.setattr(event_handler, "send_event_to_queue", _factory)
+
+        w = self._worker()
+        w._timing = {"configure_ms": 10.0, "connect_ms": 20.0}
+
+        w._emit_start_metrics()  # sync call, no running event loop
+
+        assert created, "no start-metrics send coroutine was built"
+        abandoned = [
+            c for c in created if inspect.getcoroutinestate(c) == inspect.CORO_CREATED
+        ]
+        assert not abandoned, (
+            "start-metrics send coroutine left un-awaited — the metric is "
+            "dropped and it surfaces as a RuntimeWarning"
+        )
+
 
 class TestDispatchEntrypoint:
     """`dispatch_entrypoint` is now a pass-through to `entrypoint`.

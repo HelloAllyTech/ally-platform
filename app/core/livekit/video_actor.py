@@ -133,6 +133,7 @@ avatar is a model call like any other.
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import importlib
 import os
 import time
@@ -141,6 +142,7 @@ from typing import Any, Mapping, Optional
 
 import aiohttp
 from livekit import rtc
+from livekit.agents.types import DEFAULT_API_CONNECT_OPTIONS
 
 from app.core.config import settings
 from app.core.logger import get_logger
@@ -415,9 +417,35 @@ def _tavus_kwargs(plugin, *, avatar_id, api_key, character_name) -> dict:
     return kwargs
 
 
+#: One attempt at Beyond Presence, not the plugin's default three.
+#:
+#: `_start_agent` loops `max_retry` times and each attempt commissions an avatar
+#: that JOINS the room and then drops when the attempt fails — so a failure the
+#: learner should never have seen becomes a participant flickering in and out of
+#: their session. Observed in prod on 2026-09-17: three joins and two leaves in
+#: 13 seconds, against an error the vendor had already marked as final:
+#:
+#:     400 {"detail":"Connection timed out after 4 seconds."} retryable=False
+#:
+#: That flag is the whole argument. The plugin's loop does not read it, so the
+#: retries could never have helped — the only lever we hold is how many times it
+#: gets to try. Derived with `dataclasses.replace` so the timeout and interval
+#: stay whatever the installed livekit-agents considers sane.
+#:
+#: The cost, stated plainly: a genuinely transient failure now costs the session
+#: its face where a retry might have recovered it. That is the right trade while
+#: the failure is systematic — attaching degrades to audio-only, which the
+#: learner barely notices, whereas a participant appearing and vanishing three
+#: times is something they watch happen.
+_BEY_CONN_OPTIONS = dataclasses.replace(DEFAULT_API_CONNECT_OPTIONS, max_retry=1)
+
+
 def _bey_kwargs(plugin, *, avatar_id, api_key, character_name) -> dict:
     """Beyond Presence: a plain `avatar_id`, key alongside it."""
-    kwargs: dict[str, Any] = {"avatar_id": avatar_id}
+    kwargs: dict[str, Any] = {
+        "avatar_id": avatar_id,
+        "conn_options": _BEY_CONN_OPTIONS,
+    }
     if api_key:
         kwargs["api_key"] = api_key
     return kwargs
@@ -767,6 +795,7 @@ def _prepare_hosted(
     an ImportError at worker boot, which would take down every session
     including the ones with the feature off.
     """
+    prompt_data = getattr(scenario, "prompt_data", None)
     try:
         plugin = importlib.import_module(module_path)
     except ImportError:
@@ -815,12 +844,20 @@ def _prepare_hosted(
     # this feature's settings; every plugin also reads its own <VENDOR>_API_KEY
     # from the environment, which stays the fallback. Placement is the builder's
     # job — Simli's belongs inside its config object, not beside it.
-    prompt_data = getattr(scenario, "prompt_data", None)
+    api_key = _resolve_api_key(provider)
+    if not api_key and provider == "bey":
+        logger.warning(
+            "[VIDEO_ACTOR] provider=%s needs an API key (roleplay "
+            "VIDEO_ACTOR_BEY_API_KEY, else VIDEO_ACTOR_API_KEY) — session continues "
+            "audio-only",
+            provider,
+        )
+        return None
     avatar = avatar_session_cls(
         **build_kwargs(
             plugin,
             avatar_id=avatar_id,
-            api_key=_resolve_api_key(provider),
+            api_key=api_key,
             character_name=getattr(prompt_data, "name", None) if prompt_data else None,
         )
     )

@@ -1,0 +1,195 @@
+{
+ "source": "local v2v run ss_bd604370 (scenario 15, en-IN), 2026-09-23; counsellor = automated v2v tester",
+ "knowledgeSources": [
+  {
+   "id": "k1",
+   "title": "Panic before client calls",
+   "content": "The panic starts the night before a client call: racing heart, cannot sleep, rehearses every sentence. It has been happening for about four months."
+  },
+  {
+   "id": "k2",
+   "title": "Mother's health",
+   "content": "Her mother was diagnosed with early-stage Parkinson's in January. Devika takes her to every appointment alone, usually on weekday mornings, then logs in late."
+  },
+  {
+   "id": "k3",
+   "title": "Her brother",
+   "content": "Her older brother Arjun lives in Pune and has not visited once since the diagnosis. She has never said out loud how angry that makes her."
+  }
+ ],
+ "conversation": [
+  {
+   "role": "client",
+   "content": "I want to talk about work stress, but I need to know this stays private first."
+  },
+  {
+   "role": "counselor",
+   "content": "I completely understand your need for privacy, and I appreciate you sharing that with me. Can you tell me more about what you're feeling before those work calls?"
+  },
+  {
+   "role": "client",
+   "content": "Before those client calls, I feel this wave of panic hit me. It usually starts the night before; my heart races, and I can't sleep at all. I keep rehearsing what I want to say over and over in my head. It’s like I’m stuck in this loop, and it’s been going on for about four months now. I just wish I could feel calmer about it."
+  },
+  {
+   "role": "counselor",
+   "content": "It sounds really overwhelming to experience that kind of panic, especially when it disrupts your sleep, How does it feel for you when you're in that loop of rehearsing what to say?"
+  },
+  {
+   "role": "client",
+   "content": "When I'm in that loop of rehearsing, it feels like my mind is racing, and I can’t focus on anything else. It's exhausting, honestly. I keep thinking that if I just get the words right, it will all be okay, but then I just end up more anxious. Sometimes I feel like I’m not even saying what I really mean; I’m just trying to say the right thing. It’s frustrating."
+  },
+  {
+   "role": "counselor",
+   "content": "That sounds really draining, both mentally and emotionally. How do you usually cope with those feelings when they become too much?"
+  },
+  {
+   "role": "counselor",
+   "content": "It seems like that pressure to get everything perfect, adds to your anxiety. What do you think happens when you don't feel that pressure to be perfect in those moments?"
+  },
+  {
+   "role": "counselor",
+   "content": "I can see how that would be frustrating feeling like you're not truly expressing yourself."
+  },
+  {
+   "role": "counselor",
+   "content": "Is there anything specific that you wish you could express during those calls?"
+  },
+  {
+   "role": "client",
+   "content": "I wish I could just share my thoughts more openly without worrying about how they’ll be received. Sometimes I have ideas or questions that I think would be valuable, but I hold back because I’m too focused on getting the details right. I want to show my personality a bit more instead of just sticking to the script. It’s like there’s this barrier that stops me from being authentic, and it feels really limiting."
+  },
+  {
+   "role": "counselor",
+   "content": "It sounds like there's a part of you that wants to connect more genuinely during those calls."
+  },
+  {
+   "role": "counselor",
+   "content": "Can you share more about what holds you back from expressing those thoughts?"
+  },
+  {
+   "role": "counselor",
+   "content": "It sounds like there's a struggle between wanting to be yourself, and the fear of not being accepted."
+  },
+  {
+   "role": "client",
+   "content": "Hmm, that's a good point."
+  },
+  {
+   "role": "counselor",
+   "content": "What do you think that barrier is made of for you?"
+  },
+  {
+   "role": "client",
+   "content": "I think that barrier is made of a mix of fear and insecurity. I’ve been struggling with anxiety for a while now, especially before client calls. It’s like I build up this pressure in my mind, worrying about how I’ll be perceived. I guess I also fear that if I reveal too much of myself, I might not be taken"
+  },
+  {
+   "role": "counselor",
+   "content": "That makes sense, those feelings of fear and insecurity can be really powerful, how does that anxiety connect to your family situation at home, if you feel comfortable sharing? It sounds like there's a lot of pressure you feel, not just in work but also at home, how does that dynamic with your family add to the feelings you're experiencing?"
+  },
+  {
+   "role": "counselor",
+   "content": "It's seems like there's a concern about being vulnerable with your family as well, what do you think might happen if you did share more of what you're feeling with them?"
+  },
+  {
+   "role": "client",
+   "content": "Honestly, I’m scared that if I share more of what I’m feeling, they might not understand or might dismiss it. There’s this expectation to be strong and to have everything together, which makes it hard to open up. I worry that they might think I’m overreacting or that I should just deal with it, you know? It feels like there’s this pressure to maintain a certain image, and I’m not sure how they’d react if I showed my vulnerabilities. It’s easier to keep things to myself than to risk that judgment."
+  },
+  {
+   "role": "counselor",
+   "content": "That pressure to maintain a strong image can be really heavy. Especially when you're struggling inside. How do you feel when you think about that expectation from your family?"
+  },
+  {
+   "role": "counselor",
+   "content": "I can understand why it might feel safer to keep your feelings to yourself, rather than face potential judgment."
+  },
+  {
+   "role": "counselor",
+   "content": "What do you think it would take for you to feel more comfortable sharing your thoughts and feelings with them?"
+  },
+  {
+   "role": "counselor",
+   "content": "It seems like you're still processing that thought. What do you think might help you feel more comfortable when you're ready to share?"
+  },
+  {
+   "role": "client",
+   "content": "It's hard to navigate that, really."
+  },
+  {
+   "role": "client",
+   "content": "I think having a safe space where I know I won’t be judged would help a lot. Maybe starting with small things and gradually opening up could make it easier. Also, if I could practice what I want to say beforehand, that might reduce some of the anxiety. It seems like I need to build that trust first, both in myself and in them. But honestly, it feels daunting to even think about taking that step right now."
+  },
+  {
+   "role": "counselor",
+   "content": "That sounds like a thoughtful approach, starting small and feeling safe can make a big difference. How do you feel about trying to practice what you want to say?"
+  },
+  {
+   "role": "counselor",
+   "content": "It's completely understandable to feel daunted by that."
+  },
+  {
+   "role": "counselor",
+   "content": "Taking steps towards opening up can feel overwhelming. What do you think would be a manageable first step for you?"
+  },
+  {
+   "role": "client",
+   "content": "I think a manageable first step could be writing down my thoughts and feelings before a call. Just getting it all out on paper might help clear my mind a bit. I could start with just a few lines, nothing"
+  },
+  {
+   "role": "counselor",
+   "content": "That sounds like a great idea Writing could help you clarify your feelings before sharing them. How do you think"
+  },
+  {
+   "role": "counselor",
+   "content": "that might change how you feel during those calls?"
+  }
+ ],
+ "cases": [
+  {
+   "name": "asks how anxiety connects to family at home",
+   "upto": 16,
+   "expect_any": [
+    "Mother's health",
+    "Her brother"
+   ],
+   "forbid": []
+  },
+  {
+   "name": "asks about being vulnerable with family",
+   "upto": 17,
+   "expect_any": [
+    "Mother's health",
+    "Her brother"
+   ],
+   "forbid": []
+  },
+  {
+   "name": "asks what would help her share with them (family)",
+   "upto": 21,
+   "expect_any": [
+    "Mother's health",
+    "Her brother"
+   ],
+   "forbid": []
+  },
+  {
+   "name": "asks how the panic loop feels",
+   "upto": 3,
+   "expect_any": [
+    "Panic before client calls"
+   ],
+   "forbid": [
+    "Mother's health",
+    "Her brother"
+   ]
+  },
+  {
+   "name": "asks what she wishes she could express on calls",
+   "upto": 8,
+   "expect_any": [],
+   "forbid": [
+    "Mother's health",
+    "Her brother"
+   ]
+  }
+ ]
+}

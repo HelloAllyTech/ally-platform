@@ -49,6 +49,25 @@ alongside `{state_x_guidelines}`. The single-placeholder form is still supported
 runtime; the prompt that used it is retired (`isObsolete`). §2.3's argument that POSITION
 should be authorable is unchanged and is why the split was possible at all.
 
+**5. The writer and the reader now use one vocabulary.** The updater prompt and Main Agent
+Prompt #3 are the two halves of this design that a human actually reads, and they were
+naming the same things differently: the updater asked for `voice_register` where #3 renders
+`{working_memory_register}`, and framed the author's states as `{stance_ladder}` /
+`{current_stance}` where #3 calls them `{state_x_guidelines}`. Curators read both. The
+prompt-facing names are now `register`, `{state_ladder}` and `{current_state}` — chosen to
+match what the store, the monologue payload and #3's own placeholders already called them,
+so the rename landed on the transient LLM schema rather than on anything persisted.
+
+Three divergences were left alone on purpose, because they are not renames. `opened_threads`
+/ `closed_threads` are deltas and `{working_memory_unresolved}` is the net set; the two
+withheld lists are paired positionally into one section; and `{working_memory_salient}` has
+no updater field at all, because recall fills it. Renaming any of those would assert a
+symmetry that does not exist. They are documented in the updater's `_meta` sidecar instead,
+which is what the studio shows a curator. The store's own `stance` keeps its name: it reaches
+ally-be as `final_stance` / `stance_path` on the write-out record and as `stanceFrom` /
+`stanceTo` on the monologue, so renaming it is a cross-service change with already-persisted
+rows behind it, and it buys nothing a prompt reader can see.
+
 **Naming.** The prompt shipped as **Main Agent Prompt #3**, not as a
 "client working memory" prompt — it sits in a picker beside #2, and naming it after its
 mechanism described how it was built rather than where it sits.

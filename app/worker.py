@@ -71,6 +71,7 @@ from app.core.queue.utils import (
 from app.core.scenario.base import Scenario
 from app.core.scoring.score_keeper import ScoreKeeper
 from app.core.session_clock import SessionClock
+from app.core.tasks import spawn_background_task
 from app.llms import BaseLLMClient
 from app.stt import BaseSTTClient
 from app.tts import BaseTTSClient
@@ -493,8 +494,9 @@ class AgentWorker:
             SemanticSimilarityEvent._EMBEDDING_CLIENT = self.embedding_client
         else:
             logger.info(
-                "No OPENAI_API_KEY configured — semantic-similarity/"
-                "paraphrase-detection events are disabled for this session."
+                "No OPENAI_API_KEY configured — "
+                "semantic-similarity/paraphrase-detection "
+                "events are disabled for this session."
             )
 
         # Resolve then parse metadata. Slim dispatches (metadataFetch pointer)
@@ -4233,9 +4235,11 @@ class AgentWorker:
                 prep,
                 self.ctx.room.name,
             )
-            task = asyncio.create_task(send_event_to_queue(message.model_dump_json()))
-            self._background_tasks.add(task)
-            task.add_done_callback(self._background_tasks.discard)
+            spawn_background_task(
+                send_event_to_queue(message.model_dump_json()),
+                name="start-metrics-send",
+                background_tasks=self._background_tasks,
+            )
         except Exception:  # noqa: BLE001 - metrics must never break a session
             logger.exception("[START_METRICS] emit failed")
 

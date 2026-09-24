@@ -102,7 +102,26 @@ def _bullets(lines: Sequence[str], empty: str) -> str:
     return "\n".join(f"- {line}" for line in kept) if kept else empty
 
 
-def _render_withheld(items: Sequence[WithheldTopic]) -> str:
+def _render_locked(topics: Sequence[str]) -> List[str]:
+    """Trainer-locked memories (``knowledge_locks.py``): title only.
+
+    Unlike the derived items below, these ARE permissive-by-authority: the
+    trainer's lock is the author's decision, keyed to the author's states, so
+    saying "not ready" here is the state machine speaking — not a second
+    controller. The content was dropped upstream and never reaches this
+    function; there is nothing here that could leak it.
+    """
+    return [
+        f"{topic} — you are not ready to talk about this yet. If it comes up, "
+        "move away from it naturally without saying what it is"
+        for topic in topics
+        if topic and topic.strip()
+    ]
+
+
+def _render_withheld(
+    items: Sequence[WithheldTopic], locked_topics: Sequence[str] = ()
+) -> str:
     """Topic and deflection only. There is no content field to leak.
 
     **Descriptive, never permissive.** This section states what has not come up
@@ -125,7 +144,7 @@ def _render_withheld(items: Sequence[WithheldTopic]) -> str:
     way next time rather than inventing a new evasion each turn. Whether to
     sidestep at all is the state's decision.
     """
-    lines: List[str] = []
+    lines: List[str] = _render_locked(locked_topics)
     for item in items:
         if item.status == "revealed":
             continue  # already out; `disclosed` carries it now
@@ -176,7 +195,9 @@ SECTION_VARIABLES = (
 )
 
 
-def render_sections(memory: ClientWorkingMemory) -> dict:
+def render_sections(
+    memory: ClientWorkingMemory, locked_topics: Sequence[str] = ()
+) -> dict:
     """Render the derived memory as one value per placeholder.
 
     Cut along the boundaries a curator would want to move, and returned as a
@@ -200,6 +221,11 @@ def render_sections(memory: ClientWorkingMemory) -> dict:
       asked to curate it. A versioned prompt with a revert-to-default button
       and a diff on every change does not need protecting from its authors.
 
+    - **Locked memories render as titles only.** `locked_topics` are the
+      titles of Knowledge Sources a trainer locked to a later state; they join
+      the withheld section ahead of the derived items. They are authored, so
+      they are passed in per render and never enter the store (§3.1).
+
     - **State guidance is absent.** It goes through `{state_x_guidelines}`.
       That is the whole reason this form exists: a designer looking at the
       prompt could not see their own state guidance in it any more.
@@ -216,7 +242,7 @@ def render_sections(memory: ClientWorkingMemory) -> dict:
         "working_memory_speech_fragments": _bullets(
             memory.speech_fragments, _NO_FRAGMENTS
         ),
-        "working_memory_withheld": _render_withheld(memory.withheld),
+        "working_memory_withheld": _render_withheld(memory.withheld, locked_topics),
         "working_memory_unresolved": _render_unresolved(memory.unresolved),
         "working_memory_disclosed": _render_facts(memory.disclosed, _NO_DISCLOSED, cap),
         "working_memory_salient": _render_facts(memory.salient_backstory, _NO_SALIENT),

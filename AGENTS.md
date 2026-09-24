@@ -85,6 +85,9 @@ taking a whole task description and returning full chunk bodies. Setup, citation
   on a deployment that refuses it, the Rust FFI's rejection log is expected and benign
   (session runs unfiltered) — `app/core/logger.py`'s `BenignNoiseCancellationFilter`
   demotes it off `livekit`'s ERROR so it doesn't page as an internal error.
+- **Fire-and-forget work goes through `spawn_background_task`** (`app/core/tasks.py`), never
+  a raw `asyncio.create_task`: off the loop `create_task(coro())` abandons the coroutine, so
+  the work is silently dropped and only resurfaces as a stray `never awaited` warning.
 - **STT confidence is not usable for Indian languages.** Don't gate behaviour on it. The
   mitigation for mis-transcription is a live guardrail that asks the learner to repeat.
 - **Provider behaviour differs per language, not just per provider.** A fix verified in
