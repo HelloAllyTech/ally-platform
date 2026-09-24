@@ -47,9 +47,16 @@ export const NetworkImage: React.FC<NetworkImageProps> = ({
   const [hasError, setHasError] = useState(false);
   const [svgContent, setSvgContent] = useState<string | null>(null);
   const [useFallback, setUseFallback] = useState(false);
+  const [svgUriError, setSvgUriError] = useState(false);
 
   // Determine if the URL is an SVG based on the file extension
   const isSvg = imageUrl?.toLowerCase().endsWith('.svg');
+
+  useEffect(() => {
+    if (svgUriError) {
+      setUseFallback(true);
+    }
+  }, [svgUriError]);
 
   useEffect(() => {
     // Reset states when URL changes
@@ -57,6 +64,7 @@ export const NetworkImage: React.FC<NetworkImageProps> = ({
     setSvgContent(null);
     setHasError(false);
     setIsLoading(true);
+    setSvgUriError(false);
   }, [imageUrl]);
 
   useEffect(() => {
@@ -106,7 +114,7 @@ export const NetworkImage: React.FC<NetworkImageProps> = ({
 
   const handleSvgUriError = () => {
     // SvgUri failed, try fetch fallback
-    setUseFallback(true);
+    setSvgUriError(true);
   };
 
   if (hasError) {
