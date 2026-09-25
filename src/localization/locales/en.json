@@ -861,7 +861,8 @@
         "moveDown": "Move down",
         "wordCount_one": "{{count}}/{{min}} word",
         "wordCount_other": "{{count}}/{{min}} words",
-        "aiGraded": "This answer is graded by AI"
+        "aiGraded": "This answer is graded by AI",
+        "likertHint": "Select one response per statement"
       },
       "results": {
         "title": "Results",
@@ -876,7 +877,11 @@
         "grading": "Grading…",
         "retry": "Retry quiz",
         "next": "Next",
-        "attemptsUsed": "Attempt {{used}} of {{max}}"
+        "attemptsUsed": "Attempt {{used}} of {{max}}",
+        "notScored": "Not scored",
+        "correctAnswer": "Correct answer",
+        "yourResponses": "Your responses",
+        "responsesSubmitted": "Responses submitted"
       }
     },
     "language": {

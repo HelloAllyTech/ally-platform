@@ -30,6 +30,7 @@ import {QuestionMedia} from '../QuestionMedia';
 import {QuizIntro} from './QuizIntro';
 import {QuizResults} from './QuizResults';
 import {FillBlankQuestion} from './widgets/FillBlankQuestion';
+import {LikertScaleQuestion} from './widgets/LikertScaleQuestion';
 import {MatchingQuestion} from './widgets/MatchingQuestion';
 import {McqQuestion} from './widgets/McqQuestion';
 import {OpenEndedQuestion} from './widgets/OpenEndedQuestion';
@@ -187,6 +188,7 @@ export const QuizItemPlayer: React.FC<QuizItemPlayerProps> = ({
         <QuizResults
           result={result}
           questions={questions}
+          answers={answers}
           isRegrading={isRegrading}
           canRetry={attemptsLeft > 0}
           onRegrade={handleRegrade}
@@ -255,6 +257,14 @@ export const QuizItemPlayer: React.FC<QuizItemPlayerProps> = ({
       case 'open_ended':
         return (
           <OpenEndedQuestion
+            question={question}
+            state={answerState}
+            onChange={s => setAnswer(question.id, s)}
+          />
+        );
+      case 'likert_scale':
+        return (
+          <LikertScaleQuestion
             question={question}
             state={answerState}
             onChange={s => setAnswer(question.id, s)}
