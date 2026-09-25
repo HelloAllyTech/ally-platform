@@ -34,6 +34,12 @@ describe('initialAnswerState', () => {
     expect(initialAnswerState(buildQuestion({type: 'fill_blank'}))).toEqual({blanks: {}});
   });
 
+  it('seeds likert_scale with an empty ratings map', () => {
+    expect(initialAnswerState(buildQuestion({type: 'likert_scale'}))).toEqual({
+      ratings: {},
+    });
+  });
+
   it('is an empty object for other types', () => {
     expect(initialAnswerState(buildQuestion({type: 'mcq_single'}))).toEqual({});
     expect(initialAnswerState(buildQuestion({type: 'true_false'}))).toEqual({});
@@ -96,6 +102,27 @@ describe('toAnswerInput', () => {
       text: 'my answer',
     });
   });
+
+  it('serializes likert ratings as a statementId/scaleOptionId array', () => {
+    const question = buildQuestion({type: 'likert_scale'});
+    expect(
+      toAnswerInput(question, {ratings: {s1: 'sc1', s2: 'sc3'}}),
+    ).toEqual({
+      questionId: 'q1',
+      ratings: [
+        {statementId: 's1', scaleOptionId: 'sc1'},
+        {statementId: 's2', scaleOptionId: 'sc3'},
+      ],
+    });
+  });
+
+  it('serializes an empty likert answer as an empty ratings array', () => {
+    const question = buildQuestion({type: 'likert_scale'});
+    expect(toAnswerInput(question, {})).toEqual({
+      questionId: 'q1',
+      ratings: [],
+    });
+  });
 });
 
 describe('isAnswered', () => {
@@ -136,6 +163,18 @@ describe('isAnswered', () => {
     const question = buildQuestion({type: 'open_ended'});
     expect(isAnswered(question, {text: '   '})).toBe(false);
     expect(isAnswered(question, {text: 'hello'})).toBe(true);
+  });
+
+  it('likert_scale requires every statement to be rated', () => {
+    const question = buildQuestion({
+      type: 'likert_scale',
+      statements: [{id: 's1', text: 'A'}, {id: 's2', text: 'B'}],
+    });
+    expect(isAnswered(question, {})).toBe(false);
+    expect(isAnswered(question, {ratings: {s1: 'sc1'}})).toBe(false);
+    expect(
+      isAnswered(question, {ratings: {s1: 'sc1', s2: 'sc2'}}),
+    ).toBe(true);
   });
 });
 
