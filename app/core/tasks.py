@@ -62,9 +62,7 @@ def spawn_background_task(
         if exc is not None:
             # Nobody awaits these, so without this the failure is invisible
             # until the GC reports "Task exception was never retrieved".
-            logger.error(
-                "[background-task] %s failed: %r", name, exc, exc_info=exc
-            )
+            logger.error("[background-task] %s failed: %r", name, exc, exc_info=exc)
 
     task.add_done_callback(_on_done)
     return task

@@ -9,7 +9,7 @@ class RealisticMockTTSClient(BaseTTSClient):
         self._config = config or {}
         self._pitch = 1.0  # Initial config
         self._tts_instance = None
-        self._current_params['pitch'] = self._pitch
+        self._current_params["pitch"] = self._pitch
 
     @property
     def tts_instance(self):
@@ -25,8 +25,8 @@ class RealisticMockTTSClient(BaseTTSClient):
         # but for this test, we assume it only updates the instance, which is
         # what the base class does. The fix should work regardless.
         if self._tts_instance:
-            if 'pitch' in params_dict:
-                self.tts_instance.pitch = params_dict['pitch']
+            if "pitch" in params_dict:
+                self.tts_instance.pitch = params_dict["pitch"]
 
 
 def test_voice_consistency_fix():

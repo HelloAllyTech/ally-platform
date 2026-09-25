@@ -5,10 +5,10 @@ rendered "(nothing from your own life is on your mind this turn)" every turn.
 The claim under test is §7.1's: a persona should be RECALLED, not dumped.
 """
 
-import pytest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
+import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
 from app.core.working_memory import consolidate as mod
