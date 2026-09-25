@@ -9,7 +9,18 @@ import {useSocket} from './useSocket';
 interface UseSocketConnectionOptions {
   path?: string;
   userId?: number;
-  eventCallbacks?: Partial<Record<SocketEvent, (params?: unknown) => void>>;
+  /**
+   * Handlers for inbound socket events. The parameter is `never` rather than
+   * `unknown` because parameters are contravariant: `(data: SocketMessage) =>
+   * void` is not assignable to `(params?: unknown) => void`, so every caller
+   * that actually typed its payload was a type error. `never` is what "any
+   * single-argument handler" has to be written as.
+   *
+   * The payload itself is genuinely untyped — it comes off the wire — and the
+   * dispatch site in `useSocket` casts once to call these. That cast is the
+   * one place the unsafety lives, rather than at every call site.
+   */
+  eventCallbacks?: Partial<Record<SocketEvent, (params: never) => void>>;
   onConnect?: () => void;
   onDisconnect?: (reason?: string) => void;
   onConnectionError?: (error?: Error) => void;
@@ -39,7 +50,7 @@ interface UseSocketConnectionOptions {
  *
  * @param {UseSocketConnectionOptions} options - Configuration options for the socket connection
  * @param {number} options.userId - The ID of the user to establish the socket connection for
- * @param {Partial<Record<SocketEvent, (params?: any) => void>>} [options.eventCallbacks] - Map of event types to their handlers
+ * @param {Partial<Record<SocketEvent, (params: never) => void>>} [options.eventCallbacks] - Map of event types to their handlers
  * @param {() => void} [options.onConnect] - Optional callback to execute when socket connects
  * @param {() => void} [options.onDisconnect] - Optional callback to execute when socket disconnects
  *

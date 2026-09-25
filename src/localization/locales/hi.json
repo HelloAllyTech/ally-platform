@@ -1708,6 +1708,28 @@
       "unsupportedBody": "कोर्स के इस हिस्से के लिए वेब वर्ज़न चाहिए. कोर्स का बाकी सब कुछ यहाँ पहले जैसा ही चलता है.",
       "backToCourse": "कोर्स पर वापस जाएं"
     },
+    "discussion": {
+      "heading": "चर्चा",
+      "emptyTitle": "अभी तक कोई पोस्ट नहीं",
+      "emptyBody": "सबसे पहले साझा करें कि आप इसे कैसे करेंगे — यहाँ कोई गलत जवाब नहीं है।",
+      "composerPlaceholder": "अपने विचार अपने शब्दों में साझा करें…",
+      "post": "पोस्ट करें",
+      "reply": "जवाब दें",
+      "save": "सहेजें",
+      "delete": "हटाएं",
+      "edited": "(संपादित)",
+      "editedByModerator": "(मॉडरेटर द्वारा संपादित)",
+      "deletedByAuthor": "[लेखक द्वारा हटाया गया]",
+      "threadLocked": "यह थ्रेड लॉक है",
+      "discussionLocked": "यह चर्चा लॉक है",
+      "lockThread": "थ्रेड लॉक करें",
+      "unlockThread": "थ्रेड अनलॉक करें",
+      "lockDiscussion": "चर्चा लॉक करें",
+      "unlockDiscussion": "चर्चा अनलॉक करें",
+      "loadFailed": "यह चर्चा लोड नहीं हो सकी.",
+      "deleteConfirmTitle": "इस पोस्ट को हटाएं?",
+      "deleteConfirmBody": "इसे वापस नहीं लाया जा सकता."
+    },
     "celebration": {
       "sectionCompleteTitle": "सेक्शन पूर्ण!",
       "sectionCompleteBody": "बहुत बढ़िया — आगे बढ़ते रहें.",
@@ -1900,6 +1922,13 @@
           "visitorBUTTERFLY": "तितली",
           "visitorLADYBIRD": "बीरबहूटी"
         }
+      }
+    },
+    "question": {
+      "media": {
+        "imageFailed": "यह तस्वीर लोड नहीं हो सकी। अपना कनेक्शन जाँचें और फिर कोशिश करें।",
+        "viewLarger": "बड़ा करके देखें",
+        "close": "बंद करें"
       }
     }
   },

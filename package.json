@@ -11,6 +11,7 @@
     "android:clean": "cd android && ./gradlew clean",
     "ios": "react-native run-ios",
     "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
     "i18n:sync": "node scripts/i18n-sync.mjs",
     "start": "npx react-native start --reset-cache",
     "test": "jest --passWithNoTests --forceExit",

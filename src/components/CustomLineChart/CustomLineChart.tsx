@@ -41,7 +41,10 @@ export const CustomLineChart: React.FC<Props> = ({
   xAxisSplitNumber = 4,
   yAxisSplitNumber = 4,
 }) => {
-  const skiaRef = useRef<SkiaChart>(null);
+  // `SkiaChart` is the component itself, not a type — the old annotation was
+  // a value in type position. The library declares its ref as `any`, so derive
+  // the instance type from the component rather than inventing a shape for it.
+  const skiaRef = useRef<React.ComponentRef<typeof SkiaChart>>(null);
   const chartRef = useRef<echarts.EChartsType | null>(null);
 
   const {seriesData, maxX} = useMemo(() => {

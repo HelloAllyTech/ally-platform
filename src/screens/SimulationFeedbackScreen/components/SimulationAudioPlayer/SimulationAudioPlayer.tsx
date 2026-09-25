@@ -447,7 +447,11 @@ export const SimulationAudioPlayer: React.FC<SimulationAudioPlayerProps> = ({
         disabled={decodeError}
         style={styles.playButton}>
         {isLoading ? (
-          <ActivityIndicator color={colors.ds.theme.primary} size="small" />
+          <ActivityIndicator
+            testID="loading-indicator"
+            color={colors.ds.theme.primary}
+            size="small"
+          />
         ) : isPlaying ? (
           <PausePlayerIcon
             width={16}

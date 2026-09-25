@@ -13,7 +13,23 @@ const TAB_ROUTES = [
 
 type TabRoute = (typeof TAB_ROUTES)[number];
 
-export const navigateToTab = <T extends NavigationProp<RootStackParamList>>(
+/**
+ * All these helpers need from a navigator is the ability to dispatch — that
+ * is the only member any of them touches.
+ *
+ * Constraining to the full `NavigationProp<RootStackParamList>` rejected the
+ * `NativeStackNavigationProp` that every native-stack screen actually holds:
+ * React Navigation brands its navigator types with a `PrivateValueStore`
+ * carrying the event map, and a native stack's event map is not the generic
+ * one. Asking only for `dispatch` sidesteps a nominal check that was never
+ * protecting anything here.
+ */
+type NavigationDispatcher = Pick<
+  NavigationProp<RootStackParamList>,
+  'dispatch'
+>;
+
+export const navigateToTab = <T extends NavigationDispatcher>(
   navigation: T,
   targetTab: TabRoute,
 ) => {
@@ -47,41 +63,31 @@ export const navigateToTab = <T extends NavigationProp<RootStackParamList>>(
   );
 };
 
-export const navigateToLearnTab = <
-  T extends NavigationProp<RootStackParamList>,
->(
+export const navigateToLearnTab = <T extends NavigationDispatcher>(
   navigation: T,
 ) => {
   navigateToTab(navigation, SCREEN_NAMES.LEARN);
 };
 
-export const navigateToCallLogTab = <
-  T extends NavigationProp<RootStackParamList>,
->(
+export const navigateToCallLogTab = <T extends NavigationDispatcher>(
   navigation: T,
 ) => {
   navigateToTab(navigation, SCREEN_NAMES.CALL_LOG);
 };
 
-export const navigateToCommunityTab = <
-  T extends NavigationProp<RootStackParamList>,
->(
+export const navigateToCommunityTab = <T extends NavigationDispatcher>(
   navigation: T,
 ) => {
   navigateToTab(navigation, SCREEN_NAMES.COMMUNITY);
 };
 
-export const navigateToSearchTab = <
-  T extends NavigationProp<RootStackParamList>,
->(
+export const navigateToSearchTab = <T extends NavigationDispatcher>(
   navigation: T,
 ) => {
   navigateToTab(navigation, SCREEN_NAMES.SEARCH);
 };
 
-export const navigateToUserAnalyticsTab = <
-  T extends NavigationProp<RootStackParamList>,
->(
+export const navigateToUserAnalyticsTab = <T extends NavigationDispatcher>(
   navigation: T,
 ) => {
   navigateToTab(navigation, SCREEN_NAMES.USER_ANALYTICS);

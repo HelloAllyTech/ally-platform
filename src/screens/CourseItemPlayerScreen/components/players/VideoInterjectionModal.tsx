@@ -14,6 +14,7 @@ import {
   toAnswerInput,
 } from '@/utils';
 
+import {QuestionMedia} from './QuestionMedia';
 import {FillBlankQuestion} from './quiz/widgets/FillBlankQuestion';
 import {MatchingQuestion} from './quiz/widgets/MatchingQuestion';
 import {McqQuestion} from './quiz/widgets/McqQuestion';
@@ -161,6 +162,7 @@ export const VideoInterjectionModal: React.FC<VideoInterjectionModalProps> = ({
                 style={styles.scroll}
                 contentContainerStyle={styles.scrollContent}>
                 <Text style={styles.prompt}>{question.prompt}</Text>
+                <QuestionMedia media={question.media} />
                 {renderWidget()}
               </ScrollView>
               <Button

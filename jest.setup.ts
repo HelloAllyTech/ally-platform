@@ -1,7 +1,28 @@
+import i18next from 'i18next';
+import {initReactI18next} from 'react-i18next';
+
 // Mock @testing-library/jest-native
 jest.mock('@testing-library/jest-native/extend-expect', () => {
   // Empty mock to prevent loading the actual module
 });
+
+// Initialize a real i18next instance so components that call react-i18next
+// directly (useTranslation, Trans) render without triggering the
+// "You need to pass in an i18next instance" warning. This uses its own
+// instance (rather than the default singleton exported by 'i18next') so it
+// doesn't change behaviour for code that imports `t` straight from
+// 'i18next' — that singleton stays uninitialized exactly as before. Test
+// files that mock 'react-i18next' or '@/hooks' themselves are unaffected —
+// this only fills in for suites that don't.
+i18next
+  .createInstance()
+  .use(initReactI18next)
+  .init({
+    lng: 'en',
+    fallbackLng: 'en',
+    resources: {en: {translation: {}}},
+    interpolation: {escapeValue: false},
+  });
 
 // Mock react-native components and modules
 jest.mock('react-native', () => {
@@ -124,7 +145,6 @@ jest.mock('react-native-svg', () => {
 
 // Mock @livekit/react-native
 jest.mock('@livekit/react-native', () => {
-  const React = require('react');
   // Mock AudioSession
   const AudioSession = {
     configureAudio: jest.fn(),

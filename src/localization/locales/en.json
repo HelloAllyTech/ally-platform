@@ -758,6 +758,28 @@
       "unsupportedBody": "This part of the course needs the web version. Everything else in the course works here as usual.",
       "backToCourse": "Back to course"
     },
+    "discussion": {
+      "heading": "Discussion",
+      "emptyTitle": "No posts yet",
+      "emptyBody": "Be the first to share how you'd approach this — there are no wrong answers here.",
+      "composerPlaceholder": "Share your thoughts in your own words…",
+      "post": "Post",
+      "reply": "Reply",
+      "save": "Save",
+      "delete": "Delete",
+      "edited": "(edited)",
+      "editedByModerator": "(edited by moderator)",
+      "deletedByAuthor": "[deleted by author]",
+      "threadLocked": "This thread is locked",
+      "discussionLocked": "This discussion is locked",
+      "lockThread": "Lock thread",
+      "unlockThread": "Unlock thread",
+      "lockDiscussion": "Lock discussion",
+      "unlockDiscussion": "Unlock discussion",
+      "loadFailed": "Couldn't load this discussion.",
+      "deleteConfirmTitle": "Delete this post?",
+      "deleteConfirmBody": "This can't be undone."
+    },
     "celebration": {
       "sectionCompleteTitle": "Section complete!",
       "sectionCompleteBody": "Nice work — keep going.",
@@ -950,6 +972,13 @@
           "visitorBUTTERFLY": "butterfly",
           "visitorLADYBIRD": "ladybird"
         }
+      }
+    },
+    "question": {
+      "media": {
+        "imageFailed": "This image couldn't load. Check your connection and try again.",
+        "viewLarger": "View larger",
+        "close": "Close"
       }
     }
   },

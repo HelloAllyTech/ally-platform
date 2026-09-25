@@ -1708,6 +1708,28 @@
       "unsupportedBody": "कोर्सच्या या भागासाठी वेब आवृत्ती लागते. कोर्समधील बाकी सर्व काही इथे नेहमीप्रमाणे चालते.",
       "backToCourse": "कोर्सवर परत जा"
     },
+    "discussion": {
+      "heading": "चर्चा",
+      "emptyTitle": "अद्याप कोणतीही पोस्ट नाही",
+      "emptyBody": "तुम्ही हे कसे कराल हे सर्वप्रथम सांगा — इथे कोणतेही चुकीचे उत्तर नाही.",
+      "composerPlaceholder": "तुमचे विचार तुमच्या स्वतःच्या शब्दांत मांडा…",
+      "post": "पोस्ट करा",
+      "reply": "उत्तर द्या",
+      "save": "जतन करा",
+      "delete": "हटवा",
+      "edited": "(संपादित)",
+      "editedByModerator": "(मॉडरेटरने संपादित केले)",
+      "deletedByAuthor": "[लेखकाने हटवले]",
+      "threadLocked": "हा थ्रेड लॉक आहे",
+      "discussionLocked": "ही चर्चा लॉक आहे",
+      "lockThread": "थ्रेड लॉक करा",
+      "unlockThread": "थ्रेड अनलॉक करा",
+      "lockDiscussion": "चर्चा लॉक करा",
+      "unlockDiscussion": "चर्चा अनलॉक करा",
+      "loadFailed": "ही चर्चा लोड होऊ शकली नाही.",
+      "deleteConfirmTitle": "ही पोस्ट हटवायची?",
+      "deleteConfirmBody": "हे पूर्ववत करता येणार नाही."
+    },
     "celebration": {
       "sectionCompleteTitle": "सेक्शन पूर्ण झाला!",
       "sectionCompleteBody": "छान काम — असेच पुढे चालू ठेवा.",
@@ -1900,6 +1922,13 @@
           "visitorBUTTERFLY": "फुलपाखरू",
           "visitorLADYBIRD": "गोगलगाय किडा"
         }
+      }
+    },
+    "question": {
+      "media": {
+        "imageFailed": "हा फोटो लोड होऊ शकला नाही. तुमचे कनेक्शन तपासा आणि पुन्हा प्रयत्न करा.",
+        "viewLarger": "मोठे करून पहा",
+        "close": "बंद करा"
       }
     }
   },

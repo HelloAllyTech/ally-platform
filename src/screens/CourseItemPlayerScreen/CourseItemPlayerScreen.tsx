@@ -3,7 +3,7 @@ import {useFocusEffect} from '@react-navigation/native';
 import {ActivityIndicator, Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {Button} from '@/components';
+import {Button, DiscussionThread} from '@/components';
 import {SCREEN_NAMES} from '@/constants';
 import {useTrackPlayerNavigation, useTranslate} from '@/hooks';
 import type {RootStackScreenProps} from '@/navigation/types';
@@ -39,7 +39,7 @@ export const CourseItemPlayerScreen: React.FC<
   RootStackScreenProps<typeof SCREEN_NAMES.COURSE_ITEM_PLAYER>
 > = ({navigation, route}) => {
   const {t} = useTranslate();
-  const {trackId, itemId} = route.params;
+  const {trackId, itemId, highlightPostId} = route.params;
 
   const {
     data: track,
@@ -250,6 +250,13 @@ export const CourseItemPlayerScreen: React.FC<
       />
 
       <View style={styles.body}>{renderItem()}</View>
+
+      {nav.current?.item.hasDiscussion ? (
+        <DiscussionThread
+          itemId={nav.currentItemId}
+          highlightPostId={highlightPostId}
+        />
+      ) : null}
 
       <PlayerBottomNav
         hasPrev={nav.hasPrev}

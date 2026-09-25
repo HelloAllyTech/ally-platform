@@ -62,6 +62,16 @@ export const Carousel = forwardRef<CarouselRef, CarouselProps>(
 
     if (!(data?.length > 0)) return null;
 
+    /**
+     * `TCarouselProps` is a discriminated union on `mode` — each mode pairs
+     * with its own `modeConfig` shape — so handing it a union-typed `mode`
+     * variable matches no single branch and the whole props object is
+     * rejected. Narrowing here picks a branch without asserting anything
+     * false: this wrapper never passes `modeConfig`, so all three values are
+     * equally valid and only inference was in the way.
+     */
+    const modeProp = mode === 'parallax' ? {mode: 'parallax' as const} : {mode};
+
     return (
       <View style={[styles.container, containerStyle]} testID={testID}>
         <View style={[styles.carouselContainer, contentContainerStyle]}>
@@ -75,7 +85,7 @@ export const Carousel = forwardRef<CarouselRef, CarouselProps>(
             autoPlayInterval={autoPlayInterval}
             loop={loop}
             enabled={enabled}
-            mode={mode}
+            {...modeProp}
             onSnapToItem={handleSnapToItem}
           />
         </View>

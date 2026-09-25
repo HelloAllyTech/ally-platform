@@ -183,6 +183,153 @@ async function appleApi(path, token) {
   return res.json();
 }
 
+/**
+ * What external TestFlight testers read before they install, and what Apple's
+ * Beta App Review reads when deciding whether to let them.
+ *
+ * It lives here rather than only in App Store Connect because Apple *requires*
+ * it to submit for external testing and gives no warning until the submission
+ * itself fails — which is exactly how it bit us: build uploaded, group
+ * assigned, submission rejected with "Beta App Description is missing" and no
+ * external tester getting the build. A console field nobody owns is a field
+ * that goes missing; a constant in the repo is one a reviewer can see.
+ */
+const BETA_APP_DESCRIPTION = `Ally is a practice and documentation app for counsellors and community health workers.
+
+In this build you can:
+- Practise conversations with AI-simulated clients and get feedback on how the conversation went.
+- Work through courses made of articles, videos, quizzes and reflection prompts.
+- Record a session and get a structured summary you can edit before saving.
+
+Please report anything that looks wrong: audio that does not start, a summary that misses something you said, text that renders incorrectly in Hindi, Marathi, Tamil or Kannada, or any screen that fails to load. Use the in-app bug report, or send feedback through TestFlight.`;
+
+/** Locale to write the beta description under when the app has none at all. */
+const BETA_LOCALE = 'en-US';
+
+/** POST/PATCH counterpart to {@link appleApi}, which is read-only. */
+async function appleApiWrite(path, token, method, body) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(
+      `App Store Connect API ${method} ${path} failed: ${res.status} ${text}`,
+    );
+  }
+  return res.status === 204 ? null : res.json();
+}
+
+/**
+ * Makes sure the app has a non-empty Beta App Description before we try to
+ * submit, since Apple rejects the submission outright without one.
+ *
+ * Deliberately fills only a blank: if someone has written a better description
+ * in App Store Connect, theirs wins. This is a floor, not a source of truth —
+ * clobbering a human's copy on every release would be its own bug.
+ */
+async function ensureBetaAppDescription(appId, token) {
+  const existing = await appleApi(`/apps/${appId}/betaAppLocalizations`, token);
+  const localizations = existing.data ?? [];
+  const preferred =
+    localizations.find(l => l.attributes?.locale === BETA_LOCALE) ??
+    localizations[0];
+
+  if (preferred?.attributes?.description?.trim()) {
+    console.log(
+      `Beta App Description already set for locale ${preferred.attributes.locale} — leaving it alone.`,
+    );
+    return;
+  }
+
+  if (preferred) {
+    await appleApiWrite(
+      `/betaAppLocalizations/${preferred.id}`,
+      token,
+      'PATCH',
+      {
+        data: {
+          type: 'betaAppLocalizations',
+          id: preferred.id,
+          attributes: {description: BETA_APP_DESCRIPTION},
+        },
+      },
+    );
+    console.log(
+      `Filled the empty Beta App Description for locale ${preferred.attributes?.locale}.`,
+    );
+    return;
+  }
+
+  await appleApiWrite('/betaAppLocalizations', token, 'POST', {
+    data: {
+      type: 'betaAppLocalizations',
+      attributes: {locale: BETA_LOCALE, description: BETA_APP_DESCRIPTION},
+      relationships: {app: {data: {type: 'apps', id: appId}}},
+    },
+  });
+  console.log(`Created a ${BETA_LOCALE} Beta App Description.`);
+}
+
+/**
+ * Prints exactly which external-testing prerequisites Apple is missing.
+ *
+ * Apple's rejection for this is `MISSING_REQUIRED_DATA` with the detail
+ * "Missing requied data." — their typo, and no indication of *which* data.
+ * Guessing costs a round trip through CI each time, so when the submission
+ * fails we read the three resources Apple actually checks and say which
+ * fields are blank. Read-only, and it never fails the run on its own: it
+ * runs on a path that is already failing.
+ */
+async function reportExternalTestingReadiness(appId, buildId, token) {
+  const has = value => (String(value ?? '').trim() ? 'set' : 'MISSING');
+  try {
+    const localizations = await appleApi(
+      `/apps/${appId}/betaAppLocalizations`,
+      token,
+    );
+    for (const l of localizations.data ?? []) {
+      console.error(
+        `  betaAppLocalizations[${l.attributes?.locale}]: description=${has(
+          l.attributes?.description,
+        )} feedbackEmail=${has(l.attributes?.feedbackEmail)}`,
+      );
+    }
+  } catch (error) {
+    console.error(`  betaAppLocalizations: could not read (${error.message})`);
+  }
+
+  try {
+    const detail = await appleApi(`/apps/${appId}/betaAppReviewDetail`, token);
+    const a = detail.data?.attributes ?? {};
+    console.error(
+      `  betaAppReviewDetail: contactFirstName=${has(a.contactFirstName)} ` +
+        `contactLastName=${has(a.contactLastName)} contactEmail=${has(a.contactEmail)} ` +
+        `contactPhone=${has(a.contactPhone)} demoAccountRequired=${a.demoAccountRequired} ` +
+        `demoAccountName=${has(a.demoAccountName)} demoAccountPassword=${has(
+          a.demoAccountPassword,
+        )}`,
+    );
+  } catch (error) {
+    console.error(`  betaAppReviewDetail: could not read (${error.message})`);
+  }
+
+  try {
+    const build = await appleApi(`/builds/${buildId}`, token);
+    console.error(
+      `  build.usesNonExemptEncryption=${build.data?.attributes?.usesNonExemptEncryption}` +
+        ' (null means export compliance has not been answered for this build)',
+    );
+  } catch (error) {
+    console.error(`  build: could not read (${error.message})`);
+  }
+}
+
 /** Reads the app's current marketing version straight from the checked-out repo — the same
  * value the build being released was made with, and the field scheduled-mobile-release.yml
  * writes during its version bump. */
@@ -303,6 +450,11 @@ async function main() {
     );
   }
 
+  // Apple refuses the review submission below outright if the app has no Beta
+  // App Description, and says so only at that point — after the build has
+  // uploaded and been assigned. Settle it first.
+  await ensureBetaAppDescription(appId, token);
+
   // Assigning a build to an external group only associates the two — it does NOT submit the
   // build for Apple's Beta App Review, which is a separate resource entirely. Without this call
   // the build sits at "Ready to Submit" in App Store Connect indefinitely (confirmed live: this
@@ -324,13 +476,20 @@ async function main() {
   });
   if (!submissionRes.ok) {
     const body = await submissionRes.text();
+    console.error(
+      'External testing prerequisites, as App Store Connect currently has them:',
+    );
+    await reportExternalTestingReadiness(appId, buildId, token);
     // Apple commonly rejects this specific call for missing export-compliance info on the
     // build — surface the raw response rather than a generic message, since that's the most
     // likely real cause and the response body names it explicitly.
     throw new Error(
       `Build ${buildId} was assigned to the group, but submitting it for Beta App Review ` +
-        `failed: ${submissionRes.status} ${body}. A common cause is missing export compliance ` +
-        `information for this build in App Store Connect — check TestFlight -> Build Uploads.`,
+        `failed: ${submissionRes.status} ${body}. Apple does not say which field is ` +
+        `missing; the readiness dump above does. Anything reported MISSING there has to be ` +
+        `filled in by a human in App Store Connect — contact details, a demo account for a ` +
+        `login-gated app, and the export-compliance answer are all judgement calls this ` +
+        `script will not invent.`,
     );
   }
 

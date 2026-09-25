@@ -1,8 +1,17 @@
 import {act, renderHook} from '@testing-library/react-native';
 import React, {useState} from 'react';
 
+import type {MessageThreadComment} from '@/types';
+
 import type {CommentsState} from '../useCommentActions';
 import {usePaginatedComments} from '../usePaginatedComments';
+
+/**
+ * A minimal valid comment. These tests only care that a payload travels
+ * through `appendData` unchanged, so the contents are incidental — but the
+ * object still has to *be* a comment, and `createdBy` is required.
+ */
+const comment = (id: string): MessageThreadComment => ({id, createdBy: {}});
 
 function usePaginatedCommentsHarness(limit?: number) {
   const [comments, setComments] = useState<CommentsState>(null);
@@ -65,7 +74,7 @@ describe('usePaginatedComments', () => {
   it('appendData calls setComments with data', () => {
     const {result} = renderHook(() => usePaginatedCommentsHarness());
 
-    const payload = {data: [{id: 'c1'}], count: 5};
+    const payload = {data: [comment('c1')], count: 5};
 
     act(() => {
       result.current.appendData(payload);
@@ -79,7 +88,7 @@ describe('usePaginatedComments', () => {
     const {result} = renderHook(() => usePaginatedCommentsHarness());
 
     act(() => {
-      result.current.appendData({data: [{id: 'a'}], count: 10});
+      result.current.appendData({data: [comment('a')], count: 10});
     });
 
     expect(result.current.canLoadMore(true, false)).toBe(true);
