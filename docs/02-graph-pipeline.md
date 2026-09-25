@@ -22,6 +22,12 @@ flowchart LR
 
 Two nodes (`resolve_branching_instruction` and `retrieve_knowledge`) are wrapped in **subgraphs** to prevent their internal LLM calls from being streamed to the user. See [Architecture](architecture.md) for the rationale.
 
+Every model call a node makes (and every call in a task a node spawns) records its usage to
+`llm_usage` under the room `instrumented_node` sets from the run's config -- the subgraph wrapping
+does not lose it. `retrieve_knowledge`'s title selector records as `knowledge_retrieval`, and passes
+the room explicitly to its detached refresh (`KNOWLEDGE_RETRIEVAL_ASYNC`). See
+[Queue Messaging](11-queue-messaging.md) for the label list.
+
 ## SimulationState
 
 `SimulationState` is a Pydantic `BaseModel` that serves as the typed state for the graph. Each field has an associated **reducer** that controls how updates are merged.
@@ -92,6 +98,9 @@ This node resolves branching instructions that guide the LLM response. Steps:
 5. **Snapshot advancing behaviours** -- capture the SHOULD_DO ids from `behavior_feedback_data` into `advancing_behaviour_ids`, since this is the last point before the graph fans out to `send_event_feedback`, which unconditionally clears `behavior_feedback_data`
 
 Returns `next_instruction`, `feedback_to_send`, and `advancing_behaviour_ids`.
+
+The two substitution calls record their tokens to `llm_usage` as `branching_instruction` and
+`branching_chat_summary`.
 
 ## Node 3a: generate_response
 
@@ -250,6 +259,8 @@ This node runs in **parallel** with `generate_response`. It detects counselor be
 4. **Build feedback data** -- populate `behavior_feedback_data` with `BehaviorInstructionFeedbackData`
 
 Results are consumed by `send_event_feedback`, which sends behavior scores to the UI and clears the state.
+
+Each classification records its tokens to `llm_usage` as `behaviour_detection`.
 
 ## Node 4: publish_done_thinking
 

@@ -509,3 +509,33 @@ class TestRetrieveKnowledgeUsage:
         assert (call["room_id"], call["task"]) == ("room-kb", "knowledge_retrieval")
         assert (call["provider"], call["model"]) == ("openai", "gpt-4.1-mini")
         assert call["prompt_tokens"] == 400
+
+    @pytest.mark.asyncio
+    async def test_room_reaches_the_call_through_the_compiled_subgraph(
+        self, ai_usage_calls
+    ):
+        """In production the node runs inside its own compiled subgraph; the
+        room must still come through LangGraph's config, not be "unknown"."""
+        import types as _types
+
+        from app.core.graph.graph_builder import build_retrieve_knowledge_subgraph
+
+        kb = [{"title": "subgraph topic", "content": "A subgraph memory 91c2"}]
+        pd = type("PD", (), {"knowledge_sources": kb})()
+        scenario = type("S", (), {"prompt_data": pd})()
+
+        await build_retrieve_knowledge_subgraph().ainvoke(
+            _make_state(messages=[HumanMessage(content="subgraph probe 91c2")]),
+            {
+                "configurable": {
+                    "scenario": scenario,
+                    "llm_client": _UsageLLMClient(["subgraph topic"]),
+                    "room": _types.SimpleNamespace(name="room-sub"),
+                    "thread_id": "room-sub",
+                }
+            },
+        )
+
+        assert [(c["room_id"], c["task"]) for c in ai_usage_calls] == [
+            ("room-sub", "knowledge_retrieval")
+        ]
