@@ -7,7 +7,7 @@ path. Mirrors the turn_metrics emit pattern.
 
 import asyncio
 import logging
-from typing import Optional, Tuple
+from typing import Any, Optional, Tuple
 
 from app.core.config import settings
 from app.core.events.schemas import CoreEventMessageType, LLMUsageData
@@ -31,9 +31,15 @@ def emit_ai_usage(
     audio_ms: Optional[int] = None,
     characters: Optional[int] = None,
     scenario_id: Optional[int] = None,
+    scenario_session_id: Optional[str] = None,
 ) -> None:
     """Schedule a best-effort ``llm_usage`` SQS message for any AI service
-    ('llm' | 'stt' | 'tts'). Never raises, never blocks the agent."""
+    ('llm' | 'stt' | 'tts'). Never raises, never blocks the agent.
+
+    ``room_id`` (the LiveKit room name) is what attributes a call to a session
+    in Core. A call made outside any room (the post-session actor evaluation,
+    an HTTP request) passes ``scenario_session_id`` instead, which Core reads
+    first."""
     try:
         if not getattr(settings, "LLM_USAGE_ENABLED", True):
             return
@@ -71,6 +77,7 @@ def emit_ai_usage(
                 characters=characters,
                 env=env,
                 scenario_id=scenario_id,
+                scenario_session_id=scenario_session_id,
             ),
         )
         body = message.model_dump_json()
@@ -88,6 +95,7 @@ def emit_llm_usage(
     task: str = LLMTask.AGENT_TURN.value,
     usage: Optional[Tuple[int, ...]] = None,
     scenario_id: Optional[int] = None,
+    scenario_session_id: Optional[str] = None,
 ) -> None:
     """Back-compat LLM helper — forwards to emit_ai_usage(service='llm').
 
@@ -111,7 +119,127 @@ def emit_llm_usage(
         total_tokens=total,
         cached_tokens=cached,
         scenario_id=scenario_id,
+        scenario_session_id=scenario_session_id,
     )
+
+
+def _resolve_room_id(room_id: Optional[str]) -> Optional[str]:
+    """The explicit room, else the graph run's context var.
+
+    Call sites that run outside a graph node must pass ``room_id``: there the
+    context var reads "unknown" and Core can't attribute the cost to a session.
+    Inside a node (and tasks spawned from one, which copy the context) the
+    context var is the room name.
+    """
+    if room_id:
+        return room_id
+    try:
+        from app.core.graph.instrumentation import get_room_id
+
+        return get_room_id()
+    except Exception:
+        return None
+
+
+def emit_langchain_usage(
+    response: Any,
+    *,
+    task: str,
+    llm_client: Any = None,
+    room_id: Optional[str] = None,
+    provider: Optional[str] = None,
+    model: Optional[str] = None,
+    scenario_id: Optional[int] = None,
+    scenario_session_id: Optional[str] = None,
+) -> None:
+    """Emit the usage carried by a LangChain ``AIMessage``. Never raises.
+
+    ``response`` is the RAW message — a structured-output call must ask for
+    ``include_raw=True``, because the parsed model alone carries no usage.
+    Provider and model default to ``llm_client``'s (a ``BaseLLMClient``).
+    Nothing is emitted when the response reports no usage.
+    """
+    try:
+        from app.core.llm_usage.extract import extract_usage_from_aimessage
+
+        usage = extract_usage_from_aimessage(response)
+        if not usage:
+            return
+        if llm_client is not None:
+            provider = provider or getattr(llm_client, "provider", None)
+            if not model:
+                llm_instance = getattr(llm_client, "llm_instance", None)
+                model = getattr(llm_instance, "model_name", None) or getattr(
+                    llm_instance, "model", None
+                )
+        emit_llm_usage(
+            room_id=_resolve_room_id(room_id),
+            provider=provider,
+            model=model if isinstance(model, str) else None,
+            task=task,
+            usage=usage,
+            scenario_id=scenario_id,
+            scenario_session_id=scenario_session_id,
+        )
+    except Exception:
+        logger.debug("emit_langchain_usage skipped (best-effort)", exc_info=True)
+
+
+def emit_openai_usage(
+    completion: Any,
+    *,
+    task: str,
+    model: Optional[str],
+    provider: str = "openai",
+    room_id: Optional[str] = None,
+    scenario_id: Optional[int] = None,
+) -> None:
+    """Emit the usage carried by a raw OpenAI SDK completion. Never raises.
+
+    ``model`` is the REQUESTED model id (as configured), not
+    ``completion.model``, which the API returns date-suffixed and which would
+    then miss Core's per-model pricing.
+    """
+    try:
+        from app.core.llm_usage.extract import extract_usage_from_openai_completion
+
+        usage = extract_usage_from_openai_completion(completion)
+        if not usage:
+            return
+        emit_llm_usage(
+            room_id=_resolve_room_id(room_id),
+            provider=provider,
+            model=model,
+            task=task,
+            usage=usage,
+            scenario_id=scenario_id,
+        )
+    except Exception:
+        logger.debug("emit_openai_usage skipped (best-effort)", exc_info=True)
+
+
+def emit_embedding_usage(
+    *,
+    task: str,
+    model: Optional[str],
+    input_tokens: int,
+    provider: str = "openai",
+    room_id: Optional[str] = None,
+) -> None:
+    """Emit an embedding call: billed on input tokens only. Never raises."""
+    try:
+        emit_ai_usage(
+            _resolve_room_id(room_id),
+            service="llm",
+            provider=provider,
+            model=model,
+            task=task,
+            prompt_tokens=int(input_tokens or 0),
+            completion_tokens=0,
+            total_tokens=int(input_tokens or 0),
+        )
+    except Exception:
+        logger.debug("emit_embedding_usage skipped (best-effort)", exc_info=True)
 
 
 async def _send(body: str) -> None:

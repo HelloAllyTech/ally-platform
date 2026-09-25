@@ -301,3 +301,31 @@ def exception_scenarios():
         (KeyError("Missing key"), "key_error"),
         (Exception("Generic error"), "generic_error"),
     ]
+
+
+@pytest.fixture
+def ai_usage_calls(monkeypatch):
+    """Capture every ``emit_ai_usage`` call as one dict (room_id + kwargs).
+
+    Every emit helper (``emit_llm_usage``, ``emit_langchain_usage``,
+    ``emit_openai_usage``, ``emit_embedding_usage``) funnels through
+    ``emit_ai_usage`` by module-global lookup, so patching it here sees them
+    all without touching SQS.
+    """
+    calls = []
+
+    def _capture(room_id, **kwargs):
+        calls.append({"room_id": room_id, **kwargs})
+
+    monkeypatch.setattr("app.core.llm_usage.emitter.emit_ai_usage", _capture)
+    return calls
+
+
+@pytest.fixture
+def graph_room(monkeypatch):
+    """Run the test body as if inside a graph node for room ``graph-room``."""
+    from app.core.graph import instrumentation
+
+    token = instrumentation._room_id_var.set("graph-room")
+    yield "graph-room"
+    instrumentation._room_id_var.reset(token)
