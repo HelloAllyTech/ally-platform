@@ -14,6 +14,59 @@ from app.tts.base import BaseTTSClient
 
 logger = get_logger(__name__)
 
+# Bound on consecutive dead sockets discarded per get(); past it the pool's
+# own connection is returned and the plugin's retry handles it as before.
+_STALE_SOCKET_DISCARD_LIMIT = 3
+
+
+def _websocket_alive(ws: Any) -> bool:
+    """False when a pooled Sarvam WebSocket can no longer be written to.
+
+    Sarvam drops an idle TTS socket after ~30-45 s (measured 2026-09-25). aiohttp
+    keeps reporting ``closed=False`` because nobody reads the close frame, but
+    the transport is gone, so the next write raises "Cannot write to closing
+    transport". Only a missing or closing transport is treated as dead; if the
+    attribute path is absent (a different aiohttp layout) the socket is assumed
+    alive, i.e. the old behaviour.
+    """
+    if getattr(ws, "closed", False):
+        return False
+    response = getattr(ws, "_response", None)
+    if response is None:
+        return True
+    connection = getattr(response, "connection", None)
+    transport = getattr(connection, "transport", None) if connection else None
+    return transport is not None and not transport.is_closing()
+
+
+def guard_stale_websockets(tts_instance: Any) -> None:
+    """Make the plugin's connection pool discard dead sockets before reuse.
+
+    livekit-plugins-sarvam keeps one WebSocket per TTS instance in a
+    ``ConnectionPool`` for up to an hour and never checks it is still open, so
+    the first synthesis after any pause longer than Sarvam's idle timeout — in
+    practice every turn, since the counsellor talks for 30 s+ — failed with
+    "Cannot write to closing transport" and only succeeded on the plugin's
+    retry (0.1 s back-off plus a fresh TLS connect, and four ERROR log lines
+    per turn). Idempotent.
+    """
+    pool = getattr(tts_instance, "_pool", None)
+    if pool is None or getattr(pool, "_ally_stale_guard", False):
+        return
+    original_get = pool.get
+
+    async def get(*, timeout: float) -> Any:
+        for _ in range(_STALE_SOCKET_DISCARD_LIMIT):
+            conn = await original_get(timeout=timeout)
+            if _websocket_alive(conn):
+                return conn
+            logger.debug("[Sarvam] discarding stale pooled TTS WebSocket")
+            pool.remove(conn)
+        return await original_get(timeout=timeout)
+
+    object.__setattr__(pool, "get", get)
+    object.__setattr__(pool, "_ally_stale_guard", True)
+
 
 class SarvamTTSClient(BaseTTSClient):
     """
@@ -183,6 +236,8 @@ class SarvamTTSClient(BaseTTSClient):
                 speaker=self._speaker,
                 api_key=self._api_key,
             )
+
+        guard_stale_websockets(self._tts_instance)
 
         # Wrap stream method to inject higher timeout
         # Apply this even if instance was provided via __init__

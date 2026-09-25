@@ -68,6 +68,17 @@ Providers optionally define two class constants:
 
 **Sarvam** -- Specialized for Indian languages. Uses `speaker` for voice selection.
 
+Two Sarvam traps, both handled in `app/tts/sarvam.py`:
+- **The configured `model` must be passed to `sarvam.TTS`.** Omitted, the plugin uses its own default
+  (`bulbul:v2`), which Sarvam has retired (400 "has been deprecated"). v3 shares none of v2's
+  speakers; prod voices were remapped by ally-be migration `1973600000000`. Don't call the plugin's
+  `update_options(model=…)` — 1.3.12 rejects anything but v2 there.
+- **Stale pooled WebSockets.** The plugin reuses one socket per instance for up to an hour, but
+  Sarvam drops idle sockets after ~30-45 s while aiohttp still reports `closed=False`. Unguarded,
+  the first synthesis of nearly every turn failed with "Cannot write to closing transport" and
+  only worked on the plugin's retry. `guard_stale_websockets` makes the pool discard a socket whose
+  transport is gone before reusing it.
+
 **Google Cloud** -- Uses `voice_name` and `gender` for voice selection. Supports voice cloning via `voice_cloning_key`. Voice parameters only (no SSML) when streaming is enabled.
 
 **Hume** -- Emotion-aware TTS. Uses `voice_id` with optional `voice_provider` (HUME_AI for pre-existing, CUSTOM_VOICE for custom). Supports `instant_mode` for lower latency. Voice parameters include a text `description` of desired emotional expression.
