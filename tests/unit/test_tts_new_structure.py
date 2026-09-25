@@ -316,7 +316,10 @@ class TestSarvamProvider:
         result = client.tts_instance
 
         mock_tts_class.assert_called_once_with(
-            target_language_code="en-IN", speaker="anushka", api_key="test-api-key"
+            target_language_code="en-IN",
+            model="bulbul:v2",
+            speaker="anushka",
+            api_key="test-api-key",
         )
         assert result == mock_tts_instance
 
@@ -342,7 +345,10 @@ class TestSarvamProvider:
         result = client.tts_instance
 
         mock_tts_class.assert_called_once_with(
-            target_language_code="hi-IN", speaker="anushka", api_key="test-api-key"
+            target_language_code="hi-IN",
+            model="bulbul:v2",
+            speaker="anushka",
+            api_key="test-api-key",
         )
         assert result == mock_tts_instance
 
@@ -369,7 +375,10 @@ class TestSarvamProvider:
 
         # Should default to "en-IN"
         mock_tts_class.assert_called_once_with(
-            target_language_code="en-IN", speaker="anushka", api_key="test-api-key"
+            target_language_code="en-IN",
+            model="bulbul:v2",
+            speaker="anushka",
+            api_key="test-api-key",
         )
         assert result == mock_tts_instance
 
@@ -811,7 +820,10 @@ class TestTTSNewStructureIntegration:
         result = client.tts_instance
 
         mock_tts_class.assert_called_once_with(
-            target_language_code="hi-IN", speaker="anushka", api_key="test-key"
+            target_language_code="hi-IN",
+            model="bulbul:v2",
+            speaker="anushka",
+            api_key="test-key",
         )
         assert result == mock_tts_instance
 

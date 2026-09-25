@@ -172,8 +172,14 @@ class SarvamTTSClient(BaseTTSClient):
         if self._tts_instance is None:
             # Create TTS instance - parameters will be set via update_options()
             # before synthesis starts
+            # The configured model MUST be passed: omitted, the plugin falls
+            # back to its own default (bulbul:v2) whatever the voice row says.
+            # That silently pinned every Sarvam voice to v2, and when Sarvam
+            # retired v2 (400 "Model 'bulbul:v2' has been deprecated") every
+            # Sarvam-voiced session lost all agent audio.
             self._tts_instance = sarvam.TTS(
                 target_language_code=self._target_language,
+                model=self._model,
                 speaker=self._speaker,
                 api_key=self._api_key,
             )
