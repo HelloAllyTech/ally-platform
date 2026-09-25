@@ -63,7 +63,7 @@ class FakeLLMInstance:
     def __init__(self, titles: list):
         self._titles = titles
 
-    def with_structured_output(self, schema):
+    def with_structured_output(self, schema, **_kwargs):
         return FakeStructuredLLM(self._titles)
 
 
@@ -168,7 +168,7 @@ class TestRetrieveRelevantKnowledge:
 
 
 class FakeFailingLLM:
-    def with_structured_output(self, schema):
+    def with_structured_output(self, schema, **_kwargs):
         return self
 
     async def ainvoke(self, messages):
@@ -258,7 +258,7 @@ class CapturingLLMClient:
         outer = self
 
         class _Instance:
-            def with_structured_output(self, schema):
+            def with_structured_output(self, schema, **_kwargs):
                 return outer.structured
 
         self._llm_instance = _Instance()

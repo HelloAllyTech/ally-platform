@@ -52,3 +52,33 @@ def extract_usage_from_aimessage(
     except Exception:
         return None
     return None
+
+
+def extract_usage_from_openai_completion(
+    completion: Any,
+) -> Optional[Tuple[int, int, int, int]]:
+    """(prompt, completion, total, cached) from a raw OpenAI SDK completion.
+
+    For the call sites that use ``AsyncOpenAI`` directly (the event and
+    behaviour classifiers, to avoid LiveKit issue #2836) rather than a
+    LangChain model: their ``ChatCompletion`` / ``ParsedChatCompletion`` carries
+    ``usage`` as an object, not LangChain's ``usage_metadata`` dict.
+
+    Never raises — returns None when usage isn't available.
+    """
+    try:
+        usage = getattr(completion, "usage", None)
+        if usage is None:
+            return None
+        prompt = int(getattr(usage, "prompt_tokens", 0) or 0)
+        completion_tokens = int(getattr(usage, "completion_tokens", 0) or 0)
+        total = int(getattr(usage, "total_tokens", 0) or 0) or (
+            prompt + completion_tokens
+        )
+        details = getattr(usage, "prompt_tokens_details", None)
+        cached = int(getattr(details, "cached_tokens", 0) or 0) if details else 0
+        if prompt or completion_tokens or total:
+            return prompt, completion_tokens, total, cached
+    except Exception:
+        return None
+    return None

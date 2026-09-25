@@ -3236,6 +3236,50 @@ class TestPredictiveFillerLlmIsolation:
         assert called_client is not shared
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("source", ["seed", "exchange", "in_turn"])
+    async def test_generation_and_clips_are_attributed_to_the_room(
+        self, monkeypatch, source
+    ):
+        """AI-cost: every filler moment runs outside the graph run, so the
+        worker must hand the room to both the LLM call (thinking_filler) and
+        the clip synthesis (clip_tts), or the spend lands on no session."""
+        from app.core.livekit import predictive_filler as predictive_filler_module
+
+        seen = {}
+
+        async def fake_generate(*_a, **kw):
+            seen["generate"] = kw
+            return [("hmm…", "hesitation")]
+
+        async def fake_synth(_tts, _requests, **kw):
+            seen["synth"] = kw
+            return [_clip("hmm…", 400.0)]
+
+        for name in (
+            "generate_seed_fillers",
+            "generate_predictive_fillers",
+            "generate_in_turn_fillers",
+        ):
+            monkeypatch.setattr(predictive_filler_module, name, fake_generate)
+        monkeypatch.setattr(
+            "app.core.livekit.filler_clips.synthesize_clips", fake_synth
+        )
+
+        w = self._worker()
+        w.scenario = types.SimpleNamespace()
+        w._predictive_filler_llm_client = Mock()
+        w._filler_pool = FillerPool()
+        w._read_conversation_history = Mock(return_value=["turn one"])
+        w._tts_provider, w._tts_model = "sarvam", "bulbul:v3"
+
+        await w._generate_fillers(source=source, partial_text="I was thinking")
+
+        assert seen["generate"]["room_id"] == "room-1"
+        assert seen["synth"]["usage_room_id"] == "room-1"
+        assert seen["synth"]["usage_provider"] == "sarvam"
+        assert seen["synth"]["usage_model"] == "bulbul:v3"
+
+    @pytest.mark.asyncio
     async def test_regeneration_skips_while_pool_still_fresh(self, monkeypatch):
         """The old loop paid an LLM + 5 TTS calls every 10s regardless.
 
@@ -3372,4 +3416,41 @@ class TestWorkerOptionsShutdownProcessTimeout:
             "shutdown handler's own drain budget (3s + 16s = 19s) plus "
             "network time for finalize_session and background-audio/"
             "supervisor-notes teardown"
+        )
+
+
+class TestSessionCostAttribution:
+    """AI-cost helpers: the worker hands its room to calls it makes itself."""
+
+    def _worker(self):
+        ctx = types.SimpleNamespace(room=types.SimpleNamespace(name="room-w"))
+        return worker.AgentWorker(ctx)
+
+    def test_usage_room_id_is_the_livekit_room_name(self):
+        assert self._worker()._usage_room_id() == "room-w"
+
+    def test_usage_room_id_tolerates_a_bare_worker(self):
+        w = self._worker()
+        w.ctx = None
+        assert w._usage_room_id() is None
+
+    def test_clip_usage_carries_the_agent_tts_provider_and_model(self):
+        w = self._worker()
+        w._tts_provider, w._tts_model = "elevenlabs", "eleven_flash_v2_5"
+        assert w._clip_usage() == {
+            "usage_room_id": "room-w",
+            "usage_provider": "elevenlabs",
+            "usage_model": "eleven_flash_v2_5",
+        }
+
+    @pytest.mark.asyncio
+    async def test_pool_embedding_is_recorded_against_the_room(self):
+        w = self._worker()
+        w.embedding_client = Mock()
+        w.embedding_client.get_embeddings_batch = AsyncMock(return_value=[[1.0]])
+
+        await w._working_memory_embed_many()(["a fact"])
+
+        w.embedding_client.get_embeddings_batch.assert_awaited_once_with(
+            ["a fact"], task="working_memory_embedding", room_id="room-w"
         )

@@ -9,10 +9,12 @@ the system prompt is built in code with the goal list injected. The LLM tuning
 the report evaluator so the two judges behave identically.
 """
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, model_validator
 
+from app.core.llm_usage.emitter import emit_langchain_usage
+from app.core.llm_usage.tasks import LLMTask
 from app.core.logger import get_logger
 from app.core.scenario_report.evaluator import _build_evaluator_llm
 from app.core.scenario_session_evaluation.schemas import (
@@ -120,6 +122,7 @@ def _build_user_message(transcript: List[ActorEvaluationTurn]) -> str:
 async def evaluate_actor_goals(
     transcript: List[ActorEvaluationTurn],
     goals: List[ActorEvaluationGoal],
+    scenario_session_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Run the LLM judge.
 
@@ -127,21 +130,47 @@ async def evaluate_actor_goals(
 
     Raises on LLM failure so the caller can ship a FAILED webhook (we want the
     superadmin to see *that* an evaluation failed, not a silent empty result).
+
+    The judge's tokens are emitted to ``llm_usage`` as ``actor_evaluation``,
+    attributed by ``scenario_session_id``: this runs in an HTTP request after
+    the session, with no LiveKit room to attribute it by.
     """
     if not transcript:
         return {"metrics": {}, "not_applicable": [], "report_markdown": ""}
     if not goals:
         return {"metrics": {}, "not_applicable": [], "report_markdown": ""}
 
-    llm = _build_evaluator_llm().with_structured_output(
-        ActorGoalEvaluationResult, method="json_mode"
+    base_llm = _build_evaluator_llm()
+    # include_raw because the parsed model alone carries no usage metadata.
+    llm = base_llm.with_structured_output(
+        ActorGoalEvaluationResult, method="json_mode", include_raw=True
     )
-    result: ActorGoalEvaluationResult = await llm.ainvoke(
+    raw_result = await llm.ainvoke(
         [
             {"role": "system", "content": build_actor_goal_system_prompt(goals)},
             {"role": "user", "content": _build_user_message(transcript)},
         ]
     )
+    if isinstance(raw_result, dict):
+        # Emitted before parsing: a parse failure still spent the tokens.
+        emit_langchain_usage(
+            raw_result.get("raw"),
+            task=LLMTask.ACTOR_EVALUATION.value,
+            provider="openai",
+            model=getattr(base_llm, "model_name", None),
+            scenario_session_id=scenario_session_id,
+        )
+        result: ActorGoalEvaluationResult = raw_result.get("parsed")
+        if result is None:
+            # include_raw captures a parse failure instead of raising it; raise
+            # it anyway, so the caller still ships a FAILED webhook.
+            raise ValueError(
+                "actor judge returned unparseable output: "
+                f"{raw_result.get('parsing_error')}"
+            )
+    else:
+        # Defensive: some providers/wrappers may ignore include_raw.
+        result = raw_result
 
     # Only echo back titles that actually match a configured goal. The judge
     # keys applicability by verbatim title, so a paraphrase or typo would

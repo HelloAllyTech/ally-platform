@@ -312,6 +312,43 @@ async def _collect_pcm(stream) -> Tuple[bytes, int, int]:
     return b"".join(chunks), sample_rate, num_channels
 
 
+def _synthesis_text(phrase: str, variant: int) -> str:
+    """The exact text sent to the TTS for ``variant`` of ``phrase``.
+
+    One place, because it is also what clip TTS is billed on (characters).
+    """
+    return _variant_text(_normalize_for_synthesis(phrase), variant)
+
+
+def _emit_clip_tts_usage(
+    characters: int,
+    room_id: Optional[str],
+    provider: Optional[str],
+    model: Optional[str],
+) -> None:
+    """Record real clip synthesis as ``clip_tts``. Never raises.
+
+    The clip instance is an isolated clone (``create_clip_tts``), never the
+    AgentSession's own TTS, so LiveKit's ``metrics_collected`` hook — which is
+    where ``agent_tts`` comes from — never sees it. Without this row filler,
+    back-channel and interim audio would be free on the cost dashboard.
+    """
+    try:
+        from app.core.llm_usage.emitter import _resolve_room_id, emit_ai_usage
+        from app.core.llm_usage.tasks import LLMTask
+
+        emit_ai_usage(
+            _resolve_room_id(room_id),
+            service="tts",
+            provider=provider,
+            model=model,
+            task=LLMTask.CLIP_TTS.value,
+            characters=characters,
+        )
+    except Exception:  # noqa: BLE001 - usage must never break a session
+        logger.debug("[FILLER] clip_tts usage skipped", exc_info=True)
+
+
 async def _render_one(
     tts, phrase: str, variant: int
 ) -> Optional[Tuple[List[Any], float]]:
@@ -325,7 +362,7 @@ async def _render_one(
     endpoint (libav InvalidDataError, zero frames) while their streaming path —
     the one the live agent speaks through — works fine.
     """
-    text = _variant_text(_normalize_for_synthesis(phrase), variant)
+    text = _synthesis_text(phrase, variant)
     if not text.strip():
         return None
     try:
@@ -385,6 +422,9 @@ async def synthesize_clips(
     language: str = "unknown",
     source: str = "unknown",
     use_cache: bool = True,
+    usage_room_id: Optional[str] = None,
+    usage_provider: Optional[str] = None,
+    usage_model: Optional[str] = None,
 ) -> List[FillerClip]:
     """Render ``phrases`` to in-memory clips, using the shared cache.
 
@@ -399,6 +439,11 @@ async def synthesize_clips(
     than a dead session.
 
     Input order is preserved; per-phrase failures are skipped, never raised.
+
+    Every phrase actually synthesized is recorded as ``clip_tts`` (characters
+    sent) against ``usage_room_id``, tagged ``usage_provider`` /
+    ``usage_model``. Cache hits cost no TTS call and record nothing; a phrase
+    that rendered no audio records nothing either.
     """
     requests: List[Tuple[str, str, int]] = []
     for item in phrases or []:
@@ -464,11 +509,13 @@ async def synthesize_clips(
                         await aclose()
                     except Exception:  # noqa: BLE001
                         pass
+            synthesized_chars = 0
             for i, out in zip(misses, rendered):
                 if out is None:
                     continue
                 frames, duration_ms = out
                 phrase, ftype, variant = requests[i]
+                synthesized_chars += len(_synthesis_text(phrase, variant))
                 if use_cache:
                     _CACHE.put(
                         _cache_key(fingerprint, language, phrase, variant),
@@ -482,6 +529,10 @@ async def synthesize_clips(
                     filler_type=ftype,
                     variant=variant,
                     source=source,
+                )
+            if synthesized_chars:
+                _emit_clip_tts_usage(
+                    synthesized_chars, usage_room_id, usage_provider, usage_model
                 )
 
     return [clip for clip in results if clip is not None]

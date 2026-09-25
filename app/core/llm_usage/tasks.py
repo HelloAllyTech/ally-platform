@@ -21,3 +21,43 @@ class LLMTask(str, Enum):
     # separate from AGENT_TURN because it is a per-simulation opt-in, so its
     # spend has to be readable on its own.
     BACKCHANNEL_PHRASES = "backchannel_phrases"
+
+    # ---- Latency-masking layer (per-simulation opt-ins, each on its own
+    # dedicated or clip instance, so each is separable on the cost dashboard).
+    # Predictive interim reply: one fast-model call per long learner turn.
+    INTERIM_REPLY = "interim_reply"
+    # Dynamic thinking-fillers: seed (session start), exchange (between turns)
+    # and in-turn (mid-utterance) generations share one label.
+    THINKING_FILLER = "thinking_filler"
+    # Clip TTS: the ISOLATED TTS instance that renders filler / back-channel /
+    # interim clips. Not the AgentSession's TTS, so LiveKit's metrics hook
+    # (agent_tts) never sees it. Recorded per real synthesis; a clip-cache hit
+    # costs nothing and records nothing.
+    CLIP_TTS = "clip_tts"
+
+    # ---- Per-turn graph calls outside the reply itself.
+    # RAG title selection over the scenario knowledge base.
+    KNOWLEDGE_RETRIEVAL = "knowledge_retrieval"
+    # <llm_response(...)> substitution inside a branching instruction.
+    BRANCHING_INSTRUCTION = "branching_instruction"
+    # <chat_summary> substitution inside a branching instruction.
+    BRANCHING_CHAT_SUMMARY = "branching_chat_summary"
+    # Scored behaviour-instruction classification (one call per instruction).
+    BEHAVIOUR_DETECTION = "behaviour_detection"
+    # Guardrail classification, including the STT coherence guard.
+    GUARDRAIL_CHECK = "guardrail_check"
+    # Binary-classifier events, batched or single.
+    BINARY_CLASSIFIER = "binary_classifier"
+    # Helper-paraphrased event evaluation.
+    HELPER_PARAPHRASED = "helper_paraphrased"
+
+    # ---- Embeddings (prompt_tokens = input tokens, completion 0).
+    # Semantic-similarity events: target sentences once, learner utterances.
+    EVENT_EMBEDDING = "event_embedding"
+    # Client working memory: backstory pool at setup, one recall query a turn.
+    WORKING_MEMORY_EMBEDDING = "working_memory_embedding"
+
+    # ---- After the session.
+    # Goal-based actor-quality evaluation of a real session (HTTP request from
+    # ally-be; attributed by scenario_session_id, not a room).
+    ACTOR_EVALUATION = "actor_evaluation"

@@ -19,7 +19,9 @@ otherwise).
 
 Everything here is best-effort: any failure returns ``None`` so the worker
 silently falls back to no interim for the turn. It must never raise into the
-session.
+session. The call's token usage is emitted to ``llm_usage`` as
+``interim_reply`` against the room the caller passes (the call runs from a
+worker task, outside the graph run whose context var ``get_room_id`` reads).
 """
 
 from __future__ import annotations
@@ -113,6 +115,7 @@ async def generate_interim_reply(
     scenario,
     messages: List[BaseMessage],
     partial_text: str,
+    room_id: Optional[str] = None,
 ) -> Optional[str]:
     """Generate one short, non-committal interim reply from the partial transcript.
 
@@ -166,8 +169,11 @@ async def generate_interim_reply(
             float(getattr(settings, "INTERIM_REPLY_LLM_TIMEOUT_MS", 1500.0)) / 1000.0
         )
         llm_instance = interim_llm_client.llm_instance
-        response = await asyncio.wait_for(
-            llm_instance.with_structured_output(_InterimReply).ainvoke(
+        # include_raw because the parsed model alone carries no usage metadata.
+        result = await asyncio.wait_for(
+            llm_instance.with_structured_output(
+                _InterimReply, include_raw=True
+            ).ainvoke(
                 [
                     SystemMessage(content=system_prompt),
                     HumanMessage(content=user_content),
@@ -175,6 +181,22 @@ async def generate_interim_reply(
             ),
             timeout=timeout_s,
         )
+        if isinstance(result, dict):
+            # Emitted before parsing: a parse failure still spent the tokens.
+            from app.core.llm_usage.emitter import emit_langchain_usage
+            from app.core.llm_usage.tasks import LLMTask
+
+            emit_langchain_usage(
+                result.get("raw"),
+                task=LLMTask.INTERIM_REPLY.value,
+                llm_client=interim_llm_client,
+                room_id=room_id,
+                scenario_id=getattr(scenario, "id", None),
+            )
+            response = result.get("parsed")
+        else:
+            # Defensive: some providers/wrappers may ignore include_raw.
+            response = result
 
         reply = getattr(response, "reply", None)
         if not isinstance(reply, str):

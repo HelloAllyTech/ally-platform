@@ -148,7 +148,9 @@ class TestSemanticSimilarityEvent:
 
                 assert result is True
                 mock_batch.assert_called_once()
-                mock_single.assert_called_once_with("How do you feel?")
+                mock_single.assert_called_once_with(
+                    "How do you feel?", task="event_embedding"
+                )
 
     @pytest.mark.asyncio
     async def test_match_semantic_with_mocked_embeddings_low_similarity(
@@ -567,3 +569,45 @@ class TestSemanticSimilarityEventIntegration:
         assert "semantic_reg_test" in orchestrator.event_registry
         assert orchestrator.event_registry["semantic_reg_test"].trigger_multiple is True
         assert orchestrator.event_registry["semantic_reg_test"].happened is False
+
+
+class TestSemanticSimilarityUsage:
+    """AI-cost: target and input embeddings are recorded as event_embedding,
+    attributed to the session's embedding client's room."""
+
+    @pytest.mark.asyncio
+    async def test_detection_records_both_embedding_calls(
+        self, monkeypatch, ai_usage_calls
+    ):
+        from app.core.embeddings.openai_embeddings import OpenAIEmbeddingClient
+
+        with patch(
+            "app.core.embeddings.openai_embeddings.OpenAIEmbeddings"
+        ) as lc_embeddings:
+            lc = lc_embeddings.return_value
+            lc.aembed_documents = AsyncMock(return_value=[[1.0, 0.0]])
+            lc.aembed_query = AsyncMock(return_value=[1.0, 0.0])
+            client = OpenAIEmbeddingClient(
+                model="text-embedding-3-small", api_key="k", room_id="room-sem"
+            )
+        monkeypatch.setattr(
+            OpenAIEmbeddingClient, "_count_input_tokens", lambda self, texts: 4
+        )
+        monkeypatch.setattr(SemanticSimilarityEvent, "_EMBEDDING_CLIENT", client)
+        monkeypatch.setattr(SemanticSimilarityEvent, "_PATTERN_CACHE", {})
+        monkeypatch.setattr(SemanticSimilarityEvent, "_INPUT_EMBEDDING_CACHE", {})
+
+        event = SemanticSimilarityEvent.create(
+            event_id="semantic_usage",
+            custom_sentences=["How are you feeling?"],
+            score=1,
+        )
+        matched = await event.detect_event(
+            [ChatMessage(role="counselor", content="How are you feeling?")]
+        )
+
+        assert matched is True
+        assert [(c["room_id"], c["task"], c["model"]) for c in ai_usage_calls] == [
+            ("room-sem", "event_embedding", "text-embedding-3-small"),
+            ("room-sem", "event_embedding", "text-embedding-3-small"),
+        ]
