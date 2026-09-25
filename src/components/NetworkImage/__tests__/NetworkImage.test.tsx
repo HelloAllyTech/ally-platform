@@ -1,5 +1,5 @@
 import React from 'react';
-import {act, render, waitFor} from '@testing-library/react-native';
+import {render, waitFor, act} from '@testing-library/react-native';
 
 import {NetworkImage} from '../NetworkImage';
 
@@ -87,11 +87,11 @@ describe('NetworkImage', () => {
     // Simulate SvgUri error
     const {SvgUri} = require('react-native-svg');
     const svgUriComponent = UNSAFE_getByType(SvgUri);
-    if (svgUriComponent.props.onError) {
-      await act(async () => {
+    act(() => {
+      if (svgUriComponent.props.onError) {
         svgUriComponent.props.onError(new Error('Failed to load'));
-      });
-    }
+      }
+    });
 
     // Should fallback to SvgXml after error
     await waitFor(() => {
@@ -128,11 +128,11 @@ describe('NetworkImage', () => {
     // Simulate SvgUri error to trigger fallback
     const {SvgUri} = require('react-native-svg');
     const svgUriComponent = UNSAFE_getByType(SvgUri);
-    if (svgUriComponent.props.onError) {
-      await act(async () => {
+    act(() => {
+      if (svgUriComponent.props.onError) {
         svgUriComponent.props.onError(new Error('Failed to load'));
-      });
-    }
+      }
+    });
 
     // Wait for fallback to fail and show error view
     await waitFor(() => {

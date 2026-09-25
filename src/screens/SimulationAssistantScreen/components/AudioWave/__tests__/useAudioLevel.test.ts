@@ -4,11 +4,27 @@ jest.mock('livekit-client', () => ({
   ParticipantEvent: {IsSpeakingChanged: 'isSpeakingChanged'},
 }));
 
+import type {RemoteParticipant} from 'livekit-client';
+
 import {useAudioLevel} from '../useAudioLevel';
 
+/**
+ * A stand-in for the four members `useAudioLevel` actually touches:
+ * `audioLevel`, `isSpeaking`, `on` and `off`. `RemoteParticipant` carries
+ * 50-odd more, none of which a unit test has any business constructing, so
+ * the object is asserted into the type rather than built up to it.
+ *
+ * The intersection with the literal shape is what keeps `on`/`off` visible as
+ * jest mocks (so `toHaveBeenCalledWith` still type-checks) and keeps `emit`,
+ * which is the test's own hook for driving the listener — it is not part of
+ * LiveKit's participant surface.
+ *
+ * The `import type` above is erased at compile time, so it does not defeat
+ * the `jest.mock('livekit-client')` at the top of this file.
+ */
 const createMockParticipant = (overrides: Record<string, unknown> = {}) => {
   const listeners = new Map<string, Set<Function>>();
-  return {
+  const mock = {
     audioLevel: 0,
     isSpeaking: false,
     on: jest.fn((event: string, cb: Function) => {
@@ -23,6 +39,7 @@ const createMockParticipant = (overrides: Record<string, unknown> = {}) => {
     },
     ...overrides,
   };
+  return mock as unknown as RemoteParticipant & typeof mock;
 };
 
 describe('useAudioLevel', () => {

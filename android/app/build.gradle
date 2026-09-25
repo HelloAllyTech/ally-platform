@@ -31,8 +31,8 @@ android {
         applicationId "com.helloally.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 89
-        versionName "1.23.28"
+        versionCode 92
+        versionName "1.23.31"
     }
 
     flavorDimensions "version"

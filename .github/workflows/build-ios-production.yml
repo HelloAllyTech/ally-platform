@@ -199,45 +199,14 @@ jobs:
               }
             ]
 
-      # Automatically hands the just-uploaded build to external TestFlight testers — no separate
-      # manual click. Deliberately non-blocking (continue-on-error): the actual build + TestFlight
-      # upload above already succeeded by this point, and a hiccup in this bonus step (e.g. a
-      # transient Apple API error, or missing export-compliance info on this specific build)
-      # shouldn't retroactively mark the whole production build as failed. Its own Slack
-      # notifications below carry the real signal either way.
-      - name: Set up Node for TestFlight external submission
-        if: success()
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - name: Install jsonwebtoken (CI-only tooling, not an app dependency)
-        if: success()
-        run: npm install jsonwebtoken --no-save
-
-      - name: Submit to TestFlight external group
-        if: success()
-        id: submit_external
-        continue-on-error: true
-        env:
-          APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
-          APPSTORE_API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
-          APPSTORE_API_PRIVATE_KEY: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
-          TESTFLIGHT_EXTERNAL_GROUP_NAME: ${{ vars.TESTFLIGHT_EXTERNAL_GROUP_NAME }}
-        run: node scripts/promote-ios-testflight.mjs
-
-      - name: Notify Slack - submitted to TestFlight external group
-        if: success() && steps.submit_external.outcome == 'success'
-        uses: tokorom/action-slack-incoming-webhook@main
-        env:
-          INCOMING_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        with:
-          text: "iOS build automatically submitted to the TestFlight external group. Apple's Beta App Review still needs to clear (typically ~24h) before external testers can install it."
-
-      - name: Notify Slack - automatic TestFlight external submission failed
-        if: success() && steps.submit_external.outcome == 'failure'
-        uses: tokorom/action-slack-incoming-webhook@main
-        env:
-          INCOMING_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        with:
-          text: 'iOS build uploaded successfully, but automatic TestFlight external submission FAILED — needs a manual retry (promote-ios-testflight-external.yml, or the admin dashboard button). <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run logs>'
+      # No external-TestFlight submission here on purpose. Every tester on this app is in
+      # Internal Testers, so chaining an external submission onto each build bought nothing
+      # and cost real confusion: it is a step that can only fail until someone fills in the
+      # Beta App Review contact details and a demo account in App Store Connect, and because
+      # it ran `continue-on-error` the run went on showing green while it failed. A green
+      # build that quietly did not do the thing is worse than not attempting the thing.
+      #
+      # If external testing is ever wanted, promote-ios-testflight-external.yml runs the same
+      # submission on demand and reports exactly which App Store Connect fields are still
+      # missing. Removing the automatic step is what commit 3f6a98b7 assumed had already
+      # happened when it deleted that workflow the first time.

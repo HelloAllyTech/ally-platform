@@ -10,6 +10,10 @@ import {
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 import {LeftArrowIcon} from '@/assets';
+import {
+  COURSE_DISCUSSION_REPLY_NOTIFICATION_TYPE,
+  SCREEN_NAMES,
+} from '@/constants';
 import {useAppNavigation, useHardwareBackPressHandler} from '@/hooks';
 import {
   NotificationItem,
@@ -61,8 +65,24 @@ export const NotificationsScreen: React.FC = () => {
       if (item.readAt === null) {
         markRead(item.id);
       }
+
+      // Course discussion reply → open the track item player at the
+      // replied-to item and (best-effort) scroll to / highlight the reply.
+      if (item.type === COURSE_DISCUSSION_REPLY_NOTIFICATION_TYPE) {
+        const notificationData = item.data ?? {};
+        const trackId = notificationData.trackId as string | undefined;
+        const itemId = notificationData.itemId as string | undefined;
+        const postId = notificationData.postId as string | undefined;
+        if (trackId && itemId) {
+          navigation.push(SCREEN_NAMES.COURSE_ITEM_PLAYER, {
+            trackId,
+            itemId,
+            highlightPostId: postId,
+          });
+        }
+      }
     },
-    [markRead],
+    [markRead, navigation],
   );
 
   const onEndReached = useCallback(() => {

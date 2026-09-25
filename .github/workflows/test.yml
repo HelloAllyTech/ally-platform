@@ -8,11 +8,23 @@
 # Deliberately its own workflow rather than a `pull_request` trigger on the
 # deploy pipeline, which would ship every PR.
 #
-# NOTE ON ENFORCEMENT: adding this file makes the checks run and report, but does
-# not make them mandatory — that is a branch-protection setting. Landed that way
-# on purpose, so a suite that turns out to be red on master blocks nobody while
-# it is being fixed. Mark "test" and "lint" as required checks once they are
-# green.
+# NOTE ON ENFORCEMENT: all three jobs are required checks as of 2026-09-21, via
+# the repo ruleset "master: tests, types and lint must pass".
+#
+# Required by the names GitHub reports them under — "Jest", "Typecheck" and
+# "Lint & format", i.e. each job's `name:`, NOT the job ids `test`, `typecheck`
+# and `lint`. (This job was called "TypeScript" until 2026-09-22; renaming it
+# meant editing the ruleset in the same change, which is exactly the coupling
+# the next paragraph warns about.) Requiring a context nothing ever reports does not fail a merge, it
+# blocks it forever waiting for a check that will never arrive, so the strings
+# below and the strings in the ruleset have to move together. Renaming a job
+# here without updating the ruleset wedges master.
+#
+# Repository admins and maintainers are on the ruleset's bypass list, so pushing
+# straight to master still works — this repo is trunk-based and branch
+# protection was deliberately removed on 2026-09-17 for that reason. The gate is
+# aimed at pull requests, Bug Hunter's included: it never merges its own, and a
+# green suite is the signal the human who does merge gets.
 
 # ally-mobile has 358 spec files and, until recently, no CI of any kind — its
 # only workflows were the four App Store / Play Store builds. Bug Hunter can
@@ -89,3 +101,34 @@ jobs:
       # flipping a threshold.
       - name: Lint
         run: npm run lint
+
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The pre-commit hook has always run this, but CI never did — so a single
+      # `--no-verify` put a type error on master permanently, where it stayed
+      # invisible (this workflow was green throughout) and then blocked the next
+      # person to commit. The guard fired on whoever came along rather than
+      # whoever broke it. That is how master reached 27 errors across 16 files.
+      #
+      # Blocking from the first run, unlike `lint` above: master is clean as of
+      # 37edff9b, so there is no backlog to grandfather in and nothing to fix
+      # before this can earn the right to fail the build.
+      #
+      # Shares the `typecheck` script with the hook rather than repeating the
+      # command, so the two cannot drift into checking different things.
+      - name: Typecheck
+        run: npm run typecheck

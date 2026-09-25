@@ -19,7 +19,15 @@ export type RootStackParamList = {
   SimulationPathDetails: {pathId: string};
   CaseDetails: {caseId: string};
   CourseOverview: {trackId: string};
-  CourseItemPlayer: {trackId: string; itemId: string};
+  CourseItemPlayer: {
+    trackId: string;
+    itemId: string;
+    /**
+     * Deep-linked from a COURSE_DISCUSSION_REPLY notification — the reply
+     * post to scroll to / highlight once the item's discussion loads.
+     */
+    highlightPostId?: string;
+  };
   CourseProgress: {trackId: string};
   SimulationAssistant: {
     sessionData: SessionData;

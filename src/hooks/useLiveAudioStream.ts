@@ -26,6 +26,14 @@ export const useLiveAudioStream = ({
 
   const appState = useRef(AppState.currentState);
   const {showSettingsAlert} = usePermissionAlert();
+  const mounted = useRef(false);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   /**
    * The recorder can only be initialised once the microphone permission has
@@ -118,6 +126,8 @@ export const useLiveAudioStream = ({
 
       try {
         const status = await check(MICROPHONE_PERMISSION);
+        if (!mounted.current) return;
+
         if (status === RESULTS.GRANTED) {
           setPermissionStatus(RESULTS.GRANTED);
           setHasRequestedPermission(false); // Reset for next time
@@ -129,6 +139,7 @@ export const useLiveAudioStream = ({
           if (shouldRequestIfNeeded && !hasRequestedPermission) {
             setHasRequestedPermission(true);
             const result = await request(MICROPHONE_PERMISSION);
+            if (!mounted.current) return;
             setPermissionStatus(result);
 
             if (result === RESULTS.GRANTED) {
@@ -149,6 +160,7 @@ export const useLiveAudioStream = ({
         }
       } catch (error) {
         logger.error(`Permission check failed: ${error}`);
+        if (!mounted.current) return;
         setPermissionStatus(RESULTS.DENIED);
       }
     },

@@ -123,6 +123,12 @@ export interface TrackDetailItem {
   score: number | null;
   attemptCount: number | null;
   maxWatchedPct: number | null;
+  /**
+   * Optional for the same released-build reason as `languageFallbackReason`
+   * above: a backend that predates course discussions omits it, and it
+   * should read as "no discussion" rather than breaking the card.
+   */
+  hasDiscussion?: boolean;
 }
 
 export interface TrackSection {
@@ -244,11 +250,33 @@ export interface QuizOption {
   text: string;
 }
 
+/**
+ * A picture or clip shown with a question, part of the stem rather than
+ * decoration. Mirrors ally-be's `QuestionMedia`; present on any sanitized
+ * question — quiz, video interjection or inline article question.
+ */
+export interface QuestionMedia {
+  kind: 'image' | 'video';
+  /** `s3` = a file the trainer uploaded; the rest are third-party embeds. */
+  source: 's3' | 'youtube' | 'vimeo' | 'loom';
+  url: string;
+  /** Images only — what the picture shows, for screen readers. */
+  alt?: string;
+  /**
+   * Uploaded video only: a still frame captured at author time. Without it
+   * a paused-at-zero clip is a black box on Android, which is the wrong
+   * thing to show someone being asked what they observe.
+   */
+  posterUrl?: string;
+}
+
 export interface SanitizedQuizQuestion {
   id: string;
   type: QuizQuestionType;
   prompt: string;
   points: number;
+  /** Optional picture or clip shown above the answer controls. */
+  media?: QuestionMedia;
   /** mcq_single / mcq_multi */
   options?: QuizOption[];
   /** ordering (pre-shuffled server-side) */

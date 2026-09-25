@@ -1,21 +1,28 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
-import {
-  ParticipantEvent,
-  RemoteParticipant,
-  TrackPublication,
-} from 'livekit-client';
+import {Participant, ParticipantEvent, TrackPublication} from 'livekit-client';
 
-// Custom hook for real-time audio level detection from remote participant
+/**
+ * Real-time audio level for a participant.
+ *
+ * Typed against `Participant`, not `RemoteParticipant`: the only members used
+ * here — `audioLevel`, `isSpeaking`, `on`, `off` — are all on the base class,
+ * and a local participant has an audio level too. The narrower type rejected
+ * `ParticipantTile`, which holds a plain `Participant`, for no benefit.
+ *
+ * `null` is accepted alongside `undefined` because callers holding a
+ * "nobody selected yet" ref reach for `null`, and both mean the same thing
+ * here: emit zero.
+ */
 export const useAudioLevel = (trackRef: {
-  participant?: RemoteParticipant;
+  participant?: Participant | null;
   publication?: TrackPublication;
 }) => {
   const [audioLevel, setAudioLevel] = useState(0);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const participantRef = useRef<RemoteParticipant | null>(null);
+  const participantRef = useRef<Participant | null>(null);
 
   // Helper function to get audio level from participant
-  const getParticipantAudioLevel = (participant: RemoteParticipant): number => {
+  const getParticipantAudioLevel = (participant: Participant): number => {
     const participantAudioLevel = participant?.audioLevel || 0;
     return participantAudioLevel > 0 ? Math.min(participantAudioLevel, 1) : 0;
   };
