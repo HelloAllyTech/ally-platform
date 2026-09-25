@@ -102,6 +102,11 @@ class CartesiaTTSClient(BaseTTSClient):
             api_key=settings.CARTESIA_API_KEY,
         )
 
+    def allows_clip_synthesis(self) -> bool:
+        """Cartesia voices are fixed speakers (a voice id, not a prompt), so a
+        clip is the same voice as the reply."""
+        return True
+
     @property
     def tts_instance(self) -> "cartesia.TTS":
         """Get the underlying Cartesia TTS instance."""

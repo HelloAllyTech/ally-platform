@@ -119,6 +119,7 @@ class GoogleTTSClient(BaseTTSClient):
         credentials_info: Optional[dict] = None,
         credentials_file: Optional[str] = None,
     ):
+        super().__init__()
         if not language_code:
             raise ValueError("Google TTS requires 'language_code'")
 
@@ -181,6 +182,19 @@ class GoogleTTSClient(BaseTTSClient):
             # Credentials (ADC)
             self._credentials_file = None
         self._tts_instance = None
+
+    def allows_clip_synthesis(self) -> bool:
+        """Clips only for Chirp 3 HD voices (``xx-XX-Chirp3-HD-<Name>``), which
+        are fixed speakers. Gemini-TTS is generative: a bare speaker name
+        (Kore, Charon), no voice name at all (the plugin then picks Gemini), or
+        a ``gemini-*`` model all mean a fresh draw per request. Standard,
+        Neural2, WaveNet and cloned voices are unclassified and fail closed
+        (see BaseTTSClient.allows_clip_synthesis)."""
+        voice = (self._voice_name or "").lower()
+        model = (self._model_name or "").lower()
+        if not voice or model.startswith("gemini") or self._voice_cloning_key:
+            return False
+        return "chirp3-hd" in voice
 
     @staticmethod
     def validate_voice(

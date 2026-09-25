@@ -2315,16 +2315,133 @@ class TestBackgroundAudioDeferral:
     as a background task for the LLM call + TTS synthesis + handler wiring.
     """
 
-    def _bg_worker(self):
+    def _bg_worker(self, clips=True):
         ctx = types.SimpleNamespace(
             room=types.SimpleNamespace(name="room-1"),
             proc=types.SimpleNamespace(userdata={}),
         )
         w = worker.AgentWorker(ctx)
         w.scenario = types.SimpleNamespace(prompt_data=types.SimpleNamespace())
-        w.tts_client = types.SimpleNamespace(tts_instance="TTS")
+        w.tts_client = types.SimpleNamespace(
+            tts_instance="TTS", can_create_clip_tts=lambda: clips
+        )
+        # What _setup_background_audio decides; set here for the tests that
+        # drive _setup_deferred_naturalness directly.
+        w._clip_tts_on = clips
         w.session = _RecordingSession()
         return w
+
+    @staticmethod
+    def _all_layers_on(monkeypatch):
+        for target in (
+            "app.core.livekit.fillers.is_filler_enabled",
+            "app.core.livekit.backchannel.is_backchannel_enabled",
+            "app.core.livekit.interim_reply.is_interim_reply_enabled",
+        ):
+            monkeypatch.setattr(target, lambda s: True)
+
+    @staticmethod
+    def _fake_player(monkeypatch):
+        class FakePlayer:
+            def __init__(self, ambient_sound=None):
+                self.ambient_sound = ambient_sound
+
+            async def start(self, room):
+                self.room = room
+
+        monkeypatch.setattr(
+            "app.core.livekit.resilient_bg_audio.ResilientBackgroundAudioPlayer",
+            FakePlayer,
+        )
+        return FakePlayer
+
+    @pytest.mark.asyncio
+    async def test_voice_without_clips_publishes_no_track_and_defers_nothing(
+        self, monkeypatch
+    ):
+        """No clip TTS: filler, back-channel and interim are all off, so with no
+        comfort tone there is nothing to publish and no LLM call to schedule."""
+        w = self._bg_worker(clips=False)
+        self._all_layers_on(monkeypatch)
+        monkeypatch.setattr(w, "_resolve_comfort_audio", AsyncMock(return_value=None))
+        deferred = AsyncMock()
+        monkeypatch.setattr(w, "_setup_deferred_naturalness", deferred)
+
+        await w._setup_background_audio()
+        await asyncio.sleep(0)
+
+        assert w._bg_audio is None
+        assert w._interim_enabled is False
+        deferred.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_voice_without_clips_keeps_the_comfort_tone(self, monkeypatch):
+        w = self._bg_worker(clips=False)
+        self._all_layers_on(monkeypatch)
+        monkeypatch.setattr(w, "_resolve_comfort_audio", AsyncMock(return_value="TONE"))
+        FakePlayer = self._fake_player(monkeypatch)
+        deferred = AsyncMock()
+        monkeypatch.setattr(w, "_setup_deferred_naturalness", deferred)
+
+        await w._setup_background_audio()
+        await asyncio.sleep(0)
+
+        assert isinstance(w._bg_audio, FakePlayer)
+        assert w._bg_audio.ambient_sound == "TONE"
+        assert w._interim_enabled is False
+        deferred.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_deferred_naturalness_makes_no_llm_calls_without_clips(
+        self, monkeypatch
+    ):
+        w = self._bg_worker(clips=False)
+        w._bg_audio = Mock()
+        self._all_layers_on(monkeypatch)
+        monkeypatch.setattr(worker.settings, "PREDICTIVE_FILLER_ENABLED", True)
+        backchannel_llm = AsyncMock(return_value=["mm-hmm"])
+        monkeypatch.setattr(
+            "app.core.livekit.backchannel.generate_backchannel_phrases",
+            backchannel_llm,
+        )
+        generate_fillers = AsyncMock(return_value=0)
+        monkeypatch.setattr(w, "_generate_fillers", generate_fillers)
+        setup_interim = Mock()
+        monkeypatch.setattr(w, "_setup_interim_reply", setup_interim)
+
+        await w._setup_deferred_naturalness()
+
+        backchannel_llm.assert_not_awaited()
+        generate_fillers.assert_not_awaited()
+        setup_interim.assert_not_called()
+        assert w.session.handlers == {}
+
+    @pytest.mark.asyncio
+    async def test_generative_voice_gets_no_clip_layers(self, monkeypatch):
+        """End to end with a real client: eleven_v3 is refused by the clip
+        policy, so the worker never schedules the clip layers' LLM calls."""
+        from app.tts.factory import create_tts_client
+
+        w = self._bg_worker()
+        w.tts_client = create_tts_client(
+            tts_config={
+                "provider": "elevenlabs",
+                "config": {"voice_id": "v1", "model": "eleven_v3"},
+            },
+            language_code="en-US",
+            gender="female",
+        )
+        self._all_layers_on(monkeypatch)
+        monkeypatch.setattr(w, "_resolve_comfort_audio", AsyncMock(return_value=None))
+        deferred = AsyncMock()
+        monkeypatch.setattr(w, "_setup_deferred_naturalness", deferred)
+
+        await w._setup_background_audio()
+        await asyncio.sleep(0)
+
+        assert w._clip_tts_on is False
+        assert w._bg_audio is None
+        deferred.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_setup_background_audio_defers_synthesis(self, monkeypatch):

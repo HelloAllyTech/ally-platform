@@ -361,6 +361,24 @@ async def _render_one(
         return None
 
 
+def clip_tts_available(tts_client) -> bool:
+    """Whether ``tts_client`` can render clips at all this session.
+
+    Checked before the filler, back-channel and interim LLM calls: their phrases
+    are only ever heard as clips, so for a voice that renders none (the clip
+    policy refuses it, or it can't be isolated) the call is paid for and thrown
+    away. Fails closed on anything that isn't a ``BaseTTSClient``-shaped client.
+    """
+    check = getattr(tts_client, "can_create_clip_tts", None)
+    if check is None:
+        return False
+    try:
+        return check() is True
+    except Exception:  # noqa: BLE001 - a policy check must never break a session
+        logger.warning("[FILLER] clip availability check failed", exc_info=True)
+        return False
+
+
 async def synthesize_clips(
     tts_client,
     phrases: Sequence[Any],

@@ -25,6 +25,9 @@ class BaseTTSClient(ABC):
     def get_tools(self) -> List[BaseTool]: ...
     def get_text_enhancement_instructions(self) -> Optional[str]: ...
     def get_defaults_for_learn_service(self) -> dict: ...
+    def allows_clip_synthesis(self) -> bool: ...   # clip policy, fails closed
+    def can_create_clip_tts(self) -> bool: ...
+    def create_clip_tts(self): ...                  # isolated instance or None
     def _validate_parameters_dict(self, params_dict) -> Dict[str, Any]: ...
     def _apply_parameters_dict(self, params_dict) -> None: ...
 ```
@@ -147,6 +150,49 @@ entirely — silence is strictly better than a dead session. `filler_audio`
 additionally falls back from `synthesize()` to the websocket `stream()` path
 per phrase, which is the route the live agent speaks through and works where
 Sarvam's one-shot endpoint is broken.
+
+Every provider client must call `super().__init__()`. Four of them (ElevenLabs,
+Sarvam, Deepgram, Google) did not, so `_current_params` was missing,
+`create_clip_tts()` raised, swallowed it and returned `None`, and every filler,
+back-channel and interim clip was skipped for those providers from v1.45.0
+(d35bb31) while the LLM calls that wrote the phrases still ran.
+`create_clip_tts()` now reads the parameters defensively, logs a failure at
+WARNING with the traceback, and closes any instance it built before failing.
+`tests/unit/test_tts_clip_real_clients.py` checks all of this against the real
+clients built by the factory, not a stub.
+
+## Clip policy (`allows_clip_synthesis`)
+
+Each clip is an independent generation on a separate TTS instance, played on the
+background track just before the reply. For a fixed-speaker voice that is the
+same voice. For a generative model each request is a new draw of the speaker, so
+the clip sounds like a second voice speaking just before the character.
+`BaseTTSClient.allows_clip_synthesis()` decides which voices may have clips. It
+**fails closed**: the base returns `False` and a client opts in only for the
+configs known to keep one speaker across generations.
+
+| Provider | Clips | Configs |
+|---|---|---|
+| Deepgram | on | all (Aura) |
+| ElevenLabs | on | `flash`, `turbo`, `multilingual_v2` models |
+| ElevenLabs | **off** | any model containing `v3` (`eleven_v3`, `eleven_v3_conversational`) |
+| Sarvam | on | `bulbul:v2` |
+| Sarvam | **off** | `bulbul:v3` and any other model (unclassified; v3 samples at temperature 0.6) |
+| Google | on | Chirp 3 HD voices (`xx-XX-Chirp3-HD-<Name>`) |
+| Google | **off** | Gemini-TTS (bare names like `Kore`, empty `voice_name`, `model_name` `gemini-*`); Standard/Neural2/WaveNet/cloned (unclassified) |
+| Cartesia | on | all |
+| Hume | **off** | all (Octave is generative) |
+| Smallest.ai | **off** | all (unclassified) |
+
+When the policy refuses a voice, `create_clip_tts()` returns `None` and logs
+`[CLIP_TTS] clips off for this session: reason=generative_voice` once, at INFO.
+Callers check `can_create_clip_tts()` (via `filler_clips.clip_tts_available`)
+**before** the filler, back-channel and interim LLM calls, because those phrases
+can only be heard as clips. Both the v1 worker (`_setup_background_audio`) and
+the v2 `NaturalnessController.start()` turn all three layers off for such a
+voice. The comfort tone still plays. Enabling clips for a new model means
+changing its row here and in the test's `CASES` table. That is a product
+decision about voice continuity, not a code cleanup.
 
 `filler_audio` also lowercases a phrase that arrives fully ALL-CAPS before
 synthesis: several TTS providers treat a fully-uppercase token as an acronym
