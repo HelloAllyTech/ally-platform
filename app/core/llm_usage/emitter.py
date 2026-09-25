@@ -173,7 +173,9 @@ def emit_langchain_usage(
                     llm_instance, "model", None
                 )
         emit_llm_usage(
-            room_id=_resolve_room_id(room_id),
+            # A call attributed by session id is made outside any room: don't
+            # borrow a room from the context var (it would read "unknown").
+            room_id=(room_id if scenario_session_id else _resolve_room_id(room_id)),
             provider=provider,
             model=model if isinstance(model, str) else None,
             task=task,
