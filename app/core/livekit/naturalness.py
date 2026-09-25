@@ -563,7 +563,7 @@ class NaturalnessController:
 
             count = int(getattr(settings, "BACKCHANNEL_COUNT", 6))
             phrases = await generate_backchannel_phrases(
-                self.llm_client, self.scenario, count
+                self.llm_client, self.scenario, count, room_id=self.room_name
             )
             if not phrases:
                 logger.info("[BACKCHANNEL] no phrases generated — no back-channel")
