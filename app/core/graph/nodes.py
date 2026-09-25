@@ -2304,6 +2304,10 @@ async def retrieve_knowledge(
             _rc_store.context = state.retrieved_context
         if not _rc_store.in_flight:
             _messages_snapshot = list(state.messages)
+            # Captured here, in the node, and passed explicitly: the refresh
+            # outlives this node, so the room must not depend on the context
+            # var still being set when the call returns.
+            _usage_room_id = get_room_id()
 
             async def _refresh_in_background() -> None:
                 try:
@@ -2313,6 +2317,7 @@ async def retrieve_knowledge(
                             _messages_snapshot,
                             knowledge_map,
                             glossary_hints=glossary_hints or None,
+                            room_id=_usage_room_id,
                         ),
                         timeout=8.0,
                     )
@@ -2360,6 +2365,7 @@ async def retrieve_knowledge(
                 state.messages,
                 knowledge_map,
                 glossary_hints=glossary_hints or None,
+                room_id=get_room_id(),
             ),
             timeout=8.0,
         )

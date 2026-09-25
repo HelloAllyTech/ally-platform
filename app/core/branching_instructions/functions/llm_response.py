@@ -69,10 +69,31 @@ async def generate_llm_response(
         # Create user message with only the content
         user_message = HumanMessage(content=content)
 
-        # Invoke LLM with structured messages
-        response = await llm_instance.with_structured_output(LLMResponse).ainvoke(
-            [system_message, user_message]
-        )
+        # Invoke LLM with structured messages. include_raw because the parsed
+        # model alone carries no usage metadata.
+        result = await llm_instance.with_structured_output(
+            LLMResponse, include_raw=True
+        ).ainvoke([system_message, user_message])
+        if isinstance(result, dict):
+            from app.core.llm_usage.emitter import emit_langchain_usage
+            from app.core.llm_usage.tasks import LLMTask
+
+            # Emitted before parsing: a parse failure still spent the tokens.
+            # No explicit room: the only caller is the resolve_branching_
+            # instruction graph node, where the room context var is set.
+            emit_langchain_usage(
+                result.get("raw"),
+                task=LLMTask.BRANCHING_INSTRUCTION.value,
+                llm_client=llm_client,
+            )
+            response = result.get("parsed")
+            if response is None:
+                raise ValueError(
+                    f"unparseable llm_response output: {result.get('parsing_error')}"
+                )
+        else:
+            # Defensive: some providers/wrappers may ignore include_raw.
+            response = result
 
         logger.debug(f"LLM response generated: {response.content[:100]}...")
 

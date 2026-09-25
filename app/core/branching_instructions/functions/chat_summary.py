@@ -68,15 +68,36 @@ async def generate_chat_summary(
 
         logger.debug("Generating chat summary...")
 
-        # Invoke LLM with structured output
-        response = await llm_instance.with_structured_output(
-            ChatSummaryResponse
+        # Invoke LLM with structured output. include_raw because the parsed
+        # model alone carries no usage metadata.
+        result = await llm_instance.with_structured_output(
+            ChatSummaryResponse, include_raw=True
         ).ainvoke(
             [
                 SystemMessage(content=load_template("branching/chat_summary_system")),
                 HumanMessage(content=f"Conversation History:\n\n{conversation_text}"),
             ]
         )
+        if isinstance(result, dict):
+            from app.core.llm_usage.emitter import emit_langchain_usage
+            from app.core.llm_usage.tasks import LLMTask
+
+            # Emitted before parsing: a parse failure still spent the tokens.
+            # No explicit room: the only caller is the resolve_branching_
+            # instruction graph node, where the room context var is set.
+            emit_langchain_usage(
+                result.get("raw"),
+                task=LLMTask.BRANCHING_CHAT_SUMMARY.value,
+                llm_client=llm_client,
+            )
+            response = result.get("parsed")
+            if response is None:
+                raise ValueError(
+                    f"unparseable chat summary: {result.get('parsing_error')}"
+                )
+        else:
+            # Defensive: some providers/wrappers may ignore include_raw.
+            response = result
 
         logger.debug("Chat summary generated successfully.")
         return response.summary

@@ -20,7 +20,7 @@ class FakeLLMInstance:
     def __init__(self, titles: list):
         self._titles = titles
 
-    def with_structured_output(self, schema):
+    def with_structured_output(self, schema, **_kwargs):
         return FakeStructuredLLM(self._titles)
 
 
@@ -133,7 +133,7 @@ class TestRetrieveKnowledgeNode:
 
 
 class FakeFailingLLM:
-    def with_structured_output(self, schema):
+    def with_structured_output(self, schema, **_kwargs):
         return self
 
     async def ainvoke(self, messages):
@@ -183,7 +183,7 @@ class CountingLLMInstance:
         self._titles = titles
         self._counter = counter
 
-    def with_structured_output(self, schema):
+    def with_structured_output(self, schema, **_kwargs):
         return CountingStructuredLLM(self._titles, self._counter)
 
 
@@ -433,3 +433,79 @@ class TestGlossarySectionsInNode:
         )
         assert result["retrieved_context"] is not None
         assert 'worry: say "டென்ஷன்"' in result["retrieved_context"]
+
+
+class _UsageStructuredLLM:
+    """Honours include_raw, returning a raw message that carries usage."""
+
+    def __init__(self, titles):
+        self._titles = titles
+
+    async def ainvoke(self, messages):
+        from langchain_core.messages import AIMessage as _AI
+
+        return {
+            "raw": _AI(
+                content="",
+                usage_metadata={
+                    "input_tokens": 400,
+                    "output_tokens": 6,
+                    "total_tokens": 406,
+                },
+            ),
+            "parsed": RelevantKeys(titles=self._titles),
+            "parsing_error": None,
+        }
+
+
+class _UsageLLMClient:
+    provider = "openai"
+
+    def __init__(self, titles):
+        self.calls = []
+        outer = self
+
+        class _Instance:
+            model_name = "gpt-4.1-mini"
+
+            def with_structured_output(self, schema, **kwargs):
+                outer.calls.append(kwargs)
+                return _UsageStructuredLLM(titles)
+
+        self._instance = _Instance()
+
+    @property
+    def llm_instance(self):
+        return self._instance
+
+
+class TestRetrieveKnowledgeUsage:
+    """AI-cost: the selection call is attributed to the node's room."""
+
+    @pytest.mark.asyncio
+    async def test_selection_call_recorded_against_the_graph_room(self, ai_usage_calls):
+        import types as _types
+
+        kb = [{"title": "usage topic", "content": "A usage-only memory 7f3a"}]
+        pd = type("PD", (), {"knowledge_sources": kb})()
+        scenario = type("S", (), {"prompt_data": pd})()
+        client = _UsageLLMClient(["usage topic"])
+
+        result = await retrieve_knowledge(
+            _make_state(messages=[HumanMessage(content="usage probe 7f3a")]),
+            {
+                "configurable": {
+                    "scenario": scenario,
+                    "llm_client": client,
+                    "room": _types.SimpleNamespace(name="room-kb"),
+                }
+            },
+        )
+
+        assert "usage topic" in result["retrieved_context"]
+        assert client.calls == [{"include_raw": True}]
+        assert len(ai_usage_calls) == 1
+        call = ai_usage_calls[0]
+        assert (call["room_id"], call["task"]) == ("room-kb", "knowledge_retrieval")
+        assert (call["provider"], call["model"]) == ("openai", "gpt-4.1-mini")
+        assert call["prompt_tokens"] == 400
