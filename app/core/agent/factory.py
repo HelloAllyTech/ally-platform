@@ -6,15 +6,17 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Set
 
 from livekit import rtc
-from livekit.agents import Agent
+from livekit.agents import Agent, llm
 from livekit.plugins.langchain import LLMAdapter
 
+from app.core.agent.glossary_swap import StreamingWordSwapper, swap_table_for
 from app.core.config import settings
 from app.core.constants import DEFAULT_LANGUAGE_CODE, Environment
 from app.core.embeddings import BaseEmbeddingClient, OpenAIEmbeddingClient
 from app.core.events.event_orchestrator.event_orchestrator import EventOrchestrator
 from app.core.livekit.livekit_models import RoomMetadataEnvelope
 from app.core.logger import get_logger
+from app.core.metrics import turn_metrics
 from app.core.scenario.base import Scenario
 from app.core.scoring.score_keeper import ScoreKeeper
 from app.llms import BaseLLMClient, create_llm_client
@@ -453,6 +455,68 @@ def configure_llm_client(scenario: Scenario) -> BaseLLMClient:
 # ====================================================================
 
 
+class GlossarySwapAgent(Agent):
+    """The session's Agent, enforcing the glossary's word swaps on its output.
+
+    Rewrites the LLM stream at ``llm_node`` — upstream of the tee into TTS and
+    the transcript — so the counsellor hears, the transcript records and the
+    judge scores the same text. The graph state gets the same swap in
+    ``generate_response``. With no swap table this is a pass-through.
+    """
+
+    def __init__(self, *, swap_table: dict[str, str], room_name: str, **kwargs):
+        super().__init__(**kwargs)
+        self._swap_table = swap_table
+        self._room_name = room_name
+
+    async def llm_node(self, chat_ctx, tools, model_settings):
+        stream = Agent.default.llm_node(self, chat_ctx, tools, model_settings)
+        if not self._swap_table:
+            async for chunk in stream:
+                yield chunk
+            return
+        # One swapper per reply: an interrupted reply's held-back partial word
+        # dies with its generator instead of leaking into the next turn.
+        swapper = StreamingWordSwapper(self._swap_table)
+        last_chunk = None
+        async for chunk in stream:
+            if isinstance(chunk, str):
+                out = swapper.feed(chunk)
+                if out:
+                    yield out
+                continue
+            delta = getattr(chunk, "delta", None)
+            content = getattr(delta, "content", None) if delta else None
+            if not content:
+                yield chunk
+                continue
+            last_chunk = chunk
+            # Copy rather than mutate: the chunk object may be shared with the
+            # adapter's own bookkeeping.
+            yield chunk.model_copy(
+                update={
+                    "delta": delta.model_copy(update={"content": swapper.feed(content)})
+                }
+            )
+        tail = swapper.flush()
+        if tail:
+            if last_chunk is not None:
+                yield llm.ChatChunk(
+                    id=last_chunk.id,
+                    delta=llm.ChoiceDelta(role="assistant", content=tail),
+                )
+            else:
+                yield tail
+        summary = swapper.swap_summary()
+        if summary:
+            turn_metrics.record(self._room_name, metadata={"glossary_swaps": summary})
+            logger.info(
+                "[GLOSSARY_SWAP] room=%s swaps=%s",
+                self._room_name,
+                ",".join(f"{r['avoid']}→{r['say']}×{r['count']}" for r in summary),
+            )
+
+
 def create_agent_with_adapter(
     thread_id: str,
     room: rtc.Room,
@@ -536,7 +600,17 @@ def create_agent_with_adapter(
     # Create agent
     # instructions is required by LiveKit Agent class
     # Using empty string since behavior is controlled by the LLM adapter/graph
-    return Agent(llm=agent_adapter, instructions="")
+    swap_table = swap_table_for(scenario)
+    if swap_table:
+        logger.info(
+            "[GLOSSARY_SWAP] room=%s enabled pairs=%d", room.name, len(swap_table)
+        )
+    return GlossarySwapAgent(
+        llm=agent_adapter,
+        instructions="",
+        swap_table=swap_table,
+        room_name=room.name,
+    )
 
 
 # ====================================================================

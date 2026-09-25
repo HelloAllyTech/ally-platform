@@ -224,6 +224,15 @@ class PromptData(BaseModel):
             "grouped by the exact glossary a session ran with."
         ),
     )
+    glossary_swaps: Optional[List[Dict[str, str]]] = Field(
+        default=None,
+        description=(
+            "Word swaps enforced on the agent's output: [{'avoid', 'say', "
+            "'sectionCode'}]. ally-be sends only published canonical glossary "
+            "rules whose both sides are one word and which are not address "
+            "forms (app/core/agent/glossary_swap.py)."
+        ),
+    )
     knowledge_sources: Optional[List[Dict[str, Any]]] = Field(
         default=None,
         description=(
@@ -871,6 +880,8 @@ class Scenario(BaseModel):
                 or prompt_data_dict.get("glossary_sections"),
                 "glossary_meta": prompt_data_dict.get("glossaryMeta")
                 or prompt_data_dict.get("glossary_meta"),
+                "glossary_swaps": prompt_data_dict.get("glossarySwaps")
+                or prompt_data_dict.get("glossary_swaps"),
                 "knowledge_sources": prompt_data_dict.get("knowledgeSources"),
                 "filler_enabled": bool(prompt_data_dict.get("fillerEnabled") or False),
                 # Comfort audio: ABSENT and EXPLICITLY FALSE are now different

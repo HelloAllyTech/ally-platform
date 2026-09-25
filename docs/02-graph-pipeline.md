@@ -150,6 +150,18 @@ letter-by-letter. Every non-English entry in that table is currently still the
 English string pending a human translation; an unknown/absent language code
 resolves to English, unchanged from the pre-existing behavior.
 
+### Glossary word swaps on the reply
+
+When room metadata carries `promptData.glossarySwaps` (ally-be: published one-word glossary rules
+that a mechanical swap cannot break), the session's Agent is a `GlossarySwapAgent`
+(`app/core/agent/factory.py`). Its `llm_node` rewrites whole words in the LLM stream **before**
+LiveKit tees it into TTS and the transcript, so audio, transcript and judge see the same text;
+the trailing partial word is held back until the next chunk (`app/core/agent/glossary_swap.py`,
+one swapper per reply). `generate_response` applies the same swap to the `AIMessage` it returns
+and to the pause re-speak line, so the actor's own history is colloquial too. Swaps are recorded
+per turn as `turn_metrics.metadata.glossary_swaps` and logged as `[GLOSSARY_SWAP]`. No swaps are
+sent → pass-through.
+
 ### System Prompt Modes
 
 The system prompt has two modes:

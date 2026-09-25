@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, cast
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
 
+from app.core.agent.glossary_swap import swap_complete_text, swap_table_for
 from app.core.config import settings
 from app.core.constants import DEFAULT_LANGUAGE_CODE, DetectionType
 from app.core.events.base import BaseEvent
@@ -1908,10 +1909,20 @@ async def generate_response(
 
     # Stash the just-generated utterance on the shared session clock so a pause
     # can re-speak it on resume (in-process; same event loop as the worker).
+    # The spoken reply had the glossary's word swaps applied as it streamed
+    # (GlossarySwapAgent.llm_node). Apply the same swaps to what the graph
+    # REMEMBERS, or the actor's own history keeps the literary form and
+    # re-teaches it on every following turn; the pause re-speak line must also
+    # match what the counsellor heard.
+    final_content = response.content
     if config and "configurable" in config:
+        final_content = swap_complete_text(
+            swap_table_for(config["configurable"].get("scenario")),
+            response.content,
+        )
         _clock = config["configurable"].get("session_clock")
         if _clock is not None:
-            _clock.last_agent_utterance = response.content
+            _clock.last_agent_utterance = final_content
 
     # NOTE: retrieved_context is deliberately NOT cleared here. The
     # refresh-cadence reuse in retrieve_knowledge re-injects
@@ -1923,7 +1934,7 @@ async def generate_response(
     # retrieve_knowledge owns the context lifecycle now: it recomputes,
     # reuses, or returns None on its disabled/error paths every turn.
     return {
-        "messages": [AIMessage(content=response.content)],
+        "messages": [AIMessage(content=final_content)],
         "new_events": [],
         "next_instruction": None,
     }
