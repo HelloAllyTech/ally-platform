@@ -9,6 +9,7 @@ generated here).
 
 import asyncio
 import httpx
+import traceback
 
 from app.core.config import settings
 from app.core.constants import ACTOR_EVALUATION_WEBHOOK_ENDPOINT
@@ -100,10 +101,12 @@ async def run_actor_evaluation(request: ActorEvaluationRequest) -> None:
             status="FAILED",
             error_message="Evaluation failed due to a missing key in the result.",
         )
-    except Exception as e:  # noqa: BLE001 — report the failure to ally-be
+    except Exception:  # noqa: BLE001 — report the failure to ally-be
         logger.exception(
             "Actor evaluation failed for session=%s", request.scenario_session_id
         )
-        payload = ActorEvaluationWebhookPayload(status="FAILED", error_message=str(e))
+        payload = ActorEvaluationWebhookPayload(
+            status="FAILED", error_message=traceback.format_exc()
+        )
 
     await _send_webhook(request.scenario_session_id, payload)
