@@ -1811,7 +1811,8 @@
         "moveDown": "கீழே நகர்த்து",
         "wordCount_one": "{{count}}/{{min}} சொல்",
         "wordCount_other": "{{count}}/{{min}} சொற்கள்",
-        "aiGraded": "இந்த பதில் AI ஆல் மதிப்பிடப்படுகிறது"
+        "aiGraded": "இந்த பதில் AI ஆல் மதிப்பிடப்படுகிறது",
+        "likertHint": "ஒவ்வொரு கூற்றுக்கும் ஒரு பதிலைத் தேர்ந்தெடுக்கவும்"
       },
       "results": {
         "title": "முடிவுகள்",
@@ -1826,7 +1827,11 @@
         "grading": "மதிப்பிடுகிறது…",
         "retry": "வினாடி வினாவை மீண்டும் முயல்",
         "next": "அடுத்து",
-        "attemptsUsed": "முயற்சி {{used}} / {{max}}"
+        "attemptsUsed": "முயற்சி {{used}} / {{max}}",
+        "notScored": "மதிப்பெண் இல்லை",
+        "correctAnswer": "சரியான பதில்",
+        "yourResponses": "உங்கள் பதில்கள்",
+        "responsesSubmitted": "பதில்கள் சமர்ப்பிக்கப்பட்டன"
       }
     },
     "language": {
