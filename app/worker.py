@@ -409,6 +409,12 @@ class AgentWorker:
         # (kept separate from the filler's pool — different phrase sets).
         self._recent_backchannel_phrases: list[str] = []
 
+        # Whether this session's voice can render clips at all (the clip policy
+        # in BaseTTSClient.allows_clip_synthesis). Decided once in
+        # _setup_background_audio; False means no filler, back-channel or
+        # interim layer, and none of their LLM calls.
+        self._clip_tts_on: bool = False
+
         # Predictive interim reply: while the learner is still speaking on a long
         # turn, a fast DEDICATED model (separate from the main reply LLM) turns
         # the partial transcript into a short, non-committal holding reply; it is
@@ -2176,6 +2182,7 @@ class AgentWorker:
         """
         try:
             from app.core.livekit.backchannel import is_backchannel_enabled
+            from app.core.livekit.filler_clips import clip_tts_available
             from app.core.livekit.fillers import is_filler_enabled
             from app.core.livekit.interim_reply import is_interim_reply_enabled
 
@@ -2184,10 +2191,18 @@ class AgentWorker:
 
             # Pure flag checks (no LLM/TTS): decide whether each layer COULD play,
             # so we can publish the track now and defer the actual synthesis.
+            # Filler, back-channel and interim are all heard only as clips, so
+            # a voice that renders none (generative, or not isolatable) turns
+            # all three off here — before their LLM calls, not after them.
             predictive_on = bool(getattr(settings, "PREDICTIVE_FILLER_ENABLED", False))
-            filler_possible = is_filler_enabled(self.scenario)
-            backchannel_possible = is_backchannel_enabled(self.scenario)
-            self._interim_enabled = is_interim_reply_enabled(self.scenario)
+            self._clip_tts_on = clip_tts_available(self.tts_client)
+            filler_possible = self._clip_tts_on and is_filler_enabled(self.scenario)
+            backchannel_possible = self._clip_tts_on and is_backchannel_enabled(
+                self.scenario
+            )
+            self._interim_enabled = self._clip_tts_on and is_interim_reply_enabled(
+                self.scenario
+            )
 
             # Nothing to play on any layer — don't publish a track.
             if (
@@ -2218,9 +2233,10 @@ class AgentWorker:
             await self._bg_audio.start(room=self.ctx.room)
             logger.info(
                 "[BG_AUDIO] BackgroundAudioPlayer started "
-                "(comfort=%s filler_possible=%s predictive=%s "
+                "(comfort=%s clip_tts=%s filler_possible=%s predictive=%s "
                 "backchannel_possible=%s interim=%s)",
                 comfort_source is not None,
+                self._clip_tts_on,
                 filler_possible,
                 predictive_on,
                 backchannel_possible,
@@ -2229,6 +2245,10 @@ class AgentWorker:
         except Exception as e:  # noqa: BLE001 - must never break a session
             logger.warning("[BG_AUDIO] setup failed (continuing without): %s", e)
             self._bg_audio = None
+            return
+
+        # Comfort tone only: nothing below would produce a clip.
+        if not self._clip_tts_on:
             return
 
         # Defer the expensive per-layer work (back-channel LLM call + filler/
@@ -2366,7 +2386,7 @@ class AgentWorker:
         turn beginning before this finishes simply gets no filler. Best-effort:
         any failure leaves the session running with whatever did resolve.
         """
-        if self._bg_audio is None:
+        if self._bg_audio is None or not self._clip_tts_on:
             return
         try:
             import time as _time

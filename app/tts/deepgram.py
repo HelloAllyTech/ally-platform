@@ -30,6 +30,7 @@ class DeepgramTTSClient(BaseTTSClient):
         language_code: str,
         api_key: Optional[str] = None,
     ):
+        super().__init__()
         if not model:
             raise ValueError("Deepgram TTS requires 'model'")
 
@@ -37,6 +38,10 @@ class DeepgramTTSClient(BaseTTSClient):
         self._language_code = language_code
         self._api_key = api_key or settings.DEEPGRAM_API_KEY
         self._tts_instance = None
+
+    def allows_clip_synthesis(self) -> bool:
+        """Aura voices are fixed speakers: a clip is the same voice."""
+        return True
 
     @staticmethod
     def validate_voice(model: str, api_key: Optional[str] = None) -> bool:
