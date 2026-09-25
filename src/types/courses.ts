@@ -243,7 +243,8 @@ export type QuizQuestionType =
   | 'ordering'
   | 'matching'
   | 'fill_blank'
-  | 'open_ended';
+  | 'open_ended'
+  | 'likert_scale';
 
 export interface QuizOption {
   id: string;
@@ -275,6 +276,11 @@ export interface SanitizedQuizQuestion {
   type: QuizQuestionType;
   prompt: string;
   points: number;
+  /**
+   * false = answered but not scored; absent (older backend) reads as true.
+   * Always present, and always false, for `likert_scale`.
+   */
+  graded?: boolean;
   /** Optional picture or clip shown above the answer controls. */
   media?: QuestionMedia;
   /** mcq_single / mcq_multi */
@@ -290,6 +296,10 @@ export interface SanitizedQuizQuestion {
   blankIds?: string[];
   /** open_ended */
   minWords?: number;
+  /** likert_scale — rows to rate, authored order, never shuffled. */
+  statements?: QuizOption[];
+  /** likert_scale — scale points, lowest first, authored order, never shuffled. */
+  scale?: QuizOption[];
 }
 
 export interface SanitizedQuiz {
@@ -299,6 +309,7 @@ export interface SanitizedQuiz {
     showExplanations: string;
   };
   questions: SanitizedQuizQuestion[];
+  /** Graded questions only; 0 means a survey with no score to pass. */
   totalPoints: number;
 }
 
@@ -310,6 +321,8 @@ export interface QuizAnswerInput {
   pairs?: {leftId: string; rightId: string}[];
   blanks?: {blankId: string; answer: string}[];
   text?: string;
+  /** likert_scale — one rating per statement; every statement must be rated. */
+  ratings?: {statementId: string; scaleOptionId: string}[];
 }
 
 // ---------------------------------------------------------------------------
@@ -350,21 +363,47 @@ export interface VideoInterjectionAnswerResult {
 
 export type QuizAttemptStatus = 'GRADED' | 'PENDING_GRADING';
 
+/**
+ * The answer key as the results screen shows it. Same field names as
+ * `QuizAnswerInput`, so "your answer" and "correct answer" resolve through
+ * one set of question-shape lookups. Mirrors ally-be's `QuizCorrectAnswer`.
+ * Never present for `likert_scale` or `open_ended`.
+ */
+export interface QuizCorrectAnswer {
+  selectedOptionIds?: string[];
+  booleanAnswer?: boolean;
+  orderedItemIds?: string[];
+  pairs?: {leftId: string; rightId: string}[];
+  blanks?: {blankId: string; acceptedAnswers: string[]}[];
+}
+
 export interface QuizQuestionResult {
   questionId: string;
-  /** null = pending LLM grading */
+  /**
+   * null now means EITHER pending LLM grading OR ungraded-without-a-key.
+   * Pending = `correct === null && graded !== false`.
+   */
   correct: boolean | null;
+  /** false = not scored; absent (older backend) reads as true. */
+  graded?: boolean;
   pointsAwarded: number;
   pointsPossible: number;
   explanation?: string;
   llmFeedback?: string;
+  /**
+   * The answer key, present only when the question has one and the trainer
+   * didn't hide it (`showCorrectAnswer !== false`). Absent on a graded
+   * question means: show the verdict, not "hidden".
+   */
+  correctAnswer?: QuizCorrectAnswer;
 }
 
 export interface QuizAttemptResult {
   attemptId: string;
   attemptNumber: number;
   status: QuizAttemptStatus;
-  scorePct: number;
+  /** null when the quiz has no graded questions (a survey). */
+  scorePct: number | null;
   passed: boolean;
   passScore: number;
   attemptsUsed: number;
