@@ -1,20 +1,20 @@
+from unittest.mock import AsyncMock, patch
 
 import pytest
-from unittest.mock import patch, AsyncMock
 
-from app.core.scenario_session_evaluation.service import run_actor_evaluation
 from app.core.scenario_session_evaluation.schemas import (
-    ActorEvaluationRequest, ActorEvaluationTurn, ActorEvaluationGoal
+    ActorEvaluationGoal,
+    ActorEvaluationRequest,
+    ActorEvaluationTurn,
 )
+from app.core.scenario_session_evaluation.service import run_actor_evaluation
 
 
 @pytest.mark.asyncio
 @patch(
-    'app.core.scenario_session_evaluation.service._send_webhook', new_callable=AsyncMock
+    "app.core.scenario_session_evaluation.service._send_webhook", new_callable=AsyncMock
 )
-@patch(
-    'app.core.scenario_session_evaluation.service.evaluate_actor_goals'
-)
+@patch("app.core.scenario_session_evaluation.service.evaluate_actor_goals")
 async def test_run_actor_evaluation_handles_key_error(
     mock_evaluate_actor_goals, mock_send_webhook
 ):
@@ -23,10 +23,8 @@ async def test_run_actor_evaluation_handles_key_error(
     request = ActorEvaluationRequest(
         scenario_session_id="test_session_id",
         transcript=[ActorEvaluationTurn(role="user", content="Hello")],
-        goals=[
-            ActorEvaluationGoal(id="1", title="Test Goal", category="Test")
-        ],
-            )
+        goals=[ActorEvaluationGoal(id="1", title="Test Goal", category="Test")],
+    )
 
     await run_actor_evaluation(request)
 

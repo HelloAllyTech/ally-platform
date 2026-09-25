@@ -3,8 +3,8 @@ from unittest.mock import AsyncMock, patch
 import httpx
 import pytest
 
-from app.core.scenario_session_evaluation.service import _send_webhook
 from app.core.scenario_session_evaluation.schemas import ActorEvaluationWebhookPayload
+from app.core.scenario_session_evaluation.service import _send_webhook
 
 
 class AsyncContextManagerMock:
@@ -48,9 +48,7 @@ async def test_send_webhook_retries_on_502():
     payload = ActorEvaluationWebhookPayload(status="COMPLETED")
 
     with (
-        patch(
-            "httpx.AsyncClient", return_value=AsyncContextManagerMock(mock_client)
-        ),
+        patch("httpx.AsyncClient", return_value=AsyncContextManagerMock(mock_client)),
         # The backoff is real seconds; the test only cares that it retries.
         patch(
             "app.core.scenario_session_evaluation.service.asyncio.sleep",
