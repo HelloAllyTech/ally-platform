@@ -1,4 +1,5 @@
 import asyncio
+import functools
 import json
 import os
 import random
@@ -57,6 +58,7 @@ from app.core.livekit.video_actor import (
     is_video_actor_enabled,
     start_video_actor,
 )
+from app.core.llm_usage.tasks import LLMTask
 from app.core.logger import (
     get_logger,
     make_child_logging_forward_only,
@@ -486,7 +488,11 @@ class AgentWorker:
         # events for an Ollama-only (no OpenAI key) session.
         if settings.OPENAI_API_KEY:
             self.embedding_client = OpenAIEmbeddingClient(
-                model=settings.OPENAI_EMBEDDING_MODEL, api_key=settings.OPENAI_API_KEY
+                model=settings.OPENAI_EMBEDDING_MODEL,
+                api_key=settings.OPENAI_API_KEY,
+                # Attributes its usage (event_embedding, working_memory_
+                # embedding) to this session, wherever the call is made from.
+                room_id=self._usage_room_id(),
             )
             logger.debug(
                 "Created shared embedding client for semantic similarity events"
@@ -751,7 +757,7 @@ class AgentWorker:
                 async def _embed_pool() -> None:
                     await attach_vectors(
                         self.client_working_memory_store.corpus,
-                        self.embedding_client.get_embeddings_batch,
+                        self._working_memory_embed_many(),
                     )
 
                 _pool_task = asyncio.create_task(_embed_pool())
@@ -2580,6 +2586,18 @@ class AgentWorker:
         call it rides on.
         """
         return getattr(getattr(getattr(self, "ctx", None), "room", None), "name", None)
+
+    def _working_memory_embed_many(self):
+        """The backstory-pool embedder, recorded as working_memory_embedding.
+
+        The pool is embedded in a detached task at setup, outside any graph
+        run, so the room is passed explicitly.
+        """
+        return functools.partial(
+            self.embedding_client.get_embeddings_batch,
+            task=LLMTask.WORKING_MEMORY_EMBEDDING.value,
+            room_id=self._usage_room_id(),
+        )
 
     def _clip_usage(self) -> dict:
         """``synthesize_clips`` kwargs that record clip TTS as ``clip_tts``.

@@ -210,3 +210,114 @@ class TestOpenAIEmbeddingClientIntegration:
         assert len(batch_results) == 2
         mock_openai_embeddings.aembed_query.assert_called_once()
         mock_openai_embeddings.aembed_documents.assert_called_once()
+
+
+class TestOpenAIEmbeddingUsage:
+    """AI-cost: a call made with task= records its input tokens."""
+
+    @pytest.fixture
+    def counted(self, monkeypatch):
+        """Token counting stubbed: 3 tokens per text."""
+        monkeypatch.setattr(
+            OpenAIEmbeddingClient,
+            "_count_input_tokens",
+            lambda self, texts: 3 * len([t for t in texts if t]),
+        )
+
+    @pytest.mark.asyncio
+    async def test_single_records_against_the_client_room(
+        self, mock_openai_embeddings, mock_settings, counted, ai_usage_calls
+    ):
+        mock_openai_embeddings.aembed_query.return_value = [0.1, 0.2]
+        client = OpenAIEmbeddingClient(room_id="room-e")
+
+        await client.get_embedding("hello", task="event_embedding")
+
+        assert ai_usage_calls == [
+            {
+                "room_id": "room-e",
+                "service": "llm",
+                "provider": "openai",
+                "model": "text-embedding-3-small",
+                "task": "event_embedding",
+                "prompt_tokens": 3,
+                "completion_tokens": 0,
+                "total_tokens": 3,
+            }
+        ]
+
+    @pytest.mark.asyncio
+    async def test_batch_sums_tokens_and_call_room_wins(
+        self, mock_openai_embeddings, mock_settings, counted, ai_usage_calls
+    ):
+        mock_openai_embeddings.aembed_documents.return_value = [[0.1], [0.2]]
+        client = OpenAIEmbeddingClient(room_id="room-e")
+
+        await client.get_embeddings_batch(
+            ["a", "b"], task="working_memory_embedding", room_id="room-override"
+        )
+
+        call = ai_usage_calls[0]
+        assert (call["room_id"], call["task"]) == (
+            "room-override",
+            "working_memory_embedding",
+        )
+        assert call["prompt_tokens"] == 6
+
+    @pytest.mark.asyncio
+    async def test_no_client_room_falls_back_to_graph_room(
+        self, mock_openai_embeddings, mock_settings, counted, ai_usage_calls, graph_room
+    ):
+        mock_openai_embeddings.aembed_query.return_value = [0.1]
+        client = OpenAIEmbeddingClient()
+
+        await client.get_embedding("hello", task="event_embedding")
+
+        assert ai_usage_calls[0]["room_id"] == graph_room
+
+    @pytest.mark.asyncio
+    async def test_no_task_records_nothing(
+        self, mock_openai_embeddings, mock_settings, counted, ai_usage_calls
+    ):
+        mock_openai_embeddings.aembed_query.return_value = [0.1]
+        await OpenAIEmbeddingClient(room_id="r").get_embedding("hello")
+        assert ai_usage_calls == []
+
+    @pytest.mark.asyncio
+    async def test_failed_call_records_nothing(
+        self, mock_openai_embeddings, mock_settings, counted, ai_usage_calls
+    ):
+        mock_openai_embeddings.aembed_query.side_effect = RuntimeError("429")
+        with pytest.raises(RuntimeError):
+            await OpenAIEmbeddingClient(room_id="r").get_embedding(
+                "hello", task="event_embedding"
+            )
+        assert ai_usage_calls == []
+
+    @pytest.mark.asyncio
+    async def test_counting_failure_never_breaks_the_call(
+        self, mock_openai_embeddings, mock_settings, ai_usage_calls, monkeypatch
+    ):
+        def _boom(self, texts):
+            raise RuntimeError("no tiktoken")
+
+        monkeypatch.setattr(OpenAIEmbeddingClient, "_count_input_tokens", _boom)
+        mock_openai_embeddings.aembed_query.return_value = [0.5]
+
+        out = await OpenAIEmbeddingClient(room_id="r").get_embedding(
+            "hello", task="event_embedding"
+        )
+
+        assert out.tolist() == [0.5]
+        assert ai_usage_calls == []
+
+    def test_token_count_matches_tiktoken_for_the_model(self, mock_settings):
+        import tiktoken
+
+        with patch("app.core.embeddings.openai_embeddings.OpenAIEmbeddings"):
+            client = OpenAIEmbeddingClient(model="text-embedding-3-small")
+        texts = ["I have been feeling low lately.", "मुझे अच्छा नहीं लग रहा"]
+        enc = tiktoken.encoding_for_model("text-embedding-3-small")
+        assert client._count_input_tokens(texts) == sum(
+            len(enc.encode_ordinary(t)) for t in texts
+        )
