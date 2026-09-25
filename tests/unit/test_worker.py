@@ -3236,6 +3236,50 @@ class TestPredictiveFillerLlmIsolation:
         assert called_client is not shared
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("source", ["seed", "exchange", "in_turn"])
+    async def test_generation_and_clips_are_attributed_to_the_room(
+        self, monkeypatch, source
+    ):
+        """AI-cost: every filler moment runs outside the graph run, so the
+        worker must hand the room to both the LLM call (thinking_filler) and
+        the clip synthesis (clip_tts), or the spend lands on no session."""
+        from app.core.livekit import predictive_filler as predictive_filler_module
+
+        seen = {}
+
+        async def fake_generate(*_a, **kw):
+            seen["generate"] = kw
+            return [("hmm…", "hesitation")]
+
+        async def fake_synth(_tts, _requests, **kw):
+            seen["synth"] = kw
+            return [_clip("hmm…", 400.0)]
+
+        for name in (
+            "generate_seed_fillers",
+            "generate_predictive_fillers",
+            "generate_in_turn_fillers",
+        ):
+            monkeypatch.setattr(predictive_filler_module, name, fake_generate)
+        monkeypatch.setattr(
+            "app.core.livekit.filler_clips.synthesize_clips", fake_synth
+        )
+
+        w = self._worker()
+        w.scenario = types.SimpleNamespace()
+        w._predictive_filler_llm_client = Mock()
+        w._filler_pool = FillerPool()
+        w._read_conversation_history = Mock(return_value=["turn one"])
+        w._tts_provider, w._tts_model = "sarvam", "bulbul:v3"
+
+        await w._generate_fillers(source=source, partial_text="I was thinking")
+
+        assert seen["generate"]["room_id"] == "room-1"
+        assert seen["synth"]["usage_room_id"] == "room-1"
+        assert seen["synth"]["usage_provider"] == "sarvam"
+        assert seen["synth"]["usage_model"] == "bulbul:v3"
+
+    @pytest.mark.asyncio
     async def test_regeneration_skips_while_pool_still_fresh(self, monkeypatch):
         """The old loop paid an LLM + 5 TTS calls every 10s regardless.
 

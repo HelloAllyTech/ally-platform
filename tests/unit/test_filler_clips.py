@@ -380,3 +380,63 @@ class TestTranscriptMarker:
 
         assert sent, "the filler transcript was never sent"
         assert '"utterance_kind":"filler"' in sent[0].replace(" ", "")
+
+
+class TestClipTtsUsage:
+    """Real clip synthesis is recorded as clip_tts; cache hits are free."""
+
+    async def test_synthesis_records_characters_against_the_room(self, ai_usage_calls):
+        client = _FakeClient()
+
+        await synthesize_clips(
+            client,
+            ["hmm", "I see"],
+            language="en-US",
+            usage_room_id="room-9",
+            usage_provider="cartesia",
+            usage_model="sonic-2",
+        )
+
+        assert ai_usage_calls == [
+            {
+                "room_id": "room-9",
+                "service": "tts",
+                "provider": "cartesia",
+                "model": "sonic-2",
+                "task": "clip_tts",
+                "characters": len("hmm") + len("I see"),
+            }
+        ]
+
+    async def test_cache_hit_records_nothing(self, ai_usage_calls):
+        client = _FakeClient()
+        await synthesize_clips(client, ["hmm"], language="en-US", usage_room_id="r")
+        ai_usage_calls.clear()
+
+        await synthesize_clips(client, ["hmm"], language="en-US", usage_room_id="r")
+
+        assert ai_usage_calls == []
+
+    async def test_bills_the_variant_text_actually_sent(self, ai_usage_calls):
+        client = _FakeClient()
+
+        await synthesize_clips(client, [("MMM", "hesitation", 1)], usage_room_id="r")
+
+        sent = client._tts.calls[0]
+        assert ai_usage_calls[0]["characters"] == len(sent)
+
+    async def test_failed_phrase_is_not_billed(self, ai_usage_calls):
+        client = _FakeClient(_FakeTTS(fail_phrases={"bad"}))
+
+        await synthesize_clips(client, ["good", "bad"], usage_room_id="r")
+
+        assert ai_usage_calls[0]["characters"] == len("good")
+
+    async def test_no_isolated_instance_records_nothing(self, ai_usage_calls):
+        class _NoIsolation(_FakeClient):
+            def create_clip_tts(self):
+                return None
+
+        await synthesize_clips(_NoIsolation(), ["hmm"], usage_room_id="r")
+
+        assert ai_usage_calls == []

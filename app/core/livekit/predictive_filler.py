@@ -28,6 +28,10 @@ superadmin edits it, local ``.txt`` otherwise.
 
 Everything here is best-effort: any failure returns an empty list so the worker
 silently keeps using whatever it already has. It must never raise into a session.
+
+All three moments' token usage is emitted to ``llm_usage`` as
+``thinking_filler`` against the room the caller passes — they run from worker
+tasks, outside the graph run whose context var ``get_room_id`` reads.
 """
 
 from __future__ import annotations
@@ -279,6 +283,7 @@ async def _generate(
     recent_fillers: Optional[List[str]] = None,
     partial_text: Optional[str] = None,
     timeout_s: Optional[float] = None,
+    room_id: Optional[str] = None,
 ) -> List[Tuple[str, str]]:
     """Shared path for all three generation moments.
 
@@ -312,15 +317,34 @@ async def _generate(
             return []
 
         llm_instance = llm_client.llm_instance
-        call = llm_instance.with_structured_output(_PredictiveFillers).ainvoke(
+        # include_raw because the parsed model alone carries no usage metadata.
+        call = llm_instance.with_structured_output(
+            _PredictiveFillers, include_raw=True
+        ).ainvoke(
             [
                 SystemMessage(content=system_prompt),
                 HumanMessage(content=user_content),
             ]
         )
-        response = (
+        result = (
             await asyncio.wait_for(call, timeout=timeout_s) if timeout_s else await call
         )
+        if isinstance(result, dict):
+            # Emitted before parsing: a parse failure still spent the tokens.
+            from app.core.llm_usage.emitter import emit_langchain_usage
+            from app.core.llm_usage.tasks import LLMTask
+
+            emit_langchain_usage(
+                result.get("raw"),
+                task=LLMTask.THINKING_FILLER.value,
+                llm_client=llm_client,
+                room_id=room_id,
+                scenario_id=getattr(scenario, "id", None),
+            )
+            response = result.get("parsed")
+        else:
+            # Defensive: some providers/wrappers may ignore include_raw.
+            response = result
         return _clean_options(
             getattr(response, "fillers", None),
             count,
@@ -339,6 +363,7 @@ async def generate_seed_fillers(
     llm_client,
     scenario,
     count: int = 8,
+    room_id: Optional[str] = None,
 ) -> List[Tuple[str, str]]:
     """Fillers from the character alone, for use before the first learner turn.
 
@@ -356,6 +381,7 @@ async def generate_seed_fillers(
             "know what will be said."
         ),
         count=count,
+        room_id=room_id,
     )
 
 
@@ -365,6 +391,7 @@ async def generate_predictive_fillers(
     messages: List[BaseMessage],
     count: int = 8,
     recent_fillers: Optional[List[str]] = None,
+    room_id: Optional[str] = None,
 ) -> List[Tuple[str, str]]:
     """Fillers for where the conversation is heading, from the turns so far.
 
@@ -385,6 +412,7 @@ async def generate_predictive_fillers(
         count=count,
         messages=messages,
         recent_fillers=recent_fillers,
+        room_id=room_id,
     )
 
 
@@ -395,6 +423,7 @@ async def generate_in_turn_fillers(
     partial_text: str,
     count: int = 3,
     timeout_s: Optional[float] = None,
+    room_id: Optional[str] = None,
 ) -> List[Tuple[str, str]]:
     """Fillers that fit what the learner is saying RIGHT NOW.
 
@@ -429,4 +458,5 @@ async def generate_in_turn_fillers(
         messages=messages,
         partial_text=partial,
         timeout_s=timeout_s,
+        room_id=room_id,
     )

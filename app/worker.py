@@ -2419,7 +2419,11 @@ class AgentWorker:
                 phrases = resolve_filler_phrases(self.scenario)
                 if phrases:
                     clips = await synthesize_clips(
-                        self.tts_client, phrases, language=language, source="static"
+                        self.tts_client,
+                        phrases,
+                        language=language,
+                        source="static",
+                        **self._clip_usage(),
                     )
                     self._filler_stats["clips_synthesized"] += len(clips)
                     self._filler_pool.add(clips)
@@ -2566,6 +2570,31 @@ class AgentWorker:
         ]
         return choice
 
+    def _usage_room_id(self) -> Optional[str]:
+        """The LiveKit room name, which attributes a model call to a session.
+
+        Passed explicitly to the calls the worker makes from its own tasks
+        (fillers, interim, back-channel, clip TTS): those run outside the graph
+        run, where the context var ``get_room_id`` reads is unset and reports
+        "unknown". Read defensively so usage bookkeeping can never break the
+        call it rides on.
+        """
+        return getattr(getattr(getattr(self, "ctx", None), "room", None), "name", None)
+
+    def _clip_usage(self) -> dict:
+        """``synthesize_clips`` kwargs that record clip TTS as ``clip_tts``.
+
+        Provider and model are the same values ``agent_tts`` rows carry: the
+        clip instance is an isolated clone of the session's TTS client, so it
+        bills at the same rate — but it is not the AgentSession's instance, so
+        LiveKit's metrics hook never counts it.
+        """
+        return {
+            "usage_room_id": self._usage_room_id(),
+            "usage_provider": getattr(self, "_tts_provider", None),
+            "usage_model": getattr(self, "_tts_model", None),
+        }
+
     def _filler_language(self) -> str:
         """The session's BCP-47 code, used as part of the clip cache key."""
         return (
@@ -2602,7 +2631,10 @@ class AgentWorker:
             count = int(getattr(settings, "PREDICTIVE_FILLER_COUNT", 8))
             if source == "seed":
                 options = await generate_seed_fillers(
-                    self._predictive_filler_llm_client, self.scenario, count
+                    self._predictive_filler_llm_client,
+                    self.scenario,
+                    count,
+                    room_id=self._usage_room_id(),
                 )
             elif source == "in_turn":
                 options = await generate_in_turn_fillers(
@@ -2615,6 +2647,7 @@ class AgentWorker:
                         getattr(settings, "FILLER_IN_TURN_TIMEOUT_MS", 2500.0)
                     )
                     / 1000.0,
+                    room_id=self._usage_room_id(),
                 )
             else:
                 messages = self._read_conversation_history()
@@ -2626,6 +2659,7 @@ class AgentWorker:
                     messages,
                     count,
                     recent_fillers=pool.phrases,
+                    room_id=self._usage_room_id(),
                 )
             self._filler_stats["llm_calls"] += 1
             if not options:
@@ -2642,6 +2676,7 @@ class AgentWorker:
                 requests,
                 language=self._filler_language(),
                 source=source,
+                **self._clip_usage(),
             )
             self._filler_stats["clips_synthesized"] += len(clips)
             added = pool.add(clips)
@@ -3039,6 +3074,7 @@ class AgentWorker:
                     [(clip.phrase, clip.filler_type, clip.variant + 1)],
                     language=self._filler_language(),
                     source=clip.source,
+                    **self._clip_usage(),
                 )
                 self._filler_stats["clips_synthesized"] += len(clips)
                 pool.add(clips)
@@ -3270,6 +3306,7 @@ class AgentWorker:
                 phrases,
                 language=self._filler_language(),
                 source="backchannel",
+                **self._clip_usage(),
             )
             logger.info(
                 "[BACKCHANNEL] synthesized %d clip(s) from %d phrase(s)",
@@ -3589,7 +3626,11 @@ class AgentWorker:
 
             messages = self._read_conversation_history()
             reply = await generate_interim_reply(
-                self._interim_llm_client, self.scenario, messages, partial_text
+                self._interim_llm_client,
+                self.scenario,
+                messages,
+                partial_text,
+                room_id=self._usage_room_id(),
             )
             if not reply:
                 if self._interim_state == "generating":
@@ -3610,6 +3651,7 @@ class AgentWorker:
                     # it will never be asked for again — caching it would only
                     # evict fillers that do repeat.
                     use_cache=False,
+                    **self._clip_usage(),
                 ),
                 timeout=tts_timeout_s,
             )

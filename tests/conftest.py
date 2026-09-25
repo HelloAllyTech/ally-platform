@@ -329,3 +329,19 @@ def graph_room(monkeypatch):
     token = instrumentation._room_id_var.set("graph-room")
     yield "graph-room"
     instrumentation._room_id_var.reset(token)
+
+
+@pytest.fixture(autouse=True)
+def _no_llm_usage_sqs(monkeypatch):
+    """No test sends a real ``llm_usage`` message.
+
+    Usage emission is fire-and-forget from inside the code under test, so any
+    test exercising an instrumented call would otherwise schedule a real SQS
+    send and leave it pending at loop close. Tests that assert on emissions use
+    ``ai_usage_calls``; this only stubs the wire.
+    """
+
+    async def _noop_send(_body):
+        return None
+
+    monkeypatch.setattr("app.core.llm_usage.emitter._send", _noop_send)
