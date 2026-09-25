@@ -149,6 +149,7 @@ describe('useLiveAudioStream', () => {
     perms.check.mockResolvedValueOnce('denied');
     perms.request.mockResolvedValueOnce('granted');
     const {getByTestId} = render(<Test />);
+    await act(async () => { await Promise.resolve(); }); // Flush microtasks for permission check/request resolution
     await waitFor(() => expect(getByTestId('perm').props.children).toBe('true'));
   });
 
@@ -158,6 +159,7 @@ describe('useLiveAudioStream', () => {
     perms.request.mockResolvedValueOnce('denied');
     const hooks = require('@/hooks');
     render(<Test />);
+    await act(async () => { await Promise.resolve(); }); // Flush microtasks
     expect(hooks.usePermissionAlert().showSettingsAlert).toBeTruthy();
   });
 });
