@@ -41,6 +41,17 @@ jobs:
         with:
           ref: master
           fetch-depth: 0
+          # The default GITHUB_TOKEN pushes as the "github-actions" app, which isn't on the
+          # "master: tests, types and lint must pass" ruleset's bypass list (only org admins/
+          # maintainers are) — its direct push of the version-bump commit gets rejected with
+          # "3 of 3 required status checks are expected", which can never be satisfied by a
+          # brand-new commit that was never itself pushed through a checked branch/PR. Using a
+          # PAT from an account with repo Maintain/Admin role instead makes the push authenticate
+          # as an already-bypass-listed identity. This step's checkout token only needs to cover
+          # the raw `git push`/`git tag` calls below — the gh CLI calls elsewhere in this job
+          # (workflow dispatch, run status reads) keep using the default GITHUB_TOKEN via the
+          # job-level GH_TOKEN env var, unaffected by this.
+          token: ${{ secrets.RELEASE_BOT_PAT }}
 
       - name: Check kill switch
         id: gate_enabled
