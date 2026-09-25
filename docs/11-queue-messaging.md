@@ -113,6 +113,23 @@ also emitted for AI calls with no room (and ally-ai publishes to the same queue 
 translation and embeddings); and it is skipped entirely for `preview-*` rooms, which have no
 persisted session in Core.
 
+`room_id` is what attributes a call to a session, so every model call a roleplay session makes
+carries one. Inside a graph node (and any task a node spawns) it comes from the graph run's context
+var (`get_room_id()`); calls the worker makes from its own tasks -- thinking fillers, the interim
+reply, back-channel phrases, clip TTS, the working-memory pool embedding -- are handed the room
+name explicitly, because there the context var reads `"unknown"`. The post-session actor
+evaluation runs with no room at all and sets `llm_usage.scenario_session_id` instead, which Core
+reads before `room_id`.
+
+Labels the live worker emits (`app/core/llm_usage/tasks.py`, string-for-string with ally-be's
+`LlmTask`): `agent_turn`, `agent_stt`, `agent_tts` (the AgentSession's own STT/TTS, via LiveKit's
+`metrics_collected`), `rolling_summary`, `client_working_memory`, `supervisor_note`,
+`backchannel_phrases`, `interim_reply`, `thinking_filler`, `clip_tts` (the isolated clip TTS
+instance, which that hook never sees; recorded per real synthesis, never for a clip-cache hit),
+`knowledge_retrieval`, `branching_instruction`, `branching_chat_summary`, `behaviour_detection`,
+`guardrail_check`, `binary_classifier`, `helper_paraphrased`, `event_embedding`,
+`working_memory_embedding` and `actor_evaluation`. Embedding rows carry input tokens only.
+
 ### UI Event Message
 
 Sent to the frontend via LiveKit data channel (not SQS):

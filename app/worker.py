@@ -1,4 +1,5 @@
 import asyncio
+import functools
 import json
 import os
 import random
@@ -57,6 +58,7 @@ from app.core.livekit.video_actor import (
     is_video_actor_enabled,
     start_video_actor,
 )
+from app.core.llm_usage.tasks import LLMTask
 from app.core.logger import (
     get_logger,
     make_child_logging_forward_only,
@@ -409,6 +411,12 @@ class AgentWorker:
         # (kept separate from the filler's pool — different phrase sets).
         self._recent_backchannel_phrases: list[str] = []
 
+        # Whether this session's voice can render clips at all (the clip policy
+        # in BaseTTSClient.allows_clip_synthesis). Decided once in
+        # _setup_background_audio; False means no filler, back-channel or
+        # interim layer, and none of their LLM calls.
+        self._clip_tts_on: bool = False
+
         # Predictive interim reply: while the learner is still speaking on a long
         # turn, a fast DEDICATED model (separate from the main reply LLM) turns
         # the partial transcript into a short, non-committal holding reply; it is
@@ -480,7 +488,11 @@ class AgentWorker:
         # events for an Ollama-only (no OpenAI key) session.
         if settings.OPENAI_API_KEY:
             self.embedding_client = OpenAIEmbeddingClient(
-                model=settings.OPENAI_EMBEDDING_MODEL, api_key=settings.OPENAI_API_KEY
+                model=settings.OPENAI_EMBEDDING_MODEL,
+                api_key=settings.OPENAI_API_KEY,
+                # Attributes its usage (event_embedding, working_memory_
+                # embedding) to this session, wherever the call is made from.
+                room_id=self._usage_room_id(),
             )
             logger.debug(
                 "Created shared embedding client for semantic similarity events"
@@ -745,7 +757,7 @@ class AgentWorker:
                 async def _embed_pool() -> None:
                     await attach_vectors(
                         self.client_working_memory_store.corpus,
-                        self.embedding_client.get_embeddings_batch,
+                        self._working_memory_embed_many(),
                     )
 
                 _pool_task = asyncio.create_task(_embed_pool())
@@ -2176,6 +2188,7 @@ class AgentWorker:
         """
         try:
             from app.core.livekit.backchannel import is_backchannel_enabled
+            from app.core.livekit.filler_clips import clip_tts_available
             from app.core.livekit.fillers import is_filler_enabled
             from app.core.livekit.interim_reply import is_interim_reply_enabled
 
@@ -2184,10 +2197,18 @@ class AgentWorker:
 
             # Pure flag checks (no LLM/TTS): decide whether each layer COULD play,
             # so we can publish the track now and defer the actual synthesis.
+            # Filler, back-channel and interim are all heard only as clips, so
+            # a voice that renders none (generative, or not isolatable) turns
+            # all three off here — before their LLM calls, not after them.
             predictive_on = bool(getattr(settings, "PREDICTIVE_FILLER_ENABLED", False))
-            filler_possible = is_filler_enabled(self.scenario)
-            backchannel_possible = is_backchannel_enabled(self.scenario)
-            self._interim_enabled = is_interim_reply_enabled(self.scenario)
+            self._clip_tts_on = clip_tts_available(self.tts_client)
+            filler_possible = self._clip_tts_on and is_filler_enabled(self.scenario)
+            backchannel_possible = self._clip_tts_on and is_backchannel_enabled(
+                self.scenario
+            )
+            self._interim_enabled = self._clip_tts_on and is_interim_reply_enabled(
+                self.scenario
+            )
 
             # Nothing to play on any layer — don't publish a track.
             if (
@@ -2218,9 +2239,10 @@ class AgentWorker:
             await self._bg_audio.start(room=self.ctx.room)
             logger.info(
                 "[BG_AUDIO] BackgroundAudioPlayer started "
-                "(comfort=%s filler_possible=%s predictive=%s "
+                "(comfort=%s clip_tts=%s filler_possible=%s predictive=%s "
                 "backchannel_possible=%s interim=%s)",
                 comfort_source is not None,
+                self._clip_tts_on,
                 filler_possible,
                 predictive_on,
                 backchannel_possible,
@@ -2229,6 +2251,10 @@ class AgentWorker:
         except Exception as e:  # noqa: BLE001 - must never break a session
             logger.warning("[BG_AUDIO] setup failed (continuing without): %s", e)
             self._bg_audio = None
+            return
+
+        # Comfort tone only: nothing below would produce a clip.
+        if not self._clip_tts_on:
             return
 
         # Defer the expensive per-layer work (back-channel LLM call + filler/
@@ -2366,7 +2392,7 @@ class AgentWorker:
         turn beginning before this finishes simply gets no filler. Best-effort:
         any failure leaves the session running with whatever did resolve.
         """
-        if self._bg_audio is None:
+        if self._bg_audio is None or not self._clip_tts_on:
             return
         try:
             import time as _time
@@ -2399,7 +2425,11 @@ class AgentWorker:
                 phrases = resolve_filler_phrases(self.scenario)
                 if phrases:
                     clips = await synthesize_clips(
-                        self.tts_client, phrases, language=language, source="static"
+                        self.tts_client,
+                        phrases,
+                        language=language,
+                        source="static",
+                        **self._clip_usage(),
                     )
                     self._filler_stats["clips_synthesized"] += len(clips)
                     self._filler_pool.add(clips)
@@ -2546,6 +2576,43 @@ class AgentWorker:
         ]
         return choice
 
+    def _usage_room_id(self) -> Optional[str]:
+        """The LiveKit room name, which attributes a model call to a session.
+
+        Passed explicitly to the calls the worker makes from its own tasks
+        (fillers, interim, back-channel, clip TTS): those run outside the graph
+        run, where the context var ``get_room_id`` reads is unset and reports
+        "unknown". Read defensively so usage bookkeeping can never break the
+        call it rides on.
+        """
+        return getattr(getattr(getattr(self, "ctx", None), "room", None), "name", None)
+
+    def _working_memory_embed_many(self):
+        """The backstory-pool embedder, recorded as working_memory_embedding.
+
+        The pool is embedded in a detached task at setup, outside any graph
+        run, so the room is passed explicitly.
+        """
+        return functools.partial(
+            self.embedding_client.get_embeddings_batch,
+            task=LLMTask.WORKING_MEMORY_EMBEDDING.value,
+            room_id=self._usage_room_id(),
+        )
+
+    def _clip_usage(self) -> dict:
+        """``synthesize_clips`` kwargs that record clip TTS as ``clip_tts``.
+
+        Provider and model are the same values ``agent_tts`` rows carry: the
+        clip instance is an isolated clone of the session's TTS client, so it
+        bills at the same rate — but it is not the AgentSession's instance, so
+        LiveKit's metrics hook never counts it.
+        """
+        return {
+            "usage_room_id": self._usage_room_id(),
+            "usage_provider": getattr(self, "_tts_provider", None),
+            "usage_model": getattr(self, "_tts_model", None),
+        }
+
     def _filler_language(self) -> str:
         """The session's BCP-47 code, used as part of the clip cache key."""
         return (
@@ -2582,7 +2649,10 @@ class AgentWorker:
             count = int(getattr(settings, "PREDICTIVE_FILLER_COUNT", 8))
             if source == "seed":
                 options = await generate_seed_fillers(
-                    self._predictive_filler_llm_client, self.scenario, count
+                    self._predictive_filler_llm_client,
+                    self.scenario,
+                    count,
+                    room_id=self._usage_room_id(),
                 )
             elif source == "in_turn":
                 options = await generate_in_turn_fillers(
@@ -2595,6 +2665,7 @@ class AgentWorker:
                         getattr(settings, "FILLER_IN_TURN_TIMEOUT_MS", 2500.0)
                     )
                     / 1000.0,
+                    room_id=self._usage_room_id(),
                 )
             else:
                 messages = self._read_conversation_history()
@@ -2606,6 +2677,7 @@ class AgentWorker:
                     messages,
                     count,
                     recent_fillers=pool.phrases,
+                    room_id=self._usage_room_id(),
                 )
             self._filler_stats["llm_calls"] += 1
             if not options:
@@ -2622,6 +2694,7 @@ class AgentWorker:
                 requests,
                 language=self._filler_language(),
                 source=source,
+                **self._clip_usage(),
             )
             self._filler_stats["clips_synthesized"] += len(clips)
             added = pool.add(clips)
@@ -3019,6 +3092,7 @@ class AgentWorker:
                     [(clip.phrase, clip.filler_type, clip.variant + 1)],
                     language=self._filler_language(),
                     source=clip.source,
+                    **self._clip_usage(),
                 )
                 self._filler_stats["clips_synthesized"] += len(clips)
                 pool.add(clips)
@@ -3237,7 +3311,7 @@ class AgentWorker:
 
             count = int(getattr(settings, "BACKCHANNEL_COUNT", 6))
             phrases = await generate_backchannel_phrases(
-                self.llm_client, self.scenario, count
+                self.llm_client, self.scenario, count, room_id=self.ctx.room.name
             )
             if not phrases:
                 logger.info("[BACKCHANNEL] no phrases generated — no back-channel")
@@ -3250,6 +3324,7 @@ class AgentWorker:
                 phrases,
                 language=self._filler_language(),
                 source="backchannel",
+                **self._clip_usage(),
             )
             logger.info(
                 "[BACKCHANNEL] synthesized %d clip(s) from %d phrase(s)",
@@ -3569,7 +3644,11 @@ class AgentWorker:
 
             messages = self._read_conversation_history()
             reply = await generate_interim_reply(
-                self._interim_llm_client, self.scenario, messages, partial_text
+                self._interim_llm_client,
+                self.scenario,
+                messages,
+                partial_text,
+                room_id=self._usage_room_id(),
             )
             if not reply:
                 if self._interim_state == "generating":
@@ -3590,6 +3669,7 @@ class AgentWorker:
                     # it will never be asked for again — caching it would only
                     # evict fillers that do repeat.
                     use_cache=False,
+                    **self._clip_usage(),
                 ),
                 timeout=tts_timeout_s,
             )

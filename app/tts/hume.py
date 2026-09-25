@@ -158,6 +158,12 @@ class HumeTTSClient(BaseTTSClient):
             api_key=settings.HUME_API_KEY,
         )
 
+    def allows_clip_synthesis(self) -> bool:
+        """Hume Octave is generative — each request re-performs the voice — so
+        a clip would be heard as a second take of the character right before
+        the reply. Stated explicitly, though the base default says the same."""
+        return False
+
     @property
     def tts_instance(self) -> TTS:
         """Get the underlying Hume.ai TTS instance."""

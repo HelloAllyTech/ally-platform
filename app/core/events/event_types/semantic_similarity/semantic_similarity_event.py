@@ -16,6 +16,7 @@ from app.core.events.base import BaseEvent, ChatMessage
 from app.core.events.event_types.semantic_similarity.constants import (
     SEMANTIC_SIMILARITY_THRESHOLD,
 )
+from app.core.llm_usage.tasks import LLMTask
 from app.core.logger import get_logger
 
 logger = get_logger(__name__)
@@ -255,7 +256,11 @@ class SemanticSimilarityEvent(BaseEvent):
                 f"embedding client. Ensure the event is created using the "
                 f".create() class method with an embedding_client."
             )
-        return await self._EMBEDDING_CLIENT.get_embedding(text)
+        # Recorded as event_embedding; the room is the client's own (one
+        # client per session), falling back to the graph run's.
+        return await self._EMBEDDING_CLIENT.get_embedding(
+            text, task=LLMTask.EVENT_EMBEDDING.value
+        )
 
     async def _get_embedding_cached(self, text: str) -> np.ndarray:
         """
@@ -316,7 +321,9 @@ class SemanticSimilarityEvent(BaseEvent):
                 f"embedding client. Ensure the event is created using the "
                 f".create() class method with an embedding_client."
             )
-        return await self._EMBEDDING_CLIENT.get_embeddings_batch(texts)
+        return await self._EMBEDDING_CLIENT.get_embeddings_batch(
+            texts, task=LLMTask.EVENT_EMBEDDING.value
+        )
 
     @staticmethod
     def _cosine_similarity(vec1: np.ndarray, vec2: np.ndarray) -> float:

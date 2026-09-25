@@ -110,7 +110,7 @@ class RecordingLLM:
     def llm_instance(self):
         return self
 
-    def with_structured_output(self, schema):
+    def with_structured_output(self, schema, **_kwargs):
         return self
 
     async def ainvoke(self, messages):

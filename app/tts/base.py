@@ -2,15 +2,51 @@
 Base TTS client interface.
 """
 
+import asyncio
+import weakref
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 from langchain_core.tools import BaseTool
 
 from app.core.logger import get_logger
 
 logger = get_logger(__name__)
+
+# Clients whose clip-policy refusal has already been logged (see
+# BaseTTSClient._clip_policy_allows). Weak, so a finished session's client
+# is not kept alive by a log-once flag.
+_CLIP_POLICY_LOGGED: "weakref.WeakSet[BaseTTSClient]" = weakref.WeakSet()
+
+# Strong references to pending aclose() tasks for discarded clip instances;
+# asyncio keeps only a weak one.
+_PENDING_CLIP_CLOSES: Set["asyncio.Task"] = set()
+
+
+def _discard_clip_instance(instance) -> None:
+    """Close a clip TTS instance that was built but will not be returned.
+
+    Without this a failure after the build orphans an open plugin instance
+    (its HTTP session / websocket pool) for every clip batch. Best-effort.
+    """
+    aclose = getattr(instance, "aclose", None)
+    if aclose is None:
+        return
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        try:
+            asyncio.run(aclose())
+        except Exception:  # noqa: BLE001 - closing is best-effort
+            logger.debug("[CLIP_TTS] closing discarded clip instance failed")
+        return
+
+    from app.core.tasks import spawn_background_task
+
+    spawn_background_task(
+        aclose(), name="clip-tts-discard", background_tasks=_PENDING_CLIP_CLOSES
+    )
 
 
 @dataclass
@@ -34,6 +70,65 @@ class BaseTTSClient(ABC):
         self._current_params: Dict[str, Any] = {}
         self._default_params: Dict[str, Any] = {}
 
+    def allows_clip_synthesis(self) -> bool:
+        """Whether this voice may be rendered as offline clips at all.
+
+        Each clip (thinking filler, back-channel, interim reply) is an
+        independent generation on a separate TTS instance, played on the
+        background track just before the real reply. For a fixed-speaker model
+        that is the same voice. For a generative one — ElevenLabs v3,
+        Gemini-TTS, Hume — every request is a fresh draw of the speaker, so
+        the clip is heard as a second voice immediately before the character's
+        own, which is the "voice changes" report in another form.
+
+        Fails closed: a client opts in by overriding this for the configs known
+        to hold one speaker across generations. Anything not classified here,
+        including a new provider or model, gets no clips until someone checks.
+        """
+        return False
+
+    def _clip_policy_allows(self) -> bool:
+        """``allows_clip_synthesis()``, logging a refusal once per session.
+
+        Every session builds its own client, so once per client is once per
+        session. The logged flag is kept off the instance: ``voice_fingerprint``
+        hashes scalar attributes, and the clip cache key must not change
+        because a log line was written.
+        """
+        try:
+            if self.allows_clip_synthesis() is True:
+                return True
+        except Exception:  # noqa: BLE001 - a broken policy check fails closed
+            logger.warning(
+                "[CLIP_TTS] clip policy check failed for %s; treating as off",
+                type(self).__name__,
+                exc_info=True,
+            )
+        if self not in _CLIP_POLICY_LOGGED:
+            _CLIP_POLICY_LOGGED.add(self)
+            logger.info(
+                "[CLIP_TTS] clips off for this session: reason=generative_voice "
+                "client=%s model=%s voice=%s",
+                type(self).__name__,
+                getattr(self, "_model", None) or getattr(self, "_model_name", None),
+                getattr(self, "_voice_name", None)
+                or getattr(self, "_voice_id", None)
+                or getattr(self, "_speaker", None)
+                or getattr(self, "_voice", None),
+            )
+        return False
+
+    def can_create_clip_tts(self) -> bool:
+        """Whether ``create_clip_tts()`` will try to build an instance.
+
+        True when the clip policy allows this voice and the client builds its
+        instance lazily (so a clone can build a fresh one). Callers check it
+        BEFORE the LLM calls that write filler, back-channel and interim
+        phrases: those phrases can only be heard through a clip, so generating
+        them for a voice that will never render one is paid for and discarded.
+        """
+        return self._clip_policy_allows() and hasattr(self, "_tts_instance")
+
     def create_clip_tts(self):
         """A SEPARATE underlying TTS instance for offline clip rendering
         (thinking fillers, backchannels, interim replies).
@@ -47,12 +142,18 @@ class BaseTTSClient(ABC):
 
         Every provider client here builds ``tts_instance`` lazily from stored
         params, so a shallow clone with the cached instance cleared rebuilds a
-        fresh, isolated instance. Returns ``None`` when isolation isn't
-        possible — callers must then SKIP clip synthesis, never fall back to
-        the shared instance.
+        fresh, isolated instance. Returns ``None`` when the clip policy refuses
+        this voice (``allows_clip_synthesis``) or isolation isn't possible —
+        callers must then SKIP clip synthesis, never fall back to the shared
+        instance.
         """
+        if not self._clip_policy_allows():
+            return None
+
         import copy
 
+        clone = None
+        new_instance = None
         try:
             clone = copy.copy(self)
             # Deep-copy the parameter dicts so the isolated instance gets the
@@ -68,13 +169,26 @@ class BaseTTSClient(ABC):
                 return None
             clone._tts_instance = None
             new_instance = clone.tts_instance
-            # Apply the current parameters to the new instance, because not all
-            # provider clients re-apply parameters from their internal state
-            # on instance creation. This ensures dynamic voice expression
-            # changes carry over to the isolated instance.
-            clone._apply_parameters_dict(clone._current_params)
+            # Re-apply stored parameters, because not all provider clients do
+            # so on instance creation. Read defensively: a client that skipped
+            # super().__init__() has no _current_params, and reading it
+            # unguarded here disabled every clip for four providers (d35bb31).
+            params = getattr(clone, "_current_params", None) or {}
+            if params:
+                clone._apply_parameters_dict(params)
             return new_instance
         except Exception:  # noqa: BLE001 - isolation is best-effort
+            logger.warning(
+                "[CLIP_TTS] could not build an isolated clip TTS for %s — "
+                "skipping clips rather than using the session's instance",
+                type(self).__name__,
+                exc_info=True,
+            )
+            built = new_instance
+            if built is None and clone is not None:
+                built = getattr(clone, "_tts_instance", None)
+            if built is not None and built is not getattr(self, "_tts_instance", None):
+                _discard_clip_instance(built)
             return None
 
     @property

@@ -317,6 +317,7 @@ async def retrieve_relevant_knowledge(
     messages: list,
     knowledge_map: Dict[str, str],
     glossary_hints: Optional[Dict[str, str]] = None,
+    room_id: Optional[str] = None,
 ) -> str:
     """
     Use the scenario LLM to identify which knowledge-base titles are
@@ -328,6 +329,10 @@ async def retrieve_relevant_knowledge(
     descriptions and switches the selector to the dual-framing prompt.
 
     Returns an empty string when nothing is relevant or on any error.
+
+    The selection call's tokens are emitted to ``llm_usage`` as
+    ``knowledge_retrieval`` against ``room_id`` (else the graph run's room). A
+    cache hit makes no call and records nothing.
     """
     if not knowledge_map or not messages:
         return ""
@@ -365,13 +370,31 @@ async def retrieve_relevant_knowledge(
             available_titles, glossary_hints, previews
         )
 
-        structured_llm = llm_client.llm_instance.with_structured_output(RelevantKeys)
-        result = await structured_llm.ainvoke(
+        # include_raw because the parsed model alone carries no usage metadata.
+        structured_llm = llm_client.llm_instance.with_structured_output(
+            RelevantKeys, include_raw=True
+        )
+        raw_result = await structured_llm.ainvoke(
             [
                 SystemMessage(content=system_prompt),
                 HumanMessage(content=f"Recent conversation:\n{conversation_text}"),
             ]
         )
+        if isinstance(raw_result, dict):
+            # Emitted before parsing: a parse failure still spent the tokens.
+            from app.core.llm_usage.emitter import emit_langchain_usage
+            from app.core.llm_usage.tasks import LLMTask
+
+            emit_langchain_usage(
+                raw_result.get("raw"),
+                task=LLMTask.KNOWLEDGE_RETRIEVAL.value,
+                llm_client=llm_client,
+                room_id=room_id,
+            )
+            result = raw_result.get("parsed")
+        else:
+            # Defensive: some providers/wrappers may ignore include_raw.
+            result = raw_result
 
         if not result or not result.titles:
             _store_cached_retrieval(cache_key, "")

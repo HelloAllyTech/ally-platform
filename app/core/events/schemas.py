@@ -51,6 +51,10 @@ class LLMUsageData(BaseModel):
     characters: Optional[int] = None
     env: Optional[str] = None
     scenario_id: Optional[int] = None
+    # For a call made outside any LiveKit room (the post-session actor
+    # evaluation, an HTTP request): Core resolves the session from this first,
+    # then falls back to the message's room_id.
+    scenario_session_id: Optional[str] = None
 
 
 class TurnMetricsData(BaseModel):

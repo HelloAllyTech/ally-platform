@@ -1,4 +1,5 @@
 import asyncio
+import functools
 import json
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, cast
@@ -51,6 +52,7 @@ from app.core.graph.utils import (
     get_live_score,
     is_event_eligible,
 )
+from app.core.llm_usage.tasks import LLMTask
 from app.core.logger import logger
 from app.core.metrics import turn_metrics
 from app.core.queue import msg_event_queue
@@ -2304,6 +2306,10 @@ async def retrieve_knowledge(
             _rc_store.context = state.retrieved_context
         if not _rc_store.in_flight:
             _messages_snapshot = list(state.messages)
+            # Captured here, in the node, and passed explicitly: the refresh
+            # outlives this node, so the room must not depend on the context
+            # var still being set when the call returns.
+            _usage_room_id = get_room_id()
 
             async def _refresh_in_background() -> None:
                 try:
@@ -2313,6 +2319,7 @@ async def retrieve_knowledge(
                             _messages_snapshot,
                             knowledge_map,
                             glossary_hints=glossary_hints or None,
+                            room_id=_usage_room_id,
                         ),
                         timeout=8.0,
                     )
@@ -2360,6 +2367,7 @@ async def retrieve_knowledge(
                 state.messages,
                 knowledge_map,
                 glossary_hints=glossary_hints or None,
+                room_id=get_room_id(),
             ),
             timeout=8.0,
         )
@@ -2608,8 +2616,15 @@ async def update_working_memory(
     # and not a broken one. Passed as a callable rather than the client so the
     # store layer never learns which provider it is talking to.
     _embedding_client = configurable.get("embedding_client")
+    # Recorded as working_memory_embedding. The room is the client's own (one
+    # per session); the query runs in the detached update, after this node.
     embed_query = (
-        _embedding_client.get_embedding if _embedding_client is not None else None
+        functools.partial(
+            _embedding_client.get_embedding,
+            task=LLMTask.WORKING_MEMORY_EMBEDDING.value,
+        )
+        if _embedding_client is not None
+        else None
     )
 
     # The TOTAL score — events AND behaviours — since the last update we

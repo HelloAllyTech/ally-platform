@@ -95,6 +95,12 @@ class NaturalnessController:
         self._user_speaking: bool = False
         self._recent_backchannel_phrases: list[str] = []
 
+        # Whether this session's voice can render clips at all (the clip policy
+        # in BaseTTSClient.allows_clip_synthesis). Decided once in start();
+        # False means no filler, back-channel or interim layer, and none of
+        # their LLM calls.
+        self._clip_tts_on: bool = False
+
         # ---- Predictive interim reply ----
         self._interim_enabled: bool = False
         self._interim_llm_client = None
@@ -133,15 +139,24 @@ class NaturalnessController:
         """
         try:
             from app.core.livekit.backchannel import is_backchannel_enabled
+            from app.core.livekit.filler_clips import clip_tts_available
             from app.core.livekit.fillers import is_filler_enabled
             from app.core.livekit.interim_reply import is_interim_reply_enabled
 
             comfort_source = await self._resolve_comfort_audio()
 
+            # Filler, back-channel and interim are heard only as clips, so a
+            # voice that renders none turns all three off before their LLM
+            # calls (see app/worker.py _setup_background_audio).
             predictive_on = bool(getattr(settings, "PREDICTIVE_FILLER_ENABLED", False))
-            filler_possible = is_filler_enabled(self.scenario)
-            backchannel_possible = is_backchannel_enabled(self.scenario)
-            self._interim_enabled = is_interim_reply_enabled(self.scenario)
+            self._clip_tts_on = clip_tts_available(self.tts_client)
+            filler_possible = self._clip_tts_on and is_filler_enabled(self.scenario)
+            backchannel_possible = self._clip_tts_on and is_backchannel_enabled(
+                self.scenario
+            )
+            self._interim_enabled = self._clip_tts_on and is_interim_reply_enabled(
+                self.scenario
+            )
 
             if (
                 comfort_source is None
@@ -164,9 +179,10 @@ class NaturalnessController:
             await self._bg_audio.start(room=self.room)
             logger.info(
                 "[BG_AUDIO] BackgroundAudioPlayer started "
-                "(comfort=%s filler_possible=%s predictive=%s "
+                "(comfort=%s clip_tts=%s filler_possible=%s predictive=%s "
                 "backchannel_possible=%s interim=%s)",
                 comfort_source is not None,
+                self._clip_tts_on,
                 filler_possible,
                 predictive_on,
                 backchannel_possible,
@@ -175,6 +191,10 @@ class NaturalnessController:
         except Exception as e:  # noqa: BLE001 - must never break a session
             logger.warning("[BG_AUDIO] setup failed (continuing without): %s", e)
             self._bg_audio = None
+            return
+
+        # Comfort tone only: nothing below would produce a clip.
+        if not self._clip_tts_on:
             return
 
         deferred_task = asyncio.create_task(self._setup_deferred_naturalness())
@@ -331,7 +351,7 @@ class NaturalnessController:
 
     async def _setup_deferred_naturalness(self) -> None:
         """Synthesize the filler/back-channel clips and wire their handlers."""
-        if self._bg_audio is None:
+        if self._bg_audio is None or not self._clip_tts_on:
             return
         try:
             from app.core.livekit.fillers import (
@@ -543,7 +563,7 @@ class NaturalnessController:
 
             count = int(getattr(settings, "BACKCHANNEL_COUNT", 6))
             phrases = await generate_backchannel_phrases(
-                self.llm_client, self.scenario, count
+                self.llm_client, self.scenario, count, room_id=self.room_name
             )
             if not phrases:
                 logger.info("[BACKCHANNEL] no phrases generated — no back-channel")

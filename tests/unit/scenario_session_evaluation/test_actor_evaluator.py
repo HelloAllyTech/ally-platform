@@ -125,3 +125,99 @@ class TestEvaluateActorGoals:
             "not_applicable": [],
             "report_markdown": "",
         }
+
+
+class TestActorEvaluationUsage:
+    """AI-cost: the judge's tokens reach llm_usage as actor_evaluation,
+    attributed by scenario_session_id (there is no room after the session)."""
+
+    @staticmethod
+    def _raw():
+        from langchain_core.messages import AIMessage
+
+        return AIMessage(
+            content="{}",
+            usage_metadata={
+                "input_tokens": 3000,
+                "output_tokens": 600,
+                "total_tokens": 3600,
+            },
+        )
+
+    @pytest.mark.asyncio
+    async def test_records_against_the_session_id(self, ai_usage_calls, graph_room):
+        goals = [_goal("Build rapport")]
+        judged = ActorGoalEvaluationResult(metrics={"Build rapport": 70})
+
+        with patch(
+            "app.core.scenario_session_evaluation.evaluator._build_evaluator_llm"
+        ) as build:
+            build.return_value.model_name = "gpt-4o-mini"
+            build.return_value.with_structured_output.return_value.ainvoke = AsyncMock(
+                return_value={
+                    "raw": self._raw(),
+                    "parsed": judged,
+                    "parsing_error": None,
+                }
+            )
+            result = await evaluate_actor_goals(
+                _transcript(), goals, scenario_session_id="sess-42"
+            )
+
+        assert result["metrics"] == {"Build rapport": 70}
+        _, kwargs = build.return_value.with_structured_output.call_args
+        assert kwargs == {"method": "json_mode", "include_raw": True}
+        assert len(ai_usage_calls) == 1
+        call = ai_usage_calls[0]
+        assert call["task"] == "actor_evaluation"
+        assert call["scenario_session_id"] == "sess-42"
+        # Not borrowed from whatever room context var happens to be set.
+        assert call["room_id"] is None
+        assert (call["provider"], call["model"]) == ("openai", "gpt-4o-mini")
+        assert call["prompt_tokens"] == 3000
+
+    @pytest.mark.asyncio
+    async def test_parse_failure_records_then_raises(self, ai_usage_calls):
+        with patch(
+            "app.core.scenario_session_evaluation.evaluator._build_evaluator_llm"
+        ) as build:
+            build.return_value.with_structured_output.return_value.ainvoke = AsyncMock(
+                return_value={
+                    "raw": self._raw(),
+                    "parsed": None,
+                    "parsing_error": ValueError("not json"),
+                }
+            )
+            with pytest.raises(ValueError):
+                await evaluate_actor_goals(
+                    _transcript(), [_goal("Build rapport")], scenario_session_id="s"
+                )
+
+        assert [c["task"] for c in ai_usage_calls] == ["actor_evaluation"]
+
+
+@pytest.mark.asyncio
+async def test_service_passes_the_session_id_to_the_judge():
+    from app.core.scenario_session_evaluation import service
+    from app.core.scenario_session_evaluation.schemas import ActorEvaluationRequest
+
+    request = ActorEvaluationRequest(
+        scenario_session_id="sess-7", transcript=_transcript(), goals=[]
+    )
+    with (
+        patch.object(
+            service,
+            "evaluate_actor_goals",
+            AsyncMock(
+                return_value={
+                    "metrics": {},
+                    "not_applicable": [],
+                    "report_markdown": "",
+                }
+            ),
+        ) as judge,
+        patch.object(service, "_send_webhook", AsyncMock()),
+    ):
+        await service.run_actor_evaluation(request)
+
+    assert judge.await_args.kwargs["scenario_session_id"] == "sess-7"

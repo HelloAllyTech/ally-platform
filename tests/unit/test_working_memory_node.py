@@ -373,3 +373,25 @@ def test_the_delta_comes_from_the_total_score_not_current_score():
 
     assert delta_from_total == 24, "behaviour scores must reach the ladder"
     assert delta_from_current == 0, "the event bucket alone would earn nothing"
+
+
+class TestRecallQueryEmbeddingIsRecorded:
+    """AI-cost: the per-turn recall query is recorded as
+    working_memory_embedding, against the session's own embedding client."""
+
+    async def test_embed_query_carries_the_task(self):
+        from unittest.mock import AsyncMock
+
+        store = ClientWorkingMemoryStore()
+        await store.begin_turn()
+        embedding_client = SimpleNamespace(get_embedding=AsyncMock(return_value=[1.0]))
+        with patch("app.core.working_memory.consolidate.schedule_update") as sched:
+            await update_working_memory(
+                _state(), _config(store, embedding_client=embedding_client)
+            )
+
+        embed_query = sched.call_args.kwargs["embed_query"]
+        await embed_query("what the learner said")
+        embedding_client.get_embedding.assert_awaited_once_with(
+            "what the learner said", task="working_memory_embedding"
+        )

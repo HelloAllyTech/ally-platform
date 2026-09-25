@@ -8,9 +8,9 @@ generated here).
 """
 
 import asyncio
+import traceback
 
 import httpx
-import traceback
 
 from app.core.config import settings
 from app.core.constants import ACTOR_EVALUATION_WEBHOOK_ENDPOINT
@@ -84,7 +84,11 @@ async def _send_webhook(
 async def run_actor_evaluation(request: ActorEvaluationRequest) -> None:
     """Evaluate the actor against the goals and webhook the result back."""
     try:
-        result = await evaluate_actor_goals(request.transcript, request.goals)
+        result = await evaluate_actor_goals(
+            request.transcript,
+            request.goals,
+            scenario_session_id=request.scenario_session_id,
+        )
         payload = ActorEvaluationWebhookPayload(
             status="COMPLETED",
             metrics=result["metrics"],

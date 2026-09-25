@@ -169,6 +169,18 @@ class SimulationBehaviorInstruction(BaseModel):
                 messages=messages,
                 response_format=ClassificationResultStrOp,
             )
+            # Recorded as soon as the call returns, before parsing. No
+            # explicit room: this only runs inside a graph node (or a task spawned
+            # from one), where the room context var is set.
+            from app.core.llm_usage.emitter import emit_openai_usage
+            from app.core.llm_usage.tasks import LLMTask
+
+            emit_openai_usage(
+                completion,
+                task=LLMTask.BEHAVIOUR_DETECTION.value,
+                model=self.model,
+                provider="openai",
+            )
 
             result = completion.choices[0].message.parsed
 

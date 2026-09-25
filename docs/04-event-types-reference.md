@@ -328,6 +328,16 @@ State (`coherence_consecutive_misses`, `coherence_escalations`, `coherence_quiet
 
 ---
 
+## AI usage (cost) per detection type
+
+Every detection type that calls a model records the call to `llm_usage` (see
+[Queue Messaging](11-queue-messaging.md)), attributed to the session by the graph run's room:
+BINARY_CLASSIFIER (single and batched) as `binary_classifier`, guardrails including COHERENCE as
+`guardrail_check` (provider `ollama` when routed to a local model), HELPER_PARAPHRASED as
+`helper_paraphrased`, and SEMANTIC_SIMILARITY's embeddings as `event_embedding` (target sentences
+once per pattern set, then one input embedding per utterance; cache hits make no call and record
+nothing). A new model-calling detection type needs its own label here and in ally-be's `LlmTask`.
+
 ## Key Source Files
 
 - `app/core/events/event_types/similarity_based/` -- SENTENCE_SIMILARITY

@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from langchain_core.messages import AIMessage
 
 import app.worker as worker
 from app.core.livekit import backchannel
@@ -150,6 +151,102 @@ class TestGenerateBackchannelPhrases:
             llm_client, _make_scenario()
         )
         assert out == []
+
+
+class TestBackchannelUsage:
+    """The call's tokens reach llm_usage under their own label."""
+
+    @staticmethod
+    def _client(result):
+        structured = AsyncMock()
+        structured.ainvoke = AsyncMock(return_value=result)
+        llm_instance = MagicMock(model_name="gpt-4o-mini")
+        llm_instance.with_structured_output = MagicMock(return_value=structured)
+        return SimpleNamespace(llm_instance=llm_instance, provider="openai")
+
+    @staticmethod
+    def _raw():
+        return AIMessage(
+            content="",
+            usage_metadata={
+                "input_tokens": 120,
+                "output_tokens": 30,
+                "total_tokens": 150,
+            },
+        )
+
+    @pytest.fixture
+    def emitted(self, monkeypatch):
+        monkeypatch.setattr(
+            backchannel, "load_and_format", lambda *a, **k: "SYSTEM PROMPT"
+        )
+        calls = []
+        monkeypatch.setattr(
+            "app.core.llm_usage.emitter.emit_llm_usage",
+            lambda **kwargs: calls.append(kwargs),
+        )
+        return calls
+
+    @pytest.mark.unit
+    async def test_emits_usage_under_backchannel_label(self, emitted):
+        llm_client = self._client(
+            {
+                "raw": self._raw(),
+                "parsed": backchannel._BackchannelPhrases(phrases=["हाँ", "अच्छा"]),
+                "parsing_error": None,
+            }
+        )
+        scenario = _make_scenario()
+        scenario.id = 42
+
+        out = await backchannel.generate_backchannel_phrases(
+            llm_client, scenario, count=6, room_id="room-1"
+        )
+
+        assert out == ["हाँ", "अच्छा"]
+        llm_client.llm_instance.with_structured_output.assert_called_once_with(
+            backchannel._BackchannelPhrases, include_raw=True
+        )
+        assert emitted == [
+            {
+                "room_id": "room-1",
+                "provider": "openai",
+                "model": "gpt-4o-mini",
+                "task": "backchannel_phrases",
+                "usage": (120, 30, 150, 0),
+                "scenario_id": 42,
+            }
+        ]
+
+    @pytest.mark.unit
+    async def test_parse_failure_still_emits_usage(self, emitted):
+        llm_client = self._client(
+            {"raw": self._raw(), "parsed": None, "parsing_error": ValueError("bad")}
+        )
+
+        out = await backchannel.generate_backchannel_phrases(
+            llm_client, _make_scenario(), room_id="room-1"
+        )
+
+        assert out == []
+        assert [c["task"] for c in emitted] == ["backchannel_phrases"]
+
+    @pytest.mark.unit
+    async def test_no_usage_metadata_emits_nothing(self, emitted):
+        llm_client = self._client(
+            {
+                "raw": AIMessage(content=""),
+                "parsed": backchannel._BackchannelPhrases(phrases=["mm-hmm"]),
+                "parsing_error": None,
+            }
+        )
+
+        out = await backchannel.generate_backchannel_phrases(
+            llm_client, _make_scenario(), room_id="room-1"
+        )
+
+        assert out == ["mm-hmm"]
+        assert emitted == []
 
 
 class _MockCtx:

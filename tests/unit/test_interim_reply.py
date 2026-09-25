@@ -563,3 +563,103 @@ class TestFillerCutover:
         w._on_filler_agent_state(types.SimpleNamespace(new_state="speaking"))
 
         w._bg_audio.flush.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# AI-cost: the interim call's tokens reach llm_usage as interim_reply
+# ---------------------------------------------------------------------------
+class TestInterimReplyUsage:
+    @staticmethod
+    def _client(result):
+        structured = MagicMock()
+        structured.ainvoke = AsyncMock(return_value=result)
+        llm_instance = MagicMock(model_name="gpt-4o-mini")
+        llm_instance.with_structured_output = MagicMock(return_value=structured)
+        return types.SimpleNamespace(llm_instance=llm_instance, provider="openai")
+
+    @staticmethod
+    def _raw():
+        return AIMessage(
+            content="",
+            usage_metadata={
+                "input_tokens": 90,
+                "output_tokens": 8,
+                "total_tokens": 98,
+            },
+        )
+
+    @pytest.mark.unit
+    async def test_emits_usage_against_the_passed_room(
+        self, monkeypatch, ai_usage_calls
+    ):
+        monkeypatch.setattr(interim_reply, "load_and_format", lambda *a, **k: "SYS")
+        client = self._client(
+            {
+                "raw": self._raw(),
+                "parsed": interim_reply._InterimReply(reply="Mm."),
+                "parsing_error": None,
+            }
+        )
+
+        out = await interim_reply.generate_interim_reply(
+            client, _make_scenario(), [], "a long partial transcript", room_id="rm-7"
+        )
+
+        assert out == "Mm."
+        client.llm_instance.with_structured_output.assert_called_once_with(
+            interim_reply._InterimReply, include_raw=True
+        )
+        assert len(ai_usage_calls) == 1
+        call = ai_usage_calls[0]
+        assert call["room_id"] == "rm-7"
+        assert call["task"] == "interim_reply"
+        assert call["model"] == "gpt-4o-mini"
+        assert call["prompt_tokens"] == 90
+
+    @pytest.mark.unit
+    async def test_parse_failure_still_emits(self, monkeypatch, ai_usage_calls):
+        monkeypatch.setattr(interim_reply, "load_and_format", lambda *a, **k: "SYS")
+        client = self._client(
+            {"raw": self._raw(), "parsed": None, "parsing_error": ValueError("x")}
+        )
+
+        out = await interim_reply.generate_interim_reply(
+            client, _make_scenario(), [], "a long partial transcript", room_id="rm-7"
+        )
+
+        assert out is None
+        assert [c["task"] for c in ai_usage_calls] == ["interim_reply"]
+
+    @pytest.mark.unit
+    async def test_worker_passes_its_room_to_generation_and_clip_tts(self, monkeypatch):
+        w = _interim_worker(monkeypatch)
+        w._interim_state = "generating"
+        w._read_conversation_history = lambda: []
+        w._tts_provider, w._tts_model = "elevenlabs", "eleven_flash_v2_5"
+        seen = {}
+
+        async def fake_generate(*_a, **kw):
+            seen["generate"] = kw
+            return "Mm, go on."
+
+        async def fake_synth(_tts, phrases, **kw):
+            seen["synth"] = kw
+            return [FillerClipForTest(phrases[0])]
+
+        monkeypatch.setattr(interim_reply, "generate_interim_reply", fake_generate)
+        monkeypatch.setattr(
+            "app.core.livekit.filler_clips.synthesize_clips", fake_synth
+        )
+
+        await w._interim_generate("I have been feeling low about everything lately")
+
+        assert seen["generate"]["room_id"] == "room-1"
+        assert seen["synth"]["usage_room_id"] == "room-1"
+        assert seen["synth"]["usage_provider"] == "elevenlabs"
+        assert seen["synth"]["usage_model"] == "eleven_flash_v2_5"
+
+
+def FillerClipForTest(phrase):
+    from app.core.livekit.filler_clips import FillerClip
+
+    return FillerClip(phrase=phrase, frames=[], duration_ms=500.0)

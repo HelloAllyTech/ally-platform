@@ -121,6 +121,7 @@ class SarvamTTSClient(BaseTTSClient):
         api_key: Optional[str] = None,
         tts_instance: Optional["sarvam.TTS"] = None,
     ):
+        super().__init__()
         if not speaker:
             raise ValueError("Sarvam TTS requires 'speaker'")
         if not model:
@@ -135,6 +136,13 @@ class SarvamTTSClient(BaseTTSClient):
         self._target_language = target_language
         self._api_key = api_key or settings.SARVAM_API_KEY
         self._tts_instance = tts_instance
+
+    def allows_clip_synthesis(self) -> bool:
+        """Clips only for bulbul:v2, a fixed-speaker model. bulbul:v3 samples
+        at a default temperature of 0.6 and has not been checked for speaker
+        consistency across independent requests, so it fails closed with every
+        other unclassified model (see BaseTTSClient.allows_clip_synthesis)."""
+        return (self._model or "").strip().lower() == "bulbul:v2"
 
     @staticmethod
     def validate_voice(model: str, speaker: str, api_key: Optional[str] = None) -> bool:
