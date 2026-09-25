@@ -26,6 +26,10 @@ export const QuizIntro: React.FC<QuizIntroProps> = ({
   const attemptsLeft =
     maxAttempts === null ? null : Math.max(0, maxAttempts - attemptsUsed);
   const canStart = attemptsLeft === null || attemptsLeft > 0;
+  // A survey has nothing to pass — no graded question contributes points.
+  const isSurvey =
+    quiz.totalPoints === 0 ||
+    quiz.questions.every(question => question.graded === false);
 
   return (
     <View style={styles.container}>
@@ -40,9 +44,13 @@ export const QuizIntro: React.FC<QuizIntroProps> = ({
             count: questionCount,
           })}
         </Text>
-        <Text style={styles.metaText}>
-          {t('courses.quiz.intro.passScore', {score: quiz.settings.passScore})}
-        </Text>
+        {!isSurvey && (
+          <Text style={styles.metaText}>
+            {t('courses.quiz.intro.passScore', {
+              score: quiz.settings.passScore,
+            })}
+          </Text>
+        )}
         <Text style={styles.metaText}>
           {attemptsLeft === null
             ? t('courses.quiz.intro.unlimitedAttempts')

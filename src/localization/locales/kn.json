@@ -1811,7 +1811,8 @@
         "moveDown": "ಕೆಳಕ್ಕೆ ಸರಿಸಿ",
         "wordCount_one": "{{count}}/{{min}} ಪದ",
         "wordCount_other": "{{count}}/{{min}} ಪದಗಳು",
-        "aiGraded": "ಈ ಉತ್ತರವನ್ನು AI ಮೂಲಕ ಮೌಲ್ಯಮಾಪನ ಮಾಡಲಾಗುತ್ತದೆ"
+        "aiGraded": "ಈ ಉತ್ತರವನ್ನು AI ಮೂಲಕ ಮೌಲ್ಯಮಾಪನ ಮಾಡಲಾಗುತ್ತದೆ",
+        "likertHint": "ಪ್ರತಿ ಹೇಳಿಕೆಗೆ ಒಂದು ಪ್ರತಿಕ್ರಿಯೆಯನ್ನು ಆಯ್ಕೆಮಾಡಿ"
       },
       "results": {
         "title": "ಫಲಿತಾಂಶಗಳು",
@@ -1826,7 +1827,11 @@
         "grading": "ಮೌಲ್ಯಮಾಪನ ಮಾಡಲಾಗುತ್ತಿದೆ…",
         "retry": "ಕ್ವಿಜ್ ಅನ್ನು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
         "next": "ಮುಂದೆ",
-        "attemptsUsed": "ಪ್ರಯತ್ನ {{used}} / {{max}}"
+        "attemptsUsed": "ಪ್ರಯತ್ನ {{used}} / {{max}}",
+        "notScored": "ಅಂಕಗಳಿಲ್ಲ",
+        "correctAnswer": "ಸರಿಯಾದ ಉತ್ತರ",
+        "yourResponses": "ನಿಮ್ಮ ಪ್ರತಿಕ್ರಿಯೆಗಳು",
+        "responsesSubmitted": "ಪ್ರತಿಕ್ರಿಯೆಗಳನ್ನು ಸಲ್ಲಿಸಲಾಗಿದೆ"
       }
     },
     "language": {

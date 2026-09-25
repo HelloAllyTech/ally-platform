@@ -155,4 +155,209 @@ describe('QuizResults', () => {
     fireEvent.press(getByTestId('question-row-q1'));
     expect(getByText(/Because it is\./)).toBeTruthy();
   });
+
+  it('pending logic ignores an ungraded question with no key (correct: null, graded: false)', () => {
+    const {queryByTestId} = render(
+      <QuizResults
+        result={buildResult({
+          questions: [
+            {
+              questionId: 'q1',
+              correct: null,
+              graded: false,
+              pointsAwarded: 0,
+              pointsPossible: 0,
+            },
+          ],
+        })}
+        questions={questions}
+        isRegrading={false}
+        canRetry={false}
+        onRegrade={jest.fn()}
+        onRetry={jest.fn()}
+        onNext={jest.fn()}
+      />,
+    );
+    // Not pending, so the passed result's Next CTA still shows.
+    expect(queryByTestId('quiz-finish-grading')).toBeNull();
+    expect(queryByTestId('quiz-next')).toBeTruthy();
+  });
+
+  it('shows a neutral "Not scored" row for an ungraded question instead of points', () => {
+    const {getByText, queryByText} = render(
+      <QuizResults
+        result={buildResult({
+          questions: [
+            {
+              questionId: 'q1',
+              correct: null,
+              graded: false,
+              pointsAwarded: 0,
+              pointsPossible: 0,
+            },
+          ],
+        })}
+        questions={questions}
+        isRegrading={false}
+        canRetry={false}
+        onRegrade={jest.fn()}
+        onRetry={jest.fn()}
+        onNext={jest.fn()}
+      />,
+    );
+    expect(getByText('courses.quiz.results.notScored')).toBeTruthy();
+    expect(queryByText('0/0')).toBeNull();
+  });
+
+  it('shows the verdict for an ungraded question that still has a key (practice question)', () => {
+    const {getByTestId, getByText} = render(
+      <QuizResults
+        result={buildResult({
+          questions: [
+            {
+              questionId: 'q1',
+              correct: false,
+              graded: false,
+              pointsAwarded: 0,
+              pointsPossible: 0,
+            },
+          ],
+        })}
+        questions={questions}
+        isRegrading={false}
+        canRetry={false}
+        onRegrade={jest.fn()}
+        onRetry={jest.fn()}
+        onNext={jest.fn()}
+      />,
+    );
+    fireEvent.press(getByTestId('question-row-q1'));
+    expect(getByText('courses.quiz.results.incorrect')).toBeTruthy();
+  });
+
+  it('renders "Correct answer:" when correctAnswer is present', () => {
+    const {getByTestId, getByText} = render(
+      <QuizResults
+        result={buildResult({
+          questions: [
+            {
+              questionId: 'q1',
+              correct: false,
+              pointsAwarded: 0,
+              pointsPossible: 1,
+              correctAnswer: {booleanAnswer: true},
+            },
+          ],
+        })}
+        questions={questions}
+        isRegrading={false}
+        canRetry={false}
+        onRegrade={jest.fn()}
+        onRetry={jest.fn()}
+        onNext={jest.fn()}
+      />,
+    );
+    fireEvent.press(getByTestId('question-row-q1'));
+    expect(
+      getByText(
+        /courses\.quiz\.results\.correctAnswer:\s*courses\.quiz\.question\.true/,
+      ),
+    ).toBeTruthy();
+  });
+
+  it('shows only the verdict, not a hidden notice, when correctAnswer is absent on a graded question', () => {
+    const {getByTestId, queryByText, getByText} = render(
+      <QuizResults
+        result={buildResult({
+          questions: [
+            {questionId: 'q1', correct: false, pointsAwarded: 0, pointsPossible: 1},
+          ],
+        })}
+        questions={questions}
+        isRegrading={false}
+        canRetry={false}
+        onRegrade={jest.fn()}
+        onRetry={jest.fn()}
+        onNext={jest.fn()}
+      />,
+    );
+    fireEvent.press(getByTestId('question-row-q1'));
+    expect(getByText('courses.quiz.results.incorrect')).toBeTruthy();
+    expect(queryByText(/correctAnswer/)).toBeNull();
+  });
+
+  it('replaces the score ring and pass/fail badge with "Responses submitted" for a survey (scorePct null)', () => {
+    const {getByText, queryByText, getByTestId} = render(
+      <QuizResults
+        result={buildResult({
+          scorePct: null,
+          questions: [
+            {
+              questionId: 'q1',
+              correct: null,
+              graded: false,
+              pointsAwarded: 0,
+              pointsPossible: 0,
+            },
+          ],
+        })}
+        questions={questions}
+        isRegrading={false}
+        canRetry={false}
+        onRegrade={jest.fn()}
+        onRetry={jest.fn()}
+        onNext={jest.fn()}
+      />,
+    );
+    expect(getByText('courses.quiz.results.responsesSubmitted')).toBeTruthy();
+    expect(queryByText('courses.quiz.results.passed')).toBeNull();
+    expect(queryByText('courses.quiz.results.failed')).toBeNull();
+    expect(queryByText('100%')).toBeNull();
+    expect(getByTestId('quiz-next')).toBeTruthy();
+  });
+
+  it('shows a likert question\'s "Your responses" list instead of a verdict', () => {
+    const likertQuestions: SanitizedQuizQuestion[] = [
+      {
+        id: 'q1',
+        type: 'likert_scale',
+        prompt: 'Rate these',
+        points: 0,
+        graded: false,
+        statements: [{id: 's1', text: 'I feel confident'}],
+        scale: [
+          {id: 'sc1', text: 'Disagree'},
+          {id: 'sc2', text: 'Agree'},
+        ],
+      },
+    ];
+    const {getByTestId, getByText, queryByText} = render(
+      <QuizResults
+        result={buildResult({
+          scorePct: null,
+          questions: [
+            {
+              questionId: 'q1',
+              correct: null,
+              graded: false,
+              pointsAwarded: 0,
+              pointsPossible: 0,
+            },
+          ],
+        })}
+        questions={likertQuestions}
+        answers={{q1: {ratings: {s1: 'sc2'}}}}
+        isRegrading={false}
+        canRetry={false}
+        onRegrade={jest.fn()}
+        onRetry={jest.fn()}
+        onNext={jest.fn()}
+      />,
+    );
+    fireEvent.press(getByTestId('question-row-q1'));
+    expect(getByText('courses.quiz.results.yourResponses')).toBeTruthy();
+    expect(getByText('I feel confident')).toBeTruthy();
+    expect(getByText('Agree')).toBeTruthy();
+    expect(queryByText('courses.quiz.results.incorrect')).toBeNull();
+  });
 });

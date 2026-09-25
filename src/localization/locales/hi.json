@@ -1811,7 +1811,8 @@
         "moveDown": "नीचे ले जाएं",
         "wordCount_one": "{{count}}/{{min}} शब्द",
         "wordCount_other": "{{count}}/{{min}} शब्द",
-        "aiGraded": "इस उत्तर की जांच AI द्वारा की जाती है"
+        "aiGraded": "इस उत्तर की जांच AI द्वारा की जाती है",
+        "likertHint": "हर कथन के लिए एक जवाब चुनें"
       },
       "results": {
         "title": "परिणाम",
@@ -1826,7 +1827,11 @@
         "grading": "जांच हो रही है…",
         "retry": "क्विज़ फिर से लें",
         "next": "अगला",
-        "attemptsUsed": "प्रयास {{used}} / {{max}}"
+        "attemptsUsed": "प्रयास {{used}} / {{max}}",
+        "notScored": "अंक नहीं दिए गए",
+        "correctAnswer": "सही उत्तर",
+        "yourResponses": "आपके जवाब",
+        "responsesSubmitted": "जवाब जमा हो गए"
       }
     },
     "language": {
