@@ -824,9 +824,21 @@ class Scenario(BaseModel):
         """
         prompt_data_dict = raw.get("promptData")
 
+        # Absent AND empty both land here, and both used to `return None` —
+        # which `Scenario.create` then handed to the non-optional
+        # `prompt_data: PromptData` field, so the whole scenario failed
+        # pydantic validation and the agent never started. Every PromptData
+        # field is optional or defaulted, so falling through with an empty
+        # dict is strictly better than a dead worker: the session runs with a
+        # default persona, the scenario-level title/description/prompt
+        # fallbacks below still apply (so `{}` behaves the same as a promptData
+        # that merely omits them), and the gap is visible in the logs.
         if not prompt_data_dict:
-            logger.error("Error: 'promptData' key not found in raw data.")
-            return None
+            logger.warning(
+                "No 'promptData' in scenario metadata (missing or empty); "
+                "falling back to default PromptData."
+            )
+            prompt_data_dict = {}
 
         try:
             mapped_data = {

@@ -78,9 +78,19 @@ class TestRoomMetadataEnvelope:
 
     @pytest.mark.unit
     def test_create_with_empty_payload(self):
-        """Test creating envelope with empty payload."""
-        with pytest.raises(ValidationError):
-            RoomMetadataEnvelope.create({})
+        """An empty payload yields an empty envelope rather than raising.
+
+        This used to assert ValidationError, but the error was the incidental
+        symptom of `_build_prompt_data` returning None for absent/empty
+        `promptData` and that None hitting the non-optional
+        `Scenario.prompt_data`. Missing prompt data is now a default
+        PromptData, so the envelope builds and the scenario is simply empty.
+        """
+        envelope = RoomMetadataEnvelope.create({})
+
+        assert isinstance(envelope.scenario, Scenario)
+        assert envelope.scenario.name == ""
+        assert envelope.scenario.prompt_data.name is None
 
     @pytest.mark.unit
     def test_create_with_scenario_only_payload(self):
@@ -145,12 +155,16 @@ class TestRoomMetadataEnvelope:
                 }
             },
         }
-        from pydantic import ValidationError
+        # Current implementation doesn't extract from non-standard nesting:
+        # the inner `scenario` key is never unwrapped, so none of the nested
+        # title/promptData/voice is picked up. That used to surface as a
+        # ValidationError (None prompt data); it is now an empty scenario.
+        envelope = RoomMetadataEnvelope.create(nested_payload)
 
-        # Current implementation doesn't extract from non-standard
-        # nesting; expect failure
-        with pytest.raises(ValidationError):
-            RoomMetadataEnvelope.create(nested_payload)
+        assert envelope.version == "1.5"
+        assert envelope.scenario.name == ""
+        assert envelope.scenario.voice is None
+        assert envelope.scenario.prompt_data.name is None
 
     @pytest.mark.unit
     def test_create_with_mock_scenario(self):
@@ -182,8 +196,6 @@ class TestRoomMetadataEnvelope:
     @pytest.mark.unit
     def test_envelope_model_validation_errors(self):
         """Test Pydantic model validation with invalid data."""
-        from pydantic import ValidationError
-
         # Test missing required fields
         with pytest.raises(ValidationError):
             RoomMetadataEnvelope()
@@ -315,16 +327,15 @@ class TestRoomMetadataEnvelope:
         }
 
         payload = payloads[payload_type]
-        from pydantic import ValidationError
 
-        if payload_type in ["empty_payload", "scenario_only"]:
-            with pytest.raises(ValidationError):
-                RoomMetadataEnvelope.create(payload)
-        else:
-            envelope = RoomMetadataEnvelope.create(payload)
-            assert isinstance(envelope, RoomMetadataEnvelope)
-            assert envelope.version  # Should have some version
-            assert isinstance(envelope.scenario, Scenario)
+        # Every shape builds, including the two without `promptData` — those
+        # used to raise ValidationError because `_build_prompt_data` returned
+        # None for absent prompt data.
+        envelope = RoomMetadataEnvelope.create(payload)
+
+        assert isinstance(envelope, RoomMetadataEnvelope)
+        assert envelope.version  # Should have some version
+        assert isinstance(envelope.scenario, Scenario)
 
 
 class TestRoomMetadataEnvelopeIntegration:

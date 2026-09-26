@@ -671,16 +671,57 @@ class TestScenario:
 
     @pytest.mark.unit
     def test_scenario_build_prompt_data_missing_key(self, mock_logger):
-        """Test _build_prompt_data with missing promptData key."""
+        """A missing `promptData` key yields a default PromptData, not None.
+
+        Regression: `_build_prompt_data` used to return None here, and
+        `Scenario.prompt_data` is a non-optional field, so the None went
+        straight into the constructor and blew up with a pydantic
+        ValidationError — the worker never started the agent.
+        """
         raw_payload = {}
 
         with patch("app.core.scenario.base.logger", mock_logger):
             result = Scenario._build_prompt_data(raw_payload)
 
-            assert result is None
-            mock_logger.error.assert_called_once()
-            error_call = mock_logger.error.call_args[0][0]
-            assert "'promptData' key not found" in error_call
+            assert isinstance(result, PromptData)
+            assert result.name is None
+            assert result.opening_statements == []
+            mock_logger.warning.assert_called_once()
+            warning_call = mock_logger.warning.call_args[0][0]
+            assert "'promptData'" in warning_call
+
+    @pytest.mark.unit
+    def test_scenario_build_prompt_data_empty_dict(self, mock_logger):
+        """An empty `promptData` dict yields a default PromptData, not None.
+
+        Regression: `if not prompt_data_dict:` is true for `{}` as well as for
+        a missing key, so an author who saved a scenario with empty prompt
+        data crashed `Scenario.create` the same way.
+        """
+        raw_payload = {"promptData": {}}
+
+        with patch("app.core.scenario.base.logger", mock_logger):
+            result = Scenario._build_prompt_data(raw_payload)
+
+        assert isinstance(result, PromptData)
+        assert result.name is None
+
+    @pytest.mark.unit
+    def test_scenario_create_survives_empty_prompt_data(self):
+        """`Scenario.create` must not raise when promptData is empty/absent.
+
+        This is the crash the regression is really about: the None returned by
+        `_build_prompt_data` reached the `prompt_data: PromptData` field.
+        """
+        for prompt_data_payload in ({}, None):
+            payload = {"title": "Empty Prompt Data"}
+            if prompt_data_payload is not None:
+                payload["promptData"] = prompt_data_payload
+
+            scenario = Scenario.create(payload)
+
+            assert isinstance(scenario.prompt_data, PromptData)
+            assert scenario.name == "Empty Prompt Data"
 
     @pytest.mark.unit
     def test_scenario_build_prompt_data_with_exception(self, mock_logger):
