@@ -258,8 +258,11 @@ class TestElevenLabsProvider:
             {"speed": 1.05, "stability": 0.7, "similarity_boost": 0.6}
         )
 
-        base_tts.update_options.assert_called_once()
-        kwargs = base_tts.update_options.call_args.kwargs
+        # tts_instance property calls update_options, then _apply_parameters_dict does.
+        assert base_tts.update_options.call_count == 2
+
+        # Check the call from _apply_parameters_dict (it's the last one)
+        _, kwargs = base_tts.update_options.call_args
         vs = kwargs["voice_settings"]
         assert vs.speed == 1.05
         assert vs.stability == 0.7

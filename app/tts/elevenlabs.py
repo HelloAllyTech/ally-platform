@@ -203,6 +203,10 @@ class ElevenLabsTTSClient(BaseTTSClient):
             )
             self._base_tts = base
             if self._is_v3_model:
+                # v3 models are generative and sentence-streamed, so they need
+                # higher stability to avoid noticeable voice shifts mid-reply.
+                voice_settings = VoiceSettings(stability=0.95, similarity_boost=0.75)
+                base.update_options(voice_settings=voice_settings)
                 # eleven_v3 has no WebSocket multi-stream-input support
                 # (livekit/agents#4901). StreamAdapter sentence-streams via
                 # the plugin's HTTP /stream chunked path instead.
