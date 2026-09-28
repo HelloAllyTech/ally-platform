@@ -121,3 +121,39 @@ def test_force_exit_disabled_skips_exit(monkeypatch):
         assert not exited.is_set(), "force-exit disabled → must not exit"
     finally:
         wd.stop()
+
+
+def test_default_threshold_is_long_enough_for_slow_responses():
+    """A regression test for a session watchdog timing out too early.
+
+    The production watchdog was firing at 75s, which proved too short for some
+    legitimate agent processing pipelines (e.g. a slow LLM call). This led to
+    sessions being terminated prematurely.
+
+    This test asserts that the watchdog's default threshold is high enough to
+    tolerate a response that takes longer than the old 75s threshold. It will
+    FAIL with the old threshold and PASS with the new, longer one.
+
+    NOTE: This test is INTENTIONALLY SLOW. It must wait for the real (default)
+    watchdog threshold to elapse to prove the fix.
+    """
+    fired = threading.Event()
+    # IMPORTANT: This test uses the SessionStallWatchdog's default threshold,
+    # exactly as it runs in production. Do NOT override `threshold_s` here.
+    wd = sw.SessionStallWatchdog(
+        on_stall=lambda: fired.set(),
+        poll_s=1.0,  # poll faster than default for test speed
+    )
+    wd.note_user_turn_finalized()
+    wd.start()
+    try:
+        # Wait for a duration that is JUST OVER the old 75s threshold.
+        has_fired = fired.wait(77.0)
+        # The bug is that the watchdog fires too early. The fix is a longer
+        # threshold. So this test should assert it does NOT fire. It will fail
+        # before the fix, and pass after.
+        assert (
+            not has_fired
+        ), "WATCHDOG FIRED PREMATURELY: session timeout is still too short"
+    finally:
+        wd.stop()

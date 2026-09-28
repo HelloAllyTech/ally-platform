@@ -70,7 +70,7 @@ class SessionStallWatchdog:
         self,
         *,
         on_stall: Callable[[], None],
-        threshold_s: float = 75.0,
+        threshold_s: float = 120.0,
         poll_s: float = 5.0,
         force_exit_grace_s: float = 30.0,
         force_exit_enabled: bool = True,
