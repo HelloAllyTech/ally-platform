@@ -420,3 +420,53 @@ jest.mock('@/hooks/useDrawerNavigation', () => ({
     toggleDrawer: jest.fn(),
   })),
 }));
+
+// React's "not wrapped in act(...)" warning means a test let a state update land
+// outside act() — a timer fired, a promise resolved — so the assertions after it
+// ran against a tree React had not finished re-rendering. The suite still goes
+// green, which is exactly why these pile up unnoticed and turn into flakes.
+// Fail the test that produced one instead of printing it.
+//
+// The collected warnings are checked in an afterEach registered here, i.e. at the
+// root of every suite, so it runs after the suite's own afterEach hooks — timers
+// drained in a file-level teardown are covered too. A test that installs its own
+// console.error mock opts itself out, which is the existing behaviour.
+const actWarnings: string[] = [];
+let consoleErrorBeforeActGuard: typeof console.error;
+
+// React logs the warning with the component name as a separate `%s` argument,
+// so the raw first argument alone would name no component at all.
+const formatActWarning = (args: unknown[]): string => {
+  const rest = args.slice(1);
+  return String(args[0]).replace(/%s/g, () =>
+    rest.length ? String(rest.shift()) : '%s',
+  );
+};
+
+beforeEach(() => {
+  actWarnings.length = 0;
+  consoleErrorBeforeActGuard = console.error;
+  console.error = (...args: Parameters<typeof console.error>) => {
+    if (typeof args[0] === 'string' && args[0].includes('not wrapped in act')) {
+      actWarnings.push(formatActWarning(args));
+      return;
+    }
+    consoleErrorBeforeActGuard(...args);
+  };
+});
+
+afterEach(() => {
+  console.error = consoleErrorBeforeActGuard;
+  if (actWarnings.length === 0) {
+    return;
+  }
+  const [first] = actWarnings;
+  const count = actWarnings.length;
+  actWarnings.length = 0;
+  throw new Error(
+    `${count} React state update${count === 1 ? '' : 's'} in this test ` +
+      `happened outside act(...). Wrap whatever triggers them — a ` +
+      `fireEvent, a jest.advanceTimersByTime, a rerender — in act(...) so ` +
+      `React flushes before the assertions run.\n\n${first}`,
+  );
+});
