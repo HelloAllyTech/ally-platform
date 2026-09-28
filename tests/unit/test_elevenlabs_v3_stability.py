@@ -3,7 +3,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from app.tts.elevenlabs import ElevenLabsTTSClient
-from livekit.plugins.elevenlabs import VoiceSettings
+
 
 class TestElevenLabsV3Stability(unittest.TestCase):
     @patch("livekit.plugins.elevenlabs.TTS")
