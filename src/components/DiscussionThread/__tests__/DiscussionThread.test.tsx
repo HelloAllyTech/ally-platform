@@ -1,5 +1,5 @@
 import React from 'react';
-import {fireEvent, render} from '@testing-library/react-native';
+import {fireEvent, render, act} from '@testing-library/react-native';
 
 import {DiscussionThread} from '../DiscussionThread';
 
@@ -96,7 +96,7 @@ describe('DiscussionThread', () => {
     expect(getByText('courses.discussion.emptyBody')).toBeTruthy();
   });
 
-  it('renders posts and posts a new top-level comment', () => {
+  it('renders posts and posts a new top-level comment', async () => {
     mockQueryState = {
       data: {
         trackId: 't1',
@@ -142,7 +142,9 @@ describe('DiscussionThread', () => {
       getByTestId('discussion-composer'),
       'My own take on this',
     );
-    fireEvent.press(getByTestId('discussion-composer-submit'));
+    await act(async () => {
+      fireEvent.press(getByTestId('discussion-composer-submit'));
+    });
     expect(mockCreatePost).toHaveBeenCalledWith({
       itemId: 'item-1',
       content: 'My own take on this',
