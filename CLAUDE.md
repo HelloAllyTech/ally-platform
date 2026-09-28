@@ -66,6 +66,13 @@ this file and a second copy here just goes stale.
   behaviour; when something native looks impossible, rebuild before debugging further.
 - **Version bumps are part of the release**, not an afterthought — Android build number and
   iOS build number both move.
+- **An `act(...)` warning fails the test, it doesn't just print.** `jest.setup.ts` collects
+  React's "not wrapped in act" warnings and throws in an `afterEach`, because a suite that
+  only warns stays green while its assertions read a tree React never finished rendering.
+  If you hit it, wrap whatever drives the update — `jest.advanceTimersByTime`, a `rerender`,
+  a `fireEvent` that kicks off a promise — in `act(...)`. Draining timers in a test file's
+  own `afterEach` counts too. Use the `await act(async () => ...)` form when a promise chain
+  has to settle; the synchronous form only flushes timers.
 - **iOS under Xcode 26 needs the fmt/consteval Podfile patch.** fmt 11.0.2's consteval format
   strings fail to compile otherwise. The `post_install` hook needs both halves: the
   `-DFMT_USE_CONSTEVAL=0` define _and_ an `#ifndef` guard on `base.h`, which otherwise
