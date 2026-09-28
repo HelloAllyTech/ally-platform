@@ -125,7 +125,7 @@ Steps:
 2. **Normalize fields** -- map `title` to `scenarioName`
 3. **Build events** -- `build_events_from_metadata()` creates `BaseEvent` instances (see [Event System](03-event-system.md))
 4. **Build voice** -- parse `voice` dict into `ScenarioVoice` with `VoiceConfig`
-5. **Build prompt data** -- map camelCase keys (`promptData.lifeHistory` to `life_history_summary`, etc.) into `PromptData`
+5. **Build prompt data** -- map camelCase keys (`promptData.lifeHistory` to `life_history_summary`, etc.) into `PromptData`. A missing **or empty** `promptData` logs a warning and falls back to a default `PromptData` (every field is optional); it does not fail scenario load
 6. **Build language config** -- parse `languageCode`, `stt`, `llm` overrides
 7. **Build termination events** -- parse both `autoTerminationEvent` (deprecated, single) and `autoTerminationEvents` (new, list)
 

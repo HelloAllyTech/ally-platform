@@ -3,7 +3,6 @@
 import json
 
 import pytest
-from pydantic import ValidationError
 
 from app.core.agent.factory import parse_room_metadata
 from app.core.livekit.livekit_models import RoomMetadataEnvelope
@@ -282,9 +281,17 @@ class TestMetadataParsingIntegration:
 
         json_metadata = json.dumps(nested_payload)
         # Current implementation does not support extracting scenario data from
-        # non-standard nested keys (e.g., "outer_wrapper"). Expect a validation error.
-        with pytest.raises(ValidationError):
-            parse_room_metadata(json_metadata)
+        # non-standard nested keys (e.g., "outer_wrapper"), so nothing from the
+        # wrapper is picked up. That used to surface as a ValidationError
+        # (absent promptData -> None -> non-optional Scenario.prompt_data);
+        # absent prompt data now defaults instead, so parsing succeeds and
+        # simply yields an empty scenario.
+        envelope = parse_room_metadata(json_metadata)
+
+        assert envelope.version == "1.5"
+        assert envelope.scenario.name == ""
+        assert envelope.scenario.voice is None
+        assert envelope.scenario.prompt_data.name is None
 
     @pytest.mark.integration
     def test_concurrent_parsing_integration(self):
