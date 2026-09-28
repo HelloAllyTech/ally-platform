@@ -1,6 +1,6 @@
 import React from 'react';
 import {Alert} from 'react-native';
-import {fireEvent, render} from '@testing-library/react-native';
+import {fireEvent, render, act} from '@testing-library/react-native';
 
 import {DiscussionPost as DiscussionPostModel} from '@/types';
 
@@ -130,7 +130,9 @@ describe('DiscussionPost', () => {
       getByTestId('discussion-post-post-1-reply'),
       'Agreed, and I would also…',
     );
-    fireEvent.press(getByTestId('discussion-post-post-1-reply-submit'));
+    await act(async () => {
+      fireEvent.press(getByTestId('discussion-post-post-1-reply-submit'));
+    });
 
     expect(onReply).toHaveBeenCalledWith('post-1', 'Agreed, and I would also…');
   });
