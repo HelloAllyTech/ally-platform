@@ -136,12 +136,15 @@ describe('useLiveAudioStream', () => {
     perms.check.mockResolvedValueOnce('denied');
     const {getByTestId} = render(<Test />);
     await waitFor(() => expect(getByTestId('perm').props.children).toBe('false'));
+    expect(perms.check).toHaveBeenCalledTimes(1);
 
+    // The permission re-check on foregrounding should fire another check, and
+    // this time the default mock will return 'granted'.
     await act(async () => {
-      // simulate app coming active
       (AppState as any)._currentState = 'background';
       (AppState as any).emit?.('change', 'active');
     });
+    await waitFor(() => expect(getByTestId('perm').props.children).toBe('true'));
   });
 
   it('requests permission when not granted on mount', async () => {
