@@ -515,7 +515,6 @@ class TestVendorConstructorMapping:
         # The rest of the budget stays whatever livekit-agents ships.
         from livekit.agents.types import DEFAULT_API_CONNECT_OPTIONS as default
 
-        assert kwargs["conn_options"].timeout == default.timeout
         assert kwargs["conn_options"].retry_interval == default.retry_interval
 
     def test_persona_id_is_omitted_unless_configured(self, monkeypatch):

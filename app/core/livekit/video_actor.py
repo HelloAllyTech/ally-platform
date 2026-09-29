@@ -438,13 +438,16 @@ def _tavus_kwargs(plugin, *, avatar_id, api_key, character_name) -> dict:
 #: learner barely notices, whereas a participant appearing and vanishing three
 #: times is something they watch happen.
 _BEY_CONN_OPTIONS = dataclasses.replace(DEFAULT_API_CONNECT_OPTIONS, max_retry=1)
+_BEY_CONN_OPTIONS_WITH_FIX = dataclasses.replace(
+    DEFAULT_API_CONNECT_OPTIONS, max_retry=1, timeout=20.0
+)
 
 
 def _bey_kwargs(plugin, *, avatar_id, api_key, character_name) -> dict:
     """Beyond Presence: a plain `avatar_id`, key alongside it."""
     kwargs: dict[str, Any] = {
         "avatar_id": avatar_id,
-        "conn_options": _BEY_CONN_OPTIONS,
+        "conn_options": _BEY_CONN_OPTIONS_WITH_FIX,
     }
     if api_key:
         kwargs["api_key"] = api_key
