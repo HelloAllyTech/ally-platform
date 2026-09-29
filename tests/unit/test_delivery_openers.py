@@ -205,16 +205,20 @@ class TestReplyNote:
         td.note_opener(OpenerRecord(category="none"))
         assert td.reply_note() is None
 
-    def test_note_names_what_was_said_and_forbids_a_second_hesitation(self):
+    def test_note_never_quotes_the_sound(self):
+        """Quoting it made the model echo it: "I mean…" -> "I mean, I try…"."""
         td = TurnDelivery()
         td.note_opener(OpenerRecord(category="vocal", spoken="Um…", kind="hesitation"))
         note = td.reply_note()
-        assert '"Um…"' in note and "do not open with another" in note
+        assert "Um" not in note
+        assert "no opening hesitation" in note and "do not repeat" in note
 
     def test_body_sound_and_bridge(self):
         td = TurnDelivery()
         td.note_opener(OpenerRecord(category="body", kind="sigh", bridge="It's hard."))
-        assert "a sigh" in td.reply_note() and "It's hard." in td.reply_note()
+        note = td.reply_note()
+        assert "a sigh" in note and "holding line" in note
+        assert "It's hard." not in note
 
     def test_turn_boundaries_clear_the_opener(self):
         td = TurnDelivery()
@@ -379,6 +383,45 @@ class TestLeadingHesitationTrimmer:
     def test_inactive_is_a_pass_through(self):
         assert _stream(LeadingHesitationTrimmer(active=False), ["Um, ok"]) == "Um, ok"
 
+    def test_strips_the_echoed_opener_phrase(self):
+        """The first live run: every opener came back at the start of the reply."""
+        cases = [
+            (
+                "I mean…",
+                ["I mean, I try a few ", "deep breaths."],
+                "I try a few deep breaths.",
+            ),
+            (
+                "Hmm…",
+                ["Hmm… it defin", "itely takes a toll."],
+                "It definitely takes a toll.",
+            ),
+            ("Uh…", ["Uh…"], ""),
+            ("मतलब…", ["मतलब, मैं ", "कोशिश करती हूँ।"], "मैं कोशिश करती हूँ।"),
+        ]
+        for opener, chunks, expected in cases:
+            trimmer = LeadingHesitationTrimmer(
+                is_active=lambda: True, phrases=lambda o=opener: [o]
+            )
+            assert _stream(trimmer, chunks) == expected, opener
+
+    def test_a_partial_phrase_match_is_released(self):
+        trimmer = LeadingHesitationTrimmer(
+            is_active=lambda: True, phrases=lambda: ["I mean…"]
+        )
+        assert _stream(trimmer, ["I ", "need a break."]) == "I need a break."
+
+    def test_activation_is_decided_at_the_first_token(self):
+        """llm_node can open before the opener is decided; the trim still sees it."""
+        state = {"on": False}
+        trimmer = LeadingHesitationTrimmer(
+            is_active=lambda: state["on"], phrases=lambda: ["Hmm…"]
+        )
+        state["on"] = True  # decided after construction, before the first token
+        assert _stream(trimmer, ["Hmm… okay then."]) == "Okay then."
+        off = LeadingHesitationTrimmer(is_active=lambda: False, phrases=lambda: [])
+        assert _stream(off, ["Hmm… okay."]) == "Hmm… okay."
+
     def test_a_reply_that_is_only_hesitation_ends_empty(self):
         assert _stream(LeadingHesitationTrimmer(active=True), ["Hmm..."]) == ""
 
@@ -474,7 +517,7 @@ class TestOpenerPlayer:
         await asyncio.sleep(0.4)
         assert len(bg.played) == 1
         assert transcripts and transcripts[0][0] == "filler"
-        assert "do not open with another" in td.reply_note()
+        assert "no opening hesitation" in td.reply_note()
 
     @pytest.mark.asyncio
     async def test_learner_speech_cancels_and_flushes(self, monkeypatch):
@@ -543,6 +586,17 @@ class TestPostFillerSilence:
         out = turn_metrics.finalize(room, 103.0)
         assert out["metadata"]["postFillerSilenceMs"] == 1600
         assert out["metadata"]["firstAudioSource"] == "filler"
+
+    def test_played_replaces_an_earlier_skip_in_the_same_turn(self):
+        """A false endpoint gives one turn two "thinking" states."""
+        room = "room-override"
+        turn_metrics.discard(room)
+        turn_metrics.note_filler_decision(room, "skipped_policy")
+        turn_metrics.note_filler_decision(room, "played", openerId="i_mean")
+        turn_metrics.note_filler_decision(room, "skipped_policy")
+        turn_metrics.note_user_speech_end(room, 1.0)
+        out = turn_metrics.finalize(room, 2.0)
+        assert out["metadata"]["fillerDecision"] == "played"
 
     def test_new_decisions_are_recorded(self):
         room = "room-decision"
@@ -650,8 +704,19 @@ class TestGraphSeams:
 
         td = TurnDelivery()
         td.note_opener(OpenerRecord(category="vocal", spoken="Hmm…"))
-        assert "Hmm…" in _delivery_reply_note({"configurable": {"turn_delivery": td}})
+        note = _delivery_reply_note({"configurable": {"turn_delivery": td}})
+        assert note and "thinking sound" in note
         assert _delivery_reply_note({"configurable": {}}) is None
+
+    def test_history_gets_the_same_trim(self):
+        from app.core.graph.nodes import _trim_after_opener
+
+        td = TurnDelivery()
+        assert _trim_after_opener(td, "Hmm… fine.") == "Hmm… fine."
+        td.note_opener(OpenerRecord(category="vocal", spoken="Hmm…"))
+        assert _trim_after_opener(td, "Hmm… fine.") == "Fine."
+        # A reply that was ONLY the echo keeps its text in history.
+        assert _trim_after_opener(td, "Hmm…") == "Hmm…"
 
 
 class TestAgentStreamStages:
@@ -662,7 +727,6 @@ class TestAgentStreamStages:
         from app.core.agent.factory import GlossarySwapAgent
 
         td = TurnDelivery()
-        td.note_opener(OpenerRecord(category="vocal", spoken="Um…"))
         agent = GlossarySwapAgent(
             instructions="",
             swap_table={},
@@ -672,6 +736,8 @@ class TestAgentStreamStages:
         )
 
         async def _fake(self, chat_ctx, tools, model_settings):
+            # The opener is decided AFTER llm_node opens, before the first token.
+            td.note_opener(OpenerRecord(category="vocal", spoken="Um…"))
             for piece in ["[long pause] um, ", "[sad] I tried ", "[sighs] twice."]:
                 yield piece
 

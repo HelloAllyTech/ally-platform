@@ -494,15 +494,30 @@ class GlossarySwapAgent(Agent):
         )
 
         stages: list = []
-        opener = getattr(self._turn_delivery, "opener", None)
-        if (
-            opener is not None
-            and opener.made_a_sound
-            and getattr(settings, "REPLY_TRIM_LEADING_HESITATION", True)
+        turn_delivery = self._turn_delivery
+        if turn_delivery is not None and getattr(
+            settings, "REPLY_TRIM_LEADING_HESITATION", True
         ):
-            # Before the tag cap: a leading pause tag it removes must not use
-            # up the reply's tag budget.
-            stages.append(LeadingHesitationTrimmer(active=True))
+            # Lazy on purpose: whether an opener played is read at the FIRST
+            # token, because llm_node can open before this turn's opener is
+            # decided. Before the tag cap, so a leading pause tag it removes
+            # does not use up the reply's tag budget.
+            def _opener():
+                return getattr(turn_delivery, "opener", None)
+
+            stages.append(
+                LeadingHesitationTrimmer(
+                    is_active=lambda: bool(_opener() and _opener().made_a_sound),
+                    phrases=lambda: [
+                        p
+                        for p in (
+                            getattr(_opener(), "spoken", None),
+                            getattr(_opener(), "bridge", None),
+                        )
+                        if p
+                    ],
+                )
+            )
         if self._audio_tag_cap is not None and self._audio_tag_cap >= 0:
             stages.append(AudioTagLimiter(self._audio_tag_cap))
         return stages

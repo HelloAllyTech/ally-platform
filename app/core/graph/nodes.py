@@ -1929,7 +1929,9 @@ async def generate_response(
     if config and "configurable" in config:
         final_content = swap_complete_text(
             swap_table_for(config["configurable"].get("scenario")),
-            response.content,
+            _trim_after_opener(
+                config["configurable"].get("turn_delivery"), response.content
+            ),
         )
         _clock = config["configurable"].get("session_clock")
         if _clock is not None:
@@ -2692,6 +2694,31 @@ async def update_working_memory(
         **_delivery_hooks(configurable.get("turn_delivery"), "working_memory"),
     )
     return {}
+
+
+def _trim_after_opener(turn_delivery, text):
+    """The same leading-hesitation trim the spoken stream got, for the history.
+
+    The graph REMEMBERS what it said; if memory keeps "Hmm… it definitely…"
+    while the learner heard "It definitely…", the actor re-learns to open with
+    the opener on every following turn. Never raises.
+    """
+    try:
+        opener = getattr(turn_delivery, "opener", None)
+        if not isinstance(text, str) or opener is None or not opener.made_a_sound:
+            return text
+        if not getattr(settings, "REPLY_TRIM_LEADING_HESITATION", True):
+            return text
+        from app.core.livekit.reply_shaping import LeadingHesitationTrimmer
+
+        trimmer = LeadingHesitationTrimmer(
+            phrases=lambda: [p for p in (opener.spoken, opener.bridge) if p],
+            is_active=lambda: True,
+        )
+        out = trimmer.feed(text) + trimmer.flush()
+        return out or text
+    except Exception:  # noqa: BLE001 - history must never cost the reply
+        return text
 
 
 def _delivery_reply_note(config: Optional[RunnableConfig]) -> Optional[str]:

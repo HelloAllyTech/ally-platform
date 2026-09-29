@@ -7,11 +7,14 @@ from app.core.metrics import turn_metrics as tm
 
 @pytest.fixture(autouse=True)
 def _reset_state():
-    tm._turns.clear()
-    tm._turn_counters.clear()
+    # Every module-level map, not just the turn ones: a transport noted for
+    # "room-1" by another test on the same xdist worker otherwise leaks into
+    # these records' metadata and fails an exact-equality assert at random.
+    for store in (tm._turns, tm._turn_counters, tm._transports, tm._closed):
+        store.clear()
     yield
-    tm._turns.clear()
-    tm._turn_counters.clear()
+    for store in (tm._turns, tm._turn_counters, tm._transports, tm._closed):
+        store.clear()
 
 
 def test_normal_turn_builds_record():

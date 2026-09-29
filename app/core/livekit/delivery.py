@@ -245,16 +245,22 @@ class TurnDelivery:
         record = self._opener
         if record is None or not record.made_a_sound:
             return None
-        parts: List[str] = []
+        # Deliberately NOT quoting the sound. The first version said 'You have
+        # already begun with "Uh…"', and in the first live run the model
+        # continued by restating it: "I mean…" -> "I mean, I try…", and one
+        # reply was only "Uh…". Naming the kind of sound, never its words,
+        # gives the model nothing to echo.
         if record.category == "body" and record.kind:
-            parts.append(f"a {record.kind}")
-        elif record.spoken:
-            parts.append(f'"{record.spoken}"')
-        if record.bridge:
-            parts.append(f'then "{record.bridge}"')
-        said = " ".join(parts) if parts else "a brief hesitation"
+            sound = f"a {record.kind}"
+        elif record.bridge and record.category == "none":
+            sound = "a short holding line"
+        else:
+            sound = "a brief thinking sound"
+        if record.bridge and record.category != "none":
+            sound += " and a short holding line"
         return (
-            f"You have ALREADY begun this reply out loud with {said}, followed by "
-            "a short pause. Continue straight from there: do not open with another "
-            "hesitation, filler word, sigh or pause tag, and do not repeat it."
+            f"Before this reply, the listener already heard you make {sound}, "
+            "then pause. Begin directly with what you actually want to say: no "
+            "opening hesitation, filler word, sigh or pause tag, and do not "
+            "repeat or refer to that sound."
         )

@@ -20,7 +20,7 @@ delayed by at most one short word.
 from __future__ import annotations
 
 import re
-from typing import Optional
+from typing import Callable, Iterable, List, Optional
 
 #: Leading words that are pure hesitation — removing them never changes what
 #: the character says. Acknowledgements ("okay", "right") are NOT here: they can
@@ -70,30 +70,121 @@ _PAUSE_TAGS = frozenset(
 
 _TAG_RE = re.compile(r"^\s*\[([^\]]{1,40})\]\s*")
 _WORD_RE = re.compile(r"^\s*([^\s,.!?…।\[]+)([\s,.!?…।]*)")
+#: The same word pattern, unanchored: ``pattern.match(buf, pos)`` never lets
+#: ``^`` match at ``pos``, so walking several words needs this one.
+_NEXT_WORD_RE = re.compile(r"\s*([^\s,.!?…।\[]+)([\s,.!?…।]*)")
 
 #: Give up holding back after this many characters: a reply that has not
 #: resolved its first word by then is streamed through untouched.
 _MAX_HOLD_CHARS = 48
 
 
-class LeadingHesitationTrimmer:
-    """Remove leading hesitation words / pause tags from a streamed reply."""
+def _phrase_words(phrase: str) -> List[str]:
+    """Lower-cased words of an opener phrase, punctuation dropped."""
+    return [
+        w.strip("-").lower()
+        for w in re.findall(r"[^\s,.!?…।\[\]]+", phrase or "")
+        if w.strip("-")
+    ]
 
-    def __init__(self, active: bool) -> None:
-        self._active = active
+
+class LeadingHesitationTrimmer:
+    """Remove a leading hesitation, pause tag or echoed opener from a reply.
+
+    Two things make it lazy rather than configured up front, both learned from
+    the first live run (2026-09-29):
+
+    * **When** it is on is decided at the FIRST token, not when the stream
+      opens. ``llm_node`` starts about when the turn's opener is decided, so a
+      check made there could miss it; by the first token (~2 s later) the
+      decision has long been recorded.
+    * **What** it strips includes the opener's own words. With "I mean…" played,
+      the reply opened "I mean, I try…"; with "Hmm…", "Hmm… it definitely…".
+      Those phrases are passed in (``phrases``) and removed when the reply
+      starts with them.
+    """
+
+    def __init__(
+        self,
+        active: bool = True,
+        is_active: Optional[Callable[[], bool]] = None,
+        phrases: Optional[Callable[[], Iterable[str]]] = None,
+    ) -> None:
+        self._is_active = is_active
+        self._phrases_fn = phrases
+        self._phrases: List[List[str]] = []
+        self._decided = is_active is None
         self._buffer = ""
         self._done = not active
 
+    def _decide(self) -> None:
+        if self._decided:
+            return
+        self._decided = True
+        try:
+            if not (self._is_active and self._is_active()):
+                self._done = True
+                return
+            self._phrases = (
+                [
+                    words
+                    for words in (_phrase_words(p) for p in (self._phrases_fn() or []))
+                    if words
+                ]
+                if self._phrases_fn
+                else []
+            )
+        except Exception:  # noqa: BLE001 - a trim must never break the reply
+            self._done = True
+
     def feed(self, text: str) -> str:
+        if not self._decided and text:
+            self._decide()
         if self._done:
+            if self._buffer:
+                out, self._buffer = self._buffer + text, ""
+                return out
             return text
         self._buffer += text
         return self._drain(final=False)
 
     def flush(self) -> str:
         if self._done:
-            return ""
+            out, self._buffer = self._buffer, ""
+            return out
         return self._drain(final=True)
+
+    def _leading_words(self, buf: str, count: int):
+        """Up to ``count`` leading words of ``buf`` and where the last one ends.
+
+        Returns (words, end, complete) where ``complete`` says the last word is
+        followed by something, so it cannot still be growing.
+        """
+        words: List[str] = []
+        pos = 0
+        for _ in range(count):
+            match = _NEXT_WORD_RE.match(buf, pos)
+            if match is None:
+                break
+            words.append(match.group(1).strip("-").lower())
+            pos = match.end()
+        return words, pos, pos < len(buf)
+
+    def _strip_phrase(self, buf: str, final: bool):
+        """Strip an echoed opener phrase. Returns (new_buf, need_more)."""
+        for words in self._phrases:
+            got, end, complete = self._leading_words(buf, len(words))
+            if got == words and (complete or final):
+                return buf[end:], False
+            if (
+                not final
+                and got == words[: len(got)]
+                and (len(got) < len(words) or not complete)
+            ):
+                # Still a possible match; wait for more text (bounded below).
+                if len(buf.strip()) <= _MAX_HOLD_CHARS:
+                    return buf, True
+        return buf, False
 
     def _drain(self, final: bool) -> str:
         while True:
@@ -103,7 +194,6 @@ class LeadingHesitationTrimmer:
                 if final:
                     self._done = True
                     self._buffer = ""
-                    return ""
                 return ""
             if stripped.startswith("["):
                 match = _TAG_RE.match(buf)
@@ -116,6 +206,13 @@ class LeadingHesitationTrimmer:
                     self._buffer = buf[match.end() :]
                     continue
                 return self._release()
+            if self._phrases:
+                new_buf, need_more = self._strip_phrase(buf, final)
+                if need_more:
+                    return ""
+                if new_buf is not buf:
+                    self._buffer = new_buf
+                    continue
             match = _WORD_RE.match(buf)
             # A word is only decidable once something follows it.
             if match is None or (match.end() == len(buf) and not final):

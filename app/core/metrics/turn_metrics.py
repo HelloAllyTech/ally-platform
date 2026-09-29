@@ -236,7 +236,12 @@ def note_filler_decision(room_id: str, decision: str, **details: Any) -> None:
     turn = _turns.setdefault(room_id, {})
     existing = turn.get("metadata")
     meta = dict(existing) if isinstance(existing, dict) else {}
-    if "fillerDecision" not in meta:
+    # First decision wins, except that "played" replaces an earlier skip: a
+    # false endpoint gives one turn two "thinking" states, and the second one
+    # playing an opener is what the learner actually heard.
+    if "fillerDecision" not in meta or (
+        decision == "played" and meta.get("fillerDecision") != "played"
+    ):
         meta["fillerDecision"] = decision
     for key, value in details.items():
         if value is not None:
