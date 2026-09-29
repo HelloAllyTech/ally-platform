@@ -100,7 +100,7 @@ def create_conversation_handler(
 
     Note: the thinking-filler is NOT here. It plays on a separate audio track via
     BackgroundAudioPlayer (set up in the worker) so it can't race the reply; see
-    app/core/livekit/filler_audio.py.
+    app/core/livekit/opener_player.py.
     """
     # Bounded de-dup of utterances. A failed transcript publish retries within
     # seconds, so a recent-window cap preserves dedup behavior exactly while

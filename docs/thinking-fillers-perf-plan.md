@@ -23,7 +23,7 @@ filler. Back-channel and comfort audio are touched only where they share code.
 | **1 — kill the wait, bridge the gap** | Done. Predicted-gap gate, duration-tiered selection, bounded continuation, event-based interim hand-off, in-memory clips. |
 | **2 — in character, in context, cheaper** | Done. Persona voice block and typed output in the prompt, in-turn generation from the partial transcript, accumulating pool with type rotation and rendering variants, worker-wide clip cache, dedicated small model, exchange-driven regeneration, session-start seed batch. |
 | **3 — early trigger** | Built behind `FILLER_EARLY_TRIGGER_ENABLED`, **default off**. Not A/B tested; do not enable without one. |
-| **4 — cleanup and docs** | Done for the v1 path. `filler_audio.py` is **retained**: the v2 controller (`naturalness.py`, used by `worker_v2.py`) still uses the temp-file path. Consolidating v2 is a follow-up. |
+| **4 — cleanup and docs** | Done. The v2 controller (`naturalness.py`) and its temp-file clip path (`filler_audio.py`) were deleted on 2026-09-29: `worker_v2.py` was already gone, so nothing imported either. Turn openers have since moved to the delivery plan — see [Turn Openers](turn-openers.md). |
 
 ### What the offline bench actually shows
 

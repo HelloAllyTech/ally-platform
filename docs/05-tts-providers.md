@@ -157,7 +157,7 @@ during clip rendering to kill live Marathi sessions mid-reply.
 clip work (a shallow clone with the lazily-cached instance cleared — every
 provider client builds `tts_instance` lazily, so the clone rebuilds fresh). If
 isolation is impossible it returns `None` and callers skip clip synthesis
-entirely — silence is strictly better than a dead session. `filler_audio`
+entirely — silence is strictly better than a dead session. `filler_clips`
 additionally falls back from `synthesize()` to the websocket `stream()` path
 per phrase, which is the route the live agent speaks through and works where
 Sarvam's one-shot endpoint is broken.
@@ -199,13 +199,12 @@ When the policy refuses a voice, `create_clip_tts()` returns `None` and logs
 `[CLIP_TTS] clips off for this session: reason=generative_voice` once, at INFO.
 Callers check `can_create_clip_tts()` (via `filler_clips.clip_tts_available`)
 **before** the filler, back-channel and interim LLM calls, because those phrases
-can only be heard as clips. Both the v1 worker (`_setup_background_audio`) and
-the v2 `NaturalnessController.start()` turn all three layers off for such a
-voice. The comfort tone still plays. Enabling clips for a new model means
+can only be heard as clips. The worker (`_setup_background_audio`) turns all
+three layers off for such a voice. The comfort tone still plays. Enabling clips for a new model means
 changing its row here and in the test's `CASES` table. That is a product
 decision about voice continuity, not a code cleanup.
 
-`filler_audio` also lowercases a phrase that arrives fully ALL-CAPS before
+`filler_clips` also lowercases a phrase that arrives fully ALL-CAPS before
 synthesis: several TTS providers treat a fully-uppercase token as an acronym
 and spell it out letter by letter (an "MMM" hesitation heard as "M, M, M"
 instead of a hum) even for plain English text.
@@ -214,7 +213,7 @@ instead of a hum) even for plain English text.
 
 **File:** `app/core/livekit/filler_clips.py`
 
-The v1 worker no longer renders naturalness clips to temp WAVs. `filler_clips`
+Naturalness clips are never rendered to temp WAVs. `filler_clips`
 synthesizes a phrase once into pre-decoded 48 kHz mono int16 frames held in
 memory — the same shape `comfort_audio.comfort_ambient_source` already feeds the
 ambient slot — and keeps the measured duration with it. Three consequences:
@@ -236,10 +235,6 @@ the mixer runs at 48 kHz, so clips are resampled and downmixed to mono once at
 synthesis rather than on every play. Both isolation rules above still apply:
 rendering uses `create_clip_tts()`, and when isolation is impossible nothing is
 synthesized.
-
-`filler_audio` remains for the v2 controller (`app/core/livekit/naturalness.py`,
-used by `app/worker_v2.py`), which still uses the temp-file path. Consolidating
-v2 onto `filler_clips` is a follow-up, not part of this change.
 
 ## Isolated synthesis failures (`_register_tts_error_fallback`)
 

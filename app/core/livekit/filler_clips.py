@@ -2,12 +2,12 @@
 
 WHY THIS EXISTS
 ---------------
-``filler_audio`` renders each phrase to a temp WAV and hands LiveKit the PATH.
-That costs on every single play: the library re-opens, decodes and resamples the
-file to 48 kHz inside the mixer pull. It also loses the one fact the playback
-decision most needs — HOW LONG the clip is — so a 0.6s "Hmm" can be chosen to
-mask a 2s gap and leave 1.4s of dead air behind it, which reads worse than no
-filler at all.
+The original clip path (``filler_audio``, since deleted) rendered each phrase to
+a temp WAV and handed LiveKit the PATH. That cost on every single play: the
+library re-opens, decodes and resamples the file to 48 kHz inside the mixer
+pull. It also loses the one fact the playback decision most needs — HOW LONG the
+clip is — so a 0.6s "Hmm" can be chosen to mask a 2s gap and leave 1.4s of dead
+air behind it, which reads worse than no filler at all.
 
 This module renders a phrase ONCE into pre-decoded 48 kHz mono int16 frames held
 in memory, exactly the way ``comfort_audio.comfort_ambient_source`` already feeds
