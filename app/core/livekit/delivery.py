@@ -49,6 +49,9 @@ MAX_OPENER_IDS = 3
 #: Opener kinds the plan may name, plus the explicit choice of saying nothing.
 PLAN_KINDS = ("silence",) + OPENER_KINDS
 
+#: The closest vocal kind to a body sound the session cannot play.
+_NEAREST_KIND = {"sigh": "reflective", "breath": "hesitation"}
+
 
 class ProposedDelivery(BaseModel):
     """How the character should begin its NEXT reply. Untrusted model output."""
@@ -142,9 +145,15 @@ def validate_delivery(
         if len(ids) >= MAX_OPENER_IDS:
             break
     kind = str(proposal.opener_kind or "").strip().lower()
+    first = catalog.get(ids[0]) if (catalog is not None and ids) else None
     if kind not in PLAN_KINDS:
-        first = catalog.get(ids[0]) if (catalog is not None and ids) else None
         kind = first.kind if first is not None else "hum"
+    elif catalog is not None and kind != "silence" and not catalog.ids_of_kind(kind):
+        # The session cannot play this kind (e.g. "sigh" before any sigh audio
+        # ships). Keep the intent, not the label: in the first live run the
+        # updater asked for "sigh" on most turns, and treating an unplayable
+        # kind as "no sound fits" left 10 of 13 turns silent.
+        kind = first.kind if first is not None else _NEAREST_KIND.get(kind, "hum")
     return DeliveryPlan(
         opener_kind=kind,
         opener_ids=tuple(ids),

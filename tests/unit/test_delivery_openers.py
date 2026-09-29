@@ -186,6 +186,20 @@ class TestValidateDelivery:
         )
         assert plan.opener_kind == "reflective"
 
+    def test_an_unplayable_kind_maps_to_the_nearest_playable_one(self):
+        """No sigh audio ships yet; a "sigh" plan must still produce a sound."""
+        catalog = build_session_catalog("en-IN")  # no assets -> no sigh entry
+        plan = validate_delivery(
+            ProposedDelivery(opener_kind="sigh"), catalog, source="working_memory"
+        )
+        assert plan.opener_kind == "reflective"
+        plan = validate_delivery(
+            ProposedDelivery(opener_kind="breath", opener_ids=["um_hesitant"]),
+            catalog,
+            source="working_memory",
+        )
+        assert plan.opener_kind == "hesitation"
+
     def test_silence_implies_a_hold(self):
         plan = validate_delivery(
             ProposedDelivery(opener_kind="silence"), None, source="planner"
