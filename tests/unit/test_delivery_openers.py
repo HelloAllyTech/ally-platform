@@ -88,6 +88,24 @@ class TestGapPredictorPairsTheHalves:
 
 
 class TestSessionCatalog:
+    def test_the_catalog_file_ships(self):
+        """It must be tracked by git: under a ``data/`` dir it was gitignored and
+        the first deploy ran with no catalog at all."""
+        import shutil
+        import subprocess
+
+        from app.core.livekit import opener_catalog
+
+        assert opener_catalog._DATA_PATH.is_file()
+        assert opener_catalog.catalog_available()
+        if shutil.which("git") is None:
+            pytest.skip("git not available")
+        ignored = subprocess.run(
+            ["git", "check-ignore", "-q", str(opener_catalog._DATA_PATH)],
+            capture_output=True,
+        )
+        assert ignored.returncode == 1, "opener_catalog.json is gitignored"
+
     def test_primary_language(self):
         assert primary_language("hi-IN") == "hi"
         assert primary_language(None) == "en"

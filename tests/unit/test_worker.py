@@ -2578,6 +2578,37 @@ class TestBackgroundAudioDeferral:
             assert event in w.session.handlers
 
     @pytest.mark.asyncio
+    async def test_no_catalog_falls_back_to_the_legacy_filler(self, monkeypatch):
+        """A catalog that cannot load must never leave the session with nothing."""
+        w = self._bg_worker()
+        w._bg_audio = Mock()
+        w._interim_enabled = False
+        monkeypatch.setattr(worker.settings, "DELIVERY_PLAN_ENABLED", True)
+        monkeypatch.setattr(worker.settings, "PREDICTIVE_FILLER_ENABLED", False)
+        monkeypatch.setattr(
+            "app.core.livekit.opener_catalog.catalog_available", lambda: False
+        )
+        monkeypatch.setattr(
+            "app.core.livekit.fillers.is_filler_enabled", lambda s: True
+        )
+        monkeypatch.setattr(
+            "app.core.livekit.fillers.resolve_filler_phrases", lambda s: ["um"]
+        )
+        monkeypatch.setattr(
+            "app.core.livekit.filler_clips.synthesize_clips",
+            AsyncMock(return_value=[_clip("um", 500.0)]),
+        )
+        monkeypatch.setattr(
+            w, "_resolve_backchannel_clips", AsyncMock(return_value=False)
+        )
+
+        await w._setup_deferred_naturalness()
+
+        assert w._opener_player is None
+        assert w.turn_delivery.active is False
+        assert w._filler_pool is not None and len(w._filler_pool) == 1
+
+    @pytest.mark.asyncio
     async def test_deferred_naturalness_registers_handlers(self, monkeypatch):
         w = self._bg_worker()
         w._bg_audio = Mock()

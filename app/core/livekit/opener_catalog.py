@@ -18,7 +18,8 @@ the worker-wide cache and most sessions pay no TTS call for them at all.
 
 Entries come from three places:
 
-* ``data/opener_catalog.json`` — the curated set, TTS-rendered per voice;
+* ``opener_catalog.json`` (beside this module) — the curated set, TTS-rendered
+  per voice;
 * ``asset`` entries (breath, sigh) — bundled audio, played as-is, skipped when
   the file is not shipped;
 * the scenario's Studio ``allowed_fillers`` — authored per language, added as
@@ -40,7 +41,9 @@ from app.core.logger import get_logger
 
 logger = get_logger(__name__)
 
-_DATA_PATH = Path(__file__).parent / "data" / "opener_catalog.json"
+#: Next to this module on purpose: the repo's .gitignore excludes every
+#: ``data/`` directory, and a catalog under one silently never shipped.
+_DATA_PATH = Path(__file__).with_name("opener_catalog.json")
 _ASSET_DIR = Path(__file__).resolve().parents[2] / "assets" / "openers"
 
 #: Every kind the plan may ask for. ``silence`` is not a catalog kind — it is
@@ -114,6 +117,12 @@ def _load_raw() -> List[Dict[str, Any]]:
     except Exception:  # noqa: BLE001 - a missing catalog means no openers
         logger.warning("[OPENER] catalog could not be loaded", exc_info=True)
         return []
+
+
+def catalog_available() -> bool:
+    """Whether the curated catalog loaded. False sends the worker to the legacy
+    filler path instead of a session with no openers at all."""
+    return bool(_load_raw())
 
 
 def build_session_catalog(

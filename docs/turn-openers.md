@@ -38,7 +38,7 @@ learner finishes the next turn → agent "thinking"
   catalog ids dropped, the bridge line capped and safety-checked), and used on
   the NEXT turn. It fits the character's state, not the learner's next words —
   that is the deliberate trade for adding nothing to the reply path.
-- **The catalog** (`app/core/livekit/data/opener_catalog.json`,
+- **The catalog** (`app/core/livekit/opener_catalog.json`,
   `opener_catalog.py`) is curated per language in native script, tagged by
   `kind` (state fit) and `family` (repeat detection). Studio `allowedFillers`
   are added as lexical entries. Rendered once per voice and cached worker-wide.

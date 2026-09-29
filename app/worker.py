@@ -2443,8 +2443,12 @@ class AgentWorker:
             started = _time.monotonic()
 
             # ---- Delivery-plan openers (replaces the filler path below) ----
+            # Falls through to the legacy filler when nothing could be rendered,
+            # so a delivery-layer failure degrades to the old behaviour rather
+            # than to silence.
             if self._delivery_mode():
                 await self._setup_opener_player()
+            if self._opener_player is not None:
                 backchannel_on = await self._resolve_backchannel_clips()
                 if backchannel_on:
                     self.session.on("user_state_changed")(
@@ -2555,10 +2559,15 @@ class AgentWorker:
         """
         try:
             from app.core.livekit.fillers import is_filler_enabled
+            from app.core.livekit.opener_catalog import catalog_available
 
-            return bool(
-                getattr(settings, "DELIVERY_PLAN_ENABLED", True)
-            ) and is_filler_enabled(self.scenario)
+            # catalog_available: a catalog that fails to load must fall back to
+            # the legacy filler, never to a session with no opener at all.
+            return (
+                bool(getattr(settings, "DELIVERY_PLAN_ENABLED", True))
+                and is_filler_enabled(self.scenario)
+                and catalog_available()
+            )
         except Exception:  # noqa: BLE001 - a gate must never break setup
             return False
 
