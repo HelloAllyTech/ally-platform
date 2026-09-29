@@ -1,5 +1,5 @@
 {
-  "_about": "Fixed catalog of turn openers (the first sound before the character's reply). Curated, not generated: each entry is rendered once per voice and cached, and the working-memory delivery plan only ever PICKS ids from this list. `kind` drives state fit (hesitation = reserved/guarded/anxious, reflective = considering, hum = neutral vocal burst, lexical = a discourse marker). `family` groups near-identical sounds so the no-repeat rule treats hmm/hmmm/mm-hmm as one. `texts` is keyed by the primary language subtag and must be in that language's native script; an entry with no text for the session language is simply unavailable. `asset` entries (breath, sigh) play a bundled audio file instead of TTS and are skipped when the file is missing. Indic lexical entries should be reviewed by a native speaker before being widened.",
+  "_about": "Fixed catalog of turn openers (the first sound before the character's reply). Curated, not generated: each entry is rendered once per voice and cached, and the working-memory delivery plan only ever PICKS ids from this list. `kind` drives state fit (hesitation = reserved/guarded/anxious, reflective = considering, hum = neutral vocal burst, lexical = a discourse marker). `family` groups near-identical sounds so the no-repeat rule treats hmm/hmmm/mm-hmm as one. `texts` is keyed by the primary language subtag and must be in that language's native script; an entry with no text for the session language is simply unavailable. `asset` entries (breath, sigh) play a bundled audio file from app/assets/openers/ instead of TTS. `{gender}` in the file name is replaced by the voice's gender (female/male); the entry is skipped when the gender is unknown or the file is missing, because a sigh in the wrong voice is worse than none. The shipped files were generated with ElevenLabs sound generation and levelled to about -30 dBFS RMS, quieter than speech. Indic lexical entries should be reviewed by a native speaker before being widened.",
   "version": 1,
   "entries": [
     {
@@ -121,13 +121,13 @@
       "id": "breath_in",
       "kind": "breath",
       "family": "breath",
-      "asset": "breath_in.wav"
+      "asset": "breath_in_{gender}.wav"
     },
     {
       "id": "sigh_soft",
       "kind": "sigh",
       "family": "sigh",
-      "asset": "sigh_soft.wav"
+      "asset": "sigh_soft_{gender}.wav"
     }
   ]
 }

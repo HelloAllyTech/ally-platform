@@ -129,17 +129,53 @@ class TestSessionCatalog:
         # Already in the curated set: not added twice.
         assert catalog.get("studio:hmm.") is None
 
-    def test_asset_entries_need_the_file(self, tmp_path):
+    def test_asset_entries_need_the_file_and_a_gender(self, tmp_path):
+        """A breath in the wrong voice is worse than none."""
         assert (
-            build_session_catalog("en-IN", asset_dir=tmp_path).get("breath_in") is None
+            build_session_catalog("en-IN", asset_dir=tmp_path, gender="female").get(
+                "breath_in"
+            )
+            is None
         )
-        with wave.open(str(tmp_path / "breath_in.wav"), "wb") as wav:
+        with wave.open(str(tmp_path / "breath_in_female.wav"), "wb") as wav:
             wav.setnchannels(1)
             wav.setsampwidth(2)
             wav.setframerate(24000)
             wav.writeframes(b"\x00\x00" * 2400)
-        entry = build_session_catalog("en-IN", asset_dir=tmp_path).get("breath_in")
+        entry = build_session_catalog("en-IN", asset_dir=tmp_path, gender="Female").get(
+            "breath_in"
+        )
         assert entry is not None and entry.is_asset
+        assert entry.asset_path.endswith("breath_in_female.wav")
+        for unknown in (None, "non-binary", ""):
+            assert (
+                build_session_catalog("en-IN", asset_dir=tmp_path, gender=unknown).get(
+                    "breath_in"
+                )
+                is None
+            )
+        assert (
+            build_session_catalog("en-IN", asset_dir=tmp_path, gender="male").get(
+                "breath_in"
+            )
+            is None
+        )
+
+    def test_the_shipped_breath_and_sigh_assets_load(self):
+        from app.core.livekit.opener_catalog import load_asset_clip
+
+        for gender in ("female", "male"):
+            catalog = build_session_catalog("hi-IN", gender=gender)
+            for entry_id, (lo, hi) in (
+                ("breath_in", (300, 1500)),
+                ("sigh_soft", (500, 1800)),
+            ):
+                entry = catalog.get(entry_id)
+                assert entry is not None, (gender, entry_id)
+                clip = load_asset_clip(entry)
+                assert clip is not None and clip.frames, (gender, entry_id)
+                assert lo <= clip.duration_ms <= hi, (gender, entry_id)
+                assert clip.filler_type in ("breath", "sigh")
 
     def test_prompt_description_lists_ids_and_words(self):
         text = build_session_catalog("en-IN").describe_for_prompt()

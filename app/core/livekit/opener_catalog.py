@@ -125,10 +125,17 @@ def catalog_available() -> bool:
     return bool(_load_raw())
 
 
+def normalize_gender(value: Optional[str]) -> Optional[str]:
+    """``"Female"`` -> ``"female"``; anything but female/male -> None."""
+    text = str(value or "").strip().lower()
+    return text if text in ("female", "male") else None
+
+
 def build_session_catalog(
     language_code: Optional[str],
     studio_fillers: Optional[Iterable[str]] = None,
     asset_dir: Optional[Path] = None,
+    gender: Optional[str] = None,
 ) -> SessionCatalog:
     """The catalog for a session in ``language_code``.
 
@@ -147,7 +154,15 @@ def build_session_catalog(
         family = str(raw.get("family") or entry_id)
         asset = raw.get("asset")
         if asset:
-            path = assets / str(asset)
+            name = str(asset)
+            if "{gender}" in name:
+                # A breath or sigh carries the speaker's body: one in the
+                # wrong voice is worse than none, so no gender means no entry.
+                voice_gender = normalize_gender(gender)
+                if voice_gender is None:
+                    continue
+                name = name.replace("{gender}", voice_gender)
+            path = assets / name
             if path.is_file():
                 catalog.entries[entry_id] = CatalogEntry(
                     id=entry_id, kind=kind, family=family, asset_path=str(path)

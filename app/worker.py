@@ -2607,6 +2607,23 @@ class AgentWorker:
             logger.warning("[DELIVERY] planner client setup failed: %s", e)
             return None
 
+    def _voice_gender(self) -> Optional[str]:
+        """The character voice's gender, for gendered opener assets, or None.
+
+        The VOICE's own gender first (it is what the breath has to match),
+        then the persona's. Read defensively: an unknown gender only means the
+        breath and sigh openers are left out.
+        """
+        from app.core.livekit.opener_catalog import normalize_gender
+
+        scenario = self.scenario
+        voice_config = getattr(getattr(scenario, "voice", None), "config", None)
+        return normalize_gender(getattr(voice_config, "gender", None)) or (
+            normalize_gender(
+                getattr(getattr(scenario, "prompt_data", None), "gender", None)
+            )
+        )
+
     async def _setup_opener_player(self) -> None:
         """Build the session catalog, render it, and wire the opener handlers.
 
@@ -2631,6 +2648,7 @@ class AgentWorker:
         self.turn_delivery.catalog = build_session_catalog(
             self._filler_language(),
             studio_fillers=resolve_filler_phrases(self.scenario),
+            gender=self._voice_gender(),
         )
         policy = OpenerPolicy(
             PolicyConfig(
