@@ -75,6 +75,8 @@ class OpenerPlayer:
         self._thinking = False
         self.user_speaking = False
         self._last_learner_text: str = ""
+        #: An opener was decided since the last real reply started.
+        self._opened_since_reply = False
         self.stats: Dict[str, Any] = {
             "turns": 0,
             "vocal": 0,
@@ -168,6 +170,9 @@ class OpenerPlayer:
             else:
                 self._thinking = False
                 self._cancel()
+                if new_state == "speaking":
+                    # A real reply started: the next learner turn may open again.
+                    self._opened_since_reply = False
                 if new_state == "listening":
                     self.turn_delivery.end_turn()
         except Exception:  # noqa: BLE001 - must never break a session
@@ -178,6 +183,14 @@ class OpenerPlayer:
         self.stats["turns"] += 1
         if self._voice_on_avatar():
             turn_metrics.note_filler_decision(self._room, "skipped_video_actor")
+            return
+        if self._opened_since_reply:
+            # A false endpoint: the learner paused, heard an opener, and went
+            # on. Their next pause is the same reply cycle, and a second opener
+            # there is two fillers stacked before one reply — seen live as
+            # "I mean…" then "Well…".
+            self.stats["none"] += 1
+            turn_metrics.note_filler_decision(self._room, "skipped_policy")
             return
         plan = self.turn_delivery.plan
         predicted = float(self._predicted_gap_ms())
@@ -196,6 +209,7 @@ class OpenerPlayer:
             "fillerPredictedGapMs": int(predicted),
             "openerPlanSource": plan.source,
             "openerPlanKind": plan.opener_kind,
+            "openerPlanHold": plan.hold_silence,
         }
         if not decision.plays_anything:
             self.stats["none"] += 1
@@ -211,6 +225,7 @@ class OpenerPlayer:
                 bridge=bridge[0] if (decision.bridge and bridge) else None,
             )
         )
+        self._opened_since_reply = True
         self._task = spawn_background_task(
             self._run(decision, created_at, details),
             name="opener-play",

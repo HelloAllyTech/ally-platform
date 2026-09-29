@@ -220,6 +220,15 @@ class TurnDelivery:
             return
         self._plan = plan
         self.plans_received += 1
+        logger.info(
+            "[DELIVERY] plan from %s after turn %d: kind=%s ids=%s hold=%s bridge=%s",
+            plan.source,
+            plan.made_after_turn,
+            plan.opener_kind,
+            ",".join(plan.opener_ids) or "-",
+            plan.hold_silence,
+            bool(plan.bridge_line),
+        )
         for listener in list(self._listeners):
             try:
                 listener(plan)

@@ -246,7 +246,10 @@ class OpenerPolicy:
 
         last = self._categories[-1] if self._categories else None
         weights: Dict[str, float] = {
-            "none": cfg.weight_none + (0.4 if plan.hold_silence else 0.0),
+            # A pause-fits plan mostly LENGTHENS the hold (above); it only
+            # nudges toward saying nothing. At +0.4, planners that set it
+            # freely left 12 of 16 live v2v turns silent.
+            "none": cfg.weight_none + (0.15 if plan.hold_silence else 0.0),
             "vocal": cfg.weight_vocal if plan.opener_kind in VOCAL_KINDS else 0.2,
             "body": cfg.weight_body if plan.opener_kind in BODY_KINDS else 0.12,
         }

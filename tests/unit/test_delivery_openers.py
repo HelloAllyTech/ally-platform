@@ -550,6 +550,26 @@ class TestOpenerPlayer:
         assert all(h.stopped for h in bg.played)
 
     @pytest.mark.asyncio
+    async def test_one_opener_per_reply_cycle(self, monkeypatch):
+        """A false endpoint must not stack a second opener before one reply."""
+        player, td, bg, _ = _player(monkeypatch)
+        await player.render_catalog()
+        player.on_agent_state("thinking")
+        await asyncio.sleep(0.3)
+        assert len(bg.played) == 1
+        # The learner resumes (back to listening), then pauses again.
+        player.on_agent_state("listening")
+        player.on_agent_state("thinking")
+        await asyncio.sleep(0.3)
+        assert len(bg.played) == 1
+        # Once a real reply has started, the next turn may open again.
+        player.on_agent_state("speaking")
+        player.on_agent_state("listening")
+        player.on_agent_state("thinking")
+        await asyncio.sleep(0.3)
+        assert len(bg.played) == 2
+
+    @pytest.mark.asyncio
     async def test_reply_taking_over_cuts_the_opener(self, monkeypatch):
         player, td, bg, _ = _player(monkeypatch)
         await player.render_catalog()
