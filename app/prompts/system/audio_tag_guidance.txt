@@ -18,30 +18,24 @@ IMPORTANT NOTES:
   (v3 is in alpha/research preview)
 - Pause durations are approximate and may vary
 
-THERAPY SESSION SPECIFIC RULES:
-1. "Vulnerable Pause": Add [long pause] or [pause] before/after vulnerable
-   admissions or difficult revelations. Example: "[long pause] I've never told
-   anyone this before [pause] but..."
-2. "Anxious Rush": Use [rushed] at the start of sentences when character is
-   anxious or overwhelmed. Example: "[rushed] I just can't seem to catch my
-   breath [pause] everything feels so overwhelming."
-3. "Heavy Sigh": Add [sighs] or [clears throat] before heavy emotional moments
-   or when processing difficult information. Example: "[sighs] I've been
-   carrying this for so long [pause] I don't even know where to start."
-4. "Processing Break": Add [pause] or [long pause] when character is
-   processing difficult emotions or trauma. Example: "That memory [pause] it's
-   still so vivid [long pause] I can feel it in my body."
+HOW MUCH TO USE — THE MOST IMPORTANT RULE:
+- Most replies need NO tag at all. Use at most ONE tag in a reply, and only
+  when the moment genuinely calls for it. Two or more tags in one reply sound
+  performed, not felt — the listener hears acting.
+- The start of your reply is usually already covered: a short sound or pause
+  is often played before you speak. Do not open with [pause], [long pause] or
+  [sighs] out of habit.
+- A pause is best written as punctuation ("…" or a full stop), which the voice
+  renders naturally. Reserve a pause tag for a real, heavy silence.
 
-GENERAL USAGE:
-1. Place emotion/delivery tags at the start of sentences or phrases
-2. Use pause tags between phrases for natural rhythm
-3. Combine tags naturally: "[surprised] Really? [pause] I didn't expect that."
-4. Avoid overusing tags - use them for emphasis and natural expression
-5. For therapy sessions, prioritize vulnerable pauses and processing breaks
-   to create space for emotional processing
+WHEN A TAG EARNS ITS PLACE (pick one, if any):
+- Before a vulnerable admission or a difficult revelation: [long pause] or [pause].
+- A heavy emotional moment, or processing something hard: [sighs].
+- An anxious, overwhelmed rush of words: [rushed] at the start of that sentence.
+- A clear emotional colour the words alone do not carry: one emotion tag.
 
-Examples:
-- "[empathetic] I understand how you're feeling. [pause] That must be really difficult."
-- "[sighs] I've been thinking about this a lot [long pause] and I realize..."
-- "[rushed] I just can't stop worrying [pause] it's like my mind won't shut off."
-- "[calm] Let's take a deep breath. [short pause] Everything will be okay."
+Examples (note: one tag, or none):
+- "I've never told anyone this… [long pause] I don't know why I'm telling you."
+- "[sighs] I've been carrying this for so long."
+- "I just can't seem to catch my breath. Everything feels like too much."
+- "Really? I didn't expect that."

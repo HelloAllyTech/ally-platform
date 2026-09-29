@@ -2536,10 +2536,54 @@ class TestBackgroundAudioDeferral:
         assert w._bg_audio is not None
 
     @pytest.mark.asyncio
+    async def test_delivery_mode_renders_the_catalog_and_activates(self, monkeypatch):
+        """With the delivery plan on, the catalog replaces the filler pool."""
+        w = self._bg_worker()
+        w._bg_audio = Mock()
+        w._interim_enabled = False
+        w.scenario = types.SimpleNamespace(
+            prompt_data=types.SimpleNamespace(),
+            language_config=types.SimpleNamespace(language_code="hi-IN"),
+        )
+        monkeypatch.setattr(worker.settings, "DELIVERY_PLAN_ENABLED", True)
+        monkeypatch.setattr(
+            "app.core.livekit.fillers.is_filler_enabled", lambda s: True
+        )
+        monkeypatch.setattr(
+            "app.core.livekit.fillers.resolve_filler_phrases", lambda s: []
+        )
+
+        async def _render(tts, phrases, **kwargs):
+            return [_clip(p[0], 600.0) for p in phrases]
+
+        monkeypatch.setattr("app.core.livekit.filler_clips.synthesize_clips", _render)
+        monkeypatch.setattr(
+            w, "_resolve_backchannel_clips", AsyncMock(return_value=False)
+        )
+
+        await w._setup_deferred_naturalness()
+
+        assert w.turn_delivery.active is True
+        assert w._opener_player is not None
+        assert w._filler_pool is None  # the legacy pool is not built
+        assert w._gap_predictor is not None
+        # Hindi session: native-script entries only, never the English text.
+        assert "हम्म।" in {c.phrase for c in w._opener_player.clips.values()}
+        assert "Hmm." not in {c.phrase for c in w._opener_player.clips.values()}
+        for event in (
+            "agent_state_changed",
+            "user_state_changed",
+            "user_input_transcribed",
+        ):
+            assert event in w.session.handlers
+
+    @pytest.mark.asyncio
     async def test_deferred_naturalness_registers_handlers(self, monkeypatch):
         w = self._bg_worker()
         w._bg_audio = Mock()
         w._interim_enabled = False
+        # The legacy filler path, kept behind the rollback flag.
+        monkeypatch.setattr(worker.settings, "DELIVERY_PLAN_ENABLED", False)
         monkeypatch.setattr(worker.settings, "PREDICTIVE_FILLER_ENABLED", False)
         monkeypatch.setattr(
             "app.core.livekit.fillers.is_filler_enabled", lambda s: True

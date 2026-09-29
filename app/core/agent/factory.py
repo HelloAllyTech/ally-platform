@@ -456,32 +456,84 @@ def configure_llm_client(scenario: Scenario) -> BaseLLMClient:
 
 
 class GlossarySwapAgent(Agent):
-    """The session's Agent, enforcing the glossary's word swaps on its output.
+    """The session's Agent, shaping its reply stream before TTS.
 
     Rewrites the LLM stream at ``llm_node`` — upstream of the tee into TTS and
     the transcript — so the counsellor hears, the transcript records and the
-    judge scores the same text. The graph state gets the same swap in
-    ``generate_response``. With no swap table this is a pass-through.
+    judge scores the same text. Three streaming stages, each optional:
+
+    * the leading-hesitation trim (``LeadingHesitationTrimmer``), only on a
+      turn where an opener already played (read from ``TurnDelivery``);
+    * the v3 audio-tag cap (``AudioTagLimiter``), for tag-capable voices;
+    * the glossary's word swaps (``StreamingWordSwapper``). The graph state
+      gets the same swap in ``generate_response``.
+
+    With no stage active this is a pass-through.
     """
 
-    def __init__(self, *, swap_table: dict[str, str], room_name: str, **kwargs):
+    def __init__(
+        self,
+        *,
+        swap_table: dict[str, str],
+        room_name: str,
+        turn_delivery=None,
+        audio_tag_cap: Optional[int] = None,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
         self._swap_table = swap_table
         self._room_name = room_name
+        self._turn_delivery = turn_delivery
+        self._audio_tag_cap = audio_tag_cap
+
+    def _reply_stages(self) -> list:
+        """Fresh per-reply stages: held-back text dies with an interrupted reply."""
+        from app.core.livekit.reply_shaping import (
+            AudioTagLimiter,
+            LeadingHesitationTrimmer,
+        )
+
+        stages: list = []
+        opener = getattr(self._turn_delivery, "opener", None)
+        if (
+            opener is not None
+            and opener.made_a_sound
+            and getattr(settings, "REPLY_TRIM_LEADING_HESITATION", True)
+        ):
+            # Before the tag cap: a leading pause tag it removes must not use
+            # up the reply's tag budget.
+            stages.append(LeadingHesitationTrimmer(active=True))
+        if self._audio_tag_cap is not None and self._audio_tag_cap >= 0:
+            stages.append(AudioTagLimiter(self._audio_tag_cap))
+        return stages
 
     async def llm_node(self, chat_ctx, tools, model_settings):
         stream = Agent.default.llm_node(self, chat_ctx, tools, model_settings)
-        if not self._swap_table:
+        stages = self._reply_stages()
+        swapper = StreamingWordSwapper(self._swap_table) if self._swap_table else None
+        if swapper is not None:
+            stages.append(swapper)
+        if not stages:
             async for chunk in stream:
                 yield chunk
             return
-        # One swapper per reply: an interrupted reply's held-back partial word
-        # dies with its generator instead of leaking into the next turn.
-        swapper = StreamingWordSwapper(self._swap_table)
+
+        def feed(text: str) -> str:
+            for stage in stages:
+                text = stage.feed(text) if text else text
+            return text
+
+        def flush() -> str:
+            # Each stage takes the previous stage's tail, then releases its own.
+            carry = ""
+            for stage in stages:
+                carry = (stage.feed(carry) if carry else "") + stage.flush()
+            return carry
+
         last_chunk = None
         async for chunk in stream:
             if isinstance(chunk, str):
-                out = swapper.feed(chunk)
+                out = feed(chunk)
                 if out:
                     yield out
                 continue
@@ -494,11 +546,9 @@ class GlossarySwapAgent(Agent):
             # Copy rather than mutate: the chunk object may be shared with the
             # adapter's own bookkeeping.
             yield chunk.model_copy(
-                update={
-                    "delta": delta.model_copy(update={"content": swapper.feed(content)})
-                }
+                update={"delta": delta.model_copy(update={"content": feed(content)})}
             )
-        tail = swapper.flush()
+        tail = flush()
         if tail:
             if last_chunk is not None:
                 yield llm.ChatChunk(
@@ -507,7 +557,7 @@ class GlossarySwapAgent(Agent):
                 )
             else:
                 yield tail
-        summary = swapper.swap_summary()
+        summary = swapper.swap_summary() if swapper is not None else None
         if summary:
             turn_metrics.record(self._room_name, metadata={"glossary_swaps": summary})
             logger.info(
@@ -531,6 +581,8 @@ def create_agent_with_adapter(
     rolling_summary_store=None,
     retrieved_context_store=None,
     client_working_memory_store=None,
+    turn_delivery=None,
+    delivery_llm_client=None,
 ) -> Agent:
     """
     Create LLM adapter and agent instance.
@@ -589,6 +641,14 @@ def create_agent_with_adapter(
     if client_working_memory_store is not None:
         configurable["client_working_memory_store"] = client_working_memory_store
 
+    # How each reply starts (app/core/livekit/delivery.py): the worker records
+    # the opener it played here and the graph's planners write the next plan.
+    # The small planner client serves scenarios without working memory.
+    if turn_delivery is not None:
+        configurable["turn_delivery"] = turn_delivery
+    if delivery_llm_client is not None:
+        configurable["delivery_llm_client"] = delivery_llm_client
+
     # Lazy import to avoid circular dependency
     from app.core.graph import agent_graph
 
@@ -610,7 +670,20 @@ def create_agent_with_adapter(
         instructions="",
         swap_table=swap_table,
         room_name=room.name,
+        turn_delivery=turn_delivery,
+        audio_tag_cap=_audio_tag_cap(tts_client),
     )
+
+
+def _audio_tag_cap(tts_client: Optional[BaseTTSClient]) -> Optional[int]:
+    """Per-reply inline-tag cap for tag-capable (v3) voices; None otherwise."""
+    try:
+        if tts_client is None or not tts_client.supports_text_enhancement():
+            return None
+    except Exception:  # noqa: BLE001 - a capability probe must not break setup
+        return None
+    cap = int(getattr(settings, "AUDIO_TAG_MAX_PER_REPLY", 1))
+    return cap if cap >= 0 else None
 
 
 # ====================================================================

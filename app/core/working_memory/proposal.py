@@ -23,6 +23,7 @@ from typing import Any, List, Optional, Sequence, Tuple
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.core.livekit.delivery import ProposedDelivery
 from app.core.logger import get_logger
 from app.core.working_memory.state import STANCES, ClientWorkingMemory, Stance
 
@@ -109,6 +110,12 @@ class ProposedUpdate(BaseModel):
     opened_threads: List[str] = Field(default_factory=list)
     closed_threads: List[str] = Field(default_factory=list)
     retrieve_cues: List[str] = Field(default_factory=list)
+    #: How the client should START its next reply — the first sound the learner
+    #: hears. Proposed here because this call already knows the client's state;
+    #: validated against the session's opener catalog by the caller, which has
+    #: it (see app/core/livekit/delivery.py). Optional: a model that omits it
+    #: leaves the previous plan in force.
+    delivery: Optional[ProposedDelivery] = None
 
 
 @dataclass
@@ -126,6 +133,9 @@ class ValidatedUpdate:
     opened_threads: List[str] = field(default_factory=list)
     closed_threads: List[str] = field(default_factory=list)
     retrieve_cues: List[str] = field(default_factory=list)
+    #: Passed through untouched: it is checked against the opener catalog,
+    #: which lives with the worker, not here.
+    delivery: Optional[ProposedDelivery] = None
 
 
 def _clean(values: List[str], *, limit: int, max_chars: int = 0) -> List[str]:
@@ -239,4 +249,5 @@ def validate(
             proposal.closed_threads, limit=10, max_chars=MAX_TOPIC_CHARS
         ),
         retrieve_cues=_clean(proposal.retrieve_cues, limit=8, max_chars=MAX_CUE_CHARS),
+        delivery=proposal.delivery,
     )

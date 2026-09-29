@@ -216,6 +216,50 @@ class TestScheduleUpdate:
         assert state.affect == "wary"
         assert state.disclosed[0].first_seen_turn == 4
 
+    async def test_a_proposed_delivery_plan_reaches_the_worker(self, monkeypatch):
+        """The updater's delivery plan is handed over, with the catalog it saw."""
+        from app.core.livekit.delivery import ProposedDelivery
+
+        seen = {}
+        monkeypatch.setattr(
+            mod,
+            "load_and_format",
+            lambda *a, **k: seen.update(catalog=k.get("opener_catalog")) or "SYS",
+        )
+        store = ClientWorkingMemoryStore()
+        delivered = []
+        llm = _llm(
+            ProposedUpdate(
+                affect="guarded",
+                delivery=ProposedDelivery(
+                    opener_kind="hesitation", opener_ids=["um_hesitant"]
+                ),
+            )
+        )
+        assert mod.schedule_update(
+            store,
+            **self._args(llm),
+            opener_catalog="- um_hesitant [hesitation]",
+            on_delivery=lambda proposal, turn: delivered.append((proposal, turn)),
+        )
+        await store._task
+        assert seen["catalog"] == "- um_hesitant [hesitation]"
+        assert delivered and delivered[0][0].opener_ids == ["um_hesitant"]
+        assert delivered[0][1] == 4
+        assert store.last_committed_turn == 4  # the commit still happened
+
+    async def test_no_catalog_names_the_absence(self, monkeypatch):
+        seen = {}
+        monkeypatch.setattr(
+            mod,
+            "load_and_format",
+            lambda *a, **k: seen.update(catalog=k.get("opener_catalog")) or "SYS",
+        )
+        store = ClientWorkingMemoryStore()
+        mod.schedule_update(store, **self._args(_llm(ProposedUpdate())))
+        await store._task
+        assert seen["catalog"] == mod.NO_OPENER_CATALOG
+
     async def test_skips_when_already_in_flight(self, monkeypatch):
         monkeypatch.setattr(mod, "load_and_format", lambda *a, **k: "SYS")
         store = ClientWorkingMemoryStore()

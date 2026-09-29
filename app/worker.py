@@ -443,6 +443,18 @@ class AgentWorker:
         self._interim_clip = None  # FillerClip, rendered in memory
         self._interim_handle = None
 
+        # Delivery plan (DELIVERY_PLAN_ENABLED): how each reply STARTS. The
+        # holder is shared with the graph through configurable — its planners
+        # write the next plan into it, generate_response reads what opener was
+        # already said — and OpenerPlayer plays the plan on the background
+        # track. Built unconditionally (it is inert until `active`), because
+        # the agent and its configurable are created before background audio
+        # knows whether any opener can play. See app/core/livekit/delivery.py.
+        from app.core.livekit.delivery import TurnDelivery
+
+        self.turn_delivery = TurnDelivery()
+        self._opener_player = None
+
         # ========== Termination Handling (for entrypoint context) ==========
         # Use asyncio.Event to signal termination from graph context
         # to entrypoint context
@@ -792,6 +804,8 @@ class AgentWorker:
             rolling_summary_store=self.rolling_summary_store,
             retrieved_context_store=self.retrieved_context_store,
             client_working_memory_store=self.client_working_memory_store,
+            turn_delivery=self.turn_delivery,
+            delivery_llm_client=self._build_delivery_llm_client(),
         )
 
         # Register callbacks
@@ -1476,6 +1490,19 @@ class AgentWorker:
             # there are no temp files to delete — dropping the references is the
             # whole of the cleanup. Log what the layer cost first.
             self._log_filler_session_stats()
+            if self._opener_player is not None:
+                logger.info(
+                    "[OPENER] session totals: %s plans=%d",
+                    {
+                        k: v
+                        for k, v in self._opener_player.stats.items()
+                        if isinstance(v, int)
+                    },
+                    self.turn_delivery.plans_received,
+                )
+                self._opener_player.shutdown()
+                self._opener_player = None
+            self.turn_delivery.active = False
             self._filler_pool = None
             self._backchannel_clips = []
             self._interim_clip = None
@@ -2209,6 +2236,13 @@ class AgentWorker:
             self._interim_enabled = self._clip_tts_on and is_interim_reply_enabled(
                 self.scenario
             )
+            if self._interim_enabled and filler_possible and self._delivery_mode():
+                # The delivery plan's bridge line is the interim now: it is
+                # written by the planner that knows the character's state and
+                # played after the opener under the same turn rules. Running the
+                # old interim as well would stack two voices on one pause.
+                logger.info("[INTERIM] superseded by the delivery plan's bridge line")
+                self._interim_enabled = False
 
             # Nothing to play on any layer — don't publish a track.
             if (
@@ -2408,6 +2442,20 @@ class AgentWorker:
             predictive_on = bool(getattr(settings, "PREDICTIVE_FILLER_ENABLED", False))
             started = _time.monotonic()
 
+            # ---- Delivery-plan openers (replaces the filler path below) ----
+            if self._delivery_mode():
+                await self._setup_opener_player()
+                backchannel_on = await self._resolve_backchannel_clips()
+                if backchannel_on:
+                    self.session.on("user_state_changed")(
+                        self._on_backchannel_user_state
+                    )
+                    logger.info(
+                        "[BACKCHANNEL] enabled (%d clip(s)) — driven off user-speaking",
+                        len(self._backchannel_clips),
+                    )
+                return
+
             # ---- Thinking filler ----
             filler_on = False
             if is_filler_enabled(self.scenario):
@@ -2498,6 +2546,158 @@ class AgentWorker:
                 e,
             )
 
+    def _delivery_mode(self) -> bool:
+        """Whether turn openers come from the delivery plan this session.
+
+        Same scenario gate as the filler it replaces (Studio's fillerEnabled +
+        the global kill-switch), plus the rollback flag. Clip availability is
+        checked by the caller: no clips, no openers, no planner calls.
+        """
+        try:
+            from app.core.livekit.fillers import is_filler_enabled
+
+            return bool(
+                getattr(settings, "DELIVERY_PLAN_ENABLED", True)
+            ) and is_filler_enabled(self.scenario)
+        except Exception:  # noqa: BLE001 - a gate must never break setup
+            return False
+
+    def _build_delivery_llm_client(self):
+        """The small planner model for scenarios WITHOUT working memory, or None.
+
+        Built at agent creation because the graph's configurable is fixed then.
+        Construction makes no network call; a session whose delivery layer never
+        activates simply never uses it (the planner node checks `active`).
+        """
+        if not self._delivery_mode():
+            return None
+        try:
+            from app.core.graph.prompt import prompt_declares_client_working_memory
+
+            prompt_data = getattr(self.scenario, "prompt_data", None)
+            if prompt_data is not None and prompt_declares_client_working_memory(
+                prompt_data
+            ):
+                return None  # the working-memory updater proposes the plan
+            from app.llms.factory import create_llm_client
+
+            return create_llm_client(
+                llm_config={
+                    "provider": getattr(
+                        settings, "DELIVERY_PLANNER_MODEL_PROVIDER", "openai"
+                    ),
+                    "config": {
+                        "model": getattr(
+                            settings, "DELIVERY_PLANNER_MODEL", "gpt-4o-mini"
+                        )
+                    },
+                },
+                language_code=self._filler_language(),
+            )
+        except Exception as e:  # noqa: BLE001 - never break setup over a plan
+            logger.warning("[DELIVERY] planner client setup failed: %s", e)
+            return None
+
+    async def _setup_opener_player(self) -> None:
+        """Build the session catalog, render it, and wire the opener handlers.
+
+        Runs in the deferred naturalness task, so rendering never delays the
+        opening statement. The catalog is fixed, so after the first session on
+        a worker most renders are cache hits. Best-effort: with nothing
+        rendered the session simply runs without openers.
+        """
+        import time as _time
+
+        from app.core.livekit.filler_clips import synthesize_clips
+        from app.core.livekit.fillers import resolve_filler_phrases
+        from app.core.livekit.gap_predictor import GapPredictor
+        from app.core.livekit.opener_catalog import build_session_catalog
+        from app.core.livekit.opener_player import OpenerPlayer
+        from app.core.livekit.opener_policy import OpenerPolicy, PolicyConfig
+
+        started = _time.monotonic()
+        self._gap_predictor = GapPredictor(
+            prior_ms=float(getattr(settings, "FILLER_GAP_PRIOR_MS", 900.0))
+        )
+        self.turn_delivery.catalog = build_session_catalog(
+            self._filler_language(),
+            studio_fillers=resolve_filler_phrases(self.scenario),
+        )
+        policy = OpenerPolicy(
+            PolicyConfig(
+                min_gap_ms=float(getattr(settings, "FILLER_PREDICTED_GAP_MS", 700.0)),
+                hold_min_ms=float(settings.OPENER_HOLD_MIN_MS),
+                hold_max_ms=float(settings.OPENER_HOLD_MAX_MS),
+                long_hold_min_ms=float(settings.OPENER_LONG_HOLD_MIN_MS),
+                long_hold_max_ms=float(settings.OPENER_LONG_HOLD_MAX_MS),
+                post_opener_pause_ms=float(settings.OPENER_POST_PAUSE_MS),
+                bridge_min_gap_ms=float(settings.OPENER_BRIDGE_MIN_GAP_MS),
+                bridge_probability=float(settings.OPENER_BRIDGE_PROBABILITY),
+                max_vocal_run=int(settings.OPENER_MAX_VOCAL_RUN),
+                repeat_window=int(settings.OPENER_REPEAT_WINDOW),
+            )
+        )
+
+        async def _synthesize(phrases, source):
+            clips = await synthesize_clips(
+                self.tts_client,
+                phrases,
+                language=self._filler_language(),
+                source=source,
+                use_cache=source != "bridge",
+                **self._clip_usage(),
+            )
+            self._filler_stats["clips_synthesized"] += len(clips)
+            return clips
+
+        player = OpenerPlayer(
+            room_name=self.ctx.room.name,
+            turn_delivery=self.turn_delivery,
+            policy=policy,
+            bg_audio_getter=lambda: self._bg_audio,
+            predicted_gap_ms=self._predicted_gap_ms,
+            synthesize=_synthesize,
+            emit_filler_transcript=self._emit_filler_transcript,
+            emit_bridge_transcript=self._emit_interim_transcript,
+            voice_on_avatar=self._voice_on_avatar,
+            post_opener_pause_ms=float(settings.OPENER_POST_PAUSE_MS),
+        )
+        playable = await player.render_catalog()
+        if not playable:
+            logger.info("[OPENER] no catalog entry rendered — no openers this session")
+            return
+        self._opener_player = player
+        self._filler_stats["first_clip_ready_s"] = round(_time.monotonic() - started, 2)
+        self.turn_delivery.on_plan(player.on_plan)
+        self.session.on("agent_state_changed")(
+            lambda ev: player.on_agent_state(
+                getattr(ev, "new_state", None), getattr(ev, "created_at", None)
+            )
+        )
+        self.session.on("user_state_changed")(
+            lambda ev: player.on_user_state(getattr(ev, "new_state", None))
+        )
+        self.session.on("user_input_transcribed")(
+            lambda ev: player.on_transcript(
+                getattr(ev, "transcript", None), bool(getattr(ev, "is_final", False))
+            )
+        )
+        self.turn_delivery.active = True
+        from app.core.graph.prompt import prompt_declares_client_working_memory
+
+        prompt_data = getattr(self.scenario, "prompt_data", None)
+        uses_wm = prompt_data is not None and prompt_declares_client_working_memory(
+            prompt_data
+        )
+        logger.info(
+            "[OPENER] enabled: %d of %d catalog entries playable (language=%s, "
+            "planner=%s)",
+            playable,
+            len(self.turn_delivery.catalog.entries),
+            self.turn_delivery.catalog.language,
+            "working_memory" if uses_wm else "small_model",
+        )
+
     def _log_filler_session_stats(self) -> None:
         """Log what the filler layer cost and delivered this session.
 
@@ -2541,16 +2741,20 @@ class AgentWorker:
     ) -> None:
         """Teach the gap predictor from a component timing as it arrives.
 
-        The two halves arrive as separate LiveKit metrics events, so they are
-        folded in separately rather than waiting to pair them up: each is a
-        genuine observation of part of the wait, and under-predicting is the safe
-        direction (the filler declines rather than talking over a fast reply).
+        The two halves of one turn's wait arrive as separate LiveKit metrics
+        events. They are PAIRED into one observation per turn: folding each in
+        alone made the average converge on the mean of the two rather than their
+        sum, which in prod predicted 0.39x the real gap and chose clips far too
+        short for it (see GapPredictor.observe_llm_ttft).
         """
         predictor = self._gap_predictor
         if predictor is None:
             return
         try:
-            predictor.observe_turn(llm_ttft_ms, tts_ttfb_ms)
+            if llm_ttft_ms is not None:
+                predictor.observe_llm_ttft(llm_ttft_ms)
+            if tts_ttfb_ms is not None:
+                predictor.observe_tts_ttfb(tts_ttfb_ms)
         except Exception:  # noqa: BLE001 - prediction must never break a turn
             pass
 

@@ -371,13 +371,14 @@ def build_simulation_graph() -> StateGraph[SimulationState]:
     return graph
 ```
 
-The sketch above is the reply path only. Three more nodes are wired in the
+The sketch above is the reply path only. Four more nodes are wired in the
 real builder, and the difference between them is *when* they are added:
 
 | Node | Position | Added |
 |---|---|---|
 | `retrieve_knowledge` (subgraph) | fans out from `START`, joins at `sync_events_and_behaviors_node` | always |
 | `update_working_memory` (subgraph) | after `publish_done_thinking` | **always** |
+| `plan_delivery` (subgraph) | after `publish_done_thinking` | **always** |
 | `compact_history` (subgraph) | after `publish_done_thinking` | only when `ROLLING_SUMMARY_ENABLED` |
 
 Both post-reply nodes sit strictly after `publish_done_thinking` — the reply
@@ -396,6 +397,18 @@ without the feature. The opt-in is now the selected main-agent prompt's body:
 the node returns immediately unless that prompt declares
 `{client_working_memory}` or a `working_memory_*` section placeholder, so the
 cost for every other simulation is one no-op node visit.
+
+`plan_delivery` plans how the character STARTS its next reply (see
+[Turn Openers](turn-openers.md)). It is the complement of working memory:
+working-memory scenarios get the plan from the updater call they already make
+(`ProposedUpdate.delivery`), so the node returns at once for them and runs a
+small-model planner, detached, only for scenarios without working memory whose
+session has an active delivery layer (`TurnDelivery.active`). Subgraph-wrapped
+for the same LiveKit #2836 reason. Neither planner can delay the current reply.
+
+`generate_response` also appends one trailing system line when an opener
+already played this turn (`TurnDelivery.reply_note`), so the reply does not
+open with a second hesitation.
 
 ---
 

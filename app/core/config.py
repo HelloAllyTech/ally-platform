@@ -538,7 +538,7 @@ class Settings(BaseSettings):
     # a DIFFERENT type, if nothing else has started by then. Bounded at two per
     # turn — a third reads as stalling rather than thinking.
     FILLER_CONTINUATION_ENABLED: bool = Field(
-        default=True,
+        default=False,
         description=(
             "Play a second, different-type filler when the first ends and "
             "neither the interim reply nor the real reply has started."
@@ -552,8 +552,12 @@ class Settings(BaseSettings):
         ),
     )
     FILLER_MAX_PER_TURN: int = Field(
-        default=2,
-        description="Hard cap on fillers played within a single turn.",
+        default=1,
+        description=(
+            "Hard cap on fillers played within a single turn. One: two fillers "
+            "back to back read as stalling (67% of prod filler turns stacked two "
+            "before this default changed)."
+        ),
     )
 
     # ---- Filler pool, cache and generation cadence ----
@@ -674,6 +678,96 @@ class Settings(BaseSettings):
         description=(
             "Wait (ms) after the learner stops before an early-trigger filler "
             "plays, so a brief mid-sentence pause doesn't get talked over."
+        ),
+    )
+
+    # ---- Delivery plan: how the character STARTS each reply ----
+    # Replaces the generated-filler path (seed / exchange / in-turn batches,
+    # the continuation filler and the interim reply) with a plan proposed by
+    # client working memory — or, for scenarios without it, by a small planner
+    # — that PICKS from a fixed opener catalog, played under deterministic
+    # turn-time rules. See app/core/livekit/delivery.py and opener_policy.py.
+    # False restores the previous filler path exactly (rollback lever).
+    DELIVERY_PLAN_ENABLED: bool = Field(
+        default=True,
+        description=(
+            "Drive turn openers from the delivery plan + opener catalog instead "
+            "of LLM-generated fillers. False restores the legacy filler path."
+        ),
+    )
+    DELIVERY_PLANNER_MODEL_PROVIDER: str = Field(
+        default="openai",
+        description=(
+            "Provider for the small delivery planner used by scenarios WITHOUT "
+            "client working memory (working-memory scenarios get the plan from "
+            "the updater call they already make)."
+        ),
+    )
+    DELIVERY_PLANNER_MODEL: str = Field(
+        default="gpt-4o-mini",
+        description="Model id for the small delivery planner.",
+    )
+    DELIVERY_PLANNER_TIMEOUT_S: float = Field(
+        default=8.0,
+        description=(
+            "Timeout for one planner call. It runs detached after the reply, "
+            "so a miss only means the next turn reuses the previous plan."
+        ),
+    )
+    OPENER_HOLD_MIN_MS: float = Field(
+        default=350.0,
+        description=(
+            "Lower bound of the randomised silence before an opener. Doubles as "
+            "a confirmation window: learner speech inside it cancels the opener."
+        ),
+    )
+    OPENER_HOLD_MAX_MS: float = Field(
+        default=1000.0, description="Upper bound of the randomised pre-opener hold."
+    )
+    OPENER_LONG_HOLD_MIN_MS: float = Field(
+        default=900.0,
+        description="Hold lower bound when the plan says a pause fits the moment.",
+    )
+    OPENER_LONG_HOLD_MAX_MS: float = Field(
+        default=1600.0,
+        description="Hold upper bound when the plan says a pause fits the moment.",
+    )
+    OPENER_POST_PAUSE_MS: float = Field(
+        default=550.0,
+        description=(
+            "Thinking pause after an opener before a bridge line (and the minimum "
+            "left before the predicted reply)."
+        ),
+    )
+    OPENER_BRIDGE_MIN_GAP_MS: float = Field(
+        default=2200.0,
+        description="Predicted gap below which no bridge line is attempted.",
+    )
+    OPENER_BRIDGE_PROBABILITY: float = Field(
+        default=0.35,
+        description="Chance of a bridge line on a turn where one fits.",
+    )
+    OPENER_MAX_VOCAL_RUN: int = Field(
+        default=2,
+        description="Most consecutive turns that may open with a vocal sound.",
+    )
+    OPENER_REPEAT_WINDOW: int = Field(
+        default=4,
+        description="Recent openers whose sound family may not be reused.",
+    )
+    # Deterministic caps on the reply stream (app/core/livekit/reply_shaping.py).
+    AUDIO_TAG_MAX_PER_REPLY: int = Field(
+        default=1,
+        description=(
+            "Most inline ElevenLabs v3 audio tags kept per reply; extras are "
+            "dropped from the stream. Negative disables the cap."
+        ),
+    )
+    REPLY_TRIM_LEADING_HESITATION: bool = Field(
+        default=True,
+        description=(
+            "When an opener already played this turn, drop a leading hesitation "
+            "word or pause tag from the reply stream."
         ),
     )
 

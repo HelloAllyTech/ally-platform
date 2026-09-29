@@ -202,6 +202,18 @@ FILLER_DECISIONS = frozenset(
         # cadence gate look like it declined turns it never saw.
         "skipped_video_actor",
         "disabled",  # feature off globally or for this scenario
+        # ---- delivery-plan openers (app/core/livekit/opener_policy.py) ----
+        # Chose no opener on purpose: variety across turns, or a pause fits.
+        # Its own bucket because "no sound" is one of the natural first sounds,
+        # not a failure to fill.
+        "skipped_policy",
+        # The learner's last words read as unfinished; an opener would land on
+        # the rest of their sentence.
+        "skipped_learner_unfinished",
+        "skipped_closing",  # the learner was saying goodbye
+        # Decided, then withdrawn during the hold: the learner spoke, the reply
+        # arrived, or a face attached. Nothing was heard.
+        "cancelled_before_play",
     }
 )
 
@@ -230,6 +242,20 @@ def note_filler_decision(room_id: str, decision: str, **details: Any) -> None:
         if value is not None:
             meta[key] = value
     turn["metadata"] = meta
+
+
+def note_filler_ended(room_id: str, filler_end_ts: float) -> None:
+    """Record when the LAST masking audio of the turn finished playing.
+
+    finalize turns it into ``postFillerSilenceMs`` — the silence between the
+    opener (or bridge line) ending and the reply starting — which is the number
+    the rubric's "a slight thinking gap, not dead air" is judged on. Before this
+    it was documented but never written, so dead air could only be inferred.
+    """
+    if not room_id:
+        return
+    turn = _turns.setdefault(room_id, {})
+    turn["filler_end_ts"] = filler_end_ts
 
 
 def note_filler_continuation(room_id: str) -> None:
@@ -334,6 +360,14 @@ def finalize(room_id: str, agent_speech_start_ts: float) -> Optional[Dict[str, A
         provenance["replyLatencyMs"] = max(
             0, round((agent_speech_start_ts - user_end) * 1000.0)
         )
+        filler_end_ts = turn.get("filler_end_ts")
+        if filler_end_ts is not None and filler_start_ts <= filler_end_ts:
+            # Negative = the reply started before the opener finished (it was
+            # cut); clamped, and flagged separately.
+            gap_ms = round((agent_speech_start_ts - filler_end_ts) * 1000.0)
+            provenance["postFillerSilenceMs"] = max(0, gap_ms)
+            if gap_ms < 0:
+                provenance["fillerCutEarlyMs"] = -gap_ms
     existing_meta = record_out.get("metadata")
     record_out["metadata"] = (
         {**existing_meta, **provenance}

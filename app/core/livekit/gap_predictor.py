@@ -52,6 +52,8 @@ class GapPredictor:
         self._min_samples = max(0, int(min_samples))
         self._value: Optional[float] = None
         self._samples = 0
+        #: This turn's LLM time-to-first-token, waiting for its TTS half.
+        self._pending_llm_ms: Optional[float] = None
 
     @property
     def samples(self) -> int:
@@ -105,6 +107,39 @@ class GapPredictor:
                 continue
         if total > 0:
             self.observe(total)
+
+    def observe_llm_ttft(self, llm_ttft_ms: Optional[float]) -> None:
+        """Hold a turn's LLM time-to-first-token until its TTS half arrives.
+
+        LiveKit reports the two halves of one turn's wait as SEPARATE metrics
+        events. Folding each into the average on its own — what this class used
+        to be fed — makes the EMA converge on roughly the MEAN of the two
+        components rather than their SUM: prod measured the prediction at 0.39x
+        the real gap on the median turn, under-predicting on 97.8% of turns, so
+        every clip chosen to fit the gap was far too short. The halves are
+        paired here instead, one observation per turn.
+        """
+        try:
+            value = float(llm_ttft_ms) if llm_ttft_ms is not None else None
+        except (TypeError, ValueError):
+            return
+        if value is not None and value > 0:
+            # A turn that never reached TTS (interrupted) is replaced, not summed.
+            self._pending_llm_ms = value
+
+    def observe_tts_ttfb(self, tts_ttfb_ms: Optional[float]) -> None:
+        """Complete the pending turn with its first TTS time-to-first-byte.
+
+        Only the FIRST TTS metric after an LLM one counts: per-sentence TTS
+        paths emit one metric per sentence, and a clip rendered off the session
+        instance is not a reply at all. Either way a TTS metric with no pending
+        LLM half is ignored rather than folded in alone.
+        """
+        pending = self._pending_llm_ms
+        if pending is None:
+            return
+        self._pending_llm_ms = None
+        self.observe_turn(pending, tts_ttfb_ms)
 
     def predict_ms(self) -> float:
         """Best estimate of the coming turn's time to first reply audio."""

@@ -1,0 +1,260 @@
+"""The delivery plan: how the character should START its next reply.
+
+WHY THIS EXISTS
+---------------
+What the learner hears first on a turn — a hum, a breath, a short bridging line,
+or simply the reply after a pause — is a judgement about the CHARACTER's state:
+a guarded client hesitates ("um…"), a reflective one hums ("hmm…"), and a moment
+of weight is better met with silence. Client working memory already derives that
+state every turn, off the reply path. So instead of a separate filler generator
+guessing the mood from the persona description, the updater that already knows
+the mood proposes the plan, and the worker plays it.
+
+Three parts, in the codebase's "the LLM proposes, code disposes" shape:
+
+* ``ProposedDelivery`` — the structured output a model returns. Untrusted.
+* ``validate_delivery`` — code decides what survives: unknown catalog ids are
+  dropped, the bridge line is capped and safety-checked.
+* ``TurnDelivery`` — the per-session holder shared by the worker (which reads
+  the plan and records the opener it played) and the graph (which writes plans
+  and tells the reply what was already said). Worker-owned and passed in through
+  ``configurable``, exactly like the working-memory store.
+
+The plan is made AFTER the character speaks and used on the NEXT turn, so it can
+fit the character's state but not what the learner is about to say. That is the
+deliberate trade: nothing is added between the learner finishing and hearing
+audio.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import time
+from dataclasses import dataclass, field
+from typing import Callable, List, Optional, Set
+
+from pydantic import BaseModel, Field
+
+from app.core.livekit.opener_catalog import OPENER_KINDS, SessionCatalog
+from app.core.logger import get_logger
+
+logger = get_logger(__name__)
+
+#: A bridge line is one short sentence. Longer and it becomes a reply, which it
+#: must never be: the real reply follows and must not be contradicted.
+MAX_BRIDGE_WORDS = 18
+MAX_BRIDGE_CHARS = 160
+MAX_OPENER_IDS = 3
+
+#: Opener kinds the plan may name, plus the explicit choice of saying nothing.
+PLAN_KINDS = ("silence",) + OPENER_KINDS
+
+
+class ProposedDelivery(BaseModel):
+    """How the character should begin its NEXT reply. Untrusted model output."""
+
+    opener_kind: str = Field(
+        default="hum",
+        description=(
+            "The kind of first sound that fits the character's state right now: "
+            "silence, hum, hesitation, reflective, lexical, breath or sigh."
+        ),
+    )
+    opener_ids: List[str] = Field(
+        default_factory=list,
+        description="Up to 3 opener ids from the catalog, best fit first.",
+    )
+    bridge_line: Optional[str] = Field(
+        default=None,
+        description=(
+            "One short, non-committal line in the character's voice that could "
+            "precede ANY reply (no answer, no fact, no question)."
+        ),
+    )
+    hold_silence: bool = Field(
+        default=False,
+        description="True when a noticeable pause fits better than any sound.",
+    )
+
+
+@dataclass(frozen=True)
+class DeliveryPlan:
+    """What code accepted from a proposal."""
+
+    opener_kind: str = "hum"
+    opener_ids: tuple = ()
+    bridge_line: Optional[str] = None
+    hold_silence: bool = False
+    #: Which planner produced it: "working_memory" | "planner" | "default".
+    source: str = "default"
+    #: The character turn the plan was derived from; -1 when unknown.
+    made_after_turn: int = -1
+    created_at: float = field(default_factory=time.time)
+
+
+#: Used until any planner has produced something. Neutral on purpose: it must be
+#: safe for a character in any state on the first learner turn.
+DEFAULT_PLAN = DeliveryPlan(opener_kind="hum", source="default")
+
+
+def _safe_bridge(text: Optional[str]) -> Optional[str]:
+    """A bridge line that can precede any reply, or None.
+
+    Same rules as the filler safety check, sized for a sentence: no question
+    (it would demand an answer the character hasn't given), no digits (always a
+    specific claim), nothing long enough to be a reply in its own right.
+    """
+    line = " ".join((text or "").split())
+    if not line:
+        return None
+    if len(line) > MAX_BRIDGE_CHARS or len(line.split()) > MAX_BRIDGE_WORDS:
+        return None
+    if "?" in line or "？" in line:
+        return None
+    if any(ch.isdigit() for ch in line):
+        return None
+    return line
+
+
+def validate_delivery(
+    proposal: Optional[ProposedDelivery],
+    catalog: Optional[SessionCatalog],
+    *,
+    source: str,
+    made_after_turn: int = -1,
+) -> Optional[DeliveryPlan]:
+    """Turn a proposal into a plan, or None when nothing usable came back.
+
+    Opener ids the session's catalog does not hold are dropped rather than
+    guessed at — a hallucinated id is the common failure. A kind outside the
+    vocabulary falls back to the kind of the first surviving id, else "hum".
+    """
+    if proposal is None:
+        return None
+    ids: List[str] = []
+    for raw in proposal.opener_ids or []:
+        entry_id = str(raw or "").strip()
+        if not entry_id or entry_id in ids:
+            continue
+        if catalog is not None and catalog.get(entry_id) is None:
+            continue
+        ids.append(entry_id)
+        if len(ids) >= MAX_OPENER_IDS:
+            break
+    kind = str(proposal.opener_kind or "").strip().lower()
+    if kind not in PLAN_KINDS:
+        first = catalog.get(ids[0]) if (catalog is not None and ids) else None
+        kind = first.kind if first is not None else "hum"
+    return DeliveryPlan(
+        opener_kind=kind,
+        opener_ids=tuple(ids),
+        bridge_line=_safe_bridge(proposal.bridge_line),
+        hold_silence=bool(proposal.hold_silence) or kind == "silence",
+        source=source,
+        made_after_turn=made_after_turn,
+    )
+
+
+@dataclass
+class OpenerRecord:
+    """What the worker decided to play at the start of the current turn."""
+
+    #: "none" | "vocal" | "body" — body = breath or sigh.
+    category: str
+    entry_id: Optional[str] = None
+    kind: Optional[str] = None
+    #: The words spoken, when there were any (catalog text or bridge line).
+    spoken: Optional[str] = None
+    bridge: Optional[str] = None
+    decided_at: float = field(default_factory=time.time)
+
+    @property
+    def made_a_sound(self) -> bool:
+        return self.category != "none" or bool(self.bridge)
+
+
+class TurnDelivery:
+    """Per-session holder: the latest plan, and this turn's opener.
+
+    Single event loop, so plain attributes suffice: plans are written from the
+    detached planner tasks and read by the worker's state handlers, all on the
+    session's loop.
+    """
+
+    def __init__(self, catalog: Optional[SessionCatalog] = None) -> None:
+        self.catalog = catalog
+        self._plan: DeliveryPlan = DEFAULT_PLAN
+        self._opener: Optional[OpenerRecord] = None
+        self._listeners: List[Callable[[DeliveryPlan], None]] = []
+        self.plans_received = 0
+        #: Set by the worker once openers can actually play (clips rendered,
+        #: handlers wired). Planners no-op until then, so a session whose
+        #: delivery layer never comes up pays for no planning calls.
+        self.active = False
+        #: The small planner (non-working-memory scenarios) runs one call at a
+        #: time; strong references to its detached tasks live here.
+        self.planner_in_flight = False
+        self.tasks: Set[asyncio.Task] = set()
+
+    # ---- plans (written by the graph's planners) --------------------
+
+    @property
+    def plan(self) -> DeliveryPlan:
+        return self._plan
+
+    def on_plan(self, listener: Callable[[DeliveryPlan], None]) -> None:
+        """Call ``listener`` with every accepted plan (e.g. to pre-render a bridge)."""
+        self._listeners.append(listener)
+
+    def set_plan(self, plan: Optional[DeliveryPlan]) -> None:
+        if plan is None:
+            return
+        self._plan = plan
+        self.plans_received += 1
+        for listener in list(self._listeners):
+            try:
+                listener(plan)
+            except Exception:  # noqa: BLE001 - a listener must not drop the plan
+                logger.warning("[DELIVERY] plan listener failed", exc_info=True)
+
+    # ---- this turn's opener (written by the worker) -----------------
+
+    def begin_turn(self) -> None:
+        """Forget last turn's opener; called when the agent starts thinking."""
+        self._opener = None
+
+    def note_opener(self, record: OpenerRecord) -> None:
+        self._opener = record
+
+    def end_turn(self) -> None:
+        self._opener = None
+
+    @property
+    def opener(self) -> Optional[OpenerRecord]:
+        return self._opener
+
+    def reply_note(self) -> Optional[str]:
+        """One line for the reply prompt describing what was already said.
+
+        This is what a separate filler system could never do: the opener is
+        decided from a plan that existed before the turn began, so the actor
+        can be told about it and stop opening with a second hesitation — 19 of
+        43 sampled prod turns were exactly that double "umm…" -> "[long pause]
+        Yeah…".
+        """
+        record = self._opener
+        if record is None or not record.made_a_sound:
+            return None
+        parts: List[str] = []
+        if record.category == "body" and record.kind:
+            parts.append(f"a {record.kind}")
+        elif record.spoken:
+            parts.append(f'"{record.spoken}"')
+        if record.bridge:
+            parts.append(f'then "{record.bridge}"')
+        said = " ".join(parts) if parts else "a brief hesitation"
+        return (
+            f"You have ALREADY begun this reply out loud with {said}, followed by "
+            "a short pause. Continue straight from there: do not open with another "
+            "hesitation, filler word, sigh or pause tag, and do not repeat it."
+        )

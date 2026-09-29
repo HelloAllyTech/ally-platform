@@ -54,6 +54,10 @@ _TEMPLATE_PATH = "system/client_working_memory_updater"
 #: leave a blank line under a heading.
 NO_AUTHORED_STAGES = "  (this scenario defines no stages)"
 NO_CURRENT_STAGE = "(no stage defined — judge from the turns alone)"
+#: Named absence for the opener catalog, same rule as the two above. A session
+#: with no delivery layer (fillers off, or a voice that renders no clips) still
+#: runs this prompt, and must read "leave it out" rather than an empty list.
+NO_OPENER_CATALOG = "(no openers available this session — leave delivery empty)"
 
 #: Turns of conversation handed to the updater. The rolling summary already
 #: carries everything older, so this window only has to cover "what just
@@ -185,6 +189,7 @@ async def consolidate(
     prompt_data=None,
     room_id: Optional[str] = None,
     authored_stance: Optional[str] = None,
+    opener_catalog: Optional[str] = None,
 ) -> Optional[ValidatedUpdate]:
     """One LLM call, then validation. Returns None when there is nothing to do.
 
@@ -247,6 +252,7 @@ async def consolidate(
         # model what to do then — judge from the turns.
         state_ladder=state_ladder or NO_AUTHORED_STAGES,
         current_state=authored_stance or NO_CURRENT_STAGE,
+        opener_catalog=opener_catalog or NO_OPENER_CATALOG,
     )
     if not system_text:
         logger.warning("[working-memory] updater template resolved empty; skipping")
@@ -531,6 +537,11 @@ def schedule_update(
     # (knowledge_locks.py). Display only: they are authored, so they reach the
     # panel's re-rendered sections and never the store.
     locked_topics: Optional[List[str]] = None,
+    # The session's opener catalog as the prompt lists it, and where an
+    # accepted delivery plan goes. Both None when the session has no delivery
+    # layer, in which case the prompt is told to leave delivery empty.
+    opener_catalog: Optional[str] = None,
+    on_delivery=None,
 ) -> bool:
     """Fire the consolidation as a DETACHED task writing into ``store``.
 
@@ -558,6 +569,7 @@ def schedule_update(
                     prompt_data=prompt_data,
                     room_id=room_id,
                     authored_stance=authored_stance,
+                    opener_catalog=opener_catalog,
                 ),
                 timeout=timeout,
             )
@@ -614,6 +626,18 @@ def schedule_update(
 
         if update is None:
             return
+
+        # The delivery plan is for the VERY NEXT learner turn, so it is handed
+        # over before recall and the commit rather than after them — it depends
+        # on neither, and every millisecond here is a chance the learner has
+        # already finished speaking.
+        if on_delivery is not None and update.delivery is not None:
+            try:
+                on_delivery(update.delivery, turn_index)
+            except Exception:  # noqa: BLE001 - a plan must not cost the commit
+                logger.warning(
+                    "[working-memory] delivery plan hand-off failed", exc_info=True
+                )
 
         # Recall runs HERE — off the reply path, after the update that produced
         # the cues, and before the single commit. Two consequences worth having:

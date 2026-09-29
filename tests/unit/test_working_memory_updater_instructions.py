@@ -143,7 +143,16 @@ def test_every_field_the_template_names_exists_on_the_schema():
         if match:
             named.update(part.strip() for part in match.group(1).split("/"))
 
+    from app.core.livekit.delivery import ProposedDelivery
+
+    # `delivery` is a nested object: its own fields are the bullets, under a
+    # heading that names the object itself.
     schema_fields = set(ProposedUpdate.model_json_schema()["properties"])
+    assert "delivery" in schema_fields
+    assert "(delivery)" in body, "the delivery section must name its field"
+    schema_fields = (schema_fields - {"delivery"}) | set(
+        ProposedDelivery.model_json_schema()["properties"]
+    )
     assert named, "no field bullets found — did the template's format change?"
     assert named == schema_fields
 

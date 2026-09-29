@@ -4,7 +4,7 @@ import json
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, cast
 
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 
 from app.core.agent.glossary_swap import swap_complete_text, swap_table_for
@@ -62,6 +62,7 @@ from app.core.scenario.base import (
     SimulationStateInstruction,
 )
 from app.core.scoring.score_keeper import ScoreKeeper
+from app.core.tasks import spawn_background_task
 from app.core.time_utils import TimingContext, time_operation
 from app.llms import create_llm_client
 from app.prompts.resolver import load_template
@@ -1701,6 +1702,14 @@ async def generate_response(
     messages_to_send.extend(history)
     if retrieved_context_message is not None:
         messages_to_send.append(retrieved_context_message)
+    # What the learner has ALREADY heard this turn (a catalog opener, a bridge
+    # line). Last, so it is the freshest instruction the model reads, and after
+    # everything cacheable so it never moves the cached prefix. See
+    # TurnDelivery.reply_note: without it the reply opened with its own "um" /
+    # "[long pause]" right after the opener in 19 of 43 sampled prod turns.
+    _opener_note = _delivery_reply_note(config)
+    if _opener_note:
+        messages_to_send.append(SystemMessage(content=_opener_note))
 
     # Get LLM instance
     llm_instance = llm_client.llm_instance
@@ -2680,8 +2689,114 @@ async def update_working_memory(
         ),
         credited_behaviours=list(getattr(state, "advancing_behaviour_ids", None) or []),
         locked_topics=_locked_topics_for_display(prompt_data, configurable),
+        **_delivery_hooks(configurable.get("turn_delivery"), "working_memory"),
     )
     return {}
+
+
+def _delivery_reply_note(config: Optional[RunnableConfig]) -> Optional[str]:
+    """The TurnDelivery note for this turn's opener, or None. Never raises."""
+    try:
+        turn_delivery = (config or {}).get("configurable", {}).get("turn_delivery")
+        return turn_delivery.reply_note() if turn_delivery is not None else None
+    except Exception:  # noqa: BLE001 - a note must never cost the reply
+        logger.debug("[DELIVERY] reply note skipped", exc_info=True)
+        return None
+
+
+async def plan_delivery(
+    state: SimulationState, config: Optional[RunnableConfig] = None
+) -> dict:
+    """Schedule the small delivery planner for scenarios WITHOUT working memory.
+
+    Terminal and detached, for the same reasons as update_working_memory: the
+    plan is for the NEXT turn, so its call must never sit between the learner
+    finishing and hearing this one. Working-memory scenarios return at once —
+    their updater already proposes the plan with the state it just derived, and
+    two planners for one turn would race.
+
+    One call per character turn at most, and none while the previous one is
+    still in flight; a miss just leaves the previous plan in force. Never writes
+    graph state — the plan lives on the worker-owned TurnDelivery.
+    """
+    configurable = (config or {}).get("configurable", {})
+    turn_delivery = configurable.get("turn_delivery")
+    if turn_delivery is None or not getattr(turn_delivery, "active", False):
+        return {}
+    catalog = getattr(turn_delivery, "catalog", None)
+    if catalog is None or not catalog.entries:
+        return {}
+    _clock = configurable.get("session_clock")
+    if _clock is not None and getattr(_clock, "is_paused", False):
+        return {}
+    scenario = cast(Scenario, configurable.get("scenario")) if configurable else None
+    prompt_data = getattr(scenario, "prompt_data", None) if scenario else None
+    if prompt_data is not None and prompt_declares_client_working_memory(prompt_data):
+        return {}
+    llm_client = configurable.get("delivery_llm_client")
+    if llm_client is None or turn_delivery.planner_in_flight:
+        return {}
+
+    from app.core.livekit.delivery import validate_delivery
+    from app.core.livekit.delivery_planner import plan_next_delivery
+
+    messages = list(state.messages)
+    room = configurable.get("room")
+    room_id = getattr(room, "name", None)
+    made_after = sum(1 for m in messages if isinstance(m, AIMessage)) - 1
+
+    async def _plan() -> None:
+        try:
+            proposal = await plan_next_delivery(
+                llm_client,
+                scenario,
+                messages,
+                catalog.describe_for_prompt(),
+                timeout_s=float(settings.DELIVERY_PLANNER_TIMEOUT_S),
+                room_id=room_id,
+            )
+            turn_delivery.set_plan(
+                validate_delivery(
+                    proposal, catalog, source="planner", made_after_turn=made_after
+                )
+            )
+        finally:
+            turn_delivery.planner_in_flight = False
+
+    turn_delivery.planner_in_flight = True
+    task = spawn_background_task(
+        _plan(), name="delivery-planner", background_tasks=turn_delivery.tasks
+    )
+    if task is None:
+        turn_delivery.planner_in_flight = False
+    return {}
+
+
+def _delivery_hooks(turn_delivery, source: str) -> dict:
+    """``schedule_update`` kwargs that route a proposed delivery plan to the worker.
+
+    Empty when the session has no active delivery layer (fillers off, a voice
+    that renders no clips, or DELIVERY_PLAN_ENABLED off): the updater prompt is
+    then told there are no openers and the field stays empty.
+    """
+    if turn_delivery is None or not getattr(turn_delivery, "active", False):
+        return {}
+    catalog = getattr(turn_delivery, "catalog", None)
+    if catalog is None or not catalog.entries:
+        return {}
+    from app.core.livekit.delivery import validate_delivery
+
+    def _on_delivery(proposal, turn_index: int) -> None:
+        turn_delivery.set_plan(
+            validate_delivery(
+                proposal, catalog, source=source, made_after_turn=turn_index
+            )
+        )
+
+    return {
+        "opener_catalog": catalog.describe_for_prompt(),
+        "on_delivery": _on_delivery,
+    }
 
 
 def _locked_topics_for_display(prompt_data: Any, configurable: dict) -> List[str]:
