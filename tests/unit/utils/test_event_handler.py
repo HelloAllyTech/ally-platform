@@ -596,10 +596,18 @@ class TestShutdownHandlerBoundsInlineFinalize:
     @pytest.mark.asyncio
     async def test_on_shutdown_times_out_a_hanging_inline_finalize(self, monkeypatch):
         finalize_started = asyncio.Event()
+        hanging_task = None
 
         async def hanging_finalize_session(**kwargs):
+            nonlocal hanging_task
             finalize_started.set()
-            await asyncio.sleep(3600)
+            # The real test is the timeout on the other side; this task just
+            # needs to stay pending long enough for that to fire.
+            hanging_task = asyncio.current_task()
+            try:
+                await asyncio.sleep(3600)
+            except asyncio.CancelledError:
+                pass
 
         monkeypatch.setattr(eh, "finalize_session", hanging_finalize_session)
 
@@ -630,10 +638,14 @@ class TestShutdownHandlerBoundsInlineFinalize:
             cleanup_background_tasks=noop_cleanup,
         )
 
-        # Bounded regardless of whether the fix is present: pre-fix, the
-        # inline finalize_session() call has no cap of its own, on_shutdown()
-        # never returns, and this raises TimeoutError.
-        await real_wait_for(handler(), timeout=2.0)
+        try:
+            # Bounded regardless of whether the fix is present: pre-fix, the
+            # inline finalize_session() call has no cap of its own, on_shutdown()
+            # never returns, and this raises TimeoutError.
+            await real_wait_for(handler(), timeout=2.0)
+        finally:
+            if hanging_task:
+                hanging_task.cancel()
 
         assert finalize_started.is_set()
 
