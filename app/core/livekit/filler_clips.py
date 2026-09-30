@@ -398,6 +398,16 @@ async def _render_one(
         return None
 
 
+def _synthesis_concurrency() -> int:
+    """How many clip syntheses may run at once (``CLIP_SYNTH_CONCURRENCY``)."""
+    try:
+        from app.core.config import settings
+
+        return max(1, int(getattr(settings, "CLIP_SYNTH_CONCURRENCY", 3)))
+    except Exception:  # noqa: BLE001 - a setting must never break synthesis
+        return 3
+
+
 def clip_tts_available(tts_client) -> bool:
     """Whether ``tts_client`` can render clips at all this session.
 
@@ -498,10 +508,20 @@ async def synthesize_clips(
                 len(requests) - len(misses),
             )
         else:
+            # Bounded, not all at once: a scenario with many Studio filler words
+            # renders a 24-entry opener catalog at session start, and firing
+            # every request together drew bursts of ElevenLabs 429 "Too Many
+            # Requests" in prod (2026-09-30).
+            limit = asyncio.Semaphore(_synthesis_concurrency())
+
+            async def _bounded(index: int):
+                async with limit:
+                    return await _render_one(
+                        tts, requests[index][0], requests[index][2]
+                    )
+
             try:
-                rendered = await asyncio.gather(
-                    *[_render_one(tts, requests[i][0], requests[i][2]) for i in misses]
-                )
+                rendered = await asyncio.gather(*[_bounded(i) for i in misses])
             finally:
                 aclose = getattr(tts, "aclose", None)
                 if aclose is not None:

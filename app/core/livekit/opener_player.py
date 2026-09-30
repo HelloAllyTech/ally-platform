@@ -147,6 +147,12 @@ class OpenerPlayer:
                     turn_metrics.record(
                         self._room, metadata={"openerCancelledByLearner": True}
                     )
+                    if not self._is_playing():
+                        # Still in the hold: nothing was heard, so this is a
+                        # withdrawn decision, not a played opener.
+                        turn_metrics.note_filler_decision(
+                            self._room, "cancelled_before_play"
+                        )
                     self._cancel()
             else:
                 self.user_speaking = False
@@ -185,12 +191,14 @@ class OpenerPlayer:
             turn_metrics.note_filler_decision(self._room, "skipped_video_actor")
             return
         if self._opened_since_reply:
-            # A false endpoint: the learner paused, heard an opener, and went
+            # A false endpoint: the learner paused, HEARD an opener, and went
             # on. Their next pause is the same reply cycle, and a second opener
             # there is two fillers stacked before one reply — seen live as
-            # "I mean…" then "Well…".
+            # "I mean…" then "Well…". Only an opener that actually played
+            # counts (the flag is set at playback): one withdrawn during its
+            # hold was never heard and must not silence the rest of the turn.
             self.stats["none"] += 1
-            turn_metrics.note_filler_decision(self._room, "skipped_policy")
+            turn_metrics.note_filler_decision(self._room, "skipped_same_reply")
             return
         plan = self.turn_delivery.plan
         predicted = float(self._predicted_gap_ms())
@@ -225,7 +233,6 @@ class OpenerPlayer:
                 bridge=bridge[0] if (decision.bridge and bridge) else None,
             )
         )
-        self._opened_since_reply = True
         self._task = spawn_background_task(
             self._run(decision, created_at, details),
             name="opener-play",
@@ -249,6 +256,7 @@ class OpenerPlayer:
                     self._withdraw()
                     return
                 play_ts = time.time()
+                self._opened_since_reply = True
                 self._handle = self._bg_audio().play(
                     AudioConfig(clip_audio_source(clip))
                 )
@@ -271,6 +279,7 @@ class OpenerPlayer:
                 text, clip = bridge
                 self._bridge = None  # a line is heard once
                 play_ts = time.time()
+                self._opened_since_reply = True
                 self._handle = self._bg_audio().play(
                     AudioConfig(clip_audio_source(clip))
                 )

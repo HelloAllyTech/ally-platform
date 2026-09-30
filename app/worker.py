@@ -2661,6 +2661,7 @@ class AgentWorker:
                 bridge_min_gap_ms=float(settings.OPENER_BRIDGE_MIN_GAP_MS),
                 bridge_probability=float(settings.OPENER_BRIDGE_PROBABILITY),
                 max_vocal_run=int(settings.OPENER_MAX_VOCAL_RUN),
+                max_silent_gap_ms=float(settings.OPENER_MAX_SILENT_GAP_MS),
                 repeat_window=int(settings.OPENER_REPEAT_WINDOW),
             )
         )
