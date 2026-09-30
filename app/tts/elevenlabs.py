@@ -200,6 +200,7 @@ class ElevenLabsTTSClient(BaseTTSClient):
                 voice_id=self._voice_id,
                 model=self._model,
                 api_key=self._api_key,
+                inactivity_timeout=30.0,
             )
             self._base_tts = base
             self._wrap_stream_with_timeout(base)
