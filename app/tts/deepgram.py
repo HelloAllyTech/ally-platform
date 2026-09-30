@@ -130,4 +130,5 @@ class DeepgramTTSClient(BaseTTSClient):
                 sample_rate=24000,
                 api_key=self._api_key,
             )
+            self._wrap_stream_with_timeout(self._tts_instance)
         return self._tts_instance

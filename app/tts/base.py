@@ -425,3 +425,35 @@ class BaseTTSClient(ABC):
 
         except Exception as e:
             logger.error(f"Failed to update TTS options: {e}", exc_info=True)
+
+    def _wrap_stream_with_timeout(self, tts_instance: Any) -> None:
+        """
+        Wrap the stream method of a TTS instance with a timeout.
+
+        Args:
+            tts_instance: The TTS instance to wrap.
+        """
+        if not hasattr(tts_instance, "stream") or hasattr(
+            tts_instance, "_timeout_wrapped"
+        ):
+            return
+
+        from livekit.agents import APIConnectOptions
+
+        from app.core.config import settings
+
+        original_stream = getattr(tts_instance, "stream")
+
+        def custom_stream(
+            conn_options: Optional[APIConnectOptions] = None,
+        ) -> Any:
+            if conn_options is None:
+                conn_options = APIConnectOptions(timeout=settings.TTS_TIMEOUT)
+            else:
+                from dataclasses import replace
+
+                conn_options = replace(conn_options, timeout=settings.TTS_TIMEOUT)
+            return original_stream(conn_options=conn_options)
+
+        object.__setattr__(tts_instance, "stream", custom_stream)
+        object.__setattr__(tts_instance, "_timeout_wrapped", True)

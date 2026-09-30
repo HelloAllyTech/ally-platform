@@ -188,6 +188,12 @@ class Settings(BaseSettings):
             "Upper limit in seconds to wait for Sarvam TTS response before giving up"
         ),
     )
+    TTS_TIMEOUT: float = Field(
+        default=30.0,
+        description=(
+            "Upper limit in seconds to wait for TTS responses before giving up"
+        ),
+    )
     HUME_API_KEY: str = Field(...)
     CARTESIA_API_KEY: str = Field(...)
     SMALLEST_API_KEY: str = Field(...)
