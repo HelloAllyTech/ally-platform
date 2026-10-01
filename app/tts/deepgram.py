@@ -132,6 +132,7 @@ class DeepgramTTSClient(BaseTTSClient):
                 api_key=self._api_key,
             )
             self._wrap_stream_with_timeout(self._tts_instance)
+            self._wrap_stream_with_timeout(self._tts_instance)
         return self._tts_instance
 
     async def synthesize(self, text: str) -> AsyncIterator[bytes]:
