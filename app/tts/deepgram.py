@@ -1,6 +1,7 @@
 """Deepgram TTS provider implementation."""
 
-from typing import Any, Dict, Optional
+import asyncio
+from typing import Any, AsyncIterator, Dict, Optional
 
 from deepgram import DeepgramClient
 from deepgram.core import ApiError as DeepgramApiError
@@ -132,3 +133,26 @@ class DeepgramTTSClient(BaseTTSClient):
             )
             self._wrap_stream_with_timeout(self._tts_instance)
         return self._tts_instance
+
+    async def synthesize(self, text: str) -> AsyncIterator[bytes]:
+        """
+        Synthesize text using Deepgram TTS with a timeout.
+
+        Args:
+            text: Text to synthesize
+
+        Yields:
+            Audio chunks as bytes
+        """
+        try:
+            # The underlying Deepgram client does not support a timeout,
+            # so we wrap the call in asyncio.wait_for.
+            agen = await asyncio.wait_for(
+                self.tts_instance.synthesize(text),
+                timeout=30.0,
+            )
+            async for chunk in agen:
+                yield chunk
+        except asyncio.TimeoutError:
+            logger.warning("Deepgram TTS synthesis timed out")
+            raise
