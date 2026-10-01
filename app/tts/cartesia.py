@@ -128,4 +128,5 @@ class CartesiaTTSClient(BaseTTSClient):
                 # rather than only for the unsupported languages.
                 word_timestamps=False,
             )
+            self._wrap_stream_with_timeout(self._tts_instance)
         return self._tts_instance

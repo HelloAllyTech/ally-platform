@@ -203,6 +203,7 @@ class ElevenLabsTTSClient(BaseTTSClient):
                 inactivity_timeout=30.0,
             )
             self._base_tts = base
+            self._wrap_stream_with_timeout(base)
             if self._is_v3_model:
                 # v3 models are generative and sentence-streamed, so they need
                 # higher stability to avoid noticeable voice shifts mid-reply.

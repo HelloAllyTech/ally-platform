@@ -217,6 +217,7 @@ class HumeTTSClient(BaseTTSClient):
                     instant_mode=self._instant_mode,
                     api_key=self._api_key,
                 )
+                self._wrap_stream_with_timeout(self._tts_instance)
                 logger.info("Successfully created Hume TTS instance")
             except AttributeError as e:
                 logger.error(

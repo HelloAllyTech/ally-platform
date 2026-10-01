@@ -343,6 +343,7 @@ class GoogleTTSClient(BaseTTSClient):
                 tts_kwargs["credentials_file"] = self._credentials_file
 
             self._tts_instance = google.TTS(**tts_kwargs)
+            self._wrap_stream_with_timeout(self._tts_instance)
         return self._tts_instance
 
     def _apply_parameters_dict(self, params_dict: Dict[str, Any]) -> None:

@@ -119,4 +119,5 @@ class SmallestAITTSClient(BaseTTSClient):
             if self._speed is not None:
                 kwargs["speed"] = self._speed
             self._tts_instance = smallestai.TTS(**kwargs)
+            self._wrap_stream_with_timeout(self._tts_instance)
         return self._tts_instance
