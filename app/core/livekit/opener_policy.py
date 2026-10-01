@@ -143,8 +143,14 @@ class PolicyConfig:
     #: adjustments. "none" is weighted in on purpose: a reply after a pause is
     #: one of the natural first sounds, not a failure to fill.
     weight_none: float = 0.35
-    weight_vocal: float = 0.45
-    weight_body: float = 0.25
+    #: The category the plan asked for, and any other playable category.
+    weight_planned: float = 0.6
+    weight_unplanned: float = 0.12
+    #: Multiplier on the category used last turn: variety without overruling
+    #: the plan outright.
+    repeat_category_factor: float = 0.4
+    #: At or above this predicted gap, choosing silence is not allowed.
+    max_silent_gap_ms: float = 3000.0
     bridge_probability: float = 0.35
 
 
@@ -245,18 +251,29 @@ class OpenerPolicy:
         room_ms = predicted_gap_ms - hold - cfg.post_opener_pause_ms
 
         last = self._categories[-1] if self._categories else None
+        # The plan's own category leads clearly: in the first prod day, the old
+        # 0.45 / 0.25 split played a different kind from the one planned on 5
+        # of 11 openers (a "sigh" plan heard as "Hmm").
+        planned_vocal = plan.opener_kind in VOCAL_KINDS
+        planned_body = plan.opener_kind in BODY_KINDS
         weights: Dict[str, float] = {
             # A pause-fits plan mostly LENGTHENS the hold (above); it only
             # nudges toward saying nothing. At +0.4, planners that set it
             # freely left 12 of 16 live v2v turns silent.
             "none": cfg.weight_none + (0.15 if plan.hold_silence else 0.0),
-            "vocal": cfg.weight_vocal if plan.opener_kind in VOCAL_KINDS else 0.2,
-            "body": cfg.weight_body if plan.opener_kind in BODY_KINDS else 0.12,
+            "vocal": cfg.weight_planned if planned_vocal else cfg.weight_unplanned,
+            "body": cfg.weight_planned if planned_body else cfg.weight_unplanned,
         }
         if self._vocal_run() >= cfg.max_vocal_run:
             weights["vocal"] = 0.0
         if last in weights:
-            weights[last] *= 0.25
+            weights[last] *= cfg.repeat_category_factor
+        # Silence is a device for a SHORT beat, not for a long wait: in the
+        # first prod day, turns where the policy chose nothing left the learner
+        # in p50 5.7 s of total silence (23 of 34 decided turns). Above this
+        # predicted gap, some sound always plays when one can.
+        if predicted_gap_ms >= cfg.max_silent_gap_ms:
+            weights["none"] = 0.0
 
         vocal = self._pick_entry(VOCAL_KINDS, plan, catalog, durations, room_ms)
         body = self._pick_entry(BODY_KINDS, plan, catalog, durations, room_ms)

@@ -2691,7 +2691,11 @@ async def update_working_memory(
         ),
         credited_behaviours=list(getattr(state, "advancing_behaviour_ids", None) or []),
         locked_topics=_locked_topics_for_display(prompt_data, configurable),
-        **_delivery_hooks(configurable.get("turn_delivery"), "working_memory"),
+        **_delivery_hooks(
+            configurable.get("turn_delivery"),
+            "working_memory",
+            recent_lines=_recent_character_lines(state.messages),
+        ),
     )
     return {}
 
@@ -2784,7 +2788,11 @@ async def plan_delivery(
             )
             turn_delivery.set_plan(
                 validate_delivery(
-                    proposal, catalog, source="planner", made_after_turn=made_after
+                    proposal,
+                    catalog,
+                    source="planner",
+                    made_after_turn=made_after,
+                    recent_lines=_recent_character_lines(messages),
                 )
             )
         finally:
@@ -2799,7 +2807,20 @@ async def plan_delivery(
     return {}
 
 
-def _delivery_hooks(turn_delivery, source: str) -> dict:
+def _recent_character_lines(messages, count: int = 6) -> List[str]:
+    """The character's last few lines, which a bridge line must not replay."""
+    lines: List[str] = []
+    for msg in reversed(list(messages or [])):
+        if isinstance(msg, AIMessage):
+            text = str(getattr(msg, "content", "") or "").strip()
+            if text:
+                lines.append(text)
+                if len(lines) >= count:
+                    break
+    return lines
+
+
+def _delivery_hooks(turn_delivery, source: str, recent_lines=()) -> dict:
     """``schedule_update`` kwargs that route a proposed delivery plan to the worker.
 
     Empty when the session has no active delivery layer (fillers off, a voice
@@ -2816,7 +2837,11 @@ def _delivery_hooks(turn_delivery, source: str) -> dict:
     def _on_delivery(proposal, turn_index: int) -> None:
         turn_delivery.set_plan(
             validate_delivery(
-                proposal, catalog, source=source, made_after_turn=turn_index
+                proposal,
+                catalog,
+                source=source,
+                made_after_turn=turn_index,
+                recent_lines=recent_lines,
             )
         )
 

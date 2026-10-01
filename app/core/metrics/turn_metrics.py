@@ -214,6 +214,9 @@ FILLER_DECISIONS = frozenset(
         # Decided, then withdrawn during the hold: the learner spoke, the reply
         # arrived, or a face attached. Nothing was heard.
         "cancelled_before_play",
+        # An opener already played earlier in this reply cycle (the learner
+        # paused, heard it, and went on); a second would stack two fillers.
+        "skipped_same_reply",
     }
 )
 

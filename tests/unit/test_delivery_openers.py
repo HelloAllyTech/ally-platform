@@ -236,6 +236,24 @@ class TestValidateDelivery:
         )
         assert plan.opener_kind == "hesitation"
 
+    def test_a_bridge_that_replays_a_recent_line_is_dropped(self):
+        catalog = build_session_catalog("en-IN")
+        recent = ["I'm trying to hold it together. It's a lot right now."]
+        plan = validate_delivery(
+            ProposedDelivery(bridge_line="I'm trying to hold it together."),
+            catalog,
+            source="working_memory",
+            recent_lines=recent,
+        )
+        assert plan.bridge_line is None
+        fresh = validate_delivery(
+            ProposedDelivery(bridge_line="Give me a second with that."),
+            catalog,
+            source="working_memory",
+            recent_lines=recent,
+        )
+        assert fresh.bridge_line == "Give me a second with that."
+
     def test_silence_implies_a_hold(self):
         plan = validate_delivery(
             ProposedDelivery(opener_kind="silence"), None, source="planner"
@@ -326,7 +344,7 @@ class TestOpenerPolicy:
         )
         assert decision.reason == "skipped_fast_turn"
 
-    def _run(self, policy, plan, catalog, turns=200, gap=3200.0, bridge_ms=None):
+    def _run(self, policy, plan, catalog, turns=200, gap=2500.0, bridge_ms=None):
         decisions = []
         for _ in range(turns):
             decision = policy.decide(
@@ -341,6 +359,32 @@ class TestOpenerPolicy:
         decisions = self._run(self._policy(), DEFAULT_PLAN, catalog)
         with_sound = sum(1 for d in decisions if d.plays_anything)
         assert 0.3 < with_sound / len(decisions) < 0.8
+
+    def test_a_long_wait_is_never_left_silent_when_a_sound_can_play(self):
+        """Prod day one: skipped turns left learners in p50 5.7 s of silence."""
+        catalog = build_session_catalog("en-IN", gender="female")
+        decisions = self._run(self._policy(), DEFAULT_PLAN, catalog, gap=4500.0)
+        silent = [d for d in decisions if not d.plays_anything]
+        assert not silent
+        # ...while a short wait may still be met with a brief silence.
+        short = self._run(self._policy(seed=4), DEFAULT_PLAN, catalog, gap=2200.0)
+        assert any(not d.plays_anything for d in short)
+
+    def test_the_planned_kind_leads(self):
+        """A "sigh" plan was heard as "Hmm" on 5 of 11 prod openers."""
+        # Measured with no history, so the no-repeat rotation (only two body
+        # families exist) cannot be what decides it.
+        catalog = build_session_catalog("en-IN", gender="female")
+        plan = DeliveryPlan(opener_kind="sigh", opener_ids=("sigh_soft",))
+        firsts = [
+            self._policy(seed=seed).decide(
+                plan, catalog, _durations(catalog), 2500.0, "I see."
+            )
+            for seed in range(200)
+        ]
+        played = [d for d in firsts if d.entry is not None]
+        on_plan = sum(1 for d in played if d.entry.id == "sigh_soft")
+        assert on_plan / len(played) > 0.7
 
     def test_vocal_runs_are_capped(self):
         catalog = build_session_catalog("en-IN")
@@ -536,7 +580,7 @@ def _player(monkeypatch, *, policy_cfg=None, plan=None):
         hold_min_ms=1.0,
         hold_max_ms=2.0,
         weight_none=0.0,
-        weight_body=0.0,
+        weight_unplanned=0.0,
         post_opener_pause_ms=1.0,
     )
     player = OpenerPlayer(
@@ -606,6 +650,38 @@ class TestOpenerPlayer:
         assert len(bg.played) == 2
 
     @pytest.mark.asyncio
+    async def test_an_opener_withdrawn_in_its_hold_does_not_block_the_turn(
+        self, monkeypatch
+    ):
+        """Nothing was heard, so the learner's next pause may still get one."""
+        cfg = PolicyConfig(
+            hold_min_ms=150.0,
+            hold_max_ms=160.0,
+            weight_none=0.0,
+            weight_unplanned=0.0,
+            post_opener_pause_ms=1.0,
+        )
+        player, td, bg, _ = _player(monkeypatch, policy_cfg=cfg)
+        await player.render_catalog()
+        decisions = []
+        monkeypatch.setattr(
+            turn_metrics,
+            "note_filler_decision",
+            lambda room, decision, **kw: decisions.append(decision),
+        )
+        player.on_agent_state("thinking")
+        await asyncio.sleep(0.02)
+        player.on_user_state("speaking")  # during the hold
+        player.on_agent_state("listening")
+        player.on_user_state("listening")
+        assert "cancelled_before_play" in decisions
+        assert bg.played == []
+        player.on_agent_state("thinking")
+        await asyncio.sleep(0.4)
+        assert len(bg.played) == 1
+        assert "skipped_same_reply" not in decisions
+
+    @pytest.mark.asyncio
     async def test_reply_taking_over_cuts_the_opener(self, monkeypatch):
         player, td, bg, _ = _player(monkeypatch)
         await player.render_catalog()
@@ -624,7 +700,7 @@ class TestOpenerPlayer:
             hold_min_ms=1.0,
             hold_max_ms=2.0,
             weight_none=0.0,
-            weight_body=0.0,
+            weight_unplanned=0.0,
             post_opener_pause_ms=1.0,
             bridge_probability=1.0,
             bridge_min_gap_ms=100.0,
@@ -644,6 +720,31 @@ class TestOpenerPlayer:
 # ---------------------------------------------------------------------------
 # Metrics
 # ---------------------------------------------------------------------------
+
+
+class TestClipSynthesisConcurrency:
+    @pytest.mark.asyncio
+    async def test_renders_are_bounded(self, monkeypatch):
+        """24 entries at once drew ElevenLabs 429 bursts in prod."""
+        from app.core.livekit import filler_clips
+
+        monkeypatch.setattr(filler_clips, "_synthesis_concurrency", lambda: 3)
+        state = {"now": 0, "peak": 0}
+
+        async def _render(tts, phrase, variant):
+            state["now"] += 1
+            state["peak"] = max(state["peak"], state["now"])
+            await asyncio.sleep(0.01)
+            state["now"] -= 1
+            return [object()], 100.0
+
+        monkeypatch.setattr(filler_clips, "_render_one", _render)
+        client = types.SimpleNamespace(create_clip_tts=lambda: object())
+        clips = await filler_clips.synthesize_clips(
+            client, [f"phrase {i}" for i in range(24)], use_cache=False
+        )
+        assert len(clips) == 24
+        assert state["peak"] == 3
 
 
 class TestPostFillerSilence:

@@ -410,6 +410,11 @@ for the same LiveKit #2836 reason. Neither planner can delay the current reply.
 already played this turn (`TurnDelivery.reply_note`), so the reply does not
 open with a second hesitation.
 
+Both planners pass the character's last few lines (`_recent_character_lines`)
+into `validate_delivery`, which drops a proposed bridge line that replays one
+of them — in prod a bridge once repeated a reply from two turns earlier word
+for word.
+
 ---
 
 ## Key Source Files

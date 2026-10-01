@@ -720,6 +720,21 @@ class Settings(BaseSettings):
             "so a miss only means the next turn reuses the previous plan."
         ),
     )
+    OPENER_MAX_SILENT_GAP_MS: float = Field(
+        default=3000.0,
+        description=(
+            "Predicted gap at or above which a turn may not open with silence: "
+            "a pause is a device for a short beat, and the first prod day left "
+            "learners in p50 5.7 s of total silence when the policy chose none."
+        ),
+    )
+    CLIP_SYNTH_CONCURRENCY: int = Field(
+        default=3,
+        description=(
+            "Most clip syntheses in flight at once. Unbounded, a 24-entry opener "
+            "catalog drew ElevenLabs 429 bursts at session start."
+        ),
+    )
     OPENER_HOLD_MIN_MS: float = Field(
         default=350.0,
         description=(

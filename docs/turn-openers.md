@@ -58,11 +58,29 @@ learner finishes the next turn → agent "thinking"
 - **Reply shaping** (`reply_shaping.py`, in `GlossarySwapAgent.llm_node`):
   `LeadingHesitationTrimmer` and `AudioTagLimiter` (`AUDIO_TAG_MAX_PER_REPLY`).
 
+## First prod day (v1.48.0 → v1.48.2)
+
+The first read (38 new-path turns, 5 sessions) confirmed the stacking, repeat
+and echo fixes, and showed four problems that v1.48.2 fixes:
+
+- **Silence on long waits.** Turns where the policy chose nothing left the
+  learner in p50 5.7 s of silence. At or above `OPENER_MAX_SILENT_GAP_MS`
+  (3 s predicted) silence is no longer an option; the vocal-run cap still
+  applies, and breath/sigh break a run of vocal openers.
+- **A withdrawn opener blocked the turn.** The one-opener-per-reply rule now
+  counts only an opener that actually played; a learner speaking during the
+  hold records `cancelled_before_play`, and a second pause after a heard
+  opener records `skipped_same_reply`.
+- **The plan was followed loosely.** The planned category now weighs 0.6 against
+  0.12 for the others (last turn's category ×0.4 for variety).
+- **ElevenLabs 429 bursts** from rendering a 24-entry catalog at once; clip
+  synthesis is bounded by `CLIP_SYNTH_CONCURRENCY` (3).
+
 ## Reading it in metrics
 
 Per turn (`scenario_session_turn_metrics.metadata`): `fillerDecision` (now also
 `skipped_policy`, `skipped_learner_unfinished`, `skipped_closing`,
-`cancelled_before_play`), `openerCategory`, `openerId`, `openerHoldMs`,
+`cancelled_before_play`, `skipped_same_reply`), `openerCategory`, `openerId`, `openerHoldMs`,
 `openerBridge`, `openerPlanSource`, `openerCancelledByLearner`, and
 `postFillerSilenceMs` — the silence between the opener ending and the reply
 starting. Per session: the `[OPENER] session totals` log line.

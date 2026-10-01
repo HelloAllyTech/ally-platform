@@ -29,9 +29,10 @@ audio.
 from __future__ import annotations
 
 import asyncio
+import re
 import time
 from dataclasses import dataclass, field
-from typing import Callable, List, Optional, Set
+from typing import Callable, List, Optional, Sequence, Set
 
 from pydantic import BaseModel, Field
 
@@ -119,12 +120,41 @@ def _safe_bridge(text: Optional[str]) -> Optional[str]:
     return line
 
 
+def _words(text: str) -> List[str]:
+    return re.findall(r"\w+", (text or "").lower())
+
+
+def repeats_recent_line(bridge: Optional[str], recent_lines: Sequence[str]) -> bool:
+    """Whether ``bridge`` restates something the character said recently.
+
+    In the first prod day a bridge line was the character's reply from two turns
+    earlier, word for word, which sounds like a replay rather than a person
+    holding the moment. Contained verbatim, or 80% of its words already in one
+    recent line, counts as a repeat.
+    """
+    words = _words(bridge or "")
+    if len(words) < 3:
+        return False
+    phrase = " ".join(words)
+    for line in recent_lines or ():
+        line_words = _words(line)
+        if not line_words:
+            continue
+        if phrase in " ".join(line_words):
+            return True
+        overlap = sum(1 for w in words if w in set(line_words)) / len(words)
+        if overlap >= 0.8:
+            return True
+    return False
+
+
 def validate_delivery(
     proposal: Optional[ProposedDelivery],
     catalog: Optional[SessionCatalog],
     *,
     source: str,
     made_after_turn: int = -1,
+    recent_lines: Sequence[str] = (),
 ) -> Optional[DeliveryPlan]:
     """Turn a proposal into a plan, or None when nothing usable came back.
 
@@ -157,7 +187,11 @@ def validate_delivery(
     return DeliveryPlan(
         opener_kind=kind,
         opener_ids=tuple(ids),
-        bridge_line=_safe_bridge(proposal.bridge_line),
+        bridge_line=(
+            None
+            if repeats_recent_line(proposal.bridge_line, recent_lines)
+            else _safe_bridge(proposal.bridge_line)
+        ),
         hold_silence=bool(proposal.hold_silence) or kind == "silence",
         source=source,
         made_after_turn=made_after_turn,

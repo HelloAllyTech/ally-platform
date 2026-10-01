@@ -103,6 +103,7 @@ class TestElevenLabsProvider:
             voice_id="test-voice-id",
             model="eleven_multilingual_v2",
             api_key="test-api-key",
+            inactivity_timeout=30.0,
         )
         assert result == mock_tts_instance
 
@@ -199,6 +200,7 @@ class TestElevenLabsProvider:
             voice_id="test-voice-id",
             model="eleven_v3",
             api_key="test-api-key",
+            inactivity_timeout=30.0,
         )
         mock_stream_adapter.assert_called_once_with(tts=base_tts)
         assert result is wrapped
