@@ -645,6 +645,19 @@ def create_shutdown_handler(
                     "proceeding to finalize"
                 )
 
+        # Non-gating combinations fire on the gate pass AFTER their deferred
+        # inputs land; the last turn has none, so evaluate them once more now
+        # that the drain above has marked the last deferred inputs.
+        try:
+            await asyncio.wait_for(
+                event_orchestrator.evaluate_deferred_combinations(
+                    getattr(event_orchestrator, "room", None)
+                ),
+                timeout=3.0,
+            )
+        except Exception as e:  # noqa: BLE001 - never block finalize on this
+            logger.warning("Final deferred-combination pass failed: %s", e)
+
         # Finalize session (send final score and cleanup)
         if not final_score_sent_ref():
             try:

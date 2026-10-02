@@ -152,3 +152,97 @@ async def test_orchestrate_deferred_report_mode_skips_send_but_scores():
 
     orch._send_events_to_core.assert_not_called()  # report mode never sends to Core
     orch._update_event_score.assert_awaited_once()  # scoring still runs
+
+
+# ---------------------------------------------------------------------------
+# EVENTS_DEFER_NON_GATING_COMBINATIONS
+# ---------------------------------------------------------------------------
+
+
+def _combo(event_id, *refs, op="OR", branching=False):
+    node = ExpressionNode(type="IDENTIFIER", id=refs[0])
+    for ref in refs[1:]:
+        node = ExpressionNode(
+            type=op, left=node, right=ExpressionNode(type="IDENTIFIER", id=ref)
+        )
+    data = MagicMock()
+    data.expression = node
+    return _ev(event_id, DetectionType.COMBINATION, branching=branching, data=data)
+
+
+def test_non_gating_combination_inputs_defer_only_with_the_flag(monkeypatch):
+    """Prod: 34 combinations on the busiest scenarios, none branching, yet
+    every input classifier held the reply."""
+    from app.core.events.event_orchestrator import event_orchestrator as mod
+
+    events = [
+        _ev("A", DetectionType.BINARY_CLASSIFIER),
+        _ev("B", DetectionType.BINARY_CLASSIFIER),
+        _combo("C", "A", "B"),  # scores only
+        _ev("X", DetectionType.BINARY_CLASSIFIER),
+        _combo("N", "X"),  # non-branching, but nested in a branching one
+        _combo("G", "N", branching=True),
+        _ev("Y", DetectionType.BINARY_CLASSIFIER),
+        _combo("T", "Y"),  # termination combination
+    ]
+    monkeypatch.setattr(mod.settings, "EVENTS_DEFER_NON_GATING_COMBINATIONS", False)
+    off = EventOrchestrator._compute_deferrable_detection_event_ids(events, {"T"})
+    assert off == set()
+
+    monkeypatch.setattr(mod.settings, "EVENTS_DEFER_NON_GATING_COMBINATIONS", True)
+    on = EventOrchestrator._compute_deferrable_detection_event_ids(events, {"T"})
+    # A and B feed only a scoring combination; X feeds a branching one through
+    # nesting, and Y a termination, so those stay on the gate.
+    assert on == {"A", "B"}
+
+
+def test_a_deferred_input_fires_its_combination_on_the_next_gate_pass(monkeypatch):
+    """The registry persists across turns, so deferring is a one-turn lag."""
+    from app.core.events.event_orchestrator import event_orchestrator as mod
+
+    monkeypatch.setattr(mod, "is_event_eligible", lambda **kw: True)
+    orch = _make_orch()
+    combo = _combo("C", "A", "B", op="AND")
+    orch._event_map = {"C": combo}
+    orch.expression_list = [
+        {
+            "type": DetectionType.COMBINATION,
+            "event_id": "C",
+            "expression": combo.data.expression,
+        }
+    ]
+    orch.event_registry = {}
+    orch.set_event_state("A", False)
+    orch.set_event_state("B", False)
+    orch.set_event_state("C", False)
+
+    orch.update(detected_event_ids={"A"})  # turn 1 gate: A on the gate
+    orch.set_event_state("B", True)  # turn 1 deferred pass marks B, after the gate
+    assert orch.event_registry["C"].happened is False
+    orch.update(detected_event_ids=None)  # turn 2 gate: no new gating detections
+    assert orch.event_registry["C"].happened is True
+
+
+@pytest.mark.asyncio
+async def test_final_pass_processes_newly_happened_combinations_once(monkeypatch):
+    from app.core.events.event_orchestrator import event_orchestrator as mod
+
+    orch = _make_orch()
+    combo = _combo("C", "A")
+    leaf = _ev("A", DetectionType.BINARY_CLASSIFIER)
+    orch.update = MagicMock()
+    orch.get_happened_events = MagicMock(return_value=[leaf, combo])
+    orch._send_events_to_core = AsyncMock()
+    orch._update_event_score = AsyncMock()
+    orch.trigger_events = None
+
+    monkeypatch.setattr(mod.settings, "EVENTS_DEFER_NON_GATING_COMBINATIONS", False)
+    assert await orch.evaluate_deferred_combinations() == 0
+    orch.update.assert_not_called()
+
+    monkeypatch.setattr(mod.settings, "EVENTS_DEFER_NON_GATING_COMBINATIONS", True)
+    assert await orch.evaluate_deferred_combinations() == 1
+    sent = orch._send_events_to_core.await_args.args[0]
+    assert [e.event_id for e in sent] == ["C"]  # the leaf was handled off-gate
+    orch._update_event_score.assert_awaited_once()
+    assert await orch.evaluate_deferred_combinations() == 0  # dedup

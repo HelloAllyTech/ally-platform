@@ -1683,6 +1683,19 @@ class Settings(BaseSettings):
             "responseLatencyMs."
         ),
     )
+    EVENTS_DEFER_NON_GATING_COMBINATIONS: bool = Field(
+        default=False,
+        description=(
+            "Latency lever on top of EVENTS_OFF_GATE_DEFER_DETECTION: defer the "
+            "inputs of combinations that neither branch nor terminate, so their "
+            "classifiers leave the reply's critical path. Such a combination "
+            "then fires (and scores, and moves state) one turn after its inputs "
+            "are detected; a final pass at shutdown covers the last turn. In "
+            "prod (2026-09-28..10-01) the busiest scenarios had only non-gating "
+            "combinations, yet ~16-20 leaf classifiers held every reply and "
+            "process_gating_events went 0.9 -> 1.4-2.2 s p50. Default False."
+        ),
+    )
     EVENTS_OFF_GATE_DEFER_DETECTION: bool = Field(
         default=False,
         description=(
