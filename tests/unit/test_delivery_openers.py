@@ -766,6 +766,16 @@ class TestOpenerPlayer:
             bridge_min_gap_ms=100.0,
         )
         player, td, bg, transcripts = _player(monkeypatch, policy_cfg=cfg)
+        recorded_meta = {}
+
+        def _merge(room, metadata=None, **kw):
+            recorded_meta.update(metadata or {})
+
+        def _decision(room, decision, **kw):
+            recorded_meta.update(kw)
+
+        monkeypatch.setattr(turn_metrics, "record", _merge)
+        monkeypatch.setattr(turn_metrics, "note_filler_decision", _decision)
         await player.render_catalog()
         td.on_plan(player.on_plan)
         td.set_plan(DeliveryPlan(bridge_line="That's a lot.", source="planner"))
@@ -774,6 +784,7 @@ class TestOpenerPlayer:
         await asyncio.sleep(0.8)
         assert ("bridge", "That's a lot.") in transcripts
         assert len(bg.played) == 2  # opener, then the bridge after a pause
+        assert recorded_meta.get("openerBridge") is True  # set when it PLAYED
         assert player._bridge is None  # heard once
         # The legacy interim reads these so it never stacks on a bridge.
         assert player.bridged_since_reply

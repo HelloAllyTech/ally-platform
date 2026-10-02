@@ -311,7 +311,12 @@ class OpenerPlayer:
     def _note_first_audio(
         self, play_ts, created_at, clip, decision: OpenerDecision, details, kind
     ) -> None:
-        turn_metrics.note_filler_started(self._room, play_ts, kind=kind)
+        turn_metrics.note_filler_started(
+            self._room,
+            play_ts,
+            kind=kind,
+            interim_source="bridge" if kind == "interim" else None,
+        )
         lead = (play_ts - created_at) * 1000.0 if created_at is not None else None
         entry = decision.entry
         turn_metrics.note_filler_decision(
@@ -324,7 +329,10 @@ class OpenerPlayer:
             openerCategory=decision.category,
             openerId=entry.id if entry else None,
             openerHoldMs=int(decision.hold_ms),
-            openerBridge=bool(decision.bridge),
+            # False until a bridge actually plays AFTER the opener (it is set
+            # there): a planned bridge the reply cut off was never heard, and
+            # counting it inflated the dashboard's "Opener + bridge" band.
+            openerBridge=False,
             **details,
         )
         logger.info(

@@ -190,3 +190,30 @@ class TestTtsModel:
         turn_metrics.note_tts_model(ROOM, "elevenlabs", "eleven_v3")
         turn_metrics.discard(ROOM)
         assert "ttsModel" not in _finalize()["metadata"]
+
+
+class TestInterimSource:
+    """A bridge line and the legacy interim are both firstAudioSource='interim';
+    interimSource says which system masked the turn."""
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("source", ["bridge", "legacy"])
+    def test_an_interim_first_turn_names_its_source(self, source):
+        turn_metrics.note_user_speech_end(ROOM, 1.0)
+        turn_metrics.note_filler_started(
+            ROOM, 1.3, kind="interim", interim_source=source
+        )
+        meta = turn_metrics.finalize(ROOM, 3.0)["metadata"]
+        assert meta["firstAudioSource"] == "interim"
+        assert meta["interimSource"] == source
+
+    @pytest.mark.unit
+    def test_only_the_first_audio_labels_it(self):
+        turn_metrics.note_user_speech_end(ROOM, 1.0)
+        turn_metrics.note_filler_started(ROOM, 1.2, kind="filler")
+        turn_metrics.note_filler_started(
+            ROOM, 1.9, kind="interim", interim_source="legacy"
+        )
+        meta = turn_metrics.finalize(ROOM, 3.0)["metadata"]
+        assert meta["firstAudioSource"] == "filler"
+        assert "interimSource" not in meta

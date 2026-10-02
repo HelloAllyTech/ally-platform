@@ -170,8 +170,18 @@ def note_tts_model(room_id: str, provider: Optional[str], model: Optional[str]) 
     _tts_models[room_id] = f"{provider}/{model}" if provider else str(model)
 
 
+#: What an interim-first turn's interim was, as ``metadata.interimSource``:
+#: the delivery plan's bridge line, or the legacy interim reply. Both are
+#: ``firstAudioSource='interim'``; without this the dashboard can't tell which
+#: system is masking the turn.
+INTERIM_SOURCES = frozenset({"bridge", "legacy"})
+
+
 def note_filler_started(
-    room_id: str, filler_start_ts: float, kind: str = "filler"
+    room_id: str,
+    filler_start_ts: float,
+    kind: str = "filler",
+    interim_source: Optional[str] = None,
 ) -> None:
     """Record when masking speech first became audible this turn.
 
@@ -196,6 +206,9 @@ def note_filler_started(
         return
     turn["filler_start_ts"] = filler_start_ts
     turn["first_audio_kind"] = kind
+    # Only the call that WON first audio labels it, so a later sound can't.
+    if kind == "interim" and interim_source in INTERIM_SOURCES:
+        turn["interim_source"] = interim_source
 
 
 #: Decisions the filler layer can reach on a turn, recorded as
@@ -375,6 +388,8 @@ def finalize(room_id: str, agent_speech_start_ts: float) -> Optional[Dict[str, A
     # separable at query time.
     first_audio_source = turn.get("first_audio_kind", "filler") if masked else "reply"
     provenance: Dict[str, Any] = {"firstAudioSource": first_audio_source}
+    if first_audio_source == "interim" and turn.get("interim_source"):
+        provenance["interimSource"] = turn["interim_source"]
     # Which output carried the speech, so a turn whose latency EXCLUDES a
     # vendor's render time is identifiable rather than silently averaged in
     # with turns that measured the real thing. See SPEECH_TRANSPORTS.
