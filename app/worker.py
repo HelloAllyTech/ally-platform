@@ -2627,14 +2627,23 @@ class AgentWorker:
             logger.warning("[DELIVERY] planner client setup failed: %s", e)
             return None
 
+    def _is_generative_elevenlabs(self) -> bool:
+        model = str(getattr(self, "_tts_model", "") or "").lower()
+        return "eleven" in model and "v3" in model
+
+    def _interim_tts_timeout_ms(self) -> float:
+        """How long the interim's render may take for this voice."""
+        if self._is_generative_elevenlabs():
+            return float(settings.INTERIM_REPLY_TTS_TIMEOUT_GENERATIVE_MS)
+        return float(getattr(settings, "INTERIM_REPLY_TTS_TIMEOUT_MS", 2500.0))
+
     def _gap_prior_ms(self) -> float:
         """The wait to assume before this session has measured its own.
 
         Per voice model, because the voice dominates it: an ElevenLabs v3
         voice's first audio byte alone is ~1.8 s.
         """
-        model = str(getattr(self, "_tts_model", "") or "").lower()
-        if "eleven" in model and "v3" in model:
+        if self._is_generative_elevenlabs():
             return float(settings.GAP_PRIOR_GENERATIVE_MS)
         return float(settings.FILLER_GAP_PRIOR_MS)
 
@@ -3949,10 +3958,7 @@ class AgentWorker:
                     self._interim_state = "idle"
                 return
 
-            tts_timeout_s = (
-                float(getattr(settings, "INTERIM_REPLY_TTS_TIMEOUT_MS", 2500.0))
-                / 1000.0
-            )
+            tts_timeout_s = self._interim_tts_timeout_ms() / 1000.0
             clips = await asyncio.wait_for(
                 synthesize_clips(
                     self.tts_client,
@@ -4058,7 +4064,7 @@ class AgentWorker:
             # endpoint) AND any thinking-filler to finish. Bounded backstop; the
             # cutover cancels this task the instant the real reply speaks.
             llm_to = float(getattr(settings, "INTERIM_REPLY_LLM_TIMEOUT_MS", 1500.0))
-            tts_to = float(getattr(settings, "INTERIM_REPLY_TTS_TIMEOUT_MS", 2500.0))
+            tts_to = self._interim_tts_timeout_ms()
             cap = time.monotonic() + (llm_to + tts_to) / 1000.0 + 1.0
             while True:
                 if self._interim_state in ("playing", "done", "idle"):

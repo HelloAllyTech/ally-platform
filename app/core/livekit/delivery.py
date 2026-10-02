@@ -197,14 +197,20 @@ def validate_delivery(
         # updater asked for "sigh" on most turns, and treating an unplayable
         # kind as "no sound fits" left 10 of 13 turns silent.
         kind = first.kind if first is not None else _NEAREST_KIND.get(kind, "hum")
+    raw_bridge = proposal.bridge_line
+    if repeats_recent_line(raw_bridge, recent_lines):
+        bridge, dropped = None, "repeats a recent line"
+    else:
+        bridge = _safe_bridge(raw_bridge)
+        dropped = "unsafe or too long" if raw_bridge and not bridge else None
+    if dropped:
+        # Logged because a missing bridge is otherwise indistinguishable from
+        # a planner that never wrote one.
+        logger.info("[DELIVERY] bridge dropped (%s): %r", dropped, raw_bridge)
     return DeliveryPlan(
         opener_kind=kind,
         opener_ids=tuple(ids),
-        bridge_line=(
-            None
-            if repeats_recent_line(proposal.bridge_line, recent_lines)
-            else _safe_bridge(proposal.bridge_line)
-        ),
+        bridge_line=bridge,
         hold_silence=bool(proposal.hold_silence) or kind == "silence",
         source=source,
         made_after_turn=made_after_turn,

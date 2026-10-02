@@ -1266,6 +1266,15 @@ class Settings(BaseSettings):
             "the interim is skipped for the turn."
         ),
     )
+    INTERIM_REPLY_TTS_TIMEOUT_GENERATIVE_MS: float = Field(
+        default=6000.0,
+        description=(
+            "The same timeout for ElevenLabs v3 voices, which take ~3-4 s to "
+            "render a whole interim sentence: at 2500 every v3 interim timed "
+            "out in v2v. Generation starts while the learner is still talking, "
+            "so the longer limit adds no latency; the real reply still cuts it."
+        ),
+    )
     INTERIM_REPLY_VOLUME: float = Field(
         default=0.9,
         description=(

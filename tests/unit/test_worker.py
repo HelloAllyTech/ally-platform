@@ -3548,3 +3548,17 @@ class TestGapPrior:
         w._tts_model = model
         assert w._gap_prior_ms() == float(getattr(worker.settings, expected))
         assert w._gap_prior_ms() >= 2000.0
+
+
+@pytest.mark.parametrize(
+    "model,expected",
+    [
+        ("eleven_v3", "INTERIM_REPLY_TTS_TIMEOUT_GENERATIVE_MS"),
+        ("eleven_multilingual_v2", "INTERIM_REPLY_TTS_TIMEOUT_MS"),
+    ],
+)
+def test_interim_render_timeout_follows_the_voice(model, expected):
+    """At 2500 ms every v3 interim timed out in v2v (~3-4 s per sentence)."""
+    w = worker.AgentWorker.__new__(worker.AgentWorker)
+    w._tts_model = model
+    assert w._interim_tts_timeout_ms() == float(getattr(worker.settings, expected))
