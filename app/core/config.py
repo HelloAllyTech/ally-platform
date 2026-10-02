@@ -735,6 +735,24 @@ class Settings(BaseSettings):
             "catalog drew ElevenLabs 429 bursts at session start."
         ),
     )
+    # Persistent clip store (app/core/livekit/clip_store.py): rendered clips in
+    # S3, shared by every session and worker, plus the curated takes written by
+    # scripts/pregenerate_voice_clips.py. Off when the bucket is empty.
+    CLIP_STORE_BUCKET: str = Field(
+        default="",
+        description="S3 bucket for rendered clips; empty disables the store.",
+    )
+    CLIP_STORE_PREFIX: str = Field(
+        default="voice-clips/v1",
+        description="Key prefix inside CLIP_STORE_BUCKET.",
+    )
+    CLIP_STORE_TIMEOUT_MS: float = Field(
+        default=1500.0,
+        description=(
+            "Per-request S3 timeout. A whole load is bounded at twice this, "
+            "after which the session renders what is missing."
+        ),
+    )
     OPENER_HOLD_MIN_MS: float = Field(
         default=300.0,
         description=(

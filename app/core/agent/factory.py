@@ -177,6 +177,40 @@ def configure_stt_client(scenario: Scenario) -> BaseSTTClient:
         return create_stt_client(language_code=language_code)
 
 
+def tts_config_for_voice(voice) -> Optional[Dict[str, Any]]:
+    """The ``create_tts_client`` config for a ``ScenarioVoice``, or None.
+
+    Shared with scripts/pregenerate_voice_clips.py: a pre-rendered clip is
+    only found by a session whose client hashes to the same voice
+    fingerprint, so both must build the client from the same dict.
+    """
+    if not voice:
+        return None
+    logger.debug(
+        f"[TTS Config] Building config from scenario.voice: "
+        f"provider={voice.provider}, name={voice.name}"
+    )
+    config = voice.config
+    return {
+        "provider": voice.provider,
+        "name": voice.name,
+        "config": {
+            "model": config.model,
+            "voice_id": config.voice_id,
+            "voice": config.voice,
+            "speed": config.speed,
+            "emotion": config.emotion,
+            "speaker": config.speaker,
+            "voice_name": config.voice_name,
+            "model_name": config.model_name,
+            "gender": config.gender,
+            "voice_cloning_key": config.voice_cloning_key,
+            "instant_mode": config.instant_mode,
+            "voice_provider": config.voice_provider,
+        },
+    }
+
+
 def configure_tts_client(scenario: Scenario) -> BaseTTSClient:
     """
     Configure TTS client from scenario metadata with fallback.
@@ -190,37 +224,7 @@ def configure_tts_client(scenario: Scenario) -> BaseTTSClient:
     Raises:
         ValueError: If TTS creation fails and gender is required for fallback
     """
-    tts_config_from_metadata = None
-    if scenario.voice:
-        logger.debug(
-            f"[TTS Config] Building config from scenario.voice: "
-            f"provider={scenario.voice.provider}, name={scenario.voice.name}"
-        )
-        logger.debug(
-            f"[TTS Config] Voice config: model={scenario.voice.config.model}, "
-            f"voice_id={scenario.voice.config.voice_id}"
-        )
-        tts_config_from_metadata = {
-            "provider": scenario.voice.provider,
-            "name": scenario.voice.name,
-            "config": {
-                "model": scenario.voice.config.model,
-                "voice_id": scenario.voice.config.voice_id,
-                "voice": scenario.voice.config.voice,
-                "speed": scenario.voice.config.speed,
-                "emotion": scenario.voice.config.emotion,
-                "speaker": scenario.voice.config.speaker,
-                "voice_name": scenario.voice.config.voice_name,
-                "model_name": scenario.voice.config.model_name,
-                "gender": scenario.voice.config.gender,
-                "voice_cloning_key": scenario.voice.config.voice_cloning_key,
-                "instant_mode": scenario.voice.config.instant_mode,
-                "voice_provider": scenario.voice.config.voice_provider,
-            },
-        }
-        logger.debug(
-            f"[TTS Config] Built tts_config_from_metadata: {tts_config_from_metadata}"
-        )
+    tts_config_from_metadata = tts_config_for_voice(scenario.voice)
 
     gender_enum = (
         Gender(scenario.prompt_data.gender.lower())

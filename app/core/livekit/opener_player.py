@@ -66,6 +66,8 @@ class OpenerPlayer:
 
         #: catalog id -> FillerClip
         self.clips: Dict[str, Any] = {}
+        #: catalog id -> how many times it has played, to rotate stored takes.
+        self._plays: Dict[str, int] = {}
         #: The rendered bridge line for the current plan: (text, clip).
         self._bridge: Optional[tuple] = None
         self._bridge_rendering: Optional[str] = None
@@ -259,6 +261,7 @@ class OpenerPlayer:
                 if clip is None:
                     self._withdraw()
                     return
+                clip = self._next_take(decision.entry.id, clip)
                 play_ts = time.time()
                 self._opened_since_reply = True
                 self._handle = self._bg_audio().play(
@@ -329,6 +332,25 @@ class OpenerPlayer:
             decision.hold_ms,
             decision.bridge,
             details.get("fillerPredictedGapMs"),
+        )
+
+    def _next_take(self, entry_id: str, clip):
+        """The take to play this time: the best first, then the alternates.
+
+        Curated takes come from the clip store; a line heard twice in a
+        session is then two different recordings, not a tape loop.
+        """
+        alternates = getattr(clip, "alternates", None) or []
+        if not alternates:
+            return clip
+        import dataclasses
+
+        count = self._plays.get(entry_id, 0)
+        self._plays[entry_id] = count + 1
+        takes = [(clip.frames, clip.duration_ms)] + list(alternates)
+        frames, duration_ms = takes[count % len(takes)]
+        return dataclasses.replace(
+            clip, frames=frames, duration_ms=duration_ms, alternates=[]
         )
 
     # ---- coordination with the interim reply -------------------------

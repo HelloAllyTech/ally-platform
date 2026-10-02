@@ -37,9 +37,10 @@ import re
 import sys
 import threading
 from collections import OrderedDict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Dict, List, Optional, Sequence, Tuple
 
+from app.core.livekit import clip_store
 from app.core.logger import get_logger
 
 logger = get_logger(__name__)
@@ -100,6 +101,10 @@ class FillerClip:
     last_played_turn: int = -1
     #: Where the phrase came from: static | seed | exchange | in_turn.
     source: str = "unknown"
+    #: Other curated takes of the same text, as ``(frames, duration_ms)``, from
+    #: the clip store. Playback may rotate through them so a repeated line is
+    #: never the same recording twice. Empty for a single render.
+    alternates: List[Tuple[List[Any], float]] = field(default_factory=list)
 
     @property
     def tier(self) -> str:
@@ -154,6 +159,9 @@ def _variant_text(phrase: str, variant: int) -> str:
     return stripped + suffixes[(variant - 1) % len(suffixes)]
 
 
+_FINGERPRINT_IGNORED = frozenset({"_tts_instance", "_base_tts", "_api_key"})
+
+
 def voice_fingerprint(tts_client) -> str:
     """A stable hash of everything that changes how this voice sounds.
 
@@ -179,6 +187,11 @@ def voice_fingerprint(tts_client) -> str:
         for name in sorted(vars(tts_client)):
             if name in ("_default_params", "_current_params"):
                 continue
+            # Not voice settings: the lazily built instance is None before first
+            # use and an object after (so it flipped the hash mid-session), and
+            # a rotated API key must not orphan every stored clip.
+            if name in _FINGERPRINT_IGNORED:
+                continue
             value = getattr(tts_client, name, None)
             if isinstance(value, (str, int, float, bool)) or value is None:
                 parts.append(f"{name}={value!r}")
@@ -201,12 +214,12 @@ class _ClipCache:
 
     def __init__(self, max_entries: int = 200) -> None:
         self._max = max(1, max_entries)
-        self._data: "OrderedDict[str, Tuple[List[Any], float]]" = OrderedDict()
+        self._data: "OrderedDict[str, Tuple[List[Any], float, list]]" = OrderedDict()
         self._lock = threading.Lock()
         self.hits = 0
         self.misses = 0
 
-    def get(self, key: str) -> Optional[Tuple[List[Any], float]]:
+    def get(self, key: str) -> Optional[Tuple[List[Any], float, list]]:
         with self._lock:
             value = self._data.get(key)
             if value is None:
@@ -216,9 +229,15 @@ class _ClipCache:
             self.hits += 1
             return value
 
-    def put(self, key: str, frames: List[Any], duration_ms: float) -> None:
+    def put(
+        self,
+        key: str,
+        frames: List[Any],
+        duration_ms: float,
+        alternates: Optional[list] = None,
+    ) -> None:
         with self._lock:
-            self._data[key] = (frames, duration_ms)
+            self._data[key] = (frames, duration_ms, list(alternates or []))
             self._data.move_to_end(key)
             while len(self._data) > self._max:
                 self._data.popitem(last=False)
@@ -326,6 +345,10 @@ _MIN_CLIP_MS = 120.0
 #: rate (conversational speech runs ~65 ms per character).
 _MAX_CLIP_BASE_MS = 1200.0
 _MAX_CLIP_MS_PER_CHAR = 110.0
+#: Each trailing-off or sentence mark is a pause the voice is asked to take
+#: ("Hmm… Well…"); v3 holds ~0.4-0.6 s on each.
+_MAX_CLIP_MS_PER_PAUSE = 700.0
+_PAUSE_MARKS = re.compile(r"…|\.\.\.|[.!?।]")
 _AUDIO_TAG = re.compile(r"\[[^\]]*\]")
 
 
@@ -367,7 +390,11 @@ def _plausible_duration(text: str, duration_ms: float) -> bool:
     is dropped rather than played as a stray second utterance.
     """
     spoken = _AUDIO_TAG.sub("", text or "").strip()
-    max_ms = _MAX_CLIP_BASE_MS + _MAX_CLIP_MS_PER_CHAR * len(spoken)
+    max_ms = (
+        _MAX_CLIP_BASE_MS
+        + _MAX_CLIP_MS_PER_CHAR * len(spoken)
+        + _MAX_CLIP_MS_PER_PAUSE * len(_PAUSE_MARKS.findall(spoken))
+    )
     return _MIN_CLIP_MS <= duration_ms <= max_ms
 
 
@@ -490,6 +517,71 @@ def clip_tts_available(tts_client) -> bool:
         return False
 
 
+def _pcm_of(frames: List[Any]) -> bytes:
+    """The raw 16-bit mono PCM behind ``frames`` (the store's format)."""
+    return b"".join(bytes(f.data) for f in frames)
+
+
+def _take_from_pcm(pcm: bytes) -> Optional[Tuple[List[Any], float]]:
+    pcm = pcm[: len(pcm) - (len(pcm) % 2)]
+    frames = _frames_from_pcm(pcm, MIXER_SAMPLE_RATE, 1)
+    if not frames:
+        return None
+    return frames, (len(pcm) / 2.0) / MIXER_SAMPLE_RATE * 1000.0
+
+
+async def _fill_from_store(
+    misses: List[int],
+    requests: List[Tuple[str, str, int]],
+    results: List[Optional[FillerClip]],
+    fingerprint: str,
+    language: str,
+    source: str,
+) -> List[int]:
+    """Serve cache misses from the persistent store; return what is left.
+
+    A stored line arrives with every curated take: the best becomes the clip,
+    the rest its alternates. Loaded takes also go into the process cache, so
+    the next session on this worker skips even the store.
+    """
+    if not clip_store.enabled():
+        return misses
+    texts = {i: _synthesis_text(requests[i][0], requests[i][2]) for i in misses}
+    stored = await clip_store.load_many(
+        fingerprint, clip_store.store_language(language), list(texts.values())
+    )
+    left: List[int] = []
+    for i in misses:
+        takes = [t for t in (_take_from_pcm(p) for p in stored.get(texts[i], [])) if t]
+        if not takes:
+            left.append(i)
+            continue
+        (frames, duration_ms), alternates = takes[0], takes[1:]
+        phrase, ftype, variant = requests[i]
+        _CACHE.put(
+            _cache_key(fingerprint, language, phrase, variant),
+            frames,
+            duration_ms,
+            alternates,
+        )
+        results[i] = FillerClip(
+            phrase=phrase,
+            frames=frames,
+            duration_ms=duration_ms,
+            filler_type=ftype,
+            variant=variant,
+            source=source,
+            alternates=alternates,
+        )
+    if len(left) < len(misses):
+        logger.info(
+            "[CLIP_STORE] served %d of %d line(s) from the store",
+            len(misses) - len(left),
+            len(misses),
+        )
+    return left
+
+
 async def synthesize_clips(
     tts_client,
     phrases: Sequence[Any],
@@ -549,7 +641,7 @@ async def synthesize_clips(
             else None
         )
         if cached is not None:
-            frames, duration_ms = cached
+            frames, duration_ms, alternates = cached
             results[i] = FillerClip(
                 phrase=phrase,
                 frames=frames,
@@ -557,9 +649,15 @@ async def synthesize_clips(
                 filler_type=ftype,
                 variant=variant,
                 source=source,
+                alternates=list(alternates),
             )
         else:
             misses.append(i)
+
+    if misses and use_cache:
+        misses = await _fill_from_store(
+            misses, requests, results, fingerprint, language, source
+        )
 
     if misses:
         create = getattr(tts_client, "create_clip_tts", None)
@@ -605,6 +703,12 @@ async def synthesize_clips(
                         _cache_key(fingerprint, language, phrase, variant),
                         frames,
                         duration_ms,
+                    )
+                    clip_store.save_in_background(
+                        fingerprint,
+                        clip_store.store_language(language),
+                        _synthesis_text(phrase, variant),
+                        _pcm_of(frames),
                     )
                 results[i] = FillerClip(
                     phrase=phrase,

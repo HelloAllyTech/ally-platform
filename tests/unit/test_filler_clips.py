@@ -475,6 +475,7 @@ class TestRenderHygiene:
             ("Hmm.", 600, True),
             ("Hmm.", 80, False),  # near-nothing
             ("Hmm.", 6000, False),  # a run-on generation
+            ("Hmm. Mm. Hmm… Hmm… let me think. Um… Uh… Well… I mean…", 10500, True),
             ("[sighs] Okay.", 1500, True),  # tags don't count as characters
             ("That is a lot to take in, honestly.", 3200, True),
         ],

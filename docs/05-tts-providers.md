@@ -186,7 +186,7 @@ configs known to keep one speaker across generations.
 |---|---|---|
 | Deepgram | on | all (Aura) |
 | ElevenLabs | on | `flash`, `turbo`, `multilingual_v2` models |
-| ElevenLabs | **off** | any model containing `v3` (`eleven_v3`, `eleven_v3_conversational`) |
+| ElevenLabs | on | `v3` models (`eleven_v3`, `eleven_v3_conversational`) — see below |
 | Sarvam | on | `bulbul:v2` |
 | Sarvam | **off** | `bulbul:v3` and any other model (unclassified; v3 samples at temperature 0.6) |
 | Google | on | Chirp 3 HD voices (`xx-XX-Chirp3-HD-<Name>`) |
@@ -200,7 +200,17 @@ When the policy refuses a voice, `create_clip_tts()` returns `None` and logs
 Callers check `can_create_clip_tts()` (via `filler_clips.clip_tts_available`)
 **before** the filler, back-channel and interim LLM calls, because those phrases
 can only be heard as clips. The worker (`_setup_background_audio`) turns all
-three layers off for such a voice. The comfort tone still plays. Enabling clips for a new model means
+three layers off for such a voice; it may still play the bundled breath/sigh
+opener recordings, which are not a generation of the voice. The comfort tone
+still plays.
+
+**Why ElevenLabs v3 is on.** v3 is generative, but the live reply on v3 is
+already one independent generation per sentence (`StreamAdapter` over the HTTP
+path), held to one speaker by the fixed voice settings in `tts_instance`
+(stability 0.95, similarity 0.75). A clip from `create_clip_tts()` has the same
+voice id, model and settings, so it is one more such sentence, not a second
+voice. Rendering a v3 voice's clips on a *different* model (flash /
+multilingual_v2) would be a second voice and is never done. Enabling clips for a new model means
 changing its row here and in the test's `CASES` table. That is a product
 decision about voice continuity, not a code cleanup.
 
@@ -208,6 +218,29 @@ decision about voice continuity, not a code cleanup.
 synthesis: several TTS providers treat a fully-uppercase token as an acronym
 and spell it out letter by letter (an "MMM" hesitation heard as "M, M, M"
 instead of a hum) even for plain English text.
+
+## Persistent clip store (`clip_store`)
+
+**File:** `app/core/livekit/clip_store.py`. Off unless `CLIP_STORE_BUCKET` is set.
+
+The process cache below dies with its worker, and in prod every session began
+with it empty (session totals showed `cache_size == cache_misses`), so each one
+re-rendered its catalog. The store keeps rendered clips in S3 at
+`{CLIP_STORE_PREFIX}/{voice fingerprint}/{language}/{text hash}/take-NN.pcm`
+(raw 48 kHz mono int16). `synthesize_clips` serves cache misses from it before
+rendering, bounded by `CLIP_STORE_TIMEOUT_MS`, and saves a fresh render as
+take 0 in the background. Bridge lines (`use_cache=False`) never touch it.
+
+`scripts/pregenerate_voice_clips.py` fills it ahead of time with curated takes:
+several renders per catalog line, ranked by speaker similarity to the voice's
+reply (WeSpeaker ONNX embeddings, weighted by the line's length) and by how
+typical each take's length and loudness are; the best three are written as
+take-00..02. `OpenerPlayer` plays the best first and rotates through the rest.
+The voice fingerprint ignores the lazily built instance and the API key, so a
+key rotation does not orphan the store.
+
+Every render also has its edge silence trimmed and is dropped if its length is
+implausible for its text (v3 can run on, or return near-nothing, for "Hmm.").
 
 ## In-memory clips (`filler_clips`)
 
