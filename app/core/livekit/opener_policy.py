@@ -152,7 +152,7 @@ class PolicyConfig:
     #: the plan outright.
     repeat_category_factor: float = 0.4
     #: At or above this predicted gap, choosing silence is not allowed.
-    max_silent_gap_ms: float = 3000.0
+    max_silent_gap_ms: float = 2000.0
     #: 1.0: the fit check and the no-two-in-a-row rule are the real gates. At
     #: 0.35, with the planner also leaving the line empty 99% of the time, one
     #: bridge played in three prod days.
@@ -286,6 +286,17 @@ class OpenerPolicy:
             weights["vocal"] = 0.0
         if body is None:
             weights["body"] = 0.0
+        # The plan's category can't play this turn (its few entries are in the
+        # no-repeat window, or the vocal-run cap is hit): the plan's weight
+        # moves to the other sound, not to silence. Otherwise a planner that
+        # keeps asking for the same kind silences most turns: prod 09-30..10-02
+        # played on 27% of "hum" plans vs 80% of "hesitation" plans, and a v2v
+        # small planner asking "sigh" 11 of 12 turns left most turns silent.
+        planned = "vocal" if planned_vocal else "body" if planned_body else None
+        if planned is not None and weights[planned] == 0.0:
+            other = "body" if planned == "vocal" else "vocal"
+            if weights[other] > 0.0:
+                weights[other] = max(weights[other], cfg.weight_planned)
 
         category = self._weighted(weights)
 

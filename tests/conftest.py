@@ -345,3 +345,13 @@ def _no_llm_usage_sqs(monkeypatch):
         return None
 
     monkeypatch.setattr("app.core.llm_usage.emitter._send", _noop_send)
+
+
+@pytest.fixture(autouse=True)
+def _no_clip_store(monkeypatch):
+    """No test reads or writes the persistent clip store by accident.
+
+    It is on whenever CLIP_STORE_BUCKET is set, and a developer's .env may set
+    it for local v2v runs; tests that exercise the store turn it back on.
+    """
+    monkeypatch.setattr("app.core.config.settings.CLIP_STORE_BUCKET", "")

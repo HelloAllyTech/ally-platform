@@ -354,6 +354,23 @@ class TestOpenerPolicy:
             decisions.append(decision)
         return decisions
 
+    def test_a_blocked_plan_falls_back_to_another_sound_not_silence(self):
+        """A planner asking "sigh" every turn: the one sigh is in the no-repeat
+        window most turns, and those turns must still mostly get a sound."""
+        catalog = build_session_catalog("en-IN", gender="female")
+        assert catalog.ids_of_kind("sigh")
+        plan = DeliveryPlan(opener_kind="sigh", source="planner")
+        decisions = self._run(self._policy(seed=4), plan, catalog, gap=2500.0)
+        played = sum(d.plays_anything for d in decisions) / len(decisions)
+        assert played >= 0.65
+        kinds = {d.entry.kind for d in decisions if d.entry is not None}
+        assert "sigh" in kinds and kinds & {
+            "hum",
+            "hesitation",
+            "lexical",
+            "reflective",
+        }
+
     def test_not_every_turn_starts_with_a_sound(self):
         catalog = build_session_catalog("en-IN")
         decisions = self._run(self._policy(), DEFAULT_PLAN, catalog)
@@ -367,7 +384,7 @@ class TestOpenerPolicy:
         silent = [d for d in decisions if not d.plays_anything]
         assert not silent
         # ...while a short wait may still be met with a brief silence.
-        short = self._run(self._policy(seed=4), DEFAULT_PLAN, catalog, gap=2200.0)
+        short = self._run(self._policy(seed=4), DEFAULT_PLAN, catalog, gap=1800.0)
         assert any(not d.plays_anything for d in short)
 
     def test_the_planned_kind_leads(self):
@@ -417,8 +434,9 @@ class TestOpenerPolicy:
         catalog = build_session_catalog("en-IN")
         quiet = DeliveryPlan(opener_kind="silence", hold_silence=True)
         loud = DEFAULT_PLAN
-        q = self._run(self._policy(seed=5), quiet, catalog)
-        l_ = self._run(self._policy(seed=5), loud, catalog)
+        # Below OPENER_MAX_SILENT_GAP_MS, where silence is still allowed.
+        q = self._run(self._policy(seed=5), quiet, catalog, gap=1800.0)
+        l_ = self._run(self._policy(seed=5), loud, catalog, gap=1800.0)
         assert sum(d.plays_anything for d in q) < sum(d.plays_anything for d in l_)
         holds = [d.hold_ms for d in q if d.plays_anything]
         assert holds and min(holds) >= 600.0

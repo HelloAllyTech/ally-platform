@@ -721,11 +721,14 @@ class Settings(BaseSettings):
         ),
     )
     OPENER_MAX_SILENT_GAP_MS: float = Field(
-        default=3000.0,
+        default=2000.0,
         description=(
             "Predicted gap at or above which a turn may not open with silence: "
             "a pause is a device for a short beat, and the first prod day left "
-            "learners in p50 5.7 s of total silence when the policy chose none."
+            "learners in p50 5.7 s of total silence when the policy chose none. "
+            "Lowered from 3000: the predictor reads ~2.5 s where the real wait "
+            "is 3-4.6 s, and prod turns that opened with silence waited 4.6 s "
+            "on average (2026-09-29..10-01)."
         ),
     )
     CLIP_SYNTH_CONCURRENCY: int = Field(
