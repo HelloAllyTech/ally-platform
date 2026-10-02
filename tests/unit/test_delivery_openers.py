@@ -1134,3 +1134,33 @@ class TestStripLeadingHesitation:
         from app.core.livekit.reply_shaping import strip_leading_hesitation
 
         assert strip_leading_hesitation(text) == expected
+
+
+class TestStripUnderstandingClaim:
+    """The interim is spoken before the reply exists; "I see…" in front of a
+    refusal contradicts it. Prod v19 forbids these and the model still said
+    "I see… it's just that…", "I get what you mean…" and "Okay, I see..."."""
+
+    @pytest.mark.parametrize(
+        "text,expected",
+        [
+            (
+                "I see… it's just that I really don't know what to expect here,",
+                "It's just that I really don't know what to expect here,",
+            ),
+            ("I get what you mean…", ""),
+            ("Okay, I see...", ""),
+            ("Oh, I see what you mean, it's just hard", "It's just hard"),
+            ("I understand, but I keep worrying…", "But I keep worrying…"),
+            ("That makes sense, it's just—", "It's just—"),
+            ("समझ गई, बस…", ""),
+            # Untouched: no claim of understanding at the start.
+            ("I’m just thinking about…", "I’m just thinking about…"),
+            ("Seeing him like this is hard", "Seeing him like this is hard"),
+            ("Okay, it's just a lot", "Okay, it's just a lot"),
+        ],
+    )
+    def test_strips_a_leading_claim(self, text, expected):
+        from app.core.livekit.reply_shaping import strip_understanding_claim
+
+        assert strip_understanding_claim(text) == expected

@@ -107,6 +107,42 @@ def strip_leading_hesitation(text: str) -> str:
     return out[:1].upper() + out[1:] if out else ""
 
 
+#: Openings that claim the character understood what was said. The interim is
+#: spoken before the real reply is written, so "I see…" in front of a reply
+#: that refuses or pushes back makes the character contradict itself in one
+#: breath. The prod prompt forbids them and gpt-4o-mini still produced
+#: "I see… it's just that…" and "I get what you mean…" (2026-10-02).
+_UNDERSTANDING_CLAIM = re.compile(
+    r"^\s*(?:(?:okay|ok|oh|ah|yes|yeah|hmm|mm|haan)[,.…!]*\s+)?(?:"
+    r"i\s+see(?:\s+what\s+you\s+mean)?"
+    r"|i\s+get\s+(?:it|that|you|what\s+you(?:'|’)?re\s+saying|what\s+you\s+mean)"
+    r"|i\s+(?:totally\s+|completely\s+)?understand"
+    r"(?:\s+(?:that|you|what\s+you\s+mean))?"
+    r"|i\s+hear\s+you"
+    r"|(?:that\s+)?makes\s+sense"
+    r"|that'?s\s+fair|fair\s+enough"
+    r"|got\s+it"
+    r"|right|okay,?\s+so|ok,?\s+so"
+    r"|समझ\s+(?:गई|गया|रही\s+हूँ|रहा\s+हूँ)"
+    r")(?=[\s,.!?…—–-]|$)[\s,.!?…—–-]*",
+    re.IGNORECASE,
+)
+
+
+def strip_understanding_claim(text: str) -> str:
+    """``text`` without a leading claim of understanding ("I see", "I get it",
+    "that makes sense", …), then without any hesitation that follows it.
+
+    Returns "" when nothing worth saying is left (fewer than two words), so
+    the caller drops the interim rather than play a fragment.
+    """
+    out = _UNDERSTANDING_CLAIM.sub("", text or "", count=1)
+    if out == (text or ""):
+        return text or ""
+    out = strip_leading_hesitation(out)
+    return out if len(out.split()) >= 2 else ""
+
+
 class LeadingHesitationTrimmer:
     """Remove a leading hesitation, pause tag or echoed opener from a reply.
 

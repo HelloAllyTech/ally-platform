@@ -3962,6 +3962,10 @@ class AgentWorker:
                 from app.core.livekit.reply_shaping import strip_leading_hesitation
 
                 reply = strip_leading_hesitation(reply)
+            if reply:
+                from app.core.livekit.reply_shaping import strip_understanding_claim
+
+                reply = strip_understanding_claim(reply)
             if not reply:
                 if self._interim_state == "generating":
                     self._interim_state = "idle"

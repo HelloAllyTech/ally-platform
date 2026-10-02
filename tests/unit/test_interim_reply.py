@@ -806,3 +806,25 @@ class TestInterimAfterAnOpener:
             await self._generate(monkeypatch, False)
             == "Hhh, you know, it's just that..."
         )
+
+
+@pytest.mark.asyncio
+async def test_an_interim_that_only_claims_understanding_is_dropped(monkeypatch):
+    w = _interim_worker(monkeypatch)
+    w._interim_state = "generating"
+    w._read_conversation_history = lambda: []
+    w._opener_player = None
+    synthesized = []
+
+    async def fake_generate(*_a, **_k):
+        return "I get what you mean…"
+
+    async def fake_synth(_tts, phrases, **_kw):
+        synthesized.append(phrases)
+        return [_clip(phrases[0])]
+
+    monkeypatch.setattr(interim_reply, "generate_interim_reply", fake_generate)
+    monkeypatch.setattr("app.core.livekit.filler_clips.synthesize_clips", fake_synth)
+    await w._interim_generate("I have been feeling low about everything lately")
+    assert synthesized == []  # nothing rendered, nothing played
+    assert w._interim_state == "idle"
