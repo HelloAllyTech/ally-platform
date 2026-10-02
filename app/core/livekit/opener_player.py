@@ -77,6 +77,9 @@ class OpenerPlayer:
         self._last_learner_text: str = ""
         #: An opener was decided since the last real reply started.
         self._opened_since_reply = False
+        #: A bridge line played since the last real reply started. The legacy
+        #: interim reply checks it so the two never stack on one pause.
+        self._bridged_since_reply = False
         self.stats: Dict[str, Any] = {
             "turns": 0,
             "vocal": 0,
@@ -179,6 +182,7 @@ class OpenerPlayer:
                 if new_state == "speaking":
                     # A real reply started: the next learner turn may open again.
                     self._opened_since_reply = False
+                    self._bridged_since_reply = False
                 if new_state == "listening":
                     self.turn_delivery.end_turn()
         except Exception:  # noqa: BLE001 - must never break a session
@@ -280,6 +284,7 @@ class OpenerPlayer:
                 self._bridge = None  # a line is heard once
                 play_ts = time.time()
                 self._opened_since_reply = True
+                self._bridged_since_reply = True
                 self._handle = self._bg_audio().play(
                     AudioConfig(clip_audio_source(clip))
                 )
@@ -325,6 +330,21 @@ class OpenerPlayer:
             decision.bridge,
             details.get("fillerPredictedGapMs"),
         )
+
+    # ---- coordination with the interim reply -------------------------
+
+    @property
+    def busy(self) -> bool:
+        """An opener is holding, playing, or about to bridge on this turn."""
+        return self._task_pending() or self._is_playing()
+
+    @property
+    def opened_since_reply(self) -> bool:
+        return self._opened_since_reply
+
+    @property
+    def bridged_since_reply(self) -> bool:
+        return self._bridged_since_reply
 
     # ---- helpers ----------------------------------------------------
 

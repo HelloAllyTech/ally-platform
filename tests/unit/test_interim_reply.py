@@ -663,3 +663,54 @@ def FillerClipForTest(phrase):
     from app.core.livekit.filler_clips import FillerClip
 
     return FillerClip(phrase=phrase, frames=[], duration_ms=500.0)
+
+
+class _FakeOpener:
+    def __init__(self, busy=False, opened=False, bridged=False):
+        self.busy = busy
+        self.opened_since_reply = opened
+        self.bridged_since_reply = bridged
+
+
+class TestInterimAlongsideOpeners:
+    """Delivery-plan openers no longer switch the interim off: it plays after
+    the opener, and never on a pause a bridge line already covered."""
+
+    def _ready_worker(self, monkeypatch, opener):
+        w = _interim_worker(monkeypatch)
+        w._opener_player = opener
+        w._interim_clip = _clip("Let me think about that.")
+        w._interim_state = "ready"
+        w._emit_interim_transcript = MagicMock()
+        monkeypatch.setattr(worker.settings, "OPENER_POST_PAUSE_MS", 1.0)
+        monkeypatch.setattr(
+            "livekit.agents.AudioConfig", lambda *a, **k: types.SimpleNamespace()
+        )
+        return w
+
+    @pytest.mark.asyncio
+    async def test_waits_for_the_opener_then_plays(self, monkeypatch):
+        opener = _FakeOpener(busy=True, opened=True)
+        w = self._ready_worker(monkeypatch, opener)
+        task = asyncio.create_task(w._interim_play_after_filler(None))
+        await asyncio.sleep(0.15)
+        w._bg_audio.play.assert_not_called()  # opener still holding/playing
+        opener.busy = False
+        await asyncio.wait_for(task, 1.0)
+        w._bg_audio.play.assert_called_once()
+        assert w._interim_state == "playing"
+
+    @pytest.mark.asyncio
+    async def test_skips_a_pause_the_bridge_covered(self, monkeypatch):
+        w = self._ready_worker(
+            monkeypatch, _FakeOpener(busy=False, opened=True, bridged=True)
+        )
+        await asyncio.wait_for(w._interim_play_after_filler(None), 1.0)
+        w._bg_audio.play.assert_not_called()
+        assert w._interim_state == "idle"
+
+    @pytest.mark.asyncio
+    async def test_plays_straight_away_when_the_policy_chose_silence(self, monkeypatch):
+        w = self._ready_worker(monkeypatch, _FakeOpener())
+        await asyncio.wait_for(w._interim_play_after_filler(None), 1.0)
+        w._bg_audio.play.assert_called_once()

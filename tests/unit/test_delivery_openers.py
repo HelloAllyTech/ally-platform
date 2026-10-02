@@ -421,7 +421,7 @@ class TestOpenerPolicy:
         l_ = self._run(self._policy(seed=5), loud, catalog)
         assert sum(d.plays_anything for d in q) < sum(d.plays_anything for d in l_)
         holds = [d.hold_ms for d in q if d.plays_anything]
-        assert holds and min(holds) >= 900.0
+        assert holds and min(holds) >= 600.0
 
     def test_the_opener_leaves_a_thinking_pause_before_the_reply(self):
         catalog = build_session_catalog("en-IN")
@@ -715,6 +715,85 @@ class TestOpenerPlayer:
         assert ("bridge", "That's a lot.") in transcripts
         assert len(bg.played) == 2  # opener, then the bridge after a pause
         assert player._bridge is None  # heard once
+        # The legacy interim reads these so it never stacks on a bridge.
+        assert player.bridged_since_reply
+        player.on_agent_state("speaking")
+        assert not player.bridged_since_reply
+
+    @pytest.mark.asyncio
+    async def test_busy_through_the_hold_and_the_clip(self, monkeypatch):
+        cfg = PolicyConfig(
+            hold_min_ms=50.0,
+            hold_max_ms=60.0,
+            weight_none=0.0,
+            weight_unplanned=0.0,
+            post_opener_pause_ms=1.0,
+        )
+        player, td, bg, _ = _player(monkeypatch, policy_cfg=cfg)
+        await player.render_catalog()
+        player.on_agent_state("thinking")
+        assert player.busy  # holding
+        await asyncio.sleep(0.6)
+        assert len(bg.played) == 1
+        assert player.opened_since_reply and not player.bridged_since_reply
+        bg.played[0].stop()  # the clip finished
+        assert not player.busy
+
+
+class TestClipLessVoice:
+    """eleven_v3: no spoken clip may render (a second voice), so only the
+    bundled breath and sigh recordings are playable."""
+
+    @pytest.mark.asyncio
+    async def test_only_body_openers_play_and_no_bridge_renders(self, monkeypatch):
+        from app.core.livekit.opener_player import OpenerPlayer
+
+        catalog = build_session_catalog("en-IN", gender="female")
+        catalog.entries = {k: e for k, e in catalog.entries.items() if e.is_asset}
+        assert catalog.entries, "breath/sigh assets must ship for this path"
+        td = TurnDelivery(catalog)
+        bg = _BG()
+        synth_calls = []
+
+        async def _synth(phrases, source):
+            synth_calls.append(source)
+            return []
+
+        player = OpenerPlayer(
+            room_name="room-v3",
+            turn_delivery=td,
+            policy=OpenerPolicy(
+                PolicyConfig(
+                    hold_min_ms=1.0,
+                    hold_max_ms=2.0,
+                    post_opener_pause_ms=1.0,
+                    bridge_probability=1.0,
+                    bridge_min_gap_ms=100.0,
+                ),
+                rng=random.Random(0),
+            ),
+            bg_audio_getter=lambda: bg,
+            predicted_gap_ms=lambda: 5000.0,
+            synthesize=_synth,
+            emit_filler_transcript=lambda text, ts: None,
+            emit_bridge_transcript=lambda text, ts: None,
+            post_opener_pause_ms=1.0,
+        )
+        monkeypatch.setattr(
+            "livekit.agents.AudioConfig", lambda *a, **k: types.SimpleNamespace()
+        )
+        assert await player.render_catalog() == len(catalog.entries)
+        assert synth_calls == []  # nothing spoken was even attempted
+        td.on_plan(player.on_plan)
+        td.set_plan(
+            DeliveryPlan(opener_kind="hum", bridge_line="Okay.", source="planner")
+        )
+        await asyncio.sleep(0.01)
+        player.on_agent_state("thinking")
+        await asyncio.sleep(1.5)
+        assert len(bg.played) == 1  # the body opener; no bridge clip exists
+        assert td.opener.category == "body"
+        assert not player.bridged_since_reply
 
 
 # ---------------------------------------------------------------------------

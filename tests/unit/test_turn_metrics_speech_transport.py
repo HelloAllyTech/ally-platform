@@ -170,3 +170,23 @@ class TestWorkerReporting:
         w._note_speech_transport()
         # ...but the speech is still riding the avatar, and the row says so.
         assert _finalize()["metadata"]["speechTransport"] == "avatar"
+
+
+class TestTtsModel:
+    """A clip-less voice (eleven_v3) gets no spoken masking, so its turns are
+    reply-first by construction; the dashboard needs the voice to tell a mix
+    shift from a latency regression."""
+
+    @pytest.mark.unit
+    def test_every_turn_carries_the_voice_model(self):
+        turn_metrics.note_tts_model(ROOM, "elevenlabs", "eleven_v3")
+        for _ in range(2):
+            assert _finalize()["metadata"]["ttsModel"] == "elevenlabs/eleven_v3"
+
+    @pytest.mark.unit
+    def test_absent_when_unknown_and_gone_with_the_session(self):
+        turn_metrics.note_tts_model(ROOM, "elevenlabs", None)
+        assert "ttsModel" not in _finalize()["metadata"]
+        turn_metrics.note_tts_model(ROOM, "elevenlabs", "eleven_v3")
+        turn_metrics.discard(ROOM)
+        assert "ttsModel" not in _finalize()["metadata"]

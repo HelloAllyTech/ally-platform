@@ -416,6 +416,8 @@ class AgentWorker:
         # _setup_background_audio; False means no filler, back-channel or
         # interim layer, and none of their LLM calls.
         self._clip_tts_on: bool = False
+        #: Clip-less voice taking only the bundled breath/sigh openers.
+        self._asset_openers_only: bool = False
 
         # Predictive interim reply: while the learner is still speaking on a long
         # turn, a fast DEDICATED model (separate from the main reply LLM) turns
@@ -2236,13 +2238,23 @@ class AgentWorker:
             self._interim_enabled = self._clip_tts_on and is_interim_reply_enabled(
                 self.scenario
             )
-            if self._interim_enabled and filler_possible and self._delivery_mode():
-                # The delivery plan's bridge line is the interim now: it is
-                # written by the planner that knows the character's state and
-                # played after the opener under the same turn rules. Running the
-                # old interim as well would stack two voices on one pause.
-                logger.info("[INTERIM] superseded by the delivery plan's bridge line")
-                self._interim_enabled = False
+            # A voice that renders no clips (eleven_v3 and the other generative
+            # voices) can still take the bundled breath and sigh openers: they
+            # are recordings, not a second generation of the voice, so the
+            # "two voices" problem the clip policy guards against can't arise.
+            # Without them every turn of such a session was reply-first at
+            # p50 ~5s in prod (2026-09-29..10-01).
+            self._asset_openers_only = (
+                not self._clip_tts_on
+                and is_filler_enabled(self.scenario)
+                and self._delivery_mode()
+                and self._has_asset_openers()
+            )
+            # The interim runs alongside delivery-plan openers as a fallback:
+            # it plays only after the opener has finished and never on a pause
+            # that already got a bridge line (see _interim_play_after_filler).
+            # Superseding it outright (v1.48.0) took interim-first turns in
+            # prod from ~30 a day to 0, because a bridge line fires rarely.
 
             # Nothing to play on any layer — don't publish a track.
             if (
@@ -2250,6 +2262,7 @@ class AgentWorker:
                 and not filler_possible
                 and not backchannel_possible
                 and not self._interim_enabled
+                and not self._asset_openers_only
             ):
                 return
 
@@ -2282,13 +2295,15 @@ class AgentWorker:
                 backchannel_possible,
                 self._interim_enabled,
             )
+            if self._asset_openers_only:
+                logger.info("[OPENER] clip-less voice: breath/sigh openers only")
         except Exception as e:  # noqa: BLE001 - must never break a session
             logger.warning("[BG_AUDIO] setup failed (continuing without): %s", e)
             self._bg_audio = None
             return
 
         # Comfort tone only: nothing below would produce a clip.
-        if not self._clip_tts_on:
+        if not self._clip_tts_on and not self._asset_openers_only:
             return
 
         # Defer the expensive per-layer work (back-channel LLM call + filler/
@@ -2426,7 +2441,9 @@ class AgentWorker:
         turn beginning before this finishes simply gets no filler. Best-effort:
         any failure leaves the session running with whatever did resolve.
         """
-        if self._bg_audio is None or not self._clip_tts_on:
+        if self._bg_audio is None or not (
+            self._clip_tts_on or self._asset_openers_only
+        ):
             return
         try:
             import time as _time
@@ -2448,7 +2465,12 @@ class AgentWorker:
             # than to silence.
             if self._delivery_mode():
                 await self._setup_opener_player()
+            if not self._clip_tts_on:
+                # Asset openers were the only layer this voice could take.
+                return
             if self._opener_player is not None:
+                if self._interim_enabled:
+                    self._setup_interim_reply()
                 backchannel_on = await self._resolve_backchannel_clips()
                 if backchannel_on:
                     self.session.on("user_state_changed")(
@@ -2607,6 +2629,18 @@ class AgentWorker:
             logger.warning("[DELIVERY] planner client setup failed: %s", e)
             return None
 
+    def _has_asset_openers(self) -> bool:
+        """Whether this session's catalog holds any bundled-audio opener."""
+        try:
+            from app.core.livekit.opener_catalog import build_session_catalog
+
+            catalog = build_session_catalog(
+                self._filler_language(), gender=self._voice_gender()
+            )
+            return any(e.is_asset for e in catalog.entries.values())
+        except Exception:  # noqa: BLE001 - a gate must never break setup
+            return False
+
     def _voice_gender(self) -> Optional[str]:
         """The character voice's gender, for gendered opener assets, or None.
 
@@ -2650,6 +2684,11 @@ class AgentWorker:
             studio_fillers=resolve_filler_phrases(self.scenario),
             gender=self._voice_gender(),
         )
+        if not self._clip_tts_on:
+            # Nothing spoken can render for this voice: keep the planner and
+            # the policy to what can actually play.
+            catalog = self.turn_delivery.catalog
+            catalog.entries = {k: e for k, e in catalog.entries.items() if e.is_asset}
         policy = OpenerPolicy(
             PolicyConfig(
                 min_gap_ms=float(getattr(settings, "FILLER_PREDICTED_GAP_MS", 700.0)),
@@ -2667,6 +2706,8 @@ class AgentWorker:
         )
 
         async def _synthesize(phrases, source):
+            if not self._clip_tts_on:
+                return []  # a bridge line would be a second voice
             clips = await synthesize_clips(
                 self.tts_client,
                 phrases,
@@ -3135,6 +3176,11 @@ class AgentWorker:
         turn_metrics.SPEECH_TRANSPORTS for why the distinction is not cosmetic.
         """
         try:
+            turn_metrics.note_tts_model(
+                self.ctx.room.name,
+                getattr(self, "_tts_provider", None),
+                getattr(self, "_tts_model", None),
+            )
             on_avatar = self._speech_on_avatar()
             turn_metrics.note_speech_transport(
                 self.ctx.room.name,
@@ -3985,6 +4031,7 @@ class AgentWorker:
                     await asyncio.wait_for(self._filler_decided.wait(), timeout=1.5)
                 except asyncio.TimeoutError:
                     pass
+            opener = self._opener_player
 
             # Wait for the clip to be ready (generation may finish just after the
             # endpoint) AND any thinking-filler to finish. Bounded backstop; the
@@ -3999,13 +4046,26 @@ class AgentWorker:
                     return
                 filler_playing = (
                     self._filler_handle is not None and not self._filler_handle.done()
-                )
+                ) or (opener is not None and opener.busy)
                 if self._interim_state == "ready" and not filler_playing:
                     break
                 if time.monotonic() > cap:
                     return
                 await asyncio.sleep(0.05)
 
+            if opener is not None:
+                if opener.bridged_since_reply:
+                    # The planner's bridge line already covered this pause; a
+                    # second holding sentence would stack two voices.
+                    self._interim_state = "idle"
+                    return
+                if opener.opened_since_reply:
+                    # The same thinking beat an opener leaves before a bridge.
+                    await asyncio.sleep(
+                        float(getattr(settings, "OPENER_POST_PAUSE_MS", 550.0)) / 1000.0
+                    )
+                    if self._user_speaking or self._interim_state != "ready":
+                        return
             clip = self._interim_clip
             if clip is None:
                 return

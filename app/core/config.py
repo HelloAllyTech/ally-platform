@@ -736,21 +736,21 @@ class Settings(BaseSettings):
         ),
     )
     OPENER_HOLD_MIN_MS: float = Field(
-        default=350.0,
+        default=300.0,
         description=(
             "Lower bound of the randomised silence before an opener. Doubles as "
             "a confirmation window: learner speech inside it cancels the opener."
         ),
     )
     OPENER_HOLD_MAX_MS: float = Field(
-        default=1000.0, description="Upper bound of the randomised pre-opener hold."
+        default=600.0, description="Upper bound of the randomised pre-opener hold."
     )
     OPENER_LONG_HOLD_MIN_MS: float = Field(
-        default=900.0,
+        default=600.0,
         description="Hold lower bound when the plan says a pause fits the moment.",
     )
     OPENER_LONG_HOLD_MAX_MS: float = Field(
-        default=1600.0,
+        default=1000.0,
         description="Hold upper bound when the plan says a pause fits the moment.",
     )
     OPENER_POST_PAUSE_MS: float = Field(

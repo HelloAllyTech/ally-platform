@@ -129,10 +129,10 @@ class OpenerDecision:
 @dataclass
 class PolicyConfig:
     min_gap_ms: float = 700.0
-    hold_min_ms: float = 350.0
-    hold_max_ms: float = 1000.0
-    long_hold_min_ms: float = 900.0
-    long_hold_max_ms: float = 1600.0
+    hold_min_ms: float = 300.0
+    hold_max_ms: float = 600.0
+    long_hold_min_ms: float = 600.0
+    long_hold_max_ms: float = 1000.0
     #: Silence after an opener before a bridge line or the reply — the
     #: "thinking" beat the rubric asks for.
     post_opener_pause_ms: float = 550.0
@@ -141,8 +141,10 @@ class PolicyConfig:
     repeat_window: int = 4
     #: Base weights for the first-sound categories before plan and history
     #: adjustments. "none" is weighted in on purpose: a reply after a pause is
-    #: one of the natural first sounds, not a failure to fill.
-    weight_none: float = 0.35
+    #: one of the natural first sounds, not a failure to fill. Lowered from
+    #: 0.35 after prod (09-29..10-01) left 68 of 249 opener turns silent for
+    #: ~4.5 s each — the pause stopped reading as a beat and became dead air.
+    weight_none: float = 0.2
     #: The category the plan asked for, and any other playable category.
     weight_planned: float = 0.6
     weight_unplanned: float = 0.12

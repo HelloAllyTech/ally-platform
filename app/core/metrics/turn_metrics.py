@@ -45,6 +45,8 @@ _closed: Dict[str, bool] = {}
 # SESSION state, not turn state: it changes at most once, when a video actor
 # attaches mid-session, so it must outlive _turns (cleared every turn).
 _transports: Dict[str, Dict[str, Any]] = {}
+#: Session-scoped voice model per room, reported as ``metadata.ttsModel``.
+_tts_models: Dict[str, str] = {}
 
 #: The audio outputs the agent's speech can ride, recorded per turn as
 #: ``metadata.speechTransport``.
@@ -153,6 +155,19 @@ def note_speech_transport(
     if provider:
         entry["speechTransportProvider"] = provider
     _transports[room_id] = entry
+
+
+def note_tts_model(room_id: str, provider: Optional[str], model: Optional[str]) -> None:
+    """Record which voice model speaks this session, as ``provider/model``.
+
+    Masking depends on it: a voice that cannot render clips (eleven_v3 and the
+    other generative voices) gets no spoken opener, bridge or interim, so its
+    turns are reply-first by construction. Without this a shift in voice mix
+    reads on the dashboard as a latency regression.
+    """
+    if not room_id or not model:
+        return
+    _tts_models[room_id] = f"{provider}/{model}" if provider else str(model)
 
 
 def note_filler_started(
@@ -364,6 +379,8 @@ def finalize(room_id: str, agent_speech_start_ts: float) -> Optional[Dict[str, A
     # vendor's render time is identifiable rather than silently averaged in
     # with turns that measured the real thing. See SPEECH_TRANSPORTS.
     provenance.update(_transports.get(room_id, {}))
+    if room_id in _tts_models:
+        provenance["ttsModel"] = _tts_models[room_id]
     if masked:
         provenance["replyLatencyMs"] = max(
             0, round((agent_speech_start_ts - user_end) * 1000.0)
@@ -394,6 +411,7 @@ def discard(room_id: str) -> None:
     # discard_inflight, which drops a paused turn while the session continues
     # on the same transport.
     _transports.pop(room_id, None)
+    _tts_models.pop(room_id, None)
 
 
 def discard_inflight(room_id: str) -> None:
