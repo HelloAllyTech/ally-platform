@@ -223,26 +223,71 @@ def test_a_deferred_input_fires_its_combination_on_the_next_gate_pass(monkeypatc
     assert orch.event_registry["C"].happened is True
 
 
-@pytest.mark.asyncio
-async def test_final_pass_processes_newly_happened_combinations_once(monkeypatch):
+def _orch_with_combo(monkeypatch, expr_refs=("A", "B"), op="AND"):
     from app.core.events.event_orchestrator import event_orchestrator as mod
 
+    monkeypatch.setattr(mod, "is_event_eligible", lambda **kw: True)
     orch = _make_orch()
-    combo = _combo("C", "A")
+    combo = _combo("C", *expr_refs, op=op)
+    orch._event_map = {"C": combo}
+    orch.expression_list = [
+        {
+            "type": DetectionType.COMBINATION,
+            "event_id": "C",
+            "expression": combo.data.expression,
+        }
+    ]
+    orch.event_registry = {}
+    for eid in (*expr_refs, "C"):
+        orch.set_event_state(eid, False)
+    orch.deferred_combination_ids = {"C"}
+    orch.trigger_events = None
+    orch.score_keeper = MagicMock(get_total_score=MagicMock(return_value=0))
+    return orch, combo
+
+
+def test_ready_deferred_combination_fires_once(monkeypatch):
+    orch, combo = _orch_with_combo(monkeypatch)
+    orch.set_event_state("A", True)
+    assert orch.process_ready_deferred_combinations() == []  # B not yet
+    orch.set_event_state("B", True)
+    assert orch.process_ready_deferred_combinations() == [combo]
+    assert orch.event_registry["C"].happened is True
+    assert "C" in orch._sent_events
+    assert orch.process_ready_deferred_combinations() == []  # never twice
+
+
+@pytest.mark.asyncio
+async def test_deferred_pass_fires_the_combination_in_the_same_turn(monkeypatch):
+    """The checklist tick should land while the character is still speaking,
+    not after the learner's next turn."""
+    orch, combo = _orch_with_combo(monkeypatch, expr_refs=("A",), op="OR")
     leaf = _ev("A", DetectionType.BINARY_CLASSIFIER)
-    orch.update = MagicMock()
-    orch.get_happened_events = MagicMock(return_value=[leaf, combo])
+    leaf.detection_config = None
+    orch._event_map["A"] = leaf
     orch._send_events_to_core = AsyncMock()
     orch._update_event_score = AsyncMock()
-    orch.trigger_events = None
+    orch._collect_branching_and_feedback_data = MagicMock(return_value=[])
+
+    await orch.orchestrate_deferred_events({"A"}, room=MagicMock())
+
+    sent = [e.event_id for e in orch._send_events_to_core.await_args.args[0]]
+    assert sent == ["A", "C"]
+    orch._update_event_score.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_shutdown_pass_is_a_safety_net(monkeypatch):
+    from app.core.events.event_orchestrator import event_orchestrator as mod
+
+    orch, combo = _orch_with_combo(monkeypatch, expr_refs=("A",), op="OR")
+    orch._send_events_to_core = AsyncMock()
+    orch._update_event_score = AsyncMock()
+    orch.set_event_state("A", True)
 
     monkeypatch.setattr(mod.settings, "EVENTS_DEFER_NON_GATING_COMBINATIONS", False)
     assert await orch.evaluate_deferred_combinations() == 0
-    orch.update.assert_not_called()
-
     monkeypatch.setattr(mod.settings, "EVENTS_DEFER_NON_GATING_COMBINATIONS", True)
     assert await orch.evaluate_deferred_combinations() == 1
-    sent = orch._send_events_to_core.await_args.args[0]
-    assert [e.event_id for e in sent] == ["C"]  # the leaf was handled off-gate
-    orch._update_event_score.assert_awaited_once()
+    assert [e.event_id for e in orch._send_events_to_core.await_args.args[0]] == ["C"]
     assert await orch.evaluate_deferred_combinations() == 0  # dedup

@@ -114,6 +114,18 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
                 self.events, self.termination_event_ids
             )
         )
+        #: Non-gating combinations, evaluated by the deferred pass
+        #: (EVENTS_DEFER_NON_GATING_COMBINATIONS). Empty when the flag is off.
+        self.deferred_combination_ids: Set[str] = (
+            {
+                e.event_id
+                for e in self.events
+                if e.detection_type == DetectionType.COMBINATION
+            }
+            - self._gating_combination_ids(self.events, self.termination_event_ids)
+            if settings.EVENTS_DEFER_NON_GATING_COMBINATIONS
+            else set()
+        )
         if self.deferrable_detection_event_ids:
             logger.debug(
                 "EVENTS_OFF_GATE_DEFER_DETECTION: %d deferrable leaf event(s): %s",
@@ -643,6 +655,37 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
         )
 
     @staticmethod
+    def _gating_combination_ids(
+        events: List[BaseEvent], termination_event_ids: Set[str]
+    ) -> Set[str]:
+        """Combinations that shape the reply: branching or termination ones,
+        plus every combination they reference (transitively)."""
+        combinations = {
+            e.event_id: e
+            for e in events
+            if e.detection_type == DetectionType.COMBINATION
+        }
+
+        def _refs(combo: BaseEvent) -> Set[str]:
+            expr = getattr(getattr(combo, "data", None), "expression", None)
+            return (
+                extract_event_ids_from_expression(expr) if expr is not None else set()
+            )
+
+        gating = {
+            cid
+            for cid, combo in combinations.items()
+            if combo.branching_instruction is not None or cid in termination_event_ids
+        }
+        frontier = list(gating)
+        while frontier:
+            for ref in _refs(combinations[frontier.pop()]):
+                if ref in combinations and ref not in gating:
+                    gating.add(ref)
+                    frontier.append(ref)
+        return gating
+
+    @staticmethod
     def _compute_deferrable_detection_event_ids(
         events: List[BaseEvent], termination_event_ids: Set[str]
     ) -> Set[str]:
@@ -671,25 +714,16 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
         if settings.EVENTS_DEFER_NON_GATING_COMBINATIONS:
             # Only combinations that shape the reply (branching / termination),
             # and the combinations they nest, keep their inputs on the gate. A
-            # non-gating combination's inputs are deferred with it: they are
-            # marked happened by the deferred pass, and the persistent registry
-            # lets the NEXT gate pass evaluate the combination — a one-turn lag,
-            # not a miss. The last turn is covered by
-            # evaluate_deferred_combinations at shutdown. In prod the busiest
+            # non-gating combination's inputs are deferred with it: the deferred
+            # pass marks them happened and evaluates the combination itself
+            # (process_ready_deferred_combinations), so it fires seconds after
+            # the reply starts rather than on the next turn; the next gate pass
+            # and the shutdown pass are safety nets. In prod the busiest
             # scenarios had 34 combinations and none branched or terminated, yet
             # their ~16-20 leaf classifiers held every reply.
-            gating = {
-                cid
-                for cid, combo in combinations.items()
-                if combo.branching_instruction is not None
-                or cid in termination_event_ids
-            }
-            frontier = list(gating)
-            while frontier:
-                for ref in _refs(combinations[frontier.pop()]):
-                    if ref in combinations and ref not in gating:
-                        gating.add(ref)
-                        frontier.append(ref)
+            gating = EventOrchestrator._gating_combination_ids(
+                events, termination_event_ids
+            )
             sources = [combinations[cid] for cid in gating]
         else:
             sources = list(combinations.values())
@@ -712,45 +746,69 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
             and e.detection_type in deferrable_types
         }
 
-    async def evaluate_deferred_combinations(self, room=None) -> int:
-        """Final combination pass at shutdown (EVENTS_DEFER_NON_GATING_COMBINATIONS).
+    def process_ready_deferred_combinations(self) -> List[BaseEvent]:
+        """Fire every deferred combination whose inputs are now satisfied.
 
-        A non-gating combination is evaluated on the gate pass AFTER its inputs
-        were marked by the deferred pass. The last turn has no next gate pass,
-        so its deferred inputs would never reach their combinations: evaluate
-        once more here, and send + score any combination that newly happened.
-        Already-sent combinations are skipped (same dedup as the gate pass).
-        Returns how many were processed.
+        Evaluates ONLY non-gating combinations (``deferred_combination_ids``):
+        the expression against the persistent registry, then the same
+        eligibility checks the gate pass applies. A combination that fires is
+        marked happened and recorded in ``_sent_events`` before returning, with
+        no await in between, so the gate pass (which also evaluates every
+        combination, as a safety net) cannot process it a second time.
+        Returns the newly fired combinations for the caller to send and score.
+        """
+        if not self.deferred_combination_ids:
+            return []
+        elapsed_time = self._get_elapsed_time()
+        current_score = self.score_keeper.get_total_score()
+        fired: List[BaseEvent] = []
+        for info in self.expression_list:
+            event_id = info.get("event_id")
+            if (
+                info.get("type") != DetectionType.COMBINATION
+                or event_id not in self.deferred_combination_ids
+                or event_id in self._sent_events
+            ):
+                continue
+            if self.trigger_events is not None and event_id not in self.trigger_events:
+                continue
+            if not evaluate_expression(info["expression"], self.event_registry):
+                continue
+            event = self._event_map.get(event_id)
+            if event is None or not is_event_eligible(
+                event=event,
+                elapsed_time=elapsed_time,
+                current_score=current_score,
+                last_occurred_at=self.get_last_occurred_at(event_id),
+                occurrence_count=self.get_occurrence_count(event_id),
+            ):
+                continue
+            self.set_event_state(event_id, True, DetectionType.COMBINATION)
+            self._sent_events.add(event_id)
+            fired.append(event)
+        return fired
+
+    async def evaluate_deferred_combinations(self, room=None) -> int:
+        """Final deferred-combination pass at shutdown (safety net).
+
+        The deferred pass normally fires these combinations itself; this
+        catches one whose inputs landed in a deferred task that finished during
+        the shutdown drain. Returns how many fired.
         """
         if not settings.EVENTS_DEFER_NON_GATING_COMBINATIONS:
             return 0
-        self.update(
-            detected_event_ids=None, current_score=self.score_keeper.get_total_score()
-        )
-        newly: List[BaseEvent] = []
-        for event in self.get_happened_events():
-            if event.detection_type != DetectionType.COMBINATION:
-                continue
-            if (
-                self.trigger_events is not None
-                and event.event_id not in self.trigger_events
-            ):
-                continue
-            if event.event_id in self._sent_events:
-                continue
-            self._sent_events.add(event.event_id)
-            newly.append(event)
-        if not newly:
+        fired = self.process_ready_deferred_combinations()
+        if not fired:
             return 0
         if not self.is_report_mode:
-            await self._send_events_to_core(newly, room)
-        await self._update_event_score(newly)
+            await self._send_events_to_core(fired, room)
+        await self._update_event_score(fired)
         logger.info(
             "[EVENTS] final deferred-combination pass processed %d: %s",
-            len(newly),
-            [e.event_id for e in newly],
+            len(fired),
+            [e.event_id for e in fired],
         )
-        return len(newly)
+        return len(fired)
 
     def _mark_deferred_leaf_detections(self, detected_event_ids: Set[str]) -> None:
         """Mark detected deferred leaf events ``happened`` (occurrence-interval aware).
@@ -828,8 +886,10 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
     ) -> List["BranchingAndFeedbackData"]:
         """Off-gate processing for deferred (non-reply-shaping) events.
 
-        Marks the detected deferred leaf events, filters them for sending, sends
-        them to Core, and commits their scores — WITHOUT re-running combination
+        Marks the detected deferred leaf events, fires any deferred (non-gating)
+        combination they complete (EVENTS_DEFER_NON_GATING_COMBINATIONS), filters
+        them for sending, sends them to Core, and commits their scores — WITHOUT
+        re-running the gate's full combination
         evaluation, cascade scoring, or get_happened_events (those ran once on the
         gate). Safe because deferred events are non-branching, non-termination,
         and referenced by no combination (see ``deferrable_detection_event_ids``),
@@ -854,6 +914,17 @@ class EventOrchestrator(ScoreEvaluatorMixin, EventSender):
         events_to_process = self._filter_deferred_events_to_send(
             happened_deferred, set(detected_event_ids)
         )
+        # Non-gating combinations whose inputs this pass just marked fire now,
+        # seconds after the reply starts, instead of on the next turn: their
+        # checklist tick and score land while the character is still speaking.
+        combos = self.process_ready_deferred_combinations()
+        if combos:
+            logger.info(
+                "[EVENTS] deferred pass fired %d combination(s): %s",
+                len(combos),
+                [e.event_id for e in combos],
+            )
+            events_to_process = list(events_to_process) + combos
 
         feedback = self._collect_branching_and_feedback_data(events_to_process)
 
