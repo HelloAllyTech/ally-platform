@@ -1,4 +1,3 @@
-
 import unittest.mock
 
 from app.core.config import settings
