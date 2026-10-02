@@ -1,4 +1,3 @@
-
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -22,6 +21,7 @@ async def test_deepgram_tts_client_synthesize_timeout(mock_wait_for):
 
         async def async_generator():
             yield b"audio_chunk"
+
         return async_generator()
 
     mock_tts_instance.synthesize = AsyncMock(side_effect=long_running_synthesize)
