@@ -282,13 +282,8 @@ class OpenerPolicy:
             "vocal": cfg.weight_planned if planned_vocal else cfg.weight_unplanned,
             "body": cfg.weight_planned if planned_body else cfg.weight_unplanned,
         }
-        body_capped = self._body_recent()
-        if body_capped:
+        if self._body_recent():
             weights["body"] = 0.0
-        # The vocal-run cap exists to make room for a body sound; when body is
-        # itself capped, it yields, since a third spoken opener beats dead air.
-        if self._vocal_run() >= cfg.max_vocal_run and not body_capped:
-            weights["vocal"] = 0.0
         if last in weights:
             weights[last] *= cfg.repeat_category_factor
         # Silence is a device for a SHORT beat, not for a long wait: in the
@@ -304,6 +299,14 @@ class OpenerPolicy:
             weights["vocal"] = 0.0
         if body is None:
             weights["body"] = 0.0
+        # The vocal-run cap keeps a "Hmm" from fronting every reply. On a short
+        # wait a pause may take its place; on a long one (where silence is not
+        # allowed) it applies only if a body sound can actually play now —
+        # otherwise another spoken opener beats dead air.
+        if self._vocal_run() >= cfg.max_vocal_run and (
+            weights["body"] > 0.0 or predicted_gap_ms < cfg.max_silent_gap_ms
+        ):
+            weights["vocal"] = 0.0
         # The plan's category can't play this turn (its few entries are in the
         # no-repeat window, or the vocal-run cap is hit): the plan's weight
         # moves to the other sound, not to silence. Otherwise a planner that

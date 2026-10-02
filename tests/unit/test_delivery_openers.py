@@ -162,15 +162,22 @@ class TestSessionCatalog:
             is None
         )
 
-    def test_the_shipped_breath_and_sigh_assets_load(self):
+    def test_the_sigh_recording_is_out_of_the_catalog(self):
+        """Prod 2026-10-02: the sigh recording before a reply was annoying in a
+        live session. A "sigh" plan maps to the nearest spoken kind instead."""
+        catalog = build_session_catalog("en-IN", gender="female")
+        assert catalog.get("sigh_soft") is None
+        plan = validate_delivery(
+            ProposedDelivery(opener_kind="sigh"), catalog, source="working_memory"
+        )
+        assert plan.opener_kind == "reflective"
+
+    def test_the_shipped_breath_asset_loads(self):
         from app.core.livekit.opener_catalog import load_asset_clip
 
         for gender in ("female", "male"):
             catalog = build_session_catalog("hi-IN", gender=gender)
-            for entry_id, (lo, hi) in (
-                ("breath_in", (300, 1500)),
-                ("sigh_soft", (500, 1800)),
-            ):
+            for entry_id, (lo, hi) in (("breath_in", (300, 1500)),):
                 entry = catalog.get(entry_id)
                 assert entry is not None, (gender, entry_id)
                 clip = load_asset_clip(entry)
@@ -414,13 +421,13 @@ class TestOpenerPolicy:
         """A planner asking "sigh" every turn: the one sigh is in the no-repeat
         window most turns, and those turns must still mostly get a sound."""
         catalog = build_session_catalog("en-IN", gender="female")
-        assert catalog.ids_of_kind("sigh")
-        plan = DeliveryPlan(opener_kind="sigh", source="planner")
+        assert catalog.ids_of_kind("breath")
+        plan = DeliveryPlan(opener_kind="breath", source="planner")
         decisions = self._run(self._policy(seed=4), plan, catalog, gap=2500.0)
         played = sum(d.plays_anything for d in decisions) / len(decisions)
         assert played >= 0.65
         kinds = {d.entry.kind for d in decisions if d.entry is not None}
-        assert "sigh" in kinds and kinds & {
+        assert "breath" in kinds and kinds & {
             "hum",
             "hesitation",
             "lexical",
@@ -428,8 +435,10 @@ class TestOpenerPolicy:
         }
 
     def test_not_every_turn_starts_with_a_sound(self):
+        # A short wait (below OPENER_MAX_SILENT_GAP_MS), where a pause may stand
+        # in for an opener.
         catalog = build_session_catalog("en-IN")
-        decisions = self._run(self._policy(), DEFAULT_PLAN, catalog)
+        decisions = self._run(self._policy(), DEFAULT_PLAN, catalog, gap=1800.0)
         with_sound = sum(1 for d in decisions if d.plays_anything)
         assert 0.3 < with_sound / len(decisions) < 0.8
 
@@ -445,10 +454,10 @@ class TestOpenerPolicy:
 
     def test_the_planned_kind_leads(self):
         """A "sigh" plan was heard as "Hmm" on 5 of 11 prod openers."""
-        # Measured with no history, so the no-repeat rotation (only two body
-        # families exist) cannot be what decides it.
+        # Measured with no history, so the no-repeat rotation cannot be what
+        # decides it. (The breath is now the only body recording.)
         catalog = build_session_catalog("en-IN", gender="female")
-        plan = DeliveryPlan(opener_kind="sigh", opener_ids=("sigh_soft",))
+        plan = DeliveryPlan(opener_kind="breath", opener_ids=("breath_in",))
         firsts = [
             self._policy(seed=seed).decide(
                 plan, catalog, _durations(catalog), 2500.0, "I see."
@@ -456,17 +465,28 @@ class TestOpenerPolicy:
             for seed in range(200)
         ]
         played = [d for d in firsts if d.entry is not None]
-        on_plan = sum(1 for d in played if d.entry.id == "sigh_soft")
+        on_plan = sum(1 for d in played if d.entry.id == "breath_in")
         assert on_plan / len(played) > 0.7
 
     def test_vocal_runs_are_capped(self):
         catalog = build_session_catalog("en-IN")
-        decisions = self._run(self._policy(max_vocal_run=2), DEFAULT_PLAN, catalog)
+        decisions = self._run(
+            self._policy(max_vocal_run=2), DEFAULT_PLAN, catalog, gap=1800.0
+        )
         run = longest = 0
         for d in decisions:
             run = run + 1 if d.category == "vocal" else 0
             longest = max(longest, run)
         assert longest <= 2
+
+    def test_on_a_long_wait_the_vocal_cap_yields_rather_than_go_silent(self):
+        """No body sound available (no gender, or the breath in its no-repeat
+        window): a long wait gets another spoken opener, never dead air."""
+        catalog = build_session_catalog("en-IN")
+        decisions = self._run(
+            self._policy(max_vocal_run=2), DEFAULT_PLAN, catalog, gap=4000.0
+        )
+        assert all(d.plays_anything for d in decisions)
 
     def test_no_family_repeats_inside_the_window(self):
         catalog = build_session_catalog("en-IN")

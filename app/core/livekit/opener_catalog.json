@@ -122,12 +122,6 @@
       "kind": "breath",
       "family": "breath",
       "asset": "breath_in_{gender}.wav"
-    },
-    {
-      "id": "sigh_soft",
-      "kind": "sigh",
-      "family": "sigh",
-      "asset": "sigh_soft_{gender}.wav"
     }
   ]
 }
