@@ -804,6 +804,13 @@ class Settings(BaseSettings):
         default=1.0,
         description="Chance of a bridge line on a turn where one fits.",
     )
+    OPENER_BODY_MIN_GAP_TURNS: int = Field(
+        default=4,
+        description=(
+            "A breath or sigh opener plays at most once in this many turns; a "
+            "planner that keeps asking for one falls back to a spoken opener."
+        ),
+    )
     OPENER_MAX_VOCAL_RUN: int = Field(
         default=2,
         description="Most consecutive turns that may open with a vocal sound.",

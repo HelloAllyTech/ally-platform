@@ -771,3 +771,38 @@ class TestFalseEndpoint:
         w._on_interim_agent_state(types.SimpleNamespace(new_state="speaking"))
         await asyncio.sleep(0)
         assert gen.cancelled() and w._interim_state == "done"
+
+
+class TestInterimAfterAnOpener:
+    """Prod: a sigh opener, then an interim opening "Hhh, you know…" — two
+    breaths in a row. In opener sessions the interim's own hesitation goes."""
+
+    async def _generate(self, monkeypatch, with_opener):
+        w = _interim_worker(monkeypatch)
+        w._interim_state = "generating"
+        w._read_conversation_history = lambda: []
+        w._opener_player = object() if with_opener else None
+
+        async def fake_generate(*_a, **_k):
+            return "Hhh, you know, it's just that..."
+
+        async def fake_synth(_tts, phrases, **_kw):
+            return [_clip(phrases[0])]
+
+        monkeypatch.setattr(interim_reply, "generate_interim_reply", fake_generate)
+        monkeypatch.setattr(
+            "app.core.livekit.filler_clips.synthesize_clips", fake_synth
+        )
+        await w._interim_generate("I have been feeling low about everything lately")
+        return w._interim_clip.phrase
+
+    @pytest.mark.asyncio
+    async def test_opener_sessions_drop_the_leading_breath(self, monkeypatch):
+        assert await self._generate(monkeypatch, True) == "You know, it's just that..."
+
+    @pytest.mark.asyncio
+    async def test_legacy_sessions_keep_it(self, monkeypatch):
+        assert (
+            await self._generate(monkeypatch, False)
+            == "Hhh, you know, it's just that..."
+        )

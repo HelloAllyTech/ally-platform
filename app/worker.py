@@ -2717,6 +2717,7 @@ class AgentWorker:
                 bridge_gap_ms=float(settings.OPENER_BRIDGE_GAP_MS),
                 bridge_probability=float(settings.OPENER_BRIDGE_PROBABILITY),
                 max_vocal_run=int(settings.OPENER_MAX_VOCAL_RUN),
+                body_min_gap_turns=int(settings.OPENER_BODY_MIN_GAP_TURNS),
                 max_silent_gap_ms=float(settings.OPENER_MAX_SILENT_GAP_MS),
                 repeat_window=int(settings.OPENER_REPEAT_WINDOW),
             )
@@ -3953,6 +3954,14 @@ class AgentWorker:
                 partial_text,
                 room_id=self._usage_room_id(),
             )
+            if reply and self._opener_player is not None:
+                # An opener (hum, sigh, breath) usually played already, so an
+                # interim that opens with its own "Hhh," or "Um," is a second
+                # hesitation in a row — heard in prod as a sigh then "Hhh, you
+                # know…".
+                from app.core.livekit.reply_shaping import strip_leading_hesitation
+
+                reply = strip_leading_hesitation(reply)
             if not reply:
                 if self._interim_state == "generating":
                     self._interim_state = "idle"

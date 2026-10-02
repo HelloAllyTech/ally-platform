@@ -48,6 +48,13 @@ _HESITATION_WORDS = frozenset(
         "अम्म",
         "म्म",
         "हम्म्",
+        # Written-out breaths, which the interim prompt's "voiced effort"
+        # openings produce ("Hhh, okay…").
+        "hh",
+        "hhh",
+        "hhhh",
+        "haah",
+        "phew",
     }
 )
 
@@ -86,6 +93,18 @@ def _phrase_words(phrase: str) -> List[str]:
         for w in re.findall(r"[^\s,.!?…।\[\]]+", phrase or "")
         if w.strip("-")
     ]
+
+
+def strip_leading_hesitation(text: str) -> str:
+    """``text`` without a leading hesitation word, pause tag or breath.
+
+    The one-shot form of LeadingHesitationTrimmer, for a whole line rather
+    than a stream (the interim reply). The first remaining letter is
+    upper-cased, since the line now starts mid-sentence.
+    """
+    trimmer = LeadingHesitationTrimmer(active=True)
+    out = (trimmer.feed(text or "") + trimmer.flush()).strip()
+    return out[:1].upper() + out[1:] if out else ""
 
 
 class LeadingHesitationTrimmer:

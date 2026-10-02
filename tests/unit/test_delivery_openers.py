@@ -396,6 +396,20 @@ class TestOpenerPolicy:
         )
         assert not too_long.bridge and too_long.entry is not None
 
+    def test_breath_and_sigh_are_spaced_out(self):
+        """Prod: a planner asking "sigh" every turn gave a breath or sigh on 4
+        of 9 turns. At most one body sound per body_min_gap_turns."""
+        catalog = build_session_catalog("en-IN", gender="female")
+        plan = DeliveryPlan(opener_kind="sigh", source="planner")
+        decisions = self._run(
+            self._policy(seed=3, body_min_gap_turns=4), plan, catalog, gap=3500.0
+        )
+        body_turns = [i for i, d in enumerate(decisions) if d.category == "body"]
+        assert body_turns, "body openers must still play sometimes"
+        assert all(b - a >= 4 for a, b in zip(body_turns, body_turns[1:]))
+        # The blocked turns still get a sound, not silence.
+        assert sum(d.plays_anything for d in decisions) / len(decisions) > 0.9
+
     def test_a_blocked_plan_falls_back_to_another_sound_not_silence(self):
         """A planner asking "sigh" every turn: the one sigh is in the no-repeat
         window most turns, and those turns must still mostly get a sound."""
@@ -1083,3 +1097,20 @@ class TestAgentStreamStages:
         monkeypatch.setattr(Agent.default, "llm_node", _fake)
         out = "".join([c async for c in agent.llm_node(None, [], None)])
         assert out == "Um, [pause] hi."
+
+
+class TestStripLeadingHesitation:
+    @pytest.mark.parametrize(
+        "text,expected",
+        [
+            ("Hhh, you know, it's just that...", "You know, it's just that..."),
+            ("Um… I guess", "I guess"),
+            ("[sighs] Okay so", "Okay so"),
+            ("I mean it", "I mean it"),
+            ("Hmm.", ""),
+        ],
+    )
+    def test_strips_only_a_leading_hesitation(self, text, expected):
+        from app.core.livekit.reply_shaping import strip_leading_hesitation
+
+        assert strip_leading_hesitation(text) == expected

@@ -142,6 +142,10 @@ class PolicyConfig:
     bridge_gap_ms: float = 250.0
     bridge_min_gap_ms: float = 2200.0
     max_vocal_run: int = 2
+    #: A breath or sigh may play at most once in this many turns. Body sounds
+    #: are the most noticeable openers; a prod session whose small planner asked
+    #: for "sigh" on all 8 plans heard a breath or sigh on 4 of 9 turns.
+    body_min_gap_turns: int = 4
     repeat_window: int = 4
     #: Base weights for the first-sound categories before plan and history
     #: adjustments. "none" is weighted in on purpose: a reply after a pause is
@@ -185,6 +189,11 @@ class OpenerPolicy:
         if decision.entry is not None:
             self._families.append(decision.entry.family)
         self._last_bridge = decision.bridge
+
+    def _body_recent(self) -> bool:
+        """Whether a body sound played within the last body_min_gap_turns - 1."""
+        window = max(0, self.config.body_min_gap_turns - 1)
+        return window > 0 and "body" in list(self._categories)[-window:]
 
     def _vocal_run(self) -> int:
         run = 0
@@ -273,7 +282,12 @@ class OpenerPolicy:
             "vocal": cfg.weight_planned if planned_vocal else cfg.weight_unplanned,
             "body": cfg.weight_planned if planned_body else cfg.weight_unplanned,
         }
-        if self._vocal_run() >= cfg.max_vocal_run:
+        body_capped = self._body_recent()
+        if body_capped:
+            weights["body"] = 0.0
+        # The vocal-run cap exists to make room for a body sound; when body is
+        # itself capped, it yields, since a third spoken opener beats dead air.
+        if self._vocal_run() >= cfg.max_vocal_run and not body_capped:
             weights["vocal"] = 0.0
         if last in weights:
             weights[last] *= cfg.repeat_category_factor
