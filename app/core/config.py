@@ -517,10 +517,20 @@ class Settings(BaseSettings):
         ),
     )
     FILLER_GAP_PRIOR_MS: float = Field(
-        default=900.0,
+        default=2500.0,
         description=(
             "Assumed reply latency (ms) for the first turns of a session, before "
-            "enough real turns exist to estimate from."
+            "enough real turns exist to estimate from. Was 900, which read every "
+            "session's first two turns as fast and left them unmasked; the real "
+            "wait from thinking to reply audio is ~2.5-3 s on fixed-speaker "
+            "voices (prod p50 3.1 s, v2v 2.5-2.8 s)."
+        ),
+    )
+    GAP_PRIOR_GENERATIVE_MS: float = Field(
+        default=4000.0,
+        description=(
+            "The same prior for ElevenLabs v3 voices, whose first audio byte "
+            "alone is ~1.8 s: v2v measured a 3.9-4.4 s wait from thinking."
         ),
     )
     FILLER_MAX_CONSECUTIVE_TURNS: int = Field(
@@ -777,9 +787,14 @@ class Settings(BaseSettings):
     OPENER_POST_PAUSE_MS: float = Field(
         default=550.0,
         description=(
-            "Thinking pause after an opener before a bridge line (and the minimum "
-            "left before the predicted reply)."
+            "Thinking pause left between the last opener sound and the "
+            "predicted reply (the opener-to-bridge beat is "
+            "OPENER_BRIDGE_GAP_MS)."
         ),
+    )
+    OPENER_BRIDGE_GAP_MS: float = Field(
+        default=250.0,
+        description="Beat between an opener and the bridge line that follows it.",
     )
     OPENER_BRIDGE_MIN_GAP_MS: float = Field(
         default=2200.0,

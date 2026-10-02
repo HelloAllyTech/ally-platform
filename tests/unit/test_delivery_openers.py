@@ -354,6 +354,31 @@ class TestOpenerPolicy:
             decisions.append(decision)
         return decisions
 
+    def test_a_long_bridge_plays_alone_and_a_short_one_after_the_opener(self):
+        """v2v on v3: a ~2.4 s line never fit behind an opener plus two beats
+        in a ~4.4 s wait, so no bridge ever played."""
+        catalog = build_session_catalog("en-IN")
+        plan = DeliveryPlan(opener_kind="hum", bridge_line="That's a lot.")
+        cfg = dict(
+            hold_min_ms=900.0,
+            hold_max_ms=925.0,
+            weight_none=0.0,
+            bridge_probability=1.0,
+        )
+        long_line = self._policy(seed=1, **cfg).decide(
+            plan, catalog, _durations(catalog), 4400.0, "I see.", 2400.0
+        )
+        assert long_line.bridge and long_line.entry is None
+        short_line = self._policy(seed=1, **cfg).decide(
+            plan, catalog, _durations(catalog), 4400.0, "I see.", 1500.0
+        )
+        assert short_line.bridge and short_line.entry is not None
+        # Too long even alone: the opener plays and the line waits.
+        too_long = self._policy(seed=1, **cfg).decide(
+            plan, catalog, _durations(catalog), 4400.0, "I see.", 3200.0
+        )
+        assert not too_long.bridge and too_long.entry is not None
+
     def test_a_blocked_plan_falls_back_to_another_sound_not_silence(self):
         """A planner asking "sigh" every turn: the one sigh is in the no-repeat
         window most turns, and those turns must still mostly get a sound."""

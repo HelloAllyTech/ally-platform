@@ -3529,3 +3529,22 @@ class TestSessionCostAttribution:
         w.embedding_client.get_embeddings_batch.assert_awaited_once_with(
             ["a fact"], task="working_memory_embedding", room_id="room-w"
         )
+
+
+class TestGapPrior:
+    """The first turns are predicted from the voice, not a fixed 900 ms that
+    read every session's opening turns as fast and left them unmasked."""
+
+    @pytest.mark.parametrize(
+        "model,expected",
+        [
+            ("eleven_v3", "GAP_PRIOR_GENERATIVE_MS"),
+            ("eleven_multilingual_v2", "FILLER_GAP_PRIOR_MS"),
+            (None, "FILLER_GAP_PRIOR_MS"),
+        ],
+    )
+    def test_prior_follows_the_voice_model(self, model, expected):
+        w = worker.AgentWorker.__new__(worker.AgentWorker)
+        w._tts_model = model
+        assert w._gap_prior_ms() == float(getattr(worker.settings, expected))
+        assert w._gap_prior_ms() >= 2000.0

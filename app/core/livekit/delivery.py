@@ -34,7 +34,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Callable, List, Optional, Sequence, Set
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.core.livekit.opener_catalog import OPENER_KINDS, SessionCatalog
 from app.core.logger import get_logger
@@ -70,8 +70,12 @@ class ProposedDelivery(BaseModel):
         default_factory=list,
         description="Up to 3 opener ids from the catalog, best fit first.",
     )
+    # Required in the JSON schema (no default), so structured output always
+    # emits it: with the field optional, the working-memory updater left it
+    # out of 4 of 5 plans in a v2v run even with the prompt saying
+    # "required". The before-validator below still tolerates an omission, so
+    # a model that skips it can't fail the whole working-memory proposal.
     bridge_line: Optional[str] = Field(
-        default=None,
         description=(
             "Required: a 3-8 word non-committal line in the character's voice "
             "that could precede ANY reply (no answer, no fact, no question)."
@@ -81,6 +85,13 @@ class ProposedDelivery(BaseModel):
         default=False,
         description="True when a noticeable pause fits better than any sound.",
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _tolerate_missing_bridge(cls, data):
+        if isinstance(data, dict) and "bridge_line" not in data:
+            return {**data, "bridge_line": None}
+        return data
 
 
 @dataclass(frozen=True)

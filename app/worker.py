@@ -2491,9 +2491,7 @@ class AgentWorker:
                         getattr(settings, "FILLER_REPEAT_WINDOW_PLAYS", 12)
                     ),
                 )
-                self._gap_predictor = GapPredictor(
-                    prior_ms=float(getattr(settings, "FILLER_GAP_PRIOR_MS", 900.0))
-                )
+                self._gap_predictor = GapPredictor(prior_ms=self._gap_prior_ms())
                 language = self._filler_language()
 
                 phrases = resolve_filler_phrases(self.scenario)
@@ -2629,6 +2627,17 @@ class AgentWorker:
             logger.warning("[DELIVERY] planner client setup failed: %s", e)
             return None
 
+    def _gap_prior_ms(self) -> float:
+        """The wait to assume before this session has measured its own.
+
+        Per voice model, because the voice dominates it: an ElevenLabs v3
+        voice's first audio byte alone is ~1.8 s.
+        """
+        model = str(getattr(self, "_tts_model", "") or "").lower()
+        if "eleven" in model and "v3" in model:
+            return float(settings.GAP_PRIOR_GENERATIVE_MS)
+        return float(settings.FILLER_GAP_PRIOR_MS)
+
     def _has_asset_openers(self) -> bool:
         """Whether this session's catalog holds any bundled-audio opener."""
         try:
@@ -2676,9 +2685,7 @@ class AgentWorker:
         from app.core.livekit.opener_policy import OpenerPolicy, PolicyConfig
 
         started = _time.monotonic()
-        self._gap_predictor = GapPredictor(
-            prior_ms=float(getattr(settings, "FILLER_GAP_PRIOR_MS", 900.0))
-        )
+        self._gap_predictor = GapPredictor(prior_ms=self._gap_prior_ms())
         self.turn_delivery.catalog = build_session_catalog(
             self._filler_language(),
             studio_fillers=resolve_filler_phrases(self.scenario),
@@ -2698,6 +2705,7 @@ class AgentWorker:
                 long_hold_max_ms=float(settings.OPENER_LONG_HOLD_MAX_MS),
                 post_opener_pause_ms=float(settings.OPENER_POST_PAUSE_MS),
                 bridge_min_gap_ms=float(settings.OPENER_BRIDGE_MIN_GAP_MS),
+                bridge_gap_ms=float(settings.OPENER_BRIDGE_GAP_MS),
                 bridge_probability=float(settings.OPENER_BRIDGE_PROBABILITY),
                 max_vocal_run=int(settings.OPENER_MAX_VOCAL_RUN),
                 max_silent_gap_ms=float(settings.OPENER_MAX_SILENT_GAP_MS),
@@ -2730,6 +2738,7 @@ class AgentWorker:
             emit_bridge_transcript=self._emit_interim_transcript,
             voice_on_avatar=self._voice_on_avatar,
             post_opener_pause_ms=float(settings.OPENER_POST_PAUSE_MS),
+            bridge_gap_ms=float(settings.OPENER_BRIDGE_GAP_MS),
         )
         playable = await player.render_catalog()
         if not playable:
@@ -3833,6 +3842,13 @@ class AgentWorker:
             if getattr(ev, "new_state", None) == "speaking":
                 import time
 
+                if self._interim_state in ("generating", "ready"):
+                    # The learner resumed after a pause within the same turn:
+                    # keep the interim being made for it. Resetting here
+                    # cancelled every v3 interim in v2v (armed 6x, played 0x):
+                    # long turns have pauses, and the line takes ~2 s to make.
+                    self._user_speaking = True
+                    return
                 self._interim_reset_turn()
                 self._user_speaking = True
                 self._user_turn_start_monotonic = time.monotonic()
@@ -4001,8 +4017,13 @@ class AgentWorker:
                     self._interim_play_task.add_done_callback(
                         self._background_tasks.discard
                     )
-            else:
+            elif getattr(ev, "new_state", None) == "speaking":
                 self._interim_cutover()
+            else:
+                # Back to listening without a reply: a false endpoint, and the
+                # learner is going on. Stop anything audible but keep an interim
+                # that is still being made, or ready, for the real end of turn.
+                self._interim_hold()
         except Exception as e:  # noqa: BLE001 - interim must never break a session
             logger.warning("[INTERIM] agent-state handler error: %s", e)
 
@@ -4100,6 +4121,19 @@ class AgentWorker:
             pass
         except Exception as e:  # noqa: BLE001 - interim must never break a session
             logger.warning("[INTERIM] play error: %s", e)
+
+    def _interim_hold(self) -> None:
+        """A false endpoint: stop playback, keep generation and a ready clip."""
+        if self._interim_play_task is not None and not self._interim_play_task.done():
+            self._interim_play_task.cancel()
+        self._interim_play_task = None
+        if self._interim_handle is not None and not self._interim_handle.done():
+            self._interim_handle.stop()
+            self._bg_audio.flush()
+        self._interim_handle = None
+        if self._interim_state == "playing":
+            # It was heard (and is in the transcript); never replay it.
+            self._interim_state = "done"
 
     def _interim_cutover(self) -> None:
         """Cut the interim the instant the real reply takes over (or turn ends)."""

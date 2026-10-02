@@ -714,3 +714,60 @@ class TestInterimAlongsideOpeners:
         w = self._ready_worker(monkeypatch, _FakeOpener())
         await asyncio.wait_for(w._interim_play_after_filler(None), 1.0)
         w._bg_audio.play.assert_called_once()
+
+
+class TestFalseEndpoint:
+    """A long turn has pauses. In v2v every v3 interim was armed and then
+    cancelled at the learner's next pause (armed 6x, played 0x)."""
+
+    @pytest.mark.unit
+    async def test_generation_survives_a_pause_and_resume(self, monkeypatch):
+        w = _interim_worker(monkeypatch)
+        gen = asyncio.create_task(asyncio.sleep(10))
+        w._interim_gen_task = gen
+        w._interim_state = "generating"
+        w._interim_armed = True
+        w._interim_partial_text = "so far"
+
+        # Agent thinks, the learner goes on: back to listening, then speaking.
+        w._on_interim_agent_state(types.SimpleNamespace(new_state="listening"))
+        w._on_interim_user_state(types.SimpleNamespace(new_state="speaking"))
+
+        assert not gen.cancelled()
+        assert w._interim_state == "generating"
+        assert w._interim_armed and w._interim_partial_text == "so far"
+        gen.cancel()
+
+    @pytest.mark.unit
+    async def test_a_ready_clip_waits_for_the_real_end_of_turn(self, monkeypatch):
+        w = _interim_worker(monkeypatch)
+        w._interim_state = "ready"
+        w._interim_clip = _clip("Hmm, that's a lot.")
+        w._on_interim_agent_state(types.SimpleNamespace(new_state="listening"))
+        w._on_interim_user_state(types.SimpleNamespace(new_state="speaking"))
+        assert w._interim_state == "ready" and w._interim_clip is not None
+
+    @pytest.mark.unit
+    async def test_a_heard_interim_is_stopped_and_never_replayed(self, monkeypatch):
+        w = _interim_worker(monkeypatch)
+        handle = MagicMock()
+        handle.done.return_value = False
+        w._interim_handle = handle
+        w._interim_state = "playing"
+        w._on_interim_agent_state(types.SimpleNamespace(new_state="listening"))
+        handle.stop.assert_called_once()
+        w._bg_audio.flush.assert_called_once()
+        assert w._interim_state == "done"
+        # The next learner speech starts a fresh turn.
+        w._on_interim_user_state(types.SimpleNamespace(new_state="speaking"))
+        assert w._interim_state == "idle"
+
+    @pytest.mark.unit
+    async def test_the_real_reply_still_cuts_everything(self, monkeypatch):
+        w = _interim_worker(monkeypatch)
+        gen = asyncio.create_task(asyncio.sleep(10))
+        w._interim_gen_task = gen
+        w._interim_state = "generating"
+        w._on_interim_agent_state(types.SimpleNamespace(new_state="speaking"))
+        await asyncio.sleep(0)
+        assert gen.cancelled() and w._interim_state == "done"

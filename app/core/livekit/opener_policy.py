@@ -136,6 +136,10 @@ class PolicyConfig:
     #: Silence after an opener before a bridge line or the reply — the
     #: "thinking" beat the rubric asks for.
     post_opener_pause_ms: float = 550.0
+    #: The beat between an opener and the bridge line after it: shorter than
+    #: the thinking pause before the reply, because "Hmm… that's a lot" is
+    #: one breath group, not two.
+    bridge_gap_ms: float = 250.0
     bridge_min_gap_ms: float = 2200.0
     max_vocal_run: int = 2
     repeat_window: int = 4
@@ -312,8 +316,15 @@ class OpenerPolicy:
                 if category == "vocal" and vocal
                 else durations.get(body.id, 0.0) if category == "body" and body else 0.0
             )
-            fits = room_ms - entry_ms - cfg.post_opener_pause_ms >= bridge_ms
-            bridge = fits and self._rng.random() < cfg.bridge_probability
+            after_opener = room_ms - entry_ms - cfg.bridge_gap_ms >= bridge_ms
+            # Doesn't fit after the opener but fits on its own: the line alone
+            # is the better first sound for a long wait. In v2v no bridge ever
+            # fit behind an opener plus two 550 ms beats (3.9-4.4 s on v3).
+            alone = not after_opener and entry_ms > 0 and room_ms >= bridge_ms
+            if (after_opener or alone) and self._rng.random() < cfg.bridge_probability:
+                bridge = True
+                if alone:
+                    category = "none"
 
         if category == "vocal" and vocal is not None:
             return OpenerDecision("vocal", vocal, hold, bridge, "played")

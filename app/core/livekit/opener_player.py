@@ -51,6 +51,7 @@ class OpenerPlayer:
         voice_on_avatar: Callable[[], bool] = lambda: False,
         background_tasks: Optional[Set[asyncio.Task]] = None,
         post_opener_pause_ms: float = 550.0,
+        bridge_gap_ms: float = 250.0,
     ) -> None:
         self._room = room_name
         self.turn_delivery = turn_delivery
@@ -63,6 +64,7 @@ class OpenerPlayer:
         self._voice_on_avatar = voice_on_avatar
         self._tasks = background_tasks if background_tasks is not None else set()
         self._post_pause_s = max(0.0, post_opener_pause_ms) / 1000.0
+        self._bridge_gap_s = max(0.0, bridge_gap_ms) / 1000.0
 
         #: catalog id -> FillerClip
         self.clips: Dict[str, Any] = {}
@@ -278,7 +280,7 @@ class OpenerPlayer:
                 turn_metrics.note_filler_ended(self._room, time.time())
                 if not decision.bridge:
                     return
-                await asyncio.sleep(self._post_pause_s)
+                await asyncio.sleep(self._bridge_gap_s)
                 if not self._can_play():
                     return
             bridge = self._bridge
