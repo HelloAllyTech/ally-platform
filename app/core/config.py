@@ -1253,10 +1253,12 @@ class Settings(BaseSettings):
         ),
     )
     INTERIM_REPLY_LLM_TIMEOUT_MS: float = Field(
-        default=1500.0,
+        default=3000.0,
         description=(
             "Timeout (ms) for the fast-model interim-text generation. On timeout "
-            "the interim is skipped for the turn (graceful degrade)."
+            "the interim is skipped for the turn (graceful degrade). Was 1500, "
+            "which Hindi output exceeded in v2v; generation starts while the "
+            "learner is still speaking, so the longer limit adds no latency."
         ),
     )
     INTERIM_REPLY_TTS_TIMEOUT_MS: float = Field(

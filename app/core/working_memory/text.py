@@ -32,7 +32,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
-from typing import Optional, Set
+from typing import List, Optional, Set
 
 #: Combining marks, discovered rather than hardcoded. Covers Devanagari matras,
 #: Tamil/Kannada/Telugu/Malayalam vowel signs, Latin diacritics and the rest —
@@ -84,6 +84,12 @@ MIN_OTHER_LEN = 2
 
 def _is_latin(token: str) -> bool:
     return all(ord(ch) < 0x0250 for ch in token)
+
+
+def word_list(text: Optional[str]) -> List[str]:
+    """Every word in order, lowercased. Indic-safe, unlike a bare ``\\w+``,
+    which splits "सोचने" at its vowel signs into "स", "चन"."""
+    return [w.lower() for w in WORD_RE.findall(_normalise(text))]
 
 
 def tokens(text: Optional[str]) -> Set[str]:

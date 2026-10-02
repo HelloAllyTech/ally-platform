@@ -29,7 +29,6 @@ audio.
 from __future__ import annotations
 
 import asyncio
-import re
 import time
 from dataclasses import dataclass, field
 from typing import Callable, List, Optional, Sequence, Set
@@ -134,7 +133,13 @@ def _safe_bridge(text: Optional[str]) -> Optional[str]:
 
 
 def _words(text: str) -> List[str]:
-    return re.findall(r"\w+", (text or "").lower())
+    from app.core.working_memory.text import word_list
+
+    return word_list(text)
+
+
+def _bigrams(words: Sequence[str]) -> Set[tuple]:
+    return set(zip(words, words[1:]))
 
 
 def repeats_recent_line(bridge: Optional[str], recent_lines: Sequence[str]) -> bool:
@@ -142,21 +147,27 @@ def repeats_recent_line(bridge: Optional[str], recent_lines: Sequence[str]) -> b
 
     In the first prod day a bridge line was the character's reply from two turns
     earlier, word for word, which sounds like a replay rather than a person
-    holding the moment. Contained verbatim, or 80% of its words already in one
-    recent line, counts as a repeat.
+    holding the moment. Contained verbatim, or 80% of its word PAIRS already in
+    one recent line, counts as a repeat.
+
+    Pairs, not single words: a short line in any language shares most of its
+    function words ("है", "में", "मुझे", "it's", "a") with whatever came
+    before. With single words, and a ``\\w+`` tokenizer that split Devanagari
+    at its vowel signs, a Hindi v2v run dropped 5 of 5 bridge lines, including
+    "सोचने में समय लगता है" that the character had never said.
     """
     words = _words(bridge or "")
     if len(words) < 3:
         return False
     phrase = " ".join(words)
+    grams = _bigrams(words)
     for line in recent_lines or ():
         line_words = _words(line)
         if not line_words:
             continue
         if phrase in " ".join(line_words):
             return True
-        overlap = sum(1 for w in words if w in set(line_words)) / len(words)
-        if overlap >= 0.8:
+        if len(grams & _bigrams(line_words)) / len(grams) >= 0.8:
             return True
     return False
 

@@ -22,6 +22,7 @@ from app.core.livekit.delivery import (
     OpenerRecord,
     ProposedDelivery,
     TurnDelivery,
+    repeats_recent_line,
     validate_delivery,
 )
 from app.core.livekit.filler_clips import FillerClip
@@ -253,6 +254,22 @@ class TestValidateDelivery:
             recent_lines=recent,
         )
         assert fresh.bridge_line == "Give me a second with that."
+
+    def test_a_fresh_indic_line_is_not_mistaken_for_a_repeat(self):
+        """Hindi v2v: every bridge was dropped as a "repeat" because shared
+        function words (and a tokenizer that split at vowel signs) made any
+        two Hindi lines overlap."""
+        recent = [
+            "मुझे लगता है कि मैं बहुत थक गई हूँ। काम में समय ही नहीं मिलता।",
+            "यह सब बहुत भारी लगता है।",
+        ]
+        for line in ("सोचने में समय लगता है...", "यह बहुत दबाव डालता है।"):
+            assert not repeats_recent_line(line, recent), line
+        # A genuine replay is still caught, in either script.
+        assert repeats_recent_line("यह सब बहुत भारी लगता है", recent)
+        assert repeats_recent_line(
+            "trying to hold it together", ["I'm trying to hold it together."]
+        )
 
     def test_silence_implies_a_hold(self):
         plan = validate_delivery(
