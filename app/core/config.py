@@ -765,7 +765,7 @@ class Settings(BaseSettings):
         description="Predicted gap below which no bridge line is attempted.",
     )
     OPENER_BRIDGE_PROBABILITY: float = Field(
-        default=0.35,
+        default=1.0,
         description="Chance of a bridge line on a turn where one fits.",
     )
     OPENER_MAX_VOCAL_RUN: int = Field(

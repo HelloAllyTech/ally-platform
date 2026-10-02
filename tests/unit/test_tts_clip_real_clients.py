@@ -78,21 +78,23 @@ CASES = [
         True,
         "CartesiaTTSClient",
     ),
-    # Generative voices: a clip would be a second draw of the speaker.
+    # v3: the live reply is already one generation per sentence under fixed
+    # voice settings; a clip on the same model and settings is one more.
     (
         "elevenlabs_v3",
         "elevenlabs",
         {"voice_id": "v1", "model": "eleven_v3"},
-        False,
+        True,
         "ElevenLabsTTSClient",
     ),
     (
         "elevenlabs_v3_conversational",
         "elevenlabs",
         {"voice_id": "v1", "model": "eleven_v3_conversational"},
-        False,
+        True,
         "ElevenLabsTTSClient",
     ),
+    # Generative voices: a clip would be a second draw of the speaker.
     (
         "google_gemini_bare_name",
         "google",
@@ -235,3 +237,20 @@ def test_stored_parameters_carry_over_to_the_clip():
     assert clip._opts.voice_settings.speed == 1.1
     # Applied to the clip's own instance; the session instance was left alone.
     assert getattr(session_instance._opts.voice_settings, "speed", None) != 1.1
+
+
+@pytest.mark.unit
+def test_a_v3_clip_speaks_with_the_session_voice_settings():
+    """The whole case for v3 clips: same model, voice and settings as the
+    reply's own per-sentence generations. Different settings would make the
+    clip a second voice."""
+    client = _build("elevenlabs", {"voice_id": "v1", "model": "eleven_v3"})
+    session_instance = client.tts_instance
+    clip = client.create_clip_tts()
+
+    assert clip is not None
+    session_opts, clip_opts = _inner(session_instance)._opts, _inner(clip)._opts
+    assert clip_opts.model == session_opts.model == "eleven_v3"
+    assert clip_opts.voice_id == session_opts.voice_id
+    assert clip_opts.voice_settings == session_opts.voice_settings
+    assert clip_opts.voice_settings.stability == 0.95

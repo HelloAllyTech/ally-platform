@@ -2238,12 +2238,12 @@ class AgentWorker:
             self._interim_enabled = self._clip_tts_on and is_interim_reply_enabled(
                 self.scenario
             )
-            # A voice that renders no clips (eleven_v3 and the other generative
-            # voices) can still take the bundled breath and sigh openers: they
-            # are recordings, not a second generation of the voice, so the
-            # "two voices" problem the clip policy guards against can't arise.
-            # Without them every turn of such a session was reply-first at
-            # p50 ~5s in prod (2026-09-29..10-01).
+            # A voice that renders no clips (Gemini-TTS, Hume and other
+            # generative voices the clip policy refuses) can still take the
+            # bundled breath and sigh openers: they are recordings, not a second
+            # generation of the voice. Without masking, eleven_v3 sessions were
+            # reply-first at p50 ~5s in prod (2026-09-29..10-01) before v3 was
+            # allowed clips on its own model and settings.
             self._asset_openers_only = (
                 not self._clip_tts_on
                 and is_filler_enabled(self.scenario)

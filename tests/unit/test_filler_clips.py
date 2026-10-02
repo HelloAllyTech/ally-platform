@@ -57,7 +57,7 @@ class _FakeStream:
 class _FakeTTS:
     """One-shot synthesis of a fixed tone, at a provider-ish sample rate."""
 
-    def __init__(self, sample_rate=24000, samples=2400, fail_phrases=()):
+    def __init__(self, sample_rate=24000, samples=7200, fail_phrases=()):
         self.sample_rate = sample_rate
         self.samples = samples
         self.fail_phrases = set(fail_phrases)
@@ -67,7 +67,8 @@ class _FakeTTS:
         self.calls.append(text)
         if text in self.fail_phrases:
             return _FakeStream([], raise_exc=True)
-        pcm = b"\x01\x00" * self.samples
+        # Audible (renders now trim edge silence), int16 LE 8000.
+        pcm = b"\x40\x1f" * self.samples
         return _FakeStream([_FakeFrame(pcm, self.sample_rate, 1)])
 
     def stream(self):
@@ -102,14 +103,14 @@ class TestRendering:
         Handing the mixer off-rate frames makes the filler play at the wrong
         pitch and speed, which is worse than not playing it.
         """
-        client = _FakeClient(_FakeTTS(sample_rate=24000, samples=2400))
+        client = _FakeClient(_FakeTTS(sample_rate=24000, samples=7200))
 
         clips = await synthesize_clips(client, ["hmm"])
 
         assert len(clips) == 1
         assert all(f.sample_rate == MIXER_SAMPLE_RATE for f in clips[0].frames)
-        # 2400 samples at 24kHz = 100ms, and resampling preserves duration.
-        assert clips[0].duration_ms == pytest.approx(100.0, abs=2.0)
+        # 7200 samples at 24kHz = 300ms, and resampling preserves duration.
+        assert clips[0].duration_ms == pytest.approx(300.0, abs=2.0)
 
     async def test_duration_drives_the_tier(self):
         client = _FakeClient(_FakeTTS(sample_rate=24000, samples=24000))  # 1s
@@ -440,3 +441,43 @@ class TestClipTtsUsage:
         await synthesize_clips(_NoIsolation(), ["hmm"], usage_room_id="r")
 
         assert ai_usage_calls == []
+
+
+class TestRenderHygiene:
+    """Edge silence is latency and an implausible length is a bad generation;
+    both are handled once, at render time."""
+
+    @staticmethod
+    def _pcm(*segments):
+        import array
+
+        out = array.array("h")
+        for ms, amp in segments:
+            out.extend([amp] * int(filler_clips.MIXER_SAMPLE_RATE * ms / 1000))
+        return out.tobytes()
+
+    def _ms(self, pcm):
+        return len(pcm) / 2 / filler_clips.MIXER_SAMPLE_RATE * 1000
+
+    def test_leading_and_trailing_silence_is_trimmed(self):
+        trimmed = filler_clips._trim_edge_silence(
+            self._pcm((400, 0), (500, 8000), (300, 0))
+        )
+        # The speech plus the edge padding either side, not the 700 ms of air.
+        assert 500 <= self._ms(trimmed) <= 500 + 2 * filler_clips._EDGE_PAD_MS + 20
+
+    def test_all_silence_trims_to_nothing(self):
+        assert filler_clips._trim_edge_silence(self._pcm((500, 0))) == b""
+
+    @pytest.mark.parametrize(
+        "text,ms,ok",
+        [
+            ("Hmm.", 600, True),
+            ("Hmm.", 80, False),  # near-nothing
+            ("Hmm.", 6000, False),  # a run-on generation
+            ("[sighs] Okay.", 1500, True),  # tags don't count as characters
+            ("That is a lot to take in, honestly.", 3200, True),
+        ],
+    )
+    def test_plausible_duration(self, text, ms, ok):
+        assert filler_clips._plausible_duration(text, ms) is ok

@@ -160,9 +160,9 @@ def note_speech_transport(
 def note_tts_model(room_id: str, provider: Optional[str], model: Optional[str]) -> None:
     """Record which voice model speaks this session, as ``provider/model``.
 
-    Masking depends on it: a voice that cannot render clips (eleven_v3 and the
-    other generative voices) gets no spoken opener, bridge or interim, so its
-    turns are reply-first by construction. Without this a shift in voice mix
+    Masking depends on it: a voice that cannot render clips (the generative
+    voices the clip policy refuses) gets no spoken opener, bridge or interim,
+    so its turns are reply-first by construction. Without this a shift in voice mix
     reads on the dashboard as a latency regression.
     """
     if not room_id or not model:

@@ -218,13 +218,18 @@ class ElevenLabsTTSClient(BaseTTSClient):
         return self._tts_instance
 
     def allows_clip_synthesis(self) -> bool:
-        """Clips only for the fixed-speaker families: flash, turbo and
-        multilingual_v2. Any v3 model (eleven_v3, eleven_v3_conversational)
-        is generative — each request is a fresh draw of the speaker — so a
-        clip would be heard as a second voice. Other models are unclassified
-        and fail closed (see BaseTTSClient.allows_clip_synthesis)."""
+        """Clips for flash, turbo, multilingual_v2 and the v3 models.
+
+        v3 is generative, but the live reply on v3 is ALREADY one independent
+        generation per sentence (StreamAdapter over the HTTP path), held to one
+        speaker only by the fixed voice settings in ``tts_instance``. A clip
+        built by ``create_clip_tts`` gets the same voice id, model and settings,
+        so it is one more such sentence — not a second voice. A clip rendered
+        on a DIFFERENT model (multilingual_v2/flash for a v3 voice) would be,
+        and is never done. Other models are unclassified and fail closed (see
+        BaseTTSClient.allows_clip_synthesis)."""
         if self._is_v3_model:
-            return False
+            return True
         model = self._model.lower()
         return any(family in model for family in ("flash", "turbo", "multilingual_v2"))
 

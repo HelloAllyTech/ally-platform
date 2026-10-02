@@ -741,8 +741,9 @@ class TestOpenerPlayer:
 
 
 class TestClipLessVoice:
-    """eleven_v3: no spoken clip may render (a second voice), so only the
-    bundled breath and sigh recordings are playable."""
+    """A voice the clip policy refuses (Gemini-TTS, Hume): no spoken clip may
+    render (a second voice), so only the bundled breath and sigh recordings
+    are playable."""
 
     @pytest.mark.asyncio
     async def test_only_body_openers_play_and_no_bridge_renders(self, monkeypatch):

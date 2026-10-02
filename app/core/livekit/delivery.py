@@ -42,9 +42,11 @@ from app.core.logger import get_logger
 logger = get_logger(__name__)
 
 #: A bridge line is one short sentence. Longer and it becomes a reply, which it
-#: must never be: the real reply follows and must not be contradicted.
-MAX_BRIDGE_WORDS = 18
-MAX_BRIDGE_CHARS = 160
+#: must never be: the real reply follows and must not be contradicted. It must
+#: also fit the wait: after an opener and two thinking beats, a ~4 s gap leaves
+#: about 1.7 s, so a 15-word (~3 s) line never fit and was never played.
+MAX_BRIDGE_WORDS = 10
+MAX_BRIDGE_CHARS = 90
 MAX_OPENER_IDS = 3
 
 #: Opener kinds the plan may name, plus the explicit choice of saying nothing.
@@ -71,8 +73,8 @@ class ProposedDelivery(BaseModel):
     bridge_line: Optional[str] = Field(
         default=None,
         description=(
-            "One short, non-committal line in the character's voice that could "
-            "precede ANY reply (no answer, no fact, no question)."
+            "Required: a 3-8 word non-committal line in the character's voice "
+            "that could precede ANY reply (no answer, no fact, no question)."
         ),
     )
     hold_silence: bool = Field(

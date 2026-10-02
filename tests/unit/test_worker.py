@@ -2418,20 +2418,20 @@ class TestBackgroundAudioDeferral:
 
     @pytest.mark.asyncio
     async def test_generative_voice_gets_no_clip_layers(self, monkeypatch):
-        """End to end with a real client: eleven_v3 is refused by the clip
-        policy, so the worker never schedules the clip layers' LLM calls."""
+        """End to end with a real client: Gemini-TTS is refused by the clip
+        policy, so the worker never schedules the clip layers' LLM calls.
+        (eleven_v3 is allowed clips on its own model and settings now.)"""
         from app.tts.factory import create_tts_client
 
         w = self._bg_worker()
         w.tts_client = create_tts_client(
-            tts_config={
-                "provider": "elevenlabs",
-                "config": {"voice_id": "v1", "model": "eleven_v3"},
-            },
+            tts_config={"provider": "google", "config": {"voice_name": "Kore"}},
             language_code="en-US",
             gender="female",
         )
         self._all_layers_on(monkeypatch)
+        # No bundled breath/sigh openers either, so nothing at all can play.
+        monkeypatch.setattr(w, "_has_asset_openers", lambda: False)
         monkeypatch.setattr(w, "_resolve_comfort_audio", AsyncMock(return_value=None))
         deferred = AsyncMock()
         monkeypatch.setattr(w, "_setup_deferred_naturalness", deferred)

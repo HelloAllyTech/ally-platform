@@ -153,7 +153,10 @@ class PolicyConfig:
     repeat_category_factor: float = 0.4
     #: At or above this predicted gap, choosing silence is not allowed.
     max_silent_gap_ms: float = 3000.0
-    bridge_probability: float = 0.35
+    #: 1.0: the fit check and the no-two-in-a-row rule are the real gates. At
+    #: 0.35, with the planner also leaving the line empty 99% of the time, one
+    #: bridge played in three prod days.
+    bridge_probability: float = 1.0
 
 
 class OpenerPolicy:

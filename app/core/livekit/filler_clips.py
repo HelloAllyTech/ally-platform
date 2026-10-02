@@ -30,8 +30,11 @@ session continues without a filler — it must never break the agent.
 
 from __future__ import annotations
 
+import array
 import asyncio
 import hashlib
+import re
+import sys
 import threading
 from collections import OrderedDict
 from dataclasses import dataclass
@@ -312,6 +315,62 @@ async def _collect_pcm(stream) -> Tuple[bytes, int, int]:
     return b"".join(chunks), sample_rate, num_channels
 
 
+#: Peak (int16) below which a 10 ms window counts as silence at a clip's edges.
+_EDGE_SILENCE_PEAK = 300
+#: Audio kept either side of the trimmed speech so onsets and tails aren't
+#: clipped.
+_EDGE_PAD_MS = 40.0
+#: A render shorter than this is not speech (an empty or failed generation).
+_MIN_CLIP_MS = 120.0
+#: Longest plausible render: a fixed allowance plus a generous per-character
+#: rate (conversational speech runs ~65 ms per character).
+_MAX_CLIP_BASE_MS = 1200.0
+_MAX_CLIP_MS_PER_CHAR = 110.0
+_AUDIO_TAG = re.compile(r"\[[^\]]*\]")
+
+
+def _trim_edge_silence(mono: bytes) -> bytes:
+    """Drop leading and trailing near-silence from 16-bit mono PCM.
+
+    Generative voices (ElevenLabs v3) often open a render with a few hundred
+    ms of silence. On an opener that silence is pure added latency, heard
+    after the hold, so it is cut here, once, at render time.
+    """
+    samples = array.array("h")
+    samples.frombytes(mono[: len(mono) - (len(mono) % 2)])
+    if sys.byteorder != "little":
+        samples.byteswap()
+    win = MIXER_SAMPLE_RATE // 100
+    n = len(samples)
+    if n == 0:
+        return mono
+
+    def loud(start: int) -> bool:
+        chunk = samples[start : start + win]
+        return bool(chunk) and max(abs(v) for v in chunk) >= _EDGE_SILENCE_PEAK
+
+    first = next((i for i in range(0, n, win) if loud(i)), None)
+    if first is None:
+        return b""
+    last = next(i for i in range(((n - 1) // win) * win, -1, -win) if loud(i))
+    pad = int(MIXER_SAMPLE_RATE * _EDGE_PAD_MS / 1000.0)
+    start = max(0, first - pad)
+    end = min(n, last + win + pad)
+    return mono[start * 2 : end * 2]
+
+
+def _plausible_duration(text: str, duration_ms: float) -> bool:
+    """Whether a render's length fits the text it was asked to say.
+
+    ElevenLabs v3 is unreliable on very short text: it can return a long
+    run-on generation or near-nothing for "Hmm." A clip outside these bounds
+    is dropped rather than played as a stray second utterance.
+    """
+    spoken = _AUDIO_TAG.sub("", text or "").strip()
+    max_ms = _MAX_CLIP_BASE_MS + _MAX_CLIP_MS_PER_CHAR * len(spoken)
+    return _MIN_CLIP_MS <= duration_ms <= max_ms
+
+
 def _synthesis_text(phrase: str, variant: int) -> str:
     """The exact text sent to the TTS for ``variant`` of ``phrase``.
 
@@ -387,11 +446,16 @@ async def _render_one(
             logger.warning("[FILLER] no audio synthesized for %r", text)
             return None
 
-        mono = _resample_to_mixer_rate(pcm, sample_rate, channels)
+        mono = _trim_edge_silence(_resample_to_mixer_rate(pcm, sample_rate, channels))
+        duration_ms = (len(mono) / 2.0) / MIXER_SAMPLE_RATE * 1000.0
+        if not _plausible_duration(text, duration_ms):
+            logger.warning(
+                "[FILLER] dropped implausible render for %r: %.0f ms", text, duration_ms
+            )
+            return None
         frames = _frames_from_pcm(mono, MIXER_SAMPLE_RATE, 1)
         if not frames:
             return None
-        duration_ms = (len(mono) / 2.0) / MIXER_SAMPLE_RATE * 1000.0
         return frames, duration_ms
     except Exception as e:  # noqa: BLE001 - a filler must never break a session
         logger.warning("[FILLER] failed to synthesize %r: %s", text, e)
