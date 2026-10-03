@@ -132,7 +132,6 @@ class DeepgramTTSClient(BaseTTSClient):
                 api_key=self._api_key,
             )
             self._wrap_stream_with_timeout(self._tts_instance)
-            self._wrap_stream_with_timeout(self._tts_instance)
         return self._tts_instance
 
     async def synthesize(self, text: str) -> AsyncIterator[bytes]:
@@ -145,15 +144,12 @@ class DeepgramTTSClient(BaseTTSClient):
         Yields:
             Audio chunks as bytes
         """
+        agen = self.tts_instance.synthesize(text)
         try:
-            # The underlying Deepgram client does not support a timeout,
-            # so we wrap the call in asyncio.wait_for.
-            agen = await asyncio.wait_for(
-                self.tts_instance.synthesize(text),
-                timeout=30.0,
-            )
-            async for chunk in agen:
-                yield chunk
+            while True:
+                yield await asyncio.wait_for(agen.__anext__(), timeout=30.0)
+        except StopAsyncIteration:
+            pass
         except asyncio.TimeoutError:
             logger.warning("Deepgram TTS synthesis timed out")
             raise
