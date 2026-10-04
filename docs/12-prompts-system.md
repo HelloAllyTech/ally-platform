@@ -60,6 +60,7 @@ Prompt codes use `ally_ai_learn_` prefix: `subdir/filename.txt` → `ally_ai_lea
 | `ally_ai_learn_system_base_role_instruction` | `system/base_role_instruction` | System prompt |
 | `ally_ai_learn_system_multilingual_instructions` | `system/multilingual_instructions` | Language samples for non-English |
 | `ally_ai_learn_counselor_report_generation_prompt` | `counselor/report_generation_prompt` | Report generation |
+| `ally_ai_learn_system_text_chat_guidance` | `system/text_chat_guidance` | Appended to the persona prompt in text-chat sessions only ([Text-Chat Roleplays](text-chat.md)) |
 
 ## Language Instruction (Non-English)
 

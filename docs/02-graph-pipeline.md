@@ -178,6 +178,11 @@ The system prompt has two modes:
 - **With branching instruction**: minimal directive-focused prompt (the instruction guides the conversation direction)
 - **Without branching instruction**: comprehensive prompt with full character details (name, age, context, personality, emotional needs, cultural context, speaking style, etc.)
 
+In both modes a **text-chat** session (`Scenario.is_text_chat`) gets one more block,
+`system/text_chat_guidance`, appended after the audio-tag guidance and before the rolling
+summary: it re-frames the call-oriented prompt as texting. Voice sessions never carry it. See
+[Text-Chat Roleplays](text-chat.md).
+
 ### Per-state dialogue length (`dialogueLength`)
 
 A scenario state may carry `dialogueLength`: `short`, `medium` or `long`. `_build_behavior_prompt`

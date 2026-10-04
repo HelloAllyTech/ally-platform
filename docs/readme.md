@@ -45,6 +45,7 @@
 | -- | [Docs Guard](docs-guard.md) | How `.docs-map.yml` is enforced, the AGENTS.md line budget, escape hatches |
 | -- | [Turn Openers](turn-openers.md) | The delivery plan: how each reply starts (catalog opener, pause or bridge line), chosen by working memory and played under the naturalness rubric |
 | -- | [Thinking Fillers Perf Plan](thinking-fillers-perf-plan.md) | Proposal: measure, then 10x the thinking-filler on speed, cost, diversity, gap bridging, character and context fit |
+| -- | [Text-Chat Roleplays](text-chat.md) | Running a roleplay typed both ways: what is shared with voice, what is switched off, the persona's texting guidance |
 | -- | [AI Video Actor](video-actor.md) | EXPERIMENTAL, off everywhere: giving a character a lip-synced face, its two gates, providers and audio-only fallback |
 | 01 | [Worker Lifecycle](01-worker-lifecycle.md) | AgentWorker 3-phase lifecycle, termination |
 | 02 | [Graph Pipeline](02-graph-pipeline.md) | SimulationState, 6 graph nodes, parallel flow, report graph |

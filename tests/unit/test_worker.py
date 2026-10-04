@@ -633,6 +633,124 @@ class TestWorker:
         assert "conversation_item_added" in dummy_session.handlers
 
     @pytest.mark.asyncio
+    async def test_entrypoint_text_chat_runs_the_room_without_audio(self, monkeypatch):
+        """A TEXT session goes through the same entrypoint as voice, but starts
+        the room text-in/text-out, builds no STT/TTS, sets up no background
+        audio, and still delivers the opening statement (as text)."""
+        from app.core.agent import factory as agent_utils
+        from app.core.livekit.livekit_models import RoomMetadataEnvelope
+        from app.core.scenario.base import PromptData, Scenario
+
+        scenario = Scenario(
+            scenarioName="test",
+            metadata={},
+            events=[],
+            trigger_events=[],
+            termination_events=[],
+            voice=None,
+            prompt_data=PromptData(
+                name="Test Client",
+                age="30",
+                gender="male",
+                current_location="Test Location",
+                opening_statements=["hey. not sure why i'm messaging"],
+                prompt="test prompt",
+            ),
+            language_config=None,
+            interaction_mode="TEXT",
+        )
+        envelope = RoomMetadataEnvelope(version="1.0", scenario=scenario)
+        monkeypatch.setattr(
+            RoomMetadataEnvelope,
+            "create",
+            lambda payload, embedding_client=None, branching_llm_config=None: (
+                envelope
+            ),
+        )
+
+        def _must_not_build(*a, **k):
+            raise AssertionError("a text chat must not build STT/TTS clients")
+
+        monkeypatch.setattr(agent_utils, "configure_stt_client", _must_not_build)
+        monkeypatch.setattr(agent_utils, "configure_tts_client", _must_not_build)
+        monkeypatch.setattr(worker, "configure_stt_client", _must_not_build)
+        monkeypatch.setattr(worker, "configure_tts_client", _must_not_build)
+        monkeypatch.setattr(
+            worker,
+            "configure_llm_client",
+            lambda scenario, branching_llm_config=None: Mock(),
+        )
+        monkeypatch.setattr(
+            worker,
+            "initialize_agent_state",
+            lambda thread_id, scenario: "2024-01-01T00:00:00Z",
+        )
+        agent_kwargs = {}
+
+        def _create_agent(*a, **k):
+            agent_kwargs.update(k)
+            return self.DummyAgent(llm=None)
+
+        monkeypatch.setattr(worker, "create_agent_with_adapter", _create_agent)
+        monkeypatch.setattr(
+            worker, "should_say_opening_statement", lambda *a, **k: True
+        )
+        interruption_wired = []
+        monkeypatch.setattr(
+            worker,
+            "setup_interruption_detection",
+            lambda session, room_id=None: interruption_wired.append(room_id),
+        )
+        bg_audio = []
+
+        async def _bg_audio(self):
+            bg_audio.append(True)
+
+        monkeypatch.setattr(worker.AgentWorker, "_setup_background_audio", _bg_audio)
+        monkeypatch.setattr(agent_graph, "update_state", lambda *a, **k: None)
+
+        class TextSession(self.DummySession):
+            async def start(self, room, agent, **kwargs):
+                self.started = True
+                self.start_kwargs = kwargs
+
+        session = TextSession()
+        session_kwargs = {}
+
+        def _session(**kwargs):
+            session_kwargs.update(kwargs)
+            return session
+
+        monkeypatch.setattr(worker, "AgentSession", _session)
+
+        class Ctx:
+            def __init__(self):
+                self.job = types.SimpleNamespace(metadata="{}", id="test-job")
+                self.room = TestWorker.DummyRoom()
+                self.proc = types.SimpleNamespace(userid="u", userdata={"vad": "VAD"})
+                self._shutdown_callbacks = []
+
+            async def connect(self):
+                return None
+
+            def add_shutdown_callback(self, callback):
+                self._shutdown_callbacks.append(callback)
+
+        await worker.entrypoint(Ctx())
+
+        assert session.started is True
+        assert session_kwargs == {"user_away_timeout": None}
+        room_in = session.start_kwargs["room_input_options"]
+        room_out = session.start_kwargs["room_output_options"]
+        assert room_in.audio_enabled is False and room_in.text_enabled is True
+        assert room_out.audio_enabled is False
+        assert room_out.transcription_enabled is True
+        # No TTS means no audio-tag guidance in the persona prompt.
+        assert agent_kwargs["tts_client"] is None
+        assert bg_audio == [] and interruption_wired == []
+        assert session.said == ["hey. not sure why i'm messaging"]
+
+    @pytest.mark.asyncio
     async def test_opening_statement_playout_timeout_is_not_logged_as_error(
         self, monkeypatch, caplog
     ):
