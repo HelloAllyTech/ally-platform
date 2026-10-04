@@ -824,6 +824,24 @@ def _append_audio_tag_guidance(
     return SystemMessage(content=combined.strip())
 
 
+def _append_text_chat_guidance(
+    message: SystemMessage, text_chat_guidance: Optional[str]
+) -> SystemMessage:
+    """Append the text-chat guidance for a TEXT session; no-op for voice.
+
+    The main-agent templates are written for a call ("how you speak", filler
+    words, "would actually speak"), and they are curator-owned in prompt
+    management, so they are not edited per mode. Instead a text session gets
+    this block after them, re-framing all of that as typing. Appended after
+    templating, like the audio-tag guidance, so its quotes and brackets never
+    reach the formatter. `text_chat_guidance` is None for every voice session.
+    """
+    guidance = (text_chat_guidance or "").strip()
+    if not guidance:
+        return message
+    return SystemMessage(content=f"{message.content}\n\n{guidance}".strip())
+
+
 # Framing for the Tier 0 language-glossary style card, shared by both delivery
 # paths (the {language_glossary} placeholder and the system-level append). The
 # "private rules / never teach or correct" sentence is load-bearing: without
@@ -978,6 +996,7 @@ def generate_system_message(
     defer_retrieved_context: bool = False,
     client_working_memory: Any = None,
     locked_memory_topics: Optional[List[str]] = None,
+    text_chat_guidance: Optional[str] = None,
 ) -> Tuple[SystemMessage, Optional[SystemMessage]]:
     """
     Generates a SystemMessage prompt for an AI roleplay assistant
@@ -1001,6 +1020,9 @@ def generate_system_message(
     so the persona emits voice audio tags inline as it generates — see
     `_append_audio_tag_guidance`.
 
+    `text_chat_guidance`, when provided (text-chat sessions only), is appended
+    after the audio-tag block — see `_append_text_chat_guidance`.
+
     `rolling_summary`, when provided (ROLLING_SUMMARY_ENABLED), is appended as
     the final block — see `_append_rolling_summary` for why it must stay last.
 
@@ -1022,6 +1044,7 @@ def generate_system_message(
         )
         msg = _ensure_language_glossary(msg, prompt_data)
         msg = _append_audio_tag_guidance(msg, audio_tag_instructions)
+        msg = _append_text_chat_guidance(msg, text_chat_guidance)
         msg = _append_rolling_summary(msg, rolling_summary)
         return _append_retrieved_context(msg, retrieved_context), None
 
@@ -1049,6 +1072,7 @@ def generate_system_message(
         )
         msg = _ensure_language_glossary(msg, prompt_data)
         msg = _append_audio_tag_guidance(msg, audio_tag_instructions)
+        msg = _append_text_chat_guidance(msg, text_chat_guidance)
         msg = _append_rolling_summary(msg, rolling_summary)
         if defer_retrieved_context:
             return msg, _build_retrieved_context_message(effective_retrieved_context)
@@ -1077,6 +1101,7 @@ def generate_system_message(
     )
     msg = _ensure_language_glossary(msg, prompt_data)
     msg = _append_audio_tag_guidance(msg, audio_tag_instructions)
+    msg = _append_text_chat_guidance(msg, text_chat_guidance)
     msg = _append_rolling_summary(msg, rolling_summary)
     if defer_retrieved_context:
         return msg, _build_retrieved_context_message(effective_retrieved_context)

@@ -18,6 +18,11 @@ from app.core.events.event_types.guardrail.guardrail_event import GuardrailEvent
 from app.core.events.event_types.guardrail.schemas import GuardrailData
 from app.core.events.factory import build_events_from_metadata
 from app.core.logger import get_logger
+from app.core.scenario.interaction_mode import (
+    INTERACTION_MODE_TEXT,
+    INTERACTION_MODE_VOICE,
+    parse_interaction_mode,
+)
 from app.core.scenario.simulation_instructions import (
     SimulationBehaviorInstruction,
     SimulationStateInstruction,
@@ -531,6 +536,13 @@ class Scenario(BaseModel):
         default=None,
         description="Ordered agent states with instructions and dialogues",
     )
+    interaction_mode: str = Field(
+        default=INTERACTION_MODE_VOICE,
+        alias="interactionMode",
+        description="VOICE (default) or TEXT. TEXT runs the same persona, events "
+        "and scoring with audio switched off: the learner types and the reply is "
+        "published as text. ally-be sends the key only for text-chat sessions.",
+    )
     timer_mode: bool = Field(
         default=False,
         alias="timerMode",
@@ -552,6 +564,11 @@ class Scenario(BaseModel):
         "populate_by_name": True,  # allow both alias and field name on input
         "arbitrary_types_allowed": True,
     }
+
+    @property
+    def is_text_chat(self) -> bool:
+        """True for a text-chat roleplay: no STT, no TTS, no audio either way."""
+        return self.interaction_mode == INTERACTION_MODE_TEXT
 
     # ---------------------------
     # Public constructor
@@ -604,6 +621,8 @@ class Scenario(BaseModel):
         conversation_started_at = cls._parse_conversation_started_at(
             scenario_session.get("conversationStartedAt")
         )
+        interaction_mode = parse_interaction_mode(raw.get("interactionMode"))
+        is_text_chat = interaction_mode == INTERACTION_MODE_TEXT
 
         # Parse guardrails array and build one GuardrailEvent per entry
         guardrail_events = []
@@ -616,6 +635,19 @@ class Scenario(BaseModel):
                     # detectorType selects the classifier: COHERENCE -> dedicated
                     # coherence classifier; CATEGORY (default) -> shared one.
                     guard_detector_type = g.get("detectorType", "CATEGORY")
+
+                    # COHERENCE exists to catch speech the STT mangled and ask
+                    # the learner to repeat. A typed message is exactly what the
+                    # learner meant, so in a text chat that guard could only
+                    # ever misfire — "sorry, I didn't catch that" to a sentence
+                    # on screen. The same scenario keeps it for voice.
+                    if is_text_chat and guard_detector_type == "COHERENCE":
+                        logger.info(
+                            "Skipping COHERENCE guardrail at index %s: "
+                            "text-chat session has no STT to repair",
+                            i,
+                        )
+                        continue
 
                     if not helper_dialogue or not actor_dialogue:
                         logger.warning(
@@ -695,7 +727,7 @@ class Scenario(BaseModel):
                 getattr(e, "detector_type", None) == "COHERENCE"
                 for e in guardrail_events
             )
-            if default_guard_enabled() and not has_coherence_guard:
+            if default_guard_enabled() and not has_coherence_guard and not is_text_chat:
                 # Match the provider selection used for authored guardrails.
                 if settings.OLLAMA_BASE_URL and settings.LOCAL_LLM_MODEL:
                     _def_url = settings.OLLAMA_BASE_URL
@@ -728,6 +760,7 @@ class Scenario(BaseModel):
             timer_mode=bool(raw.get("timerMode", False)),
             max_time_value=raw.get("maxTimeValue"),
             pause_enabled=raw.get("pauseEnabled"),
+            interaction_mode=interaction_mode,
             conversation_started_at=conversation_started_at,
             events=built_events,
             trigger_events=trigger_events,

@@ -28,6 +28,7 @@ The top-level model that holds everything for a session:
 | `language_config` | `Optional[LanguageConfig]` | Language-specific STT/LLM overrides |
 | `behavior_instructions` | `Optional[List[SimulationBehaviorInstruction]]` | SHOULD_DO / SHOULD_NOT_DO behaviors for counselor |
 | `state_instructions` | `Optional[List[SimulationStateInstruction]]` | Ordered agent states with score windows and dialogues |
+| `interaction_mode` | `str` | `VOICE` (default) or `TEXT` (alias: `interactionMode`); `is_text_chat` reads it. See [Text-Chat Roleplays](text-chat.md) |
 
 ### PromptData
 
@@ -128,6 +129,7 @@ Steps:
 5. **Build prompt data** -- map camelCase keys (`promptData.lifeHistory` to `life_history_summary`, etc.) into `PromptData`. A missing **or empty** `promptData` logs a warning and falls back to a default `PromptData` (every field is optional); it does not fail scenario load
 6. **Build language config** -- parse `languageCode`, `stt`, `llm` overrides
 7. **Build termination events** -- parse both `autoTerminationEvent` (deprecated, single) and `autoTerminationEvents` (new, list)
+8. **Build guardrails** -- one `GuardrailEvent` per `guardrails[]` entry. In a text-chat session COHERENCE guardrails (and the platform-default one) are skipped: they repair mis-transcribed speech, and typed text has none
 
 ## Key Mapping: Backend to PromptData
 

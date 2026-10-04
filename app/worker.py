@@ -51,6 +51,7 @@ from app.core.livekit.audio_filters import (
     session_livekit_url,
     supports_noise_cancellation,
 )
+from app.core.livekit.text_chat import text_chat_room_options
 from app.core.livekit.video_actor import (
     attach_video_actor,
     defers_attach,
@@ -555,15 +556,31 @@ class AgentWorker:
         else:
             logger.info("[METADATA_PROMPTS] scenario has no prompt_data.prompts")
 
-        # Configure STT and TTS clients - using utility functions
-        self.stt_client = configure_stt_client(self.scenario)
-        self.tts_client = configure_tts_client(self.scenario)
+        # Configure STT and TTS clients - using utility functions. A text-chat
+        # roleplay has neither: the learner types, the reply is published as
+        # text, and leaving both None is what keeps every voice-only feature
+        # below (audio tags, fillers, opener clips, TTS-failure recovery) off.
+        if self._is_text_chat:
+            self.stt_client = None
+            self.tts_client = None
+            logger.info(
+                "[TEXT_CHAT] text-chat roleplay — no STT/TTS (room=%s)",
+                self.ctx.room.name,
+            )
+        else:
+            self.stt_client = configure_stt_client(self.scenario)
+            self.tts_client = configure_tts_client(self.scenario)
 
         # Capture STT/TTS provider+model for token-usage (AI-cost) emission in
         # the metrics hook. Read defensively off the scenario config; the live
         # billable metrics (audio duration / characters) come from LiveKit.
-        self._stt_provider, self._stt_model = _resolve_stt_meta(self.scenario)
-        self._tts_provider, self._tts_model = _resolve_tts_meta(self.scenario)
+        if self._is_text_chat:
+            # Nothing is transcribed or synthesized, so nothing is attributed.
+            self._stt_provider = self._stt_model = None
+            self._tts_provider = self._tts_model = None
+        else:
+            self._stt_provider, self._stt_model = _resolve_stt_meta(self.scenario)
+            self._tts_provider, self._tts_model = _resolve_tts_meta(self.scenario)
 
         # Configure LLM client
         self.llm_client = configure_llm_client(self.scenario)
@@ -929,8 +946,27 @@ class AgentWorker:
             logger.exception("[WATCHDOG] failed to arm; continuing without it")
             self._stall_watchdog = None
 
+    @property
+    def _is_text_chat(self) -> bool:
+        """Whether this job is a text-chat roleplay (audio off both ways).
+
+        None-safe: read before configure() has parsed the scenario, and by
+        tests that build a worker without one — both mean a voice session.
+        """
+        return bool(getattr(self.scenario, "is_text_chat", False))
+
     def _create_session(self):
         """Create agent session with STT and TTS."""
+        if self._is_text_chat:
+            # Text chat: no STT, TTS, VAD or turn detection. Each typed message
+            # IS the end of the learner's turn, so there is nothing to detect.
+            # user_away_timeout is off because "away" is derived from voice
+            # activity, which a typing learner never produces — left on, it
+            # would flag every learner as away while they compose a reply.
+            self._session_tts_instance = None
+            self.session = AgentSession(user_away_timeout=None)
+            return
+
         # VAD is always prewarmed in prewarm(), so retrieve it regardless
         vad = self.ctx.proc.userdata.get("vad")
         stt_instance = self.stt_client.stt_instance
@@ -1168,8 +1204,9 @@ class AgentWorker:
 
         # The complementary case to the close handler above: ONE failed
         # synthesis, which never accumulates to a close and costs the learner a
-        # whole turn of audio in silence.
-        self._register_tts_error_fallback()
+        # whole turn of audio in silence. A text chat synthesizes nothing.
+        if not self._is_text_chat:
+            self._register_tts_error_fallback()
 
         # Conversation handler (register on session)
         conversation_handler, state_handlers, cleanup_conversation_handler = (
@@ -1778,6 +1815,11 @@ class AgentWorker:
         # client sends one. Only an explicit True enables (missing/False → off).
         if getattr(self.scenario, "pause_enabled", None) is not True:
             logger.warning("[PAUSE] Ignored — pause not enabled for this scenario")
+            return
+        # Pause gates audio I/O, which a text chat does not have; the chat
+        # client offers no pause control, so a packet here is stale or forged.
+        if self._is_text_chat:
+            logger.warning("[PAUSE] Ignored — text-chat session has no pause")
             return
 
         logger.info("[PAUSE] Pausing simulation")
@@ -4362,7 +4404,9 @@ class AgentWorker:
             # videoActorEnabled), both defaulting False. For a session that has
             # not opted in — every session today — this is one boolean read and
             # the ordering below is exactly what it has always been.
-            _video_actor_wanted = is_video_actor_enabled(self.scenario)
+            _video_actor_wanted = (
+                is_video_actor_enabled(self.scenario) and not self._is_text_chat
+            )
             # Deferred is the default: the session starts audio-only and the
             # avatar attaches itself once it is actually rendering, so the
             # learner never waits out a 5-12s vendor render before the character
@@ -4424,13 +4468,21 @@ class AgentWorker:
             else:
                 _output_options = {}
 
+            if self._is_text_chat:
+                # Text in on lk.chat, text out on lk.transcription, no audio
+                # either way — see app/core/livekit/text_chat.py.
+                _room_input_options, _text_output_options = text_chat_room_options()
+                _output_options = {"room_output_options": _text_output_options}
+            else:
+                _room_input_options = RoomInputOptions(
+                    noise_cancellation=None if _is_v2v_room else bvc,
+                )
+
             await self.session.start(
                 # ... (rest of the args identical)
                 room=self.ctx.room,
                 agent=self.agent,
-                room_input_options=RoomInputOptions(
-                    noise_cancellation=None if _is_v2v_room else bvc,
-                ),
+                room_input_options=_room_input_options,
                 **_output_options,
             )
 
@@ -4475,15 +4527,21 @@ class AgentWorker:
         # the start-latency breakdown.
         _prep_t0 = time.monotonic()
 
-        # Setup interruption detection
-        setup_interruption_detection(self.session, self.ctx.room.name)
+        # Setup interruption detection. It listens for audio playback
+        # finishing, so a text chat (no audio output) has nothing to watch.
+        if not self._is_text_chat:
+            setup_interruption_detection(self.session, self.ctx.room.name)
 
         # Initialize event orchestrator (only after session is connected)
         await self.event_orchestrator.initialize()
 
         # Set up the shared background-audio track — comfort room tone and the
         # thinking-filler (best-effort; never blocks or breaks the session).
-        await self._setup_background_audio()
+        # Every layer on it is sound, so a text chat skips it wholesale; that
+        # one gate is also what keeps fillers, back-channel and interim replies
+        # off, since they are all wired from here.
+        if not self._is_text_chat:
+            await self._setup_background_audio()
 
         self._timing["prep_ms"] = (time.monotonic() - _prep_t0) * 1000
 

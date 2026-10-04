@@ -1467,6 +1467,30 @@ async def generate_response(
             )
             audio_tag_instructions = None
 
+    # Text-chat roleplay: the main-agent prompts are written for a call, so a
+    # TEXT session appends guidance on writing as a person texting a helpline.
+    # Resolved from prompt management (code
+    # `ally_ai_learn_system_text_chat_guidance`, local fallback
+    # `app/prompts/system/text_chat_guidance.txt`): a dashboard override wins.
+    # Always None for a voice session, leaving its prompt unchanged.
+    text_chat_guidance = None
+    if scenario is not None and getattr(scenario, "is_text_chat", False):
+        try:
+            text_chat_guidance = (
+                load_template("system/text_chat_guidance", scenario.prompt_data) or None
+            )
+            if not text_chat_guidance:
+                logger.warning(
+                    "[generate_response] text chat guidance resolved empty; "
+                    "the persona will write in its voice-call style"
+                )
+        except Exception:
+            logger.exception(
+                "[generate_response] failed to resolve text chat guidance; "
+                "the persona will write in its voice-call style"
+            )
+            text_chat_guidance = None
+
     # Get language code
     language_code = DEFAULT_LANGUAGE_CODE
     if scenario and scenario.language_config:
@@ -1527,6 +1551,7 @@ async def generate_response(
             defer_retrieved_context=settings.RETRIEVED_CONTEXT_DEFER_TO_SUFFIX,
             client_working_memory=_cwm_memory,
             locked_memory_topics=_locked_memory_topics,
+            text_chat_guidance=text_chat_guidance,
         )
 
         room_name = ""
