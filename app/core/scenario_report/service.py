@@ -50,22 +50,53 @@ def _get_report_semaphore():
     return _report_semaphore
 
 
-# Registry of currently-running ScenarioReportService instances, keyed by
-# report_id. Populated by ScenarioReportService.run() on entry and cleared
-# in its finally block. The cancel HTTP endpoint looks instances up here
-# to signal user-initiated cancellation. Process-local — fine for a
-# single-worker deployment, would need a Redis pubsub bridge for multi-
-# worker setups (out of scope here; we run one worker per container).
+# Registry of accepted ScenarioReportService instances, keyed by report_id:
+# queued for a concurrency slot or running. Populated by accept_report() the
+# moment the generate endpoint accepts a report -- not when it starts running
+# -- so a cancel that lands while the report is still queued finds it, and a
+# repeated trigger for the same report (ally-be retries the generate call) is
+# refused instead of running the simulation and judge twice. Cleared when the
+# run ends. Process-local — fine for a single-worker deployment, would need a
+# Redis pubsub bridge for multi-worker setups (out of scope here; we run one
+# worker per container).
 _ACTIVE_REPORT_SERVICES: dict[str, "ScenarioReportService"] = {}
+
+# Report-result webhook delivery: attempts, and the first backoff (doubling).
+# The same bounded retry as the actor-evaluation webhook
+# (app/core/scenario_session_evaluation/service.py): one transient failure
+# must not throw away a finished simulation and judge.
+_WEBHOOK_ATTEMPTS = 3
+_WEBHOOK_BACKOFF_S = 1.0
+
+
+def accept_report(service: "ScenarioReportService") -> bool:
+    """Register a report the moment it is accepted, before it waits for a slot.
+
+    Returns False, registering nothing, when a report with the same id is
+    already queued or running in this process.
+    """
+    report_id = service._request.report_id
+    if report_id in _ACTIVE_REPORT_SERVICES:
+        return False
+    _ACTIVE_REPORT_SERVICES[report_id] = service
+    return True
+
+
+def _release_report(service: "ScenarioReportService") -> None:
+    """Unregister ``service``, if it is the one registered under its id."""
+    report_id = service._request.report_id
+    if _ACTIVE_REPORT_SERVICES.get(report_id) is service:
+        del _ACTIVE_REPORT_SERVICES[report_id]
 
 
 def request_cancel(report_id: str) -> bool:
-    """Signal the running report service (if any) to stop.
+    """Signal the queued or running report service (if any) to stop.
 
     Called by the FastAPI cancel endpoint after ally-be relays a user's
-    cancel click. Returns True if a running service was found and
+    cancel click. Returns True if a queued or running service was found and
     signalled, False if no in-flight report matches the ID (already
-    completed, never started, or unknown).
+    completed or unknown). A queued report stops as soon as it gets a slot,
+    before any setup or model call.
     """
     service = _ACTIVE_REPORT_SERVICES.get(report_id)
     if service is None:
@@ -138,45 +169,51 @@ async def run_report_with_concurrency_limit(
             waiting_count,
         )
 
-    async with semaphore:
-        logger.info(
-            "Report %s started execution (concurrency slot acquired)",
-            report_id,
-        )
-        try:
-            await service.run()
-        except Exception as e:
-            # Outer backstop for any exception that escapes service.run()
-            # (e.g. a crash inside its own except: handler, an OOM, a bug
-            # in the cleanup `finally`). Without this, the asyncio task
-            # dies silently and the DB row sits at STARTED forever — which
-            # was the exact failure mode users were reporting as "report
-            # generation taking a lot more time". A FAILED webhook here
-            # ensures the UI can show the error and stop polling.
-            logger.exception(
-                "Report %s crashed outside service.run()'s handler: %s",
+    try:
+        async with semaphore:
+            logger.info(
+                "Report %s started execution (concurrency slot acquired)",
                 report_id,
-                e,
             )
             try:
-                error_message = f"{type(e).__name__}: {e}"[:500]
-                await service._send_webhook(
-                    ScenarioReportWebhookPayload(
-                        metrics={},
-                        status=ReportStatus.FAILED,
-                        transcripts=service._transcripts,
-                        error_message=error_message,
-                    )
-                )
-            except Exception:
-                # Last-resort: if even the webhook send fails, log loudly
-                # so ops can spot it. The DB row will remain at STARTED
-                # but that's strictly better than an exception swallowed
-                # by asyncio's task done-callback with no log.
+                await service.run()
+            except Exception as e:
+                # Outer backstop for any exception that escapes service.run()
+                # (e.g. a crash inside its own except: handler, an OOM, a bug
+                # in the cleanup `finally`). Without this, the asyncio task
+                # dies silently and the DB row sits at STARTED forever — which
+                # was the exact failure mode users were reporting as "report
+                # generation taking a lot more time". A FAILED webhook here
+                # ensures the UI can show the error and stop polling.
                 logger.exception(
-                    "Failed to send FAILED webhook for report %s after outer crash",
+                    "Report %s crashed outside service.run()'s handler: %s",
                     report_id,
+                    e,
                 )
+                try:
+                    error_message = f"{type(e).__name__}: {e}"[:500]
+                    await service._send_webhook(
+                        ScenarioReportWebhookPayload(
+                            metrics={},
+                            status=ReportStatus.FAILED,
+                            transcripts=service._transcripts,
+                            error_message=error_message,
+                        )
+                    )
+                except Exception:
+                    # Last-resort: if even the webhook send fails, log loudly
+                    # so ops can spot it. The DB row will remain at STARTED
+                    # but that's strictly better than an exception swallowed
+                    # by asyncio's task done-callback with no log.
+                    logger.exception(
+                        "Failed to send FAILED webhook for report %s after outer crash",
+                        report_id,
+                    )
+    finally:
+        # run() unregisters itself; this covers a report that never got that
+        # far (e.g. its task was cancelled while it waited for a slot), which
+        # would otherwise block its id for the life of the process.
+        _release_report(service)
 
 
 class ScenarioReportService:
@@ -215,15 +252,17 @@ class ScenarioReportService:
         """Mark the run for user-initiated cancellation.
 
         Called from the FastAPI cancel endpoint via the
-        _ACTIVE_REPORT_SERVICES registry. Setting the flag is enough —
-        the run loop checks it between turns and exits early. Idempotent:
+        _ACTIVE_REPORT_SERVICES registry. Setting the flag is enough — a
+        report still queued for a slot stops as soon as it gets one, and a
+        running one checks it between turns and exits early. Idempotent:
         repeated calls are no-ops.
         """
         if self._cancel_requested:
             return
         self._cancel_requested = True
         logger.info(
-            "Cancel requested for report_id=%s — run loop will exit at next turn",
+            "Cancel requested for report_id=%s — it will stop before its next "
+            "turn (or before starting, if still queued)",
             self._request.report_id,
         )
 
@@ -304,39 +343,84 @@ class ScenarioReportService:
         return result
 
     async def _send_webhook(self, payload: ScenarioReportWebhookPayload) -> None:
-        """PATCH the report payload to the core backend webhook."""
+        """PATCH the report payload to the core backend webhook.
+
+        Retried with backoff, up to ``_WEBHOOK_ATTEMPTS`` attempts, on a 5xx
+        (as the actor-evaluation webhook is) and on a failure to connect, which
+        never reaches Core: the payload carries a finished simulation and
+        judge, and dropping it on one transient failure makes the user
+        regenerate the whole report. A 4xx, or a failure after the request may
+        have been delivered (a read timeout), is not retried.
+        """
         url = (
             f"{settings.CORE_SERVICE_BASE_URL}"
             f"{SCENARIO_REPORT_WEBHOOK_ENDPOINT}"
             f"/{self._request.report_id}"
         )
         logger.info("Sending webhook to %s (status=%s)", url, payload.status)
-        try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                resp = await client.patch(
-                    url,
-                    json=payload.model_dump(),
-                    headers={
-                        "Content-Type": "application/json",
-                        "x-api-key": settings.CORE_SERVICE_API_KEY,
-                    },
+        for attempt in range(_WEBHOOK_ATTEMPTS):
+            retry_in = _WEBHOOK_BACKOFF_S * (2**attempt)
+            can_retry = attempt < _WEBHOOK_ATTEMPTS - 1
+            try:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    resp = await client.patch(
+                        url,
+                        json=payload.model_dump(),
+                        headers={
+                            "Content-Type": "application/json",
+                            "x-api-key": settings.CORE_SERVICE_API_KEY,
+                        },
+                    )
+                    resp.raise_for_status()
+                    logger.info(
+                        "Webhook delivered successfully (status=%d)", resp.status_code
+                    )
+                    return
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code >= 500 and can_retry:
+                    logger.warning(
+                        "Webhook failed with HTTP %d for report_id=%s, "
+                        "retrying in %.1fs (attempt %d/%d)",
+                        e.response.status_code,
+                        self._request.report_id,
+                        retry_in,
+                        attempt + 1,
+                        _WEBHOOK_ATTEMPTS,
+                    )
+                    await asyncio.sleep(retry_in)
+                    continue
+                logger.error(
+                    "Webhook failed with HTTP %d for report_id=%s: %s",
+                    e.response.status_code,
+                    self._request.report_id,
+                    e.response.text,
                 )
-                resp.raise_for_status()
-                logger.info(
-                    "Webhook delivered successfully (status=%d)", resp.status_code
+                return
+            except (httpx.ConnectError, httpx.ConnectTimeout) as e:
+                if can_retry:
+                    logger.warning(
+                        "Webhook could not connect for report_id=%s (%s), "
+                        "retrying in %.1fs (attempt %d/%d)",
+                        self._request.report_id,
+                        type(e).__name__,
+                        retry_in,
+                        attempt + 1,
+                        _WEBHOOK_ATTEMPTS,
+                    )
+                    await asyncio.sleep(retry_in)
+                    continue
+                logger.exception(
+                    "Webhook could not connect for report_id=%s after %d attempts",
+                    self._request.report_id,
+                    _WEBHOOK_ATTEMPTS,
                 )
-        except httpx.HTTPStatusError as e:
-            logger.error(
-                "Webhook failed with HTTP %d for report_id=%s: %s",
-                e.response.status_code,
-                self._request.report_id,
-                e.response.text,
-            )
-        except Exception:
-            logger.exception(
-                "Unexpected error sending webhook for report_id=%s",
-                self._request.report_id,
-            )
+                return
+            except Exception:
+                logger.exception(
+                    "Unexpected error sending webhook for report_id=%s",
+                    self._request.report_id,
+                )
+                return
 
     @staticmethod
     def _detect_repetition_loop(
@@ -421,24 +505,43 @@ class ScenarioReportService:
         report_id = req.report_id
         _run_start = time.perf_counter()
 
-        # Register so the cancel HTTP endpoint can find us. Last-write-
-        # wins on report_id collision (shouldn't happen — report_id is a
-        # UUID generated by ally-be) but we log for safety.
-        if report_id in _ACTIVE_REPORT_SERVICES:
+        # accept_report() registered us when the report was accepted, so a
+        # cancel could find us while we were queued. Register here too in case
+        # run() was called directly; never displace another instance.
+        if _ACTIVE_REPORT_SERVICES.setdefault(report_id, self) is not self:
             logger.warning(
-                "Duplicate report_id=%s in active services registry; "
-                "overwriting earlier entry",
+                "report_id=%s is registered to another service instance; this "
+                "run cannot be cancelled through the registry",
                 report_id,
             )
-        _ACTIVE_REPORT_SERVICES[report_id] = self
-        logger.info(
-            "Starting report generation: report_id=%s, scenario_id=%s, turns=%s",
-            report_id,
-            req.scenario_id,
-            req.turns,
-        )
 
         try:
+            # Cancelled while queued for a slot: stop before any setup or model
+            # call, shipping the same CANCELLED webhook a mid-run cancel does.
+            if self._cancel_requested:
+                logger.info(
+                    "Report %s cancelled before it started — skipping the "
+                    "simulation and eval, shipping CANCELLED webhook",
+                    report_id,
+                )
+                await self._send_webhook(
+                    ScenarioReportWebhookPayload(
+                        metrics={},
+                        status=ReportStatus.CANCELLED,
+                        transcripts=[],
+                        report_markdown="",
+                        error_message=None,
+                    )
+                )
+                return
+
+            logger.info(
+                "Starting report generation: report_id=%s, scenario_id=%s, turns=%s",
+                report_id,
+                req.scenario_id,
+                req.turns,
+            )
+
             # -- Setup
             # Two independent tracks run concurrently:
             #   A) scenario chain  : create embedding client → build scenario
@@ -794,9 +897,7 @@ class ScenarioReportService:
             )
         finally:
             self._checkpointer.delete_thread(report_id)
-            # Always unregister from the active-services registry so the
-            # cancel endpoint stops finding a completed service. Use .pop
-            # with default to tolerate the (theoretical) case where we
-            # never made it into the registry — e.g. an exception during
-            # __init__ before run() registered. Idempotent.
-            _ACTIVE_REPORT_SERVICES.pop(report_id, None)
+            # Always unregister so the cancel endpoint stops finding a
+            # completed service and the id can be generated again. Only our
+            # own entry; idempotent.
+            _release_report(self)

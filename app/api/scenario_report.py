@@ -12,11 +12,16 @@ from app.core.scenario_report.schemas import (
 )
 from app.core.scenario_report.service import (
     ScenarioReportService,
+    accept_report,
     request_cancel,
     run_report_with_concurrency_limit,
 )
+from app.core.tasks import spawn_background_task
 
 logger = get_logger(__name__)
+
+# Strong references to in-flight report tasks (asyncio holds only weak ones).
+_report_tasks: "set[asyncio.Task]" = set()
 
 router = APIRouter(
     prefix="/scenario-report",
@@ -33,7 +38,9 @@ router = APIRouter(
         "Accepts a scenario report generation request and starts an "
         "asynchronous N-turn simulated conversation between a client agent "
         "and a counselor agent. Returns immediately with status 'processing'. "
-        "Results are delivered via webhook upon completion."
+        "Results are delivered via webhook upon completion. A request for a "
+        "report_id already queued or running in this worker starts nothing new "
+        "and answers 202 with already_running=true."
     ),
     status_code=202,
 )
@@ -49,9 +56,24 @@ async def generate_scenario_report(
     )
 
     service = ScenarioReportService(request)
-    asyncio.create_task(
+    if not accept_report(service):
+        # ally-be retries this call on failure, so a retry after a slow first
+        # request can arrive while that report is still queued or running.
+        # Running it again would repeat the whole simulation and judge.
+        logger.warning(
+            "Report %s is already queued or running; not starting another",
+            request.report_id,
+        )
+        return ScenarioReportResponse(
+            scenario_id=request.scenario_id,
+            report_id=request.report_id,
+            already_running=True,
+        )
+
+    spawn_background_task(
         run_report_with_concurrency_limit(service),
         name=f"report-{request.report_id}",
+        background_tasks=_report_tasks,
     )
 
     return ScenarioReportResponse(
@@ -65,11 +87,12 @@ async def generate_scenario_report(
     summary="Signal an in-flight report to stop",
     description=(
         "Called by ally-be when the user clicks Cancel in the studio. "
-        "Looks up the active ScenarioReportService for `report_id` and "
-        "sets its cancellation flag — the run loop exits on the next "
-        "iteration and ships a CANCELLED webhook with any partial "
-        "transcripts collected so far. No-op when the report has "
-        "already completed or doesn't exist in this worker's registry."
+        "Looks up the queued or running ScenarioReportService for "
+        "`report_id` and sets its cancellation flag — a queued report stops "
+        "as soon as it gets a slot, a running one on its next turn, and "
+        "either ships a CANCELLED webhook with any partial transcripts "
+        "collected so far. No-op when the report has already completed or "
+        "doesn't exist in this worker's registry."
     ),
     status_code=202,
 )

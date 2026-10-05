@@ -61,6 +61,14 @@ class ScenarioReportResponse(BaseModel):
     scenario_id: int
     report_id: str
     status: ReportStatus = ReportStatus.PROCESSING
+    already_running: bool = Field(
+        default=False,
+        description=(
+            "True when a report with this report_id was already queued or "
+            "running in this worker, so this request started nothing new "
+            "(e.g. a retried trigger). Its result still arrives by webhook."
+        ),
+    )
 
 
 class TranscriptEntry(BaseModel):

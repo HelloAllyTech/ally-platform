@@ -291,8 +291,9 @@ class TestSendWebhook:
         assert call_kwargs.kwargs["json"]["status"] == "COMPLETED"
 
     @pytest.mark.asyncio
+    @patch("app.core.scenario_report.service.asyncio.sleep", new_callable=AsyncMock)
     @patch("app.core.scenario_report.service.httpx.AsyncClient")
-    async def test_handles_http_error(self, mock_client_cls):
+    async def test_handles_http_error(self, mock_client_cls, _sleep):
         mock_resp = MagicMock()
         mock_resp.status_code = 500
         mock_resp.text = "Internal Server Error"
@@ -778,3 +779,226 @@ def _make_prompt_data(**overrides):
     for k, v in defaults.items():
         setattr(mock, k, v)
     return mock
+
+
+# ------------------------------------------------------------------
+# Report-result webhook: bounded retry
+# ------------------------------------------------------------------
+
+
+def _webhook_client(*outcomes):
+    """An httpx.AsyncClient stand-in whose successive PATCHes produce
+    ``outcomes``: an int status code, or an exception to raise."""
+    responses = []
+    for outcome in outcomes:
+        if isinstance(outcome, Exception):
+            responses.append(outcome)
+            continue
+        resp = MagicMock()
+        resp.status_code = outcome
+        resp.text = "body"
+        if outcome >= 400:
+            resp.raise_for_status.side_effect = httpx.HTTPStatusError(
+                "error", request=MagicMock(), response=resp
+            )
+        responses.append(resp)
+    client = AsyncMock()
+    client.patch.side_effect = responses
+    client.__aenter__ = AsyncMock(return_value=client)
+    client.__aexit__ = AsyncMock(return_value=False)
+    return client
+
+
+class TestSendWebhookRetry:
+    """A finished simulation + judge must not be thrown away on one transient
+    webhook failure (the actor-evaluation webhook already retried)."""
+
+    @staticmethod
+    def _payload():
+        return ScenarioReportWebhookPayload(
+            metrics={"x": 80}, status="COMPLETED", transcripts=[]
+        )
+
+    async def _send(self, client):
+        svc = ScenarioReportService(_make_request())
+        with (
+            patch(
+                "app.core.scenario_report.service.httpx.AsyncClient",
+                return_value=client,
+            ),
+            patch(
+                "app.core.scenario_report.service.asyncio.sleep",
+                new_callable=AsyncMock,
+            ) as sleep,
+        ):
+            await svc._send_webhook(self._payload())
+        return [c.args[0] for c in sleep.await_args_list]
+
+    @pytest.mark.asyncio
+    async def test_retries_a_5xx_then_delivers(self):
+        client = _webhook_client(503, 200)
+        sleeps = await self._send(client)
+        assert client.patch.await_count == 2
+        assert sleeps == [1.0]
+
+    @pytest.mark.asyncio
+    async def test_gives_up_after_three_attempts_with_backoff(self):
+        client = _webhook_client(500, 502, 503)
+        sleeps = await self._send(client)  # does not raise
+        assert client.patch.await_count == 3
+        assert sleeps == [1.0, 2.0]
+
+    @pytest.mark.asyncio
+    async def test_a_4xx_is_not_retried(self):
+        client = _webhook_client(404)
+        sleeps = await self._send(client)
+        assert client.patch.await_count == 1
+        assert sleeps == []
+
+    @pytest.mark.asyncio
+    async def test_retries_a_failure_to_connect(self):
+        client = _webhook_client(httpx.ConnectError("refused"), 200)
+        sleeps = await self._send(client)
+        assert client.patch.await_count == 2
+        assert sleeps == [1.0]
+
+    @pytest.mark.asyncio
+    async def test_a_read_timeout_is_not_retried(self):
+        """The PATCH may have landed: Core appends transcripts, so resending
+        could duplicate them."""
+        client = _webhook_client(httpx.ReadTimeout("slow"))
+        sleeps = await self._send(client)
+        assert client.patch.await_count == 1
+        assert sleeps == []
+
+
+# ------------------------------------------------------------------
+# Queued reports: cancel and duplicate triggers
+# ------------------------------------------------------------------
+
+
+class TestQueuedReports:
+    """A report is registered when accepted, not when it starts running, so a
+    cancel that lands while it waits for a slot stops it before any model call,
+    and a repeated trigger for the same id cannot start a second run."""
+
+    @staticmethod
+    def _setup_patches():
+        """Patch everything run() would touch after its early cancel check."""
+        return (
+            patch("app.core.scenario_report.service.OpenAIEmbeddingClient"),
+            patch("app.core.scenario_report.service.Scenario"),
+            patch("app.core.scenario_report.service.create_llm_client"),
+            patch("app.core.scenario_report.service.evaluate_transcript"),
+        )
+
+    def test_a_second_accept_for_the_same_id_is_refused(self):
+        from app.core.scenario_report.service import (
+            _ACTIVE_REPORT_SERVICES,
+            accept_report,
+        )
+
+        first = ScenarioReportService(_make_request(report_id="dup"))
+        second = ScenarioReportService(_make_request(report_id="dup"))
+
+        assert accept_report(first) is True
+        assert accept_report(second) is False
+        assert _ACTIVE_REPORT_SERVICES["dup"] is first
+
+    @pytest.mark.asyncio
+    async def test_cancel_while_queued_stops_before_any_model_call(self):
+        import asyncio
+
+        from app.core.scenario_report import service as report_service
+
+        slot = asyncio.Semaphore(1)
+        await slot.acquire()  # another report holds the only slot
+        svc = ScenarioReportService(_make_request(report_id="queued"))
+        assert report_service.accept_report(svc)
+
+        embed_p, scenario_p, llm_p, eval_p = self._setup_patches()
+        with (
+            patch.object(report_service, "_get_report_semaphore", return_value=slot),
+            patch.object(svc, "_send_webhook", new_callable=AsyncMock) as webhook,
+            embed_p as embed,
+            scenario_p as scenario,
+            llm_p as create_llm,
+            eval_p as evaluate,
+        ):
+            task = asyncio.create_task(
+                report_service.run_report_with_concurrency_limit(svc)
+            )
+            await asyncio.sleep(0)  # now waiting for the slot
+
+            # Before this change the cancel found nothing while queued.
+            assert report_service.request_cancel("queued") is True
+
+            slot.release()
+            await task
+
+        for setup in (embed, scenario.create, create_llm, evaluate):
+            setup.assert_not_called()
+        webhook.assert_awaited_once()
+        payload = webhook.await_args.args[0]
+        assert payload.status == ReportStatus.CANCELLED
+        assert payload.transcripts == []
+        assert "queued" not in report_service._ACTIVE_REPORT_SERVICES
+
+    @pytest.mark.asyncio
+    async def test_a_report_cancelled_while_waiting_frees_its_id(self):
+        import asyncio
+
+        from app.core.scenario_report import service as report_service
+
+        slot = asyncio.Semaphore(1)
+        await slot.acquire()
+        svc = ScenarioReportService(_make_request(report_id="shutdown"))
+        assert report_service.accept_report(svc)
+
+        with patch.object(report_service, "_get_report_semaphore", return_value=slot):
+            task = asyncio.create_task(
+                report_service.run_report_with_concurrency_limit(svc)
+            )
+            await asyncio.sleep(0)
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+
+        assert "shutdown" not in report_service._ACTIVE_REPORT_SERVICES
+
+    @pytest.mark.asyncio
+    async def test_a_finished_report_frees_its_id(self):
+        import asyncio
+
+        from app.core.scenario_report import service as report_service
+
+        svc = ScenarioReportService(_make_request(report_id="done"))
+        assert report_service.accept_report(svc)
+        with (
+            patch.object(
+                report_service,
+                "_get_report_semaphore",
+                return_value=asyncio.Semaphore(1),
+            ),
+            patch.object(svc, "run", new_callable=AsyncMock),
+        ):
+            await report_service.run_report_with_concurrency_limit(svc)
+
+        # A later trigger for the same id (a deliberate regenerate) runs.
+        again = ScenarioReportService(_make_request(report_id="done"))
+        assert report_service.accept_report(again) is True
+
+    @pytest.mark.asyncio
+    async def test_run_does_not_displace_the_accepted_instance(self):
+        """run() on another instance with an accepted id must not take over
+        the registry entry the cancel endpoint relies on, nor remove it."""
+        from app.core.scenario_report import service as report_service
+
+        accepted = ScenarioReportService(_make_request(report_id="same"))
+        assert report_service.accept_report(accepted)
+        other = ScenarioReportService(_make_request(report_id="same"))
+        other.request_cancel()  # exit early, no setup
+        with patch.object(other, "_send_webhook", new_callable=AsyncMock):
+            await other.run()
+
+        assert report_service._ACTIVE_REPORT_SERVICES["same"] is accepted
