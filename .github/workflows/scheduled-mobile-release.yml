@@ -8,6 +8,12 @@ name: Scheduled mobile release
 #
 # A daily check with an internal 48h-elapsed gate is used instead of a `*/2 * *` day-of-month
 # cron, which drifts at month boundaries and doesn't actually mean "every 2 days".
+#
+# "New commits since the last auto-release" alone isn't enough to release — a run of pure
+# chore/docs/ci/style/refactor/test commits has nothing a real user would notice, and burns an
+# App Store + Play Store review cycle (plus Slack noise) for no visible change. The cadence gate
+# additionally requires at least one conventional-commit `feat`/`fix` subject in range; anything
+# else-only skips, same as "no new commits" does today.
 
 on:
   schedule:
@@ -73,10 +79,24 @@ jobs:
             echo "proceed=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          # A commit counts as user-facing for this gate when its subject is a conventional-commit
+          # `feat`/`fix` (with or without a scope) — chore/docs/ci/style/refactor/test/build/perf/
+          # revert don't, even though some of those (e.g. `perf`) can matter; keeping this to the
+          # two types users actually feel keeps the check simple and matches what the release
+          # notes step already highlights as the interesting part of a release.
+          has_meaningful_commit() {
+            git log "$1" --pretty='%s' | grep -v '^Merge pull request' | grep -qiE '^(feat|fix)(\(|:)'
+          }
+
           LAST_TAG=$(git tag -l 'auto-release/*' --sort=-creatordate | head -1 || true)
           if [ -z "$LAST_TAG" ]; then
-            echo "No previous auto-release tag found. Proceeding (first run)."
-            echo "proceed=true" >> "$GITHUB_OUTPUT"
+            echo "No previous auto-release tag found (first run)."
+            if has_meaningful_commit "-20"; then
+              echo "proceed=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "No feat/fix commits in the last 20 commits. Skipping."
+              echo "proceed=false" >> "$GITHUB_OUTPUT"
+            fi
           else
             LAST_SHA=$(git rev-list -n 1 "$LAST_TAG")
             HEAD_SHA=$(git rev-parse HEAD)
@@ -89,6 +109,9 @@ jobs:
               echo "proceed=false" >> "$GITHUB_OUTPUT"
             elif [ "$ELAPSED_H" -lt 48 ]; then
               echo "Only ${ELAPSED_H}h since $LAST_TAG (need 48h). Skipping."
+              echo "proceed=false" >> "$GITHUB_OUTPUT"
+            elif ! has_meaningful_commit "$LAST_TAG..HEAD"; then
+              echo "Only chore/docs/ci/other commits since $LAST_TAG, no feat/fix. Skipping."
               echo "proceed=false" >> "$GITHUB_OUTPUT"
             else
               echo "proceed=true" >> "$GITHUB_OUTPUT"
