@@ -121,6 +121,16 @@ name explicitly, because there the context var reads `"unknown"`. The post-sessi
 evaluation runs with no room at all and sets `llm_usage.scenario_session_id` instead, which Core
 reads before `room_id`.
 
+Two features started over HTTP also call models. A studio rehearsal (scenario report) has no
+session: its graph-node calls record under the report id (the graph's `thread_id`, which the node
+wrapper falls back to without a room), and its two own calls -- the simulated counsellor, once per
+turn, and the judge over the finished transcript -- are handed that id as the room explicitly and
+also carry `llm_usage.metadata = {"report_id": ...}` (stored verbatim by Core). Core cannot map a
+report id to a session, so these rows carry no session. The V2V tester joins a real session's room
+as a simulated learner; its reply (once per exchange) and its end-of-run role-fidelity judge record
+against that room and `scenario_session_id`, under tester labels so Core can keep tester spend out
+of the session's delivery cost.
+
 Labels the live worker emits (`app/core/llm_usage/tasks.py`, string-for-string with ally-be's
 `LlmTask`): `agent_turn`, `agent_stt`, `agent_tts` (the AgentSession's own STT/TTS, via LiveKit's
 `metrics_collected`), `rolling_summary`, `client_working_memory`, `supervisor_note`,
@@ -128,7 +138,9 @@ Labels the live worker emits (`app/core/llm_usage/tasks.py`, string-for-string w
 instance, which that hook never sees; recorded per real synthesis, never for a clip-cache hit),
 `knowledge_retrieval`, `branching_instruction`, `branching_chat_summary`, `behaviour_detection`,
 `guardrail_check`, `binary_classifier`, `helper_paraphrased`, `event_embedding`,
-`working_memory_embedding` and `actor_evaluation`. Embedding rows carry input tokens only.
+`working_memory_embedding` and `actor_evaluation`; the rehearsal adds `scenario_report_counselor`
+and `scenario_report_evaluation`, the V2V tester `v2v_tester_reply` and `v2v_role_fidelity_judge`.
+Embedding rows carry input tokens only.
 
 ### UI Event Message
 

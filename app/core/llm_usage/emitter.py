@@ -7,7 +7,7 @@ path. Mirrors the turn_metrics emit pattern.
 
 import asyncio
 import logging
-from typing import Any, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 from app.core.config import settings
 from app.core.events.schemas import CoreEventMessageType, LLMUsageData
@@ -32,6 +32,7 @@ def emit_ai_usage(
     characters: Optional[int] = None,
     scenario_id: Optional[int] = None,
     scenario_session_id: Optional[str] = None,
+    metadata: Optional[Dict[str, Any]] = None,
 ) -> None:
     """Schedule a best-effort ``llm_usage`` SQS message for any AI service
     ('llm' | 'stt' | 'tts'). Never raises, never blocks the agent.
@@ -39,7 +40,8 @@ def emit_ai_usage(
     ``room_id`` (the LiveKit room name) is what attributes a call to a session
     in Core. A call made outside any room (the post-session actor evaluation,
     an HTTP request) passes ``scenario_session_id`` instead, which Core reads
-    first."""
+    first. ``metadata`` is stored verbatim on the row, for context no column
+    carries (a studio rehearsal's ``report_id``)."""
     try:
         if not getattr(settings, "LLM_USAGE_ENABLED", True):
             return
@@ -78,6 +80,7 @@ def emit_ai_usage(
                 env=env,
                 scenario_id=scenario_id,
                 scenario_session_id=scenario_session_id,
+                metadata=metadata,
             ),
         )
         body = message.model_dump_json()
@@ -96,6 +99,7 @@ def emit_llm_usage(
     usage: Optional[Tuple[int, ...]] = None,
     scenario_id: Optional[int] = None,
     scenario_session_id: Optional[str] = None,
+    metadata: Optional[Dict[str, Any]] = None,
 ) -> None:
     """Back-compat LLM helper — forwards to emit_ai_usage(service='llm').
 
@@ -120,6 +124,7 @@ def emit_llm_usage(
         cached_tokens=cached,
         scenario_id=scenario_id,
         scenario_session_id=scenario_session_id,
+        metadata=metadata,
     )
 
 
@@ -151,6 +156,7 @@ def emit_langchain_usage(
     model: Optional[str] = None,
     scenario_id: Optional[int] = None,
     scenario_session_id: Optional[str] = None,
+    metadata: Optional[Dict[str, Any]] = None,
 ) -> None:
     """Emit the usage carried by a LangChain ``AIMessage``. Never raises.
 
@@ -182,6 +188,7 @@ def emit_langchain_usage(
             usage=usage,
             scenario_id=scenario_id,
             scenario_session_id=scenario_session_id,
+            metadata=metadata,
         )
     except Exception:
         logger.debug("emit_langchain_usage skipped (best-effort)", exc_info=True)
@@ -195,6 +202,8 @@ def emit_openai_usage(
     provider: str = "openai",
     room_id: Optional[str] = None,
     scenario_id: Optional[int] = None,
+    scenario_session_id: Optional[str] = None,
+    metadata: Optional[Dict[str, Any]] = None,
 ) -> None:
     """Emit the usage carried by a raw OpenAI SDK completion. Never raises.
 
@@ -209,12 +218,16 @@ def emit_openai_usage(
         if not usage:
             return
         emit_llm_usage(
-            room_id=_resolve_room_id(room_id),
+            # As in emit_langchain_usage: a call attributed by session id is
+            # not handed a room from the context var.
+            room_id=(room_id if scenario_session_id else _resolve_room_id(room_id)),
             provider=provider,
             model=model,
             task=task,
             usage=usage,
             scenario_id=scenario_id,
+            scenario_session_id=scenario_session_id,
+            metadata=metadata,
         )
     except Exception:
         logger.debug("emit_openai_usage skipped (best-effort)", exc_info=True)

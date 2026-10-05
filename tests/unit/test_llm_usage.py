@@ -273,3 +273,77 @@ class TestEmitHelpers:
         )
         assert captured["room_id"] == ""
         assert captured["llm_usage"].scenario_session_id == "sess-9"
+
+    @pytest.mark.unit
+    def test_metadata_reaches_the_wire(self, monkeypatch):
+        captured = {}
+
+        def fake_create_llm_usage(room_id, llm_usage):
+            captured["room_id"] = room_id
+            captured["llm_usage"] = llm_usage
+            return SimpleNamespace(model_dump_json=lambda: "{}")
+
+        monkeypatch.setattr(
+            "app.core.llm_usage.emitter.CoreEventMessageType.create_llm_usage",
+            fake_create_llm_usage,
+        )
+        monkeypatch.setattr(
+            "app.core.llm_usage.emitter.asyncio.create_task", lambda c: c.close()
+        )
+        from app.core.llm_usage.emitter import emit_langchain_usage
+
+        emit_langchain_usage(
+            self._aimessage(),
+            task="scenario_report_counselor",
+            room_id="rep-1",
+            metadata={"report_id": "rep-1"},
+        )
+        assert captured["room_id"] == "rep-1"
+        assert captured["llm_usage"].metadata == {"report_id": "rep-1"}
+
+    @pytest.mark.unit
+    def test_openai_usage_carries_session_id_and_explicit_room(
+        self, ai_usage_calls, graph_room
+    ):
+        from app.core.llm_usage.emitter import emit_openai_usage
+
+        completion = SimpleNamespace(
+            usage=SimpleNamespace(
+                prompt_tokens=50, completion_tokens=5, total_tokens=55
+            )
+        )
+        emit_openai_usage(
+            completion,
+            task="v2v_tester_reply",
+            model="gpt-4o-mini",
+            room_id="room-under-test",
+            scenario_session_id="sess-1",
+        )
+        call = ai_usage_calls[0]
+        assert call["room_id"] == "room-under-test"
+        assert call["scenario_session_id"] == "sess-1"
+
+    @pytest.mark.unit
+    def test_openai_usage_by_session_does_not_borrow_the_context_room(
+        self, ai_usage_calls, graph_room
+    ):
+        from app.core.llm_usage.emitter import emit_openai_usage
+
+        completion = SimpleNamespace(
+            usage=SimpleNamespace(prompt_tokens=5, completion_tokens=1, total_tokens=6)
+        )
+        emit_openai_usage(completion, task="x", model="m", scenario_session_id="sess-2")
+        assert ai_usage_calls[0]["room_id"] is None
+
+
+class TestNewTaskLabels:
+    """String-for-string with ally-be's LlmTask: a mismatch lands in UNKNOWN."""
+
+    @pytest.mark.unit
+    def test_rehearsal_and_tester_labels(self):
+        from app.core.llm_usage.tasks import LLMTask
+
+        assert LLMTask.SCENARIO_REPORT_EVALUATION.value == "scenario_report_evaluation"
+        assert LLMTask.SCENARIO_REPORT_COUNSELOR.value == "scenario_report_counselor"
+        assert LLMTask.V2V_TESTER_REPLY.value == "v2v_tester_reply"
+        assert LLMTask.V2V_ROLE_FIDELITY_JUDGE.value == "v2v_role_fidelity_judge"

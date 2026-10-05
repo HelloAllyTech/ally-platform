@@ -448,6 +448,114 @@ class TestEvaluateTranscript:
             counselor_prompt="prompt",
         )
 
+        # include_raw so the judge's token usage can be recorded.
         mock_client.with_structured_output.assert_called_once_with(
-            EvaluationResult, method="json_mode"
+            EvaluationResult, method="json_mode", include_raw=True
         )
+
+
+class TestReportEvaluationUsage:
+    """AI-cost: the rehearsal judge's tokens reach llm_usage as
+    scenario_report_evaluation. A rehearsal has no session, so the report id is
+    the room (as for the rehearsal's graph-node calls) and the metadata."""
+
+    @staticmethod
+    def _raw():
+        from langchain_core.messages import AIMessage
+
+        return AIMessage(
+            content="{}",
+            usage_metadata={
+                "input_tokens": 9000,
+                "output_tokens": 900,
+                "total_tokens": 9900,
+                "input_token_details": {"cache_read": 4096},
+            },
+        )
+
+    @staticmethod
+    def _judge(ainvoke_result):
+        mock_llm = AsyncMock()
+        mock_llm.ainvoke.return_value = ainvoke_result
+        mock_client = MagicMock()
+        mock_client.model_name = "gpt-4o-mini"
+        mock_client.with_structured_output.return_value = mock_llm
+        return mock_client
+
+    @pytest.mark.asyncio
+    @patch("app.core.scenario_report.evaluator._build_evaluator_llm")
+    async def test_records_against_the_report_id(
+        self, mock_build, ai_usage_calls, graph_room
+    ):
+        judged = EvaluationResult(metrics={"consistency": 70}, report_markdown="# R")
+        mock_build.return_value = self._judge(
+            {"raw": self._raw(), "parsed": judged, "parsing_error": None}
+        )
+
+        result = await evaluate_transcript(
+            transcripts=[_make_transcript()],
+            prompt_data=_make_prompt_data(),
+            counselor_prompt="prompt",
+            report_id="rep-42",
+        )
+
+        assert result == {"metrics": {"consistency": 70}, "report_markdown": "# R"}
+        _, kwargs = mock_build.return_value.with_structured_output.call_args
+        assert kwargs == {"method": "json_mode", "include_raw": True}
+        assert len(ai_usage_calls) == 1
+        call = ai_usage_calls[0]
+        assert call["task"] == "scenario_report_evaluation"
+        # The report id, not whatever room context var happens to be set.
+        assert call["room_id"] == "rep-42"
+        assert call["metadata"] == {"report_id": "rep-42"}
+        assert (call["provider"], call["model"]) == ("openai", "gpt-4o-mini")
+        assert (call["prompt_tokens"], call["completion_tokens"]) == (9000, 900)
+        assert call["cached_tokens"] == 4096
+
+    @pytest.mark.asyncio
+    @patch("app.core.scenario_report.evaluator._build_evaluator_llm")
+    async def test_parse_failure_records_then_returns_empty(
+        self, mock_build, ai_usage_calls
+    ):
+        """Unchanged outcome (empty result -> FAILED webhook), but the tokens
+        spent on the unparseable answer are recorded."""
+        mock_build.return_value = self._judge(
+            {
+                "raw": self._raw(),
+                "parsed": None,
+                "parsing_error": ValueError("not json"),
+            }
+        )
+
+        result = await evaluate_transcript(
+            transcripts=[_make_transcript()],
+            prompt_data=_make_prompt_data(),
+            counselor_prompt="prompt",
+            report_id="rep-1",
+        )
+
+        assert result == {"metrics": {}, "report_markdown": ""}
+        assert [c["task"] for c in ai_usage_calls] == ["scenario_report_evaluation"]
+
+    @pytest.mark.asyncio
+    @patch("app.core.scenario_report.evaluator._build_evaluator_llm")
+    async def test_a_failing_emitter_does_not_fail_the_judge(
+        self, mock_build, monkeypatch
+    ):
+        def _boom(*a, **k):
+            raise RuntimeError("queue down")
+
+        monkeypatch.setattr("app.core.llm_usage.emitter.emit_ai_usage", _boom)
+        judged = EvaluationResult(metrics={"consistency": 70}, report_markdown="# R")
+        mock_build.return_value = self._judge(
+            {"raw": self._raw(), "parsed": judged, "parsing_error": None}
+        )
+
+        result = await evaluate_transcript(
+            transcripts=[_make_transcript()],
+            prompt_data=_make_prompt_data(),
+            counselor_prompt="prompt",
+            report_id="rep-1",
+        )
+
+        assert result["metrics"] == {"consistency": 70}

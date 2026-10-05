@@ -61,3 +61,20 @@ class LLMTask(str, Enum):
     # Goal-based actor-quality evaluation of a real session (HTTP request from
     # ally-be; attributed by scenario_session_id, not a room).
     ACTOR_EVALUATION = "actor_evaluation"
+
+    # ---- Studio rehearsal (scenario report): a simulated conversation with no
+    # learner, run from an HTTP request. No session exists, so these record
+    # under the report id as room (as the rehearsal's graph-node calls already
+    # do) with metadata.report_id.
+    # The simulated counsellor: one call per rehearsal turn.
+    SCENARIO_REPORT_COUNSELOR = "scenario_report_counselor"
+    # The LLM judge over the finished rehearsal transcript: one call per report.
+    SCENARIO_REPORT_EVALUATION = "scenario_report_evaluation"
+
+    # ---- V2V tester: the simulated learner that joins a real session's room.
+    # Recorded against that room and session, under labels of their own so
+    # tester spend is never read as the session's delivery cost.
+    # The tester's reply: one call per exchange.
+    V2V_TESTER_REPLY = "v2v_tester_reply"
+    # End-of-run judge counting tester turns that broke the counsellor role.
+    V2V_ROLE_FIDELITY_JUDGE = "v2v_role_fidelity_judge"

@@ -23,6 +23,8 @@ from app.core.events.base import BaseEvent
 from app.core.events.event_orchestrator.event_orchestrator import EventOrchestrator
 from app.core.graph.checkpointer import PruningCheckpointer
 from app.core.graph.graph_builder import get_report_graph
+from app.core.llm_usage.emitter import emit_langchain_usage
+from app.core.llm_usage.tasks import LLMTask
 from app.core.logger import get_logger
 from app.core.scenario.base import Scenario
 from app.core.scenario_report.evaluator import evaluate_transcript
@@ -595,6 +597,15 @@ class ScenarioReportService:
                 counselor_resp = await counselor_llm.llm_instance.ainvoke(windowed)
                 counselor_text = counselor_resp.content
                 counselor_ms = (time.monotonic() - counselor_started_at) * 1000
+                # Outside any graph node, so the room (the report id, as the
+                # rehearsal's graph-node calls use) is passed explicitly.
+                emit_langchain_usage(
+                    counselor_resp,
+                    task=LLMTask.SCENARIO_REPORT_COUNSELOR.value,
+                    llm_client=counselor_llm,
+                    room_id=report_id,
+                    metadata={"report_id": report_id},
+                )
                 self._record_transcript(counselor_text, "COUNSELOR")
                 counselor_messages.append(AIMessage(content=counselor_text))
 
@@ -700,6 +711,7 @@ class ScenarioReportService:
                 prompt_data=scenario.prompt_data,
                 counselor_prompt=counselor_system_prompt,
                 selected_prompt_code=self._request.evaluator_prompt_code,
+                report_id=report_id,
             )
             eval_ms = (time.monotonic() - eval_started_at) * 1000
             logger.info(
