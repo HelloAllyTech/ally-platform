@@ -5,7 +5,7 @@ Centralized schemas for event orchestrator and related structures.
 import time
 from datetime import datetime
 from enum import Enum
-from typing import Optional, TypedDict
+from typing import Any, Dict, Optional, TypedDict
 
 from pydantic import BaseModel, Field
 
@@ -55,6 +55,9 @@ class LLMUsageData(BaseModel):
     # evaluation, an HTTP request): Core resolves the session from this first,
     # then falls back to the message's room_id.
     scenario_session_id: Optional[str] = None
+    # Free-form correlation context Core stores verbatim on the row (e.g.
+    # {"report_id": ...} for a studio rehearsal, which has no session).
+    metadata: Optional[Dict[str, Any]] = None
 
 
 class TurnMetricsData(BaseModel):

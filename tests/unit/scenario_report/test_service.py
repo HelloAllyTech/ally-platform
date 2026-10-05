@@ -1002,3 +1002,74 @@ class TestQueuedReports:
             await other.run()
 
         assert report_service._ACTIVE_REPORT_SERVICES["same"] is accepted
+
+
+# ------------------------------------------------------------------
+# AI usage (cost) of the rehearsal's own calls
+# ------------------------------------------------------------------
+
+
+class TestRehearsalUsage:
+    """The simulated counsellor runs outside any graph node, so it records under
+    the report id explicitly (the room the rehearsal's graph-node calls use)."""
+
+    @pytest.mark.asyncio
+    @patch("app.core.scenario_report.service.load_and_format")
+    @patch("app.core.scenario_report.service.evaluate_transcript")
+    @patch("app.core.scenario_report.service.EventOrchestrator")
+    @patch("app.core.scenario_report.service.get_report_graph")
+    @patch("app.core.scenario_report.service.create_llm_client")
+    @patch("app.core.scenario_report.service.configure_llm_client")
+    @patch("app.core.scenario_report.service.Scenario")
+    @patch("app.core.scenario_report.service.OpenAIEmbeddingClient")
+    async def test_each_counsellor_turn_records_under_the_report_id(
+        self,
+        mock_embed,
+        mock_scenario_cls,
+        mock_configure_llm,
+        mock_create_llm,
+        mock_get_graph,
+        mock_orch_cls,
+        mock_evaluate,
+        mock_load,
+        ai_usage_calls,
+    ):
+        mock_load.side_effect = _mock_load_and_format
+        scenario, graph, counselor_llm, orchestrator = TestServiceRun()._setup_mocks()
+        counselor_llm.provider = "openai"
+        counselor_llm.llm_instance.model_name = "gpt-4o-mini"
+        counselor_llm.llm_instance.ainvoke = AsyncMock(
+            return_value=AIMessage(
+                content="Counselor response",
+                usage_metadata={
+                    "input_tokens": 1200,
+                    "output_tokens": 40,
+                    "total_tokens": 1240,
+                    "input_token_details": {"cache_read": 1024},
+                },
+            )
+        )
+        mock_embed.return_value = MagicMock()
+        mock_scenario_cls.create.return_value = scenario
+        mock_configure_llm.return_value = MagicMock()
+        mock_create_llm.return_value = counselor_llm
+        mock_get_graph.return_value.compile.return_value = graph
+        mock_orch_cls.return_value = orchestrator
+        mock_evaluate.return_value = {"metrics": {"x": 50}, "report_markdown": "# R"}
+
+        svc = ScenarioReportService(_make_request(turns=2, report_id="rep-7"))
+        with patch.object(svc, "_send_webhook", new_callable=AsyncMock):
+            await svc.run()
+
+        counsellor = [
+            c for c in ai_usage_calls if c["task"] == "scenario_report_counselor"
+        ]
+        assert len(counsellor) == 2
+        for call in counsellor:
+            assert call["room_id"] == "rep-7"
+            assert call["metadata"] == {"report_id": "rep-7"}
+            assert (call["provider"], call["model"]) == ("openai", "gpt-4o-mini")
+            assert call["prompt_tokens"] == 1200
+            assert call["cached_tokens"] == 1024
+        # The judge is told which report it is scoring, to record against it.
+        assert mock_evaluate.await_args.kwargs["report_id"] == "rep-7"
