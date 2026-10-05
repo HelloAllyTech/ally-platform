@@ -145,6 +145,17 @@ class GuardrailEvent(BaseEvent):
         last = conversations[-1]
         if last.role.lower() != "counselor":
             return False
+        if self.detector_type == "COHERENCE" and self._coherence_exhausted():
+            # Once the escalation budget is spent the policy answers False for
+            # the rest of the session whatever the classifier says, so don't
+            # pay for (or gate the reply on) a classification it would discard.
+            logger.info(
+                "[COHERENCE] event=%s suppressed for the rest of the session "
+                "(%d escalation(s) used); classification skipped",
+                self.event_id,
+                self.coherence_escalations,
+            )
+            return False
         context = self._format_context(conversations[:-1])
         violation = await self._classify(last.content, context)
         if self.detector_type != "COHERENCE":
@@ -154,6 +165,22 @@ class GuardrailEvent(BaseEvent):
     # ------------------------------------------------------------------
     # COHERENCE escalation policy
     # ------------------------------------------------------------------
+
+    def _coherence_exhausted(self) -> bool:
+        """Whether the session's escalation budget is spent.
+
+        From then on ``_apply_coherence_policy`` returns False on every turn:
+        the escalation count only grows and the cap is fixed, and the streak
+        and instruction it still updates feed only decisions it can no longer
+        make. Errs toward classifying: on any error this says False, so the
+        policy's own fallback to the raw classifier result still applies.
+        """
+        try:
+            from app.core.events import coherence_guard as policy
+
+            return self.coherence_escalations >= policy.max_escalations()
+        except Exception:  # noqa: BLE001
+            return False
 
     def _apply_coherence_policy(self, violation: bool) -> bool:
         """Decide whether a classified coherence violation should actually fire.
