@@ -237,3 +237,157 @@ class TestGuardrailDetectorTypeRouting:
         assert "events/guardrail_system" in templates
         assert "events/guardrail_user" in templates
         assert "events/coherence_guardrail_system" not in templates
+
+
+# ------------------------------------------------------------------ #
+# COHERENCE: no classification once the escalation budget is spent
+# ------------------------------------------------------------------ #
+
+
+class TestCoherenceSkipsClassificationWhenExhausted:
+    """After the hard cap the policy answers False on every turn whatever the
+    classifier says, so the classification is skipped. Everything before that
+    (cooldowns included: a coherent turn there still resets the streak) must
+    be classified and decided exactly as before."""
+
+    GARBLED = "garbled"
+    CLEAR = "clear"
+
+    @pytest.fixture(autouse=True)
+    def fake_clock(self, monkeypatch):
+        """A clock the test advances, so cooldowns are exercised for real."""
+        from types import SimpleNamespace
+
+        from app.core.events.event_types.guardrail import guardrail_event
+
+        clock = {"now": 1000.0}
+        monkeypatch.setattr(
+            guardrail_event, "time", SimpleNamespace(monotonic=lambda: clock["now"])
+        )
+        return clock
+
+    @staticmethod
+    def _event():
+        from app.core.branching_instructions.base import BranchingInstruction
+
+        return GuardrailEvent.create(
+            event_id="guardrail-coherence",
+            data=GuardrailData(
+                helper_dialogue="gibberish boundary", actor_dialogue="ask to repeat"
+            ),
+            detector_type="COHERENCE",
+            branching_instruction=BranchingInstruction.create(
+                "ask to repeat", prompt_data=None
+            ),
+            score=0,
+            visibility_type=VisibilityType.PASSIVE,
+            emoji=None,
+            emoji_message=None,
+        )
+
+    async def _drive(self, turns, fake_clock, step_s):
+        """New path: detect_event per turn. Returns (fired, instruction when
+        fired, number of classifications)."""
+        event = self._event()
+        classify = AsyncMock(side_effect=lambda text, ctx="": text == self.GARBLED)
+        fired, instructions = [], []
+        with patch.object(GuardrailEvent, "_classify", classify):
+            for text in turns:
+                fake_clock["now"] += step_s
+                result = await event.detect_event([make_message("counselor", text)])
+                fired.append(result)
+                instructions.append(
+                    event.branching_instruction.content if result else None
+                )
+        return fired, instructions, classify.await_count
+
+    def _reference(self, turns, fake_clock, step_s):
+        """Old path: classify every turn, then apply the policy."""
+        event = self._event()
+        fired, instructions = [], []
+        for text in turns:
+            fake_clock["now"] += step_s
+            result = event._apply_coherence_policy(text == self.GARBLED)
+            fired.append(result)
+            instructions.append(event.branching_instruction.content if result else None)
+        return fired, instructions
+
+    @pytest.mark.asyncio
+    async def test_stops_classifying_after_the_cap(self, fake_clock):
+        # Defaults: escalate after 3, cap 2. Turns 20s apart clear the 8s gap,
+        # and nine 20s turns clear the 90s cooldown before the next escalation.
+        turns = [self.GARBLED] * 30
+        fired, _, classifications = await self._drive(turns, fake_clock, 20.0)
+
+        assert sum(fired) >= 2  # both escalations happened
+        last_fire = max(i for i, f in enumerate(fired) if f)
+        assert not any(fired[last_fire + 1 :])
+        # Classified up to and including the second escalation, never after.
+        assert classifications == last_fire + 1
+
+    @pytest.mark.asyncio
+    async def test_decisions_match_classify_then_policy(self, fake_clock):
+        import random
+
+        rng = random.Random(1234)
+        for _ in range(200):
+            turns = [
+                self.GARBLED if rng.random() < 0.7 else self.CLEAR
+                for _ in range(rng.randint(1, 40))
+            ]
+            step_s = rng.choice([1.0, 5.0, 20.0, 60.0])
+            fake_clock["now"] = 1000.0
+            new_fired, new_instr, _ = await self._drive(turns, fake_clock, step_s)
+            fake_clock["now"] = 1000.0
+            old_fired, old_instr = self._reference(turns, fake_clock, step_s)
+            assert new_fired == old_fired, (turns, step_s)
+            assert new_instr == old_instr, (turns, step_s)
+
+    @pytest.mark.asyncio
+    async def test_cooldown_turns_are_still_classified(self, fake_clock):
+        """A coherent turn during the cooldown resets the streak, which changes
+        what happens when it lapses, so the cooldown is not a reason to skip."""
+        event = self._event()
+        event.coherence_escalations = 1  # under the cap of 2
+        event.coherence_quiet_until = fake_clock["now"] + 90.0
+        classify = AsyncMock(return_value=False)
+        with patch.object(GuardrailEvent, "_classify", classify):
+            await event.detect_event([make_message("counselor", "hello")])
+        classify.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_cap_of_zero_never_classifies(self, monkeypatch):
+        from app.core.config import settings
+
+        monkeypatch.setattr(settings, "STT_COHERENCE_MAX_ESCALATIONS", 0)
+        event = self._event()
+        classify = AsyncMock(return_value=True)
+        with patch.object(GuardrailEvent, "_classify", classify):
+            assert not await event.detect_event([make_message("counselor", "x")])
+        classify.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_a_policy_error_still_classifies(self, monkeypatch):
+        """If the cap can't be read, classify: the policy then falls back to the
+        raw classifier result, as it always has."""
+        from app.core.events import coherence_guard
+
+        def _boom():
+            raise ValueError("bad setting")
+
+        monkeypatch.setattr(coherence_guard, "max_escalations", _boom)
+        event = self._event()
+        event.coherence_escalations = 5
+        classify = AsyncMock(return_value=True)
+        with patch.object(GuardrailEvent, "_classify", classify):
+            assert await event.detect_event([make_message("counselor", "x")])
+        classify.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_category_guardrails_always_classify(self):
+        event = make_guardrail_event()
+        event.coherence_escalations = 99  # irrelevant to CATEGORY
+        classify = AsyncMock(return_value=True)
+        with patch.object(GuardrailEvent, "_classify", classify):
+            assert await event.detect_event([make_message("counselor", "x")])
+        classify.assert_awaited_once()

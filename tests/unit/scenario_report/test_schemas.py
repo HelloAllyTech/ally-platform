@@ -76,7 +76,17 @@ class TestScenarioReportResponse:
             "scenario_id": 42,
             "report_id": "r-1",
             "status": "PROCESSING",
+            "already_running": False,
         }
+
+    def test_already_running_is_still_processing(self):
+        """A duplicate trigger answers like the first one did, plus the flag:
+        ally-be's caller only checks for a 2xx."""
+        resp = ScenarioReportResponse(
+            scenario_id=1, report_id="abc", already_running=True
+        )
+        assert resp.status == ReportStatus.PROCESSING
+        assert resp.already_running is True
 
 
 class TestTranscriptEntry:
