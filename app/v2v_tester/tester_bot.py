@@ -33,6 +33,8 @@ from openai import AsyncOpenAI
 
 from app.core.config import settings
 from app.core.livekit.video_actor import is_avatar_participant
+from app.core.llm_usage.emitter import emit_openai_usage
+from app.core.llm_usage.tasks import LLMTask
 from app.core.logger import get_logger
 
 logger = get_logger(__name__)
@@ -167,6 +169,9 @@ or rephrasing is natural.
 """
 
 # ── Tester bot ────────────────────────────────────────────────────────────────
+
+# The tester's model, for both its replies and the role-fidelity judge.
+_TESTER_MODEL = "gpt-4o-mini"
 
 # How long (seconds) to wait for the counselor to speak before giving up.
 _IDLE_TIMEOUT_S = 90.0
@@ -493,7 +498,7 @@ class V2VTesterBot:
             numbered = "\n".join(f"{i + 1}. {t}" for i, t in enumerate(learner_turns))
             resp = await asyncio.wait_for(
                 llm.chat.completions.create(
-                    model="gpt-4o-mini",
+                    model=_TESTER_MODEL,
                     max_tokens=20,
                     temperature=0,
                     messages=[
@@ -514,6 +519,7 @@ class V2VTesterBot:
                 ),
                 timeout=15.0,
             )
+            self._record_usage(resp, LLMTask.V2V_ROLE_FIDELITY_JUDGE)
             text = (resp.choices[0].message.content or "").strip()
             digits = "".join(ch for ch in text if ch.isdigit())
             if digits:
@@ -679,7 +685,7 @@ class V2VTesterBot:
         try:
             resp = await asyncio.wait_for(
                 llm.chat.completions.create(
-                    model="gpt-4o-mini",
+                    model=_TESTER_MODEL,
                     max_tokens=80,
                     temperature=0.8,
                     messages=[
@@ -689,10 +695,24 @@ class V2VTesterBot:
                 ),
                 timeout=15.0,
             )
+            self._record_usage(resp, LLMTask.V2V_TESTER_REPLY)
             return (resp.choices[0].message.content or "").strip()
         except Exception as exc:  # noqa: BLE001
             logger.warning("[V2V] LLM error: %s", exc)
             return ""
+
+    def _record_usage(self, completion, task: LLMTask) -> None:
+        """Record a tester call to ``llm_usage`` against the room and session
+        under test, under a tester label so Core can keep it out of that
+        session's delivery cost. Schedules the send and returns at once;
+        never raises."""
+        emit_openai_usage(
+            completion,
+            task=task.value,
+            model=_TESTER_MODEL,
+            room_id=self.room_name,
+            scenario_session_id=self.scenario_session_id or None,
+        )
 
     # ── TTS: synthesize and publish audio frames ──────────────────────────────
 

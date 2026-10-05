@@ -13,6 +13,8 @@ from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field, model_validator
 
 from app.core.config import settings
+from app.core.llm_usage.emitter import emit_langchain_usage
+from app.core.llm_usage.tasks import LLMTask
 from app.core.logger import get_logger
 from app.core.scenario.base import PromptData
 from app.core.scenario_report.schemas import TranscriptEntry
@@ -147,9 +149,15 @@ async def evaluate_transcript(
     prompt_data: PromptData,
     counselor_prompt: str,
     selected_prompt_code: Optional[str] = None,
+    report_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Use an LLM as a judge to evaluate the client agent's performance.
+
+    The judge's tokens are recorded to ``llm_usage`` as
+    ``scenario_report_evaluation`` under ``report_id`` as room (a rehearsal has
+    no session; its graph-node calls record under the same id), with
+    ``metadata.report_id``. A parse failure still records what it spent.
 
     Args:
         selected_prompt_code: promptCode of an evaluator (transcript-judge)
@@ -198,8 +206,10 @@ async def evaluate_transcript(
                     model,
                 )
 
-        llm = _build_evaluator_llm(eval_model, eval_temperature).with_structured_output(
-            EvaluationResult, method="json_mode"
+        base_llm = _build_evaluator_llm(eval_model, eval_temperature)
+        # include_raw because the parsed model alone carries no usage metadata.
+        llm = base_llm.with_structured_output(
+            EvaluationResult, method="json_mode", include_raw=True
         )
         user_message = _build_evaluation_prompt(
             transcripts, prompt_data, counselor_prompt
@@ -215,7 +225,7 @@ async def evaluate_transcript(
                 "evaluation/evaluator_system", prompt_data
             )
 
-        result: EvaluationResult = await llm.ainvoke(
+        raw_result = await llm.ainvoke(
             [
                 {
                     "role": "system",
@@ -224,6 +234,28 @@ async def evaluate_transcript(
                 {"role": "user", "content": user_message},
             ]
         )
+        if isinstance(raw_result, dict):
+            # Emitted before parsing: a parse failure still spent the tokens.
+            emit_langchain_usage(
+                raw_result.get("raw"),
+                task=LLMTask.SCENARIO_REPORT_EVALUATION.value,
+                provider="openai",
+                model=getattr(base_llm, "model_name", None),
+                room_id=report_id,
+                metadata={"report_id": report_id} if report_id else None,
+            )
+            result: EvaluationResult = raw_result.get("parsed")
+            if result is None:
+                # include_raw captures a parse failure instead of raising it;
+                # raise it so the except below returns the empty result, as a
+                # parse failure did before.
+                raise ValueError(
+                    "report judge returned unparseable output: "
+                    f"{raw_result.get('parsing_error')}"
+                )
+        else:
+            # Defensive: some providers/wrappers may ignore include_raw.
+            result = raw_result
 
         return {"metrics": result.metrics, "report_markdown": result.report_markdown}
 
