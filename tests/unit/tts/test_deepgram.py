@@ -1,5 +1,5 @@
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -16,19 +16,22 @@ async def test_deepgram_tts_client_synthesize_timeout(mock_wait_for):
     # Mock the underlying deepgram.TTS instance
     mock_tts_instance = MagicMock()
 
-    async def long_running_synthesize(*args, **kwargs):
+    # synthesize() returns the audio stream itself (an async generator), which
+    # the client iterates chunk by chunk under asyncio.wait_for.
+    async def slow_stream(*args, **kwargs):
         await asyncio.sleep(0.1)
+        yield b"audio_chunk"
 
-        async def async_generator():
-            yield b"audio_chunk"
-
-        return async_generator()
-
-    mock_tts_instance.synthesize = AsyncMock(side_effect=long_running_synthesize)
+    mock_tts_instance.synthesize = MagicMock(side_effect=slow_stream)
     client._tts_instance = mock_tts_instance
 
-    # Make the mock_wait_for raise a TimeoutError
-    mock_wait_for.side_effect = asyncio.TimeoutError
+    # Time out the first chunk. Close the pending __anext__ awaitable, as the
+    # real wait_for would cancel it, so no never-awaited warning leaks.
+    def time_out(awaitable, timeout):
+        awaitable.close()
+        raise asyncio.TimeoutError
+
+    mock_wait_for.side_effect = time_out
 
     with pytest.raises(asyncio.TimeoutError):
         async for _ in client.synthesize("Hello"):
