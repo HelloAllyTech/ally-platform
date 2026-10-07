@@ -66,10 +66,10 @@ export const RoleplayCasePlayer: React.FC<RoleplayCasePlayerProps> = ({
   const coverImageUrl = isCase
     ? caseDetails?.coverImageUrl
     : scenario?.coverImageUrl;
+  // The item's own description is the player header's job (PlayerTopBar);
+  // the card shows the scenario/case blurb.
   const description =
-    item.description ||
-    (isCase ? caseDetails?.description : scenario?.description) ||
-    '';
+    (isCase ? caseDetails?.description : scenario?.description) || '';
 
   const launch = async () => {
     await setActiveTrackContext({trackId, itemId: item.id});

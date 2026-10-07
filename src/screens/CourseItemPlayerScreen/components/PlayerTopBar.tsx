@@ -11,6 +11,10 @@ import {SegmentedProgressRail} from './SegmentedProgressRail';
 
 export interface PlayerTopBarProps {
   sectionTitle: string;
+  /** The component's own title — the heading; the section title is its eyebrow. */
+  itemTitle: string;
+  /** The author's description of the component, when they wrote one. */
+  itemDescription: string | null;
   sectionItems: FlatTrackItem[];
   currentItemId: string;
   overallPct: number;
@@ -18,12 +22,16 @@ export interface PlayerTopBarProps {
 }
 
 /**
- * Full-screen player header: exit button, current section title, the
- * segmented progress rail for the section, and the overall completion %.
- * Mirrors ally-web's `PlayerTopBar`.
+ * Full-screen player header: exit button, section eyebrow + current item
+ * title, the item's description, the segmented progress rail for the
+ * section, and the overall completion %. The item title and description
+ * live here rather than inside the players so every component type shows
+ * them. Mirrors ally-web's `PlayerTopBar`.
  */
 export const PlayerTopBar: React.FC<PlayerTopBarProps> = ({
   sectionTitle,
+  itemTitle,
+  itemDescription,
   sectionItems,
   currentItemId,
   overallPct,
@@ -45,13 +53,23 @@ export const PlayerTopBar: React.FC<PlayerTopBarProps> = ({
             color={colors.ds.typography.highEmphasis}
           />
         </TouchableOpacity>
-        <Text style={styles.sectionTitle} numberOfLines={1}>
-          {sectionTitle}
-        </Text>
+        <View style={styles.titles}>
+          <Text style={styles.sectionTitle} numberOfLines={1}>
+            {sectionTitle}
+          </Text>
+          <Text style={styles.itemTitle} numberOfLines={1}>
+            {itemTitle}
+          </Text>
+        </View>
         <Text style={styles.progressText}>
           {t('courses.player.overallProgress', {pct: overallPct})}
         </Text>
       </View>
+      {itemDescription ? (
+        <Text style={styles.description} numberOfLines={2}>
+          {itemDescription}
+        </Text>
+      ) : null}
       <SegmentedProgressRail
         sectionItems={sectionItems}
         currentItemId={currentItemId}
@@ -82,12 +100,27 @@ const styles = ScaledSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sectionTitle: {
+  titles: {
     flex: 1,
+    minWidth: 0,
+  },
+  sectionTitle: {
+    ...fontFamily.ROBOTO.REGULAR,
+    ...typography.body.tiny,
+    fontWeight: fontWeights.regular,
+    color: colors.ds.typography.mediumEmphasis,
+  },
+  itemTitle: {
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
     ...typography.body.medium,
     fontWeight: fontWeights.medium,
     color: colors.ds.typography.highEmphasis,
+  },
+  description: {
+    ...fontFamily.ROBOTO.REGULAR,
+    ...typography.body.small,
+    fontWeight: fontWeights.regular,
+    color: colors.ds.typography.mediumEmphasis,
   },
   progressText: {
     ...fontFamily.ROBOTO.REGULAR,

@@ -243,6 +243,8 @@ export const CourseItemPlayerScreen: React.FC<
     <View style={styles.container}>
       <PlayerTopBar
         sectionTitle={nav.current?.sectionTitle ?? ''}
+        itemTitle={nav.current?.item.title ?? ''}
+        itemDescription={nav.current?.item.description ?? null}
         sectionItems={sectionItems}
         currentItemId={nav.currentItemId}
         overallPct={nav.overallPct}
