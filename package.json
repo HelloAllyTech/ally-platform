@@ -13,6 +13,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "i18n:sync": "node scripts/i18n-sync.mjs",
+    "i18n:parity": "node scripts/i18n-parity.mjs",
     "start": "npx react-native start --reset-cache",
     "test": "jest --passWithNoTests --forceExit",
     "test:coverage": "jest --coverage --coverageReporters=text --coverageReporters=html --passWithNoTests",
