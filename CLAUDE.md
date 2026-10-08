@@ -20,12 +20,10 @@ tool yourself, incorporate relevant returned guidance, and cite chunk titles:
 - **while reviewing**, for how a change behaves rather than how it reads.
 
 **Search on your own initiative** — you don't need to be asked. Trivial mechanical changes (rename,
-dependency bump, typo) are exempt. Setup is zero (a committed bridge mints your own key from `gh`),
-Stacks replaced the wiki's old Product Management Best Practices, and the query technique, citation
-format, and `/stacks:planning_context` human entry point are all at
+dependency bump, typo) are exempt. Setup is zero (a committed bridge mints your own key from `gh`).
+Query technique, citation format and the `/stacks:planning_context` human entry point are at
 [Planning with Stacks](https://tech.helloally.ai/#/wiki/contributing/planning-with-stacks.md) —
-read it rather than this restating it, since the retrieval details there change independently of
-this file and a second copy here just goes stale.
+read that rather than a copy here, which would only go stale.
 
 ## What am I doing?
 
@@ -67,17 +65,14 @@ this file and a second copy here just goes stale.
 - **Version bumps are part of the release**, not an afterthought — Android build number and
   iOS build number both move.
 - **An `act(...)` warning fails the test, it doesn't just print.** `jest.setup.ts` collects
-  React's "not wrapped in act" warnings and throws in an `afterEach`, because a suite that
-  only warns stays green while its assertions read a tree React never finished rendering.
-  If you hit it, wrap whatever drives the update — `jest.advanceTimersByTime`, a `rerender`,
-  a `fireEvent` that kicks off a promise — in `act(...)`. Draining timers in a test file's
-  own `afterEach` counts too. Use the `await act(async () => ...)` form when a promise chain
-  has to settle; the synchronous form only flushes timers.
+  React's "not wrapped in act" warnings and throws in an `afterEach`. Wrap whatever drives the
+  update — `jest.advanceTimersByTime`, a `rerender`, a `fireEvent` that starts a promise — in
+  `act(...)`; use `await act(async () => ...)` when a promise chain has to settle. Timers
+  drained in a test file's own `afterEach` count too.
 - **iOS under Xcode 26 needs the fmt/consteval Podfile patch.** fmt 11.0.2's consteval format
-  strings fail to compile otherwise. The `post_install` hook needs both halves: the
-  `-DFMT_USE_CONSTEVAL=0` define _and_ an `#ifndef` guard on `base.h`, which otherwise
-  re-defines the macro from its own compiler sniffing and clobbers the define alone. `Pods/`
-  is gitignored, so the header patch has to live in the hook, not a commit.
+  strings fail to compile otherwise. The `post_install` hook needs both the `-DFMT_USE_CONSTEVAL=0`
+  define _and_ an `#ifndef` guard on `base.h`, which otherwise re-defines the macro from its own
+  compiler sniffing. `Pods/` is gitignored, so the header patch lives in the hook, not a commit.
 
 ## Commands
 
