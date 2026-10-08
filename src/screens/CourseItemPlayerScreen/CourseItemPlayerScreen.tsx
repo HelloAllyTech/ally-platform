@@ -1,6 +1,7 @@
 import {useCallback, useEffect, useState} from 'react';
 import {useFocusEffect} from '@react-navigation/native';
 import {ActivityIndicator, Text, View} from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {Button, DiscussionThread} from '@/components';
@@ -240,7 +241,7 @@ export const CourseItemPlayerScreen: React.FC<
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <PlayerTopBar
         sectionTitle={nav.current?.sectionTitle ?? ''}
         sectionItems={sectionItems}
@@ -279,7 +280,7 @@ export const CourseItemPlayerScreen: React.FC<
           navigateToLearnTab(navigation);
         }}
       />
-    </View>
+    </SafeAreaView>
   );
 };
 
