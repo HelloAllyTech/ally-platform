@@ -20,6 +20,11 @@ class TestModelSupportsTemperature:
             ("gpt-4o-mini", True),
             ("gpt-4.1", True),
             ("gemini-2.5-pro", True),
+            ("gemini-2.5-flash", True),
+            ("gemini-3-pro-preview", False),
+            ("gemini-3.1-pro-preview", False),
+            ("models/gemini-3.6-flash", False),
+            ("gemini-flash-latest", False),
             ("gpt-5", False),
             ("gpt-5-mini", False),
             ("o1", False),
@@ -30,6 +35,21 @@ class TestModelSupportsTemperature:
     )
     def test_supports(self, model, expected):
         assert model_supports_temperature(model) is expected
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize(
+        "model,sent",
+        [("gemini-2.5-flash", 0.3), ("gemini-3-flash-preview", None)],
+    )
+    def test_gemini_client_omits_temperature_for_gemini_3(self, model, sent):
+        """Gemini 3+ gets no temperature on the wire: neither the override nor
+        langchain's 0.7 default (its request builder drops None fields)."""
+        from app.llms.gemini import GeminiLLMClient
+
+        client = GeminiLLMClient(
+            model=model, language_code="en-IN", temperature=0.3, api_key="test"
+        )
+        assert client.llm_instance.temperature == sent
 
     @pytest.mark.unit
     @patch("app.llms.factory.OpenAILLMClient")

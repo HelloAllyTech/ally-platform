@@ -6,7 +6,7 @@ from app.core.config import settings
 from app.core.constants import DEFAULT_LANGUAGE_CODE, DEFAULT_LLM_CONFIG, LLMProvider
 from app.core.logger import get_logger
 from app.llms.base import BaseLLMClient
-from app.llms.gemini import GeminiLLMClient
+from app.llms.gemini import GeminiLLMClient, is_gemini_3_or_later
 from app.llms.openai import OpenAILLMClient
 
 logger = get_logger(__name__)
@@ -34,13 +34,16 @@ def model_supports_temperature(model: Optional[str]) -> bool:
     """Whether a model accepts a custom ``temperature``.
 
     OpenAI reasoning models (o-series, gpt-5 family) only allow the default and
-    return a 400 for any other value. Return False for those so callers can drop
-    the override instead of failing the call. Unknown/None models default True.
+    return a 400 for any other value; Gemini 3+ deprecated custom sampling. Return
+    False for those so callers can drop the override instead of failing the call.
+    Unknown/None models default True.
     """
     if not model:
         return True
     name = model.strip().lower()
-    return not name.startswith(("o1", "o3", "o4", "gpt-5"))
+    return not (
+        name.startswith(("o1", "o3", "o4", "gpt-5")) or is_gemini_3_or_later(name)
+    )
 
 
 def create_llm_client(
