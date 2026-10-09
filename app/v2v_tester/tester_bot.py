@@ -247,98 +247,98 @@ class V2VTesterBot:
         session in the worker process per attempt, which is how repeated
         broken launches drove the container's memory up.
         """
-        logger.info("[V2V] starting tester bot for room=%s", self.room_name)
-        # Create the aiohttp session early so the track_subscribed handler
-        # (registered below) can reference it via self._http_session.
-        self._http_session = aiohttp.ClientSession()
-        room = rtc.Room()
-        self._room = room
+        room = None
         tts = None
         llm = None
         connected = False
-
-        @room.on("track_subscribed")
-        def _on_track_subscribed(
-            track: rtc.Track,
-            pub: rtc.RemoteTrackPublication,
-            participant: rtc.RemoteParticipant,
-        ) -> None:
-            if track.kind != rtc.TrackKind.KIND_AUDIO:
-                return
-            # The agent publishes TWO audio tracks: its voice (AgentSession
-            # room output) and the comfort/filler "background_audio" track
-            # (BackgroundAudioPlayer). Publish ORDER is not stable across
-            # agent versions — a 2026-08 release flipped it and the tester
-            # spent whole runs transcribing comfort noise (utterances_heard=0,
-            # idle_timeout). Select by publication NAME, never by order.
-            if pub.name == "background_audio":
-                logger.info(
-                    "[V2V] skipping background_audio track %s from %s",
-                    track.sid,
-                    participant.identity,
-                )
-                return
-            # ONE STT pipeline per run, except when a video actor attaches
-            # mid-session and takes the character's speech with it — see
-            # should_take_over_stt.
-            if not should_take_over_stt(
-                current_sid=self._stt_track_sid,
-                current_is_avatar=self._stt_on_avatar,
-                new_identity=participant.identity,
-            ):
-                logger.info(
-                    "[V2V] ignoring extra audio track from %s (STT already "
-                    "attached to %s)",
-                    participant.identity,
-                    self._stt_track_sid,
-                )
-                return
-            if self._stt_track_sid is not None:
-                logger.info(
-                    "[V2V] video actor attached — moving STT from %s to %s's "
-                    "track %s, where the character's speech now is",
-                    self._stt_track_sid,
-                    participant.identity,
-                    track.sid,
-                )
-                if self._stt_task is not None and not self._stt_task.done():
-                    self._stt_task.cancel()
-            else:
-                logger.info(
-                    "[V2V] subscribed to audio from participant=%s",
-                    participant.identity,
-                )
-            self._stt_track_sid = track.sid
-            self._stt_on_avatar = is_avatar_participant(participant.identity)
-            task = asyncio.create_task(
-                self._stream_and_transcribe(track, self._http_session),
-                name=f"v2v-stt-{participant.identity}",
-            )
-            self._stt_task = task
-            self._bg_tasks.add(task)
-            task.add_done_callback(self._bg_tasks.discard)
-
-        @room.on("track_published")
-        def _on_track_published(
-            pub: rtc.RemoteTrackPublication,
-            participant: rtc.RemoteParticipant,
-        ) -> None:
-            logger.info(
-                "[V2V] track_published: participant=%s kind=%s sid=%s",
-                participant.identity,
-                pub.kind,
-                pub.sid,
-            )
-
-        @room.on("participant_connected")
-        def _on_participant_connected(participant: rtc.RemoteParticipant) -> None:
-            logger.info(
-                "[V2V] participant_connected: identity=%s kind=%s",
-                participant.identity,
-                participant.kind,
-            )
-
         try:
+            # Create the aiohttp session early so the track_subscribed handler
+            # (registered below) can reference it via self._http_session.
+            self._http_session = aiohttp.ClientSession()
+            room = rtc.Room()
+            self._room = room
+
+            @room.on("track_subscribed")
+            def _on_track_subscribed(
+                track: rtc.Track,
+                pub: rtc.RemoteTrackPublication,
+                participant: rtc.RemoteParticipant,
+            ) -> None:
+                if track.kind != rtc.TrackKind.KIND_AUDIO:
+                    return
+                # The agent publishes TWO audio tracks: its voice (AgentSession
+                # room output) and the comfort/filler "background_audio" track
+                # (BackgroundAudioPlayer). Publish ORDER is not stable across
+                # agent versions — a 2026-08 release flipped it and the tester
+                # spent whole runs transcribing comfort noise (utterances_heard=0,
+                # idle_timeout). Select by publication NAME, never by order.
+                if pub.name == "background_audio":
+                    logger.info(
+                        "[V2V] skipping background_audio track %s from %s",
+                        track.sid,
+                        participant.identity,
+                    )
+                    return
+                # ONE STT pipeline per run, except when a video actor attaches
+                # mid-session and takes the character's speech with it — see
+                # should_take_over_stt.
+                if not should_take_over_stt(
+                    current_sid=self._stt_track_sid,
+                    current_is_avatar=self._stt_on_avatar,
+                    new_identity=participant.identity,
+                ):
+                    logger.info(
+                        "[V2V] ignoring extra audio track from %s (STT already "
+                        "attached to %s)",
+                        participant.identity,
+                        self._stt_track_sid,
+                    )
+                    return
+                if self._stt_track_sid is not None:
+                    logger.info(
+                        "[V2V] video actor attached — moving STT from %s to %s's "
+                        "track %s, where the character's speech now is",
+                        self._stt_track_sid,
+                        participant.identity,
+                        track.sid,
+                    )
+                    if self._stt_task is not None and not self._stt_task.done():
+                        self._stt_task.cancel()
+                else:
+                    logger.info(
+                        "[V2V] subscribed to audio from participant=%s",
+                        participant.identity,
+                    )
+                self._stt_track_sid = track.sid
+                self._stt_on_avatar = is_avatar_participant(participant.identity)
+                task = asyncio.create_task(
+                    self._stream_and_transcribe(track, self._http_session),
+                    name=f"v2v-stt-{participant.identity}",
+                )
+                self._stt_task = task
+                self._bg_tasks.add(task)
+                task.add_done_callback(self._bg_tasks.discard)
+
+            @room.on("track_published")
+            def _on_track_published(
+                pub: rtc.RemoteTrackPublication,
+                participant: rtc.RemoteParticipant,
+            ) -> None:
+                logger.info(
+                    "[V2V] track_published: participant=%s kind=%s sid=%s",
+                    participant.identity,
+                    pub.kind,
+                    pub.sid,
+                )
+
+            @room.on("participant_connected")
+            def _on_participant_connected(participant: rtc.RemoteParticipant) -> None:
+                logger.info(
+                    "[V2V] participant_connected: identity=%s kind=%s",
+                    participant.identity,
+                    participant.kind,
+                )
+
             await room.connect(
                 settings.LIVEKIT_URL,
                 self.tester_token,
