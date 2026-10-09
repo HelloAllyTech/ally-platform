@@ -1185,7 +1185,7 @@ class Scenario(BaseModel):
         # falls through, since normalize_*() would otherwise treat it as the
         # default.)
         raw_language_code = (
-            raw.get("languageCode") or raw.get("language") or DEFAULT_LANGUAGE_CODE
+            raw.get("languageCode") or raw.get("language") or raw.get("language_code") or DEFAULT_LANGUAGE_CODE
         )
         language_code = normalize_language_code_for_providers(raw_language_code)
         # WARNING on purpose: a temporary diagnostic that must appear even when
