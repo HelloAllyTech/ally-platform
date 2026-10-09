@@ -247,15 +247,16 @@ class V2VTesterBot:
         session in the worker process per attempt, which is how repeated
         broken launches drove the container's memory up.
         """
+        room = None
+        tts = None
+        llm = None
+        connected = False
         try:
             # Create the aiohttp session early so the track_subscribed handler
             # (registered below) can reference it via self._http_session.
             self._http_session = aiohttp.ClientSession()
             room = rtc.Room()
             self._room = room
-            tts = None
-            llm = None
-            connected = False
 
             @room.on("track_subscribed")
             def _on_track_subscribed(
