@@ -266,7 +266,13 @@ async def consolidate(
         # Repeated here deliberately: this is the last thing the model reads
         # before it answers, and the failure being prevented is an instruction
         # at the top of a long prompt losing to the pull of the examples.
-        f"Reply with every field written in {language_label}."
+        f"Reply with every field written in {language_label}. "
+        # speech_fragments is the one field the actor imitates for voice, so a
+        # stray phrase in another language compounds: prod session df4eb7f3 (an
+        # English sim) recorded the client's "koi baat nahi" as a fragment, and
+        # within two turns every reply and every fragment was Hinglish.
+        f"speech_fragments in particular: drop any phrase that is not in "
+        f"{language_label}, even if the client said it."
     )
 
     # include_raw for the same reason as the summarizer: with_structured_output

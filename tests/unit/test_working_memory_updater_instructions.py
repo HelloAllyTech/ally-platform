@@ -67,6 +67,18 @@ def test_every_placeholder_is_filled():
     assert "{" not in _render()
 
 
+def test_speech_fragments_must_stay_in_the_session_language():
+    # The actor imitates speech_fragments for voice, so one recorded phrase in
+    # another language compounds turn over turn: an English prod session saved
+    # "koi baat nahi" and was fully Hinglish two turns later.
+    text = _render()
+    fragments_rule = next(
+        line for line in text.splitlines() if line.startswith("- speech_fragments:")
+    )
+    assert "Every fragment must be in Malayalam" in fragments_rule
+    assert "leave that phrase out even though they said it" in fragments_rule
+
+
 # --- The two couplings that used to be able to drift silently -----------------
 #
 # Both failures below produce a COMPLETE session: a plausible transcript, a
