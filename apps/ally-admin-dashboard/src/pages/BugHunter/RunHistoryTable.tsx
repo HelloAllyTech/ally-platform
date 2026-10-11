@@ -21,12 +21,16 @@ import { formatDateTime, formatTimestamp } from "@utils";
 import { useBugHunterUrlState } from "./bugHunterUrlState";
 import { BUG_HUNT_EVENT_STAGE_LABELS } from "./bugHuntEventLabels";
 import { BugHuntStatusBadge } from "./BugHuntStatusBadge";
+import { RunDecisions } from "./DecisionLog";
 import { BUG_FINDINGS_TABLE_ANCHOR_ID } from "./findingsTableAnchor";
 
 const TRIGGER_LABELS: Record<BugHuntTrigger, string> = {
   [BugHuntTrigger.SCHEDULED]: en.bugHunter.triggerScheduled,
   [BugHuntTrigger.MANUAL]: en.bugHunter.triggerManual,
   [BugHuntTrigger.FIX_SESSION]: en.bugHunter.triggerFixSession,
+  [BugHuntTrigger.VERIFY_FIX]: en.bugHunter.triggerVerifyFix,
+  [BugHuntTrigger.VERIFY_FINDINGS]: en.bugHunter.triggerVerifyFindings,
+  [BugHuntTrigger.PR_REVIEW]: en.bugHunter.triggerPrReview,
 };
 
 /** "—" for runs closed before token counts were tracked, not just cost. */
@@ -140,6 +144,7 @@ const RunDetailRow: FC<{ runId: string }> = ({ runId }) => {
             ))}
           </ul>
         )}
+        <RunDecisions runId={runId} />
       </TableCell>
     </TableRow>
   );

@@ -134,6 +134,7 @@ export const SOURCE_ORDER: BugFindingSource[] = [
   BugFindingSource.LINT_ERROR,
   BugFindingSource.REPORTED_BUG,
   BugFindingSource.UX_SIGNAL,
+  BugFindingSource.LOCALE_PARITY,
   BugFindingSource.ANALYTICS_SUGGESTION,
 ];
 
@@ -148,6 +149,7 @@ export const SOURCE_SCALE: ColorScale = {
   [sourceLabel(BugFindingSource.LINT_ERROR)]: PALETTE.gold,
   [sourceLabel(BugFindingSource.REPORTED_BUG)]: PALETTE.magenta,
   [sourceLabel(BugFindingSource.UX_SIGNAL)]: PALETTE.cyan,
+  [sourceLabel(BugFindingSource.LOCALE_PARITY)]: PALETTE.purple,
   [sourceLabel(BugFindingSource.ANALYTICS_SUGGESTION)]: PALETTE.gray,
 };
 
@@ -292,18 +294,26 @@ export const TRIGGER_ORDER: BugHuntTrigger[] = [
   BugHuntTrigger.SCHEDULED,
   BugHuntTrigger.MANUAL,
   BugHuntTrigger.FIX_SESSION,
+  BugHuntTrigger.VERIFY_FIX,
+  BugHuntTrigger.VERIFY_FINDINGS,
 ];
 
 export const TRIGGER_LABELS: Record<BugHuntTrigger, string> = {
   [BugHuntTrigger.SCHEDULED]: "Nightly sweep",
   [BugHuntTrigger.MANUAL]: "On-demand sweep",
   [BugHuntTrigger.FIX_SESSION]: "Fix session",
+  [BugHuntTrigger.VERIFY_FIX]: "Verifier (fixes)",
+  [BugHuntTrigger.VERIFY_FINDINGS]: "Verifier (findings)",
+  [BugHuntTrigger.PR_REVIEW]: "PR review",
 };
 
 export const TRIGGER_SCALE: ColorScale = {
   [TRIGGER_LABELS[BugHuntTrigger.SCHEDULED]]: PALETTE.blue,
   [TRIGGER_LABELS[BugHuntTrigger.MANUAL]]: PALETTE.orange,
   [TRIGGER_LABELS[BugHuntTrigger.FIX_SESSION]]: PALETTE.teal,
+  [TRIGGER_LABELS[BugHuntTrigger.VERIFY_FIX]]: PALETTE.purple,
+  [TRIGGER_LABELS[BugHuntTrigger.VERIFY_FINDINGS]]: PALETTE.magenta,
+  [TRIGGER_LABELS[BugHuntTrigger.PR_REVIEW]]: PALETTE.green,
 };
 
 const dayTokens = (d: BugHunterOperationsDay, trigger: BugHuntTrigger): number => {

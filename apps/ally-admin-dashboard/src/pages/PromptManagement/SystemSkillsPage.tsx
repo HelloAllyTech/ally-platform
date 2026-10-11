@@ -28,7 +28,7 @@ export const SystemSkillsPage: React.FC = () => {
 
   const header = (
     <>
-      <h1 className="text-2xl text-typography-900 pb-6 font-secondary">
+      <h1 className="text-2xl text-typography-900 pb-4 md:pb-6 font-secondary">
         {en.simulation.scenarioPrompts}
       </h1>
       {canViewExperiments && (

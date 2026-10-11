@@ -10,6 +10,10 @@ export const en = {
     searchMenu: "Search menu...",
     noMenuResults: "No matching tabs",
     clearSearch: "Clear search",
+    filter: "Filter",
+    removeFilter: "Remove filter",
+    openMenu: "Open menu",
+    closeMenu: "Close menu",
     searchOrCreate: "Search or create",
     loading: "Loading...",
     loadMore: "Load more",
@@ -31,6 +35,7 @@ export const en = {
     disabled: "Disabled",
     edit: "Edit",
     view: "View",
+    moreActions: "More actions",
     or: "OR",
     retry: "Retry",
     characters: "characters",
@@ -1177,6 +1182,16 @@ export const en = {
         "Which coding-agent CLI runs the build. Claude Code is battle-tested; Gemini CLI is wired in but unverified end-to-end — its install/run/event-parsing code is built against the installed package's own schema, not a completed real run. Switching engine clears the model fields below, since a model id from one engine means nothing to the other.",
       saved: "Saved.",
       save: "Save",
+      decisionOwnersHeading: "Who decides each move",
+      decisionOwnersHelp:
+        "Bug Hunter's orchestrator makes eight kinds of decision (OPP-0783). Each has an owner, the rule or the model, and the other answers as a shadow so the replay can compare them. Hand a point to the other owner here when the replay on Analytics → Bug Agent says it should flip. The Verifier vendor and the merge gate are fixed in code.",
+      decisionOwnersLoadFailed: "Couldn't load who owns each decision.",
+      decisionOwnersSaveFailed: "Couldn't change the owner.",
+      decisionOwnerDefault: "Default ({owner})",
+      decisionOwnerRule: "The rule",
+      decisionOwnerModel: "The model",
+      decisionOwnerFixed: "Fixed in code",
+      decisionOwnerSaved: "{point} now decided by {owner}.",
     },
     legalDescription:
       "Edit the content shown on the public Terms of Service and Privacy Policy pages.",
@@ -2587,6 +2602,7 @@ export const en = {
     findingSourceReportedBug: "Reported by team",
     findingSourceAnalyticsSuggestion: "Analytics suggestion",
     findingSourceUxSignal: "UX signal",
+    findingSourceLocaleParity: "Locale parity",
     findingSeverityLow: "Low",
     findingSeverityMedium: "Medium",
     findingSeverityHigh: "High",
@@ -2643,6 +2659,14 @@ export const en = {
     reporterStaffTooltip: "Filed by somebody internal.",
     reporterContextTitle: "Captured with the report",
     reporterContextEmpty: "Their client captured no extra context.",
+    reporterContextSurface: "Where they saw it",
+    reporterContextExpected: "Expected",
+    reporterContextSteps: "Steps",
+    reporterContextHappenedAt: "When it happened",
+    reporterContextFrequency: "How often",
+    reporterContextImpact: "Impact",
+    reporterContextIdentifiers: "Identifiers",
+    reporterContextLanguage: "Language",
     reporterContextScreen: "Screen",
     reporterContextDevice: "Device",
     reporterContextOs: "OS",
@@ -2796,6 +2820,159 @@ export const en = {
     drawerRediscovered:
       "I have found this again {count} time(s) since. I am not re-filing it while your decision stands.",
 
+    // ── the decision log, scoreboard and replay (OPP-0776) ────────────────
+    decisions: {
+      title: "How I decided",
+      runTitle: "How I planned this run",
+      empty: "No decisions recorded yet.",
+      pointD1: "which senses",
+      pointD2: "which model",
+      pointD3: "verify, hold or drop",
+      pointD4: "which Verifier",
+      pointD5: "fix now or hold",
+      pointD6: "approach and model",
+      pointD7: "retry, escalate or ask",
+      pointD8: "merge",
+      ownerRule: "the rule",
+      ownerModel: "the model",
+      byOwner: "by {owner}",
+      shadowWouldHave: "{owner} would have: {pick}",
+      shadowAgreed: "both agreed",
+      veto: "veto ({by}): {reason}",
+      approach: "Approach: {approach}",
+      outcomeBetter: "turned out well",
+      outcomeWorse: "turned out badly",
+      outcomeSame: "same either way",
+    },
+    scoreboard: {
+      title: "Scoreboard — which sense and model is winning where",
+      subtitle:
+        "The last {days} days on {repo}: what each sense filed and how much of it was accepted, which model it ran on, and how each model does as a fixer. The Finder's D1, D2 and D6 read these cells.",
+      repoLabel: "Repo",
+      bySense: "By sense",
+      byModel: "By finder model",
+      fixers: "As a fixer",
+      colSense: "Sense",
+      colModel: "Model",
+      colFiled: "Filed",
+      colAccepted: "Accepted",
+      colDeclined: "Declined",
+      colPending: "Pending",
+      colAcceptance: "Acceptance",
+      colSessions: "Sessions",
+      colMerged: "Merged",
+      colFailed: "Failed",
+      colVerdicts: "Verifier pass / fail",
+      acceptanceTooltip:
+        "Accepted over ruled-on (accepted + declined as finder error). Pending findings are left out. Fewer than 5 ruled on reads as a dash: too thin to call.",
+      empty: "Nothing filed on this repo in the window.",
+      fixersEmpty: "No fix sessions on this repo in the window.",
+      thin: "—",
+      replayTitle: "Decision replay — should the other owner take a point?",
+      replaySubtitle:
+        "Per decision point: how often the owner and its shadow disagreed, and who turned out right, judged by what happened to the case. A point flips to the other owner once the shadow has won {threshold} disagreements and more than the owner. The flip itself is a setting on Settings → AI models.",
+      colPoint: "Point",
+      colOwner: "Owner now",
+      colDecisions: "Decisions",
+      colAgreed: "Agreed",
+      colDisagreed: "Disagreed",
+      colOwnerWins: "Owner right",
+      colShadowWins: "Shadow right",
+      colVetoes: "Vetoes",
+      colVerdict: "Verdict",
+      verdictFlip: "flip",
+      verdictKeep: "keep",
+      verdictNotEnough: "not enough cases",
+      verdictFixed: "fixed",
+      replayEmpty: "No decisions in the window yet.",
+    },
+
+    // ── the Work tab's "Today, by repo" board ──────────────────────────────
+    today: {
+      title: "Today, by repo",
+      subtitle: "{date}, since midnight India time",
+      colRepo: "Repo",
+      colSweeps: "Sweeps",
+      colFound: "Found",
+      colVerified: "Verifier on findings",
+      colSessions: "Fix sessions",
+      colFixVerdicts: "Verifier on fixes",
+      colPrsOpen: "PRs open",
+      colMerged: "Merged",
+      colReleased: "Released",
+      colSpend: "Spend",
+      total: "Total",
+      sweepsDone: "done",
+      sweepsFailed: "failed",
+      sweepsRunning: "running",
+      sweepsSkipped: "skipped",
+      verifiedWord: "confirmed",
+      refutedWord: "refuted",
+      passedWord: "passed",
+      failedWord: "failed",
+      sessionsAuto: "by me",
+      sessionsByYou: "by you",
+      sessionsRunning: "running",
+      sessionsFailed: "failed",
+    },
+
+    // ── the independent verifier's view of a finding (OPP-0780) ───────────
+    drawerIndependentPending: "My independent verifier is still reading this",
+    drawerIndependentConfirmed: "Confirmed by my independent verifier",
+    drawerIndependentRefuted: "Refuted by my independent verifier",
+    drawerIndependentUnsure: "My independent verifier could not settle this; it is yours to decide",
+    drawerIndependentTooltip:
+      "After a sweep closes, a separate run on a different model reproduces each unproven finding and tries to refute it. I fix nothing in AI mode until it has confirmed the bug.",
+
+    // ── the Verifier's verdict on a fix (OPP-0779) ────────────────────────
+    drawerVerdictPass: "My Verifier passed this fix",
+    drawerVerdictFail: "My Verifier refused this fix",
+    drawerVerdictTooltip:
+      "After I open a fix PR, a separate run on a different model reads it with fresh eyes: does the regression test fail before and pass after, is the suite green, does the diff do only what the bug needs, do data files keep their counts. I merge only on a pass, and only where this repo lets me.",
+    drawerVerdictBy: "Read on {engine}",
+    drawerVerdictCheckSkipped: "skipped: {reason}",
+
+    // ── the case file's budget (OPP-0775) ─────────────────────────────────
+    drawerBudgetLabel: "What I've spent on this bug",
+    drawerBudgetTooltip:
+      "Every bug has a budget: fix sessions, attempts, times I asked for help, dollars and minutes. I stop starting new sessions once any of them is spent, so trying again is a decision you make, not a reflex I have.",
+    drawerBudgetSummary:
+      "{sessions} of {sessionsCap} sessions · {attempts} of {attemptsCap} attempts · ${usd} of ${usdCap}",
+    drawerBudgetExhausted: "Budget spent ({kind}). I won't start another session on my own.",
+    drawerBudgetOverridden: "You started a session past the budget on {date}.",
+    drawerFixSessionForceLabel: "Start anyway, past the budget",
+    drawerFixSessionForceHelp:
+      "Read what the last session left behind first. I'll note that you overrode the budget.",
+
+    // ── why a reported bug was missed (OPP-0774) ───────────────────────────
+    // Written by the miss classifier a moment after a person files a bug. The
+    // reader is whoever decides what Bug Hunter should learn to look at next,
+    // so the sense is named as a thing to build or fix, not as an enum.
+    drawerMissTitle: "Why I didn't find this first",
+    drawerMissTooltip:
+      "Every bug a person reports is one I should have caught. I write down which kind of miss it was and which sense would have seen it, so the next thing I learn to look at is the thing people keep finding for me.",
+    drawerMissWouldNeed: "What would have caught it: {sense}",
+    drawerMissSeeMatched: "See what I had already found",
+    missNoSense: "I have no sense that could have seen this",
+    missSenseMissed: "A sense I have should have caught this and didn't",
+    missDetectedDeclined: "I had found this, and it was turned down",
+    missDetectedNotFixed: "I had found this, and it wasn't fixed or released in time",
+    missNotAMiss: "Not a miss on my part",
+    missSenseProductionLog: "my production-log reader",
+    missSenseBrowserErrors: "my browser-error reader",
+    missSenseUxSignal: "my UX-signal scan",
+    missSenseCodeReview: "my nightly diff review",
+    missSenseTests: "the test and lint run",
+    missSenseUserJourney: "walking the real screens in a browser or on a device",
+    missSenseDataIntegrity: "a nightly check over production data",
+    missSenseVoiceQa: "listening to live roleplay audio",
+    missSenseApiContract: "exercising the API with seeded data",
+    missSenseVisual: "a design-consistency pass over screens",
+    missSenseLocaleParity: "comparing locale files and rendered text against English",
+    missSenseMobileCrash: "a crash signal from the mobile app",
+    missSenseStaticContent: "a check for placeholder text in shipped HTML and meta tags",
+    missSenseLlmOutputEval: "judging generated text against its brief",
+
     // ── the post-mortem a failed fix session leaves behind ─────────────────
     // Read by two audiences: the admin deciding whether to press "Ask me to
     // try again", and (through the dossier) the session that retries. The
@@ -2810,6 +2987,37 @@ export const en = {
     drawerPostmortemWhyFailed: "Why my fixes didn't hold",
     drawerPostmortemTryNext: "What a retry should do differently",
     drawerPostmortemGotcha: "A trap in this repo I hit (now in my notebook)",
+
+    // ── the study a fix session writes before it changes any code ─────────
+    // Shown so a reviewer reads the reasoning behind a diff, not only the
+    // diff: where I said the value lives decides whether the fix is the
+    // right shape at all.
+    drawerStudyTitle: "How I understood it before fixing",
+    drawerStudyTooltip:
+      "Before I change any code I read the feature end to end — where the value lives, what carries it to the screen, what the client sends — and write it down. A second model reviews it, the Verifier compares my diff with it, and a retry reads it to see where I went wrong.",
+    drawerStudyRecorded: "From my session of {date}",
+    drawerStudyFeature: "The feature",
+    drawerStudyHowItWorks: "How it works today",
+    drawerStudyValueLivesIn: "Where the value lives",
+    drawerStudyValueHomes: {
+      database: "a database table an admin edits",
+      locale_file: "the locale JSON files",
+      config: "configuration",
+      code: "code",
+      other_repo: "another codebase",
+      mixed: "more than one place",
+    },
+    drawerStudySibling: "The working example I compared against",
+    drawerStudyRootCause: "Root cause",
+    drawerStudyApproach: "The fix I planned",
+    drawerStudyFiles: "Files I planned to change",
+    drawerStudyLeaveAlone: "Left alone on purpose",
+    drawerStudyOtherRepos: "Other codebases a complete fix needs",
+    drawerStudyRisks: "Risks",
+    drawerStudyTestPlan: "The regression test",
+    drawerStudyPreviousWrong: "What my earlier study got wrong",
+    drawerStudyReviewNone: "Reviewed by {model}: no concerns.",
+    drawerStudyReviewConcerns: "Reviewed by {model} — concerns I had to answer:",
 
     // ── confidence and regressions ─────────────────────────────────────────
     drawerConfidenceLabel: "How sure my checkers were",
@@ -2991,6 +3199,9 @@ export const en = {
     triggerScheduled: "Nightly",
     triggerManual: "On demand",
     triggerFixSession: "Fix session",
+    triggerVerifyFix: "Verifier (fixes)",
+    triggerVerifyFindings: "Verifier (findings)",
+    triggerPrReview: "PR review",
     statusRunning: "Running",
     statusCompleted: "Completed",
     statusFailed: "Failed",
@@ -3183,6 +3394,13 @@ export const en = {
     // so this tooltip is never explaining a column of repeated Age values.
     findingColumnUpdatedTooltip:
       "When anything last happened to a bug — I re-read it on a sweep, its status moved, or someone rewrote it. Age is how long it's been on my list; this is whether it's been touched lately. On a bug your team reported weeks ago and I only looked at last night, those two are very far apart.",
+    // Only shows once some bug in view has cost anything, so a table of
+    // untouched reports is not a column of dashes.
+    drawerPrReview: "Found reviewing pull request #{number}",
+    drawerPrReviewCommented: "· my comment is on the PR",
+    findingColumnCost: "Est. cost",
+    findingColumnCostTooltip:
+      "What my fix sessions on this bug have cost so far: the engine's own figure where it reported one, else my token estimate. Sweep cost is not counted — a sweep reads the whole repo and no one bug owns it. Sort by it to see which bugs have burned the most. The drawer has the per-session breakdown.",
     runScopeBanner: "Showing only the bugs my {repo} sweep at {timestamp} touched.",
     runScopeBannerLoading: "Showing only the bugs one sweep touched.",
     // The point of the sentence. "Found 10" meant ten rows touched, and most of

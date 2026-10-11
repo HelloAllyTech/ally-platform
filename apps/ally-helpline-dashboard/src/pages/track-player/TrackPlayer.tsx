@@ -154,7 +154,7 @@ export const TrackPlayer: FC = () => {
           <p className="text-typography-700">{t("tracks2.player.loadFailed")}</p>
           <button
             onClick={loadItem}
-            className="rounded-full bg-primary-500 px-6 py-2 text-sm font-medium text-white hover:bg-primary-600"
+            className="rounded-full bg-primary-500 px-6 py-2 text-sm font-medium text-white hover:bg-primary-600 max-md:min-h-11"
           >
             {t("tracks2.player.retry")}
           </button>
@@ -258,6 +258,8 @@ export const TrackPlayer: FC = () => {
     <div className="fixed inset-0 z-40 flex h-[100dvh] w-full flex-col bg-white font-primary">
       <PlayerTopBar
         sectionTitle={nav.current?.sectionTitle ?? ""}
+        itemTitle={nav.current?.item.title ?? ""}
+        itemDescription={nav.current?.item.description ?? null}
         sectionItems={sectionItems}
         currentItemId={itemId}
         overallPct={nav.overallPct}
