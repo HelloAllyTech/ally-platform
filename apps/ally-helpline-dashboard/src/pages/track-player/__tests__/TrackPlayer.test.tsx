@@ -1,3 +1,4 @@
+
 import { vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -83,7 +84,7 @@ describe("TrackPlayer", () => {
             <Route path="/track/:trackId/:itemId" element={<TrackPlayer />} />
           </Routes>
         </MemoryRouter>
-      </Provider>,
+      </Provider>
     );
 
     expect(screen.getByRole("heading", { level: 1, name: "Test Item Title" })).toBeInTheDocument();

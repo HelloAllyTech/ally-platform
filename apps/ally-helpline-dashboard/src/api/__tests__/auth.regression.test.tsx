@@ -1,3 +1,4 @@
+
 import React from "react";
 import { configureStore } from "@reduxjs/toolkit";
 import { renderHook } from "@testing-library/react";
@@ -11,7 +12,8 @@ const testStore = configureStore({
   reducer: {
     [baseAPI.reducerPath]: baseAPI.reducer,
   },
-  middleware: getDefaultMiddleware => getDefaultMiddleware().concat(baseAPI.middleware),
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware().concat(baseAPI.middleware),
 });
 
 const TestWrapper = ({ children }: { children: React.ReactNode }) => (
