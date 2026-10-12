@@ -172,12 +172,13 @@ export const bugHunterAPI = baseAPI.injectEndpoints({
      * and passes GitHub's own refusal through — so a failure here is worth
      * showing verbatim rather than replacing with a generic line.
      */
-    mergeBugFinding: builder.mutation<BugFinding, string>({
-      query: id => ({
+    mergeBugFinding: builder.mutation<BugFinding, { id: string; force?: boolean }>({
+      query: ({ id, force }) => ({
         url: ApiEndpoints.BUG_HUNTER.FINDING_MERGE(id),
         method: HttpMethod.POST,
+        body: force ? { force: true } : {},
       }),
-      invalidatesTags: (_result, _error, id) => [
+      invalidatesTags: (_result, _error, { id }) => [
         { type: TAG_TYPES.BUG_HUNTER_FINDINGS, id },
         { type: TAG_TYPES.BUG_HUNTER_FINDINGS, id: "LIST" },
       ],

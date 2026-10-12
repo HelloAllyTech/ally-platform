@@ -406,6 +406,22 @@ export interface BugFixStudy {
   review: { concerns: string[]; model: string | null; at: string } | null;
 }
 
+/** Mirrors ally-be's BugCaseChain: six links from the symptom to the change. */
+export type BugChainLink = "observed" | "reproduced" | "located" | "changed" | "resolved" | "held";
+export type BugChainLinkStatus = "present" | "weak" | "missing" | "broken";
+export interface BugChainEntry {
+  link: BugChainLink;
+  status: BugChainLinkStatus;
+  evidence: string | null;
+}
+export interface BugCaseChain {
+  links: BugChainEntry[];
+  /** Links one to five all present or weak. */
+  mergeable: boolean;
+  /** Links one to five that are missing or broken. */
+  blocking: BugChainLink[];
+}
+
 /** Mirrors ally-be's BugFaultLocation. */
 export interface BugFaultLocation {
   layer: "code" | "data" | "config" | "unknown";
@@ -502,6 +518,8 @@ export interface BugFinding {
    * fix session.
    */
   faultLocation: BugFaultLocation | null;
+  /** The case chain, derived on read — see BugCaseChain. */
+  chain: BugCaseChain;
   /**
    * What the last failed fix session left behind, or null. Written by the
    * fix protocol with `status: failed`; the next session reads it in its

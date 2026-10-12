@@ -3067,6 +3067,28 @@ export const en = {
     drawerMergeConfirmBody:
       "I'll merge the PR as you. This does NOT deploy it — releasing to production is still a separate press.",
     drawerMergeConfirm: "Merge",
+    drawerMergeChainIncomplete:
+      "The case chain is not complete: {links}. I merge only a fix I can trace from the symptom to the change. If you have read the chain and still want it, tick the box.",
+    drawerMergeForceLabel: "Merge anyway — I've read the chain",
+    drawerMergeForceHelp:
+      "Recorded with the merge. This is how #792 landed with the wrong layer fixed; please read first.",
+    drawerChainTitle: "The chain",
+    drawerChainTooltip:
+      "A fix is a chain of evidence from the symptom to the change: observed, reproduced, located, changed in that mechanism, resolved for the reporter, held after release. I merge only when the first five hold; the sixth is checked after release. A missing or broken link is what to look at before any diff.",
+    drawerChainLinks: {
+      observed: "Observed",
+      reproduced: "Reproduced",
+      located: "Located",
+      changed: "Changed in that mechanism",
+      resolved: "Resolved for the reporter",
+      held: "Held after release",
+    },
+    drawerChainStatus: {
+      present: "present",
+      weak: "weak",
+      missing: "missing",
+      broken: "broken",
+    },
     drawerMergeFailed: "Couldn't merge that PR.",
     queueAwaitingMerge: "Green and waiting for your merge",
     drawerDecisionFailed: "Couldn't record that decision. Try again.",

@@ -146,6 +146,18 @@ const finding = (overrides: Record<string, unknown> = {}) => ({
   miss: null,
   latestFixVerdict: null,
   independentVerification: null,
+  chain: {
+    links: [
+      { link: "observed", status: "present", evidence: "reporter's steps" },
+      { link: "reproduced", status: "present", evidence: "seen" },
+      { link: "located", status: "present", evidence: "code in ally-be" },
+      { link: "changed", status: "present", evidence: "1 file" },
+      { link: "resolved", status: "weak", evidence: "test only" },
+      { link: "held", status: "missing", evidence: null },
+    ],
+    mergeable: true,
+    blocking: [],
+  },
   pr: null,
   budget: {
     caps: { sessions: 2, attempts: 4, escalations: 1, usd: 15, minutes: 120 },
@@ -649,6 +661,46 @@ describe("BugFindingDrawer — release to production", () => {
     expect(screen.getByText(/This is not a code bug/)).toBeInTheDocument();
   });
 
+  it("shows the case chain link by link and refuses a merge until the admin reads a broken chain", () => {
+    renderDrawer(
+      finding({
+        status: BugFindingStatus.PR_OPENED,
+        prUrl: "https://github.com/HelloAllyTech/ally-web/pull/798",
+        chain: {
+          links: [
+            { link: "observed", status: "present", evidence: "reporter's steps" },
+            {
+              link: "reproduced",
+              status: "present",
+              evidence: "GET …?languageCode=mr returns English",
+            },
+            { link: "located", status: "present", evidence: "data in ally-be" },
+            {
+              link: "changed",
+              status: "broken",
+              evidence: "the fault is in data and the change is in locale_file",
+            },
+            { link: "resolved", status: "missing", evidence: null },
+            { link: "held", status: "missing", evidence: null },
+          ],
+          mergeable: false,
+          blocking: ["changed", "resolved"],
+        },
+      }),
+    );
+    expect(screen.getByTestId("case-chain")).toBeInTheDocument();
+    expect(screen.getByTestId("chain-changed")).toHaveAttribute("data-status", "broken");
+    expect(
+      screen.getByText(/the fault is in data and the change is in locale_file/),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Merge it"));
+    expect(screen.getByTestId("merge-chain-warning")).toBeInTheDocument();
+    expect(
+      screen.getByText(/changed in that mechanism, resolved for the reporter/),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Merge").closest("button")).toBeDisabled();
+  });
+
   it("shows no post-mortem box for a bug no session has given up on", () => {
     renderDrawer(finding({ status: BugFindingStatus.FAILED, postmortem: null }));
     expect(screen.queryByText("Why my last fix session failed")).not.toBeInTheDocument();
@@ -1124,7 +1176,7 @@ describe("BugFindingDrawer — merging a green PR", () => {
     fireEvent.click(screen.getByText("Merge it"));
     fireEvent.click(screen.getByText("Merge"));
 
-    await waitFor(() => expect(mergeFinding).toHaveBeenCalledWith("finding-1"));
+    await waitFor(() => expect(mergeFinding).toHaveBeenCalledWith({ id: "finding-1" }));
   });
 
   it("surfaces GitHub's own refusal rather than a generic failure", async () => {
