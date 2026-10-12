@@ -17,6 +17,7 @@ vi.mock("@ally-ui-mono/ui-shared", () => ({
 // SteerComposer and CollapsibleAside render only in the build layout, which no
 // test reached until the restart cases below.
 let startDialogProps: any;
+let prdPanelProps: any[] = [];
 vi.mock("@components/builder", async () => ({
   // The real rule, not a stub: it is what decides whether Start is blocked.
   designBuildBlock: (await vi.importActual<any>("../../../components/builder/designGate"))
@@ -27,7 +28,10 @@ vi.mock("@components/builder", async () => ({
   ChatMessage: () => <div>ChatMessage</div>,
   CollapsibleAside: ({ children }: any) => <div>{children}</div>,
   ConfirmCancelDialog: () => null,
-  PrdDocPanel: () => <div>PrdDocPanel</div>,
+  PrdDocPanel: (props: any) => {
+    prdPanelProps.push(props);
+    return <div>PrdDocPanel</div>;
+  },
   ReadinessRing: () => <div>ReadinessRing</div>,
   StartBuildDialog: (props: any) => {
     startDialogProps = props;
@@ -213,6 +217,34 @@ describe("BuilderSession", () => {
     };
     render(<BuilderSession />);
     expect(startDialogProps.designBlock).toBeNull();
+  });
+
+  /**
+   * After a failed or stopped build is exactly when the PRD needs fixing, and
+   * the backend accepts the edit. The panel used to lock every finished
+   * session and say "a build is running".
+   */
+  it("keeps the PRD editable after a failed build, and locks it once complete", () => {
+    sessionResult = {
+      data: { ...baseSession, status: "FAILED", currentStage: "GATE" },
+      isLoading: false,
+      isError: false,
+    };
+    prdPanelProps = [];
+    const { unmount } = render(<BuilderSession />);
+    expect(prdPanelProps.length).toBeGreaterThan(0);
+    expect(prdPanelProps.every(props => props.editable === true)).toBe(true);
+    unmount();
+
+    sessionResult = {
+      data: { ...baseSession, status: "COMPLETED", currentStage: "DONE" },
+      isLoading: false,
+      isError: false,
+    };
+    prdPanelProps = [];
+    render(<BuilderSession />);
+    expect(prdPanelProps.every(props => props.editable === false)).toBe(true);
+    expect(prdPanelProps[0].lockedReason).toMatch(/session is complete/);
   });
 
   it("follows the session row when a build finishes while the page is open", () => {

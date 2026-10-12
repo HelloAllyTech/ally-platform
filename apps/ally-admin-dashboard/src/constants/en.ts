@@ -3567,6 +3567,8 @@ export const en = {
       saveFailed: "Couldn't save that edit.",
       lockedWhileBuilding:
         "The PRD is locked while a build is running — it's what the build is working from. Stop the build to edit it.",
+      lockedCompleted:
+        "This session is complete and its pull requests are open — the PRD stays as it was built. Start a new session for further changes.",
       sections: {
         summary: "Summary",
         problem: "Problem",

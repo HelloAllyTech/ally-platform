@@ -81,6 +81,8 @@ interface PrdDocPanelProps {
    * through, so this panel stays free of the design's API hooks.
    */
   designSection?: React.ReactNode;
+  /** Why the PRD cannot be edited, shown when `editable` is false. */
+  lockedReason?: string;
 }
 
 /**
@@ -105,6 +107,7 @@ export const PrdDocPanel: React.FC<PrdDocPanelProps> = ({
   createdByName = null,
   transcript,
   designSection,
+  lockedReason,
 }) => {
   const strings = en.builder.prd;
   const [editingKey, setEditingKey] = useState<string | null>(null);
@@ -334,7 +337,7 @@ export const PrdDocPanel: React.FC<PrdDocPanelProps> = ({
 
       {!editable && (
         <p className="border-b border-neutral-200 bg-neutral-50 px-4 py-2 text-xs text-typography-600">
-          {strings.lockedWhileBuilding}
+          {lockedReason ?? strings.lockedWhileBuilding}
         </p>
       )}
 

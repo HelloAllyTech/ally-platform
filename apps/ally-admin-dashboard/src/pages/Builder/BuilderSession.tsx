@@ -277,7 +277,16 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
 
   const effectiveStatus = status ?? session.status;
   const isTerminal = ["COMPLETED", "FAILED", "CANCELLED"].includes(effectiveStatus);
-  const prdEditable = !PRD_FROZEN.includes(effectiveStatus) && !isTerminal;
+  // Editable after a failed or stopped build — that is exactly when the PRD
+  // needs fixing before the next one, and the backend accepts the edit. Only a
+  // running build (which reads it) and a completed session (whose pull
+  // requests were built from it) hold it. It used to lock every terminal
+  // status and blame "a build is running" for it.
+  const prdEditable = !PRD_FROZEN.includes(effectiveStatus) && effectiveStatus !== "COMPLETED";
+  const prdLockedReason =
+    effectiveStatus === "COMPLETED"
+      ? en.builder.prd.lockedCompleted
+      : en.builder.prd.lockedWhileBuilding;
   // A session that ever reached a build shows the build view, including after
   // it finished: coming back to a completed session to read what happened is
   // the main reason to open one, and dropping back to the interview would
@@ -441,6 +450,7 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
                   readiness={readiness}
                   versionNumber={versionNumber}
                   editable={prdEditable}
+                  lockedReason={prdLockedReason}
                   onSaveSection={handleSaveSection}
                   sessionTitle={session.title}
                   repos={session.repos ?? []}
@@ -527,6 +537,7 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
                   readiness={readiness}
                   versionNumber={versionNumber}
                   editable={prdEditable}
+                  lockedReason={prdLockedReason}
                   onSaveSection={handleSaveSection}
                   sessionTitle={session.title}
                   repos={session.repos ?? []}
@@ -580,6 +591,7 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
               readiness={readiness}
               versionNumber={versionNumber}
               editable={prdEditable}
+              lockedReason={prdLockedReason}
               onSaveSection={handleSaveSection}
               sessionTitle={session.title}
               repos={session.repos ?? []}
