@@ -80,7 +80,9 @@ export const RunHistoryRail: React.FC<RunHistoryRailProps> = ({
                   {strings.runLabel(run.sequence, run.mode)}
                 </span>
                 <Tag type={BUILDER_RUN_STATUS_TAG_TYPE[run.status]} size="sm" className="shrink-0">
-                  {strings.runStatusLabels[run.status] ?? run.status}
+                  {run.status === "QUEUED" && run.githubRunUrl
+                    ? strings.runStatusLabels.STARTING
+                    : (strings.runStatusLabels[run.status] ?? run.status)}
                 </Tag>
               </div>
               {!quiet && (

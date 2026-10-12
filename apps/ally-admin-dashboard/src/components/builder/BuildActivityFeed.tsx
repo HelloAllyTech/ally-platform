@@ -53,6 +53,12 @@ interface BuildActivityFeedProps {
    * feed rather than as a banner over it — see {@link FailureRow}.
    */
   failure?: { title: string; detail?: string | null } | null;
+  /**
+   * True until this run's events have been fetched once. Without it the feed
+   * said "Waiting for the first update…" over a run that already had hundreds
+   * of events, for as long as the first fetch took.
+   */
+  isLoading?: boolean;
 }
 
 /**
@@ -309,6 +315,7 @@ const pairToolResults = (events: BuilderBuildEvent[]): Map<string, BuilderBuildE
 export const BuildActivityFeed: React.FC<BuildActivityFeedProps> = ({
   events,
   isLive,
+  isLoading = false,
   failure,
 }) => {
   const strings = en.builder.build;
@@ -673,7 +680,13 @@ export const BuildActivityFeed: React.FC<BuildActivityFeedProps> = ({
       >
         {visible.length === 0 && !failure ? (
           <p className="mt-8 text-center text-sm text-typography-500">
-            {isLive ? strings.feedStarting : strings.feedEmpty}
+            {isLoading
+              ? strings.feedLoading
+              : events.length > 0
+                ? strings.feedWorking(events.length)
+                : isLive
+                  ? strings.feedStarting
+                  : strings.feedEmpty}
           </p>
         ) : (
           <div className="flex flex-col gap-2">

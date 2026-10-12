@@ -66,6 +66,9 @@ export const BuildView: React.FC<BuildViewProps> = ({
   const [eventsByRun, setEventsByRun] = useState<Record<string, BuilderBuildEvent[]>>({});
   const lastSeqByRunRef = useRef<Record<string, number>>({});
   const backfilledRunsRef = useRef<Set<string>>(new Set());
+  // Runs whose events have been fetched at least once, failed fetches
+  // included — so the feed can tell "loading" from "nothing yet".
+  const [loadedRuns, setLoadedRuns] = useState<Set<string>>(() => new Set());
 
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   // True until the reader picks an older run on purpose — selection then
@@ -231,6 +234,8 @@ export const BuildView: React.FC<BuildViewProps> = ({
         // The next tick (for the live run) or the next selection (for a
         // historical one) tries again; a transient fetch failure isn't worth
         // telling anyone about.
+      } finally {
+        setLoadedRuns(previous => (previous.has(runId) ? previous : new Set(previous).add(runId)));
       }
     },
     [fetchEvents, appendEvents],
@@ -477,6 +482,7 @@ export const BuildView: React.FC<BuildViewProps> = ({
       <BuildActivityFeed
         events={displayedEvents}
         isLive={isLive && isViewingLive}
+        isLoading={!!selectedRunId && !loadedRuns.has(selectedRunId)}
         failure={
           failureTitle
             ? {

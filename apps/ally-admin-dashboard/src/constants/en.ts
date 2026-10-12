@@ -3770,7 +3770,10 @@ export const en = {
       e2eEvidence: "End-to-end evidence",
       e2eSkipped: (reason: string) => `Skipped the end-to-end check — ${reason}`,
       jumpToLive: "Jump to live",
-      feedStarting: "Waiting for the first update…",
+      feedStarting: "The runner is starting. The first update usually arrives within a minute.",
+      feedLoading: "Loading this run's activity…",
+      feedWorking: (count: number) =>
+        `Working — ${count} ${count === 1 ? "step" : "steps"} so far, none with anything to show yet.`,
       feedEmpty: "Nothing recorded for this run.",
       runLabel: (sequence: number, mode: string) =>
         mode === "resume"
@@ -3799,6 +3802,9 @@ export const en = {
       runLiveBadge: "Live",
       runStatusLabels: {
         QUEUED: "Queued",
+        // QUEUED on our side, but GitHub has accepted the run: it stays QUEUED
+        // until its first event arrives, which can take a minute.
+        STARTING: "Starting",
         RUNNING: "Running",
         SUCCEEDED: "Succeeded",
         FAILED: "Failed",
