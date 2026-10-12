@@ -33,6 +33,7 @@ import {
   BUG_FINDING_FIX_SESSION_START_STATUSES,
   BUG_FINDING_LOW_CONFIDENCE_THRESHOLD,
   BugFindingDecisionReason,
+  BugFindingSource,
   BugFindingStatus,
   BugHuntEventStage,
 } from "@types";
@@ -139,6 +140,11 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
   // The admin's explicit "past the budget" tick for this dialog only (OPP-0775).
   const [forceFix, setForceFix] = useState(false);
   const budgetSpent = Boolean(finding?.budget?.exhausted);
+  // A human report nobody has located yet: "Put me on it" locates first
+  // (the server sends the Verifier, not a fix session) unless forced.
+  const needsLocating =
+    finding?.source === BugFindingSource.REPORTED_BUG &&
+    finding?.independentVerification !== "confirmed";
   const [cancelFixSession, { isLoading: isCancellingSession }] = useCancelBugFixSessionMutation();
   const [merge, { isLoading: isMerging }] = useMergeBugFindingMutation();
   const [release, { isLoading: isReleasing }] = useReleaseBugFindingMutation();
@@ -700,6 +706,46 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
                       <TooltipIcon />
                     </button>
                   </Tooltip>
+                </div>
+              )}
+
+              {/* Where the verifier located the fault (locate before fixing,
+                  2026-10-12): the line a reviewer reads before any diff, and
+                  the reason a data or config fault never gets a session. */}
+              {finding.faultLocation && finding.faultLocation.layer !== "unknown" && (
+                <div
+                  data-testid="fault-location"
+                  className={`flex flex-col gap-1 rounded border p-2 ${
+                    finding.faultLocation.layer === "code"
+                      ? "border-border-light bg-neutral-50"
+                      : "border-amber-200 bg-amber-50"
+                  }`}
+                >
+                  <p className="text-xs font-medium text-typography-900">
+                    {(finding.faultLocation.repo
+                      ? en.bugHunter.drawerFaultLocatedRepo
+                      : en.bugHunter.drawerFaultLocated
+                    )
+                      .replace("{layer}", finding.faultLocation.layer)
+                      .replace("{repo}", finding.faultLocation.repo ?? "")}
+                  </p>
+                  {finding.faultLocation.evidence && (
+                    <PostmortemLine
+                      label={en.bugHunter.drawerFaultEvidence}
+                      value={finding.faultLocation.evidence}
+                      mono
+                    />
+                  )}
+                  {finding.faultLocation.repair && (
+                    <PostmortemLine
+                      label={en.bugHunter.drawerFaultRepair}
+                      value={finding.faultLocation.repair}
+                      emphasis
+                    />
+                  )}
+                  {finding.faultLocation.layer !== "code" && (
+                    <p className="text-[11px] text-amber-800">{en.bugHunter.drawerFaultDataNote}</p>
+                  )}
                 </div>
               )}
 
@@ -1488,7 +1534,10 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
               : en.bugHunter.drawerFixSessionConfirmBodyUnknownRepo
           }
           primaryButton={{
-            label: en.bugHunter.drawerFixSessionStart,
+            label:
+              needsLocating && !forceFix
+                ? en.bugHunter.drawerLocateFirstStart
+                : en.bugHunter.drawerFixSessionStart,
             onClick: handleStartFixSession,
             disabled: isStartingSession || (budgetSpent && !forceFix),
           }}
@@ -1500,6 +1549,20 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
           {/* Past the budget, Start is disabled until the admin ticks the
               override: the refusal the server would give is shown here first,
               so nobody learns about the budget from an error toast. */}
+          {needsLocating && (
+            <div className="mt-3 text-left" data-testid="locate-first">
+              <p className="text-xs text-typography-700 mb-2">
+                {en.bugHunter.drawerLocateFirstNote}
+              </p>
+              <Checkbox
+                id={`drawer-${id}-locate-force`}
+                labelText={en.bugHunter.drawerLocateFirstForceLabel}
+                helperText={en.bugHunter.drawerLocateFirstForceHelp}
+                checked={forceFix}
+                onChange={(_e: unknown, { checked }: { checked: boolean }) => setForceFix(checked)}
+              />
+            </div>
+          )}
           {budgetSpent && (
             <div className="mt-3 text-left" data-testid="budget-override">
               <p className="text-xs text-amber-700 mb-2">

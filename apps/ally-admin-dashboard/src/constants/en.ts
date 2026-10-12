@@ -2932,6 +2932,18 @@ export const en = {
     drawerIndependentConfirmed: "Confirmed by my independent verifier",
     drawerIndependentRefuted: "Refuted by my independent verifier",
     drawerIndependentUnsure: "My independent verifier could not settle this; it is yours to decide",
+    drawerFaultLocated: "Fault located in {layer}",
+    drawerFaultLocatedRepo: "Fault located in {layer} ({repo})",
+    drawerFaultEvidence: "What I saw in production",
+    drawerFaultRepair: "The repair a person makes",
+    drawerFaultDataNote:
+      'This is not a code bug, so I will not start a fix session on it. Once the repair is made, reject it with "Something else" and a note, or re-open the report if it persists.',
+    drawerLocateFirstNote:
+      "This is a human report I haven't located yet. Pressing Locate sends my verifier to reproduce it against production first and say whether the fault is in code, data or configuration; a code fault then goes to a fix session on its own.",
+    drawerLocateFirstForceLabel: "Skip locating, start the fix session now",
+    drawerLocateFirstForceHelp:
+      "Only if you already know the fault is in this repo's code. A fix that starts from the symptom alone is how the wrong layer gets fixed.",
+    drawerLocateFirstStart: "Locate the fault",
     drawerIndependentTooltip:
       "After a sweep closes, a separate run on a different model reproduces each unproven finding and tries to refute it. I fix nothing in AI mode until it has confirmed the bug.",
 

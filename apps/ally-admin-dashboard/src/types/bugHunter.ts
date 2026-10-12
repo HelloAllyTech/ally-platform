@@ -406,6 +406,14 @@ export interface BugFixStudy {
   review: { concerns: string[]; model: string | null; at: string } | null;
 }
 
+/** Mirrors ally-be's BugFaultLocation. */
+export interface BugFaultLocation {
+  layer: "code" | "data" | "config" | "unknown";
+  repo: string | null;
+  evidence: string | null;
+  repair: string | null;
+}
+
 /** Mirrors ally-be's FixPostmortemDto plus the two fields setStatus stamps on it. */
 export interface BugFixPostmortem {
   attempts?: number;
@@ -487,6 +495,13 @@ export interface BugFinding {
    * Null for proven findings, human reports, and findings from before it existed.
    */
   independentVerification: "pending" | "confirmed" | "refuted" | "unsure" | null;
+  /**
+   * Where the independent verifier located the fault, with its production
+   * evidence and, for data or config, the repair a person makes. Null until
+   * a verifier has located it. A located data or config fault never gets a
+   * fix session.
+   */
+  faultLocation: BugFaultLocation | null;
   /**
    * What the last failed fix session left behind, or null. Written by the
    * fix protocol with `status: failed`; the next session reads it in its

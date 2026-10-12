@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { BugFindingStatus } from "@types";
+import { BugFindingSource, BugFindingStatus } from "@types";
 
 import { BugFindingDrawer } from "../BugFindingDrawer";
 
@@ -263,13 +263,23 @@ describe("BugFindingDrawer — fix session", () => {
     releaseFinding.mockReturnValue({ unwrap: () => Promise.resolve({}) });
   });
 
+  it("locates first on a human report nobody has located: the button reads Locate the fault and sends no force", async () => {
+    renderDrawer(finding({ independentVerification: null }));
+    fireEvent.click(screen.getByText("Put me on it"));
+    expect(screen.getByTestId("locate-first")).toBeInTheDocument();
+    expect(screen.getByText("Locate the fault")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Locate the fault"));
+    await waitFor(() => expect(startFixSession).toHaveBeenCalled());
+    expect(startFixSession.mock.calls[0][0]).toEqual({ id: "finding-1" });
+  });
+
   it("offers a fix session on a new, untriaged bug — the whole point of the button", () => {
     renderDrawer(finding());
     expect(screen.getByText("Put me on it")).toBeInTheDocument();
   });
 
   it("starts the session on confirm, without asking for a repo", async () => {
-    renderDrawer(finding());
+    renderDrawer(finding({ independentVerification: "confirmed" }));
     fireEvent.click(screen.getByText("Put me on it"));
     fireEvent.click(screen.getByText("Start now"));
 
@@ -277,7 +287,7 @@ describe("BugFindingDrawer — fix session", () => {
   });
 
   it("offers a codebase picker when the bug has no repo, defaulting to letting Bug Hunter classify it", async () => {
-    renderDrawer(finding({ repo: null }));
+    renderDrawer(finding({ independentVerification: "confirmed", repo: null }));
     fireEvent.click(screen.getByText("Put me on it"));
 
     expect(screen.getByText("Start now")).not.toBeDisabled();
@@ -288,7 +298,7 @@ describe("BugFindingDrawer — fix session", () => {
   });
 
   it("sends the codebase the admin picked, which is how a bug the classifier could not place gets fixed", async () => {
-    renderDrawer(finding({ repo: null }));
+    renderDrawer(finding({ independentVerification: "confirmed", repo: null }));
     fireEvent.click(screen.getByText("Put me on it"));
 
     fireEvent.change(screen.getByLabelText("Which codebase?"), { target: { value: "ally-web" } });
@@ -320,6 +330,7 @@ describe("BugFindingDrawer — fix session", () => {
   it("keeps Start disabled once the budget is spent until the admin ticks the override, then sends force", async () => {
     renderDrawer(
       finding({
+        independentVerification: "confirmed",
         budget: {
           caps: { sessions: 2, attempts: 4, escalations: 1, usd: 15, minutes: 120 },
           used: { sessions: 2, attempts: 4, escalations: 0, usd: 6, minutes: 70 },
@@ -376,7 +387,7 @@ describe("BugFindingDrawer — fix session", () => {
     startFixSession.mockReturnValue({
       unwrap: () => Promise.reject({ data: { message: "Bug Hunter is OFF." } }),
     });
-    renderDrawer(finding());
+    renderDrawer(finding({ independentVerification: "confirmed" }));
 
     fireEvent.click(screen.getByText("Put me on it"));
     fireEvent.click(screen.getByText("Start now"));
@@ -614,6 +625,28 @@ describe("BugFindingDrawer — release to production", () => {
   it("shows no study box before a session has studied the bug", () => {
     renderDrawer(finding({ status: BugFindingStatus.APPROVED, study: null }));
     expect(screen.queryByText("How I understood it before fixing")).not.toBeInTheDocument();
+  });
+
+  it("shows where the verifier located the fault, with the repair, and no fix session for a data fault", () => {
+    renderDrawer(
+      finding({
+        status: BugFindingStatus.PENDING_APPROVAL,
+        source: BugFindingSource.REPORTED_BUG,
+        independentVerification: "confirmed",
+        faultLocation: {
+          layer: "data",
+          repo: "ally-be",
+          evidence: "GET /api/v1/learn/scenarios/public?languageCode=mr returns the English titles",
+          repair:
+            "Generate and publish Marathi translations for the four public scenarios in Studio.",
+        },
+      }),
+    );
+    expect(screen.getByTestId("fault-location")).toBeInTheDocument();
+    expect(screen.getByText("Fault located in data (ally-be)")).toBeInTheDocument();
+    expect(screen.getByText(/returns the English titles/)).toBeInTheDocument();
+    expect(screen.getByText(/Generate and publish Marathi translations/)).toBeInTheDocument();
+    expect(screen.getByText(/This is not a code bug/)).toBeInTheDocument();
   });
 
   it("shows no post-mortem box for a bug no session has given up on", () => {
