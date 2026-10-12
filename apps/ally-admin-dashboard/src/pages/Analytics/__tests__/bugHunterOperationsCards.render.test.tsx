@@ -16,10 +16,24 @@ vi.mock("@api", () => ({
 }));
 vi.mock("@components", () => ({ cellTypes: {} }));
 
-import { BugHunterOperationsMetrics } from "@types";
+import { BugHuntTrigger, BugHunterOperationsMetrics } from "@types";
 
 import { BugHunterOperationsCards } from "../BugHunterOperationsCards";
 
+const tokens = (input = 0, output = 0, runs = 0, costUsd = 0) => ({
+  runs,
+  inputTokens: input,
+  outputTokens: output,
+  costUsd,
+});
+const allTokens = () => ({
+  [BugHuntTrigger.SCHEDULED]: tokens(),
+  [BugHuntTrigger.MANUAL]: tokens(),
+  [BugHuntTrigger.FIX_SESSION]: tokens(),
+  [BugHuntTrigger.VERIFY_FIX]: tokens(),
+  [BugHuntTrigger.VERIFY_FINDINGS]: tokens(),
+  [BugHuntTrigger.PR_REVIEW]: tokens(),
+});
 const outcomes = (filed = 0, accepted = 0, declined = 0, undecided = 0) => ({
   filed,
   accepted,
@@ -30,8 +44,24 @@ const outcomes = (filed = 0, accepted = 0, declined = 0, undecided = 0) => ({
 const fixture: BugHunterOperationsMetrics = {
   windowDays: 30,
   since: "2026-08-29T00:00:00.000Z",
-  days: [{ date: "2026-09-27", ...outcomes(6, 3, 2, 1) }],
-  totals: outcomes(6, 3, 2, 1),
+  days: [
+    {
+      date: "2026-09-27",
+      ...outcomes(6, 3, 2, 1),
+      tokens: {
+        ...allTokens(),
+        [BugHuntTrigger.SCHEDULED]: tokens(1_000_000, 200_000, 2, 3.5),
+        [BugHuntTrigger.FIX_SESSION]: tokens(300_000, 50_000, 1, 1.25),
+      },
+    },
+  ],
+  totals: {
+    ...outcomes(6, 3, 2, 1),
+    inputTokens: 1_300_000,
+    outputTokens: 250_000,
+    costUsd: 4.75,
+    runs: 3,
+  },
 };
 
 const filters = {
@@ -46,7 +76,7 @@ const filters = {
  * chart can typecheck and still throw on render — this is the check for that.
  */
 describe("BugHunterOperationsCards", () => {
-  it("renders the one card kept from server-shaped data and asks for the mapped day window", () => {
+  it("renders the two cards kept from server-shaped data and asks for the mapped day window", () => {
     useGetBugHunterOperationsMetricsQuery.mockReturnValue({
       data: fixture,
       isLoading: false,
@@ -57,13 +87,14 @@ describe("BugHunterOperationsCards", () => {
 
     expect(useGetBugHunterOperationsMetricsQuery).toHaveBeenCalledWith({ days: 30 });
     expect(screen.getByText("Bugs filed per day")).toBeInTheDocument();
+    expect(screen.getByText("Spend over time")).toBeInTheDocument();
+    expect(screen.getByText(/\$4\.75 over the window/)).toBeInTheDocument();
     // The cards pruned on 2026-10-12 stay gone.
     for (const title of [
       "Bugs filed per day, by source",
       "How hard they were to spot",
       "Who raises bugs",
       "Tokens spent per day, by trigger",
-      "Spend over time",
       "Code shown to the sweeps per day",
       "Tokens by model",
     ]) {
@@ -75,12 +106,17 @@ describe("BugHunterOperationsCards", () => {
 
   it("shows the empty states rather than blank plots when nothing has run", () => {
     useGetBugHunterOperationsMetricsQuery.mockReturnValue({
-      data: { ...fixture, days: [], totals: outcomes() },
+      data: {
+        ...fixture,
+        days: [],
+        totals: { ...outcomes(), inputTokens: 0, outputTokens: 0, costUsd: 0, runs: 0 },
+      },
       isLoading: false,
       isError: false,
       refetch: vi.fn(),
     });
     render(<BugHunterOperationsCards {...filters} />);
     expect(screen.getAllByText("No bugs filed in this window yet.").length).toBeGreaterThan(0);
+    expect(screen.getByText("No runs spent anything in this window.")).toBeInTheDocument();
   });
 });

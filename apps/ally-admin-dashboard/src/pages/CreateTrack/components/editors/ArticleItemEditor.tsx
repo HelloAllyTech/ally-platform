@@ -6,8 +6,8 @@ import { toast } from "sonner";
 import { TextArea, Tooltip } from "@ally-ui-mono/ui-shared";
 import { TooltipIcon, Trash } from "@assets";
 import { RichTextEditor } from "@components/rich-text-editor";
-import { MAX_ARTICLE_QUESTIONS } from "@constants";
-import { McqSingleQuestion, TrackFormValues, TrackItemType } from "@types";
+import { MAX_ARTICLE_QUESTIONS, MAX_ARTICLE_RESOURCES } from "@constants";
+import { ArticleResource, McqSingleQuestion, TrackFormValues, TrackItemType } from "@types";
 
 import { ItemEditorFrame } from "./ItemEditorFrame";
 import { McqEditor } from "./quiz/McqEditor";
@@ -58,6 +58,22 @@ export const ArticleItemEditor: FC<ArticleItemEditorProps> = ({
     keyName: "fieldId",
   });
 
+  const resourcesName = `${base}.article.resources` as `sections.0.items.0.article.resources`;
+  const {
+    fields: resourceFields,
+    append: appendResource,
+    remove: removeResource,
+  } = useFieldArray({
+    control,
+    name: resourcesName,
+    keyName: "fieldId",
+  });
+  const watchedResources = useWatch({ control, name: resourcesName });
+  const resources = useMemo(
+    () => (watchedResources ?? []) as ArticleResource[],
+    [watchedResources],
+  );
+
   const html = (useWatch({ control, name: htmlName }) ?? "") as string;
   const watchedQuestions = useWatch({ control, name: questionsName });
   // `useWatch` hands back a fresh array each render when the field is unset,
@@ -102,6 +118,16 @@ export const ArticleItemEditor: FC<ArticleItemEditorProps> = ({
     append(question);
     return question.id;
   };
+
+  const handleAddResource = () => {
+    if (resourceFields.length >= MAX_ARTICLE_RESOURCES) {
+      toast.error(`An article can hold at most ${MAX_ARTICLE_RESOURCES} resources.`);
+      return;
+    }
+    appendResource({ id: crypto.randomUUID(), title: "", url: "" });
+  };
+
+  const isValidResourceUrl = (url: string) => !url || /^https?:\/\//i.test(url);
 
   const handleRemoveQuestion = (index: number, questionId: string) => {
     remove(index);
@@ -246,6 +272,107 @@ export const ArticleItemEditor: FC<ArticleItemEditorProps> = ({
           })}
         </div>
       )}
+
+      <div className="flex flex-col gap-4">
+        <span className="inline-flex items-center gap-1">
+          <span className="text-sm font-medium text-typography-800">
+            Resources ({resourceFields.length}/{MAX_ARTICLE_RESOURCES})
+          </span>
+          <Tooltip
+            label="Learners see these as links alongside the article — they open in place, without leaving the course."
+            align="top"
+          >
+            <button type="button" className="cursor-pointer inline-flex items-center">
+              <TooltipIcon />
+            </button>
+          </Tooltip>
+        </span>
+
+        {resourceFields.map((field, index) => {
+          const resource = resources[index];
+          const urlValid = isValidResourceUrl(resource?.url ?? "");
+
+          return (
+            <div
+              key={field.fieldId}
+              className="border border-border-light rounded-md p-4 flex flex-col gap-3"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-typography-800">
+                  Resource {index + 1}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => removeResource(index)}
+                  className="text-destructive-500 hover:text-destructive-600 max-lg:p-2.5 max-lg:-m-2.5"
+                  aria-label={`Delete resource ${index + 1}`}
+                >
+                  <Trash className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label
+                  htmlFor={`${resourcesName}.${index}.title`}
+                  className="text-sm font-medium text-typography-800"
+                >
+                  Title
+                </label>
+                <Controller
+                  control={control}
+                  name={`${resourcesName}.${index}.title`}
+                  render={({ field: titleField }) => (
+                    <input
+                      id={`${resourcesName}.${index}.title`}
+                      type="text"
+                      {...titleField}
+                      value={titleField.value ?? ""}
+                      placeholder="e.g. Mental Health First Aid Guide"
+                      className="w-full border border-border-light rounded-md px-3 py-2 text-sm outline-none focus:border-primary-400"
+                    />
+                  )}
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label
+                  htmlFor={`${resourcesName}.${index}.url`}
+                  className="text-sm font-medium text-typography-800"
+                >
+                  URL
+                </label>
+                <Controller
+                  control={control}
+                  name={`${resourcesName}.${index}.url`}
+                  render={({ field: urlField }) => (
+                    <input
+                      id={`${resourcesName}.${index}.url`}
+                      type="text"
+                      {...urlField}
+                      value={urlField.value ?? ""}
+                      placeholder="https://example.com/article"
+                      className={`w-full border rounded-md px-3 py-2 text-sm outline-none focus:border-primary-400 ${
+                        urlValid ? "border-border-light" : "border-destructive-400"
+                      }`}
+                    />
+                  )}
+                />
+                {!urlValid && (
+                  <p className="text-xs text-destructive-500">Enter a valid http(s) link.</p>
+                )}
+              </div>
+            </div>
+          );
+        })}
+
+        <button
+          type="button"
+          onClick={handleAddResource}
+          className="self-start text-sm font-medium text-primary-500 hover:text-primary-600"
+        >
+          + Add resource
+        </button>
+      </div>
     </ItemEditorFrame>
   );
 };

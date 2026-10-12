@@ -37,6 +37,9 @@ export const MAX_MCQ_OPTIONS = 8;
 /** Inline questions per article. Mirrors the server's own cap. */
 export const MAX_ARTICLE_QUESTIONS = 10;
 
+/** Curated external links per article. Mirrors the server's own cap. */
+export const MAX_ARTICLE_RESOURCES = 10;
+
 /* ---- Question media ----------------------------------------------------- */
 
 /**

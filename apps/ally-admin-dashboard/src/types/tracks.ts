@@ -37,6 +37,16 @@ export enum TrackGameKey {
 /* Inline content payloads (track_items.content JSONB)                        */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * A curated external link shown in the "Resources" list after an article's
+ * body. Supplementary reading only — never gates completion.
+ */
+export interface ArticleResource {
+  id: string;
+  title: string;
+  url: string;
+}
+
 export interface ArticleContent {
   html: string;
   imageUrls?: string[];
@@ -48,6 +58,7 @@ export interface ArticleContent {
    * the learner's payload ever carries.
    */
   questions?: McqSingleQuestion[];
+  resources?: ArticleResource[];
 }
 
 export type VideoSource = "s3" | "youtube" | "vimeo" | "loom";

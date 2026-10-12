@@ -638,6 +638,15 @@ export interface BugHunterOperationsDay {
   declined: number;
   /** Of `filed`, still new or pending approval. */
   undecided: number;
+  /** Tokens and cost spent by runs that started that day, by trigger. Always every trigger. */
+  tokens: Record<BugHuntTrigger, BugHunterOperationsTokens>;
+}
+
+export interface BugHunterOperationsTokens {
+  runs: number;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
 }
 
 export interface BugHunterOperationsMetrics {
@@ -650,6 +659,10 @@ export interface BugHunterOperationsMetrics {
     accepted: number;
     declined: number;
     undecided: number;
+    inputTokens: number;
+    outputTokens: number;
+    costUsd: number;
+    runs: number;
   };
 }
 
