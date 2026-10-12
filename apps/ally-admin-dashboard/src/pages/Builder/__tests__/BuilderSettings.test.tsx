@@ -85,7 +85,6 @@ const baseSettings = {
   enabled: true,
   maxConcurrentBuilds: 3,
   defaultBudgetUsd: "25",
-  defaultEngine: "claude-code",
   autoReviewEnabled: false,
   autoApproveEnabled: false,
   autoReleaseEnabled: false,
@@ -146,39 +145,15 @@ describe("BuilderSettings", () => {
     });
   });
 
-  /**
-   * One engine, so there is nothing to switch to — the picker's job now is to
-   * send what it holds rather than to offer a choice. It stays because the
-   * field is real and an admin should be able to see what Builder runs on, and
-   * because putting another engine back is an entry in one array.
-   */
-  it("sends the chosen engine on save", async () => {
+  // Builder runs only on opencode, so there is no engine to pick or send.
+  it("has no engine picker and sends no engine on save", async () => {
     render(<BuilderSettings />);
 
-    fireEvent.change(screen.getByLabelText("Engine"), { target: { value: "opencode" } });
+    expect(screen.queryByLabelText("Engine")).not.toBeInTheDocument();
     fireEvent.click(screen.getByText("Save"));
 
-    await vi.waitFor(() => {
-      expect(updateSettings).toHaveBeenCalledWith(
-        expect.objectContaining({ defaultEngine: "opencode" }),
-      );
-    });
-  });
-
-  /**
-   * The engines whose invocation cases, install steps and event normalisers
-   * were deleted must not be offerable: choosing one would be a control that
-   * looks like it works and silently does not, which is the failure this
-   * picker was narrowed to prevent once already.
-   */
-  it("offers no engine Builder cannot run", () => {
-    render(<BuilderSettings />);
-
-    const options = Array.from(screen.getByLabelText("Engine").querySelectorAll("option")).map(
-      option => option.getAttribute("value"),
-    );
-
-    expect(options).toEqual(["opencode"]);
+    await vi.waitFor(() => expect(updateSettings).toHaveBeenCalled());
+    expect(updateSettings.mock.calls[0][0]).not.toHaveProperty("defaultEngine");
   });
 
   it("shows repo-map freshness read-only", () => {

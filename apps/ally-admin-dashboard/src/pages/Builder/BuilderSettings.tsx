@@ -36,28 +36,10 @@ type SettingsDraft = Pick<
   | "maxFixRunsPerPr"
   | "maxConcurrentBuilds"
   | "defaultBudgetUsd"
-  | "defaultEngine"
   | "plannerModel"
   | "coderModel"
   | "verifierModel"
 >;
-
-/**
- * Only what Builder will actually run — the same list as the AI models tab's,
- * and it has to stay the same list. ally-be holds an engine ALLOWLIST
- * (`builderAllowedEngines`) and overrules anything off it wherever the value
- * came from, including this row, so offering `claude-code` here would be a
- * control that appears to work and silently does not.
- *
- * This picker was missed when the models tab's was corrected, which is worse
- * than it sounds: a `<select>` whose value is absent from its options renders
- * as the first one, so with prod on `opencode` this page read "Claude Code" —
- * a settings screen stating the opposite of what is stored.
- *
- * Putting Claude back is one environment variable on ally-be plus an entry
- * here, in that order — the list is what decides, this is only what offers.
- */
-const BUILDER_ENGINE_OPTIONS = [{ value: "opencode", text: "opencode (multi-provider harness)" }];
 
 const Field: React.FC<{ label: string; hint?: string; children: React.ReactNode }> = ({
   label,
@@ -116,7 +98,6 @@ export const BuilderSettings: React.FC = () => {
         maxFixRunsPerPr: data.maxFixRunsPerPr,
         maxConcurrentBuilds: data.maxConcurrentBuilds,
         defaultBudgetUsd: data.defaultBudgetUsd,
-        defaultEngine: data.defaultEngine,
         plannerModel: data.plannerModel,
         coderModel: data.coderModel,
         verifierModel: data.verifierModel,
@@ -142,7 +123,6 @@ export const BuilderSettings: React.FC = () => {
         ...(draft.defaultBudgetUsd !== null
           ? { defaultBudgetUsd: Number(draft.defaultBudgetUsd) }
           : {}),
-        defaultEngine: draft.defaultEngine ?? "",
         // "" clears a tier back to the platform default — see api/builder.ts.
         plannerModel: draft.plannerModel ?? "",
         coderModel: draft.coderModel ?? "",
@@ -322,22 +302,6 @@ export const BuilderSettings: React.FC = () => {
                 />
               </Field>
             </div>
-          </section>
-
-          <section className="flex flex-col gap-3">
-            <Field label={strings.engineLabel} hint={strings.engineHelp}>
-              <Select
-                id="builder-settings-engine"
-                labelText={strings.engineLabel}
-                hideLabel
-                value={draft.defaultEngine ?? BUILDER_ENGINE_OPTIONS[0].value}
-                onChange={event => set("defaultEngine", event.target.value)}
-              >
-                {BUILDER_ENGINE_OPTIONS.map(option => (
-                  <SelectItem key={option.value} value={option.value} text={option.text} />
-                ))}
-              </Select>
-            </Field>
           </section>
 
           <section className="flex flex-col gap-3">

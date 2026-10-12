@@ -23,9 +23,8 @@ import { en } from "@constants";
 import { BugHuntDecisionOwner, BugHuntDecisionPoint, BugHunterModelSettings } from "@types";
 
 /**
- * The Claude Code models Bug Hunter's pipeline runs on, and Builder's when
- * its engine is claude-code. Not the full platform model catalog (that
- * includes OpenAI entries neither pipeline can use — there's no autonomous
+ * The Claude Code models Bug Hunter's pipeline runs on. Not the full platform
+ * model catalog (that includes OpenAI entries neither pipeline can use — there's no autonomous
  * coding-agent CLI for OpenAI's models wired in here). Ordered cheap to
  * expensive so the trade-off reads directly from the list.
  */
@@ -44,22 +43,6 @@ const GEMINI_MODEL_OPTIONS = [
   { value: "gemini-2.5-flash", text: "gemini-2.5-flash (fastest, cheapest)" },
   { value: "gemini-2.5-pro", text: "gemini-2.5-pro (strongest)" },
 ];
-
-/**
- * Only what Builder will actually run.
- *
- * ally-be holds an engine ALLOWLIST (`builderAllowedEngines`) and overrules
- * anything off it wherever the value came from — the run override, the
- * session, or this very row. `claude-code` is off that list, deliberately, so
- * offering it here would be a control that appears to work and silently does
- * not: pick it, save it, and every build still runs on Gemini. A picker whose
- * choice is quietly ignored is the exact failure this platform has spent a
- * week removing, so the option is gone rather than disabled with an asterisk.
- *
- * Putting Claude back is one environment variable on ally-be plus an entry
- * here, in that order — the list is what decides, this is only what offers.
- */
-const BUILDER_ENGINE_OPTIONS = [{ value: "opencode", text: "opencode (multi-provider harness)" }];
 
 /**
  * Gemini CLI has no equivalent to the Task-tool subagent dispatch
@@ -116,9 +99,8 @@ const Field: React.FC<{ label: string; hint?: string; children: React.ReactNode 
   </div>
 );
 
-/** Builder's own engine + three tiers, trimmed to just the fields this tab edits. */
+/** Builder's three tiers, trimmed to just the fields this tab edits. */
 type BuilderModelDraft = {
-  defaultEngine: string | null;
   plannerModel: string | null;
   coderModel: string | null;
   verifierModel: string | null;
@@ -278,7 +260,6 @@ const BuilderModelSection: React.FC = () => {
   useEffect(() => {
     if (data) {
       setDraft({
-        defaultEngine: data.defaultEngine,
         plannerModel: data.plannerModel,
         coderModel: data.coderModel,
         verifierModel: data.verifierModel,
@@ -289,13 +270,10 @@ const BuilderModelSection: React.FC = () => {
   const set = (key: keyof BuilderModelDraft, value: string | null) =>
     setDraft(current => (current ? { ...current, [key]: value } : current));
 
-  const engine = draft?.defaultEngine ?? "claude-code";
-
   const handleSave = async () => {
     if (!draft) return;
     try {
       await updateSettings({
-        defaultEngine: draft.defaultEngine ?? "",
         // "" clears a tier back to the platform default — see api/builder.ts.
         plannerModel: draft.plannerModel ?? "",
         coderModel: draft.coderModel ?? "",
@@ -324,36 +302,6 @@ const BuilderModelSection: React.FC = () => {
         <SkeletonText paragraph lineCount={4} className="mt-3" />
       ) : (
         <>
-          <div className="mt-3">
-            <Field label={strings.builderEngineLabel} hint={strings.builderEngineHelp}>
-              <Select
-                id="settings-ai-models-builder-engine"
-                labelText={strings.builderEngineLabel}
-                hideLabel
-                value={engine}
-                onChange={event =>
-                  // Switching engine clears the per-tier models too — a
-                  // Claude model id left behind under Gemini (or the reverse)
-                  // would be silently meaningless rather than caught early.
-                  setDraft(current =>
-                    current
-                      ? {
-                          ...current,
-                          defaultEngine: event.target.value,
-                          plannerModel: null,
-                          coderModel: null,
-                          verifierModel: null,
-                        }
-                      : current,
-                  )
-                }
-              >
-                {BUILDER_ENGINE_OPTIONS.map(option => (
-                  <SelectItem key={option.value} value={option.value} text={option.text} />
-                ))}
-              </Select>
-            </Field>
-          </div>
           <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
             <Select
               id="settings-ai-models-builder-planner-model"
@@ -362,7 +310,7 @@ const BuilderModelSection: React.FC = () => {
               onChange={event => set("plannerModel", event.target.value || null)}
             >
               <SelectItem value="" text={builderStrings.modelPlaceholder} />
-              {modelOptionsForEngine(engine).map(option => (
+              {OPENCODE_MODEL_OPTIONS.map(option => (
                 <SelectItem key={option.value} value={option.value} text={option.text} />
               ))}
             </Select>
@@ -373,7 +321,7 @@ const BuilderModelSection: React.FC = () => {
               onChange={event => set("coderModel", event.target.value || null)}
             >
               <SelectItem value="" text={builderStrings.modelPlaceholder} />
-              {modelOptionsForEngine(engine).map(option => (
+              {OPENCODE_MODEL_OPTIONS.map(option => (
                 <SelectItem key={option.value} value={option.value} text={option.text} />
               ))}
             </Select>
@@ -384,7 +332,7 @@ const BuilderModelSection: React.FC = () => {
               onChange={event => set("verifierModel", event.target.value || null)}
             >
               <SelectItem value="" text={builderStrings.modelPlaceholder} />
-              {modelOptionsForEngine(engine).map(option => (
+              {OPENCODE_MODEL_OPTIONS.map(option => (
                 <SelectItem key={option.value} value={option.value} text={option.text} />
               ))}
             </Select>

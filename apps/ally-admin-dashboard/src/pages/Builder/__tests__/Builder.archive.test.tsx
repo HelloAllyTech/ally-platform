@@ -127,7 +127,6 @@ const session = (overrides: Partial<BuilderSession> = {}): BuilderSession => ({
   status: "COMPLETED",
   currentStage: null,
   repos: ["ally-be"],
-  engine: "claude",
   model: null,
   lastMessageSeq: 0,
   budgetUsd: null,

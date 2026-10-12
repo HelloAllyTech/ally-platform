@@ -127,7 +127,6 @@ describe("AiModelsTab", () => {
         enabled: true,
         maxConcurrentBuilds: 3,
         defaultBudgetUsd: "25",
-        defaultEngine: "claude-code",
         plannerModel: null,
         coderModel: "claude-opus-5",
         verifierModel: null,
@@ -226,7 +225,6 @@ describe("AiModelsTab", () => {
 
     await vi.waitFor(() => {
       expect(updateBuilderSettings).toHaveBeenCalledWith({
-        defaultEngine: "claude-code",
         plannerModel: "",
         coderModel: "",
         verifierModel: "",
@@ -235,26 +233,11 @@ describe("AiModelsTab", () => {
     expect(updateBugHunterSettings).not.toHaveBeenCalled();
   });
 
-  /**
-   * Builder has one engine, so its picker cannot offer a wrong answer.
-   *
-   * The engines it used to offer had their invocation cases, install steps and
-   * event normalisers deleted when opencode — a harness rather than a vendor —
-   * made a second and third way to run a model unnecessary. Offering one now
-   * would be a control that appears to work and silently does not: ally-be's
-   * allowlist overrules anything off it wherever it came from.
-   *
-   * Bug Hunter's picker above still offers two, and is meant to: it is a
-   * separate harness that installs its own engines in its own workflows.
-   */
-  it("offers Builder no engine it cannot run", () => {
+  // Builder runs only on opencode: the only Engine picker left is Bug Hunter's.
+  it("offers no engine picker for Builder", () => {
     render(<AiModelsTab />);
 
-    const options = Array.from(
-      screen.getAllByLabelText("Engine")[1].querySelectorAll("option"),
-    ).map(option => option.getAttribute("value"));
-
-    expect(options).toEqual(["opencode"]);
+    expect(screen.getAllByLabelText("Engine")).toHaveLength(1);
   });
 
   it("shows an error only for the section that failed to load", () => {

@@ -17,17 +17,23 @@ import {
 } from "../../pages/Builder/builderMotion";
 import { sharedMarkdownComponents } from "../markdown/markdownComponents";
 
-/** Human labels for engine tool names — the raw names leak plumbing. */
+/**
+ * Human labels for the coding agent's tool ids — the raw names leak plumbing.
+ * Keyed on opencode's lowercase ids; the lookup lowercases, so older runs
+ * recorded with Claude Code's capitalised names (`Bash`, `WebFetch`) still
+ * read the same. Unknown tools (our MCP `builder_*` tools among them) fall
+ * back to their raw name.
+ */
 const TOOL_LABELS: Record<string, string> = {
-  Bash: "Ran a command",
-  Read: "Read a file",
-  Glob: "Looked for files",
-  Grep: "Searched the code",
-  Task: "Asked a sub-agent",
-  WebFetch: "Fetched a page",
+  bash: "Ran a command",
+  read: "Read a file",
+  glob: "Looked for files",
+  grep: "Searched the code",
+  task: "Asked a sub-agent",
+  webfetch: "Fetched a page",
 };
 
-const toolLabel = (name: string) => TOOL_LABELS[name] ?? name;
+export const toolLabel = (name: string) => TOOL_LABELS[name.toLowerCase()] ?? name;
 
 /**
  * Events with no row of their own. `tool_result` in particular is not

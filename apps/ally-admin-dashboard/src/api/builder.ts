@@ -189,7 +189,6 @@ export const builderAPI = baseAPI.injectEndpoints({
       BuilderBuildRun,
       {
         id: string;
-        engine?: string;
         /** The coder tier. Planner and verifier are overridden separately below. */
         model?: string;
         plannerModel?: string;
@@ -370,7 +369,6 @@ export const builderAPI = baseAPI.injectEndpoints({
         plannerModel?: string;
         coderModel?: string;
         verifierModel?: string;
-        defaultEngine?: string;
       }
     >({
       query: body => ({

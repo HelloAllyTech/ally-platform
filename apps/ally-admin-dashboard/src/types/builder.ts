@@ -36,7 +36,6 @@ export interface BuilderSession {
   status: BuilderSessionStatus;
   currentStage: BuilderStage | null;
   repos: string[] | null;
-  engine: string;
   model: string | null;
   lastMessageSeq: number;
   budgetUsd: string | null;
@@ -249,7 +248,6 @@ export interface BuilderBuildRun {
   /** `fix` is a run dispatched from Bug Hunter's build-a-fix flow, not a session resume. */
   mode: "build" | "resume" | "fix";
   status: BuilderRunStatus;
-  engine: string;
   model: string;
   branchSlug: string;
   branches: Record<string, string> | null;
@@ -388,8 +386,6 @@ export interface BuilderSettings {
   plannerModel: string | null;
   coderModel: string | null;
   verifierModel: string | null;
-  /** Which coding engine a new build runs on when nothing else says. Null = claude-code. */
-  defaultEngine: string | null;
 }
 
 export interface BuilderNotification {
@@ -411,7 +407,6 @@ export interface UpdateBuilderSessionRequest {
   id: string;
   title?: string;
   repos?: string[];
-  engine?: string;
   model?: string;
 }
 
