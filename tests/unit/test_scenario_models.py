@@ -731,7 +731,7 @@ class TestScenario:
                 "name": "Test",
                 # Character fields are optional now, so a missing field no
                 # longer fails. Pass an invalid type for a strictly-typed
-                # field to trigger the ValidationError -> None path.
+                # field to trigger the ValidationError -> PromptData() path.
                 "prompts": 123,
             }
         }
@@ -739,7 +739,7 @@ class TestScenario:
         with patch("app.core.scenario.base.logger", mock_logger):
             result = Scenario._build_prompt_data(raw_payload)
 
-            assert result is None
+            assert isinstance(result, PromptData)
             mock_logger.error.assert_called_once()
             error_call = mock_logger.error.call_args[0][0]
             assert "Error instantiating PromptData" in error_call
