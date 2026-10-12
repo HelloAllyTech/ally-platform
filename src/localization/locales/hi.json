@@ -1746,6 +1746,8 @@
       "read": "पढ़ा गया",
       "answerQuestionToContinue": "आगे बढ़ने के लिए प्रश्न का उत्तर दें",
       "answerQuestionsToContinue": "आगे बढ़ने के लिए प्रश्नों के उत्तर दें",
+      "resourcesHeading": "संसाधन",
+      "openExternally": "बाहरी रूप से खोलें",
       "question": {
         "title": "त्वरित जाँच",
         "submit": "उत्तर जाँचें",

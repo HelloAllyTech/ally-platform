@@ -1,20 +1,23 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   LayoutChangeEvent,
+  Linking,
   NativeScrollEvent,
   NativeSyntheticEvent,
   ScrollView,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {TickRoundIcon} from '@/assets';
+import {ChevronRight, TickRoundIcon} from '@/assets';
 import {Button, RichText} from '@/components';
 import {useTranslate} from '@/hooks';
 import {useMarkArticleReadMutation} from '@/services';
-import {colors} from '@/theme';
+import {colors, fontFamily, fontWeights, typography} from '@/theme';
 import {
+  ArticleResource,
   StartArticleItemPayload,
   SubmitArticleQuestionAnswerResult,
   TrackItemCompletionResult,
@@ -22,6 +25,14 @@ import {
 import {splitArticleHtml} from '@/utils';
 
 import {ArticleQuestionCard} from './ArticleQuestionCard';
+import {ExternalResourceSheet} from './ExternalResourceSheet';
+
+/** Android's WebView frequently cannot render these inline — hand off to the OS instead. */
+const DOCUMENT_EXTENSIONS = ['.pdf', '.doc', '.docx', '.ppt', '.pptx'];
+const isDocumentUrl = (url: string): boolean => {
+  const path = url.split('?')[0].split('#')[0].toLowerCase();
+  return DOCUMENT_EXTENSIONS.some(ext => path.endsWith(ext));
+};
 
 export interface ArticlePlayerProps {
   payload: StartArticleItemPayload;
@@ -61,6 +72,9 @@ export const ArticlePlayer: React.FC<ArticlePlayerProps> = ({
   const [reachedEnd, setReachedEnd] = useState(false);
   const [marked, setMarked] = useState(alreadyCompleted);
   const [markArticleRead, {isLoading}] = useMarkArticleReadMutation();
+  const [activeResource, setActiveResource] = useState<ArticleResource | null>(
+    null,
+  );
 
   const segments = useMemo(
     () => splitArticleHtml(payload.html, payload.questions ?? []),
@@ -106,19 +120,24 @@ export const ArticlePlayer: React.FC<ArticlePlayerProps> = ({
     }
   };
 
-  const contentHeightRef = useRef(0);
+  // Reached-end is tracked against a sentinel placed right after the article
+  // body (before the Resources section, when there is one) — not against
+  // total scroll-content height. Resources are supplementary, never required
+  // reading, so scrolling past them must never be a precondition for
+  // completion (mirrors ally-web's IntersectionObserver-sentinel approach).
+  const sentinelYRef = useRef(0);
   const layoutHeightRef = useRef(0);
   const fallbackTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined,
   );
 
   const evaluateScrollability = useCallback(() => {
-    const contentH = contentHeightRef.current;
+    const sentinelY = sentinelYRef.current;
     const layoutH = layoutHeightRef.current;
     if (
-      contentH > 0 &&
+      sentinelY > 0 &&
       layoutH > 0 &&
-      contentH <= layoutH &&
+      sentinelY <= layoutH &&
       !fallbackTimerRef.current
     ) {
       fallbackTimerRef.current = setTimeout(
@@ -141,17 +160,31 @@ export const ArticlePlayer: React.FC<ArticlePlayerProps> = ({
     const pct =
       max <= 0 ? 100 : Math.min(100, Math.round((contentOffset.y / max) * 100));
     setScrollPct(pct);
-    if (pct >= READ_SCROLL_THRESHOLD * 100) setReachedEnd(true);
+    const sentinelY = sentinelYRef.current;
+    if (
+      sentinelY > 0 &&
+      contentOffset.y + layoutMeasurement.height >= sentinelY
+    ) {
+      setReachedEnd(true);
+    }
   };
 
-  const handleContentSizeChange = (_width: number, height: number) => {
-    contentHeightRef.current = height;
+  const handleSentinelLayout = (e: LayoutChangeEvent) => {
+    sentinelYRef.current = e.nativeEvent.layout.y;
     evaluateScrollability();
   };
 
   const handleLayout = (e: LayoutChangeEvent) => {
     layoutHeightRef.current = e.nativeEvent.layout.height;
     evaluateScrollability();
+  };
+
+  const handleResourcePress = (resource: ArticleResource) => {
+    if (isDocumentUrl(resource.url)) {
+      Linking.openURL(resource.url);
+      return;
+    }
+    setActiveResource(resource);
   };
 
   const canMark =
@@ -181,7 +214,6 @@ export const ArticlePlayer: React.FC<ArticlePlayerProps> = ({
         contentContainerStyle={styles.scrollContent}
         onScroll={handleScroll}
         scrollEventThrottle={16}
-        onContentSizeChange={handleContentSizeChange}
         onLayout={handleLayout}>
         {segments.map(segment =>
           segment.kind === 'html' ? (
@@ -197,7 +229,35 @@ export const ArticlePlayer: React.FC<ArticlePlayerProps> = ({
             />
           ),
         )}
+        <View testID="article-end-sentinel" onLayout={handleSentinelLayout} />
+
+        {!!payload.resources?.length && (
+          <View style={styles.resourcesSection}>
+            <Text style={styles.resourcesHeading}>
+              {t('courses.article.resourcesHeading')}
+            </Text>
+            {payload.resources.map(resource => (
+              <TouchableOpacity
+                key={resource.id}
+                style={styles.resourceRow}
+                onPress={() => handleResourcePress(resource)}
+                accessibilityRole="button">
+                <Text style={styles.resourceTitle} numberOfLines={1}>
+                  {resource.title}
+                </Text>
+                <ChevronRight />
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
       </ScrollView>
+
+      {activeResource && (
+        <ExternalResourceSheet
+          resource={activeResource}
+          onClose={() => setActiveResource(null)}
+        />
+      )}
 
       <View style={styles.footer}>
         {marked ? (
@@ -264,5 +324,37 @@ const styles = ScaledSheet.create({
   },
   readChipText: {
     color: colors.ds.green[700],
+  },
+  resourcesSection: {
+    marginTop: '24@ms',
+    borderTopWidth: 1,
+    borderTopColor: colors.ds.stroke.primary,
+    paddingTop: '16@ms',
+    gap: '8@ms',
+  },
+  resourcesHeading: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    ...typography.body.medium,
+    fontWeight: fontWeights.medium,
+    color: colors.ds.typography.highEmphasis,
+    marginBottom: '4@ms',
+  },
+  resourceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '8@ms',
+    borderWidth: 1,
+    borderColor: colors.ds.stroke.primary,
+    borderRadius: '10@ms',
+    paddingHorizontal: '12@ms',
+    paddingVertical: '10@ms',
+  },
+  resourceTitle: {
+    ...fontFamily.ROBOTO.REGULAR,
+    ...typography.body.small,
+    fontWeight: fontWeights.medium,
+    color: colors.ds.theme.primary,
+    flex: 1,
   },
 });
