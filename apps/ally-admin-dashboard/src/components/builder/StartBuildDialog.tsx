@@ -41,6 +41,13 @@ interface StartBuildDialogProps {
    * accepts start-build from either PRD_READY or FAILED.
    */
   retryError?: string | null;
+  /**
+   * Why the technical design stops this build, from `designBuildBlock`. A
+   * block disables Start outright — unlike PRD readiness there is no "start
+   * anyway": the backend refuses start-build until the design is approved and
+   * fresh.
+   */
+  designBlock?: "notApproved" | "stale" | null;
   onStarted: () => void;
 }
 
@@ -69,6 +76,7 @@ export const StartBuildDialog: React.FC<StartBuildDialogProps> = ({
   spentUsd,
   readiness,
   retryError,
+  designBlock = null,
   onStarted,
 }) => {
   const strings = en.builder.startBuildDialog;
@@ -168,6 +176,20 @@ export const StartBuildDialog: React.FC<StartBuildDialogProps> = ({
               hideCloseButton
               title={strings.retryIntro}
               subtitle={retryError}
+            />
+          )}
+
+          {designBlock && (
+            <InlineNotification
+              kind="error"
+              lowContrast
+              hideCloseButton
+              title={
+                designBlock === "stale" ? strings.designStaleTitle : strings.designNotApprovedTitle
+              }
+              subtitle={
+                designBlock === "stale" ? strings.designStaleBody : strings.designNotApprovedBody
+              }
             />
           )}
 
@@ -301,7 +323,7 @@ export const StartBuildDialog: React.FC<StartBuildDialogProps> = ({
             <Button
               kind="primary"
               className="max-sm:!w-full max-sm:!max-w-none"
-              disabled={isStarting}
+              disabled={isStarting || Boolean(designBlock)}
               onClick={() => void handleSubmit()}
             >
               {submitLabel}

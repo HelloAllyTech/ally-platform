@@ -187,4 +187,23 @@ describe("StartBuildDialog", () => {
     // there are two rather than picking one keeps the test honest about that.
     expect(screen.getAllByText("Retry build")).toHaveLength(2);
   });
+
+  it("blocks starting until the technical design is approved", () => {
+    render(
+      <StartBuildDialog {...baseProps} currentRepos={["ally-be"]} designBlock="notApproved" />,
+    );
+
+    expect(screen.getByText("Approve the technical design first")).toBeInTheDocument();
+    const start = screen.getByRole("button", { name: "Start build" });
+    expect(start).toBeDisabled();
+    fireEvent.click(start);
+    expect(startBuild).not.toHaveBeenCalled();
+  });
+
+  it("says the design is out of date when the PRD changed after approval", () => {
+    render(<StartBuildDialog {...baseProps} designBlock="stale" />);
+
+    expect(screen.getByText("The design is out of date")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start build" })).toBeDisabled();
+  });
 });

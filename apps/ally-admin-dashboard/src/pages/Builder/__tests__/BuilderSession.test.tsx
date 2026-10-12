@@ -16,7 +16,12 @@ vi.mock("@ally-ui-mono/ui-shared", () => ({
 
 // SteerComposer and CollapsibleAside render only in the build layout, which no
 // test reached until the restart cases below.
-vi.mock("@components/builder", () => ({
+let startDialogProps: any;
+vi.mock("@components/builder", async () => ({
+  // The real rule, not a stub: it is what decides whether Start is blocked.
+  designBuildBlock: (await vi.importActual<any>("../../../components/builder/designGate"))
+    .designBuildBlock,
+  TechnicalDesignPanel: () => <div>TechnicalDesignPanel</div>,
   BuildView: () => <div>BuildView</div>,
   ChatComposer: () => <div>ChatComposer</div>,
   ChatMessage: () => <div>ChatMessage</div>,
@@ -24,7 +29,10 @@ vi.mock("@components/builder", () => ({
   ConfirmCancelDialog: () => null,
   PrdDocPanel: () => <div>PrdDocPanel</div>,
   ReadinessRing: () => <div>ReadinessRing</div>,
-  StartBuildDialog: () => null,
+  StartBuildDialog: (props: any) => {
+    startDialogProps = props;
+    return null;
+  },
   SteerComposer: () => <div>SteerComposer</div>,
 }));
 
@@ -179,6 +187,34 @@ describe("BuilderSession", () => {
    * end, and only a refresh reconciled the two. The poll moving is the moment
    * the local copy stops being the newer of the two.
    */
+  it("tells the start dialog the build is blocked until the design is approved", () => {
+    render(<BuilderSession />);
+    expect(startDialogProps.designBlock).toBe("notApproved");
+  });
+
+  it("blocks on a stale approved design, and not on a fresh one", () => {
+    const approved = {
+      ...baseSession,
+      prd: { title: "", technicalDesign: { status: "approved" } },
+    };
+    sessionResult = {
+      data: { ...approved, designReadiness: { ready: true, stale: true, blockers: [] } },
+      isLoading: false,
+      isError: false,
+    };
+    const { unmount } = render(<BuilderSession />);
+    expect(startDialogProps.designBlock).toBe("stale");
+    unmount();
+
+    sessionResult = {
+      data: { ...approved, designReadiness: { ready: true, stale: false, blockers: [] } },
+      isLoading: false,
+      isError: false,
+    };
+    render(<BuilderSession />);
+    expect(startDialogProps.designBlock).toBeNull();
+  });
+
   it("follows the session row when a build finishes while the page is open", () => {
     sessionResult = {
       data: { ...baseSession, status: "BUILDING", currentStage: "CODING" },

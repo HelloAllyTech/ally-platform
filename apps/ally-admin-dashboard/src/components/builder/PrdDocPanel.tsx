@@ -75,6 +75,12 @@ interface PrdDocPanelProps {
   createdByName?: string | null;
   /** The interview feed — exported as the PDF's transcript appendix only. */
   transcript?: BuilderChatMessage[];
+  /**
+   * Rendered after the last PRD section, inside the same scroll area — the
+   * host passes the technical design here. A slot rather than props threaded
+   * through, so this panel stays free of the design's API hooks.
+   */
+  designSection?: React.ReactNode;
 }
 
 /**
@@ -98,6 +104,7 @@ export const PrdDocPanel: React.FC<PrdDocPanelProps> = ({
   repos = [],
   createdByName = null,
   transcript,
+  designSection,
 }) => {
   const strings = en.builder.prd;
   const [editingKey, setEditingKey] = useState<string | null>(null);
@@ -457,6 +464,8 @@ export const PrdDocPanel: React.FC<PrdDocPanelProps> = ({
             <p className="mt-1 text-sm italic text-typography-400">{strings.noOpenQuestions}</p>
           )}
         </section>
+
+        {designSection}
       </div>
     </div>
   );

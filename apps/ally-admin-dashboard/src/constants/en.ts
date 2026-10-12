@@ -3636,6 +3636,65 @@ export const en = {
       },
     },
 
+    // The technical design — drafted from the PRD by a read-only agent, then
+    // approved before a build may start.
+    design: {
+      heading: "Technical design",
+      statusNone: "Not drafted",
+      statusDrafting: "Drafting",
+      statusReview: "Ready for review",
+      statusApproved: "Approved",
+      statusFailed: "Failed",
+      stale: "Out of date",
+      staleHint:
+        "The PRD changed after this design was drafted, so it no longer describes what will be built. Redraft it before building.",
+      none: "No design yet. Builder reads the code and writes down which files change, which contracts move and which tests prove each requirement — before any code is written.",
+      // An async job: say how long it takes and that nobody needs to wait on it.
+      drafting:
+        "The designer is reading the code — this takes a few minutes. You can leave this page; it carries on without you.",
+      watchRun: "Watch on GitHub",
+      failed: "The design run failed:",
+      failedUnknown: "No reason was recorded.",
+      approvedBy: (at: string) => `Approved ${at}`,
+      draftedAt: (at: string) => `Drafted ${at}`,
+      prdNotReady: "Finish the PRD first — the design is drafted from it.",
+      draft: "Draft technical design",
+      redraft: "Redraft",
+      draftHint:
+        "Starts a read-only agent that explores the selected repos and writes a design for this PRD; a second agent then critiques it. It changes no code and takes a few minutes.",
+      redraftHint:
+        "Replaces this design with a fresh draft from the current PRD. An approved design has to be approved again.",
+      approve: "Approve design",
+      approveHint:
+        "Approving holds the build to this design: it may only change the files in Scope, and it must write the tests in the test map. Redraft if either is wrong.",
+      draftFailed: "Couldn't start the design run.",
+      approveFailed: "Couldn't approve the design.",
+      blockersTitle: "Not ready to approve",
+      sections: {
+        design: "Design",
+        contracts: "Changed contracts",
+        compatibility: "Compatibility",
+        scope: "Scope",
+        tests: "Tests",
+        openDecisions: "Open decisions",
+        reviewer: "Reviewer",
+      },
+      contractName: "Contract",
+      contractChange: "Change",
+      contractReaders: "Read by",
+      testRequirement: "Requirement",
+      testFile: "File",
+      testAsserts: "Asserts",
+      openDecisionsHint: "Each of these blocks approval until it is settled in the PRD.",
+      noContracts: "No shared contract changes.",
+      noScope: "No files named.",
+      noTests: "No tests mapped.",
+      noOpenDecisions: "Nothing left to decide.",
+      reviewPass: "No concerns",
+      reviewConcerns: "Concerns",
+      noReview: "Not reviewed yet.",
+    },
+
     // Readiness
     readiness: {
       heading: "Build readiness",
@@ -3718,7 +3777,11 @@ export const en = {
           ? `Run ${sequence} (resumed)`
           : mode === "fix"
             ? `Run ${sequence} (fix)`
-            : `Run ${sequence}`,
+            : mode === "review"
+              ? `Run ${sequence} (review)`
+              : mode === "design"
+                ? `Run ${sequence} (design)`
+                : `Run ${sequence}`,
       // Run history rail — reading an older run's transcript without losing
       // the live one is the whole point, so the rail says which run is which
       // rather than leaving that to a bare sequence number.
@@ -3730,6 +3793,8 @@ export const en = {
         build: "Build",
         resume: "Resume",
         fix: "Fix",
+        review: "Review",
+        design: "Design",
       } as Record<string, string>,
       runLiveBadge: "Live",
       runStatusLabels: {
@@ -3827,6 +3892,12 @@ export const en = {
       saveReposFailed: "Couldn't save the chosen repos.",
       submit: "Start build",
       retrySubmit: "Retry build",
+      designNotApprovedTitle: "Approve the technical design first",
+      designNotApprovedBody:
+        "A build is held to an approved design's scope and test map. Draft the design from the PRD panel, read it, and approve it.",
+      designStaleTitle: "The design is out of date",
+      designStaleBody:
+        "The PRD changed after the technical design was approved. Redraft and approve it again before building.",
     },
 
     /**

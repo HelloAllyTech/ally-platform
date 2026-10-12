@@ -99,6 +99,67 @@ export interface BuilderPrdDocument {
   e2ePlanMd: string;
   openQuestions: string[];
   ui?: { interview?: Record<string, boolean> };
+  /**
+   * The technical design drafted from this PRD by a read-only agent, then
+   * critiqued and approved by an admin before a build may start. Absent until
+   * someone asks for one.
+   */
+  technicalDesign?: BuilderTechnicalDesign | null;
+}
+
+/* ── Technical design ───────────────────────────────────────────────────── */
+
+export type BuilderTechnicalDesignStatus = "drafting" | "review" | "approved" | "failed";
+
+export interface BuilderDesignScope {
+  repo: string;
+  files: string[];
+}
+
+export interface BuilderDesignContract {
+  name: string;
+  change: string;
+  /** Each as `repo:path:line`. */
+  readers: string[];
+}
+
+export interface BuilderDesignTest {
+  requirementId: string;
+  repo: string;
+  file: string;
+  asserts: string;
+}
+
+export interface BuilderDesignReview {
+  verdict: "pass" | "concerns";
+  notesMd: string;
+  at: string;
+}
+
+export interface BuilderTechnicalDesign {
+  status: BuilderTechnicalDesignStatus;
+  runId: string | null;
+  designMd: string;
+  scope: BuilderDesignScope[];
+  contracts: BuilderDesignContract[];
+  compatibilityMd: string;
+  testMap: BuilderDesignTest[];
+  /** Each one blocks approval until it is settled. */
+  openDecisions: string[];
+  review: BuilderDesignReview | null;
+  /** Hash of the PRD the design was drafted from — how staleness is decided. */
+  productHash: string;
+  draftedAt: string | null;
+  approvedBy: number | null;
+  approvedAt: string | null;
+  error: string | null;
+}
+
+export interface BuilderDesignReadiness {
+  ready: boolean;
+  /** The PRD changed after the design was drafted or approved. */
+  stale: boolean;
+  blockers: string[];
 }
 
 export interface BuilderPrdReadinessSection {
@@ -226,6 +287,8 @@ export interface BuilderSessionDetail extends BuilderSession {
   prd: BuilderPrdDocument;
   prdVersionNumber: number;
   readiness: BuilderPrdReadiness;
+  /** Whether the technical design can be approved, and whether a build may rely on it. */
+  designReadiness?: BuilderDesignReadiness;
   /** Display name of the admin who started the session (email when blank). */
   createdByName?: string | null;
 }
@@ -245,8 +308,12 @@ export interface BuilderBuildRun {
   id: string;
   sessionId: string;
   sequence: number;
-  /** `fix` is a run dispatched from Bug Hunter's build-a-fix flow, not a session resume. */
-  mode: "build" | "resume" | "fix";
+  /**
+   * `fix` is a run dispatched from Bug Hunter's build-a-fix flow, not a session
+   * resume; `review` is Builder reviewing its own pull request; `design` is the
+   * read-only technical-design pass that runs before a build.
+   */
+  mode: "build" | "resume" | "fix" | "review" | "design";
   status: BuilderRunStatus;
   model: string;
   branchSlug: string;

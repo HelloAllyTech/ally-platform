@@ -208,6 +208,27 @@ export const builderAPI = baseAPI.injectEndpoints({
     }),
 
     /**
+     * Start (or restart) the technical-design run. Returns the run; the design
+     * itself lands on the session's PRD, which the session poll picks up.
+     */
+    startBuilderDesign: builder.mutation<BuilderBuildRun, string>({
+      query: id => ({
+        url: ApiEndpoints.BUILDER.SESSION_DESIGN(id),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: (result, error, id) => [{ type: TAG_TYPES.BUILDER_SESSION, id }],
+    }),
+
+    /** Approve the design — the build is then held to its scope and test map. */
+    approveBuilderDesign: builder.mutation<unknown, string>({
+      query: id => ({
+        url: ApiEndpoints.BUILDER.SESSION_DESIGN_APPROVE(id),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: (result, error, id) => [{ type: TAG_TYPES.BUILDER_SESSION, id }],
+    }),
+
+    /**
      * Live spend, the ceiling, and whether a run is parked on it.
      *
      * Untagged: the page polls it while a build runs, and hanging it off
@@ -482,6 +503,8 @@ export const {
   useGetBuilderRepoCommandsQuery,
   useGetBuilderRepoMapsQuery,
   useStartBuilderBuildMutation,
+  useStartBuilderDesignMutation,
+  useApproveBuilderDesignMutation,
   useGetBuilderSessionBudgetQuery,
   useGetBuilderSteersQuery,
   useSteerBuilderSessionMutation,

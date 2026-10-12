@@ -21,6 +21,8 @@ import {
   ReadinessRing,
   StartBuildDialog,
   SteerComposer,
+  TechnicalDesignPanel,
+  designBuildBlock,
 } from "@components/builder";
 import type { BuilderAnswerPayload } from "@components/builder";
 import { ErrorBoundary } from "@components/error-boundary";
@@ -317,6 +319,23 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
   const canRestart =
     RESTARTABLE.includes(effectiveStatus) || (effectiveStatus === "COMPLETED" && shippedNothing);
 
+  // Read off the polled session row, not the local PRD copy: the design is
+  // written by a separate run, which no interview SSE frame reports. The row is
+  // already polled every few seconds while the session is live, which is what
+  // brings a drafting design's result in.
+  const technicalDesign = session.prd?.technicalDesign ?? null;
+  const designReadiness = session.designReadiness ?? null;
+  const designBlock = designBuildBlock(technicalDesign, designReadiness);
+  const designSection = (
+    <TechnicalDesignPanel
+      sessionId={sessionId}
+      design={technicalDesign}
+      designReadiness={designReadiness}
+      prdReady={readiness.ready}
+      locked={PRD_FROZEN.includes(effectiveStatus)}
+    />
+  );
+
   const startBuildAction = (
     <Button
       kind="primary"
@@ -427,6 +446,7 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
                   repos={session.repos ?? []}
                   createdByName={session.createdByName}
                   transcript={messages}
+                  designSection={designSection}
                 />
               </ErrorBoundary>
             </CollapsibleAside>
@@ -512,6 +532,7 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
                   repos={session.repos ?? []}
                   createdByName={session.createdByName}
                   transcript={messages}
+                  designSection={designSection}
                 />
               </ErrorBoundary>
               <div className="border-t border-neutral-200 p-3">{startBuildAction}</div>
@@ -542,6 +563,7 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
         spentUsd={session.totalCostUsd}
         readiness={readiness}
         retryError={retryError}
+        designBlock={designBlock}
         onStarted={() => setStatus("BUILDING")}
       />
       {showPrdSheet && (
@@ -563,6 +585,7 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
               repos={session.repos ?? []}
               createdByName={session.createdByName}
               transcript={messages}
+              designSection={designSection}
             />
           </ErrorBoundary>
         </SidePanel>

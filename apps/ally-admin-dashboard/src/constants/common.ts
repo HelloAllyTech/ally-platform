@@ -608,6 +608,9 @@ export const ApiEndpoints = {
     REPO_MAPS: "/v1/builder/repo-maps",
     // Builds
     SESSION_START_BUILD: (id: string) => `/v1/builder/sessions/${id}/start-build`,
+    // The technical design: drafted by a read-only run, then approved before a build may start.
+    SESSION_DESIGN: (id: string) => `/v1/builder/sessions/${id}/design`,
+    SESSION_DESIGN_APPROVE: (id: string) => `/v1/builder/sessions/${id}/design/approve`,
     SESSION_RUNS: (id: string) => `/v1/builder/sessions/${id}/runs`,
     // Raising the ceiling is a POST, not part of the session PATCH: it is
     // allowed mid-build (which is the case it exists for) and authorises
