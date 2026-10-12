@@ -5,8 +5,9 @@ import { toast } from "sonner";
 
 import { RichTextRenderer } from "@ally-ui-mono/ui-shared";
 import { useMarkArticleReadMutation } from "@api";
-import { TickGreenBackground } from "@assets";
+import { ArrowRight, TickGreenBackground } from "@assets";
 import {
+  ArticleResource,
   StartArticleItemPayload,
   SubmitArticleQuestionAnswerResponse,
   TrackItemCompletionResult,
@@ -14,6 +15,7 @@ import {
 
 import { ArticleQuestionCard } from "./ArticleQuestionCard";
 import { splitArticleHtml } from "./articleSegments";
+import { ExternalResourceModal } from "./ExternalResourceModal";
 
 interface ArticleItemPlayerProps {
   payload: StartArticleItemPayload;
@@ -69,6 +71,7 @@ export const ArticleItemPlayer: FC<ArticleItemPlayerProps> = ({
   const [marked, setMarked] = useState(alreadyCompleted);
   const [markArticleRead, { isLoading }] = useMarkArticleReadMutation();
   const [fontScaleIndex, setFontScaleIndex] = useState(readStoredFontScaleIndex);
+  const [activeResource, setActiveResource] = useState<ArticleResource | null>(null);
 
   const segments = useMemo(
     () => splitArticleHtml(payload.html, payload.questions ?? []),
@@ -217,7 +220,34 @@ export const ArticleItemPlayer: FC<ArticleItemPlayerProps> = ({
           )}
           <div ref={sentinelRef} aria-hidden className="h-px w-full" />
         </article>
+
+        {payload.resources && payload.resources.length > 0 && (
+          <div className="mx-auto mt-8 max-w-[68ch] border-t border-border-light pt-6">
+            <h2 className="mb-3 text-sm font-semibold text-typography-900">
+              {t("tracks2.article.resourcesHeading")}
+            </h2>
+            <div className="flex flex-col gap-2">
+              {payload.resources.map(resource => (
+                <button
+                  key={resource.id}
+                  type="button"
+                  onClick={() => setActiveResource(resource)}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-border-light px-3 py-2 text-left text-sm font-medium text-primary-500 transition-colors hover:bg-background-secondary"
+                >
+                  <span className="truncate">{resource.title}</span>
+                  <span className="flex-shrink-0">
+                    <ArrowRight />
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
+
+      {activeResource && (
+        <ExternalResourceModal resource={activeResource} onClose={() => setActiveResource(null)} />
+      )}
 
       <div className="flex flex-shrink-0 items-center justify-center border-t border-border-light bg-white px-4 py-3">
         {marked ? (

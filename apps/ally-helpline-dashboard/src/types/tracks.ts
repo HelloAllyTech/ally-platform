@@ -549,6 +549,13 @@ export interface ArticleQuestion extends SanitizedQuizQuestion {
   explanation: string | null;
 }
 
+/** A curated external link shown after the article body. Supplementary — never gates completion. */
+export interface ArticleResource {
+  id: string;
+  title: string;
+  url: string;
+}
+
 export interface StartArticleItemPayload extends StartTrackItemBase {
   type: TrackItemType.ARTICLE;
   html: string;
@@ -556,6 +563,7 @@ export interface StartArticleItemPayload extends StartTrackItemBase {
   /** Empty for an article authored without questions. */
   questions?: ArticleQuestion[];
   answeredQuestionCount?: number;
+  resources?: ArticleResource[];
 }
 
 /** Response to `POST .../article-questions/:questionId/answer`. */

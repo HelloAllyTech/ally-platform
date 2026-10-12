@@ -1682,6 +1682,8 @@
       "decreaseFontSize": "Decrease text size",
       "answerQuestionToContinue": "Answer the question to continue",
       "answerQuestionsToContinue": "Answer the questions to continue",
+      "resourcesHeading": "Resources",
+      "openInNewTab": "Open in new tab",
       "question": {
         "title": "Quick check",
         "submit": "Check answer",
