@@ -131,8 +131,13 @@ export interface BuilderDesignTest {
 }
 
 export interface BuilderDesignReview {
+  /** "concerns" exactly when `defects` is non-empty (reviews from before the split: as filed). */
   verdict: "pass" | "concerns";
   notesMd: string;
+  /** What would make the build wrong or a released client break. */
+  defects?: string[];
+  /** Scope the design could widen to — a person's call, not a failure. */
+  suggestions?: string[];
   at: string;
 }
 

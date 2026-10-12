@@ -3694,6 +3694,8 @@ export const en = {
       noOpenDecisions: "Nothing left to decide.",
       reviewPass: "No concerns",
       reviewConcerns: "Concerns",
+      reviewDefects: "Defects",
+      reviewSuggestions: "Suggestions — could widen the scope; not defects",
       noReview: "Not reviewed yet.",
     },
 

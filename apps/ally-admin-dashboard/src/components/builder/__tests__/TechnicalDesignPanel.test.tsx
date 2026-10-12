@@ -196,6 +196,30 @@ describe("TechnicalDesignPanel", () => {
     expect(await screen.findByText("Settle the open decisions first.")).toBeInTheDocument();
   });
 
+  /**
+   * A reviewer's scope ideas are not faults. Shown apart from defects, so a
+   * sound design with suggestions does not read as a failing one.
+   */
+  it("shows defects and suggestions as separate lists", () => {
+    renderPanel({
+      design: design({
+        review: {
+          verdict: "pass",
+          notesMd: "rendered copy for older readers",
+          defects: [],
+          suggestions: ["Article questions could take rich text too."],
+          at: "2026-10-12T10:00:00Z",
+        },
+      }),
+    });
+
+    expect(screen.getByText("No concerns")).toBeInTheDocument();
+    expect(screen.getByText(/Suggestions — could widen the scope/)).toBeInTheDocument();
+    expect(screen.getByText("Article questions could take rich text too.")).toBeInTheDocument();
+    expect(screen.queryByText("Defects")).not.toBeInTheDocument();
+    expect(screen.queryByText("rendered copy for older readers")).not.toBeInTheDocument();
+  });
+
   it("disables both actions while a build is running", () => {
     renderPanel({ locked: true });
 

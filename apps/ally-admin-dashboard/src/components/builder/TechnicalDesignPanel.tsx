@@ -342,7 +342,29 @@ export const TechnicalDesignPanel: React.FC<TechnicalDesignPanelProps> = ({
                 </Tag>
               )}
             </div>
-            {review ? (
+            {review && (review.defects || review.suggestions) ? (
+              // Split reviews: defects first, since they are what the verdict
+              // means; suggestions separately, since they are scope calls for
+              // a person rather than faults. notesMd repeats both for older
+              // readers, so only what is left over is shown here.
+              <div className="mt-1 flex flex-col gap-2">
+                {[
+                  { title: strings.reviewDefects, items: review.defects ?? [] },
+                  { title: strings.reviewSuggestions, items: review.suggestions ?? [] },
+                ]
+                  .filter(group => group.items.length > 0)
+                  .map(group => (
+                    <div key={group.title}>
+                      <p className="text-xs font-semibold text-typography-700">{group.title}</p>
+                      <ul className="ml-4 list-disc text-sm text-typography-700">
+                        {group.items.map((item, index) => (
+                          <li key={index}>{renderMarkdown(item)}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+              </div>
+            ) : review ? (
               renderMarkdown(review.notesMd)
             ) : (
               <p className="mt-1 text-sm italic text-typography-400">{strings.noReview}</p>
