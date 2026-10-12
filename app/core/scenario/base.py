@@ -815,7 +815,7 @@ class Scenario(BaseModel):
         Normalize BE keys to what Scenario expects (compatible with aliases).
         """
         return {
-            "scenarioName": raw.get("title") or "",
+            "scenarioName": raw.get("scenarioName") or raw.get("title") or "",
             "metadata": raw.get("metadata", {}),
         }
 
@@ -1031,7 +1031,7 @@ class Scenario(BaseModel):
             return prompt_data_obj
         except Exception as e:
             logger.error(f"Error instantiating PromptData from mapped data: {e}")
-            return None
+            return PromptData()
 
     @staticmethod
     def _normalize_termination_event_data(event_data: Dict[str, Any]) -> Dict[str, Any]:
