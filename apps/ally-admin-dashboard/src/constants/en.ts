@@ -2875,6 +2875,27 @@ export const en = {
         "Accepted over ruled-on (accepted + declined as finder error). Pending findings are left out. Fewer than 5 ruled on reads as a dash: too thin to call.",
       empty: "Nothing filed on this repo in the window.",
       fixersEmpty: "No fix sessions on this repo in the window.",
+      colHeld: "Held / came back",
+      colHeldTooltip:
+        "Released and re-checked in production with the symptom gone (link six of the chain) / fixes that came back: refused at the wrong layer, reverted, regressed or found back in production. This is the number I learn from, not merged.",
+      wrongFixesTitle: "Where my fixes broke",
+      wrongFixesCaption:
+        "Every fix that turned out wrong in the window, by the link of the case chain that broke. A link that keeps breaking is a failure class before anyone names it.",
+      wrongFixesEmpty: "No fix has turned out wrong in this window.",
+      wrongFixesLinks: {
+        observed: "observed",
+        reproduced: "reproduced",
+        located: "located",
+        changed: "changed in that mechanism",
+        resolved: "resolved for the reporter",
+        held: "held after release",
+      },
+      wrongFixesSource: {
+        verifier: "Verifier refused",
+        regression: "came back in a sweep",
+        revert: "reverted by a person",
+        held_check: "back after release",
+      },
       thin: "—",
       replayTitle: "Decision replay — should the other owner take a point?",
       replaySubtitle:
@@ -3064,6 +3085,28 @@ export const en = {
     drawerMergeConfirmBody:
       "I'll merge the PR as you. This does NOT deploy it — releasing to production is still a separate press.",
     drawerMergeConfirm: "Merge",
+    drawerMergeChainIncomplete:
+      "The case chain is not complete: {links}. I merge only a fix I can trace from the symptom to the change. If you have read the chain and still want it, tick the box.",
+    drawerMergeForceLabel: "Merge anyway — I've read the chain",
+    drawerMergeForceHelp:
+      "Recorded with the merge. This is how #792 landed with the wrong layer fixed; please read first.",
+    drawerChainTitle: "The chain",
+    drawerChainTooltip:
+      "A fix is a chain of evidence from the symptom to the change: observed, reproduced, located, changed in that mechanism, resolved for the reporter, held after release. I merge only when the first five hold; the sixth is checked after release. A missing or broken link is what to look at before any diff.",
+    drawerChainLinks: {
+      observed: "Observed",
+      reproduced: "Reproduced",
+      located: "Located",
+      changed: "Changed in that mechanism",
+      resolved: "Resolved for the reporter",
+      held: "Held after release",
+    },
+    drawerChainStatus: {
+      present: "present",
+      weak: "weak",
+      missing: "missing",
+      broken: "broken",
+    },
     drawerMergeFailed: "Couldn't merge that PR.",
     queueAwaitingMerge: "Green and waiting for your merge",
     drawerDecisionFailed: "Couldn't record that decision. Try again.",

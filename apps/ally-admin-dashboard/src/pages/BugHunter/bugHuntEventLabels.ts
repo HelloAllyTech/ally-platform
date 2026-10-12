@@ -28,4 +28,5 @@ export const BUG_HUNT_EVENT_STAGE_LABELS: Record<BugHuntEventStage, string> = {
   [BugHuntEventStage.REGRESSED]: "Came back",
   [BugHuntEventStage.RECURRENCE_SUPPRESSED]: "Found again",
   [BugHuntEventStage.REVERSED]: "Dismissal reversed",
+  [BugHuntEventStage.WRONG_FIX]: "Fix was wrong",
 };

@@ -18,6 +18,7 @@ import {
   BugHunterScoreboard,
   BugHunterSettings,
   BugHunterToday,
+  BugHunterWrongFixSummary,
   BugHuntRun,
   BugHuntRunDetail,
   ListBugFindingsQuery,
@@ -172,12 +173,13 @@ export const bugHunterAPI = baseAPI.injectEndpoints({
      * and passes GitHub's own refusal through — so a failure here is worth
      * showing verbatim rather than replacing with a generic line.
      */
-    mergeBugFinding: builder.mutation<BugFinding, string>({
-      query: id => ({
+    mergeBugFinding: builder.mutation<BugFinding, { id: string; force?: boolean }>({
+      query: ({ id, force }) => ({
         url: ApiEndpoints.BUG_HUNTER.FINDING_MERGE(id),
         method: HttpMethod.POST,
+        body: force ? { force: true } : {},
       }),
-      invalidatesTags: (_result, _error, id) => [
+      invalidatesTags: (_result, _error, { id }) => [
         { type: TAG_TYPES.BUG_HUNTER_FINDINGS, id },
         { type: TAG_TYPES.BUG_HUNTER_FINDINGS, id: "LIST" },
       ],
@@ -274,6 +276,22 @@ export const bugHunterAPI = baseAPI.injectEndpoints({
      * now. Shares the findings list's tag — a triage decision moves a day's
      * accepted/declined split, so the card refreshes with the table.
      */
+    /**
+     * The wrong-fix table (2026-10-12): fixes that turned out wrong, by the
+     * chain link that broke. Same tag as findings: a reopened bug moves it.
+     */
+    getBugHunterWrongFixes: builder.query<BugHunterWrongFixSummary, { days?: number } | void>({
+      query: arg => {
+        const days = arg && typeof arg === "object" ? arg.days : undefined;
+        return {
+          url: ApiEndpoints.BUG_HUNTER.METRICS_WRONG_FIXES,
+          method: HttpMethod.GET,
+          params: days ? { days } : undefined,
+        };
+      },
+      providesTags: [{ type: TAG_TYPES.BUG_HUNTER_FINDINGS, id: "LIST" }],
+    }),
+
     getBugHunterOperationsMetrics: builder.query<
       BugHunterOperationsMetrics,
       { days?: number } | void
@@ -539,6 +557,7 @@ export const {
   useGetBugHunterDecisionOwnersQuery,
   useUpdateBugHunterDecisionOwnerMutation,
   useGetBugHunterOperationsMetricsQuery,
+  useGetBugHunterWrongFixesQuery,
   useGetBugHunterNotificationsQuery,
   useMarkBugHunterNotificationReadMutation,
   useMarkAllBugHunterNotificationsReadMutation,

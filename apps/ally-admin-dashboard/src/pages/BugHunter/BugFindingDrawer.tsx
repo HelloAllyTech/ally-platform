@@ -140,6 +140,7 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
   // The admin's explicit "past the budget" tick for this dialog only (OPP-0775).
   const [forceFix, setForceFix] = useState(false);
   const budgetSpent = Boolean(finding?.budget?.exhausted);
+  const chainBlocked = Boolean(finding?.chain && !finding.chain.mergeable);
   // A human report nobody has located yet: "Put me on it" locates first
   // (the server sends the Verifier, not a fix session) unless forced.
   const needsLocating =
@@ -147,6 +148,7 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
     finding?.independentVerification !== "confirmed";
   const [cancelFixSession, { isLoading: isCancellingSession }] = useCancelBugFixSessionMutation();
   const [merge, { isLoading: isMerging }] = useMergeBugFindingMutation();
+  const [forceMerge, setForceMerge] = useState(false);
   const [release, { isLoading: isReleasing }] = useReleaseBugFindingMutation();
   const [editDescription, { isLoading: isSavingDescription }] =
     useEditBugFindingDescriptionMutation();
@@ -291,7 +293,7 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
 
   const handleMerge = async () => {
     try {
-      await merge(id).unwrap();
+      await merge({ id, ...(forceMerge ? { force: true } : {}) }).unwrap();
       setConfirmAction(null);
     } catch (error) {
       // GitHub's own refusal is the useful one — "At least 1 approving review
@@ -706,6 +708,56 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
                       <TooltipIcon />
                     </button>
                   </Tooltip>
+                </div>
+              )}
+
+              {/* The case chain (2026-10-12): six links from the symptom to
+                  the change. Read before the diff; a missing or broken link
+                  is what a wrong-layer fix looks like before it merges. */}
+              {finding.chain && (
+                <div data-testid="case-chain" className="flex flex-col gap-1">
+                  <div className="flex items-center gap-1">
+                    <p className="text-xs font-medium text-typography-900">
+                      {en.bugHunter.drawerChainTitle}
+                    </p>
+                    <Tooltip label={en.bugHunter.drawerChainTooltip} align="top">
+                      <button type="button" className="cursor-pointer inline-flex items-center">
+                        <TooltipIcon />
+                      </button>
+                    </Tooltip>
+                  </div>
+                  <ol className="flex flex-col gap-0.5">
+                    {finding.chain.links.map(l => (
+                      <li
+                        key={l.link}
+                        data-testid={`chain-${l.link}`}
+                        data-status={l.status}
+                        className="flex items-start gap-2 text-xs"
+                      >
+                        <span
+                          aria-hidden="true"
+                          className={`mt-1 inline-block h-2.5 w-2.5 shrink-0 rounded-full ${
+                            l.status === "present"
+                              ? "bg-green-600"
+                              : l.status === "weak"
+                                ? "bg-amber-400"
+                                : l.status === "broken"
+                                  ? "bg-red-600"
+                                  : "border border-gray-400 bg-transparent"
+                          }`}
+                        />
+                        <span className="min-w-0">
+                          <span className="font-medium text-typography-900">
+                            {en.bugHunter.drawerChainLinks[l.link]}
+                          </span>{" "}
+                          <span className="text-typography-600">
+                            {en.bugHunter.drawerChainStatus[l.status]}
+                            {l.evidence ? ` — ${l.evidence}` : ""}
+                          </span>
+                        </span>
+                      </li>
+                    ))}
+                  </ol>
                 </div>
               )}
 
@@ -1517,10 +1569,35 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
           primaryButton={{
             label: en.bugHunter.drawerMergeConfirm,
             onClick: handleMerge,
-            disabled: isMerging,
+            disabled: isMerging || (chainBlocked && !forceMerge),
           }}
           secondaryButton={{ label: en.bugHunter.cancel, onClick: () => setConfirmAction(null) }}
-        />
+        >
+          {/* The case chain, before the one click that cannot be undone from
+              here: the refusal the server would give, shown first, with the
+              override recorded. */}
+          {chainBlocked && (
+            <div className="mt-3 text-left" data-testid="merge-chain-warning">
+              <p className="text-xs text-amber-700 mb-2">
+                {en.bugHunter.drawerMergeChainIncomplete.replace(
+                  "{links}",
+                  (finding?.chain.blocking ?? [])
+                    .map(l => en.bugHunter.drawerChainLinks[l].toLowerCase())
+                    .join(", "),
+                )}
+              </p>
+              <Checkbox
+                id={`drawer-${id}-force-merge`}
+                labelText={en.bugHunter.drawerMergeForceLabel}
+                helperText={en.bugHunter.drawerMergeForceHelp}
+                checked={forceMerge}
+                onChange={(_e: unknown, { checked }: { checked: boolean }) =>
+                  setForceMerge(checked)
+                }
+              />
+            </div>
+          )}
+        </ActionConfirmationPopup>
       )}
 
       {confirmAction === "fixSession" && (

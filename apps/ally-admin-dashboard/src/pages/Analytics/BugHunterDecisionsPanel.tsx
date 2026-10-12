@@ -1,7 +1,11 @@
 import { useMemo, useState } from "react";
 
 import { CarbonDropdown as Dropdown, Tooltip } from "@ally-ui-mono/ui-shared";
-import { useGetBugHunterDecisionReplayQuery, useGetBugHunterScoreboardQuery } from "@api";
+import {
+  useGetBugHunterDecisionReplayQuery,
+  useGetBugHunterScoreboardQuery,
+  useGetBugHunterWrongFixesQuery,
+} from "@api";
 import { TooltipIcon } from "@assets";
 import { en } from "@constants";
 
@@ -40,6 +44,14 @@ export const BugHunterDecisionsPanel = ({ query }: AnalyticsTabFilters) => {
   const senseRows = useMemo(() => scoreboardRows(board.data?.bySense), [board.data]);
   const modelRows = useMemo(() => scoreboardRows(board.data?.byModel), [board.data]);
   const fixers = useMemo(() => fixerRows(board.data?.fixByModel), [board.data]);
+  const wrongFixes = useGetBugHunterWrongFixesQuery({ days });
+  const brokenLinks = useMemo(
+    () =>
+      Object.entries(wrongFixes.data?.byLink ?? {})
+        .filter(([, n]) => n > 0)
+        .sort((a, b) => b[1] - a[1]),
+    [wrongFixes.data],
+  );
   const points = replay.data?.points ?? [];
   const threshold = points[0]?.flipThreshold ?? 30;
 
@@ -151,6 +163,9 @@ export const BugHunterDecisionsPanel = ({ query }: AnalyticsTabFilters) => {
                       <th className={thNum}>{t.colMerged}</th>
                       <th className={thNum}>{t.colFailed}</th>
                       <th className={thNum}>{t.colVerdicts}</th>
+                      <th className={thNum} title={t.colHeldTooltip}>
+                        {t.colHeld}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -171,10 +186,42 @@ export const BugHunterDecisionsPanel = ({ query }: AnalyticsTabFilters) => {
                         <td className={tdNum}>
                           {r.passVerdicts} / {r.failVerdicts}
                         </td>
+                        <td className={tdNum} data-testid={`fixer-held-${r.key}`}>
+                          {r.held} / {r.cameBack}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+              )}
+
+              {/* The wrong-fix table (2026-10-12), beside the miss table: which
+                  link of the case chain broke on fixes that turned out wrong.
+                  A link that keeps breaking names the next failure class. */}
+              <h4 className="text-xs font-semibold text-typography-900 mt-3 mb-1">
+                {t.wrongFixesTitle}
+              </h4>
+              <p className="text-[11px] text-typography-500 mb-1">{t.wrongFixesCaption}</p>
+              {brokenLinks.length === 0 ? (
+                <p className="text-xs text-typography-500" data-testid="wrong-fixes-empty">
+                  {t.wrongFixesEmpty}
+                </p>
+              ) : (
+                <ul data-testid="wrong-fixes" className="text-xs flex flex-col gap-0.5">
+                  {brokenLinks.map(([link, n]) => (
+                    <li key={link} className="flex justify-between gap-2">
+                      <span>
+                        {t.wrongFixesLinks[link as keyof typeof t.wrongFixesLinks] ?? link}
+                      </span>
+                      <span className="font-mono">{n}</span>
+                    </li>
+                  ))}
+                  {(wrongFixes.data?.recent ?? []).slice(0, 5).map(r => (
+                    <li key={r.findingId} className="text-typography-600 truncate">
+                      {t.wrongFixesSource[r.source]} · {r.title}
+                    </li>
+                  ))}
+                </ul>
               )}
             </div>
           </div>
