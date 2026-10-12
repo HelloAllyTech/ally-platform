@@ -28,14 +28,18 @@ vi.mock("@api", () => ({
   useReleaseBugFindingMutation: vi.fn(() => [vi.fn(), { isLoading: false }]),
   useCancelBugFixSessionMutation: vi.fn(() => [vi.fn(), { isLoading: false }]),
   useMergeBugFindingMutation: vi.fn(() => [vi.fn(), { isLoading: false }]),
-  // The accuracy panel's own query. Empty rather than absent: the panel is
-  // mounted by the Performance section and every case here is about which
-  // sections render, not about the figures.
-  useGetBugHunterMetricsQuery: vi.fn(() => ({ data: undefined, isLoading: false, isError: false })),
   // The Notebook tab's own hooks. Empty rather than absent: mounted only when
   // that section is open, but the module mock has to supply them.
-  useGetBugHunterMemoryQuery: vi.fn(() => ({ data: { items: [] }, isLoading: false, isError: false })),
-  useGetBugHunterRetiredMemoryQuery: vi.fn(() => ({ data: { items: [] }, isLoading: false, isError: false })),
+  useGetBugHunterMemoryQuery: vi.fn(() => ({
+    data: { items: [] },
+    isLoading: false,
+    isError: false,
+  })),
+  useGetBugHunterRetiredMemoryQuery: vi.fn(() => ({
+    data: { items: [] },
+    isLoading: false,
+    isError: false,
+  })),
   useRestoreBugHunterMemoryMutation: vi.fn(() => [vi.fn(), { isLoading: false }]),
   useAddBugHunterMemoryMutation: vi.fn(() => [vi.fn(), { isLoading: false }]),
   useRetireBugHunterMemoryMutation: vi.fn(() => [vi.fn(), { isLoading: false }]),

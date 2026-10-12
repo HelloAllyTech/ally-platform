@@ -613,45 +613,6 @@ export interface ListBugHuntRunsResponse {
   items: BugHuntRun[];
 }
 
-/** The scorecard's four tiles and token line, totalled server-side over one window. */
-export interface BugHuntRunWindowSummary {
-  runs: number;
-  costUsd: number;
-  completed: number;
-  failed: number;
-  running: number;
-  /** Triggered while the kill switch was off, or with nothing new to sweep. */
-  skipped: number;
-  found: number;
-  autoMerged: number;
-  prOpened: number;
-  dismissed: number;
-  inputTokens: number;
-  outputTokens: number;
-  /** Runs that reported both token counts; the token sums are over these only. */
-  tokensReported: number;
-}
-
-/** One calendar day of the scorecard sparkline, in the zone the request asked for. */
-export interface BugHuntRunDayPoint {
-  /** `YYYY-MM-DD` */
-  date: string;
-  runs: number;
-  costUsd: number;
-  found: number;
-}
-
-/** `GET /v1/bug-hunter/runs/summary` */
-export interface BugHuntRunsSummary {
-  /** The window totalled; null is all time. */
-  days: number | null;
-  /** The zone the series was bucketed in — what was asked for, or UTC if that was unknown. */
-  timeZone: string;
-  window: BugHuntRunWindowSummary;
-  /** One point per day for the last fourteen days, oldest first; quiet days are zeros. */
-  series: BugHuntRunDayPoint[];
-}
-
 /**
  * Where a roadmap bug went. Returned by the deep-link lookup so an
  * `?opportunity=<id>` link to a bug can redirect rather than 404.
@@ -666,143 +627,6 @@ export interface BugFindingRef {
 
 // ── metrics (GET /v1/bug-hunter/metrics) ──────────────────────────────────
 
-/** One source's or one repo's funnel, from filed to live. Mirrors ally-be's FindingFunnel. */
-export interface BugHunterFunnel {
-  /** The source or repo this row aggregates. Null for a finding with no repo yet. */
-  key: string | null;
-  filed: number;
-  /** Refuted by the Verify phase. */
-  dismissed: number;
-  /** Declined by a human. */
-  rejected: number;
-  /** Reached a fix at all — explicitly in Manual mode, implicitly in AI mode. */
-  approved: number;
-  /** Reached master. A released fix counts here too. */
-  merged: number;
-  released: number;
-  failed: number;
-  open: number;
-  /** Declines where the finder was judged wrong. */
-  finderErrors: number;
-  /** Declines with no reason stored — rows decided before the column existed. */
-  reasonNotRecorded: number;
-  /**
-   * `1 - finderErrors / judged`. **Null when nothing has been judged**, which
-   * a renderer must show as "not enough decisions yet" rather than as 0%:
-   * a young install has findings and no decisions, and 0% would read as the
-   * agent being wrong every time.
-   */
-  accuracy: number | null;
-  lowConfidence: number;
-  unscored: number;
-  /** Finder-error dismissals later proven wrong by a same-dedupe-key finding shipping. */
-  reversed: number;
-  /**
-   * `reversed / finderErrors` — a correction to the raw error rate: a
-   * reversal means a finding was incorrectly dismissed by an admin and later
-   * shipped under a duplicate report. Null when nothing has ever been
-   * dismissed as a finder error.
-   */
-  reversalRate: number | null;
-}
-
-export interface BugHunterDecline {
-  reason: BugFindingDecisionReason | "not_recorded";
-  count: number;
-  /** True when this reason means the finder was wrong. */
-  finderError: boolean;
-}
-
-export interface BugHunterEscalation {
-  /**
-   * The escalation event's exact summary text. Several escalation paths
-   * report a fixed, literal string (a model-tier bump, a multi-repo plan,
-   * suite-still-red-after-cap), so grouping on this already separates them
-   * cleanly; an open product question is genuine free text and shows up as
-   * many small one-off groups.
-   */
-  summary: string;
-  count: number;
-}
-
-export interface BugHunterStageLatency {
-  /** Median, not mean — one stalled bug should not describe the month. */
-  medianHours: number | null;
-  p90Hours: number | null;
-  /** Findings the figures are computed from. A median over two is not a latency. */
-  sampled: number;
-}
-
-export interface BugHunterMetrics {
-  windowDays: number;
-  since: string;
-  totalFiled: number;
-  overall: BugHunterFunnel;
-  bySource: BugHunterFunnel[];
-  byRepo: BugHunterFunnel[];
-  declines: BugHunterDecline[];
-  escalations: BugHunterEscalation[];
-  latency: {
-    filedToDecided: BugHunterStageLatency;
-    filedToMerged: BugHunterStageLatency;
-    mergedToReleased: BugHunterStageLatency;
-  };
-  regressions: {
-    /** New findings in the window that are a fix coming back. */
-    filed: number;
-    /** Fixes shipped in the window that have since returned. */
-    fixesThatFailed: number;
-    /** fixesThatFailed / merged. Null when nothing merged. */
-    rate: number | null;
-  };
-  cost: {
-    totalUsd: number;
-    runs: number;
-    fixSessionRuns: number;
-    fixSessionUsd: number;
-    /** Fix-session spend per fix that actually landed. Null when nothing merged. */
-    perMergedFixUsd: number | null;
-  };
-}
-
-// ── Operations metrics (GET /metrics/operations) ───────────────────────────
-// The volume view beside BugHunterMetrics, which judges outcomes. Every
-// volume figure arrives paired with where that cohort stands now, so the panel
-// cannot draw a count without its acceptance share beside it.
-
-export type BugHunterReporter = "agent" | "staff" | "consumer";
-
-/**
- * How hard a bug was to spot, derived server-side from `proven` + `source`:
- * easy = tool output proved it; hard = the agent inferred it and verifiers had
- * to agree; reported = a person filed it, so the agent spotted nothing.
- */
-export type BugHunterDifficulty = "easy" | "hard" | "reported";
-
-export interface BugHunterOperationsOutcomes {
-  filed: number;
-  accepted: number;
-  declined: number;
-  undecided: number;
-}
-
-export interface BugHunterOperationsBreadth {
-  /** Runs that reported breadth at all. */
-  runs: number;
-  linesInScope: number;
-  filesInScope: number;
-  commits: number;
-  /** Runs that read the whole repo rather than the day's diff. */
-  deepRuns: number;
-}
-
-export interface BugHunterOperationsTokens {
-  runs: number;
-  inputTokens: number;
-  outputTokens: number;
-  costUsd: number;
-}
-
 export interface BugHunterOperationsDay {
   /** YYYY-MM-DD in the database clock (UTC). */
   date: string;
@@ -814,42 +638,6 @@ export interface BugHunterOperationsDay {
   declined: number;
   /** Of `filed`, still new or pending approval. */
   undecided: number;
-  /** `filed` by finding source; absent sources had none that day. */
-  bySource: Partial<Record<BugFindingSource, number>>;
-  /** `filed` by how hard it was to spot. Always all three keys. */
-  byDifficulty: Record<BugHunterDifficulty, BugHunterOperationsOutcomes>;
-  /** Tokens spent by runs that started that day, by trigger. */
-  tokens: Record<BugHuntTrigger, BugHunterOperationsTokens>;
-  /** Code scope shown to that day's sweeps. Null = not recorded (not zero). */
-  breadth: BugHunterOperationsBreadth | null;
-}
-
-export interface BugHunterOperationsDifficulty extends BugHunterOperationsOutcomes {
-  difficulty: BugHunterDifficulty;
-}
-
-export interface BugHunterOperationsSource {
-  source: BugFindingSource;
-  filed: number;
-  accepted: number;
-  declined: number;
-  undecided: number;
-}
-
-export interface BugHunterOperationsReporter {
-  reporter: BugHunterReporter;
-  filed: number;
-  accepted: number;
-  declined: number;
-}
-
-export interface BugHunterOperationsModel {
-  model: string;
-  provider: string;
-  runs: number;
-  inputTokens: number;
-  outputTokens: number;
-  cacheReadTokens: number;
 }
 
 export interface BugHunterOperationsMetrics {
@@ -857,25 +645,11 @@ export interface BugHunterOperationsMetrics {
   since: string;
   /** Every calendar day in the window, oldest first, zeros included. */
   days: BugHunterOperationsDay[];
-  /** Window totals per source, most filed first. */
-  bySource: BugHunterOperationsSource[];
-  /** Always easy, hard, reported, in that order. */
-  byDifficulty: BugHunterOperationsDifficulty[];
-  /** Window breadth over every run that reported it, or null when none did. */
-  breadth: BugHunterOperationsBreadth | null;
-  /** Always all three reporters, zeros included. */
-  byReporter: BugHunterOperationsReporter[];
-  /** Window totals per model, most tokens first. Empty until CI has reported usage. */
-  tokensByModel: BugHunterOperationsModel[];
   totals: {
     filed: number;
     accepted: number;
     declined: number;
     undecided: number;
-    inputTokens: number;
-    outputTokens: number;
-    costUsd: number;
-    runs: number;
   };
 }
 

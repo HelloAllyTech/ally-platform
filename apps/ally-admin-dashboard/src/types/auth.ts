@@ -912,14 +912,6 @@ export interface FixSessionEngineCostResponse {
 // BugAgentPerformanceResponseDto from GET /api/v1/analytics/bug-agent-performance.
 // Every rate is null (not 0) when its denominator was zero that week — a rate
 // over nothing is unmeasured, not zero.
-export interface BugAgentPerformancePrecisionWeek {
-  week: string;
-  accuracy: number | null;
-  reversalRate: number | null;
-  filed: number;
-  judged: number;
-}
-
 export interface BugAgentPerformanceSourceAccuracy {
   source: string;
   accuracy: number | null;
@@ -964,16 +956,6 @@ export interface BugAgentPerformanceReliabilityWeek {
   failed: number;
 }
 
-/** One UTC day of bugs found across every repo and source — mirrors FoundDayDto. */
-export interface BugAgentPerformanceFoundDay {
-  /** yyyy-mm-dd, UTC — the clock the sweeps run on. */
-  day: string;
-  /** Distinct top-level findings filed that day, excluding any since dismissed or rejected. A quiet day is a real 0. */
-  filed: number;
-  /** Mean of `filed` over this day and the six before; null for the first six days of the window. */
-  rollingAvg7: number | null;
-}
-
 /** One week of Bug Hunter's goal numbers — mirrors ally-be's GoalWeekDto (OPP-0778). */
 export interface BugAgentPerformanceGoalWeek {
   week: string;
@@ -1004,15 +986,12 @@ export interface BugAgentPerformanceResponse {
     window: BugAgentPerformanceGoalWindow;
   };
   precision: {
-    weekly: BugAgentPerformancePrecisionWeek[];
     bySource: BugAgentPerformanceSourceAccuracy[];
   };
   throughput: BugAgentPerformanceThroughputWeek[];
   speed: BugAgentPerformanceSpeedWeek[];
   cost: BugAgentPerformanceCostWeek[];
   reliability: BugAgentPerformanceReliabilityWeek[];
-  /** Bugs found per day, oldest first, gap-filled — the one daily series on the tab. */
-  found: BugAgentPerformanceFoundDay[];
   window: AnalyticsWindow;
   computedAt: string;
 }

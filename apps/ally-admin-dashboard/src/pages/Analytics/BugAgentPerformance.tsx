@@ -7,20 +7,15 @@ import { useGetBugAgentPerformanceQuery } from "@api";
 import { AnalyticsTabFilters, asOf, windowLabel } from "./analyticsFilters";
 import {
   buildCostTrend,
-  buildFoundTrend,
   buildGoalTrend,
   buildMissReasons,
-  buildPrecisionTrend,
   buildReliabilityTrend,
   buildSourceAccuracyBreakdown,
   buildSpeedTrend,
   buildThroughputTrend,
   COST_SCALE,
-  FOUND_SCALE,
-  foundTakeaway,
   GOAL_SCALE,
   goalTakeaway,
-  PRECISION_SCALE,
   RELIABILITY_SCALE,
   SPEED_SCALE,
   THROUGHPUT_SCALE,
@@ -39,10 +34,17 @@ import { buildColorScale, formatPercent, formatUsd } from "./tokenChart";
 import { RunHistoryTable } from "../BugHunter/RunHistoryTable";
 
 /**
- * Bug Hunter's five headline performance trends, week over week: is it
- * finding real bugs (precision), does it finish what it starts (throughput),
- * how fast (speed), at what cost, and does it stay healthy while doing it
- * (reliability).
+ * Bug Hunter's performance, in the charts somebody actually watches: whether
+ * it finds bugs before people do and why not, which finder is right how often,
+ * does it finish what it starts (throughput), how fast (speed), at what cost,
+ * and does it stay healthy while doing it (reliability).
+ *
+ * Pruned on 2026-10-12 to what is observed: the overall precision trend
+ * (Precision by finder is the one that says what to fix), "Bugs found per
+ * day" (the operations card "Bugs filed per day" shows the same count beside
+ * where each bug stands), and six operations cards nobody acted on went. The
+ * chart helpers and the endpoints still serve those series, so a card can come
+ * back without backend work.
  *
  * Deliberately week-bucketed regardless of the tab-wide range picker's
  * `range` — the backend (`BugAgentPerformanceAnalyticsService`) always
@@ -67,23 +69,19 @@ export const BugAgentPerformance = (filters: AnalyticsTabFilters) => {
   const { query } = filters;
   const { data, isLoading, isError, refetch } = useGetBugAgentPerformanceQuery(query);
 
-  const precisionWeekly = useMemo(() => data?.precision.weekly ?? [], [data]);
   const bySource = useMemo(() => data?.precision.bySource ?? [], [data]);
   const throughputWeekly = useMemo(() => data?.throughput ?? [], [data]);
   const speedWeekly = useMemo(() => data?.speed ?? [], [data]);
   const costWeekly = useMemo(() => data?.cost ?? [], [data]);
   const reliabilityWeekly = useMemo(() => data?.reliability ?? [], [data]);
-  const foundDaily = useMemo(() => data?.found ?? [], [data]);
   const goalWeekly = useMemo(() => data?.goal?.weekly ?? [], [data]);
   const goalTrend = useMemo(() => buildGoalTrend(goalWeekly), [goalWeekly]);
   const missReasons = useMemo(() => buildMissReasons(data?.goal?.window.missReasons ?? {}), [data]);
 
-  const precisionTrend = useMemo(() => buildPrecisionTrend(precisionWeekly), [precisionWeekly]);
   const sourceAccuracy = useMemo(() => buildSourceAccuracyBreakdown(bySource), [bySource]);
   const throughputTrend = useMemo(() => buildThroughputTrend(throughputWeekly), [throughputWeekly]);
   const speedTrend = useMemo(() => buildSpeedTrend(speedWeekly), [speedWeekly]);
   const costTrend = useMemo(() => buildCostTrend(costWeekly), [costWeekly]);
-  const foundTrend = useMemo(() => buildFoundTrend(foundDaily), [foundDaily]);
   const reliabilityTrend = useMemo(
     () => buildReliabilityTrend(reliabilityWeekly),
     [reliabilityWeekly],
@@ -106,10 +104,6 @@ export const BugAgentPerformance = (filters: AnalyticsTabFilters) => {
     },
   });
 
-  const precisionOptions = useMemo(
-    () => withPercentTicks(lineOpts({ leftTitle: "Rate", colorScale: PRECISION_SCALE })),
-    [],
-  );
   const sourceAccuracyOptions = useMemo(
     () =>
       withPercentTicks(
@@ -129,10 +123,6 @@ export const BugAgentPerformance = (filters: AnalyticsTabFilters) => {
     [],
   );
   const costOptions = useMemo(() => lineOpts({ leftTitle: "USD", colorScale: COST_SCALE }), []);
-  const foundOptions = useMemo(
-    () => lineOpts({ leftTitle: "Bugs found", colorScale: FOUND_SCALE }),
-    [],
-  );
   const goalOptions = useMemo(
     () => withPercentTicks(lineOpts({ leftTitle: "Share", colorScale: GOAL_SCALE })),
     [],
@@ -205,70 +195,24 @@ export const BugAgentPerformance = (filters: AnalyticsTabFilters) => {
         </ChartCard>
       </div>
 
-      {/* The headline the governor asked for, ahead of the weekly rates: is
-          the agent finding FEWER bugs as the codebases get cleaner? Daily,
-          not weekly like everything below it, because the sweeps are nightly
-          and a week would hide a change for seven days. */}
       <ChartCard
-        title="Bugs found per day"
-        caption="Distinct bugs Bug Hunter filed each day across every repo and source, leaving out any since dismissed or rejected, with the trailing seven-day average as the line to read the trend from. A day's count can drop later as its findings are ruled on. A quiet night is a real zero. Days are UTC, the clock the sweeps run on."
-        source={source(
-          "bug_findings top-level rows by createdAt day whose current status is not dismissed or rejected; the average is the mean of that day and the six before it",
-        )}
-        takeaway={foundTakeaway(foundDaily)}
+        title="Precision by finder"
+        caption="Whole-window accuracy per finder type — worst first. The finder with the lowest bar is the one to fix or retire. code_review has no external ground truth, so it's structurally the one most likely to trail."
+        source={source("bug_findings, whole window (not bucketed)")}
         loading={isLoading && !data}
         error={isError}
         onRetry={refetch}
-        errorTitle="Couldn't load bugs found per day"
-        empty={foundTrend.length === 0}
-        emptyText="No days in this window"
+        errorTitle="Couldn't load the finder breakdown"
+        empty={sourceAccuracy.length === 0}
+        emptyText="No finder has a judged finding yet in this window"
+        wide
         height={CHART_HEIGHT}
-        chartId="AAQ-201"
+        chartId="AAQ-131"
       >
-        <ScrollableChart data={foundTrend}>
-          <LineChart data={foundTrend} options={foundOptions} />
+        <ScrollableChart data={sourceAccuracy} on="group">
+          <SimpleBarChart data={sourceAccuracy} options={sourceAccuracyOptions} />
         </ScrollableChart>
       </ChartCard>
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <ChartCard
-          title="Precision"
-          caption="Is Bug Hunter finding real bugs? Accuracy and reversal rate, for findings filed that week."
-          source={source(
-            "bug_findings, folded per week the same way AccuracyPanel folds a whole window",
-          )}
-          loading={isLoading && !data}
-          error={isError}
-          onRetry={refetch}
-          errorTitle="Couldn't load precision"
-          empty={precisionTrend.length === 0}
-          emptyText="Nothing judged yet in this window"
-          height={CHART_HEIGHT}
-          chartId="AAQ-130"
-        >
-          <ScrollableChart data={precisionTrend}>
-            <LineChart data={precisionTrend} options={precisionOptions} />
-          </ScrollableChart>
-        </ChartCard>
-
-        <ChartCard
-          title="Precision by finder"
-          caption="Whole-window accuracy per finder type — worst first. code_review has no external ground truth, so it's structurally the one most likely to trail."
-          source={source("bug_findings, whole window (not bucketed)")}
-          loading={isLoading && !data}
-          error={isError}
-          onRetry={refetch}
-          errorTitle="Couldn't load the finder breakdown"
-          empty={sourceAccuracy.length === 0}
-          emptyText="No finder has a judged finding yet in this window"
-          height={CHART_HEIGHT}
-          chartId="AAQ-131"
-        >
-          <ScrollableChart data={sourceAccuracy} on="group">
-            <SimpleBarChart data={sourceAccuracy} options={sourceAccuracyOptions} />
-          </ScrollableChart>
-        </ChartCard>
-      </div>
 
       <ChartCard
         title="Fix throughput"
@@ -360,15 +304,15 @@ export const BugAgentPerformance = (filters: AnalyticsTabFilters) => {
         </ScrollableChart>
       </ChartCard>
 
-      {/* The rates above say whether Bug Hunter is any good; the counts below
-          say what it actually turned up, day by day. Separate cards rather
-          than more lines on the trends: volumes and rates share no axis. */}
+      {/* The rates above say whether Bug Hunter is any good; the count below
+          says what it actually turned up, day by day, beside where each bug
+          stands now. A separate card rather than a line on the trends: a
+          volume and a rate share no axis. */}
       <div className="pt-2">
         <h3 className="text-sm font-semibold text-typography-900">What it turns up, day by day</h3>
         <p className="text-xs text-typography-600">
-          Volume beside its acceptance share — how many bugs get filed, from where, how hard they
-          were to spot, who raises them, and what the models cost. Day-bucketed and UTC, from the
-          same page range mapped to a day count.
+          How many bugs get filed each day and how many of them hold up. Day-bucketed and UTC, from
+          the same page range mapped to a day count.
         </p>
       </div>
       <BugHunterOperationsCards {...filters} />

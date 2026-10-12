@@ -109,7 +109,7 @@ export const LiveClock: FC<LiveClockProps> = ({ since, mode = "updated", srLabel
     <span
       className="text-[11px] tabular-nums text-typography-500"
       // An `aria-label` on a bare <span> is ignored by assistive tech, so the
-      // role comes with it — the same pairing `Sparkbars` and the scorecard's
+      // role comes with it — the same pairing the retired `Sparkbars` and the scorecard's
       // chip row use. "45s" is compact notation for a sighted reader and a
       // named graphic to a screen reader, which is what `role="img"` describes.
       role={accessibleName ? "img" : undefined}

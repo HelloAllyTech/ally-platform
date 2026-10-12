@@ -36,7 +36,7 @@ import { stageFromFindingStatus } from "./pipelineStage";
  *
  * Read the rest of the page and every section is a record. The table's
  * Needs-you bucket is your blocked work. The shift log is what it has done.
- * `BugFindingsTable` is the inventory. `AgentScorecard` and `RunHistoryTable`
+ * `BugFindingsTable` is the inventory. `RunHistoryTable`
  * are the ledger. The agent's own work-in-progress had one page-level
  * representation — the profile card's sentence "I'm working on 3 fixes right
  * now" — and no way to see which three, how far each had got, or whether any of

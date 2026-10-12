@@ -11,7 +11,7 @@ import { PIPELINE_STAGES, stageFromFindingStatus } from "./pipelineStage";
  *
  * Every other section of the tab is a record: the table's Needs-you bucket is
  * your blocked work, the shift log is what it has done, `BugFindingsTable`
- * is the inventory, `AgentScorecard` and `RunHistoryTable` are the ledger. None
+ * is the inventory, `RunHistoryTable` is the ledger. None
  * of them is present tense. The agent's own work-in-progress had exactly one
  * page-level representation — the sentence "I'm working on 3 fixes right now" on
  * the profile card — and the only way to see *which* three and how far each had

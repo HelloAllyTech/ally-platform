@@ -135,6 +135,8 @@ const session = (overrides: Partial<BuilderSession> = {}): BuilderSession => ({
   runnerMinutes: 0,
   error: null,
   archivedAt: null,
+  createdBy: 1,
+  createdByName: "Asha Rao",
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
   ...overrides,
@@ -217,11 +219,11 @@ describe("Builder mission control — archive", () => {
       fireEvent.click(screen.getByLabelText("Show archived"));
 
       expect(getArchivedSpy).toHaveBeenLastCalledWith(
-        { status: undefined, limit: 12, offset: 0 },
+        { status: undefined, mine: false, limit: 12, offset: 0 },
         expect.anything(),
       );
       expect(getSessionsSpy).toHaveBeenLastCalledWith(
-        { status: undefined },
+        { status: undefined, mine: false },
         expect.objectContaining({ skip: true }),
       );
       expect(screen.queryByText("Recent")).toBeNull();
@@ -332,11 +334,11 @@ describe("Builder mission control — archive", () => {
       fireEvent.click(screen.getByText("Next"));
 
       expect(getArchivedSpy).toHaveBeenLastCalledWith(
-        { status: undefined, limit: 12, offset: 12 },
+        { status: undefined, mine: false, limit: 12, offset: 12 },
         expect.anything(),
       );
       expect(getSessionsSpy).toHaveBeenLastCalledWith(
-        { status: undefined },
+        { status: undefined, mine: false },
         expect.objectContaining({ skip: true }),
       );
     });

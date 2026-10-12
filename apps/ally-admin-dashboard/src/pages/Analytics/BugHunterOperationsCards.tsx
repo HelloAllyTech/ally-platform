@@ -1,77 +1,36 @@
 import { ReactNode, useMemo, useState } from "react";
 
-import { SimpleBarChart, StackedBarChart } from "@carbon/charts-react";
+import { StackedBarChart } from "@carbon/charts-react";
 
-import { CarbonDropdown as Dropdown } from "@ally-ui-mono/ui-shared";
 import { useGetBugHunterOperationsMetricsQuery } from "@api";
 
 import { AnalyticsTabFilters } from "./analyticsFilters";
 import {
-  BREADTH_SCALE,
-  DIFFICULTY_SCALE,
   OUTCOME_SCALE,
-  OpsBar,
   OpsDatum,
-  SOURCE_SCALE,
-  TRIGGER_SCALE,
-  breadthEmptyText,
-  breadthStart,
-  breadthTakeaway,
-  buildBreadthSeries,
-  buildBreadthTable,
-  buildDifficultySeries,
-  buildDifficultyTable,
   buildFiledSeries,
   buildFiledTable,
-  buildModelBars,
-  buildModelTable,
-  buildReporterBars,
-  buildReporterTable,
-  buildSourceSeries,
-  buildSourceTable,
-  buildSpendSeries,
-  buildSpendTable,
-  buildTokensSeries,
-  buildTokensTable,
-  SPEND_GRANULARITIES,
-  SpendGranularity,
-  spendEmptyText,
-  spendTakeaway,
-  difficultyTakeaway,
   filedEmptyText,
   filedTakeaway,
-  modelEmptyText,
-  modelTakeaway,
   operationsWindowLabel,
-  presentSources,
   rangeToDays,
-  reporterTakeaway,
-  sourceTakeaway,
-  tokensEmptyText,
-  tokensTakeaway,
-  uniformScale,
 } from "./bugHunterOperationsChart";
 import { ChartDetailModal, ChartTableData } from "./ChartDetailModal";
-import {
-  CHART_HEIGHT,
-  ChartCard,
-  ScrollableChart,
-  buildSource,
-  hBarOpts,
-  integerTickValues,
-  stackedBarOpts,
-} from "./chartKit";
-import { formatUsd, formatUsdCompact } from "./tokenChart";
+import { CHART_HEIGHT, ChartCard, ScrollableChart, buildSource, stackedBarOpts } from "./chartKit";
 
 /**
  * Bug Hunter's volume, beside its rates.
  *
- * The five trend cards above this answer whether the agent is right, fast,
- * cheap and reliable — all rates, all week-bucketed. These seven answer the
- * operator's Monday-morning questions, which are counts and day-shaped: did
- * last night file anything, which finder is producing the noise, how hard
- * were the bugs, who is reporting them, is the token bill creeping, and how
- * much code was the sweep actually shown.
+ * The trend cards above this answer whether the agent is right, fast, cheap
+ * and reliable — all rates, all week-bucketed. This one answers the
+ * operator's Monday-morning question, which is a count and day-shaped: did
+ * last night file anything, and does what it files hold up.
+ *
+ * Seven cards until 2026-10-12 (by source, difficulty, who reports, tokens by
+ * trigger, spend over time, code breadth, tokens by model). Nobody acted on
+ * them, and cost already has its own chart above and the AI cost tab, so they
+ * went; `bugHunterOperationsChart.ts` and the endpoint still carry their
+ * series for a card that earns its way back.
  *
  * Reads `GET /v1/bug-hunter/metrics/operations`, which is anchored on today
  * and takes a day count, so the page range is mapped to days
@@ -91,265 +50,30 @@ export const BugHunterOperationsCards = ({ query }: AnalyticsTabFilters) => {
   const common = { loading: isLoading && !data, error: isError, onRetry: refetch };
 
   const filedSeries = useMemo(() => buildFiledSeries(dayRows), [dayRows]);
-  const sources = useMemo(() => presentSources(data?.bySource ?? []), [data]);
-  const sourceSeries = useMemo(() => buildSourceSeries(dayRows, sources), [dayRows, sources]);
-  const difficultySeries = useMemo(() => buildDifficultySeries(dayRows), [dayRows]);
-  const reporterBars = useMemo(() => buildReporterBars(data?.byReporter ?? []), [data]);
-  const tokensSeries = useMemo(() => buildTokensSeries(dayRows), [dayRows]);
-  // Spend over time, at the grain the reader picks. Folded client-side from the
-  // same day rows, so switching Day / Week / Month costs no request.
-  const [spendGranularity, setSpendGranularity] = useState<SpendGranularity>("day");
-  const spendSeries = useMemo(
-    () => buildSpendSeries(dayRows, spendGranularity),
-    [dayRows, spendGranularity],
-  );
-  const breadthSeries = useMemo(() => buildBreadthSeries(dayRows), [dayRows]);
-  const modelBars = useMemo(() => buildModelBars(data?.tokensByModel ?? []), [data]);
-
   const countOpts = useMemo(
     () =>
       stackedBarOpts({ leftTitle: "Bugs", bottomTitle: "Day (UTC)", colorScale: OUTCOME_SCALE }),
     [],
   );
-  const sourceOpts = useMemo(
-    () => stackedBarOpts({ leftTitle: "Bugs", bottomTitle: "Day (UTC)", colorScale: SOURCE_SCALE }),
-    [],
-  );
-  const difficultyOpts = useMemo(
-    () =>
-      stackedBarOpts({ leftTitle: "Bugs", bottomTitle: "Day (UTC)", colorScale: DIFFICULTY_SCALE }),
-    [],
-  );
-  const tokensOpts = useMemo(
-    () =>
-      stackedBarOpts({ leftTitle: "Tokens", bottomTitle: "Day (UTC)", colorScale: TRIGGER_SCALE }),
-    [],
-  );
-  const spendOpts = useMemo(() => {
-    const base = stackedBarOpts({
-      leftTitle: "Estimated cost (USD)",
-      bottomTitle:
-        spendGranularity === "day"
-          ? "Day (UTC)"
-          : spendGranularity === "week"
-            ? "Week (UTC, from Monday)"
-            : "Month (UTC)",
-      colorScale: TRIGGER_SCALE,
-    });
-    // Same hand-applied tick formatter CodingAgentCost uses: `extra` on the
-    // chartKit factories replaces a whole axis key rather than deep-merging.
-    return {
-      ...base,
-      axes: {
-        ...base.axes,
-        left: {
-          ...base.axes.left,
-          ticks: { formatter: (tick: number | Date) => formatUsdCompact(Number(tick)) },
-        },
-      },
-    };
-  }, [spendGranularity]);
-  const breadthOpts = useMemo(
-    () =>
-      stackedBarOpts({
-        leftTitle: "Lines of code",
-        bottomTitle: "Day (UTC)",
-        colorScale: BREADTH_SCALE,
-        legend: false,
-      }),
-    [],
-  );
-  const reporterOpts = useMemo(
-    () =>
-      hBarOpts({
-        bottomTitle: "Bugs",
-        colorScale: uniformScale(reporterBars.map(b => b.group)),
-        valueTicks: integerTickValues(Math.max(0, ...reporterBars.map(b => b.value))),
-      }),
-    [reporterBars],
-  );
-  const modelOpts = useMemo(
-    () =>
-      hBarOpts({
-        bottomTitle: "Tokens",
-        colorScale: uniformScale(modelBars.map(b => b.group)),
-      }),
-    [modelBars],
-  );
-
-  const start = breadthStart(dayRows);
-  const totalCost = data ? formatUsd(data.totals.costUsd) : undefined;
-
   return (
     <div className="flex flex-col gap-6">
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <OpsCard
-          title="Bugs filed per day"
-          caption="Distinct bugs Bug Hunter filed each day, from every source, coloured by where each stands today. A re-discovery touches its existing row rather than filing a new one, so nothing counts twice. Days are UTC, the clock the sweeps run on."
-          source={source(
-            "bug_findings, one row per bug, by createdAt day; status folded to accepted / declined / undecided",
-          )}
-          takeaway={filedTakeaway(data ?? emptyMetrics)}
-          emptyText={filedEmptyText(data)}
-          table={buildFiledTable(dayRows)}
-          chartId="AAQ-158"
-          {...common}
-          render={height => (
-            <ScrollableChart data={filedSeries}>
-              <StackedBarChart data={filedSeries} options={{ ...countOpts, height }} />
-            </ScrollableChart>
-          )}
-        />
-
-        <OpsCard
-          title="Bugs filed per day, by source"
-          caption="The same bugs, split by the finder that raised them. A source that files a lot but is mostly declined is noise — the table view carries each source's accepted share."
-          source={source("bug_findings by createdAt day and source")}
-          takeaway={sourceTakeaway(data?.bySource ?? [])}
-          emptyText={filedEmptyText(data)}
-          table={buildSourceTable(data?.bySource ?? [])}
-          tableCaption="Window totals per source, with the accepted share the stacked bars cannot show."
-          chartId="AAQ-159"
-          {...common}
-          render={height => (
-            <ScrollableChart data={sourceSeries}>
-              <StackedBarChart data={sourceSeries} options={{ ...sourceOpts, height }} />
-            </ScrollableChart>
-          )}
-        />
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <OpsCard
-          title="How hard they were to spot"
-          caption="Derived, not stored. Easy to spot: a failing test, a lint error or a recurring production error proved it — the tool output is the bug. Hard to spot: Bug Hunter inferred it from reading code or telemetry and two verifiers had to agree. Reported by people: a person filed it, so the agent spotted nothing and it sits in neither bucket."
-          source={source(
-            "bug_findings: proven → easy; unproven agent-found → hard; source = reported_bug → reported",
-          )}
-          takeaway={difficultyTakeaway(data ?? emptyMetrics)}
-          emptyText={filedEmptyText(data)}
-          table={buildDifficultyTable(data ?? emptyMetrics)}
-          tableCaption="Window totals per bucket, with the accepted share — the comparison the split exists for."
-          chartId="AAQ-160"
-          {...common}
-          render={height => (
-            <ScrollableChart data={difficultySeries}>
-              <StackedBarChart data={difficultySeries} options={{ ...difficultyOpts, height }} />
-            </ScrollableChart>
-          )}
-        />
-
-        <OpsCard
-          title="Who raises bugs"
-          caption="Bug Hunter's own finders and UX signals, against bugs people filed: staff through the roadmap, consumers through the in-app “Report a problem” form. All three always listed — a zero for consumers is a fact worth seeing."
-          source={source(
-            "bug_findings; reported_bug rows split by the linked roadmap_opportunities.source",
-          )}
-          takeaway={reporterTakeaway(data?.byReporter ?? [])}
-          emptyText={filedEmptyText(data)}
-          table={buildReporterTable(data?.byReporter ?? [])}
-          chartId="AAQ-161"
-          {...common}
-          render={height => (
-            <SimpleBarChart data={reporterBars} options={{ ...reporterOpts, height }} />
-          )}
-        />
-      </div>
-
       <OpsCard
         wide
-        title="Tokens spent per day, by trigger"
-        caption={`Input plus output tokens for runs that started each day, split by what started them. In Works-solo mode a nightly sweep finds, verifies AND fixes in one run, so a sweep's tokens cannot honestly be split into finding and fixing — the trigger is the split that exists.${
-          totalCost ? ` ${totalCost} over the window.` : ""
-        }`}
+        title="Bugs filed per day"
+        caption="Distinct bugs Bug Hunter filed each day, from every source, coloured by where each stands today. A re-discovery touches its existing row rather than filing a new one, so nothing counts twice. Days are UTC, the clock the sweeps run on."
         source={source(
-          "bug_hunt_runs totalInputTokens + totalOutputTokens by createdAt day and trigger; skipped runs excluded",
+          "bug_findings, one row per bug, by createdAt day; status folded to accepted / declined / undecided",
         )}
-        takeaway={tokensTakeaway(data ?? emptyMetrics)}
-        emptyText={tokensEmptyText(data)}
-        table={buildTokensTable(dayRows)}
-        chartId="AAQ-162"
+        takeaway={filedTakeaway(data ?? emptyMetrics)}
+        emptyText={filedEmptyText(data)}
+        table={buildFiledTable(dayRows)}
+        chartId="AAQ-158"
         {...common}
         render={height => (
-          <ScrollableChart data={tokensSeries}>
-            <StackedBarChart data={tokensSeries} options={{ ...tokensOpts, height }} />
+          <ScrollableChart data={filedSeries}>
+            <StackedBarChart data={filedSeries} options={{ ...countOpts, height }} />
           </ScrollableChart>
         )}
-      />
-
-      <OpsCard
-        wide
-        title="Spend over time"
-        caption="Estimated cost of the runs that started in each period, split by what started them — the CLI's own figure where a run reported one, our token-priced estimate otherwise. Pick the grain: days for last week's bill, weeks or months for the trend."
-        source={source(
-          "bug_hunt_runs: metadata.cliReportedCostUsd else totalTokenCostUsd, summed by createdAt day and trigger, folded into the chosen period on the client",
-        )}
-        takeaway={data ? spendTakeaway(data, spendGranularity) : undefined}
-        emptyText={spendEmptyText(data)}
-        table={buildSpendTable(dayRows, spendGranularity)}
-        chartId="AAQ-170"
-        controls={
-          <div className="w-28 shrink-0">
-            <Dropdown
-              id="bug-hunter-spend-granularity"
-              size="sm"
-              titleText="Period"
-              hideLabel
-              label="Period"
-              items={SPEND_GRANULARITIES}
-              selectedItem={
-                SPEND_GRANULARITIES.find(g => g.id === spendGranularity) ?? SPEND_GRANULARITIES[0]
-              }
-              itemToString={item => item?.label ?? ""}
-              onChange={({ selectedItem }) => {
-                if (selectedItem) setSpendGranularity(selectedItem.id);
-              }}
-            />
-          </div>
-        }
-        {...common}
-        render={height => (
-          <ScrollableChart data={spendSeries}>
-            <StackedBarChart data={spendSeries} options={{ ...spendOpts, height }} />
-          </ScrollableChart>
-        )}
-      />
-
-      <OpsCard
-        wide
-        title="Code shown to the sweeps per day"
-        caption={`Lines of code in scope for the sweeps that started each day — the day's diff, or the whole tree on a deep sweep — as each sweep reports after Discover. This is the breadth proxy: tokens say how much the model read, this says how much it was given to read.${
-          start
-            ? ` Recording began ${start}; the plot starts there rather than showing earlier days as zero.`
-            : ""
-        }`}
-        source={source(
-          "bug_hunt_runs.metadata.breadth.linesInScope summed by createdAt day; null = not recorded",
-        )}
-        takeaway={data ? breadthTakeaway(data) : undefined}
-        emptyText={breadthEmptyText(data)}
-        table={buildBreadthTable(dayRows)}
-        tableCaption="Every day in the window, including those before recording began, marked “not recorded”."
-        chartId="AAQ-163"
-        {...common}
-        render={height => (
-          <ScrollableChart data={breadthSeries}>
-            <StackedBarChart data={breadthSeries} options={{ ...breadthOpts, height }} />
-          </ScrollableChart>
-        )}
-      />
-
-      <OpsCard
-        wide
-        title="Tokens by model"
-        caption="Which models did the work, from the per-model usage the runner reports after each run. One run spends across several: the sweep on its default tier, hard fixes on the escalation tier. Cache reads are counted inside input tokens."
-        source={source("llm_usage rows tagged bug_hunter, joined to runs in the window, by model")}
-        takeaway={modelTakeaway(data?.tokensByModel ?? [])}
-        emptyText={modelEmptyText(data)}
-        table={buildModelTable(data?.tokensByModel ?? [])}
-        chartId="AAQ-164"
-        {...common}
-        render={height => <SimpleBarChart data={modelBars} options={{ ...modelOpts, height }} />}
       />
     </div>
   );
@@ -455,4 +179,4 @@ const OpsCard = ({
   );
 };
 
-export type { OpsBar, OpsDatum };
+export type { OpsDatum };

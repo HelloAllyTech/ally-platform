@@ -26,7 +26,7 @@ import { formatUsd } from "./tokenChart";
  * silently diluting the very comparison this chart exists to show. A
  * chart-local, finer day count is how a reader actually isolates "since it
  * was fixed" from "since Gemini existed at all". Same reasoning as
- * BugHunter/AccuracyPanel.tsx's own local WINDOWS control.
+ * the retired AccuracyPanel's own local WINDOWS control had.
  */
 const DAY_OPTIONS = [3, 7, 14, 30] as const;
 type Days = (typeof DAY_OPTIONS)[number];
