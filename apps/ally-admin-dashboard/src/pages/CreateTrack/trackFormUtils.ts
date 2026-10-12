@@ -9,6 +9,7 @@ import {
   MAX_ANNOTATION_LABELS,
   MAX_ANNOTATION_UNITS,
   MAX_ARTICLE_QUESTIONS,
+  MAX_ARTICLE_RESOURCES,
   MAX_JOURNAL_PROMPTS,
   MAX_LIKERT_SCALE_POINTS,
   MAX_LIKERT_STATEMENTS,
@@ -587,6 +588,20 @@ const validateItem = (item: TrackItemFormValue): string[] => {
           break;
         }
       }
+
+      const resources = item.article?.resources ?? [];
+      if (resources.length > MAX_ARTICLE_RESOURCES) {
+        errors.push(`Article: at most ${MAX_ARTICLE_RESOURCES} resources`);
+      }
+      resources.forEach((resource, index) => {
+        const label = `Article resource ${index + 1}`;
+        if (isBlank(resource.title)) {
+          errors.push(`${label}: title is required`);
+        }
+        if (!/^https?:\/\//i.test(resource.url ?? "")) {
+          errors.push(`${label}: enter a valid http(s) link`);
+        }
+      });
       break;
     }
     case TrackItemType.VIDEO: {
@@ -880,10 +895,12 @@ export const serializeItem = (item: TrackItemFormValue, order: number): TrackStr
       const questions = (item.article?.questions ?? []).filter(question =>
         placed.includes(question.id),
       );
+      const resources = item.article?.resources ?? [];
       payload.content = {
         html,
         ...(imageUrls.length > 0 ? { imageUrls } : {}),
         ...(questions.length > 0 ? { questions } : {}),
+        ...(resources.length > 0 ? { resources } : {}),
       };
       break;
     }
