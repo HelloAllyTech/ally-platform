@@ -513,14 +513,22 @@ describe("first-audio split", () => {
     expect(groupsInOrder).toEqual([
       FIRST_AUDIO_GROUPS.reply,
       FIRST_AUDIO_GROUPS.interim,
-      FIRST_AUDIO_GROUPS.bridge,
       FIRST_AUDIO_GROUPS.filler,
-      FIRST_AUDIO_GROUPS.openerBridge,
       FIRST_AUDIO_GROUPS.unknown,
     ]);
   });
 
-  it("splits a bridge line played alone from the legacy interim", () => {
+  it("shows only the four plain tags, whatever system produced the audio", () => {
+    expect(Object.values(FIRST_AUDIO_GROUPS)).toEqual([
+      "Thinking filler",
+      "Interim reply",
+      "The reply itself",
+      "Not recorded",
+    ]);
+    expect(Object.keys(FIRST_AUDIO_SCALE)).toHaveLength(4);
+  });
+
+  it("counts a bridge line played alone as an interim reply", () => {
     const point = {
       ...mixed,
       firstAudioInterimTurns: 2,
@@ -534,14 +542,13 @@ describe("first-audio split", () => {
       buildFirstAudioMixSeries([point]).map(d => [d.group, d.value]),
     );
 
-    expect(byGroup[FIRST_AUDIO_GROUPS.bridge]).toBe(30);
-    expect(byGroup[FIRST_AUDIO_GROUPS.interim]).toBe(10);
+    expect(byGroup[FIRST_AUDIO_GROUPS.interim]).toBe(40);
     expect(countMaskedTurns([point])).toBe(10);
   });
 
-  describe("opener + bridge", () => {
-    // The backend already EXCLUDES bridges from firstAudioFillerTurns, so the
-    // five counts partition the bucket.
+  describe("an opener sound followed by a bridge line", () => {
+    // The backend already EXCLUDES these from firstAudioFillerTurns, so the
+    // counts partition the bucket.
     const bridged = point({
       turns: 20,
       firstAudioFillerTurns: 6,
@@ -553,36 +560,42 @@ describe("first-audio split", () => {
       avgFirstAudioOpenerBridgeMs: 350,
     });
 
-    it("is its own band, not folded into the thinking filler, and the stack still sums to 100", () => {
+    it("counts as a thinking filler, because a sound was heard first", () => {
       const series = buildFirstAudioMixSeries([bridged]);
       const byGroup = Object.fromEntries(series.map(d => [d.group, d.value]));
 
-      expect(byGroup[FIRST_AUDIO_GROUPS.filler]).toBe(30);
-      expect(byGroup[FIRST_AUDIO_GROUPS.openerBridge]).toBe(20);
+      expect(byGroup[FIRST_AUDIO_GROUPS.filler]).toBe(50);
       expect(series.reduce((sum, d) => sum + d.value, 0)).toBe(100);
     });
 
-    it("has a colour of its own, distinct from the filler's", () => {
-      expect(FIRST_AUDIO_GROUPS.openerBridge).toBe("Opener + bridge");
-      expect(FIRST_AUDIO_SCALE[FIRST_AUDIO_GROUPS.openerBridge]).toBeDefined();
-      expect(FIRST_AUDIO_SCALE[FIRST_AUDIO_GROUPS.openerBridge]).not.toBe(
-        FIRST_AUDIO_SCALE[FIRST_AUDIO_GROUPS.filler],
-      );
-    });
-
-    it("gets its own mean time-to-first-voice line", () => {
+    it("pools into the filler's mean wait, weighted by turns", () => {
       const byGroup = Object.fromEntries(
         buildFirstAudioLatencySeries([bridged]).map(d => [d.group, d.value]),
       );
 
-      expect(byGroup[FIRST_AUDIO_GROUPS.openerBridge]).toBe(0.35);
-      expect(byGroup[FIRST_AUDIO_GROUPS.filler]).toBe(0.48);
+      // (480 * 6 + 350 * 4) / 10 = 428 ms
+      expect(byGroup[FIRST_AUDIO_GROUPS.filler]).toBe(0.428);
     });
 
     it("counts as instrumented and as masked", () => {
       expect(countFirstAudioTurns([bridged])).toBe(18);
       expect(countMaskedTurns([bridged])).toBe(14);
     });
+  });
+
+  it("leaves out a group's mean when its count is zero", () => {
+    const byGroup = Object.fromEntries(
+      buildFirstAudioLatencySeries([
+        point({
+          firstAudioInterimTurns: 0,
+          avgFirstAudioInterimMs: 9999,
+          firstAudioBridgeTurns: 2,
+          avgFirstAudioBridgeMs: 1500,
+        }),
+      ]).map(d => [d.group, d.value]),
+    );
+
+    expect(byGroup[FIRST_AUDIO_GROUPS.interim]).toBe(1.5);
   });
 
   it("omits a bucket with no turns rather than drawing an empty 100% stack", () => {
@@ -694,17 +707,14 @@ describe("first-audio split by voice model", () => {
     expect(Array.from(new Set(series.map(d => d.group)))).toEqual([
       FIRST_AUDIO_GROUPS.reply,
       FIRST_AUDIO_GROUPS.interim,
-      FIRST_AUDIO_GROUPS.bridge,
       FIRST_AUDIO_GROUPS.filler,
-      FIRST_AUDIO_GROUPS.openerBridge,
       FIRST_AUDIO_GROUPS.unknown,
     ]);
     const forModel = (model: string) =>
       Object.fromEntries(series.filter(d => d.key === model).map(d => [d.group, d.value]));
 
     expect(forModel("cartesia/sonic-2")).toMatchObject({
-      [FIRST_AUDIO_GROUPS.filler]: 50,
-      [FIRST_AUDIO_GROUPS.openerBridge]: 10,
+      [FIRST_AUDIO_GROUPS.filler]: 60,
       [FIRST_AUDIO_GROUPS.interim]: 20,
       [FIRST_AUDIO_GROUPS.reply]: 20,
     });
@@ -718,17 +728,15 @@ describe("first-audio split by voice model", () => {
       "Voice model",
       "Turns",
       "The reply itself %",
-      "Interim (legacy) %",
-      "Bridge line %",
+      "Interim reply %",
       "Thinking filler %",
-      "Opener + bridge %",
       "Not recorded %",
       "p50 first voice (s)",
       "p50 real reply (s)",
     ]);
     expect(table.rows).toEqual([
-      ["cartesia/sonic-2", 100, 20, 20, 0, 50, 10, 0, 0.9, 3.2],
-      ["unknown", 500, 0, 0, 0, 0, 0, 100, 2, null],
+      ["cartesia/sonic-2", 100, 20, 20, 60, 0, 0.9, 3.2],
+      ["unknown", 500, 0, 0, 0, 100, 2, null],
     ]);
   });
 

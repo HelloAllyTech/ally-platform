@@ -217,46 +217,33 @@ export function buildPromptCacheHitRateSeries(points: VoiceLatencyPoint[]): Late
  */
 export const FIRST_AUDIO_GROUPS = {
   filler: "Thinking filler",
-  /**
-   * A filler played as an opener's bridge line (ally-ai-learn v1.48.0+). The
-   * agent records it as a filler, but it is a different decision with a
-   * different trigger, so it gets its own band — folded into "Thinking filler"
-   * a rise in bridges read as a rise in filler coverage.
-   */
-  openerBridge: "Opener + bridge",
-  /**
-   * The delivery plan's bridge line played on its own (ally-ai-learn
-   * v1.49.1+, `interimSource: "bridge"`). The agent records it as an interim,
-   * but it is the new system's line, not the legacy interim reply, and the
-   * point of the split is to see which of the two is doing the masking.
-   */
-  bridge: "Bridge line",
-  /**
-   * The legacy predictive interim reply, plus interim turns recorded before
-   * the agent labelled them (the backend keeps those here rather than guess).
-   */
-  interim: "Interim (legacy)",
+  interim: "Interim reply",
   reply: "The reply itself",
   unknown: "Not recorded",
 };
+
+/**
+ * The backend reports which SYSTEM produced the first audio (an opener sound
+ * with a bridge line after it, the delivery plan's bridge line, the legacy
+ * interim). The learner can't tell those apart, and neither could the people
+ * reading this chart, so it shows only what was heard: a sound, a few words, or
+ * the reply. An opener followed by a bridge was a sound first, so it counts as a
+ * thinking filler; a bridge line on its own is a few holding words, so it
+ * counts as an interim reply. The detailed counts stay in the API response.
+ */
+const fillerFirst = (p: VoiceLatencyPoint) =>
+  p.firstAudioFillerTurns + p.firstAudioOpenerBridgeTurns;
+const interimFirst = (p: VoiceLatencyPoint) => p.firstAudioInterimTurns + p.firstAudioBridgeTurns;
 
 /**
  * Masking speech and the real reply are different KINDS of first audio, not
  * degrees of one thing, so they take distinct hues rather than a ramp. "Not
  * recorded" is the absence of knowledge, not a fourth kind of audio, so it takes
  * context grey — the same rule the usage-level zero band follows (§8.2).
- *
- * The opener bridge takes the filler's DARK teal: it is a filler played in a
- * different slot, so it reads as the filler's sibling (adjacent in the stack)
- * while staying a distinct band from it.
  */
 export const FIRST_AUDIO_SCALE: ColorScale = {
   [FIRST_AUDIO_GROUPS.filler]: PALETTE.teal,
-  [FIRST_AUDIO_GROUPS.openerBridge]: PALETTE.darkTeal,
   [FIRST_AUDIO_GROUPS.interim]: PALETTE.purple,
-  // The bridge line is the interim's sibling (same slot, new system), so it
-  // takes the interim's darker hue, mirroring filler/opener-bridge.
-  [FIRST_AUDIO_GROUPS.bridge]: PALETTE.indigo,
   [FIRST_AUDIO_GROUPS.reply]: STAT.avg,
   [FIRST_AUDIO_GROUPS.unknown]: CONTEXT.faint,
 };
@@ -267,15 +254,13 @@ const firstAudioBuckets = (points: VoiceLatencyPoint[]) =>
     .filter(point => point.source === "pipeline")
     .map(point => ({
       point,
-      // Denominator is the sum of the six mutually-exclusive counts rather
-      // than `turns`: they partition the bucket by construction (the backend
+      // Denominator is the sum of the mutually-exclusive counts rather than
+      // `turns`: they partition the bucket by construction (the backend
       // excludes opener bridges from the filler count), so summing them cannot
       // produce shares that fail to reach 100%.
       total:
-        point.firstAudioFillerTurns +
-        point.firstAudioOpenerBridgeTurns +
-        point.firstAudioInterimTurns +
-        point.firstAudioBridgeTurns +
+        fillerFirst(point) +
+        interimFirst(point) +
         point.firstAudioReplyTurns +
         point.firstAudioUnknownTurns,
     }))
@@ -288,23 +273,20 @@ const shareOf = (count: number, total: number) => Math.round((1000 * count) / to
  * Share of each bucket's turns by what spoke first, as a 100%-stacked bar.
  *
  * Emitted group-by-group in stack order (Carbon takes stack order from first
- * appearance), reading bottom-to-top: the unmasked reply, then the four kinds
- * of masking speech (legacy interim, bridge line, thinking filler, opener bridge — the bridge sits
- * directly on its filler sibling), then the unrecorded remainder LAST. "Not
- * recorded" sits on top on purpose — its size is an artefact of when
- * instrumentation landed, and putting it at the bottom would shift the real
- * bands off a common baseline and make them impossible to compare across
- * buckets.
+ * appearance), reading bottom-to-top: the unmasked reply, then the two kinds
+ * of masking speech (interim reply, thinking filler), then the unrecorded
+ * remainder LAST. "Not recorded" sits on top on purpose — its size is an
+ * artefact of when instrumentation landed, and putting it at the bottom would
+ * shift the real bands off a common baseline and make them impossible to
+ * compare across buckets.
  */
 export function buildFirstAudioMixSeries(points: VoiceLatencyPoint[]): LatencyDatum[] {
   const buckets = firstAudioBuckets(points);
   return (
     [
       [FIRST_AUDIO_GROUPS.reply, (p: VoiceLatencyPoint) => p.firstAudioReplyTurns],
-      [FIRST_AUDIO_GROUPS.interim, (p: VoiceLatencyPoint) => p.firstAudioInterimTurns],
-      [FIRST_AUDIO_GROUPS.bridge, (p: VoiceLatencyPoint) => p.firstAudioBridgeTurns],
-      [FIRST_AUDIO_GROUPS.filler, (p: VoiceLatencyPoint) => p.firstAudioFillerTurns],
-      [FIRST_AUDIO_GROUPS.openerBridge, (p: VoiceLatencyPoint) => p.firstAudioOpenerBridgeTurns],
+      [FIRST_AUDIO_GROUPS.interim, interimFirst],
+      [FIRST_AUDIO_GROUPS.filler, fillerFirst],
       [FIRST_AUDIO_GROUPS.unknown, (p: VoiceLatencyPoint) => p.firstAudioUnknownTurns],
     ] as const
   ).flatMap(([group, pick]) =>
@@ -322,10 +304,8 @@ const VOICE_MODEL_SPLIT: readonly (readonly [
   (r: VoiceLatencyByVoiceModelRow) => number,
 ])[] = [
   [FIRST_AUDIO_GROUPS.reply, r => r.replyTurns],
-  [FIRST_AUDIO_GROUPS.interim, r => r.interimTurns],
-  [FIRST_AUDIO_GROUPS.bridge, r => r.bridgeTurns],
-  [FIRST_AUDIO_GROUPS.filler, r => r.fillerTurns],
-  [FIRST_AUDIO_GROUPS.openerBridge, r => r.openerBridgeTurns],
+  [FIRST_AUDIO_GROUPS.interim, r => r.interimTurns + r.bridgeTurns],
+  [FIRST_AUDIO_GROUPS.filler, r => r.fillerTurns + r.openerBridgeTurns],
   [FIRST_AUDIO_GROUPS.unknown, r => r.unknownTurns],
 ];
 
@@ -406,6 +386,21 @@ export function countVoiceModelTurns(rows: VoiceLatencyByVoiceModelRow[]): numbe
 }
 
 /**
+ * The mean of several groups' means, weighted by each group's turn count — the
+ * exact mean over their union, which averaging the means would not be. When
+ * none of the groups with a mean reports a turn count, their plain average
+ * stands in rather than hiding a mean the backend did send. Null when no group
+ * has a mean.
+ */
+const pooledMean = (parts: readonly (readonly [number | null, number])[]): number | null => {
+  const known = parts.filter((part): part is readonly [number, number] => part[0] != null);
+  if (known.length === 0) return null;
+  const n = known.reduce((sum, [, turns]) => sum + Math.max(0, turns), 0);
+  if (n === 0) return known.reduce((sum, [mean]) => sum + mean, 0) / known.length;
+  return known.reduce((sum, [mean, turns]) => sum + mean * Math.max(0, turns), 0) / n;
+};
+
+/**
  * Mean time-to-first-voice per bucket, split by what spoke first.
  *
  * This is the "why" behind the headline trend: filler-first turns sit near the
@@ -423,10 +418,20 @@ export function buildFirstAudioLatencySeries(points: VoiceLatencyPoint[]): Laten
     .flatMap(point =>
       (
         [
-          [FIRST_AUDIO_GROUPS.filler, point.avgFirstAudioFillerMs],
-          [FIRST_AUDIO_GROUPS.openerBridge, point.avgFirstAudioOpenerBridgeMs],
-          [FIRST_AUDIO_GROUPS.interim, point.avgFirstAudioInterimMs],
-          [FIRST_AUDIO_GROUPS.bridge, point.avgFirstAudioBridgeMs],
+          [
+            FIRST_AUDIO_GROUPS.filler,
+            pooledMean([
+              [point.avgFirstAudioFillerMs, point.firstAudioFillerTurns],
+              [point.avgFirstAudioOpenerBridgeMs, point.firstAudioOpenerBridgeTurns],
+            ]),
+          ],
+          [
+            FIRST_AUDIO_GROUPS.interim,
+            pooledMean([
+              [point.avgFirstAudioInterimMs, point.firstAudioInterimTurns],
+              [point.avgFirstAudioBridgeMs, point.firstAudioBridgeTurns],
+            ]),
+          ],
           [FIRST_AUDIO_GROUPS.reply, point.avgFirstAudioReplyMs],
         ] as const
       ).flatMap(([group, ms]) =>
@@ -472,30 +477,16 @@ export function countFirstAudioTurns(points: VoiceLatencyPoint[]): number {
   return points
     .filter(point => point.source === "pipeline")
     .reduce(
-      (sum, point) =>
-        sum +
-        point.firstAudioFillerTurns +
-        point.firstAudioOpenerBridgeTurns +
-        point.firstAudioInterimTurns +
-        point.firstAudioBridgeTurns +
-        point.firstAudioReplyTurns,
+      (sum, point) => sum + fillerFirst(point) + interimFirst(point) + point.firstAudioReplyTurns,
       0,
     );
 }
 
-/** Live turns whose first audio was masking speech (filler, opener bridge, bridge line or interim). */
+/** Live turns whose first audio was masking speech (a thinking filler or an interim reply). */
 export function countMaskedTurns(points: VoiceLatencyPoint[]): number {
   return points
     .filter(point => point.source === "pipeline")
-    .reduce(
-      (sum, point) =>
-        sum +
-        point.firstAudioFillerTurns +
-        point.firstAudioOpenerBridgeTurns +
-        point.firstAudioInterimTurns +
-        point.firstAudioBridgeTurns,
-      0,
-    );
+    .reduce((sum, point) => sum + fillerFirst(point) + interimFirst(point), 0);
 }
 
 export type LanguageBarDatum = { group: string; value: number };
