@@ -35,9 +35,10 @@ interface ScenarioVersionPanelProps {
   /**
    * Awaited before creating/branching so the parent can flush unsaved edits of
    * the current draft first — otherwise a branch would clone the server's
-   * last-saved config and miss in-editor changes.
+   * last-saved config and miss in-editor changes. Resolving `false` cancels
+   * the create; the parent has already told the author why.
    */
-  onBeforeCreate?: () => Promise<void>;
+  onBeforeCreate?: () => Promise<boolean | void>;
 }
 
 const STATUS_PILL: Record<ScenarioVersionStatus, string> = {
@@ -119,7 +120,7 @@ export const ScenarioVersionPanel: React.FC<ScenarioVersionPanelProps> = ({
     try {
       // Persist the current draft's unsaved edits first so a branch clones the
       // latest config, not the server's last-autosaved snapshot.
-      await onBeforeCreate?.();
+      if ((await onBeforeCreate?.()) === false) return;
       const created = await createVersion({
         scenarioId,
         name: draftName.trim() || undefined,

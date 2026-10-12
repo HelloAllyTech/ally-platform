@@ -5,17 +5,13 @@ import { vi, describe, it, expect, beforeEach } from "vitest";
 import { ScenarioVersionPanel } from "../ScenarioVersionPanel";
 import { ScenarioVersionStatus, ScenarioVersionType, formatVersionLabel } from "@types";
 
-const {
-  mockUseGetScenarioVersionsQuery,
-  mockCreateVersion,
-  mockUpdateVersion,
-  mockDeleteVersion,
-} = vi.hoisted(() => ({
-  mockUseGetScenarioVersionsQuery: vi.fn(),
-  mockCreateVersion: vi.fn(),
-  mockUpdateVersion: vi.fn(),
-  mockDeleteVersion: vi.fn(),
-}));
+const { mockUseGetScenarioVersionsQuery, mockCreateVersion, mockUpdateVersion, mockDeleteVersion } =
+  vi.hoisted(() => ({
+    mockUseGetScenarioVersionsQuery: vi.fn(),
+    mockCreateVersion: vi.fn(),
+    mockUpdateVersion: vi.fn(),
+    mockDeleteVersion: vi.fn(),
+  }));
 
 vi.mock("@api", () => ({
   useGetScenarioVersionsQuery: (...args: any[]) => mockUseGetScenarioVersionsQuery(...args),
@@ -298,6 +294,21 @@ describe("ScenarioVersionPanel", () => {
       expect(mockCreateVersion).not.toHaveBeenCalled();
     });
 
+    it("cancels quietly when the parent declines to flush, without a second error", async () => {
+      // A live roleplay's edits can't be flushed (that would take it offline);
+      // the parent says so itself and answers false.
+      const onBeforeCreate = vi.fn(() => Promise.resolve(false));
+
+      renderPanel({ onBeforeCreate });
+
+      fireEvent.click(screen.getByText("+ New version"));
+      fireEvent.click(screen.getByTitle("Create"));
+
+      await vi.waitFor(() => expect(onBeforeCreate).toHaveBeenCalled());
+      expect(mockCreateVersion).not.toHaveBeenCalled();
+      expect(toast.error).not.toHaveBeenCalled();
+    });
+
     it("keeps the create row open and reports the failure when the API rejects", async () => {
       const onEditVersion = vi.fn();
       mockCreateVersion.mockReturnValue({ unwrap: () => Promise.reject(new Error("500")) });
@@ -498,7 +509,9 @@ describe("ScenarioVersionPanel", () => {
 
       renderPanel();
 
-      expect(screen.getByText("No versions yet. Create one to start iterating.")).toBeInTheDocument();
+      expect(
+        screen.getByText("No versions yet. Create one to start iterating."),
+      ).toBeInTheDocument();
     });
 
     it("renders nothing and skips the query when closed", () => {

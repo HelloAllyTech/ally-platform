@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { Provider } from "react-redux";
 import { BrowserRouter } from "react-router-dom";
 import { configureStore } from "@reduxjs/toolkit";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { toast } from "sonner";
 
 import { CreateSimulation } from "../CreateSimulation";
@@ -27,6 +27,13 @@ const mockEn = vi.hoisted(() => ({
     rolePlays: "Roleplays",
     editSimulation: "Edit Simulation",
     createNewSimulation: "Create Simulation",
+    liveUnpublishedChanges: "Unpublished changes — Publish to apply them",
+    liveVersionSwitchBlocked: "This roleplay is live — publish your changes first.",
+    takeOfflineTitle: "Take this roleplay",
+    takeOfflineTitleItalic: "offline?",
+    takeOfflineDescription: "Saving it as a draft takes it offline for learners.",
+    saveAsDraft: "Save as draft",
+    keepEditing: "Keep editing",
     advancedEventsLatencyWarning: (count: number) =>
       `Heads up: ${count} advanced events are selected for this simulation. Selecting more than 10 can increase response latency during a session.`,
     versions: {
@@ -83,11 +90,20 @@ const mockDeleteCoverImage = vi.fn();
 // Mutable count of mapped (advanced) events returned to the page; tests vary it
 // to exercise the latency warning threshold.
 const mockMappedEvents = vi.hoisted(() => ({ count: 0 }));
+// The scenario record the lazy load hands the page; tests set its status to
+// put the editor on a live (published) or a draft roleplay.
+const mockAdminSimulation = vi.hoisted(() => ({ data: null as any }));
+// Props of the latest ScenarioVersionPanel render, so a test can drive its
+// callbacks (open a version, create one) without the real panel.
+const mockVersionPanel = vi.hoisted(() => ({ props: null as any }));
 
 vi.mock("@api", () => ({
   useCreateSimulationMutation: () => [mockCreateSimulation, { isLoading: false }],
   useUpdateSimulationByIdMutation: () => [mockUpdateSimulation],
-  useLazyGetAdminSimulationByIdQuery: () => [mockGetSimulationById, { data: null }],
+  useLazyGetAdminSimulationByIdQuery: () => [
+    mockGetSimulationById,
+    { data: mockAdminSimulation.data },
+  ],
   useDeleteCoverImageMutation: () => [mockDeleteCoverImage],
   useGetAvailableLanguageVoicesQuery: () => ({ data: [] }),
   useGetPromptsQuery: () => ({ data: [] }),
@@ -165,7 +181,10 @@ vi.mock("@components", () => ({
   ),
   AgentBuilderCopilotWizard: () => <div data-testid="agent-builder-wizard" />,
   ReportSection: () => <div data-testid="report-section" />,
-  ScenarioVersionPanel: () => <div data-testid="scenario-version-panel" />,
+  ScenarioVersionPanel: (props: any) => {
+    mockVersionPanel.props = props;
+    return <div data-testid="scenario-version-panel" />;
+  },
   TranslationProgressToast: () => null,
 }));
 
@@ -311,6 +330,8 @@ describe("CreateSimulation", () => {
     (useForm as any).mockReturnValue(mockFormMethods);
     mockParams.id = undefined;
     mockMappedEvents.count = 0;
+    mockAdminSimulation.data = null;
+    mockVersionPanel.props = null;
 
     // Mock scrollTo function for containerRef
     Element.prototype.scrollTo = vi.fn();
@@ -577,6 +598,122 @@ describe("CreateSimulation", () => {
         mockFormMethods.formState = { dirtyFields: {} };
         vi.useRealTimers();
       }
+    });
+  });
+
+  // Every editor save sends status DRAFT. On a published roleplay that takes it
+  // offline for learners — which a background save did, with no click, to a
+  // production roleplay on 2026-10-06. Live roleplays are never saved in the
+  // background, and an explicit Save asks first.
+  describe("Live roleplay", () => {
+    const openRoleplay = (status: "ACTIVE" | "DRAFT") => {
+      mockParams.id = "105";
+      mockAdminSimulation.data = { id: "105", title: "Nikhil [3]", status };
+      mockFormMethods.formState = { dirtyFields: { title: true } } as any;
+      mockUpdateSimulation.mockResolvedValue({ data: [{ id: "105" }] });
+      mockFormMethods.getValues.mockReturnValue({
+        title: "Nikhil [3]",
+        description: "Test Description",
+        triggerWarningIds: [],
+      });
+      renderCreateSimulation();
+    };
+    const savedStatus = (call = 0) => mockUpdateSimulation.mock.calls[call][0].simulation.status;
+
+    afterEach(() => {
+      mockFormMethods.formState = { dirtyFields: {} };
+      vi.useRealTimers();
+    });
+
+    it("never autosaves a live roleplay, and says its edits are unpublished", async () => {
+      vi.useFakeTimers();
+      openRoleplay("ACTIVE");
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(30_000);
+      });
+
+      expect(mockUpdateSimulation).not.toHaveBeenCalled();
+      expect(screen.getByText("Unpublished changes — Publish to apply them")).toBeInTheDocument();
+    });
+
+    it("still autosaves a draft roleplay", async () => {
+      vi.useFakeTimers();
+      openRoleplay("DRAFT");
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10_000);
+      });
+
+      expect(mockUpdateSimulation).toHaveBeenCalledTimes(1);
+      expect(savedStatus()).toBe("DRAFT");
+      expect(screen.queryByText(/Unpublished changes/)).not.toBeInTheDocument();
+    });
+
+    it("asks before Save takes a live roleplay offline, and saves as a draft once confirmed", async () => {
+      openRoleplay("ACTIVE");
+
+      fireEvent.click(screen.getAllByText("Save Draft")[0]);
+      expect(screen.getByText("Take this roleplay")).toBeInTheDocument();
+      expect(mockUpdateSimulation).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByText("Save as draft"));
+      await waitFor(() => expect(mockUpdateSimulation).toHaveBeenCalledTimes(1));
+      expect(savedStatus()).toBe("DRAFT");
+    });
+
+    it("leaves a live roleplay alone when the author keeps editing", () => {
+      openRoleplay("ACTIVE");
+
+      fireEvent.click(screen.getAllByText("Save Draft")[0]);
+      fireEvent.click(screen.getByText("Keep editing"));
+
+      expect(screen.queryByText("Take this roleplay")).not.toBeInTheDocument();
+      expect(mockUpdateSimulation).not.toHaveBeenCalled();
+    });
+
+    it("saves a draft roleplay straight away, without asking", async () => {
+      openRoleplay("DRAFT");
+
+      fireEvent.click(screen.getAllByText("Save Draft")[0]);
+
+      expect(screen.queryByText("Take this roleplay")).not.toBeInTheDocument();
+      await waitFor(() => expect(mockUpdateSimulation).toHaveBeenCalledTimes(1));
+    });
+
+    it("asks the same question when the author saves and exits a live roleplay", async () => {
+      openRoleplay("ACTIVE");
+
+      fireEvent.click(screen.getByText("Roleplays"));
+      fireEvent.click(screen.getByText("Save and Exit"));
+      expect(screen.getByText("Take this roleplay")).toBeInTheDocument();
+      expect(mockUpdateSimulation).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByText("Save as draft"));
+      await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith(-1));
+      expect(savedStatus()).toBe("DRAFT");
+    });
+
+    it("won't switch or branch versions over unpublished live edits", async () => {
+      const { toast } = await import("sonner");
+      openRoleplay("ACTIVE");
+
+      let proceed: boolean | void = true;
+      await act(async () => {
+        proceed = await mockVersionPanel.props.onBeforeCreate();
+      });
+      expect(proceed).toBe(false);
+
+      await act(async () => {
+        await mockVersionPanel.props.onEditVersion({ id: "v2", status: "DRAFT", config: {} });
+      });
+
+      // Stopped with a reason, not saved as a draft, and the form kept.
+      expect(toast.error).toHaveBeenCalledWith(
+        "This roleplay is live — publish your changes first.",
+      );
+      expect(mockUpdateSimulation).not.toHaveBeenCalled();
+      expect(toast.success).not.toHaveBeenCalled();
     });
   });
 
@@ -1052,7 +1189,9 @@ describe("CreateSimulation", () => {
           { id: "state-1", name: "Named State" },
           { id: "state-2", name: "" },
         ],
-        knowledgeSources: [{ id: "ks-1", title: "Test", content: "Test", unlocksFromStateId: "state-2" }],
+        knowledgeSources: [
+          { id: "ks-1", title: "Test", content: "Test", unlocksFromStateId: "state-2" },
+        ],
         triggerWarningIds: [],
       });
 
@@ -1066,7 +1205,9 @@ describe("CreateSimulation", () => {
             id: "existing-id",
             simulation: expect.objectContaining({
               states: [{ id: "state-1", name: "Named State" }],
-              knowledgeSources: [{ id: "ks-1", title: "Test", content: "Test", unlocksFromStateId: null }],
+              knowledgeSources: [
+                { id: "ks-1", title: "Test", content: "Test", unlocksFromStateId: null },
+              ],
             }),
           }),
         );

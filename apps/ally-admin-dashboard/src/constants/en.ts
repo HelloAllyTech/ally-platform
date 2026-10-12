@@ -214,6 +214,17 @@ export const en = {
     autosaving: "Saving…",
     draftAutosaved: "Draft autosaved",
     autosaveFailed: "Couldn’t save — click Save to retry",
+    // A published roleplay is never saved in the background (a draft save
+    // takes it offline for learners), so its edits wait for Publish.
+    liveUnpublishedChanges: "Unpublished changes — Publish to apply them",
+    liveVersionSwitchBlocked:
+      "This roleplay is live — publish your changes before switching versions, or reload to discard them.",
+    takeOfflineTitle: "Take this roleplay",
+    takeOfflineTitleItalic: "offline?",
+    takeOfflineDescription:
+      "Saving it as a draft takes it offline for learners until you publish it again. To keep it live, use Publish instead.",
+    saveAsDraft: "Save as draft",
+    keepEditing: "Keep editing",
     versions: {
       title: "Versions",
       switchVersion: "Switch version",
