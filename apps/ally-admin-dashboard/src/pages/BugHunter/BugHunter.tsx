@@ -73,7 +73,7 @@ import { ANALYTICS_BUG_AGENT_TAB_ID, ANALYTICS_TAB_PARAM } from "../Analytics/An
  * unread notifications, and run-level messages remain readable in the shift log.
  *
  * **Performance** — gone (OPP-0749, 2026-10-05). The governor's surface —
- * `AgentScorecard`, `AccuracyPanel`, `RunHistoryTable` — lives on Analytics →
+ * `RunHistoryTable` and the performance charts — lives on Analytics →
  * Bug Agent beside the operations charts, so one place answers "how is Bug
  * Hunter doing" and this page is for work. `?section=performance` redirects
  * there, so an old link still lands on the numbers.
