@@ -94,6 +94,12 @@ const SessionCard: React.FC<{
           <p className="mt-0.5 truncate text-xs text-typography-500">
             {session.repos?.length ? session.repos.join(", ") : strings.noReposYet}
           </p>
+          {/* Sessions are shared across Builder users, so each card says whose it is. */}
+          {session.createdByName && (
+            <p className="mt-0.5 truncate text-xs text-typography-500">
+              {strings.startedBy(session.createdByName)}
+            </p>
+          )}
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
           <Tag type={BUILDER_STATUS_TAG_TYPE[session.status]} size="sm">
@@ -156,6 +162,7 @@ export const Builder: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<BuilderSessionStatus[]>([]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const [mineOnly, setMineOnly] = useState(false);
   const [archivedOffset, setArchivedOffset] = useState(0);
   const addFilterBtnRef = useRef<HTMLButtonElement>(null);
 
@@ -164,7 +171,7 @@ export const Builder: React.FC = () => {
     isLoading,
     isError,
   } = useGetBuilderSessionsQuery(
-    { status: statusFilter.length ? statusFilter : undefined },
+    { status: statusFilter.length ? statusFilter : undefined, mine: mineOnly },
     {
       // Interviews and builds move on their own; a stale list is how a waiting
       // question goes unnoticed. Skipped while the archived view is showing —
@@ -182,6 +189,7 @@ export const Builder: React.FC = () => {
   } = useGetArchivedBuilderSessionsQuery(
     {
       status: statusFilter.length ? statusFilter : undefined,
+      mine: mineOnly,
       limit: ARCHIVED_PAGE_SIZE,
       offset: archivedOffset,
     },
@@ -252,7 +260,7 @@ export const Builder: React.FC = () => {
     ];
   }, [statusFilter, strings.filterStatusLabel, strings.status]);
 
-  const isFiltering = statusFilter.length > 0 || searchQuery.trim().length > 0;
+  const isFiltering = mineOnly || statusFilter.length > 0 || searchQuery.trim().length > 0;
   const isCurrentLoading = showArchived ? isArchivedLoading : isLoading;
   const hasLoaded = showArchived ? archivedPage !== undefined : sessions !== undefined;
 
@@ -391,6 +399,15 @@ export const Builder: React.FC = () => {
           checked={showArchived}
           onChange={(_event: unknown, { checked }: { checked: boolean }) => {
             setShowArchived(checked);
+            setArchivedOffset(0);
+          }}
+        />
+        <Checkbox
+          id="builder-mine-only"
+          labelText={strings.showMineOnlyLabel}
+          checked={mineOnly}
+          onChange={(_event: unknown, { checked }: { checked: boolean }) => {
+            setMineOnly(checked);
             setArchivedOffset(0);
           }}
         />

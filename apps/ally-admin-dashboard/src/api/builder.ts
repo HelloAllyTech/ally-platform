@@ -42,16 +42,20 @@ import { baseAPI } from "./baseApi";
  */
 export const builderAPI = baseAPI.injectEndpoints({
   endpoints: builder => ({
-    getBuilderSessions: builder.query<BuilderSession[], { status?: BuilderSessionStatus[] } | void>(
-      {
-        query: params => ({
-          url: ApiEndpoints.BUILDER.SESSIONS,
-          method: HttpMethod.GET,
-          params: params && params.status?.length ? { status: params.status } : undefined,
-        }),
-        providesTags: [TAG_TYPES.BUILDER_SESSIONS],
-      },
-    ),
+    getBuilderSessions: builder.query<
+      BuilderSession[],
+      { status?: BuilderSessionStatus[]; mine?: boolean } | void
+    >({
+      query: params => ({
+        url: ApiEndpoints.BUILDER.SESSIONS,
+        method: HttpMethod.GET,
+        params: {
+          ...(params && params.status?.length ? { status: params.status } : {}),
+          ...(params && params.mine ? { mine: true } : {}),
+        },
+      }),
+      providesTags: [TAG_TYPES.BUILDER_SESSIONS],
+    }),
 
     /**
      * The archived-only view: a distinct query, not a param on
@@ -62,12 +66,18 @@ export const builderAPI = baseAPI.injectEndpoints({
      */
     getArchivedBuilderSessions: builder.query<
       BuilderArchivedSessionsPage,
-      { status?: BuilderSessionStatus[]; limit: number; offset: number }
+      { status?: BuilderSessionStatus[]; mine?: boolean; limit: number; offset: number }
     >({
-      query: ({ status, limit, offset }) => ({
+      query: ({ status, mine, limit, offset }) => ({
         url: ApiEndpoints.BUILDER.SESSIONS,
         method: HttpMethod.GET,
-        params: { archived: true, limit, offset, ...(status?.length ? { status } : {}) },
+        params: {
+          archived: true,
+          limit,
+          offset,
+          ...(status?.length ? { status } : {}),
+          ...(mine ? { mine: true } : {}),
+        },
       }),
       providesTags: [TAG_TYPES.BUILDER_SESSIONS],
     }),

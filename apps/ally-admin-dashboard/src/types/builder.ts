@@ -43,8 +43,12 @@ export interface BuilderSession {
   totalCostUsd: string;
   runnerMinutes: number;
   error: string | null;
-  /** Set once the creator archives the session out of their default feed. */
+  /** Set once anyone archives the session; the feed is shared across Builder users. */
   archivedAt: string | null;
+  /** User id of whoever started the session. */
+  createdBy: number;
+  /** Display name of whoever started it (email when blank); null if the user is gone. */
+  createdByName?: string | null;
   createdAt: string;
   updatedAt: string;
 }

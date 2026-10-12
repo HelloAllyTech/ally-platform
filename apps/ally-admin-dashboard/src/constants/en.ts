@@ -3725,6 +3725,8 @@ export const en = {
     retryBuild: "Retry build",
     sessionGone: "This session is gone — start a new one.",
     showArchivedLabel: "Show archived",
+    showMineOnlyLabel: "Only sessions I started",
+    startedBy: (name: string) => `Started by ${name}`,
     archiveAction: "Archive",
     unarchiveAction: "Unarchive",
     archiveSuccess: "Build archived.",

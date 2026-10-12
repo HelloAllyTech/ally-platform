@@ -134,6 +134,8 @@ const session = (overrides: Partial<BuilderSession> = {}): BuilderSession => ({
   runnerMinutes: 0,
   error: null,
   archivedAt: null,
+  createdBy: 1,
+  createdByName: "Asha Rao",
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
   ...overrides,
@@ -150,7 +152,10 @@ describe("Builder mission control — status filter", () => {
 
   it("fetches with no status filter by default", () => {
     render(<Builder />, { wrapper: MemoryRouter });
-    expect(getSessionsSpy).toHaveBeenCalledWith({ status: undefined }, expect.anything());
+    expect(getSessionsSpy).toHaveBeenCalledWith(
+      { status: undefined, mine: false },
+      expect.anything(),
+    );
   });
 
   it("passes the chosen status through to the sessions query", () => {
@@ -162,7 +167,10 @@ describe("Builder mission control — status filter", () => {
     // rather than by text, which would be ambiguous between the two.
     fireEvent.click(screen.getByLabelText("Failed"));
 
-    expect(getSessionsSpy).toHaveBeenLastCalledWith({ status: ["FAILED"] }, expect.anything());
+    expect(getSessionsSpy).toHaveBeenLastCalledWith(
+      { status: ["FAILED"], mine: false },
+      expect.anything(),
+    );
   });
 
   it("shows a status chip once a filter is applied, and clearing it resets the query", () => {
@@ -177,7 +185,27 @@ describe("Builder mission control — status filter", () => {
     expect(screen.getByText(/Status: Failed/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "clear-Status" }));
-    expect(getSessionsSpy).toHaveBeenLastCalledWith({ status: undefined }, expect.anything());
+    expect(getSessionsSpy).toHaveBeenLastCalledWith(
+      { status: undefined, mine: false },
+      expect.anything(),
+    );
+  });
+
+  it("says who started each session, since the feed is shared", () => {
+    render(<Builder />, { wrapper: MemoryRouter });
+
+    expect(screen.getAllByText("Started by Asha Rao").length).toBeGreaterThan(0);
+  });
+
+  it("narrows the feed to the caller's own sessions", () => {
+    render(<Builder />, { wrapper: MemoryRouter });
+
+    fireEvent.click(screen.getByLabelText("Only sessions I started"));
+
+    expect(getSessionsSpy).toHaveBeenLastCalledWith(
+      { status: undefined, mine: true },
+      expect.anything(),
+    );
   });
 
   it("narrows the list by title through the search box, client-side", () => {
