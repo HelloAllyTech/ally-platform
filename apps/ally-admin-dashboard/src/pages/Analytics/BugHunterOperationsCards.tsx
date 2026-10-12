@@ -7,7 +7,6 @@ import { useGetBugHunterOperationsMetricsQuery } from "@api";
 import { AnalyticsTabFilters } from "./analyticsFilters";
 import {
   OUTCOME_SCALE,
-  OpsBar,
   OpsDatum,
   buildFiledSeries,
   buildFiledTable,
@@ -180,4 +179,4 @@ const OpsCard = ({
   );
 };
 
-export type { OpsBar, OpsDatum };
+export type { OpsDatum };

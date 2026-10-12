@@ -11,7 +11,6 @@ import {
   BugHuntDecisionPoint,
   BugHuntDecisionReplay,
   BugHunterMemoryEntry,
-  BugHunterMetrics,
   BugHunterMode,
   BugHunterModelSettings,
   BugHunterNotification,
@@ -21,7 +20,6 @@ import {
   BugHunterToday,
   BugHuntRun,
   BugHuntRunDetail,
-  BugHuntRunsSummary,
   ListBugFindingsQuery,
   ListBugFindingsResponse,
   ListBugHunterMemoryResponse,
@@ -98,30 +96,6 @@ export const bugHunterAPI = baseAPI.injectEndpoints({
         url: ApiEndpoints.BUG_HUNTER.RUNS,
         method: HttpMethod.GET,
       }),
-      providesTags: [{ type: TAG_TYPES.BUG_HUNTER_RUNS, id: "LIST" }],
-    }),
-
-    /**
-     * The scorecard's totals for one window, aggregated in Postgres over every
-     * run in it. `getBugHuntRuns` is capped at the newest 50 rows, which is
-     * about a week of five nightly sweeps plus fix sessions — so a browser-side
-     * sum over it showed the same figure for "7 days", "30 days" and "All".
-     * `days` null means all time; `timeZone` shapes only the per-day series.
-     */
-    getBugHuntRunsSummary: builder.query<
-      BugHuntRunsSummary,
-      { days: number | null; timeZone?: string }
-    >({
-      query: ({ days, timeZone }) => ({
-        url: ApiEndpoints.BUG_HUNTER.RUNS_SUMMARY,
-        method: HttpMethod.GET,
-        params: {
-          ...(days != null ? { days } : {}),
-          ...(timeZone ? { timeZone } : {}),
-        },
-      }),
-      // Same tag as the run list: a triggered sweep or a run finishing
-      // invalidates the list, and the totals must move with it.
       providesTags: [{ type: TAG_TYPES.BUG_HUNTER_RUNS, id: "LIST" }],
     }),
 
@@ -295,31 +269,10 @@ export const bugHunterAPI = baseAPI.injectEndpoints({
       ],
     }),
 
-    getBugHunterMetrics: builder.query<BugHunterMetrics, { days?: number } | void>({
-      query: arg => {
-        // `arg` is `void` when the hook is called with no argument, and
-        // narrowing it before the property read is what keeps that call legal
-        // — the backend defaults the window itself, so omitting `days` is a
-        // real usage rather than a mistake.
-        const days = arg && typeof arg === "object" ? arg.days : undefined;
-        return {
-          url: ApiEndpoints.BUG_HUNTER.METRICS,
-          method: HttpMethod.GET,
-          params: days ? { days } : undefined,
-        };
-      },
-      // Shares the findings list's tag so triaging a bug refreshes the
-      // accuracy figures it just moved — the two are the same data read two
-      // ways, and a panel that disagreed with the table above it would read
-      // as a defect.
-      providesTags: [{ type: TAG_TYPES.BUG_HUNTER_FINDINGS, id: "LIST" }],
-    }),
-
     /**
-     * The volume view beside `getBugHunterMetrics`: what gets filed each day,
-     * where it comes from, who raised it, and what the models cost. Same
-     * window argument, same tag — a triage decision moves a day's
-     * accepted/declined split, so the two panels must refresh together.
+     * The volume view: what gets filed each day beside where each bug stands
+     * now. Shares the findings list's tag — a triage decision moves a day's
+     * accepted/declined split, so the card refreshes with the table.
      */
     getBugHunterOperationsMetrics: builder.query<
       BugHunterOperationsMetrics,
@@ -564,7 +517,6 @@ export const {
   useGetBugHunterModelSettingsQuery,
   useUpdateBugHunterModelSettingsMutation,
   useGetBugHuntRunsQuery,
-  useGetBugHuntRunsSummaryQuery,
   useTriggerBugHuntSweepMutation,
   useGetBugHuntRunQuery,
   useGetBugFindingsQuery,
@@ -579,7 +531,6 @@ export const {
   useCancelBugFixSessionMutation,
   useMergeBugFindingMutation,
   useReleaseBugFindingMutation,
-  useGetBugHunterMetricsQuery,
   useGetBugHunterTodayQuery,
   useGetBugFindingDecisionsQuery,
   useGetBugHuntRunDecisionsQuery,

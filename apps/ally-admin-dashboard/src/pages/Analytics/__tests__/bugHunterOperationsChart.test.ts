@@ -1,45 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  BugFindingSource,
-  BugHuntTrigger,
-  BugHunterOperationsDay,
-  BugHunterOperationsMetrics,
-} from "@types";
+import { BugHunterOperationsDay, BugHunterOperationsMetrics } from "@types";
 
 import {
-  BREADTH_GROUP,
-  DIFFICULTY_LABELS,
   OUTCOME_ACCEPTED,
   OUTCOME_DECLINED,
   OUTCOME_UNDECIDED,
-  SOURCE_SCALE,
-  breadthStart,
-  buildBreadthSeries,
-  buildBreadthTable,
-  buildDifficultyTable,
   buildFiledSeries,
-  buildReporterBars,
-  buildSourceSeries,
-  buildSourceTable,
-  difficultyTakeaway,
   filedTakeaway,
-  presentSources,
   rangeToDays,
-  sourceLabel,
-  tokensPerLine,
-  buildSpendSeries,
-  buildSpendTable,
-  spendBucket,
-  spendTakeaway,
 } from "../bugHunterOperationsChart";
 
-const tokens = (input = 0, output = 0, runs = 0, costUsd = 0) => ({
-  runs,
-  inputTokens: input,
-  outputTokens: output,
-  costUsd,
-});
 const outcomes = (filed = 0, accepted = 0, declined = 0, undecided = 0) => ({
   filed,
   accepted,
@@ -53,14 +24,6 @@ const day = (date: string, over: Partial<BugHunterOperationsDay> = {}): BugHunte
   accepted: 0,
   declined: 0,
   undecided: 0,
-  bySource: {},
-  byDifficulty: { easy: outcomes(), hard: outcomes(), reported: outcomes() },
-  breadth: null,
-  tokens: {
-    [BugHuntTrigger.SCHEDULED]: tokens(),
-    [BugHuntTrigger.MANUAL]: tokens(),
-    [BugHuntTrigger.FIX_SESSION]: tokens(),
-  },
   ...over,
 });
 
@@ -68,16 +31,7 @@ const metrics = (over: Partial<BugHunterOperationsMetrics> = {}): BugHunterOpera
   windowDays: 30,
   since: "2026-08-29T00:00:00.000Z",
   days: [],
-  bySource: [],
-  byDifficulty: [
-    { difficulty: "easy", ...outcomes() },
-    { difficulty: "hard", ...outcomes() },
-    { difficulty: "reported", ...outcomes() },
-  ],
-  breadth: null,
-  byReporter: [],
-  tokensByModel: [],
-  totals: { ...outcomes(), inputTokens: 0, outputTokens: 0, costUsd: 0, runs: 0 },
+  totals: outcomes(),
   ...over,
 });
 
@@ -117,198 +71,16 @@ describe("filed series", () => {
     expect(
       filedTakeaway(
         metrics({
-          totals: { ...outcomes(8, 3, 2, 3), inputTokens: 0, outputTokens: 0, costUsd: 0, runs: 0 },
+          totals: outcomes(8, 3, 2, 3),
         }),
       ),
     ).toBe("8 filed · 60% of the 5 ruled on were accepted");
     expect(
       filedTakeaway(
         metrics({
-          totals: { ...outcomes(4, 0, 0, 4), inputTokens: 0, outputTokens: 0, costUsd: 0, runs: 0 },
+          totals: outcomes(4, 0, 0, 4),
         }),
       ),
     ).toBe("4 filed — none ruled on yet");
-  });
-});
-
-describe("source series", () => {
-  it("plots only sources present in the window, each in its fixed colour and in palette order", () => {
-    const bySource = [
-      { source: BugFindingSource.REPORTED_BUG, ...outcomes(9, 3, 1, 5) },
-      { source: BugFindingSource.CODE_REVIEW, ...outcomes(44, 18, 16, 10) },
-    ];
-    const sources = presentSources(bySource);
-    expect(sources).toEqual([BugFindingSource.CODE_REVIEW, BugFindingSource.REPORTED_BUG]);
-    const series = buildSourceSeries(
-      [day("2026-09-27", { bySource: { [BugFindingSource.CODE_REVIEW]: 5 } })],
-      sources,
-    );
-    expect(series).toEqual([
-      { group: sourceLabel(BugFindingSource.CODE_REVIEW), key: "2026-09-27", value: 5 },
-      { group: sourceLabel(BugFindingSource.REPORTED_BUG), key: "2026-09-27", value: 0 },
-    ]);
-    // The colour is keyed by the label the series uses, so the legend matches the bars.
-    expect(SOURCE_SCALE[sourceLabel(BugFindingSource.CODE_REVIEW)]).toBeDefined();
-  });
-
-  it("puts a dash, never 0%, beside a source nobody has ruled on", () => {
-    const table = buildSourceTable([
-      { source: BugFindingSource.UX_SIGNAL, ...outcomes(4, 0, 0, 4) },
-      { source: BugFindingSource.TEST_FAILURE, ...outcomes(2, 2, 0, 0) },
-    ]);
-    expect(table.rows[0][5]).toBe("—");
-    expect(table.rows[1][5]).toBe("100%");
-  });
-});
-
-describe("difficulty", () => {
-  it("lists all three buckets in a fixed order and compares hard against easy", () => {
-    const data = metrics({
-      byDifficulty: [
-        { difficulty: "easy", ...outcomes(29, 22, 2, 5) },
-        { difficulty: "hard", ...outcomes(44, 18, 16, 10) },
-        { difficulty: "reported", ...outcomes() },
-      ],
-    });
-    const table = buildDifficultyTable(data);
-    expect(table.rows.map(r => r[0])).toEqual([
-      DIFFICULTY_LABELS.easy,
-      DIFFICULTY_LABELS.hard,
-      DIFFICULTY_LABELS.reported,
-    ]);
-    expect(table.rows[2][5]).toBe("—");
-    expect(difficultyTakeaway(data)).toBe(
-      "44 hard-to-spot vs 29 easy — accepted 53% vs 92% of those ruled on",
-    );
-  });
-});
-
-describe("reporters", () => {
-  it("always yields all three bars so a zero for consumers is visible", () => {
-    expect(buildReporterBars([{ reporter: "agent", filed: 7, accepted: 3, declined: 2 }])).toEqual([
-      { group: "Bug Hunter", value: 7 },
-      { group: "Staff", value: 0 },
-      { group: "Consumers", value: 0 },
-    ]);
-  });
-});
-
-describe("breadth", () => {
-  const days = [
-    day("2026-09-21", {
-      tokens: { ...day("x").tokens, [BugHuntTrigger.SCHEDULED]: tokens(500_000, 50_000, 5) },
-    }),
-    day("2026-09-22"),
-    day("2026-09-23", {
-      breadth: { runs: 5, linesInScope: 4000, filesInScope: 60, commits: 7, deepRuns: 0 },
-      tokens: {
-        ...day("x").tokens,
-        [BugHuntTrigger.SCHEDULED]: tokens(1_000_000, 200_000, 5),
-        [BugHuntTrigger.FIX_SESSION]: tokens(900_000, 100_000, 2),
-      },
-    }),
-    day("2026-09-24"),
-  ];
-
-  it("starts the plot on the first recorded day rather than drawing earlier days as zero", () => {
-    expect(breadthStart(days)).toBe("2026-09-23");
-    expect(buildBreadthSeries(days)).toEqual([
-      { group: BREADTH_GROUP, key: "2026-09-23", value: 4000 },
-      { group: BREADTH_GROUP, key: "2026-09-24", value: 0 },
-    ]);
-    expect(buildBreadthSeries([day("2026-09-21")])).toEqual([]);
-  });
-
-  it("marks unrecorded days in the table instead of printing zero lines", () => {
-    const table = buildBreadthTable(days);
-    expect(table.rows[0][1]).toBe("not recorded");
-    expect(table.rows[2].slice(1, 3)).toEqual([4000, 60]);
-  });
-
-  it("computes tokens per line from sweep tokens only, over the measured days", () => {
-    // 1.2M sweep tokens on the one measured day; the fix session's 1M and the
-    // unmeasured day's 550k are both left out.
-    expect(tokensPerLine(days)).toBe(300);
-    expect(tokensPerLine([day("2026-09-21")])).toBeNull();
-  });
-});
-
-describe("spend over time", () => {
-  const spent = (date: string, scheduled: number, fix = 0) =>
-    day(date, {
-      tokens: {
-        [BugHuntTrigger.SCHEDULED]: { ...tokens(), runs: 1, costUsd: scheduled },
-        [BugHuntTrigger.MANUAL]: tokens(),
-        [BugHuntTrigger.FIX_SESSION]: { ...tokens(), runs: fix ? 1 : 0, costUsd: fix },
-      },
-    });
-
-  it("buckets a day by itself, by the Monday of its week, or by its month", () => {
-    expect(spendBucket("2026-10-01", "day")).toBe("2026-10-01");
-    // 2026-10-01 is a Thursday; 2026-10-04 a Sunday; 2026-10-05 a Monday.
-    expect(spendBucket("2026-10-01", "week")).toBe("Wk of 2026-09-28");
-    expect(spendBucket("2026-10-04", "week")).toBe("Wk of 2026-09-28");
-    expect(spendBucket("2026-10-05", "week")).toBe("Wk of 2026-10-05");
-    expect(spendBucket("2026-10-01", "month")).toBe("2026-10");
-  });
-
-  it("sums cost per bucket and trigger, keeping buckets in date order", () => {
-    const days = [spent("2026-09-30", 1.1), spent("2026-10-01", 2.2, 0.5), spent("2026-10-05", 4)];
-
-    const byDay = buildSpendSeries(days, "day");
-    expect(byDay.filter(p => p.group === "Nightly sweep").map(p => [p.key, p.value])).toEqual([
-      ["2026-09-30", 1.1],
-      ["2026-10-01", 2.2],
-      ["2026-10-05", 4],
-    ]);
-
-    const byWeek = buildSpendSeries(days, "week");
-    expect(byWeek.filter(p => p.group === "Nightly sweep").map(p => [p.key, p.value])).toEqual([
-      ["Wk of 2026-09-28", 3.3],
-      ["Wk of 2026-10-05", 4],
-    ]);
-    expect(byWeek.find(p => p.group === "Fix session" && p.key === "Wk of 2026-09-28")?.value).toBe(
-      0.5,
-    );
-
-    const byMonth = buildSpendSeries(days, "month");
-    expect(byMonth.filter(p => p.group === "Nightly sweep").map(p => [p.key, p.value])).toEqual([
-      ["2026-09", 1.1],
-      ["2026-10", 6.2],
-    ]);
-  });
-
-  it("tables every bucket with a total and a run count", () => {
-    const table = buildSpendTable(
-      [spent("2026-09-30", 1.1), spent("2026-10-01", 2.2, 0.5)],
-      "month",
-    );
-    expect(table.columns[0]).toBe("Month (UTC)");
-    expect(table.columns).toContain("Total (USD)");
-    expect(table.rows).toEqual([
-      ["2026-09", 1.1, 0, 0, 0, 0, 1.1, 1],
-      ["2026-10", 2.2, 0, 0.5, 0, 0, 2.7, 2],
-    ]);
-  });
-
-  it("names the total, the average per period and the peak", () => {
-    const days = [spent("2026-09-30", 1), spent("2026-10-01", 3)];
-    const data = {
-      days,
-      totals: {
-        filed: 0,
-        accepted: 0,
-        declined: 0,
-        undecided: 0,
-        inputTokens: 0,
-        outputTokens: 0,
-        costUsd: 4,
-        runs: 2,
-      },
-    } as unknown as Parameters<typeof spendTakeaway>[0];
-    expect(spendTakeaway(data, "day")).toMatch(
-      /\$4\.00 over the window · \$2\.00 per day on average · most in 2026-10-01 \(\$3\.00\)/,
-    );
-    expect(spendTakeaway(data, "month")).toMatch(/per month on average · most in 2026-10/);
   });
 });
