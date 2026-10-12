@@ -444,6 +444,26 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
     watch,
   } = formMethods;
 
+  // A published roleplay being edited on its live record (not a draft
+  // version). Every save from the editor sends DRAFT, so on one of these a save
+  // takes the roleplay offline for learners until someone publishes again —
+  // which the background savers did silently on 2026-10-06 (#105, no click).
+  // So nothing saves it in the background, and an explicit Save asks first.
+  // `savedAsDraft` covers the gap after a confirmed Save, before the record is
+  // refetched.
+  const [savedAsDraft, setSavedAsDraft] = useState(false);
+  useEffect(() => setSavedAsDraft(false), [adminSimulationByIdData]);
+  const isEditingLiveRoleplay =
+    !viewMode &&
+    !!simulationId &&
+    !activeVersionId &&
+    !savedAsDraft &&
+    (adminSimulationByIdData?.status === SimulationStatus.ACTIVE ||
+      adminSimulationByIdData?.status === SimulationStatus.PUBLISHED);
+  const hasUnsavedEdits = Object.keys(dirtyFields).length > 0;
+  // The explicit save waiting on the "take it offline?" confirmation.
+  const [pendingOfflineSave, setPendingOfflineSave] = useState<"save" | "saveAndExit" | null>(null);
+
   // Watch all form values to check mandatory fields
   const formValues = watch();
 
@@ -878,15 +898,24 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
   // only runs on a 10s interval, so without this a quick switch would discard
   // any field changes (e.g. Skill version) made since the last tick when the
   // form is reset to the incoming version.
-  const flushPendingEdits = async () => {
-    if (viewMode) return;
-    if (Object.keys(dirtyFields).length === 0) return;
-    if (isActiveVersionReadOnly) return; // archived snapshot — nothing to save
+  //
+  // Returns false to stop the switch. On a live roleplay the flush would save
+  // it as a draft (offline for learners), and skipping it would let the reset
+  // drop the author's edits, so the switch waits until they publish or reload.
+  const flushPendingEdits = async (): Promise<boolean> => {
+    if (viewMode) return true;
+    if (!hasUnsavedEdits) return true;
+    if (isActiveVersionReadOnly) return true; // archived snapshot — nothing to save
+    if (isEditingLiveRoleplay) {
+      toast.error(en.simulation.liveVersionSwitchBlocked);
+      return false;
+    }
     try {
       await saveSimulationChangesCore(SimulationStatus.DRAFT, { silent: true });
     } catch {
       /* best-effort — proceed with the switch even if the flush fails */
     }
+    return true;
   };
 
   const handleSaveDraft = async (options?: { silent?: boolean }) => {
@@ -897,6 +926,8 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
         if (response?.data?.[0]?.id && !simulationId) {
           setSimulationId(response?.data?.[0]?.id);
         }
+        // The live record is a draft now; stop treating it as published.
+        if (!activeVersionId) setSavedAsDraft(true);
         // Reset form to clear dirtyFields after successful save
         const currentFormValues = formMethods.getValues();
         formMethods.reset(currentFormValues);
@@ -938,6 +969,7 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
   const autosaveRef = useRef<() => void>(() => {});
   autosaveRef.current = () => {
     if (viewMode) return; // View Details never saves
+    if (isEditingLiveRoleplay) return; // a draft save would take it offline; edits wait for Publish
     if (draftSaveBlockedMessage) return; // backend refuses drafts for this sim
     if (isAutosavingRef.current) return; // an autosave is already running
     if (isCreatingSimulation) return; // a create/publish is in flight
@@ -1037,13 +1069,39 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
     navigate(-1);
   };
 
-  const handleSaveAndExit = async () => {
+  const doSaveAndExit = async () => {
     const response = await saveSimulationChanges(SimulationStatus.DRAFT);
     if (response) {
       setShowDiscardPopup(false);
       navigate(-1);
       toast.success("Simulation changes saved successfully!");
     }
+  };
+
+  const handleSaveAndExit = () => {
+    if (isEditingLiveRoleplay) {
+      setShowDiscardPopup(false);
+      setPendingOfflineSave("saveAndExit");
+      return;
+    }
+    void doSaveAndExit();
+  };
+
+  // Header Save. On a live roleplay it confirms first: it saves as a draft,
+  // which takes the roleplay offline for learners.
+  const handleSaveClick = () => {
+    if (isEditingLiveRoleplay) {
+      setPendingOfflineSave("save");
+      return;
+    }
+    void handleSaveDraft();
+  };
+
+  const handleConfirmOfflineSave = () => {
+    const action = pendingOfflineSave;
+    setPendingOfflineSave(null);
+    if (action === "saveAndExit") void doSaveAndExit();
+    else if (action === "save") void handleSaveDraft();
   };
 
   const handleCloseDiscardPopup = () => {
@@ -1302,6 +1360,15 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
               {en.simulation.readOnlyViewNote}
             </span>
           )}
+          {isEditingLiveRoleplay && hasUnsavedEdits && (
+            <span
+              className="flex items-center gap-1.5 text-xs text-typography-500"
+              aria-live="polite"
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-warning-400" />
+              {en.simulation.liveUnpublishedChanges}
+            </span>
+          )}
           {!viewMode && autosaveState !== "idle" && (
             <span
               className={`flex items-center gap-1.5 text-xs transition-opacity ${
@@ -1359,7 +1426,7 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
                 onClose={() => setIsVersionPanelOpen(false)}
                 onEditVersion={async version => {
                   // Save the outgoing draft/live edits before the form reset.
-                  await flushPendingEdits();
+                  if (!(await flushPendingEdits())) return;
                   if (version.isLive || version.status === ScenarioVersionStatus.PUBLISHED) {
                     // This version IS the live scenario — edit it via the live
                     // path. Clearing activeVersionId makes the load effect
@@ -1402,7 +1469,7 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
           {!viewMode && (
             <Button
               variant={ButtonVariant.TEXT}
-              onClick={() => handleSaveDraft()}
+              onClick={handleSaveClick}
               className="px-4 h-[40px] text-typography-900"
             >
               {en.simulation.save}
@@ -1518,6 +1585,24 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
         secondaryButton={{
           label: en.simulation.discardChanges,
           onClick: handleDiscardChanges,
+          variant: ButtonVariant.SECONDARY,
+        }}
+      />
+
+      <ActionConfirmationPopup
+        isOpen={pendingOfflineSave !== null}
+        onClose={() => setPendingOfflineSave(null)}
+        title={en.simulation.takeOfflineTitle}
+        titleItalic={en.simulation.takeOfflineTitleItalic}
+        description={en.simulation.takeOfflineDescription}
+        primaryButton={{
+          label: en.simulation.saveAsDraft,
+          onClick: handleConfirmOfflineSave,
+          variant: ButtonVariant.PRIMARY,
+        }}
+        secondaryButton={{
+          label: en.simulation.keepEditing,
+          onClick: () => setPendingOfflineSave(null),
           variant: ButtonVariant.SECONDARY,
         }}
       />
