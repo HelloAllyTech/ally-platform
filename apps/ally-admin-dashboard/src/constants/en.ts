@@ -2878,6 +2878,27 @@ export const en = {
         "Accepted over ruled-on (accepted + declined as finder error). Pending findings are left out. Fewer than 5 ruled on reads as a dash: too thin to call.",
       empty: "Nothing filed on this repo in the window.",
       fixersEmpty: "No fix sessions on this repo in the window.",
+      colHeld: "Held / came back",
+      colHeldTooltip:
+        "Released and re-checked in production with the symptom gone (link six of the chain) / fixes that came back: refused at the wrong layer, reverted, regressed or found back in production. This is the number I learn from, not merged.",
+      wrongFixesTitle: "Where my fixes broke",
+      wrongFixesCaption:
+        "Every fix that turned out wrong in the window, by the link of the case chain that broke. A link that keeps breaking is a failure class before anyone names it.",
+      wrongFixesEmpty: "No fix has turned out wrong in this window.",
+      wrongFixesLinks: {
+        observed: "observed",
+        reproduced: "reproduced",
+        located: "located",
+        changed: "changed in that mechanism",
+        resolved: "resolved for the reporter",
+        held: "held after release",
+      },
+      wrongFixesSource: {
+        verifier: "Verifier refused",
+        regression: "came back in a sweep",
+        revert: "reverted by a person",
+        held_check: "back after release",
+      },
       thin: "—",
       replayTitle: "Decision replay — should the other owner take a point?",
       replaySubtitle:

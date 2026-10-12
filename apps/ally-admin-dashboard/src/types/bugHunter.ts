@@ -76,6 +76,8 @@ export enum BugHuntEventStage {
   RECURRENCE_SUPPRESSED = "recurrence_suppressed",
   /** This dismissal was proven wrong — a same-dedupe-key finding shipped. See ally-be's checkForAndRecordReversals. */
   REVERSED = "reversed",
+  /** A fix turned out wrong — the payload names the chain link that broke. See ally-be's BugWrongFix. */
+  WRONG_FIX = "wrong_fix",
 }
 
 /**
@@ -520,6 +522,8 @@ export interface BugFinding {
   faultLocation: BugFaultLocation | null;
   /** The case chain, derived on read — see BugCaseChain. */
   chain: BugCaseChain;
+  /** Set when a fix turned out wrong — see BugWrongFix. */
+  wrongFix: BugWrongFix | null;
   /**
    * What the last failed fix session left behind, or null. Written by the
    * fix protocol with `status: failed`; the next session reads it in its
@@ -802,6 +806,40 @@ export interface BugHunterScoreboardFixRow {
   failed: number;
   passVerdicts: number;
   failVerdicts: number;
+  /** Released and re-checked gone in production — link six of the chain. */
+  held: number;
+  /** Refused at the wrong layer, reverted, regressed or back in production. */
+  cameBack: number;
+}
+
+/** Mirrors ally-be's BugWrongFix: a fix that turned out wrong, by the chain link that broke. */
+export interface BugWrongFix {
+  link: BugChainLink;
+  source: "verifier" | "regression" | "revert" | "held_check";
+  reason: string;
+  prUrl: string | null;
+  sha: string | null;
+  by: string | null;
+  at: string;
+}
+
+/** `GET /v1/bug-hunter/metrics/wrong-fixes` */
+export interface BugHunterWrongFixSummary {
+  windowDays: number;
+  since: string;
+  total: number;
+  byLink: Record<BugChainLink, number>;
+  bySource: Record<BugWrongFix["source"], number>;
+  recent: {
+    findingId: string;
+    title: string;
+    repo: string | null;
+    link: BugChainLink;
+    source: BugWrongFix["source"];
+    reason: string;
+    prUrl: string | null;
+    at: string;
+  }[];
 }
 
 /** What each sense and model has produced on a repo — mirrors ally-be's `Scoreboard`. */
