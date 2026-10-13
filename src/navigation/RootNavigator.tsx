@@ -66,6 +66,8 @@ import {logger} from '@/utils';
 import {getItem, setItem} from '@/utils/asyncStorage';
 import {
   getCallIdFromUrl,
+  getCourseIdFromUrl,
+  isCourseLink,
   isSupportedDeepLink,
   navigateToCallSummaryOrLog,
 } from '@/utils/deeplink';
@@ -89,6 +91,12 @@ const NavigationContent = ({
   const permissions = useSelector((s: AppRootState) => s.user.permissions);
   const pendingItemIdRef = useRef<number | undefined>(undefined);
   const deepLinkInProgressRef = useRef<boolean>(false);
+  // A course share link (`/course/:trackId`) waiting for the learner to be
+  // signed in and past the post-login routing (Splash, CompleteProfile).
+  const pendingCourseIdRef = useRef<string | undefined>(undefined);
+  // The launch URL is re-read whenever the link effect re-subscribes; a
+  // course link must open once, not every time summary fields reload.
+  const launchCourseUrlHandledRef = useRef<boolean>(false);
   const [
     getSummaryFields,
     {data: summaryFields, isLoading: summaryFieldsLoading},
@@ -186,10 +194,22 @@ const NavigationContent = ({
       pendingItemIdRef.current = undefined;
     };
 
-    const handleURL = (url?: string | null) => {
+    const handleURL = (url?: string | null, isLaunchUrl = false) => {
       if (!url) return;
       try {
         const parsed = new URL(url);
+        if (isSupportedDeepLink(parsed) && isCourseLink(parsed)) {
+          if (isLaunchUrl) {
+            if (launchCourseUrlHandledRef.current) return;
+            launchCourseUrlHandledRef.current = true;
+          }
+          const trackId = getCourseIdFromUrl(parsed);
+          if (trackId) {
+            pendingCourseIdRef.current = trackId;
+            openPendingCourse();
+          }
+          return;
+        }
         if (isSupportedDeepLink(parsed)) {
           const callId = getCallIdFromUrl(parsed);
           if (callId) {
@@ -201,10 +221,41 @@ const NavigationContent = ({
       }
     };
 
-    Linking.getInitialURL().then(handleURL);
+    Linking.getInitialURL().then(url => handleURL(url, true));
     const sub = Linking.addEventListener('url', e => handleURL(e.url));
     return () => sub.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, navigationRef, summaryFieldsLoading, summaryFields]);
+
+  /**
+   * Opens a pending course link once the learner can see it: signed in, and
+   * past Splash/CompleteProfile, whose own post-login `replace` would
+   * otherwise swap the course straight back out. Signed out, the link waits
+   * through login (in memory — a killed app drops it, as summary links do).
+   * Access is the overview's to decide: a course that is not theirs shows
+   * the "not available" state there.
+   */
+  const openPendingCourse = useCallback(() => {
+    const trackId = pendingCourseIdRef.current;
+    if (!trackId || !isAuthenticated || !navigationRef.isReady()) return;
+    const current = navigationRef.getCurrentRoute()?.name as RouteNames;
+    if (
+      current === SCREEN_NAMES.SPLASH ||
+      current === SCREEN_NAMES.COMPLETE_PROFILE
+    ) {
+      return;
+    }
+    pendingCourseIdRef.current = undefined;
+    // A live session the app routed a counsellor back into outranks a link:
+    // drop it rather than pull them out, or spring it on them afterwards.
+    if (current === SCREEN_NAMES.LISTENING) return;
+    navigationRef.navigate(SCREEN_NAMES.COURSE_OVERVIEW, {trackId});
+  }, [isAuthenticated, navigationRef]);
+
+  useEffect(() => {
+    openPendingCourse();
+    return navigationRef.addListener('state', openPendingCourse);
+  }, [openPendingCourse, navigationRef]);
 
   // If dependencies flip true while a deep link is pending, handle it now
   useEffect(() => {
