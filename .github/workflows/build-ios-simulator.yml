@@ -26,6 +26,22 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # macos-15 runners ship more than one Xcode version, and the default
+      # selected one doesn't necessarily have the newest iOS SDK. The first
+      # build attempt failed compiling device_info_plus (a transitive dep,
+      # not one this project added directly): its iOS code references
+      # NSProcessInfo.isiOSAppOnVision, an iOS-26.1-only API — the selector
+      # has to exist in *some* imported header for the compiler to resolve
+      # it even inside an `@available` guard. Pinning the dependency down
+      # to a pre-26.1-aware version isn't viable either: it's stuck behind
+      # flutter_secure_storage's Windows backend needing a win32 major bump
+      # that landed in the same device_info_plus release as the Vision
+      # support. Selecting the newest available Xcode is the real fix.
+      - name: Select latest Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
