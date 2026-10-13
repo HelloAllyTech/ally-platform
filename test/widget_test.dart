@@ -9,6 +9,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Ally'), findsOneWidget);
-    expect(find.text('Simulate sign-in (dev only)'), findsOneWidget);
+    expect(find.text('Send code'), findsOneWidget);
   });
 }
