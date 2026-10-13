@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/localization/translate_ref.dart';
 import '../data/simulations_repository.dart';
 
 /// Port of ally-mobile (React Native)'s `SimulationsScreen` — scenario list
@@ -16,12 +17,16 @@ class SimulationsScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Simulations'),
+        title: Text(ref.t('learn.tabs.simulations')),
         actions: [
           creditsAsync.when(
             data: (credits) => Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Center(child: Text('${credits.remaining} credits')),
+              child: Center(
+                child: Text(
+                  ref.t('simulations.creditsRemaining', {'count': credits.remaining}),
+                ),
+              ),
             ),
             loading: () => const SizedBox.shrink(),
             error: (_, _) => const SizedBox.shrink(),
@@ -30,11 +35,12 @@ class SimulationsScreen extends ConsumerWidget {
       ),
       body: scenariosAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) =>
-            Center(child: Text('Failed to load scenarios: $error')),
+        error: (error, _) => Center(
+          child: Text('${ref.t('simulations.failedToLoadScenarios')}: $error'),
+        ),
         data: (scenarios) {
           if (scenarios.isEmpty) {
-            return const Center(child: Text('No scenarios available yet.'));
+            return Center(child: Text(ref.t('simulationPage.noSimulationsAvailable')));
           }
           return ListView.builder(
             padding: const EdgeInsets.all(16),

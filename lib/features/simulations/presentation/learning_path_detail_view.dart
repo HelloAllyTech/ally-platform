@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/localization/translate_ref.dart';
 import '../data/simulation_models.dart';
 
 /// Shared body for CaseDetailsScreen and SimulationPathDetailsScreen — ally-
@@ -19,7 +21,7 @@ import '../data/simulation_models.dart';
 /// `showRetryModal`) — those need the backend error body's `entityId`
 /// parsed out of a Dio exception, real further work; failures here just
 /// surface as a SnackBar. Low-credits warning modal also not ported.
-class LearningPathDetailView extends StatefulWidget {
+class LearningPathDetailView extends ConsumerStatefulWidget {
   const LearningPathDetailView({
     super.key,
     required this.details,
@@ -42,10 +44,10 @@ class LearningPathDetailView extends StatefulWidget {
   final Future<void> Function(PathScenario scenario) onViewFeedback;
 
   @override
-  State<LearningPathDetailView> createState() => _LearningPathDetailViewState();
+  ConsumerState<LearningPathDetailView> createState() => _LearningPathDetailViewState();
 }
 
-class _LearningPathDetailViewState extends State<LearningPathDetailView> {
+class _LearningPathDetailViewState extends ConsumerState<LearningPathDetailView> {
   bool _isStarting = false;
   String? _error;
 
@@ -61,7 +63,7 @@ class _LearningPathDetailViewState extends State<LearningPathDetailView> {
       await widget.onEnsureSession();
       await widget.onStartScenario(scenario);
     } catch (e) {
-      setState(() => _error = 'Failed to start: $e');
+      setState(() => _error = '${ref.tr('errors.startSimulation')}: $e');
     } finally {
       if (mounted) setState(() => _isStarting = false);
     }
@@ -72,9 +74,9 @@ class _LearningPathDetailViewState extends State<LearningPathDetailView> {
       await widget.onViewFeedback(scenario);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to load session: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${ref.tr('errors.loadSession')}: $e')),
+        );
       }
     }
   }
@@ -100,15 +102,18 @@ class _LearningPathDetailViewState extends State<LearningPathDetailView> {
           const SizedBox(height: 8),
         ],
         Text(
-          '${details.completedScenarios}/${details.scenarios.length} completed',
+          ref.t('learn.details.progress', {
+            'completed': details.completedScenarios,
+            'total': details.scenarios.length,
+          }),
         ),
         if (_isCompleted) ...[
           const SizedBox(height: 4),
-          const Row(
+          Row(
             children: [
-              Icon(Icons.check_circle, color: Colors.green, size: 18),
-              SizedBox(width: 6),
-              Text('Completed'),
+              const Icon(Icons.check_circle, color: Colors.green, size: 18),
+              const SizedBox(width: 6),
+              Text(ref.t('simulations.completed_one')),
             ],
           ),
         ],
@@ -123,7 +128,7 @@ class _LearningPathDetailViewState extends State<LearningPathDetailView> {
                   height: 20,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : Text(_isStarted ? 'Continue' : 'Start'),
+              : Text(_isStarted ? ref.t('common.continue') : ref.t('common.start')),
         ),
         if (_error != null) ...[
           const SizedBox(height: 8),
@@ -143,7 +148,7 @@ class _LearningPathDetailViewState extends State<LearningPathDetailView> {
   }
 }
 
-class _ScenarioRow extends StatelessWidget {
+class _ScenarioRow extends ConsumerWidget {
   const _ScenarioRow({
     required this.scenario,
     required this.isNext,
@@ -159,7 +164,7 @@ class _ScenarioRow extends StatelessWidget {
   final VoidCallback onViewFeedback;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final locked = scenario.status == SessionItemStatus.locked;
     final completed = scenario.status == SessionItemStatus.completed;
 
@@ -173,14 +178,17 @@ class _ScenarioRow extends StatelessWidget {
               ? const Icon(Icons.check, size: 18)
               : Text('${scenario.order}'),
         ),
-        title: Text(scenario.title ?? 'Scenario ${scenario.scenarioId}'),
+        title: Text(
+          scenario.title ??
+              ref.t('simulations.scenarioFallbackTitle', {'id': scenario.scenarioId}),
+        ),
         subtitle: scenario.description != null
             ? Text(scenario.description!)
             : null,
         trailing: completed && scenario.sessionId != null
             ? IconButton(
                 icon: const Icon(Icons.description_outlined),
-                tooltip: 'View feedback',
+                tooltip: ref.t('simulations.viewFeedback'),
                 onPressed: onViewFeedback,
               )
             : null,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/localization/translate_ref.dart';
 import '../data/simulation_transcript_repository.dart';
 
 /// Port of ally-mobile (React Native)'s `TranscriptTab`/`SimulationTranscript`
@@ -69,7 +70,7 @@ class _SimulationTranscriptTabState
             result.messages.isNotEmpty && _messages.length < result.count;
       });
     } catch (e) {
-      setState(() => _error = 'Failed to load transcript: $e');
+      setState(() => _error = '${ref.tr('postSim.tabs.transcriptTranslationFailed')}: $e');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -113,8 +114,8 @@ class _SimulationTranscriptTabState
       );
     }
     if (_messages.isEmpty) {
-      return const Center(
-        child: Text('No transcript available for this session.'),
+      return Center(
+        child: Text(ref.t('transcription.empty')),
       );
     }
 
@@ -138,7 +139,7 @@ class _SimulationTranscriptTabState
                 : CrossAxisAlignment.start,
             children: [
               Text(
-                '${message.isLearner ? 'You' : 'Client'} · ${message.formattedTime}',
+                '${message.isLearner ? ref.t('transcription.youLabel') : ref.t('transcription.clientLabel')} · ${message.formattedTime}',
                 style: Theme.of(context).textTheme.labelSmall,
               ),
               const SizedBox(height: 4),
