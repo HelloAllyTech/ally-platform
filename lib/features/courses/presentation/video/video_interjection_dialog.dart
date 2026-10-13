@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/localization/translate_ref.dart';
 import '../../data/courses_repository.dart';
 import '../../data/quiz_models.dart';
 import '../../data/start_item_payload.dart';
@@ -57,7 +58,7 @@ class _VideoInterjectionDialogState extends ConsumerState<VideoInterjectionDialo
         );
       });
     } catch (e) {
-      setState(() => _error = 'Failed to submit: $e');
+      setState(() => _error = '${ref.tr('courses.video.interjection.submitError')}: $e');
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -78,7 +79,7 @@ class _VideoInterjectionDialogState extends ConsumerState<VideoInterjectionDialo
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  'Quick check',
+                  ref.t('courses.video.interjection.title'),
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
@@ -106,12 +107,12 @@ class _VideoInterjectionDialogState extends ConsumerState<VideoInterjectionDialo
                             width: 16,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Text('Submit'),
+                        : Text(ref.t('courses.video.interjection.submit')),
                   )
                 else
                   FilledButton(
                     onPressed: () => Navigator.of(context).pop(true),
-                    child: const Text('Continue'),
+                    child: Text(ref.t('courses.video.interjection.continue')),
                   ),
               ],
             ),

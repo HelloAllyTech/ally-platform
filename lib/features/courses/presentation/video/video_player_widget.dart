@@ -1,7 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:video_player/video_player.dart';
+
+import '../../../../core/localization/translate_ref.dart';
 
 /// Port of ally-mobile (React Native)'s `VideoPlayer` — thin native video
 /// playback wrapper (S3-hosted sources only — see `VideoFallbackCard` for
@@ -14,7 +17,7 @@ import 'package:video_player/video_player.dart';
 /// `react-native-video`), so this polls `controller.value.position` on a
 /// short timer instead — functionally equivalent, just a different
 /// mechanism for the same signal.
-class VideoPlayerWidget extends StatefulWidget {
+class VideoPlayerWidget extends ConsumerStatefulWidget {
   const VideoPlayerWidget({
     super.key,
     required this.url,
@@ -27,10 +30,10 @@ class VideoPlayerWidget extends StatefulWidget {
   final VoidCallback onPauseOrEnd;
 
   @override
-  State<VideoPlayerWidget> createState() => VideoPlayerWidgetState();
+  ConsumerState<VideoPlayerWidget> createState() => VideoPlayerWidgetState();
 }
 
-class VideoPlayerWidgetState extends State<VideoPlayerWidget> {
+class VideoPlayerWidgetState extends ConsumerState<VideoPlayerWidget> {
   late final VideoPlayerController _controller;
   Timer? _progressPoll;
   bool _wasPlaying = false;
@@ -82,8 +85,8 @@ class VideoPlayerWidgetState extends State<VideoPlayerWidget> {
           color: Colors.black,
           child: Center(
             child: Text(
-              'Could not load this video.',
-              style: TextStyle(color: Colors.white70),
+              ref.t('courses.video.loadFailed'),
+              style: const TextStyle(color: Colors.white70),
             ),
           ),
         ),

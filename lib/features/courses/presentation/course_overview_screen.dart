@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/localization/translate_ref.dart';
 import '../data/courses_repository.dart';
 
 /// Ported from ally-mobile (React Native)'s `CourseOverviewScreen` — the
@@ -16,13 +17,14 @@ class CourseOverviewScreen extends ConsumerWidget {
     final tracksAsync = ref.watch(learnTracksProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Courses')),
+      appBar: AppBar(title: Text(ref.t('learn.tabs.courses'))),
       body: tracksAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(child: Text('Failed to load courses: $error')),
+        error: (error, _) =>
+            Center(child: Text('${ref.t('courses.listLoadFailed')}: $error')),
         data: (tracks) {
           if (tracks.isEmpty) {
-            return const Center(child: Text('No courses available yet.'));
+            return Center(child: Text(ref.t('simulationPage.noCoursesAvailable')));
           }
           return RefreshIndicator(
             onRefresh: () => ref.refresh(learnTracksProvider.future),
@@ -44,7 +46,10 @@ class CourseOverviewScreen extends ConsumerWidget {
                         if (track.description != null) Text(track.description!),
                         const SizedBox(height: 8),
                         LinearProgressIndicator(value: progress),
-                        Text('${track.completedItems}/${track.totalItems} items'),
+                        Text(ref.t('simulations.progressCompleted', {
+                          'current': track.completedItems,
+                          'total': track.totalItems,
+                        })),
                       ],
                     ),
                     trailing: track.enrolled
@@ -56,7 +61,7 @@ class CourseOverviewScreen extends ConsumerWidget {
                                   .enrollTrack(track.id);
                               ref.invalidate(learnTracksProvider);
                             },
-                            child: const Text('Enroll'),
+                            child: Text(ref.t('courses.enroll')),
                           ),
                     onTap: track.enrolled
                         ? () => context.push('/courses/${track.id}')

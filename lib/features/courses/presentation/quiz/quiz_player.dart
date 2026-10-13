@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/localization/translate_ref.dart';
 import '../../data/courses_repository.dart';
 import '../../data/quiz_models.dart';
 import 'quiz_question_widget.dart';
@@ -41,7 +42,7 @@ class _QuizPlayerState extends ConsumerState<QuizPlayer> {
 
   Future<void> _submit() async {
     if (_answers.length < widget.quiz.questions.length) {
-      setState(() => _error = 'Please answer every question before submitting.');
+      setState(() => _error = ref.tr('courses.quiz.question.answerAllError'));
       return;
     }
     setState(() {
@@ -56,7 +57,7 @@ class _QuizPlayerState extends ConsumerState<QuizPlayer> {
       setState(() => _result = result);
       if (result.passed) widget.onCompleted();
     } catch (e) {
-      setState(() => _error = 'Failed to submit quiz: $e');
+      setState(() => _error = '${ref.tr('courses.quiz.question.submitError')}: $e');
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -65,7 +66,7 @@ class _QuizPlayerState extends ConsumerState<QuizPlayer> {
   @override
   Widget build(BuildContext context) {
     if (_attemptsExhausted && _result == null) {
-      return const Center(child: Text('No attempts remaining for this quiz.'));
+      return Center(child: Text(ref.t('courses.quiz.intro.noAttemptsLeft')));
     }
 
     final resultsByQuestion = {
@@ -86,14 +87,24 @@ class _QuizPlayerState extends ConsumerState<QuizPlayer> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    _result!.passed ? 'Passed!' : 'Not passed',
+                    _result!.passed
+                        ? ref.t('courses.quiz.results.passed')
+                        : ref.t('courses.quiz.results.failed'),
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   if (_result!.scorePct != null)
-                    Text('Score: ${_result!.scorePct!.toStringAsFixed(0)}% '
-                        '(pass: ${_result!.passScore}%)'),
-                  Text('Attempt ${_result!.attemptsUsed}'
-                      '${_result!.maxAttempts != null ? " of ${_result!.maxAttempts}" : ""}'),
+                    Text(ref.t('courses.quiz.results.scoreSummary', {
+                      'score': _result!.scorePct!.toStringAsFixed(0),
+                      'pass': _result!.passScore,
+                    })),
+                  Text(_result!.maxAttempts != null
+                      ? ref.t('courses.quiz.results.attemptsUsed', {
+                          'used': _result!.attemptsUsed,
+                          'max': _result!.maxAttempts,
+                        })
+                      : ref.t('courses.quiz.results.attemptsUsedNoMax', {
+                          'used': _result!.attemptsUsed,
+                        })),
                 ],
               ),
             ),
@@ -115,7 +126,7 @@ class _QuizPlayerState extends ConsumerState<QuizPlayer> {
             onPressed: _isSubmitting ? null : _submit,
             child: _isSubmitting
                 ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Text('Submit quiz'),
+                : Text(ref.t('courses.quiz.question.submit')),
           )
         else if (!_result!.passed && !_attemptsExhausted)
           FilledButton(
@@ -123,7 +134,7 @@ class _QuizPlayerState extends ConsumerState<QuizPlayer> {
               _result = null;
               _answers.clear();
             }),
-            child: const Text('Try again'),
+            child: Text(ref.t('courses.quiz.results.retry')),
           ),
       ],
     );

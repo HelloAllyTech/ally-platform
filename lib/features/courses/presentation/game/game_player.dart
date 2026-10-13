@@ -5,6 +5,7 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
+import '../../../../core/localization/translate_ref.dart';
 import '../../data/courses_repository.dart';
 import '../../data/start_item_payload.dart';
 
@@ -91,7 +92,7 @@ class _GamePlayerState extends ConsumerState<GamePlayer> {
     final gameKey = widget.payload.gameKey;
     final assetPath = _gameAssetPaths[gameKey];
     if (assetPath == null) {
-      setState(() => _loadError = 'This game isn\'t supported in this build.');
+      setState(() => _loadError = ref.tr('courses.player.unsupportedTitle'));
       return;
     }
     final html = await rootBundle.loadString(assetPath);
@@ -170,15 +171,16 @@ class _GamePlayerState extends ConsumerState<GamePlayer> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             if (_lastScore != null) ...[
-              Text('Last score: $_lastScore'),
+              Text(ref.t('courses.game.lastScore.$gameKey', {'score': _lastScore})),
               const SizedBox(width: 16),
             ],
-            if (_bestScore != null) Text('Best: $_bestScore'),
+            if (_bestScore != null)
+              Text(ref.t('courses.game.bestScore.$gameKey', {'score': _bestScore})),
           ],
         ),
         const SizedBox(height: 8),
         Text(
-          'Optional — this doesn\'t block course progress.',
+          ref.t('courses.game.optional'),
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodySmall,
         ),

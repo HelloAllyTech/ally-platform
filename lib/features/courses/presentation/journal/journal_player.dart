@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/localization/translate_ref.dart';
 import '../../data/courses_repository.dart';
 import '../../data/start_item_payload.dart';
 
@@ -109,14 +110,14 @@ class _JournalPlayerState extends ConsumerState<JournalPlayer> {
   }
 
   String get _autosaveLabel {
-    if (_submitted) return 'Submitted';
+    if (_submitted) return ref.t('courses.journal.submitted');
     switch (_autosaveStatus) {
       case _AutosaveStatus.saving:
-        return 'Saving…';
+        return ref.t('courses.journal.saving');
       case _AutosaveStatus.failed:
-        return 'Failed to save';
+        return ref.t('courses.journal.saveFailed');
       case _AutosaveStatus.saved:
-        return 'Saved';
+        return ref.t('courses.journal.saved');
     }
   }
 
@@ -162,9 +163,9 @@ class _JournalPlayerState extends ConsumerState<JournalPlayer> {
                                   children: [
                                     TextSpan(text: _prompts[i].prompt),
                                     if (_prompts[i].required)
-                                      const TextSpan(
-                                        text: ' (required)',
-                                        style: TextStyle(color: Colors.red, fontSize: 12),
+                                      TextSpan(
+                                        text: ' (${ref.t('courses.journal.required')})',
+                                        style: const TextStyle(color: Colors.red, fontSize: 12),
                                       ),
                                   ],
                                 ),
@@ -180,7 +181,7 @@ class _JournalPlayerState extends ConsumerState<JournalPlayer> {
                           enabled: !_submitted,
                           decoration: InputDecoration(
                             border: const OutlineInputBorder(),
-                            hintText: _prompts[i].placeholder ?? 'Type your response…',
+                            hintText: _prompts[i].placeholder ?? ref.t('courses.journal.placeholder'),
                           ),
                         ),
                       ],
@@ -194,12 +195,12 @@ class _JournalPlayerState extends ConsumerState<JournalPlayer> {
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: _submitted
-                ? const Row(
+                ? Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.check_circle, color: Colors.green),
-                      SizedBox(width: 8),
-                      Text('Submitted'),
+                      const Icon(Icons.check_circle, color: Colors.green),
+                      const SizedBox(width: 8),
+                      Text(ref.t('courses.journal.submitted')),
                     ],
                   )
                 : SizedBox(
@@ -212,7 +213,7 @@ class _JournalPlayerState extends ConsumerState<JournalPlayer> {
                               width: 16,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : const Text('Submit'),
+                          : Text(ref.t('courses.journal.submit')),
                     ),
                   ),
           ),
