@@ -700,6 +700,10 @@
     "courseCompleted": "Course completed",
     "lockedTooltip": "Complete the previous items to unlock this",
     "notFound": "Course not found",
+    "notAvailable": {
+      "title": "This course isn't available for your account",
+      "body": "It hasn't been made available to your organisation or group. If you think you should have it, ask your organisation's admin."
+    },
     "viewProgress": "View progress",
     "progressDashboard": {
       "title": "Progress",
