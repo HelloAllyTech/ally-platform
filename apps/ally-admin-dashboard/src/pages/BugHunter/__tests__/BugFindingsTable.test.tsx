@@ -57,7 +57,13 @@ vi.mock("@components", () => ({
 
 vi.mock("@ally-ui-mono/ui-shared", () => ({
   Search: ({ id, labelText, value, onChange, placeholder }: any) => (
-    <input id={id} aria-label={labelText} placeholder={placeholder} value={value} onChange={onChange} />
+    <input
+      id={id}
+      aria-label={labelText}
+      placeholder={placeholder}
+      value={value}
+      onChange={onChange}
+    />
   ),
   Select: ({ id, children, value, onChange, labelText }: any) => (
     <select id={id} aria-label={labelText} value={value} onChange={onChange}>
@@ -169,7 +175,8 @@ const findings = [
 /** The table's view state lives in the query string now, so it needs a router. */
 const renderTable = () =>
   render(
-    <MemoryRouter>
+    // Backlog, where these NEW fixtures live.
+    <MemoryRouter initialEntries={["/?bucket=backlog"]}>
       <BugFindingsTable onShowShortcuts={vi.fn()} canTriage />
     </MemoryRouter>,
   );

@@ -2,15 +2,10 @@ import { FC, ReactNode, useCallback, useEffect, useId, useRef, useState } from "
 
 import { Button, Search } from "@ally-ui-mono/ui-shared";
 import { en } from "@constants";
-import { BugFindingSeverity, BugFindingSource, BugFindingStage, BugFindingStatus } from "@types";
+import { BugFindingSeverity, BugFindingSource } from "@types";
 
-import {
-  BUG_FINDING_SEVERITY_LABELS,
-  BUG_FINDING_SOURCE_LABELS,
-  BUG_FINDING_STAGE_LABELS,
-  BUG_FINDING_STATUS_LABELS,
-} from "./bugFindingLabels";
-import { activeFacetCount, AgeFilter, FindingsFilters, hasActiveFilters } from "./findingsView";
+import { BUG_FINDING_SEVERITY_LABELS, BUG_FINDING_SOURCE_LABELS } from "./bugFindingLabels";
+import { activeFacetCount, AgeFilter, FindingsFilters } from "./findingsView";
 
 /**
  * The bugs table's filter controls: a search box, one button that opens every
@@ -24,12 +19,16 @@ import { activeFacetCount, AgeFilter, FindingsFilters, hasActiveFilters } from "
  * wraps to three lines pushes the table itself below the fold — which is the
  * exact failure the profile card was shortened to fix.
  *
- * So the *core* control stays permanently visible (search, plus the bucket
- * chips directly above this) and everything else is one click away, with a
+ * So the *core* control stays permanently visible (search, plus the tabs
+ * directly above this) and everything else is one click away, with a
  * count on the button so a reader can never be filtering without knowing it.
  * That is Stacks' *Progressive Disclosure and Contextual Relevance in Agent
  * Interfaces* — show core capabilities first, reveal the rest progressively,
  * and use grouping rather than density to keep the surface navigable.
+ *
+ * Status and roadmap stage left the panel on 2026-10-13: the tabs above are
+ * status, and stage is derived from it, so both sections were a second way to
+ * ask a question the tabs already answer.
  *
  * ## The pills are the reason the panel can be hidden
  *
@@ -42,10 +41,9 @@ import { activeFacetCount, AgeFilter, FindingsFilters, hasActiveFilters } from "
  * ## Every option is one that exists
  *
  * The sections are built from what the loaded window actually holds
- * (`statusesInWindow` and friends), not from the enums. A facet listing all
- * seventeen statuses when the window holds three is sixteen options that
- * either do nothing or filter to nothing, and the reader has to click one to
- * find out which. A facet with fewer than two values is dropped entirely —
+ * (`sourcesInWindow` and friends), not from the enums. A facet listing every
+ * value the enum can hold when the window holds three is a list of options
+ * that filter to nothing, and the reader has to click one to find out which. A facet with fewer than two values is dropped entirely —
  * there is nothing to choose between.
  */
 
@@ -72,7 +70,7 @@ interface FacetSectionProps<T extends string> {
  * the admin's shared `FilterDropdown`, whose two-panel apply-gated flow suits a
  * server-filtered list where each change costs a request. Everything here is
  * client-side over a window already in memory, and every other control on this
- * tab (chips, search, density) writes the URL on the gesture — an apply step
+ * page (tabs, search) writes the URL on the gesture — an apply step
  * would make the facets the one place where clicking a thing does not do the
  * thing.
  */
@@ -187,16 +185,12 @@ export interface FindingsFilterBarProps {
     repos: string[];
     severities: BugFindingSeverity[];
     sources: BugFindingSource[];
-    statuses: BugFindingStatus[];
-    stages: BugFindingStage[];
   };
   /** How many rows in the window carry each value — the numbers beside the checkboxes. */
   counts: {
     repos: Record<string, number>;
     severities: Record<string, number>;
     sources: Record<string, number>;
-    statuses: Record<string, number>;
-    stages: Record<string, number>;
     ages: Record<AgeFilter, number>;
     duplicates: number;
   };
@@ -204,8 +198,6 @@ export interface FindingsFilterBarProps {
   onRepos: (repos: string[]) => void;
   onSeverities: (severities: BugFindingSeverity[]) => void;
   onSources: (sources: BugFindingSource[]) => void;
-  onStatuses: (statuses: BugFindingStatus[]) => void;
-  onStages: (stages: BugFindingStage[]) => void;
   onAge: (age: AgeFilter) => void;
   onDuplicatesOnly: (only: boolean) => void;
   onClearAll: () => void;
@@ -221,8 +213,6 @@ export const FindingsFilterBar: FC<FindingsFilterBarProps> = ({
   onRepos,
   onSeverities,
   onSources,
-  onStatuses,
-  onStages,
   onAge,
   onDuplicatesOnly,
   onClearAll,
@@ -233,18 +223,17 @@ export const FindingsFilterBar: FC<FindingsFilterBarProps> = ({
   const wrapperRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
-  const facetCount = activeFacetCount(filters);
   /**
-   * Whether anything at all is narrowing the table — facets, the search box, or
-   * a bucket chip.
+   * How many facet values are on — the button's badge, and whether the pill
+   * row has anything to say.
    *
-   * Broader than `facetCount`, and the two are not interchangeable. The count
-   * on the button is about the *panel*, so it deliberately excludes the two
-   * controls that are already visible beside it. The reset below is about the
-   * *table*, so it must not be: a reader who has only typed in the search box
-   * still wants one thing to press to get all their rows back.
+   * The pill row is about the *panel*: it shows what the collapsed panel is
+   * hiding. It used to render for search and the bucket chip too, neither of
+   * which has a pill, so typing one letter produced a row holding nothing but
+   * a "Clear filters" button. The search box clears itself with its own ×, and
+   * the tab is where you are rather than a filter you set.
    */
-  const anythingActive = hasActiveFilters(filters);
+  const facetCount = activeFacetCount(filters);
 
   const close = useCallback(() => {
     setOpen(false);
@@ -332,16 +321,6 @@ export const FindingsFilterBar: FC<FindingsFilterBarProps> = ({
               className="absolute right-0 top-full z-30 mt-1 w-72 max-w-[calc(100vw-2rem)] max-h-[26rem] overflow-y-auto custom-scrollbar rounded-lg border border-border-light bg-white shadow-lg divide-y divide-border-light"
             >
               <FacetSection
-                title={en.bugHunter.filterSectionStatus}
-                options={available.statuses.map(status => ({
-                  value: status,
-                  label: label(BUG_FINDING_STATUS_LABELS, status),
-                  count: counts.statuses[status] ?? 0,
-                }))}
-                selected={filters.statuses}
-                onChange={onStatuses}
-              />
-              <FacetSection
                 title={en.bugHunter.filterSectionRepo}
                 options={available.repos.map(repo => ({
                   value: repo,
@@ -371,17 +350,6 @@ export const FindingsFilterBar: FC<FindingsFilterBarProps> = ({
                 selected={filters.sources}
                 onChange={onSources}
               />
-              <FacetSection
-                title={en.bugHunter.filterSectionStage}
-                options={available.stages.map(stage => ({
-                  value: stage,
-                  label: label(BUG_FINDING_STAGE_LABELS, stage),
-                  count: counts.stages[stage] ?? 0,
-                }))}
-                selected={filters.stages}
-                onChange={onStages}
-              />
-
               <AgeSection value={filters.age} onChange={onAge} counts={counts.ages} />
 
               {/* Only offered when the window actually holds a duplicate — a
@@ -408,17 +376,10 @@ export const FindingsFilterBar: FC<FindingsFilterBarProps> = ({
       </div>
 
       {/* The state the collapsed panel would otherwise hide. Absent entirely
-          when nothing is on, so a clean table has no chrome under its search
+          when no facet is on, so a clean table has no chrome under its search
           box. */}
-      {anythingActive && (
+      {facetCount > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">
-          {filters.statuses.map(status => (
-            <FilterPill
-              key={`status-${status}`}
-              label={label(BUG_FINDING_STATUS_LABELS, status)}
-              onRemove={() => onStatuses(filters.statuses.filter(v => v !== status))}
-            />
-          ))}
           {filters.repos.map(repo => (
             <FilterPill
               key={`repo-${repo}`}
@@ -438,13 +399,6 @@ export const FindingsFilterBar: FC<FindingsFilterBarProps> = ({
               key={`src-${source}`}
               label={label(BUG_FINDING_SOURCE_LABELS, source)}
               onRemove={() => onSources(filters.sources.filter(v => v !== source))}
-            />
-          ))}
-          {filters.stages.map(stage => (
-            <FilterPill
-              key={`stage-${stage}`}
-              label={label(BUG_FINDING_STAGE_LABELS, stage)}
-              onRemove={() => onStages(filters.stages.filter(v => v !== stage))}
             />
           ))}
           {filters.age !== "all" && (

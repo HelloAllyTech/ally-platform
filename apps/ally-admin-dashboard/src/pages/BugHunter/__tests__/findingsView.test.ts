@@ -3,16 +3,14 @@ import { describe, expect, it } from "vitest";
 import { BugFinding, BugFindingSeverity, BugFindingSource, BugFindingStatus } from "@types";
 
 import {
+  activeFacetCount,
   buildFindingsView,
-  costOf,
+  countTabs,
   duplicateKey,
   EMPTY_FILTERS,
   FindingsFilters,
-  formatCost,
   hasActiveFilters,
   reposInWindow,
-  updatedAt,
-  wasTouchedSinceDiscovery,
 } from "../findingsView";
 
 const finding = (overrides: Partial<BugFinding> & { id: string }): BugFinding =>
@@ -75,14 +73,14 @@ describe("filtering", () => {
     ).toHaveLength(1);
   });
 
-  it("filters by lifecycle bucket rather than by one status at a time", () => {
+  it("filters by tab rather than by one status at a time", () => {
     const findings = [
       finding({ id: "pending", status: BugFindingStatus.PENDING_APPROVAL }),
       finding({ id: "asked", status: BugFindingStatus.NEEDS_INPUT }),
       finding({ id: "fixing", status: BugFindingStatus.FIXING }),
     ];
 
-    // The whole point of the buckets: two different statuses, one filter.
+    // The whole point of the tabs: two different statuses, one tab.
     const needsYou = view(findings, { filters: { ...EMPTY_FILTERS, bucket: "needs_you" } });
     expect(needsYou.rows.map(r => r.finding.id).sort()).toEqual(["asked", "pending"]);
   });
@@ -130,41 +128,54 @@ describe("filtering", () => {
   it("knows when no filter is set, so the table can hide its own clear button", () => {
     expect(hasActiveFilters(EMPTY_FILTERS)).toBe(false);
     expect(hasActiveFilters({ ...EMPTY_FILTERS, search: "   " })).toBe(false);
-    expect(hasActiveFilters({ ...EMPTY_FILTERS, bucket: "needs_you" })).toBe(true);
+    expect(hasActiveFilters({ ...EMPTY_FILTERS, search: "auth" })).toBe(true);
+    expect(hasActiveFilters({ ...EMPTY_FILTERS, repos: ["ally-be"] })).toBe(true);
+  });
+
+  // The tab is where the reader is, not a filter they forgot they set:
+  // "Clear filters" leaves it alone, and it puts no pill under the search box.
+  it("does not count the tab as a filter", () => {
+    expect(hasActiveFilters({ ...EMPTY_FILTERS, bucket: "needs_you" })).toBe(false);
+    expect(activeFacetCount({ ...EMPTY_FILTERS, bucket: "done" })).toBe(0);
+  });
+
+  // The pill row renders on this count; search has its own × and no pill, so
+  // typing one letter must not produce a row holding only "Clear filters".
+  it("counts facets only, not the search box", () => {
+    expect(activeFacetCount({ ...EMPTY_FILTERS, search: "auth" })).toBe(0);
+    expect(
+      activeFacetCount({ ...EMPTY_FILTERS, repos: ["ally-be", "ally-web"], age: "stale" }),
+    ).toBe(3);
   });
 });
 
 describe("sorting", () => {
-  it("orders severity worst-first when descending, with unclassified last", () => {
+  // Status sorts by tab, then by status within the tab — the order a triager
+  // means, not the alphabet's.
+  it("orders status by tab, Needs you first when ascending", () => {
     const findings = [
-      finding({ id: "low", severity: BugFindingSeverity.LOW }),
-      finding({ id: "none", severity: null }),
-      finding({ id: "high", severity: BugFindingSeverity.HIGH }),
-      finding({ id: "medium", severity: BugFindingSeverity.MEDIUM }),
+      finding({ id: "done", status: BugFindingStatus.RELEASED }),
+      finding({ id: "backlog", status: BugFindingStatus.NEW }),
+      finding({ id: "needs-you", status: BugFindingStatus.NEEDS_INPUT }),
+      finding({ id: "failed", status: BugFindingStatus.FAILED }),
+      finding({ id: "in-progress", status: BugFindingStatus.FIXING }),
     ];
 
-    const sorted = view(findings, { sortKey: "severity", sortDirection: "desc" });
-    expect(sorted.rows.map(r => r.finding.id)).toEqual(["high", "medium", "low", "none"]);
+    const sorted = view(findings, { sortKey: "status", sortDirection: "asc" });
+    expect(sorted.rows.map(r => r.finding.id)).toEqual([
+      "needs-you",
+      "failed",
+      "in-progress",
+      "backlog",
+      "done",
+    ]);
   });
 
-  it("orders by what has been spent, most first when descending, with untouched bugs last (OPP-0748)", () => {
-    const spent = (usd: number) => ({
-      caps: { sessions: 2, attempts: 4, escalations: 1, usd: 15, minutes: 120 },
-      used: { sessions: usd > 0 ? 1 : 0, attempts: 0, escalations: 0, usd, minutes: 0 },
-      exhausted: null,
-      overriddenBy: null,
-      overriddenAt: null,
-    });
-    const findings = [
-      finding({ id: "cheap", budget: spent(0.4) }),
-      finding({ id: "free", budget: spent(0) }),
-      finding({ id: "dear", budget: spent(6.25) }),
-    ];
-    const sorted = view(findings, { sortKey: "cost", sortDirection: "desc" });
-    expect(sorted.rows.map(r => r.finding.id)).toEqual(["dear", "cheap", "free"]);
-    expect(costOf(findings[2])).toBe(6.25);
-    expect(formatCost(6.25)).toBe("$6.25");
-    expect(formatCost(0)).toBe("—");
+  it("orders titles A–Z", () => {
+    const findings = [finding({ id: "b", title: "Beta" }), finding({ id: "a", title: "Alpha" })];
+    expect(
+      view(findings, { sortKey: "title", sortDirection: "asc" }).rows.map(r => r.finding.id),
+    ).toEqual(["a", "b"]);
   });
 
   it("never reorders the array it was handed", () => {
@@ -174,20 +185,20 @@ describe("sorting", () => {
     ];
     view(findings, { sortKey: "discovered", sortDirection: "desc" });
 
-    // The card, the queue and this table read the same RTK Query cache entry in
-    // one render; an in-place sort here would silently reorder theirs.
+    // The header and this table read the same RTK Query cache entry in one
+    // render; an in-place sort here would silently reorder the header's.
     expect(findings.map(f => f.id)).toEqual(["older", "newer"]);
   });
 
   it("breaks ties deterministically, so a poll cannot make rows swap places", () => {
     const sameSecond = "2026-08-17T09:00:00.000Z";
     const findings = [
-      finding({ id: "b-id", createdAt: sameSecond, severity: BugFindingSeverity.HIGH }),
-      finding({ id: "a-id", createdAt: sameSecond, severity: BugFindingSeverity.HIGH }),
+      finding({ id: "b-id", createdAt: sameSecond, status: BugFindingStatus.NEW }),
+      finding({ id: "a-id", createdAt: sameSecond, status: BugFindingStatus.NEW }),
     ];
 
-    const first = view(findings, { sortKey: "severity", sortDirection: "desc" });
-    const second = view([...findings].reverse(), { sortKey: "severity", sortDirection: "desc" });
+    const first = view(findings, { sortKey: "status", sortDirection: "asc" });
+    const second = view([...findings].reverse(), { sortKey: "status", sortDirection: "asc" });
     expect(first.rows.map(r => r.finding.id)).toEqual(second.rows.map(r => r.finding.id));
   });
 });
@@ -279,54 +290,33 @@ describe("reposInWindow", () => {
  * exactly the bug an admin goes looking for: one their team filed weeks ago
  * that last night's sweep re-read.
  */
-describe("wasTouchedSinceDiscovery", () => {
-  it("is true for a bug re-read long after it was filed", () => {
-    expect(
-      wasTouchedSinceDiscovery(
-        finding({
-          id: "a",
-          createdAt: "2026-07-01T00:00:00.000Z",
-          updatedAt: "2026-08-22T03:45:00.000Z",
-        }),
-      ),
-    ).toBe(true);
+
+describe("countTabs", () => {
+  const findings = [
+    finding({ id: "a", status: BugFindingStatus.PENDING_APPROVAL, title: "Auth token expiry" }),
+    finding({ id: "b", status: BugFindingStatus.RELEASED, title: "Auth redirect loop" }),
+    finding({ id: "c", status: BugFindingStatus.NEW, title: "Avatar crop" }),
+  ];
+
+  it("counts every tab regardless of which one is open", () => {
+    expect(countTabs(findings, { ...EMPTY_FILTERS, bucket: "done" })).toEqual({
+      needs_you: 1,
+      failed: 0,
+      in_progress: 0,
+      backlog: 1,
+      done: 1,
+    });
   });
 
-  it("is false within the minute of slack a single sweep needs", () => {
-    // Inserted, then PATCHed to pending_approval seconds later, all inside one
-    // sweep. A strict `>` would call every row touched and the column would
-    // repeat Age down the whole table.
-    expect(
-      wasTouchedSinceDiscovery(
-        finding({
-          id: "a",
-          createdAt: "2026-08-22T03:45:00.000Z",
-          updatedAt: "2026-08-22T03:45:12.000Z",
-        }),
-      ),
-    ).toBe(false);
-  });
-
-  it("is false for a bug nothing has happened to", () => {
-    expect(
-      wasTouchedSinceDiscovery(
-        finding({
-          id: "a",
-          createdAt: "2026-08-22T03:45:00.000Z",
-          updatedAt: "2026-08-22T03:45:00.000Z",
-        }),
-      ),
-    ).toBe(false);
-  });
-});
-
-describe("updatedAt", () => {
-  it("falls back to the discovery date rather than returning NaN", () => {
-    // NaN would sort the row to an arbitrary place in the table instead of to
-    // one end — a defect nobody reads as a date-parsing problem.
-    const created = "2026-08-17T00:00:00.000Z";
-    expect(updatedAt(finding({ id: "a", createdAt: created, updatedAt: "not a date" }))).toBe(
-      new Date(created).getTime(),
-    );
+  // A search typed on Needs you whose match lives in Done says so on the Done
+  // tab, rather than leaving an empty table and a shrug.
+  it("follows the search box and the facets", () => {
+    expect(countTabs(findings, { ...EMPTY_FILTERS, bucket: "needs_you", search: "auth" })).toEqual({
+      needs_you: 1,
+      failed: 0,
+      in_progress: 0,
+      backlog: 0,
+      done: 1,
+    });
   });
 });

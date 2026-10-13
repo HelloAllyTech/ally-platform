@@ -3,7 +3,11 @@ import { FC, useState } from "react";
 import { toast } from "sonner";
 
 import { Button, Tooltip } from "@ally-ui-mono/ui-shared";
-import { useApproveBugFindingMutation, useRejectBugFindingMutation } from "@api";
+import {
+  useApproveBugFindingMutation,
+  useRejectBugFindingMutation,
+  useStartBugFixSessionMutation,
+} from "@api";
 import { ActionConfirmationPopup } from "@components/action-confirmation-popup";
 import { en } from "@constants";
 import { BugFinding, BugFindingDecisionReason } from "@types";
@@ -12,8 +16,13 @@ import { canSubmitDecline, DeclineReasonPicker } from "./DeclineReasonPicker";
 import { BulkOutcome, eligibleFor, MAX_NAMED_FAILURES, TriageAction } from "./triage";
 
 /**
- * The bar that appears when rows are selected: approve or reject a whole
- * selection behind one confirmation.
+ * The bar that appears when rows are selected: approve, reject, or put Bug
+ * Hunter on a whole selection behind one confirmation.
+ *
+ * "Put me on it" joined on 2026-10-13, when it and Reject came off the rows
+ * (each row now carries at most its one next step). It leaves out bugs with no
+ * repo — the drawer asks which codebase to open, and that question can't be
+ * asked once for a mixed selection — and says so in its own count.
  *
  * ## Where the throughput actually comes from
  *
@@ -24,7 +33,7 @@ import { BulkOutcome, eligibleFor, MAX_NAMED_FAILURES, TriageAction } from "./tr
  * wrong trade however fast it feels.
  *
  * This is where the cost collapses: twenty rejections behind one dialog instead
- * of twenty. A night's sweep in "Checks with you" mode lands every finding at
+ * of twenty. A night's sweep in Manual mode lands every finding at
  * `PENDING_APPROVAL`, and the honest shape of that morning's work is "these
  * fourteen are noise, this one matters" — one gesture and one decision, not
  * fifteen.
@@ -65,6 +74,11 @@ const summarise = (action: TriageAction, outcome: BulkOutcome): string => {
         ? strings.bulkApproveDoneOne
         : strings.bulkApproveDone.replace("{count}", String(outcome.succeeded));
     }
+    if (action === "fix") {
+      return outcome.succeeded === 1
+        ? strings.bulkFixDoneOne
+        : strings.bulkFixDone.replace("{count}", String(outcome.succeeded));
+    }
     return outcome.succeeded === 1
       ? strings.bulkRejectDoneOne
       : strings.bulkRejectDone.replace("{count}", String(outcome.succeeded));
@@ -89,6 +103,7 @@ const summarise = (action: TriageAction, outcome: BulkOutcome): string => {
 export const BulkTriageBar: FC<BulkTriageBarProps> = ({ selected, onClear, onSettled }) => {
   const [approve] = useApproveBugFindingMutation();
   const [reject] = useRejectBugFindingMutation();
+  const [startFixSession] = useStartBugFixSessionMutation();
 
   const [confirming, setConfirming] = useState<TriageAction | null>(null);
   const [declineReason, setDeclineReason] = useState<BugFindingDecisionReason | null>(null);
@@ -98,9 +113,10 @@ export const BulkTriageBar: FC<BulkTriageBarProps> = ({ selected, onClear, onSet
 
   const approvable = eligibleFor("approve", selected);
   const rejectable = eligibleFor("reject", selected);
+  const fixable = eligibleFor("fix", selected);
 
   const run = async (action: TriageAction) => {
-    const targets = action === "approve" ? approvable : rejectable;
+    const targets = action === "approve" ? approvable : action === "fix" ? fixable : rejectable;
     if (action === "reject" && !canSubmitDecline(declineReason, declineNote)) {
       toast.error(en.bugHunter.declineReasonRequired);
       return;
@@ -117,6 +133,7 @@ export const BulkTriageBar: FC<BulkTriageBarProps> = ({ selected, onClear, onSet
     for (const finding of targets) {
       try {
         if (action === "approve") await approve(finding.id).unwrap();
+        else if (action === "fix") await startFixSession({ id: finding.id }).unwrap();
         else {
           // One reason for the whole batch. This is what keeps the mandatory
           // reason affordable on the action that actually collapses the
@@ -217,6 +234,28 @@ export const BulkTriageBar: FC<BulkTriageBarProps> = ({ selected, onClear, onSet
               </span>
             </Tooltip>
 
+            <Tooltip
+              label={
+                fixable.length === 0
+                  ? en.bugHunter.bulkFixNone
+                  : en.bugHunter.bulkFixScope
+                      .replace("{eligible}", String(fixable.length))
+                      .replace("{selected}", String(selected.length))
+              }
+              align="top"
+            >
+              <span className="inline-flex">
+                <Button
+                  size="sm"
+                  kind="tertiary"
+                  disabled={fixable.length === 0 || isBusy}
+                  onClick={() => setConfirming("fix")}
+                >
+                  {en.bugHunter.bulkFix.replace("{count}", String(fixable.length))}
+                </Button>
+              </span>
+            </Tooltip>
+
             <Button size="sm" kind="ghost" onClick={onClear} disabled={isBusy}>
               {en.bugHunter.bulkClear}
             </Button>
@@ -233,6 +272,23 @@ export const BulkTriageBar: FC<BulkTriageBarProps> = ({ selected, onClear, onSet
           primaryButton={{
             label: en.bugHunter.bulkApproveConfirm,
             onClick: () => void run("approve"),
+          }}
+          secondaryButton={{
+            label: en.bugHunter.cancel,
+            onClick: () => setConfirming(null),
+          }}
+        />
+      )}
+
+      {confirming === "fix" && (
+        <ActionConfirmationPopup
+          isOpen
+          onClose={() => setConfirming(null)}
+          title={en.bugHunter.bulkFixConfirmTitle.replace("{count}", String(fixable.length))}
+          description={en.bugHunter.bulkFixConfirmBody}
+          primaryButton={{
+            label: en.bugHunter.bulkFixConfirm,
+            onClick: () => void run("fix"),
           }}
           secondaryButton={{
             label: en.bugHunter.cancel,

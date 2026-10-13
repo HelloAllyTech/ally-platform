@@ -65,7 +65,12 @@ describe("TodayBoardView", () => {
     render(<TodayBoardView board={board} />);
 
     expect(screen.getByText("Today, by repo")).toBeInTheDocument();
-    expect(screen.getByText("2026-10-07, since midnight India time")).toBeInTheDocument();
+    // Every column counts since midnight except open PRs, which is the live
+    // number — and the header says so rather than letting it pass for a day's.
+    expect(
+      screen.getByText("2026-10-07, since midnight India time. Open PRs is the live count."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Open PRs now")).toBeInTheDocument();
 
     const web = screen.getByTestId("today-ally-web");
     expect(web).toHaveTextContent("1 done · 1 failed");

@@ -67,6 +67,7 @@ import {
   FlowConnection as CFlowConnection,
   Globe as CGlobe,
   Group as CGroup,
+  Help as CHelp,
   Image as CImage,
   Information as CInformation,
   ListBulleted as CListBulleted,
@@ -271,6 +272,7 @@ export const TickGreenBackground = createCarbonIcon(CCheckmarkFilled, {
 
 export const BarChart3 = createCarbonIcon(CChartBar);
 export const Info = createCarbonIcon(CInformation);
+export const HelpIcon = createCarbonIcon(CHelp);
 export const Languages = createCarbonIcon(CTranslate);
 export const Settings = createCarbonIcon(CSettings);
 export const Flag = createCarbonIcon(CFlag);

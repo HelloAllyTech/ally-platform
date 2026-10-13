@@ -105,6 +105,7 @@ vi.mock("framer-motion", () => ({
 import { BugFinding, BugFindingSource, BugFindingStatus } from "@types";
 
 import { BugFindingsTable } from "../BugFindingsTable";
+import { bucketOf } from "../lifecycleBucket";
 
 const finding = (overrides: Partial<BugFinding> & { id: string }): BugFinding =>
   ({
@@ -129,7 +130,12 @@ const finding = (overrides: Partial<BugFinding> & { id: string }): BugFinding =>
 
 const onShowShortcuts = vi.fn();
 
-const mount = (items: BugFinding[], url = "/") => {
+/**
+ * Opens on the tab the first fixture lives in. The page itself opens on Needs
+ * you or In progress, and most fixtures here are NEW — Backlog — so a bare "/"
+ * would mount an empty tab and every keystroke would be testing nothing.
+ */
+const mount = (items: BugFinding[], url = `/?bucket=${bucketOf(items[0])}`) => {
   getBugFindings.mockReturnValue({
     data: { items, count: items.length },
     isLoading: false,
@@ -244,9 +250,7 @@ describe("BugFindingsTable — keyboard triage", () => {
 
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
       expect(approveFinding).not.toHaveBeenCalled();
-      expect(toastError).toHaveBeenCalledWith(
-        "That doesn't apply to this bug from where it is.",
-      );
+      expect(toastError).toHaveBeenCalledWith("That doesn't apply to this bug from where it is.");
     });
 
     it("offers the reject confirmation for a new bug, which ally-be does accept", () => {
@@ -263,8 +267,8 @@ describe("BugFindingsTable — keyboard triage", () => {
       expect(rejectFinding).not.toHaveBeenCalled();
 
       fireEvent.click(screen.getByLabelText("It isn't a bug"));
-      // Scoped to the dialog: the row's own button says "Reject" too, which is
-      // exactly why the confirmation says something else.
+      // The confirmation says "Reject it" rather than "Reject", so it can never
+      // be confused with whatever opened it.
       fireEvent.click(screen.getByText("Reject it"));
       expect(rejectFinding).toHaveBeenCalledWith({
         id: "a",
@@ -334,7 +338,11 @@ describe("BugFindingsTable — keyboard triage", () => {
       expect(screen.queryByText("2 bugs selected")).not.toBeInTheDocument();
     });
 
-    /** Each button counts its own subset — approve's door is narrower than reject's. */
+    /**
+     * Each button counts its own subset — approve's door is narrower than
+     * reject's. A selection outlives a tab switch, so one gathered on two tabs
+     * is counted as a whole.
+     */
     it("counts each bulk action against the statuses it actually applies to", () => {
       mount([
         finding({ id: "a", status: BugFindingStatus.NEW }),
@@ -342,9 +350,13 @@ describe("BugFindingsTable — keyboard triage", () => {
         finding({ id: "c", status: BugFindingStatus.FIXING }),
       ]);
       press("X", { shiftKey: true });
+      fireEvent.click(screen.getByRole("tab", { name: /Needs you/ }));
+      press("X", { shiftKey: true });
 
+      expect(screen.getByText("2 bugs selected")).toBeInTheDocument();
       expect(screen.getByText("Approve 1")).toBeInTheDocument();
       expect(screen.getByText("Reject 2")).toBeInTheDocument();
+      expect(screen.getByText("Put me on 2")).toBeInTheDocument();
     });
   });
 
@@ -373,7 +385,7 @@ describe("BugFindingsTable — keyboard triage", () => {
 
     /** While the drawer is open the list underneath is not what the keyboard is addressing. */
     it("stands down while a drawer is open", () => {
-      mount([finding({ id: "a" }), finding({ id: "b" })], "/?bug=a");
+      mount([finding({ id: "a" }), finding({ id: "b" })], "/?bucket=backlog&bug=a");
       press("j");
       expect(focusedLabel()).not.toBe("Open bug: Bug a");
     });

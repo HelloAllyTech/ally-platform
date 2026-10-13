@@ -1,6 +1,8 @@
 import { FC } from "react";
 
+import { Tooltip } from "@ally-ui-mono/ui-shared";
 import { useGetBugHunterTodayQuery } from "@api";
+import { TooltipIcon } from "@assets";
 import { en } from "@constants";
 import { BugHunterToday, BugHunterTodayRepo } from "@types";
 
@@ -15,12 +17,22 @@ const fmtUsd = (n: number): string => `$${n.toFixed(2)}`;
 /**
  * "Today, by repo" — one row per repo of what Bug Hunter did since midnight:
  * sweeps that ran, bugs found, what the independent verifier confirmed or
- * refuted, fix sessions started by it and by people, fix PRs open, merged and
- * released, and the money spent. A totals row underneath.
+ * refuted, fix sessions started by it and by people, merges and releases, the
+ * money spent, and the fix PRs open right now. A totals row underneath.
  *
- * Read-only and self-contained: it reads one endpoint on its own poll and
- * touches nothing the table below depends on. Renders nothing while the first
- * load is in flight so a quiet page does not flash an empty grid.
+ * Lives on Analytics → Bug Agent beside the shift log since 2026-10-13. It sat
+ * on Bug Hunter's Work tab above the bugs table, where it was a report on the
+ * day in the middle of a triage surface; the governor who reads the runs is
+ * the reader who reads this.
+ *
+ * "Open PRs now" is the one column that is not since midnight — ally-be counts
+ * PR_OPENED findings live — and it used to sit under a header saying "since
+ * midnight" with nothing to say otherwise. The subtitle and the column's own
+ * tooltip now say it.
+ *
+ * Read-only and self-contained: it reads one endpoint on its own poll. Renders
+ * nothing while the first load is in flight so a quiet page does not flash an
+ * empty grid.
  */
 export const TodayBoard: FC = () => {
   const { data, isError } = useGetBugHunterTodayQuery(
@@ -83,7 +95,16 @@ export const TodayBoardView: FC<{ board: BugHunterToday }> = ({ board }) => {
               <th className="py-1 pr-3 font-medium">{t.colVerified}</th>
               <th className="py-1 pr-3 font-medium">{t.colSessions}</th>
               <th className="py-1 pr-3 font-medium">{t.colFixVerdicts}</th>
-              <th className="py-1 pr-3 font-medium text-right">{t.colPrsOpen}</th>
+              <th className="py-1 pr-3 font-medium text-right">
+                <span className="inline-flex items-center justify-end gap-1">
+                  {t.colPrsOpen}
+                  <Tooltip label={t.colPrsOpenTooltip} align="top">
+                    <button type="button" className="cursor-pointer inline-flex items-center">
+                      <TooltipIcon />
+                    </button>
+                  </Tooltip>
+                </span>
+              </th>
               <th className="py-1 pr-3 font-medium text-right">{t.colMerged}</th>
               <th className="py-1 pr-3 font-medium text-right">{t.colReleased}</th>
               <th className="py-1 font-medium text-right">{t.colSpend}</th>

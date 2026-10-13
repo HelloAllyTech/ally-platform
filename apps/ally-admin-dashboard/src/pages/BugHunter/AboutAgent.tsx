@@ -1,24 +1,19 @@
 import { FC } from "react";
 
 import { Accordion, AccordionItem } from "@ally-ui-mono/ui-shared";
-import { AgentAvatar } from "@components/agent-avatar";
 import { en } from "@constants";
 
 /**
  * "About me" — the old FAQ, asked in the second person and answered in the
  * first, so reading it feels like asking a colleague how they work.
  *
- * Where this sits on the page depends on whether Bug Hunter has ever been put
- * on duty (see BugHunter.tsx): unread introductions belong at the top, and
- * eleven accordions between the working-style control and the actual work do
- * not.
+ * Rendered in the side panel behind the header's help button since
+ * 2026-10-13. It was a tab before that, and before that sat at the top of the
+ * page while off duty and at the bottom while on — reference material read
+ * once, given the same weight as the work. The panel supplies the heading.
  */
 export const AboutAgent: FC = () => (
   <div className="max-w-3xl">
-    <div className="flex items-center gap-2 mb-2">
-      <AgentAvatar size="sm" label={en.bugHunter.agentName} />
-      <h2 className="text-sm font-semibold text-typography-900">{en.bugHunter.faqTitle}</h2>
-    </div>
     <Accordion size="sm">
       <AccordionItem title={en.bugHunter.faqWhatTitle}>
         <p className="text-sm text-typography-700">{en.bugHunter.faqWhatBody}</p>
