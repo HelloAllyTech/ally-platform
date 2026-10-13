@@ -103,6 +103,7 @@ vi.mock("framer-motion", () => ({
 import { BugFinding, BugFindingSeverity, BugFindingSource, BugFindingStatus } from "@types";
 
 import { BugFindingsTable } from "../BugFindingsTable";
+import { bucketOf } from "../lifecycleBucket";
 
 const finding = (overrides: Partial<BugFinding> & { id: string }): BugFinding =>
   ({
@@ -125,11 +126,16 @@ const finding = (overrides: Partial<BugFinding> & { id: string }): BugFinding =>
   }) as unknown as BugFinding;
 
 /**
- * `url` seeds the query string, which is where the table's filters live now —
- * so a test that needs to start on a bucket says so in the address rather than
- * driving a parent's `useState`.
+ * `url` seeds the query string, which is where the table's filters live — so a
+ * test that needs a tab says so in the address rather than driving a parent's
+ * `useState`. By default it opens the tab the first fixture lives in: most are
+ * NEW, which is Backlog, and the page itself opens on Needs you or In progress.
  */
-const mount = (items: BugFinding[], count?: number, url = "/") => {
+const mount = (
+  items: BugFinding[],
+  count?: number,
+  url = items.length ? `/?bucket=${bucketOf(items[0])}` : "/",
+) => {
   getBugFindings.mockReturnValue({
     data: { items, count: count ?? items.length },
     isLoading: false,
@@ -149,8 +155,8 @@ describe("BugFindingsTable — triage controls", () => {
   it("shares one request with the rest of the page rather than querying per filter", () => {
     mount([finding({ id: "a" })]);
 
-    // The card, the queue and this table all ask for exactly this, so RTK Query
-    // serves them from one cache entry. Pushing filters into the query would
+    // The header and this table both ask for exactly this, so RTK Query serves
+    // them from one cache entry. Pushing filters into the query would
     // fork that entry per filter combination.
     expect(getBugFindings).toHaveBeenCalledWith(
       { status: "all", limit: 100 },
@@ -171,10 +177,7 @@ describe("BugFindingsTable — triage controls", () => {
   });
 
   it("filters by repo, offering only repos that are actually present", () => {
-    mount([
-      finding({ id: "a", repo: "ally-be" }),
-      finding({ id: "b", repo: "ally-web" }),
-    ]);
+    mount([finding({ id: "a", repo: "ally-be" }), finding({ id: "b", repo: "ally-web" })]);
 
     fireEvent.click(screen.getByRole("button", { name: /Filters/ }));
     const panel = screen.getByRole("dialog", { name: "Filter bugs" });
@@ -212,10 +215,7 @@ describe("BugFindingsTable — triage controls", () => {
    * its rows.
    */
   it("shows an active facet as a pill that removes just that value", () => {
-    mount([
-      finding({ id: "a", repo: "ally-be" }),
-      finding({ id: "b", repo: "ally-web" }),
-    ]);
+    mount([finding({ id: "a", repo: "ally-be" }), finding({ id: "b", repo: "ally-web" })]);
 
     fireEvent.click(screen.getByRole("button", { name: /Filters/ }));
     fireEvent.click(
@@ -228,7 +228,7 @@ describe("BugFindingsTable — triage controls", () => {
     expect(screen.getByText("Bug b")).toBeInTheDocument();
   });
 
-  it("honours the lifecycle bucket the address bar has set", () => {
+  it("honours the tab the address bar has set", () => {
     mount(
       [
         finding({ id: "waiting", status: BugFindingStatus.PENDING_APPROVAL }),
@@ -283,15 +283,13 @@ describe("BugFindingsTable — triage controls", () => {
     expect(screen.getByText("Age").closest("th")).toHaveAttribute("aria-sort", "ascending");
   });
 
-  it("sorts severity worst-first the moment that column is chosen", () => {
-    mount([
-      finding({ id: "low", severity: BugFindingSeverity.LOW }),
-      finding({ id: "high", severity: BugFindingSeverity.HIGH }),
-    ]);
+  // Severity lost its column on 2026-10-13; what is left of it is a dot before
+  // the title, named for a screen reader.
+  it("marks severity with a named dot before the title rather than a column", () => {
+    mount([finding({ id: "high", severity: BugFindingSeverity.HIGH })]);
 
-    fireEvent.click(screen.getByText("Severity"));
-    const openers = screen.getAllByRole("button", { name: /^Open bug:/ });
-    expect(openers[0]).toHaveAccessibleName("Open bug: Bug high");
+    expect(screen.queryByText("Severity")).not.toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "High severity" })).toBeInTheDocument();
   });
 
   it("flags a duplicate pair and keeps both rows", () => {
@@ -317,28 +315,27 @@ describe("BugFindingsTable — triage controls", () => {
     expect(screen.queryByTestId("empty-state")).not.toBeInTheDocument();
   });
 
-  it("clears every filter at once, including the bucket the page owns", () => {
-    getBugFindings.mockReturnValue({
-      data: { items: [finding({ id: "a", title: "Terms link" })], count: 1 },
-      isLoading: false,
-      isError: false,
-      refetch: vi.fn(),
-    });
-
-    // Started on a bucket via the query string rather than through a stateful
-    // parent — the bucket is URL state now, so "clear" has to clear the URL and
-    // a real router is what proves it did.
-    render(
-      <MemoryRouter initialEntries={["/?bucket=needs_you"]}>
-        <BugFindingsTable onShowShortcuts={vi.fn()} canTriage />
-      </MemoryRouter>,
-    );
+  // The tab is where the reader is, not a filter: "Clear filters" brings the
+  // rows back and leaves the reader on the tab they chose.
+  it("clears every filter at once, but keeps the tab", () => {
+    mount([finding({ id: "a", title: "Terms link" })]);
 
     fireEvent.change(screen.getByLabelText("Search bugs"), { target: { value: "zzzz" } });
     expect(screen.queryByText("Terms link")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getAllByText("Clear filters")[0]);
     expect(screen.getByText("Terms link")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /Backlog/ })).toHaveAttribute("aria-selected", "true");
+  });
+
+  // Search has its own ×, and the tab has no pill: a row holding nothing but
+  // "Clear filters" under one typed letter was the bug.
+  it("draws no pill row for a search alone", () => {
+    mount([finding({ id: "a", title: "Terms link" })]);
+
+    fireEvent.change(screen.getByLabelText("Search bugs"), { target: { value: "terms" } });
+    expect(screen.getByText("Terms link")).toBeInTheDocument();
+    expect(screen.queryByText("Clear filters")).not.toBeInTheDocument();
   });
 
   it("still shows the real empty state when there is genuinely nothing", () => {
@@ -391,5 +388,134 @@ describe("BugFindingsTable — triage controls", () => {
     );
 
     expect(container.querySelectorAll(".animate-pulse").length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * The 2026-10-13 simplification: five tabs in place of eight chips, a default
+ * that is never "everything", and at most one button per row.
+ */
+describe("BugFindingsTable — tabs and the one next step", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const mixed = () => [
+    finding({ id: "waiting", status: BugFindingStatus.PENDING_APPROVAL }),
+    finding({ id: "asked", status: BugFindingStatus.NEEDS_INPUT }),
+    finding({ id: "red", status: BugFindingStatus.FAILED }),
+    finding({ id: "fixing", status: BugFindingStatus.FIXING }),
+    finding({ id: "pr", status: BugFindingStatus.PR_OPENED, prUrl: "https://example.com/pr/1" }),
+    finding({ id: "new", status: BugFindingStatus.NEW }),
+    finding({ id: "live", status: BugFindingStatus.RELEASED }),
+  ];
+
+  it("opens on Needs you when anything needs you", () => {
+    mount(mixed(), undefined, "/");
+
+    expect(screen.getByRole("tab", { name: /Needs you/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("Bug waiting")).toBeInTheDocument();
+    expect(screen.queryByText("Bug new")).not.toBeInTheDocument();
+  });
+
+  it("opens on In progress when nothing needs you", () => {
+    mount(
+      [
+        finding({ id: "fixing", status: BugFindingStatus.FIXING }),
+        finding({ id: "live", status: BugFindingStatus.RELEASED }),
+      ],
+      undefined,
+      "/",
+    );
+
+    expect(screen.getByRole("tab", { name: /In progress/ })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByText("Bug fixing")).toBeInTheDocument();
+    expect(screen.queryByText("Bug live")).not.toBeInTheDocument();
+  });
+
+  it("counts every tab, and has no Everything", () => {
+    mount(mixed(), undefined, "/");
+
+    const tabs = screen.getAllByRole("tab").map(tab => tab.textContent);
+    expect(tabs).toEqual(["Needs you2", "Failed1", "In progress2", "Backlog1", "Done1"]);
+  });
+
+  it("switches tab on click and writes it to the address", () => {
+    mount(mixed(), undefined, "/");
+
+    fireEvent.click(screen.getByRole("tab", { name: /Done/ }));
+    expect(screen.getByText("Bug live")).toBeInTheDocument();
+    expect(screen.queryByText("Bug waiting")).not.toBeInTheDocument();
+  });
+
+  it("says what lands in an empty tab rather than showing a bare table", () => {
+    mount([finding({ id: "only", status: BugFindingStatus.NEW })], undefined, "/?bucket=failed");
+    expect(screen.getByText("Nothing has failed")).toBeInTheDocument();
+    // Not the "nothing matches your filters" state: no filter is set.
+    expect(screen.queryByText("Nothing here matches those filters")).not.toBeInTheDocument();
+  });
+
+  it("offers one button per row, naming the next human step", () => {
+    mount(mixed(), undefined, "/?bucket=needs_you");
+    expect(screen.getByRole("button", { name: "Approve" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Answer" })).toBeInTheDocument();
+    // Reject and "Put me on it" are the drawer's and the bulk bar's now.
+    expect(screen.queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Put me on it" })).not.toBeInTheDocument();
+  });
+
+  it("offers nothing on rows that don't need a human", () => {
+    mount(mixed(), undefined, "/?bucket=backlog");
+    expect(screen.getByText("Bug new")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^(Approve|Answer|Try again|Merge|Release)$/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("confirms Approve in place, like the a key", () => {
+    mount(mixed(), undefined, "/?bucket=needs_you");
+    fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+
+    expect(screen.getByText("Approve this bug for me to fix?")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Approve it"));
+    expect(approveFinding).toHaveBeenCalledWith("waiting");
+  });
+
+  it("confirms Try again on a failed bug as a fresh fix session", () => {
+    mount(mixed(), undefined, "/?bucket=failed");
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+    expect(screen.getByText("Put Bug Hunter on this bug?")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Start now"));
+    expect(startFixSession).toHaveBeenCalledWith({ id: "red" });
+  });
+
+  // The answer box and the merge dialog's case chain live in the drawer.
+  it("opens the drawer for Answer and Merge", () => {
+    mount(mixed(), undefined, "/?bucket=needs_you");
+    fireEvent.click(screen.getByRole("button", { name: "Answer" }));
+    expect(screen.getByTestId("drawer")).toHaveTextContent("asked");
+  });
+
+  it("puts a spinner beside an agent-working status, and none beside a PR waiting on review", () => {
+    mount(mixed(), undefined, "/?bucket=in_progress");
+    const rows = document.querySelectorAll("tbody tr");
+    const fixingRow = [...rows].find(row => row.textContent?.includes("Bug fixing"));
+    const prRow = [...rows].find(row => row.textContent?.includes("Bug pr"));
+
+    expect(
+      fixingRow?.querySelector('[role="status"], [aria-hidden="true"].font-mono'),
+    ).toBeTruthy();
+    expect(prRow?.textContent).toContain("Merge");
+  });
+
+  it("drops the columns that repeated another one", () => {
+    mount(mixed(), undefined, "/?bucket=needs_you");
+    ["Stage", "Updated", "Est. cost", "PR", "Severity", "Repo"].forEach(header =>
+      expect(screen.queryByRole("columnheader", { name: header })).not.toBeInTheDocument(),
+    );
+    // Repo and source ride under the title instead.
+    expect(screen.getAllByText("ally-be · Code review").length).toBeGreaterThan(0);
   });
 });

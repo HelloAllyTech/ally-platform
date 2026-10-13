@@ -1,6 +1,6 @@
 import { BUG_FINDING_FIX_SESSION_START_STATUSES, BugFinding, BugFindingStatus } from "@types";
 
-import { bucketOfStatus } from "./lifecycleBucket";
+import { bucketOf } from "./lifecycleBucket";
 
 /**
  * Which decisions are legal on a given bug, and how old it is — the rules the
@@ -26,7 +26,7 @@ import { bucketOfStatus } from "./lifecycleBucket";
  *   `BUG_FINDING_FIX_SESSION_START_STATUSES`, which `@types` already mirrors.
  *
  * That asymmetry between approve and reject is not a detail: with the kill
- * switch on "Checks with you", a night's sweep lands every finding at
+ * switch on Manual, a night's sweep lands every finding at
  * `PENDING_APPROVAL` and both actions apply — but bugs a human reported arrive
  * at `NEW`, where only reject does. A bulk bar that offered "Approve 52" over a
  * selection of `NEW` findings would fire 52 requests and fail 52 times.
@@ -68,8 +68,8 @@ export const canAct = (action: TriageAction, finding: BugFinding): boolean => {
  *
  * Stricter than `canAct` for `fix` alone, and only because of the repo
  * question above. Kept as a separate predicate rather than a flag on `canAct`
- * so a row's own button and the bulk bar cannot drift: the row offers "Put me
- * on it" for a repo-less bug (the drawer will ask), the bulk bar does not.
+ * so the drawer and the bulk bar cannot drift: the drawer offers "Put me on it"
+ * for a repo-less bug and asks which repo, the bulk bar leaves it out.
  */
 export const bulkEligible = (action: TriageAction, finding: BugFinding): boolean =>
   action === "fix" ? canAct(action, finding) && !!finding.repo : canAct(action, finding);
@@ -127,16 +127,49 @@ export const stalenessTier = (days: number): StalenessTier => {
 /**
  * Whether age is worth colouring for this bug at all.
  *
- * Only for bugs that are waiting on somebody: `needs_you`, `problem` and
- * `queued`. A bug that shipped three months ago is not "stale" — it is done,
- * and tinting it amber would teach a reader to ignore the tint, which is the
- * one thing a staleness signal cannot survive. Same argument as
- * `LifecycleBucketChips`' colour rule: quiet when normal, loud only when it
- * needs acting on.
+ * Only for bugs waiting on a human — the Needs you tab. A backlog bug nobody
+ * has started for two months is old, but it is not *late*: nobody owes it a
+ * decision. Tinting it told a reader that fifty-two backlog rows were overdue,
+ * in the same red the Failed tab uses, which is how a staleness signal teaches
+ * people to ignore it.
  */
-export const showsStaleness = (finding: BugFinding): boolean => {
-  const bucket = bucketOfStatus(finding.status);
-  return bucket === "needs_you" || bucket === "problem" || bucket === "queued";
+export const showsStaleness = (finding: BugFinding): boolean => bucketOf(finding) === "needs_you";
+
+/**
+ * The one thing a person can do next on a row, if anything.
+ *
+ * At most one per row, and only on rows that need a human — the rest of a
+ * row's possible moves (reject, "put me on it", stop, stage) live in the drawer
+ * and, for the ones that batch, in the bulk bar. A column of three tinted
+ * buttons on every row made every row look like it needed you; one button on
+ * the rows that do is what makes those rows findable (Stacks: *Desert Oasis:
+ * Isolating the Primary Call-to-Action*).
+ *
+ * - `approve` — PENDING_APPROVAL. Confirmed in place, like the `a` key.
+ * - `answer` — NEEDS_INPUT. The question and the answer box are in the drawer.
+ * - `retry` — FAILED. A fresh fix session, confirmed in place, like the `f` key.
+ * - `merge` — PR_OPENED with a PR. Opens the drawer, whose merge dialog shows
+ *   the case chain before the one click that cannot be undone from here.
+ * - `release` — RELEASE_FAILED. Opens the drawer: whether it can be released
+ *   again is something only the detail endpoint knows.
+ */
+export type NextStep = "approve" | "answer" | "retry" | "merge" | "release";
+
+export const nextStep = (finding: BugFinding): NextStep | null => {
+  switch (finding.status) {
+    case BugFindingStatus.PENDING_APPROVAL:
+      return "approve";
+    case BugFindingStatus.NEEDS_INPUT:
+      return "answer";
+    case BugFindingStatus.FAILED:
+      return "retry";
+    case BugFindingStatus.PR_OPENED:
+      return finding.prUrl ? "merge" : null;
+    case BugFindingStatus.RELEASE_FAILED:
+      return "release";
+    default:
+      return null;
+  }
 };
 
 /**

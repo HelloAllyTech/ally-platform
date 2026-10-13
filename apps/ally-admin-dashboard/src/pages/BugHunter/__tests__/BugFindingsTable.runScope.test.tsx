@@ -144,7 +144,7 @@ const mount = (items: BugFinding[], count?: number, url = "/") => {
 };
 
 /**
- * Scoping the table to one sweep, and telling Age apart from Updated.
+ * Scoping the table to one sweep.
  *
  * ## The defect behind all of it
  *
@@ -155,8 +155,8 @@ const mount = (items: BugFinding[], count?: number, url = "/") => {
  * weeks before the sweep stamped its id onto them. Ten were found, eight of
  * them were old rows, and nothing on the page could say so.
  *
- * Two fixes, tested here. The scope answers "which ten?"; the Updated column
- * stops a re-read bug from looking untouched since the day it was filed.
+ * The scope answers "which ten?", and the banner says that some of them are
+ * older than the sweep.
  */
 describe("BugFindingsTable — one sweep's bugs", () => {
   beforeEach(() => {
@@ -192,9 +192,18 @@ describe("BugFindingsTable — one sweep's bugs", () => {
       ),
     ).toBeInTheDocument();
     // Stated, not implied: a reader who has not seen this line reads
-    // "Everything 1" as "one bug exists".
+    // "Backlog 1" as "one bug is waiting".
     expect(screen.getByText(/Some of these bugs are older than the sweep/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Show all bugs" })).toBeInTheDocument();
+  });
+
+  // A sweep's bugs usually sit in Backlog or Done; opening its scope on an
+  // empty In progress beside "1 found" would read as a broken link.
+  it("opens the scope on its first non-empty tab", () => {
+    mount([finding({ id: "a", runId: "run-a" })], 1, "/?run=run-a");
+
+    expect(screen.getByRole("tab", { name: /Backlog/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("Bug a")).toBeInTheDocument();
   });
 
   it("still names the scope while the run's own details are loading", () => {
@@ -226,68 +235,32 @@ describe("BugFindingsTable — one sweep's bugs", () => {
   });
 });
 
-describe("BugFindingsTable — Age and Updated are different questions", () => {
+/**
+ * Updated and Est. cost were dropped on 2026-10-13: Age answers "how long has
+ * this sat?" for the triager, and what a bug has cost is in its drawer. Kept
+ * as a guard so neither creeps back as a column.
+ */
+describe("BugFindingsTable — the columns it no longer has", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getBugHuntRun.mockReturnValue({ data: undefined });
   });
 
-  it("shows Updated once something in view has moved since it was found", () => {
-    mount([
-      finding({
-        id: "a",
-        createdAt: "2026-08-01T00:00:00.000Z",
-        updatedAt: "2026-08-22T00:00:00.000Z",
-      }),
-    ]);
+  it("shows no Updated or Est. cost column, even when a bug has moved since it was found", () => {
+    mount(
+      [
+        finding({
+          id: "a",
+          createdAt: "2026-08-01T00:00:00.000Z",
+          updatedAt: "2026-08-22T00:00:00.000Z",
+        }),
+      ],
+      undefined,
+      "/?bucket=backlog",
+    );
 
-    expect(screen.getByRole("button", { name: /Updated/ })).toBeInTheDocument();
-  });
-
-  it("collapses Updated when it would only repeat Age", () => {
-    mount([
-      finding({
-        id: "a",
-        createdAt: "2026-08-17T00:00:00.000Z",
-        // Seconds later, within the same sweep: inserted, then PATCHed to
-        // pending_approval. A strict `>` would call this "updated" and the
-        // column would be a second copy of Age on the whole table — a worse
-        // dead column than an em-dash, because a reader has to compare the two
-        // before concluding they say the same thing.
-        updatedAt: "2026-08-17T00:00:12.000Z",
-      }),
-    ]);
-
+    expect(screen.getByText("Bug a")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Updated/ })).not.toBeInTheDocument();
-  });
-
-  it("sorts by Updated independently of Age", () => {
-    mount([
-      // Filed in July, re-read by last night's sweep — the case the whole
-      // change exists for. Oldest by Age, newest by Updated.
-      finding({
-        id: "old-report",
-        title: "Filed in July, looked at last night",
-        createdAt: "2026-07-01T00:00:00.000Z",
-        updatedAt: "2026-08-22T00:00:00.000Z",
-      }),
-      finding({
-        id: "fresh-find",
-        title: "Found last week and untouched since",
-        createdAt: "2026-08-15T00:00:00.000Z",
-        updatedAt: "2026-08-15T00:00:00.000Z",
-      }),
-    ]);
-
-    const titles = () =>
-      [...document.querySelectorAll("tbody tr")].map(row => row.textContent ?? "");
-
-    // Default sort is discovery, newest first.
-    expect(titles()[0]).toContain("Found last week and untouched since");
-
-    // One click on Updated sorts descending — the re-read July bug comes top,
-    // which is the row an admin was looking for and could not find.
-    fireEvent.click(screen.getByRole("button", { name: /Updated/ }));
-    expect(titles()[0]).toContain("Filed in July, looked at last night");
+    expect(screen.queryByRole("button", { name: /Est\. cost/ })).not.toBeInTheDocument();
   });
 });

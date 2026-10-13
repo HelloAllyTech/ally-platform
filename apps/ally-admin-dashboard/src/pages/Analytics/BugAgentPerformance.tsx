@@ -32,6 +32,7 @@ import {
 } from "./chartKit";
 import { buildColorScale, formatPercent, formatUsd } from "./tokenChart";
 import { RunHistoryTable } from "../BugHunter/RunHistoryTable";
+import { TodayBoard } from "../BugHunter/TodayBoard";
 
 /**
  * Bug Hunter's performance, in the charts somebody actually watches: whether
@@ -61,8 +62,8 @@ import { RunHistoryTable } from "../BugHunter/RunHistoryTable";
  * Bug Hunter page's retired Performance tab. The scorecard and the accuracy
  * panel moved here with it and were removed the same day at the product
  * head's request: the trends and operations charts already carry their figures. The Bug
- * Hunter page keeps Work, Notebook and About; its old `?section=performance`
- * redirects here. The shift log's "N found" links jump back to that page's
+ * Hunter page keeps Work and Notebook; its old `?section=performance` redirects
+ * here. "Today, by repo" joined the shift log here on 2026-10-13. The shift log's "N found" links jump back to that page's
  * table — see `RunHistoryTable`.
  */
 export const BugAgentPerformance = (filters: AnalyticsTabFilters) => {
@@ -320,6 +321,13 @@ export const BugAgentPerformance = (filters: AnalyticsTabFilters) => {
       {/* The cells the orchestrator reads before it decides, and the replay
           that says whether its owners should change (OPP-0776 / OPP-0783). */}
       <BugHunterDecisionsPanel {...filters} />
+
+      {/* Today so far, one row per repo — the day the shift log's newest rows
+          belong to, summed. Moved here from Bug Hunter's Work tab on
+          2026-10-13: a report on the day, for the reader who reads the runs. */}
+      <div className="pt-2">
+        <TodayBoard />
+      </div>
 
       {/* The per-run ledger every number above aggregates: status, trigger,
           cost and the GitHub run for each sweep and fix session. The only view

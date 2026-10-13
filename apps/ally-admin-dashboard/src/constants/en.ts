@@ -2471,30 +2471,30 @@ export const en = {
     agentStatusOnShiftDetail: "Nothing on my desk. My next sweep runs tonight.",
     agentStatusOnShiftDetailManual:
       "Nothing on my desk. My next sweep runs tonight — I'll check with you before I fix anything.",
-    // ── Lifecycle buckets (the chip row above the bugs table) ────────────────
-    // Seventeen statuses collapsed into the seven groups an admin scans for,
-    // named by whose move it is next. These replace both the four-tile workload
-    // strip on the card and the flat seventeen-item status <Select>; see
-    // lifecycleBucket.ts for why the groups are cut this way.
-    //
-    // "In progress" and "In review" keep the workload tiles' exact wording on
-    // purpose — the numbers moved, the vocabulary shouldn't.
-    bucketGroupLabel: "Filter bugs by what needs to happen next",
-    bucketAll: "Everything",
-    bucketNeedsYou: "Needs your call",
-    // Not "Failed": the bucket holds a failed fix and a failed release, and the
-    // shared fact is that a job went red, which is also how the status line
-    // says it ("{count} of my jobs went red").
-    bucketProblem: "Went red",
-    // NEW, APPROVED and BLOCKED — recorded, accepted, nobody blocked, not
-    // started. "Queued" would collide with the QUEUED status pill ("Starting…").
-    bucketQueued: "On the list",
-    bucketInFlight: "In progress",
-    bucketInReview: "In review",
-    // Matches the RELEASED status pill's own label rather than inventing a
-    // second word for production.
-    bucketShipped: "Live",
-    bucketClosed: "Closed",
+    // ── Tabs over the bugs table (2026-10-13) ───────────────────────────────
+    // Five tabs replaced seven chips and "Everything": one question each, in
+    // the order a reader asks them. Plain words, named by what is in them —
+    // see lifecycleBucket.ts for which statuses each holds.
+    tabsLabel: "Bugs by what happens next",
+    tabNeedsYou: "Needs you",
+    tabFailed: "Failed",
+    tabInProgress: "In progress",
+    tabBacklog: "Backlog",
+    tabDone: "Done",
+    // An empty tab says what lands in it, so it reads as "nothing yet" rather
+    // than as something broken. App voice: this is the page describing itself.
+    tabEmptyNeedsYouTitle: "Nothing needs you right now",
+    tabEmptyNeedsYouSubtitle: "Bugs waiting for your approval or an answer land here.",
+    tabEmptyFailedTitle: "Nothing has failed",
+    tabEmptyFailedSubtitle:
+      "Fix sessions and releases that go red land here, for you to try again or close.",
+    tabEmptyInProgressTitle: "Nothing in progress",
+    tabEmptyInProgressSubtitle:
+      "Bugs being fixed or released, and fixes with a pull request open for review, land here.",
+    tabEmptyBacklogTitle: "The backlog is empty",
+    tabEmptyBacklogSubtitle: "New bugs that nobody has started yet land here.",
+    tabEmptyDoneTitle: "Nothing done yet",
+    tabEmptyDoneSubtitle: "Merged, live and closed bugs land here.",
 
     // ── What I need from you (the decision queue) ────────────────────────────
     // First person, and it ends with what happens next — the voice rules in
@@ -2525,11 +2525,12 @@ export const en = {
 
     // ── Working style: how much rope, not on/off ─────────────────────────────
     modeLabel: "Working style",
-    modeOff: "Off duty",
-    modeManual: "Checks with you",
-    modeAi: "Works solo",
-    modeTooltip:
-      "Off duty blocks every trigger, nightly and on-demand alike — there is no separate pause. Checks with you (Manual mode) and Works solo (AI mode) both keep it finding bugs on schedule; only Checks with you holds the fix stage for your approval on each bug, in the table below. Changing this mid-run lets the current run finish under the old setting.",
+    // Plain control labels (2026-10-13). The API and the logs say off, manual
+    // and ai; About names both vocabularies so they join up. The confirm
+    // dialogs below still speak in Bug Hunter's own voice.
+    modeOff: "Off",
+    modeManual: "Manual",
+    modeAi: "Autonomous",
     modeOffConfirmTitle: "Send Bug Hunter off duty?",
     modeManualConfirmTitle: "Ask Bug Hunter to check with you first?",
     modeAiConfirmTitle: "Let Bug Hunter work solo?",
@@ -2545,6 +2546,20 @@ export const en = {
     // Links to the shared Model Settings hub (see `en.modelSettings`) rather
     // than a Bug-Hunter-only page — Builder's model tiers live there too.
     settingsLink: "Model settings",
+    // ── The one-line header (2026-10-13) ─────────────────────────────────────
+    // State, then what it is doing, then when it last swept — each fragment in
+    // sentence case so any of them can drop out. App voice: the header reports
+    // on Bug Hunter rather than speaking as it.
+    headerFixingNow: "Fixing {count} now",
+    headerSweepingNow: "Sweeping {repo} now",
+    headerLastSweep: "Last sweep {when}",
+    headerNoSweepYet: "No sweep yet",
+    headerAgo: "{span} ago",
+    headerJustNow: "just now",
+    headerMenuLabel: "More actions",
+    menuScanUxSignals: "Scan UX signals now",
+    menuMapFeatures: "Map features now",
+    helpButtonLabel: "About Bug Hunter",
     // ── About me (was the FAQ) ───────────────────────────────────────────────
     // Questions in the second person, answers in the first: this reads as
     // asking a colleague how they work, not as product documentation. Both
@@ -2556,7 +2571,7 @@ export const en = {
       "Every night — and whenever you ask — I go through the Ally repos looking for bugs: failing or flaky tests, an LLM code-review pass over recent changes, production error signals, and the bugs your team has already reported on the product roadmap. Everything I find, and everything your team reports, lands in my bugs table below with its current status.",
     faqModesTitle: "What's the difference between the two working styles?",
     faqModesBody:
-      'I discover and verify bugs the same way in both, on the same schedule. On Works solo (AI mode) a bug I\'ve verified goes straight to the fix stage. On Checks with you (Manual mode) it waits at "Pending approval" in my table until you approve it — I fix nothing without a click from you first.',
+      'I discover and verify bugs the same way in both, on the same schedule. On Autonomous (AI mode) a bug I\'ve verified goes straight to the fix stage. On Manual it waits at "Pending approval" under Needs you until you approve it — I fix nothing without a click from you first.',
     faqTrivialTitle: "What do you fix on your own, and what do you just propose?",
     faqTrivialBody:
       "I merge my own fix only in a narrow, pre-approved set of cases: a lint or type-only change, or a single-file fix backed by a new regression test that fails before it and passes after. I never touch migrations, auth and permission code, payment paths or other security-sensitive services on my own, however small the diff looks — those always come to you as a PR.",
@@ -2574,35 +2589,25 @@ export const en = {
       "In my bugs table below — click any row to open it, approve or reject it, or answer a question I've asked. There's no separate review screen.",
     faqEscalationTitle: "Where do you tell me you're stuck?",
     faqEscalationBody:
-      "In my messages at the top of this page — that's the only place I speak. I post there when I need an answer from you, when something has gone wrong, and when a fix reaches production. The count beside them is what's unread; it turns orange when I'm actually blocked waiting on you. A bug at \"Needs input\" has an open question — open it to read and answer. A quiet, successful night gets no message at all, on purpose.",
+      'Under Needs you, the first tab of my bugs table. A bug that needs your approval waits there, and so does one where I\'ve asked you a question — it reads "Needs input", and its Answer button opens it so you can reply. Anything of mine that went red is under Failed. The count beside Bug Hunter in the sidebar is my unread notifications. A quiet, successful night gets no message at all, on purpose.',
     faqReposTitle: "Which repos do you touch?",
     faqReposBody: "ally-be, ally-web, ally-ai, ally-ai-learn and ally-mobile.",
     faqCostTitle: "What does a night of your work cost?",
     faqCostBody:
-      "Every sweep's estimated token cost is in my shift log below, from the same LLM usage data the platform's cost analytics use.",
+      "Every sweep's estimated token cost is in my shift log on Analytics → Bug Agent, from the same LLM usage data the platform's cost analytics use. What my fix sessions on one bug have cost is on that bug.",
     faqOffTitle: "How do I stop you?",
     faqOffBody:
-      "Set my working style to Off duty above. That blocks every trigger immediately — nightly and on-demand alike.",
+      "Set my working style to Off at the top of the page. That blocks every trigger immediately — nightly and on-demand alike.",
     // ── Findings table (the comprehensive bug table) ──────────────────────────
-    findingsTitle: "Bugs I'm tracking",
-    // No longer "newest first": the table sorts by three columns now, so stating
-    // one order as a property of the list would be wrong the moment anyone
-    // clicks a header. Newest-first is still the default.
-    findingsSubtitle:
-      "Everything I know about, from any source. Search it, or filter by what needs doing.",
     findingColumnTitle: "Bug",
-    findingColumnRepo: "Repo",
-    findingColumnSeverity: "Severity",
     findingColumnStatus: "Status",
     // Sorting by status walks the lifecycle rather than the alphabet, which is
     // worth saying: "sort by status" reads as an arbitrary ordering until you
     // know that clicking it brings your own unfinished work to the top.
     findingColumnStatusTooltip:
-      "Where a bug is in my pipeline. Sorting by it groups the list the way the chips above do — whatever is waiting on you first, then my own work in the order I do it, then what's finished.",
-    // `findingColumnStage` itself already lives with the stage labels below.
-    findingColumnStageTooltip:
-      "The coarse roadmap ladder — New, Prioritised, In development, Released — so a bug reads the same way as an idea on the roadmap board. I derive it from the status on its left unless somebody pinned it by hand.",
-    findingColumnPr: "PR",
+      "Where a bug is in my pipeline. Sorting by it walks the lifecycle rather than the alphabet — within Done, say, the merged fixes, then the live ones, then the closed.",
+    // The severity dot before a title: its accessible name and hover title.
+    severityDotLabel: "{severity} severity",
     findingSourceTestFailure: "Failing test",
     findingSourceLintError: "Lint error",
     findingSourceCodeReview: "Code review",
@@ -2614,7 +2619,6 @@ export const en = {
     findingSeverityLow: "Low",
     findingSeverityMedium: "Medium",
     findingSeverityHigh: "High",
-    findingSeverityNone: "—",
     findingStatusNew: "New",
     findingStatusPendingApproval: "Pending approval",
     findingStatusApproved: "Approved",
@@ -2640,12 +2644,8 @@ export const en = {
     findingStageUnderDevelopment: "In development",
     findingStageReleased: "Released",
     findingStageArchived: "Archived",
-    findingColumnStage: "Stage",
     findingStagePinnedTooltip:
       "Stage set by hand by {name} on {date}. It no longer follows the fix pipeline.",
-    findingStageAutoTooltip:
-      "Stage follows the fix pipeline automatically — it's {stage} because this bug is {status}.",
-    findingStagePinned: "pinned",
     stageSectionTitle: "Stage",
     stageAutoLabel: "Following the pipeline",
     stageEditLabel: "Set stage by hand",
@@ -2701,15 +2701,12 @@ export const en = {
     // the triager's daily surface; the monthly governance numbers moved to
     // Analytics → Bug Agent (OPP-0749) — see BugHunter.tsx.
     sectionWork: "Work",
-    sectionAbout: "About",
     sectionNotebook: "Notebook",
     filtersButton: "Filters",
     filtersPanelLabel: "Filter bugs",
-    filterSectionStatus: "Status",
     filterSectionRepo: "Repo",
     filterSectionSeverity: "Severity",
     filterSectionSource: "Source",
-    filterSectionStage: "Roadmap stage",
     filterSectionAge: "Age",
     filterSectionClear: "Clear",
     filterAgeAll: "Any age",
@@ -2726,7 +2723,7 @@ export const en = {
     // I find shows up here" is the wrong thing to tell someone who has just
     // typed a typo into the search box.
     noMatchTitle: "Nothing here matches those filters",
-    noMatchSubtitle: "Clear them, or pick a different group above.",
+    noMatchSubtitle: "Clear them, or try another tab.",
     // "Showing 1 of 1 bugs" is both ungrammatical and redundant, so a single
     // match gets its own line rather than a template with a plural stuck on it.
     resultSummaryOne: "Showing 1 bug",
@@ -2916,17 +2913,22 @@ export const en = {
       replayEmpty: "No decisions in the window yet.",
     },
 
-    // ── the Work tab's "Today, by repo" board ──────────────────────────────
+    // ── "Today, by repo" — Analytics → Bug Agent, beside the shift log ──────
     today: {
       title: "Today, by repo",
-      subtitle: "{date}, since midnight India time",
+      // Every column counts since midnight except open PRs, which is the live
+      // number; the subtitle says so rather than letting the one exception
+      // pass for a day's count.
+      subtitle: "{date}, since midnight India time. Open PRs is the live count.",
       colRepo: "Repo",
       colSweeps: "Sweeps",
       colFound: "Found",
       colVerified: "Verifier on findings",
       colSessions: "Fix sessions",
       colFixVerdicts: "Verifier on fixes",
-      colPrsOpen: "PRs open",
+      colPrsOpen: "Open PRs now",
+      colPrsOpenTooltip:
+        "Fix pull requests open right now, whatever day they were opened. Every other column counts since midnight.",
       colMerged: "Merged",
       colReleased: "Released",
       colSpend: "Spend",
@@ -3335,85 +3337,15 @@ export const en = {
     // The dense rail has no visible stage names, so its group name carries
     // them — see the `dense` prop in PipelineRail.tsx.
     pipelineRailDenseLabel: "Pipeline stage: {stage}, step {step} of {total}",
-    // ── Live clock (freshness readout next to the status pill) ──────────────
-    updatedJustNow: "Updated just now",
-    updatedSecondsAgo: "Updated {count}s ago",
-    updatedMinutesAgo: "Updated {count}m ago",
-    updatedHoursAgo: "Updated {count}h ago",
-    // The same clock in `elapsed` mode: a bare duration, because the caller's
-    // own words say what it is a duration of. No "just now" case — a counter
-    // climbing from 0s is the signal.
-    elapsedSeconds: "{count}s",
-    elapsedMinutes: "{count}m",
-    elapsedHours: "{count}h",
-    // Both modes hover to the exact moment, to the second. The relative form
-    // answers "is this still moving?"; only a real timestamp answers "which
-    // sweep was this?", and an incident review needs the second one.
-    clockUpdatedExactTitle: "Last updated {timestamp}",
-    clockElapsedExactTitle: "Started {timestamp}",
-    // ── Live work board ("on it right now") ─────────────────────────────────
-    // The tab's only present-tense section, and the only one that reports the
-    // agent's own work in progress rather than a record of it. Voice rules
-    // apply as everywhere else — first person, plain, and every line ends with
-    // what happens next — with one extra constraint specific to this section:
-    // nothing here may be written to sound busier than the data is. The board
-    // is absent entirely when nothing is in flight, so no string below ever has
-    // to cover an idle agent.
-    liveWorkTitle: "On it right now",
-    liveWorkSubtitle:
-      "These are moving on their own — nothing here needs you. Open one to follow along.",
-    liveWorkSweeping: "I'm sweeping {repo}.",
-    liveWorkSweepElapsedLabel: "Sweeping for {duration}",
-    liveWorkStageElapsedLabel: "{duration} on this step",
-    liveWorkNoRepo: "No codebase matched to this one yet",
-    // What each in-flight status means, as the thing it is doing.
-    liveWorkQueued: "I've queued a fix session — it starts as soon as a runner frees up.",
-    liveWorkFixing:
-      "I'm writing the fix now: a failing test that reproduces it first, then the change, then the whole suite.",
-    liveWorkCoordinating:
-      "This one spans repos, so I'm working through them in order — one has to land before the next starts.",
-    liveWorkReleasing: "The release is running. I'll report how it went here in a few minutes.",
-    liveWorkGeneric: "I'm working on this one now.",
-    // Where a bug just got to. Shown for a few seconds after it stops being in
-    // flight, which is the only moment on the tab where finishing is visible as
-    // it happens rather than as a row that quietly changed colour.
-    liveWorkLandedPrOpened: "Fix written and pushed — the PR is open for review.",
-    liveWorkLandedMerged: "Merged to master. Putting it in front of users is your call.",
-    liveWorkLandedReleased: "Released to production. Users have this fix now.",
-    liveWorkLandedReleaseFailed:
-      "It's merged, but the release went red. The details are on the bug.",
-    liveWorkLandedNeedsInput:
-      "I've stopped on this one — my question for you is in the queue above.",
-    liveWorkLandedPendingApproval: "Waiting on your call before I start fixing it.",
-    liveWorkLandedFailed: "That attempt went red. Whether I try again is your call.",
-    liveWorkLandedCancelled: "You stopped this session. The bug is still open.",
-    liveWorkLandedClosed: "Off the board — I won't pick this one up.",
-    liveWorkLandedRequeued: "Back in the queue. I'll pick it up on my next pass.",
-    liveWorkShowAll: "Show {count} more",
-    liveWorkShowFewer: "Show fewer",
     // ── Age / staleness column ─────────────────────────────────────
     findingColumnAge: "Age",
     findingColumnAgeTooltip:
       "How long a bug has been on my list. I only colour it for bugs still waiting on a decision — something that shipped last month isn't stale, it's finished.",
     findingAgeStaleTooltip: "Waiting on a decision for over a week.",
     findingAgeAncientTooltip: "Waiting on a decision for over a month.",
-    // ── "Updated" column, and the run scope it exists to explain ────
-    // Not "Last triaged". `updatedAt` moves for anything at all — my own sweep
-    // re-reading the bug, a status change, an admin rewriting the description —
-    // and a column promising it was me who last looked would be wrong roughly
-    // whenever a human touched the row.
-    findingColumnUpdated: "Updated",
-    // Only shows once something in view has actually moved since it was found,
-    // so this tooltip is never explaining a column of repeated Age values.
-    findingColumnUpdatedTooltip:
-      "When anything last happened to a bug — I re-read it on a sweep, its status moved, or someone rewrote it. Age is how long it's been on my list; this is whether it's been touched lately. On a bug your team reported weeks ago and I only looked at last night, those two are very far apart.",
-    // Only shows once some bug in view has cost anything, so a table of
-    // untouched reports is not a column of dashes.
     drawerPrReview: "Found reviewing pull request #{number}",
     drawerPrReviewCommented: "· my comment is on the PR",
-    findingColumnCost: "Est. cost",
-    findingColumnCostTooltip:
-      "What my fix sessions on this bug have cost so far: the engine's own figure where it reported one, else my token estimate. Sweep cost is not counted — a sweep reads the whole repo and no one bug owns it. Sort by it to see which bugs have burned the most. The drawer has the per-session breakdown.",
+    // ── The run scope ───────────────────────────────────────────────
     runScopeBanner: "Showing only the bugs my {repo} sweep at {timestamp} touched.",
     runScopeBannerLoading: "Showing only the bugs one sweep touched.",
     // The point of the sentence. "Found 10" meant ten rows touched, and most of
@@ -3421,21 +3353,27 @@ export const en = {
     // ten were never going to be at the top of a table sorted by age, and the
     // only reading left was that they had gone missing.
     runScopeBannerHint:
-      "Counts and filters below describe this sweep only. Some of these bugs are older than the sweep — I re-read what your team reported, so a bug filed weeks ago still counts as found on the night I looked at it.",
+      "Counts, tabs and filters below describe this sweep only. Some of these bugs are older than the sweep — I re-read what your team reported, so a bug filed weeks ago still counts as found on the night I looked at it.",
     runScopeClear: "Show all bugs",
     runScopeCellLabel: "Show the {count} bugs this {repo} sweep touched",
-    // ── Row selection and quick actions ─────────────────────────────
+    // ── Row selection and the row's one next step ───────────────────
     rowSelectLabel: "Select bug: {title}",
     selectAllLabel: "Select every bug on this page",
     selectAllTooltip:
       "Selects the bugs on this page only — not the whole filtered list, and not the bugs I'm not currently holding.",
-    quickActionsColumn: "Decide",
-    quickApprove: "Approve",
-    quickReject: "Reject",
-    quickFix: "Put me on it",
+    // Screen-reader only: most rows have no button, so a visible heading would
+    // promise a column of buttons that isn't there.
+    quickActionsColumn: "Next step",
+    // At most one per row, and only on rows that need a human (triage.ts
+    // `nextStep`). Reject and "Put me on it" are in the drawer and the bulk bar.
+    nextStepApprove: "Approve",
+    nextStepAnswer: "Answer",
+    nextStepRetry: "Try again",
+    nextStepMerge: "Merge",
+    nextStepRelease: "Release",
     quickActionFailed: "Couldn't record that. Try again.",
-    // Deliberately not "Approve"/"Reject" again. The row button that opened the
-    // dialog says those, and two identical labels on screen at once make it
+    // Deliberately not "Approve"/"Reject" again. The button or key that opened
+    // the dialog says those, and two identical labels on screen at once make it
     // ambiguous which one you are confirming — the same rule the fix-session
     // dialog follows with "Start now".
     quickApproveConfirm: "Approve it",
@@ -3447,13 +3385,17 @@ export const en = {
     bulkSelected: "{count} bugs selected",
     bulkApprove: "Approve {count}",
     bulkReject: "Reject {count}",
+    bulkFix: "Put me on {count}",
     bulkClear: "Clear",
     // Approve and reject have different doors — approve needs "pending your
     // approval", reject also takes "new" — so each states its own scope rather
     // than sharing one sentence with the verb swapped in.
     bulkApproveScope: "{eligible} of {selected} can be approved from where they are.",
     bulkRejectScope: "{eligible} of {selected} can be rejected from where they are.",
+    bulkFixScope: "{eligible} of {selected} can get a fix session from where they are.",
     bulkApproveNone: "Approving only applies to bugs pending your approval. None of these are.",
+    bulkFixNone:
+      "A fix session needs a bug that is still open and matched to a codebase. None of these are — open one to pick its repo.",
     bulkRejectNone:
       "Rejecting only applies to bugs that are new or pending your approval. None of these are.",
     bulkApproveConfirmTitle: "Approve {count} bugs for me to fix?",
@@ -3464,11 +3406,17 @@ export const en = {
     bulkRejectConfirmBody:
       "I'll never pick them up, and this can't be undone. Anything that has moved on since you selected it is skipped, and I'll tell you which.",
     bulkRejectConfirm: "Reject them",
+    bulkFixConfirmTitle: "Put me on {count} bugs?",
+    bulkFixConfirmBody:
+      "I'll start a fix session on each of them now rather than waiting for tonight's sweep — each one a full session with its own cost. Anything that has moved on since you selected it is skipped, and I'll tell you which.",
+    bulkFixConfirm: "Start them",
     bulkProgress: "Working through {done} of {total}…",
     bulkApproveDoneOne: "Approved 1 bug.",
     bulkApproveDone: "Approved {count} bugs.",
     bulkRejectDoneOne: "Rejected 1 bug.",
     bulkRejectDone: "Rejected {count} bugs.",
+    bulkFixDoneOne: "Started 1 fix session.",
+    bulkFixDone: "Started {count} fix sessions.",
     // Partial failure is the ordinary case, not the exception: a selection made
     // fifteen seconds ago can hold a bug whose status has since moved. Both
     // halves get said, and the failures get named rather than counted.

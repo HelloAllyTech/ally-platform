@@ -1,15 +1,15 @@
+import { BugFinding, BugFindingSeverity, BugFindingSource, BugFindingStatus } from "@types";
+
 import {
-  BugFinding,
-  BugFindingSeverity,
-  BugFindingSource,
-  BugFindingStage,
-  BugFindingStatus,
-} from "@types";
-
-import { bucketOfStatus, LIFECYCLE_BUCKETS } from "./lifecycleBucket";
+  BucketCounts,
+  bucketOf,
+  bucketOfStatus,
+  countByBucket,
+  IN_FLIGHT_STATUSES,
+  LIFECYCLE_BUCKETS,
+  LifecycleBucket,
+} from "./lifecycleBucket";
 import { ageInDays, STALENESS_DAYS } from "./triage";
-
-import type { BucketFilter } from "./LifecycleBucketChips";
 
 /**
  * Turning the loaded window of findings into the rows on screen: filter, sort,
@@ -18,120 +18,77 @@ import type { BucketFilter } from "./LifecycleBucketChips";
  * ## Why all of this is client-side
  *
  * `GET /findings` filters by one status, one source and one repo, and knows
- * nothing about free-text search, severity or the seven lifecycle buckets. It
- * could learn — but every surface on this tab (the card's status line, the
- * chips, the queue, this table) needs the *same* hundred findings, and they
+ * nothing about free-text search, severity or the five lifecycle tabs. It
+ * could learn — but every surface on this page (the header's status line, the
+ * tab counts, this table) needs the *same* hundred findings, and they
  * ordinarily share exactly one RTK Query cache entry because they all ask for
  * `{status: "all", limit: 100}`. Pushing filters into the query would fork that
- * entry per filter combination and turn one request into five, to sift a list
- * small enough that the sifting is free.
+ * entry per filter combination and turn one request into several, to sift a
+ * list small enough that the sifting is free.
  *
  * So the window stays server-side (newest 100, or more once a reader has
  * clicked "Load more" — see `BugFindingsTable`'s `limit` state) and everything
  * inside it is computed here. The honest consequence is that filters describe
  * the window and not the whole table, which is why `FindingsView.windowed`
  * exists: the table states it in words rather than letting a reader assume a
- * filter searched history. That is the same failure the old workload strip's
- * footnote was apologising for, fixed by being accurate about the denominator
- * instead.
+ * filter searched history.
  *
  * ## Every facet is multi-select
  *
- * They were single-valued, which quietly made whole questions unaskable rather
- * than merely awkward: "everything red across ally-be *and* ally-web" is one
- * triage pass, and a one-repo-at-a-time facet turns it into two passes whose
- * results you have to hold in your head. Arrays cost nothing here — an empty
- * array means "don't filter on this", so the absent case stays as cheap as the
- * old `"all"` sentinel was — and they make the URL say the true thing
+ * "Everything in ally-be *and* ally-web" is one triage pass, and a
+ * one-repo-at-a-time facet turns it into two passes whose results you have to
+ * hold in your head. An empty array means "don't filter on this", so the
+ * absent case stays free, and the URL says the true thing
  * (`?repo=ally-be,ally-web`).
+ *
+ * Status and roadmap stage stopped being facets on 2026-10-13: the tabs cover
+ * status, and stage is derived from status.
  *
  * Kept out of the component for the ordinary reason: this is the part with
  * rules in it, and rules are worth testing without rendering a table.
  */
 
-/**
- * Every column the table can show is sortable, plus source, which is a facet
- * rather than a column and still worth ordering by when you want the
- * human-filed reports gathered together.
- */
-export type SortKey =
-  | "discovered"
-  | "updated"
-  | "severity"
-  | "title"
-  | "status"
-  | "repo"
-  | "source"
-  | "stage"
-  | "cost";
+/** One tab, or every tab — the latter only for counting what each tab would hold. */
+export type BucketFilter = LifecycleBucket | "all";
 
-export const SORT_KEYS: SortKey[] = [
-  "discovered",
-  "updated",
-  "severity",
-  "title",
-  "status",
-  "repo",
-  "source",
-  "stage",
-  "cost",
-];
+/**
+ * Every column the table shows is sortable: the bug's title, its status (in
+ * lifecycle order) and its age. Severity, repo, stage, cost and "updated" lost
+ * their columns on 2026-10-13 and their sort keys with them — a `?sort=` for a
+ * column that is not on screen orders the rows by something the reader cannot
+ * see, which reads as a broken table. An old link carrying one falls back to
+ * the default order.
+ */
+export type SortKey = "discovered" | "title" | "status";
+
+export const SORT_KEYS: SortKey[] = ["discovered", "title", "status"];
 
 export type SortDirection = "asc" | "desc";
 
 /**
  * The direction a column is usually read in, used when the reader switches to
- * a new sort key rather than flipping the current one.
- *
- * Dates and severity descend (newest, worst first); names ascend (A–Z). Status
- * ascends because its rank below is ordered "most in need of a human first",
- * so ascending is the useful end.
+ * a new sort key rather than flipping the current one: newest first for age,
+ * A–Z for a title, and "most in need of a human first" for status.
  */
 export const DEFAULT_SORT_DIRECTION: Record<SortKey, SortDirection> = {
   discovered: "desc",
-  updated: "desc",
-  severity: "desc",
   title: "asc",
   status: "asc",
-  repo: "asc",
-  source: "asc",
-  stage: "asc",
-  cost: "desc",
 };
 
-/**
- * What has been spent on a bug so far: every fix session's cost, charged to
- * the case file's budget as it runs (OPP-0775). Sweep cost is not here — a
- * sweep reads the whole repo and no one bug owns it. Zero for a bug nothing
- * has worked on.
- */
-export const costOf = (finding: BugFinding): number => {
-  const usd = finding.budget?.used?.usd;
-  return typeof usd === "number" && Number.isFinite(usd) && usd > 0 ? usd : 0;
-};
-
-/** `$0.42`, or a dash for a bug nothing has been spent on yet. */
-export const formatCost = (usd: number): string => (usd > 0 ? `$${usd.toFixed(2)}` : "—");
-
-/** High first when descending — the order an admin means by "sort by severity". */
+/** High first — the order an admin means by "worst first". */
 const SEVERITY_RANK: Record<BugFindingSeverity, number> = {
   [BugFindingSeverity.HIGH]: 3,
   [BugFindingSeverity.MEDIUM]: 2,
   [BugFindingSeverity.LOW]: 1,
 };
 
-/** Unclassified severity ranks below "low" rather than above "high". */
-const severityRank = (severity: BugFindingSeverity | null): number =>
-  severity ? SEVERITY_RANK[severity] : 0;
-
 /**
  * Where a status sorts, when the reader asks for the Status column.
  *
- * Bucket order first, status order within the bucket — never the enum's own
- * declaration order and never alphabetical. Sorting seventeen statuses
- * alphabetically puts "Approved" above "Needs input" and reads as noise; this
- * ranking puts the rows whose next move belongs to a human at one end, which
- * is the only reason anyone sorts by status on a triage table.
+ * Tab order first, status order within the tab — never the enum's own
+ * declaration order and never alphabetical. Within one tab that groups like
+ * with like: in Done, the merged fixes, then the live ones, then the closed.
  *
  * Derived from `LIFECYCLE_BUCKETS` rather than written out, so the two orders
  * cannot drift and an eighteenth status is classified in exactly one place
@@ -140,31 +97,20 @@ const severityRank = (severity: BugFindingSeverity | null): number =>
 const STATUS_RANK: Record<BugFindingStatus, number> = Object.values(BugFindingStatus).reduce(
   (ranks, status) => {
     const bucketIndex = LIFECYCLE_BUCKETS.indexOf(bucketOfStatus(status));
-    // ×100 leaves room for the within-bucket tiebreak below without any
-    // bucket's range ever reaching into the next one's.
+    // ×100 leaves room for the within-tab tiebreak below without any tab's
+    // range ever reaching into the next one's.
     ranks[status] = bucketIndex * 100 + Object.values(BugFindingStatus).indexOf(status);
     return ranks;
   },
   {} as Record<BugFindingStatus, number>,
 );
 
-/** The roadmap ladder in ladder order, so sorting by stage walks it rather than the alphabet. */
-const STAGE_RANK: Record<BugFindingStage, number> = {
-  [BugFindingStage.NEW]: 0,
-  [BugFindingStage.PRIORITISED]: 1,
-  [BugFindingStage.UNDER_DEVELOPMENT]: 2,
-  [BugFindingStage.RELEASED]: 3,
-  [BugFindingStage.ARCHIVED]: 4,
-};
-
 /**
  * How old a bug is, as a filter.
  *
  * The two "over" bands are deliberately `STALENESS_DAYS` and not round numbers
- * of their own. The Age column already tints amber over a week and red over a
- * month; a filter reading "Over a week" that used a different boundary would
- * return rows the column had not tinted, and the tint is the thing that makes
- * someone reach for the filter in the first place.
+ * of their own, so the filter and the Age column's tint on Needs-you rows agree
+ * about what "over a week" means.
  */
 export type AgeFilter = "all" | "day" | "week" | "stale" | "ancient";
 
@@ -187,6 +133,7 @@ const matchesAge = (finding: BugFinding, age: AgeFilter, now: number): boolean =
 };
 
 export interface FindingsFilters {
+  /** The open tab. Navigation rather than a filter in the reader's sense, but applied the same way. */
   bucket: BucketFilter;
   /** Free text over title, description, file, repo and the reporter's name. Trimmed and case-folded by `applyFilters`. */
   search: string;
@@ -194,18 +141,11 @@ export interface FindingsFilters {
   repos: string[];
   severities: BugFindingSeverity[];
   sources: BugFindingSource[];
-  statuses: BugFindingStatus[];
-  stages: BugFindingStage[];
   age: AgeFilter;
   /**
    * Narrow to bugs that share a duplicate key with at least one other bug in
-   * the window.
-   *
-   * The table has flagged duplicates with a "×2" badge for a while and offered
-   * no way to gather them, which is backwards: the badge's whole purpose is to
-   * prompt "close one of these", and acting on that meant paging through
-   * looking for badges. It is a filter over the window rather than a facet
-   * because duplicate-ness is a property of the *set*, not of a row.
+   * the window. A filter over the window rather than a facet, because
+   * duplicate-ness is a property of the *set*, not of a row.
    */
   duplicatesOnly: boolean;
 }
@@ -216,42 +156,26 @@ export const EMPTY_FILTERS: FindingsFilters = {
   repos: [],
   severities: [],
   sources: [],
-  statuses: [],
-  stages: [],
   age: "all",
   duplicatesOnly: false,
 };
 
-export const hasActiveFilters = (filters: FindingsFilters): boolean =>
-  filters.bucket !== "all" ||
-  filters.search.trim() !== "" ||
-  filters.repos.length > 0 ||
-  filters.severities.length > 0 ||
-  filters.sources.length > 0 ||
-  filters.statuses.length > 0 ||
-  filters.stages.length > 0 ||
-  filters.age !== "all" ||
-  filters.duplicatesOnly;
-
-/** How many facet values are set, for the "Filters" button's count badge. Bucket and search are excluded — they have their own always-visible controls. */
+/** How many facet values are set — the "Filters" button's badge, and whether the pill row has anything to show. Tab and search are excluded: they have their own always-visible controls. */
 export const activeFacetCount = (filters: FindingsFilters): number =>
   filters.repos.length +
   filters.severities.length +
   filters.sources.length +
-  filters.statuses.length +
-  filters.stages.length +
   (filters.age === "all" ? 0 : 1) +
   (filters.duplicatesOnly ? 1 : 0);
 
 /**
- * The key two findings have to share to be called duplicates of each other.
- *
- * Title, repo *and* status — not title alone. Two records with the same title
- * where one is REJECTED and the other is NEW are not the same item to an admin:
- * one is a decision already made and the other is a decision outstanding, and
- * flagging them as a pair would invite someone to treat the outstanding one as
- * already handled.
+ * Whether search or a facet is narrowing the rows. The tab is not counted: it
+ * is where the reader is, not a filter they forgot they set, and "Clear
+ * filters" leaves it alone.
  */
+export const hasActiveFilters = (filters: FindingsFilters): boolean =>
+  filters.search.trim() !== "" || activeFacetCount(filters) > 0;
+
 /**
  * Joins the parts of a duplicate key.
  *
@@ -262,6 +186,13 @@ export const activeFacetCount = (filters: FindingsFilters): number =>
  */
 const DUPLICATE_KEY_SEPARATOR = "\u0000";
 
+/**
+ * The key two findings have to share to be called duplicates of each other.
+ *
+ * Title, repo *and* status — not title alone. Two records with the same title
+ * where one is REJECTED and the other is NEW are not the same item to an admin:
+ * one is a decision already made and the other is a decision outstanding.
+ */
 export const duplicateKey = (finding: BugFinding): string =>
   [finding.title.trim().toLowerCase(), finding.repo ?? "", finding.status].join(
     DUPLICATE_KEY_SEPARATOR,
@@ -276,9 +207,7 @@ export interface FindingRow {
    * Duplicates are *flagged and both kept*, never collapsed into one row. The
    * same bug reported twice is two records, each independently approvable and
    * rejectable, and merging them behind a "×2" badge would leave the second one
-   * live after someone had dealt with what looked like the only one. The badge
-   * exists so that seeing the same title twice reads as a known fact about the
-   * data rather than as a rendering bug — which is how it read in production.
+   * live after someone had dealt with what looked like the only one.
    */
   duplicateCount?: number;
 }
@@ -324,7 +253,7 @@ const matchesSearch = (finding: BugFinding, needle: string): boolean =>
   (finding.file?.toLowerCase().includes(needle) ?? false) ||
   (finding.repo?.toLowerCase().includes(needle) ?? false) ||
   // "Everything Priya filed" is a question this table shows the answer to on
-  // every human-reported row and had no way to ask.
+  // every human-reported row.
   (finding.report?.reportedByName?.toLowerCase().includes(needle) ?? false);
 
 /**
@@ -345,12 +274,10 @@ const applyFilters = (
   const needle = filters.search.trim().toLowerCase();
 
   return findings.filter(finding => {
-    if (filters.bucket !== "all" && bucketOfStatus(finding.status) !== filters.bucket) return false;
+    if (filters.bucket !== "all" && bucketOf(finding) !== filters.bucket) return false;
     if (!passesFacet(filters.repos, finding.repo)) return false;
     if (!passesFacet(filters.severities, finding.severity)) return false;
     if (!passesFacet(filters.sources, finding.source)) return false;
-    if (!passesFacet(filters.statuses, finding.status)) return false;
-    if (!passesFacet(filters.stages, finding.stage)) return false;
     if (!matchesAge(finding, filters.age, now)) return false;
     if (filters.duplicatesOnly && (duplicates.get(duplicateKey(finding)) ?? 1) < 2) return false;
     if (needle !== "" && !matchesSearch(finding, needle)) return false;
@@ -358,60 +285,14 @@ const applyFilters = (
   });
 };
 
-/**
- * When anything last happened to a bug, falling back to its discovery date.
- *
- * The fallback is for an unparseable value rather than a missing one: the field
- * is required on the wire, but a NaN here would sort its row to an arbitrary
- * place in the table instead of to one end, which is the kind of defect nobody
- * reads as a date-parsing problem.
- */
-export const updatedAt = (finding: BugFinding): number => {
-  const at = new Date(finding.updatedAt).getTime();
-  return Number.isNaN(at) ? new Date(finding.createdAt).getTime() : at;
-};
-
-/**
- * True when a bug has been touched since it was discovered — a status move, a
- * sweep re-triaging it, an admin rewriting its description.
- *
- * The minute of slack is not cosmetic: a finding is INSERTed and then PATCHed
- * to `pending_approval` seconds later within one sweep, so a strict `>` would
- * call every row "updated" and the column would repeat Age on the whole table.
- */
-export const wasTouchedSinceDiscovery = (finding: BugFinding): boolean =>
-  updatedAt(finding) - new Date(finding.createdAt).getTime() > 60_000;
-
-/** Nulls sort to the end in both directions, rather than clumping at whichever end `localeCompare("")` lands them. */
-const compareNullableText = (a: string | null, b: string | null, sign: number): number => {
-  if (a === b) return 0;
-  if (!a) return 1 * sign;
-  if (!b) return -1 * sign;
-  return a.localeCompare(b);
-};
-
-const compare = (a: BugFinding, b: BugFinding, sortKey: SortKey, sign: number): number => {
+const compare = (a: BugFinding, b: BugFinding, sortKey: SortKey): number => {
   switch (sortKey) {
-    case "severity":
-      return severityRank(a.severity) - severityRank(b.severity);
     case "title":
       return a.title.localeCompare(b.title);
     case "discovered":
       return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-    case "updated":
-      return updatedAt(a) - updatedAt(b);
     case "status":
       return STATUS_RANK[a.status] - STATUS_RANK[b.status];
-    case "stage":
-      return STAGE_RANK[a.stage] - STAGE_RANK[b.stage];
-    case "source":
-      return a.source.localeCompare(b.source);
-    case "cost":
-      return costOf(a) - costOf(b);
-    case "repo":
-      // Multiplied back out by the caller, so the sign is passed in to keep
-      // "no repo" at the bottom whichever way the column is pointing.
-      return compareNullableText(a.repo, b.repo, sign);
   }
 };
 
@@ -419,9 +300,9 @@ const compare = (a: BugFinding, b: BugFinding, sortKey: SortKey, sign: number): 
  * Sorts a copy, never the argument.
  *
  * The array handed in is `data.items` straight off an RTK Query cache entry,
- * which three other surfaces on this page read from the same render. `.sort()`
- * mutates in place, so sorting it directly would reorder the card's and the
- * queue's view of the world as a side effect of clicking a column header here.
+ * which the header reads from in the same render. `.sort()` mutates in place,
+ * so sorting it directly would reorder the header's view of the world as a
+ * side effect of clicking a column header here.
  */
 const sortFindings = (
   findings: BugFinding[],
@@ -430,7 +311,7 @@ const sortFindings = (
 ): BugFinding[] => {
   const sign = direction === "asc" ? 1 : -1;
   return [...findings].sort((a, b) => {
-    const primary = compare(a, b, sortKey, sign) * sign;
+    const primary = compare(a, b, sortKey) * sign;
     if (primary !== 0) return primary;
     // Ties broken by recency, then by id. Without the id, two findings created
     // in the same second swap places between polls and the table flickers.
@@ -487,34 +368,35 @@ export const buildFindingsView = ({
   };
 };
 
+/**
+ * How many bugs each tab would hold under the current search and facets.
+ *
+ * Narrowed by them, unlike the facet panel's own counts, because these are
+ * what tell a searcher where their match went: a title typed on the Needs you
+ * tab that lives in Done shows up as "Done 1" rather than as an empty table.
+ */
+export const countTabs = (
+  findings: BugFinding[],
+  filters: FindingsFilters,
+  now: number = Date.now(),
+): BucketCounts =>
+  countByBucket(
+    applyFilters(findings, { ...filters, bucket: "all" }, countDuplicates(findings), now),
+  );
+
 /** Repos present in the window, for the repo facet — so the facet never offers a value that matches nothing. */
 export const reposInWindow = (findings: BugFinding[]): string[] =>
   Array.from(new Set(findings.map(finding => finding.repo).filter((r): r is string => !!r))).sort();
 
 /**
- * Statuses present in the window, in the same rank order the Status sort uses.
- *
- * Offered instead of all seventeen for the reason `lifecycleBucket`'s docblock
- * gives about the old flat `<Select>`: a list of every status the enum can hold
- * is a list of mostly-empty options, and the reader has to try one to find out.
- * Only what is actually in front of them.
+ * Sources present in the window, alphabetically by enum value — offered
+ * instead of every value the enum can hold, because a facet of mostly-empty
+ * options has to be clicked to find out which ones do nothing.
  */
-export const statusesInWindow = (findings: BugFinding[]): BugFindingStatus[] =>
-  Array.from(new Set(findings.map(finding => finding.status))).sort(
-    (a, b) => STATUS_RANK[a] - STATUS_RANK[b],
-  );
-
-/** Stages present in the window, in ladder order. Same argument as `statusesInWindow`. */
-export const stagesInWindow = (findings: BugFinding[]): BugFindingStage[] =>
-  Array.from(new Set(findings.map(finding => finding.stage))).sort(
-    (a, b) => STAGE_RANK[a] - STAGE_RANK[b],
-  );
-
-/** Sources present in the window, alphabetically by enum value. Same argument as `statusesInWindow`. */
 export const sourcesInWindow = (findings: BugFinding[]): BugFindingSource[] =>
   Array.from(new Set(findings.map(finding => finding.source))).sort();
 
-/** Severities present in the window, worst first. Same argument as `statusesInWindow`. */
+/** Severities present in the window, worst first. Same argument as `sourcesInWindow`. */
 export const severitiesInWindow = (findings: BugFinding[]): BugFindingSeverity[] =>
   Array.from(
     new Set(findings.map(finding => finding.severity).filter((s): s is BugFindingSeverity => !!s)),
@@ -530,8 +412,6 @@ export interface FacetCounts {
   repos: Record<string, number>;
   severities: Record<string, number>;
   sources: Record<string, number>;
-  statuses: Record<string, number>;
-  stages: Record<string, number>;
   ages: Record<AgeFilter, number>;
   duplicates: number;
 }
@@ -541,19 +421,15 @@ export interface FacetCounts {
  * checkboxes in the filter panel.
  *
  * Counted over the **whole loaded window**, not over the rows the other filters
- * currently leave standing. That is the same denominator the bucket chips use,
- * and picking one denominator for every number on the toolbar is worth more
- * than the extra precision of live-narrowing counts: a panel where ticking
- * "ally-be" silently rewrites the numbers next to every other facet is a panel
- * whose numbers cannot be compared with each other or with the chips.
+ * currently leave standing: a panel where ticking "ally-be" silently rewrites
+ * the numbers next to every other facet is a panel whose numbers cannot be
+ * compared with each other.
  */
 export const buildFacetCounts = (findings: BugFinding[], now: number = Date.now()): FacetCounts => {
   const counts: FacetCounts = {
     repos: {},
     severities: {},
     sources: {},
-    statuses: {},
-    stages: {},
     ages: { all: findings.length, day: 0, week: 0, stale: 0, ancient: 0 },
     duplicates: duplicateCountInWindow(findings),
   };
@@ -567,8 +443,6 @@ export const buildFacetCounts = (findings: BugFinding[], now: number = Date.now(
     bump(counts.repos, finding.repo);
     bump(counts.severities, finding.severity);
     bump(counts.sources, finding.source);
-    bump(counts.statuses, finding.status);
-    bump(counts.stages, finding.stage);
     // The bands overlap on purpose — "under a week" contains "under a day", and
     // "over a month" is a subset of "over a week" — because each is counted the
     // same way the filter matches, and a reader picking one wants the number
@@ -583,12 +457,9 @@ export const buildFacetCounts = (findings: BugFinding[], now: number = Date.now(
 
 /**
  * Whether Bug Hunter is moving this bug right now — the spinner rides along
- * wherever this is true.
- *
- * Asked of the bucket rather than of a fourth copy of the same status list.
- * The table used to carry its own `MID_FLIGHT_STATUSES` array identical to
- * `agentPersona`'s `IN_FLIGHT_STATUSES` and to the drawer's, which is three
- * places to remember when an eighteenth status arrives.
+ * wherever this is true. Asked of the shared `IN_FLIGHT_STATUSES` rather than a
+ * copy, so the spinner, the header's "fixing N now" and the In progress tab
+ * cannot disagree about what "working" means.
  */
 export const isMidFlight = (status: BugFindingStatus): boolean =>
-  bucketOfStatus(status) === "in_flight";
+  IN_FLIGHT_STATUSES.includes(status);

@@ -1,20 +1,17 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock API hooks — mode state, the findings table, and run history all come entirely from these.
 vi.mock("@api", () => ({
-  // UxSignalsPanel sits on the Work tab. It renders null without the UX_SIGNALS
-  // toggle, which these tests do not grant — but its hooks still run, so the
-  // mock has to supply them.
+  // The header's ⋯ menu holds the UX Signals scan. The menu item is absent
+  // without the UX_SIGNALS toggle, which these tests do not grant — but the
+  // hook behind it still runs, so the mock has to supply its queries.
   useScanUxSignalsMutation: vi.fn(() => [vi.fn(), { isLoading: false }]),
   useGetUxSignalScansQuery: vi.fn(() => ({ data: { scans: [] } })),
-  // The panel invalidates the findings and suggestions queues itself, once it
+  // The hook invalidates the findings and suggestions queues itself, once it
   // sees a scan finish — so it reaches for the store's util alongside the hooks.
   baseAPI: { util: { invalidateTags: vi.fn() } },
-  // The Today board sits on the Work tab and reads its own query; it renders
-  // nothing until data lands, so an empty answer keeps these tests quiet.
-  useGetBugHunterTodayQuery: vi.fn(() => ({ data: undefined, isError: false })),
   useGetBugHunterSettingsQuery: vi.fn(),
   useUpdateBugHunterSettingsMutation: vi.fn(),
   useGetBugHuntRunsQuery: vi.fn(),
@@ -99,8 +96,7 @@ vi.mock("framer-motion", () => {
 
 vi.mock("@ally-ui-mono/ui-shared", () => ({
   // Matches the real strip's `data-testid={`tab-${id}`}` so a test can address
-  // a tab without going through its label — which matters here because the
-  // About tab sits next to a heading of nearly the same name.
+  // a page section without going through its label.
   Tabs: ({ items, activeId, onChange }: any) => (
     <div data-testid="tabs">
       {items.map((item: any) => (
@@ -154,9 +150,19 @@ vi.mock("@ally-ui-mono/ui-shared", () => ({
     </select>
   ),
   SelectItem: ({ value, text }: any) => <option value={value}>{text}</option>,
-  Button: ({ children, onClick, disabled }: any) => (
-    <button onClick={onClick} disabled={disabled}>
+  Button: ({ children, onClick, disabled, iconDescription }: any) => (
+    <button onClick={onClick} disabled={disabled} aria-label={iconDescription}>
       {children}
+    </button>
+  ),
+  OverflowMenu: ({ children, iconDescription }: any) => (
+    <div role="menu" aria-label={iconDescription}>
+      {children}
+    </div>
+  ),
+  OverflowMenuItem: ({ itemText, onClick, disabled }: any) => (
+    <button role="menuitem" onClick={onClick} disabled={disabled}>
+      {itemText}
     </button>
   ),
   TextArea: ({ value, onChange, placeholder }: any) => (
@@ -252,10 +258,35 @@ const mockFindingsQuery = (overrides: Record<string, unknown> = {}) => {
   });
 };
 
+const mountPage = (url = "/") =>
+  render(
+    <MemoryRouter initialEntries={[url]}>
+      <BugHunter />
+      <LocationProbe />
+    </MemoryRouter>,
+  );
+
+const onDuty = () =>
+  mockSettingsQuery({
+    data: { mode: BugHunterMode.AI, updatedBy: 7, updatedAt: "2026-08-01T00:00:00.000Z" },
+  });
+
+const finding = (id: string, status: string, title: string) => ({
+  id,
+  status,
+  title,
+  source: "code_review",
+  repo: "ally-be",
+  severity: null,
+  escalationQuestion: null,
+  createdAt: "2026-08-18",
+  updatedAt: "2026-08-18",
+});
+
 /**
- * This file covers the page as a *layout*: who is at the top of it, what order
- * the surfaces come in, and which of them appear at all. The working-style
- * control moved onto the profile card and is tested in AgentProfileCard.test.
+ * This file covers the page as a *layout*: what is at the top of it, which
+ * surfaces appear at all, and where About went. The header's own controls are
+ * AgentProfileCard.test's; the table's are the BugFindingsTable suites'.
  */
 describe("BugHunter", () => {
   beforeEach(() => {
@@ -274,92 +305,56 @@ describe("BugHunter", () => {
     });
   });
 
-  it("leads with the character rather than a page heading", () => {
-    render(
-      <MemoryRouter>
-        <BugHunter />
-      </MemoryRouter>,
-    );
+  it("leads with the one-line header rather than a page heading", () => {
+    mountPage();
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bug Hunter");
   });
 
-  it("renders every About-me question, so a reader can find them before putting it on duty", () => {
-    render(
-      <MemoryRouter>
-        <BugHunter />
-      </MemoryRouter>,
-    );
-    expect(screen.getByText("What do you do?")).toBeInTheDocument();
-    expect(
-      screen.getByText("What's the difference between the two working styles?"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText("What do you fix on your own, and what do you just propose?"),
-    ).toBeInTheDocument();
-    expect(screen.getByText("How do I stop you?")).toBeInTheDocument();
-  });
-
-  it("names both old mode names in About me, so logs and docs still join up", () => {
-    render(
-      <MemoryRouter>
-        <BugHunter />
-      </MemoryRouter>,
-    );
-    expect(screen.getByText(/Works solo \(AI mode\)/)).toBeInTheDocument();
-    expect(screen.getByText(/Checks with you \(Manual mode\)/)).toBeInTheDocument();
-  });
-
-  const onDuty = () =>
-    mockSettingsQuery({
-      data: { mode: BugHunterMode.AI, updatedBy: 7, updatedAt: "2026-08-01T00:00:00.000Z" },
-    });
-
-  // Which tab you land on is the whole of the old "where does About me go"
-  // rule, which used to render the same component in two different places
-  // depending on the mode.
-  it("lands on About while nobody has put it on duty", () => {
-    render(
-      <MemoryRouter>
-        <BugHunter />
-      </MemoryRouter>,
-    );
-    expect(screen.getByTestId("tab-about")).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("heading", { name: "About me" })).toBeInTheDocument();
-    // Nothing on the Work tab has anything in it yet, so it is not rendered.
-    expect(screen.queryByText("Bugs I'm tracking")).not.toBeInTheDocument();
-  });
-
-  it("lands on the work once it is on duty, with About behind its own tab", () => {
+  // About left the strip for the header's help button on 2026-10-13.
+  it("has two sections, Work and Notebook", () => {
     onDuty();
-    render(
-      <MemoryRouter>
-        <BugHunter />
-      </MemoryRouter>,
-    );
+    mountPage();
     expect(screen.getByTestId("tab-work")).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByText("Bugs I'm tracking")).toBeInTheDocument();
-    // Eleven FAQ accordions under the table were three screens of scroll below
-    // the work — the reason this page is tabbed at all.
-    expect(screen.queryByRole("heading", { name: "About me" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("tab-notebook")).toBeInTheDocument();
+    expect(screen.queryByTestId("tab-about")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("tab-performance")).not.toBeInTheDocument();
   });
 
-  /**
-   * The scorecard and the shift log answer a governance question asked roughly
-   * monthly, and used to render under the bugs table on every single visit.
-   */
-  it("has no Performance tab, and keeps the governance panels off this page entirely (OPP-0749)", () => {
-    onDuty();
-    render(
-      <MemoryRouter>
-        <BugHunter />
-      </MemoryRouter>,
-    );
-    expect(screen.queryByTestId("tab-performance")).not.toBeInTheDocument();
-    expect(screen.queryByText("How I'm doing")).not.toBeInTheDocument();
-    expect(screen.queryByText("My shift log")).not.toBeInTheDocument();
-    expect(screen.getByTestId("tab-work")).toBeInTheDocument();
-    expect(screen.getByTestId("tab-notebook")).toBeInTheDocument();
-    expect(screen.getByTestId("tab-about")).toBeInTheDocument();
+  it("opens About in a side panel from the help button, with every question in it", () => {
+    mountPage();
+    expect(screen.queryByTestId("side-panel")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "About Bug Hunter" }));
+    const panel = screen.getByTestId("side-panel");
+    expect(panel).toHaveTextContent("About me");
+    expect(panel).toHaveTextContent("What do you do?");
+    expect(panel).toHaveTextContent("What's the difference between the two working styles?");
+    expect(panel).toHaveTextContent("How do I stop you?");
+  });
+
+  // The control says Autonomous and Manual now; the API and the logs say AI
+  // and Manual. About names both so the vocabularies still join up.
+  it("names the control's labels and the API's in About", () => {
+    mountPage();
+    fireEvent.click(screen.getByRole("button", { name: "About Bug Hunter" }));
+    expect(screen.getByText(/On Autonomous \(AI mode\)/)).toBeInTheDocument();
+    expect(screen.getByText(/On Manual it waits/)).toBeInTheDocument();
+  });
+
+  // The FAQ pointed at a messages inbox removed on 2026-10-01 and at a shift
+  // log that moved to Analytics.
+  it("points About at where things are now", () => {
+    mountPage();
+    fireEvent.click(screen.getByRole("button", { name: "About Bug Hunter" }));
+    expect(screen.getByText(/Under Needs you, the first tab of my bugs table/)).toBeInTheDocument();
+    expect(screen.getByText(/my shift log on Analytics → Bug Agent/)).toBeInTheDocument();
+    expect(screen.queryByText(/In my messages at the top of this page/)).not.toBeInTheDocument();
+  });
+
+  it("opens the help panel for an old ?section=about link, and drops the param", () => {
+    mountPage("/?section=about");
+    expect(screen.getByTestId("side-panel")).toBeInTheDocument();
+    expect(screen.getByTestId("location").textContent).toBe("/");
   });
 
   // The numbers moved to Analytics → Bug Agent; an old link to the section
@@ -377,147 +372,77 @@ describe("BugHunter", () => {
     expect(screen.getByTestId("location").textContent).toBe("/analytics?tab=bug-agent-performance");
   });
 
-  // The card is the page's heading and holds the kill switch, so it must be
-  // reachable from every section rather than living on one of them.
-  it("keeps the agent's card above the tabs, whichever section is open", () => {
+  // The header holds the kill switch, so it must be reachable from every
+  // section rather than living on one of them.
+  it("keeps the header above the tabs, whichever section is open", () => {
     onDuty();
-    render(
-      <MemoryRouter>
-        <BugHunter />
-      </MemoryRouter>,
-    );
+    mountPage();
     fireEvent.click(screen.getByTestId("tab-notebook"));
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bug Hunter");
-
-    fireEvent.click(screen.getByTestId("tab-about"));
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bug Hunter");
+    expect(screen.getByTestId("bug-hunter-mode-select")).toBeInTheDocument();
   });
 
   it("reads the open section out of the address bar, so a section is linkable", () => {
     onDuty();
-    render(
-      <MemoryRouter initialEntries={["/?section=notebook"]}>
-        <BugHunter />
-      </MemoryRouter>,
-    );
+    mountPage("/?section=notebook");
     expect(screen.getByText("My notebook")).toBeInTheDocument();
   });
 
-  it("falls back to the default section for a hand-edited one, rather than erroring", () => {
+  it("falls back to Work for a hand-edited section, rather than erroring", () => {
     onDuty();
-    render(
-      <MemoryRouter initialEntries={["/?section=telemetry"]}>
-        <BugHunter />
-      </MemoryRouter>,
-    );
+    mountPage("/?section=telemetry");
     expect(screen.getByTestId("tab-work")).toHaveAttribute("aria-pressed", "true");
   });
 
-  // The queue is the reason the page was re-ordered: the old layout could state
-  // "4 bugs are waiting on your call" on the card and offer no way to act on any
-  // of them, two screens above the table where those four were hiding.
-  it("has no queue and no inbox on the work tab: decisions live in the table", () => {
-    mockSettingsQuery({
-      data: { mode: BugHunterMode.AI, updatedBy: 7, updatedAt: "2026-08-01T00:00:00.000Z" },
-    });
+  /**
+   * The 2026-10-13 cut: the Work tab is the bugs table and nothing else. The
+   * live board repeated rows the table already had, the today board was a
+   * report on the day, and the UX Signals bar was a nightly job's button.
+   */
+  it("puts nothing but the bugs table on the Work tab", () => {
+    onDuty();
     mockFindingsQuery({
       data: {
         items: [
-          {
-            id: "f-1",
-            status: "pending_approval",
-            title: "A bug awaiting your call",
-            source: "code_review",
-            repo: "ally-be",
-            severity: null,
-            escalationQuestion: null,
-            createdAt: "2026-08-18",
-          },
-        ],
-        count: 1,
-      },
-    });
-    render(
-      <MemoryRouter>
-        <BugHunter />
-      </MemoryRouter>,
-    );
-
-    // Both sections came off the page on 2026-10-01: the queue duplicated the
-    // table's Needs-you bucket and the drawer, the inbox duplicated the queue.
-    expect(screen.queryByText("What I need from you")).not.toBeInTheDocument();
-    expect(screen.queryByText("Messages from Bug Hunter")).not.toBeInTheDocument();
-    expect(screen.getByText("Bugs I'm tracking")).toBeInTheDocument();
-  });
-
-  // The section the page was missing: every other surface here is a record of
-  // something, and the agent's live work had no page-level home beyond one
-  // sentence on the card.
-  it("puts what it is doing right now above the bugs table", () => {
-    mockSettingsQuery({
-      data: { mode: BugHunterMode.AI, updatedBy: 7, updatedAt: "2026-08-01T00:00:00.000Z" },
-    });
-    mockFindingsQuery({
-      data: {
-        items: [
-          {
-            id: "f-1",
-            status: "pending_approval",
-            title: "A bug awaiting your call",
-            source: "code_review",
-            repo: "ally-be",
-            severity: null,
-            escalationQuestion: null,
-            createdAt: "2026-08-18",
-            updatedAt: "2026-08-18",
-          },
-          {
-            id: "f-2",
-            status: "fixing",
-            title: "A bug being fixed right now",
-            source: "test_failure",
-            repo: "ally-web",
-            severity: null,
-            escalationQuestion: null,
-            createdAt: "2026-08-18",
-            updatedAt: "2026-08-18",
-          },
+          finding("f-1", "pending_approval", "A bug awaiting your call"),
+          finding("f-2", "fixing", "A bug being fixed right now"),
         ],
         count: 2,
       },
     });
-    render(
-      <MemoryRouter>
-        <BugHunter />
-      </MemoryRouter>,
-    );
-
-    const live = screen.getByText("On it right now");
-    const bugs = screen.getByText("Bugs I'm tracking");
-
-    expect(live.compareDocumentPosition(bugs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  });
-
-  it("says nothing about live work on a quiet day, rather than showing an empty board", () => {
-    mockSettingsQuery({
-      data: { mode: BugHunterMode.AI, updatedBy: 7, updatedAt: "2026-08-01T00:00:00.000Z" },
-    });
-    render(
-      <MemoryRouter>
-        <BugHunter />
-      </MemoryRouter>,
-    );
+    mountPage();
 
     expect(screen.queryByText("On it right now")).not.toBeInTheDocument();
+    expect(screen.queryByText("Today, by repo")).not.toBeInTheDocument();
+    expect(screen.queryByText("UX Signals")).not.toBeInTheDocument();
+    expect(screen.queryByText("What I need from you")).not.toBeInTheDocument();
+    expect(screen.queryByText("Messages from Bug Hunter")).not.toBeInTheDocument();
+    expect(screen.getByRole("tablist", { name: "Bugs by what happens next" })).toBeInTheDocument();
+    expect(screen.getByText("A bug awaiting your call")).toBeInTheDocument();
   });
 
-  it("shows an empty state on each tab that has no data yet", () => {
+  it("takes Fixing N now to the In progress tab, from whichever section you are on", () => {
     onDuty();
-    render(
-      <MemoryRouter>
-        <BugHunter />
-      </MemoryRouter>,
-    );
+    mockFindingsQuery({
+      data: {
+        items: [
+          finding("f-1", "pending_approval", "A bug awaiting your call"),
+          finding("f-2", "fixing", "A bug being fixed right now"),
+        ],
+        count: 2,
+      },
+    });
+    mountPage("/?section=notebook");
+
+    fireEvent.click(screen.getByRole("button", { name: /Fixing 1 now/ }));
+    expect(screen.getByTestId("location").textContent).toBe("/?bucket=in_progress");
+    expect(screen.getByText("A bug being fixed right now")).toBeInTheDocument();
+    expect(screen.queryByText("A bug awaiting your call")).not.toBeInTheDocument();
+  });
+
+  it("shows an empty state when there is nothing at all yet", () => {
+    onDuty();
+    mountPage();
     expect(
       screen.getAllByTestId("empty-state").some(el => el.textContent?.includes("No bugs yet")),
     ).toBe(true);

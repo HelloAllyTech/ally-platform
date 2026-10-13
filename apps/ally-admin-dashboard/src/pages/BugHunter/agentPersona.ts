@@ -49,18 +49,22 @@ export type AgentStatusKind =
 
 export interface AgentStatus {
   kind: AgentStatusKind;
-  /** The pill: two or three words. */
+  /** The state word at the head of the header's status sentence: two or three words. */
   label: string;
-  /** One line under the name, in its own voice. */
+  /**
+   * The same state as a sentence in its own voice. The header shows it on
+   * hover over the state word since 2026-10-13, when the visible sentence
+   * became state · "Fixing N now" · last sweep.
+   */
   detail: string;
 }
 
 /**
- * The status groups these functions classify by now live in
- * `lifecycleBucket.ts`, which the bugs table and the workload strip read the
- * same definitions from. They used to be four private arrays in this file, and
- * a second copy grew next to the table's filter — which is how a status pill
- * and a workload tile end up disagreeing about the same number.
+ * The status groups these functions classify by live in `lifecycleBucket.ts`,
+ * which the bugs table's tabs read the same definitions from. They used to be
+ * private arrays in this file, and a second copy grew next to the table's
+ * filter — which is how a status line and a tab count end up disagreeing about
+ * the same number.
  */
 
 const countOf = (findings: BugFinding[], statuses: BugFindingStatus[]) =>
@@ -152,22 +156,3 @@ export const deriveAgentStatus = ({
         : strings.agentStatusOnShiftDetail,
   };
 };
-
-/**
- * The four-number workload summary that used to live here (`summariseWorkload`,
- * `AgentWorkload`, `SHIPPED_WINDOW_DAYS`) is gone. `countByBucket` in
- * `lifecycleBucket.ts` replaced it.
- *
- * The difference is not just where it lives. The old summary counted four
- * groups that between them did not cover all seventeen statuses, so its four
- * tiles summed to less than the list they were drawn from — hence the footnote
- * conceding it was "a picture of this week, not an all-time total". The bucket
- * counts partition every finding into exactly one group, so the chip row sums
- * to the total and can be read as a breakdown.
- *
- * The one thing genuinely lost is the seven-day window on "shipped": the chip
- * counts every RELEASED finding in the loaded window rather than only those
- * released in the last week. That window is what made the old tile
- * un-sum-able, and "Live" is a fact about a bug that does not expire after
- * seven days.
- */

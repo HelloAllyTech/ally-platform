@@ -2,7 +2,7 @@ import { useCallback, useMemo } from "react";
 
 import { useSearchParams } from "react-router-dom";
 
-import { BugFindingSeverity, BugFindingSource, BugFindingStage, BugFindingStatus } from "@types";
+import { BugFindingSeverity, BugFindingSource } from "@types";
 
 import {
   AGE_FILTERS,
@@ -12,9 +12,7 @@ import {
   SortDirection,
   SortKey,
 } from "./findingsView";
-import { LIFECYCLE_BUCKETS, LifecycleBucket } from "./lifecycleBucket";
-
-import type { BucketFilter } from "./LifecycleBucketChips";
+import { LifecycleBucket, parseBucket } from "./lifecycleBucket";
 
 /**
  * The tab's view state, kept in the query string instead of in `useState`.
@@ -29,7 +27,7 @@ import type { BucketFilter } from "./LifecycleBucketChips";
  *   to find the row.
  * - **Bookmarking a view.** "Everything red in ally-be" is a question an admin
  *   asks daily and had to re-answer with four controls every time.
- *   `?bucket=problem&repo=ally-be` is that question, saved.
+ *   `?bucket=failed&repo=ally-be` is that question, saved.
  * - **The back button.** Opening a bug and pressing Back left the page, losing
  *   the filters that found it, rather than closing the drawer.
  *
@@ -76,6 +74,11 @@ import type { BucketFilter } from "./LifecycleBucketChips";
 export const BUG_HUNTER_PARAM = {
   /** The finding whose drawer is open. */
   bug: "bug",
+  /**
+   * The open tab. Still spelled `bucket` so links from before the tabs keep
+   * working: the old chip values (`problem`, `in_review`, …) are read through
+   * `parseBucket`, which maps each onto the tab it now lives under.
+   */
   bucket: "bucket",
   /** Free-text search. `q` because that is what every search box in the world calls it. */
   search: "q",
@@ -95,8 +98,6 @@ export const BUG_HUNTER_PARAM = {
   repo: "repo",
   severity: "sev",
   source: "src",
-  status: "status",
-  stage: "stage",
   age: "age",
   /** Present-and-`1` means on. Absent means off — see `write` on why defaults are dropped. */
   duplicates: "dup",
@@ -119,11 +120,8 @@ export const PAGE_SIZES = [20, 50, 100] as const;
 export type PageSize = (typeof PAGE_SIZES)[number];
 export const DEFAULT_PAGE_SIZE: PageSize = 20;
 
-const BUCKET_VALUES = new Set<string>(LIFECYCLE_BUCKETS);
 const SEVERITY_VALUES = new Set<string>(Object.values(BugFindingSeverity));
 const SOURCE_VALUES = new Set<string>(Object.values(BugFindingSource));
-const STATUS_VALUES = new Set<string>(Object.values(BugFindingStatus));
-const STAGE_VALUES = new Set<string>(Object.values(BugFindingStage));
 const AGE_VALUES = new Set<string>(AGE_FILTERS);
 const SORT_VALUES = new Set<string>(SORT_KEYS);
 
@@ -182,15 +180,19 @@ const readRepos = (params: URLSearchParams): string[] => {
 export interface BugHunterUrlState {
   /** The open finding's id, or null when the drawer is closed. */
   bug: string | null;
-  bucket: BucketFilter;
+  /**
+   * The tab the link names, or null when it names none — in which case the
+   * table picks one from the counts (`defaultBucket`). Null rather than a
+   * fixed default because the right default depends on data this hook can't
+   * see.
+   */
+  bucket: LifecycleBucket | null;
   search: string;
   /** The sweep whose findings the table is scoped to, or null for every bug. */
   run: string | null;
   repos: string[];
   severities: BugFindingSeverity[];
   sources: BugFindingSource[];
-  statuses: BugFindingStatus[];
-  stages: BugFindingStage[];
   age: AgeFilter;
   duplicatesOnly: boolean;
   sort: SortKey;
@@ -201,7 +203,7 @@ export interface BugHunterUrlState {
 export interface BugHunterUrlActions {
   /** Opens a bug's drawer, or closes it with `null`. Pushes history so Back closes the drawer. */
   setBug: (id: string | null) => void;
-  setBucket: (bucket: BucketFilter) => void;
+  setBucket: (bucket: LifecycleBucket) => void;
   setSearch: (search: string) => void;
   /**
    * Scopes the table to one sweep, or drops the scope with `null`.
@@ -221,8 +223,6 @@ export interface BugHunterUrlActions {
   setRepos: (repos: string[]) => void;
   setSeverities: (severities: BugFindingSeverity[]) => void;
   setSources: (sources: BugFindingSource[]) => void;
-  setStatuses: (statuses: BugFindingStatus[]) => void;
-  setStages: (stages: BugFindingStage[]) => void;
   setAge: (age: AgeFilter) => void;
   setDuplicatesOnly: (only: boolean) => void;
   /**
@@ -236,24 +236,21 @@ export interface BugHunterUrlActions {
   /** Flips the current column, or moves to a new one at its natural direction. */
   toggleSort: (key: SortKey) => void;
   setPageSize: (size: PageSize) => void;
-  /** Drops every filter but leaves the open bug and the sort alone. */
+  /** Drops search, every facet and the sweep scope, but leaves the tab, the open bug and the sort alone. */
   clearFilters: () => void;
 }
 
 /**
- * True when any filter is set — used to decide whether to offer "Clear
- * filters". Density, sort, page size and the open bug are not filters and are
- * excluded: none of them changes *which* bugs are on the page.
+ * True when any filter is set. The tab, sort, page size and the open bug are
+ * not filters and are excluded: the tab is where the reader is, and the rest
+ * don't change *which* bugs are on the page.
  */
 export const hasFilterParams = (state: BugHunterUrlState): boolean =>
-  state.bucket !== "all" ||
   state.search.trim() !== "" ||
   state.run !== null ||
   state.repos.length > 0 ||
   state.severities.length > 0 ||
   state.sources.length > 0 ||
-  state.statuses.length > 0 ||
-  state.stages.length > 0 ||
   state.age !== "all" ||
   state.duplicatesOnly;
 
@@ -273,7 +270,7 @@ export const useBugHunterUrlState = (): BugHunterUrlState & BugHunterUrlActions 
 
     return {
       bug: searchParams.get(BUG_HUNTER_PARAM.bug) || null,
-      bucket: readFacet<LifecycleBucket>(searchParams, BUG_HUNTER_PARAM.bucket, BUCKET_VALUES),
+      bucket: parseBucket(searchParams.get(BUG_HUNTER_PARAM.bucket)),
       search: searchParams.get(BUG_HUNTER_PARAM.search) ?? "",
       // Unvalidated for the same reason as `repos`: this hook cannot see the
       // run list, and a run id that matches nothing renders as an empty scope
@@ -286,8 +283,6 @@ export const useBugHunterUrlState = (): BugHunterUrlState & BugHunterUrlActions 
         SEVERITY_VALUES,
       ),
       sources: readList<BugFindingSource>(searchParams, BUG_HUNTER_PARAM.source, SOURCE_VALUES),
-      statuses: readList<BugFindingStatus>(searchParams, BUG_HUNTER_PARAM.status, STATUS_VALUES),
-      stages: readList<BugFindingStage>(searchParams, BUG_HUNTER_PARAM.stage, STAGE_VALUES),
       // `readFacet` speaks "all" and the age filter's own absent value is also
       // "all", so this needs no translation — unlike the lists above.
       age: rawAge,
@@ -352,8 +347,11 @@ export const useBugHunterUrlState = (): BugHunterUrlState & BugHunterUrlActions 
     [write],
   );
 
+  // Written even when it matches what the page would have picked by default:
+  // that default moves with the data, and a tab someone clicked should stay
+  // put when Needs you empties under them.
   const setBucket = useCallback(
-    (bucket: BucketFilter) => write({ [BUG_HUNTER_PARAM.bucket]: bucket }),
+    (bucket: LifecycleBucket) => write({ [BUG_HUNTER_PARAM.bucket]: bucket }),
     [write],
   );
 
@@ -376,8 +374,6 @@ export const useBugHunterUrlState = (): BugHunterUrlState & BugHunterUrlActions 
           [BUG_HUNTER_PARAM.repo]: null,
           [BUG_HUNTER_PARAM.severity]: null,
           [BUG_HUNTER_PARAM.source]: null,
-          [BUG_HUNTER_PARAM.status]: null,
-          [BUG_HUNTER_PARAM.stage]: null,
           [BUG_HUNTER_PARAM.age]: null,
           [BUG_HUNTER_PARAM.duplicates]: null,
         }),
@@ -398,16 +394,6 @@ export const useBugHunterUrlState = (): BugHunterUrlState & BugHunterUrlActions 
 
   const setSources = useCallback(
     (sources: BugFindingSource[]) => write({ [BUG_HUNTER_PARAM.source]: writeList(sources) }),
-    [write],
-  );
-
-  const setStatuses = useCallback(
-    (statuses: BugFindingStatus[]) => write({ [BUG_HUNTER_PARAM.status]: writeList(statuses) }),
-    [write],
-  );
-
-  const setStages = useCallback(
-    (stages: BugFindingStage[]) => write({ [BUG_HUNTER_PARAM.stage]: writeList(stages) }),
     [write],
   );
 
@@ -459,14 +445,11 @@ export const useBugHunterUrlState = (): BugHunterUrlState & BugHunterUrlActions 
   const clearFilters = useCallback(
     () =>
       write({
-        [BUG_HUNTER_PARAM.bucket]: null,
         [BUG_HUNTER_PARAM.search]: null,
         [BUG_HUNTER_PARAM.run]: null,
         [BUG_HUNTER_PARAM.repo]: null,
         [BUG_HUNTER_PARAM.severity]: null,
         [BUG_HUNTER_PARAM.source]: null,
-        [BUG_HUNTER_PARAM.status]: null,
-        [BUG_HUNTER_PARAM.stage]: null,
         [BUG_HUNTER_PARAM.age]: null,
         [BUG_HUNTER_PARAM.duplicates]: null,
       }),
@@ -482,8 +465,6 @@ export const useBugHunterUrlState = (): BugHunterUrlState & BugHunterUrlActions 
     setRepos,
     setSeverities,
     setSources,
-    setStatuses,
-    setStages,
     setAge,
     setDuplicatesOnly,
     setSort,

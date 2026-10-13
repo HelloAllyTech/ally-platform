@@ -34,20 +34,21 @@ import { KeyboardShortcutSheet } from "../BugHunter/KeyboardShortcutSheet";
  * ## What is deliberately NOT reimplemented here
  *
  * Everything. `BugFindingsTable` already reads `?bucket=`, `?q=`, `?sev=` and
- * the rest out of the query string, so this tab inherits filtering, sorting,
- * search, paging, the age tint, the duplicate flag and the detail drawer for
- * free — and inherits every future change to them too. `canTriage={false}` is
- * the whole of the read-only contract; it is the same flag the table already
- * threads down to its rows and its drawer, so there is exactly one copy of that
- * rule rather than a second read-only code path to keep in step.
+ * the rest out of the query string, so this tab inherits its status tabs,
+ * filtering, sorting, search, paging, the age tint, the duplicate flag and the
+ * detail drawer for free — and inherits every future change to them too.
+ * `canTriage={false}` is the whole of the read-only contract; it is the same
+ * flag the table already threads down to its rows and its drawer, so there is
+ * exactly one copy of that rule rather than a second read-only code path to
+ * keep in step.
  *
  * ## Sharing a query string with the board
  *
  * The bug table's params (`bug`, `bucket`, `q`, `sev`, `src`, …) and the
  * roadmap's (`tab`, `view`, `opportunity`) do not collide, so a link to
- * `?tab=bugs&bucket=problem` lands on this tab with that filter applied. The
- * page clears `?bug=` when you leave, for the same reason it clears
- * `?opportunity=` — a drawer belongs to the tab that opened it.
+ * `?tab=bugs&bucket=failed` lands on this tab with its Failed tab open. The page
+ * clears `?bug=` when you leave, for the same reason it clears `?opportunity=`
+ * — a drawer belongs to the tab that opened it.
  */
 export const BugsTab: FC = () => {
   const [showShortcuts, setShowShortcuts] = useState(false);
