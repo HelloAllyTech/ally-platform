@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/localization/translate_ref.dart';
 import '../data/bug_report_repository.dart';
 
 /// Scoped port of ally-mobile (React Native)'s `BugReportScreen` —
@@ -27,7 +28,7 @@ class _BugReportScreenState extends ConsumerState<BugReportScreen> {
 
   Future<void> _submit() async {
     if (_controller.text.trim().isEmpty) {
-      setState(() => _error = 'Please describe the issue.');
+      setState(() => _error = ref.tr('bugReport.emptyError'));
       return;
     }
     setState(() {
@@ -38,7 +39,7 @@ class _BugReportScreenState extends ConsumerState<BugReportScreen> {
       await ref.read(bugReportRepositoryProvider).createBugReport(_controller.text.trim());
       if (mounted) setState(() => _submitted = true);
     } catch (e) {
-      setState(() => _error = 'Failed to submit report: $e');
+      setState(() => _error = '${ref.tr('errors.submitBugReport')}: $e');
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -47,20 +48,20 @@ class _BugReportScreenState extends ConsumerState<BugReportScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Report a bug')),
+      appBar: AppBar(title: Text(ref.t('bugReport.title'))),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: _submitted
-            ? const Center(child: Text('Thanks — your report was submitted.'))
+            ? Center(child: Text(ref.t('bugReport.successMessage')))
             : Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   TextField(
                     controller: _controller,
                     maxLines: 6,
-                    decoration: const InputDecoration(
-                      labelText: 'What went wrong?',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: ref.t('bugReport.placeholder'),
+                      border: const OutlineInputBorder(),
                     ),
                   ),
                   if (_error != null) ...[
@@ -76,7 +77,7 @@ class _BugReportScreenState extends ConsumerState<BugReportScreen> {
                             height: 20,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Text('Submit'),
+                        : Text(ref.t('bugReport.submit')),
                   ),
                 ],
               ),

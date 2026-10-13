@@ -6,6 +6,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
 
 import '../../../core/config/app_config.dart';
+import '../../../core/localization/translate_ref.dart';
 import '../../../core/realtime/foreground_recording_service.dart';
 import '../../../core/realtime/socket_events.dart';
 import '../../../core/realtime/socket_service.dart';
@@ -53,7 +54,7 @@ class _ScribeRecordingScreenState
 
     final micStatus = await Permission.microphone.request();
     if (!micStatus.isGranted) {
-      setState(() => _error = 'Microphone permission denied.');
+      setState(() => _error = ref.tr('errors.permission'));
       return;
     }
     // Required on Android 13+ for the foreground service's own persistent
@@ -78,8 +79,8 @@ class _ScribeRecordingScreenState
     );
 
     await ForegroundRecordingService.start(
-      notificationTitle: 'Recording session',
-      notificationText: 'Ally is recording this session.',
+      notificationTitle: ref.tr('scribe.notificationTitle'),
+      notificationText: ref.tr('scribe.notificationText'),
     );
 
     // Matches MICROPHONE_AUDIO_SAMPLE_RATE / channels / bitsPerSample in
@@ -124,7 +125,7 @@ class _ScribeRecordingScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Scribe recording (Phase 1)')),
+      appBar: AppBar(title: Text(ref.t('scribe.title'))),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -137,11 +138,12 @@ class _ScribeRecordingScreenState
                 color: _isRecording ? Colors.red : null,
               ),
               const SizedBox(height: 16),
-              Text(_isRecording ? 'Recording' : 'Not recording'),
+              Text(_isRecording ? ref.t('scribe.recording') : ref.t('scribe.notRecording')),
               Text(
-                'Socket: ${_isSocketConnected ? "connected" : "disconnected"}',
+                '${ref.t('scribe.socketLabel')}: ${_isSocketConnected ? ref.t('scribe.connected') : ref.t('scribe.disconnected')}',
               ),
-              if (_isRecording) Text('Audio chunks sent: $_chunksSent'),
+              if (_isRecording)
+                Text(ref.t('scribe.chunksSent', {'count': _chunksSent})),
               if (_error != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
@@ -150,15 +152,13 @@ class _ScribeRecordingScreenState
               const SizedBox(height: 24),
               FilledButton(
                 onPressed: _isRecording ? _stopRecording : _startRecording,
-                child: Text(_isRecording ? 'Stop' : 'Start recording'),
+                child: Text(_isRecording ? ref.t('scribe.stop') : ref.t('scribe.startRecording')),
               ),
               const SizedBox(height: 16),
-              const Text(
-                'Lock the screen or switch apps while recording to verify '
-                'the foreground service keeps audio chunks flowing — this '
-                'is the exact failure mode this rewrite exists to fix.',
+              Text(
+                ref.t('scribe.testingHint'),
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12, color: Colors.grey),
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
               ),
             ],
           ),

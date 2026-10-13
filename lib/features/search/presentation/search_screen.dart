@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/localization/translate_ref.dart';
 import '../data/search_repository.dart';
 
 /// Port of ally-mobile (React Native)'s `SearchScreen` + `useSearch` hook —
@@ -70,7 +71,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         _hasMore = result.total > result.documents.length;
       });
     } catch (e) {
-      setState(() => _error = 'Search failed: $e');
+      setState(() => _error = '${ref.tr('search.error')}: $e');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -94,7 +95,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         _hasMore = result.total > result.documents.length;
       });
     } catch (e) {
-      setState(() => _error = 'Search failed: $e');
+      setState(() => _error = '${ref.tr('search.error')}: $e');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -132,7 +133,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       appBar: AppBar(
         title: TextField(
           controller: _controller,
-          decoration: const InputDecoration(hintText: 'Search resources...'),
+          decoration: InputDecoration(hintText: ref.t('search.placeholder')),
           onSubmitted: (_) => _search(),
         ),
         actions: [IconButton(icon: const Icon(Icons.search), onPressed: _search)],
@@ -150,7 +151,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 4),
                       child: ChoiceChip(
-                        label: Text('$category ($count)'),
+                        label: Text(
+                          '${category == 'All' ? ref.t('search.allLabel') : category} ($count)',
+                        ),
                         selected: _selectedCategory == category,
                         onSelected: (_) => _selectCategory(category),
                       ),
@@ -164,9 +167,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 : _error != null
                     ? Center(child: Text(_error!, style: const TextStyle(color: Colors.red)))
                     : _lastSearchedText.isEmpty
-                        ? const Center(child: Text('Search for counselling resources.'))
+                        ? Center(child: Text(ref.t('search.headerDescription')))
                         : _resources.isEmpty
-                            ? const Center(child: Text('No results found.'))
+                            ? Center(
+                                child: Text(ref.t('search.noResults', {'query': _lastSearchedText})),
+                              )
                             : ListView.builder(
                                 controller: _scrollController,
                                 itemCount: _resources.length + (_isLoadingMore ? 1 : 0),

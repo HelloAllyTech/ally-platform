@@ -1,27 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../core/localization/translate_ref.dart';
 
 /// Scoped port of ally-mobile (React Native)'s `BoxBreathingScreen` — a
 /// 4-phase (inhale/hold/exhale/hold) breathing guide animation, no backend
 /// calls. The original's exact timing/copy per phase and session-length
 /// configuration aren't verified against the RN source line-by-line here;
 /// this reproduces the standard 4-4-4-4 box-breathing pattern.
-class BoxBreathingScreen extends StatefulWidget {
+class BoxBreathingScreen extends ConsumerStatefulWidget {
   const BoxBreathingScreen({super.key});
 
   @override
-  State<BoxBreathingScreen> createState() => _BoxBreathingScreenState();
+  ConsumerState<BoxBreathingScreen> createState() => _BoxBreathingScreenState();
 }
 
 enum _Phase { inhale, holdIn, exhale, holdOut }
 
-const _phaseLabel = {
-  _Phase.inhale: 'Breathe in',
-  _Phase.holdIn: 'Hold',
-  _Phase.exhale: 'Breathe out',
-  _Phase.holdOut: 'Hold',
-};
-
-class _BoxBreathingScreenState extends State<BoxBreathingScreen>
+class _BoxBreathingScreenState extends ConsumerState<BoxBreathingScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   _Phase _phase = _Phase.inhale;
@@ -75,10 +71,22 @@ class _BoxBreathingScreenState extends State<BoxBreathingScreen>
     }
   }
 
+  String _phaseLabel(_Phase phase) {
+    switch (phase) {
+      case _Phase.inhale:
+        return ref.t('boxBreathing.phaseInhale');
+      case _Phase.holdIn:
+      case _Phase.holdOut:
+        return ref.t('boxBreathing.phaseHold');
+      case _Phase.exhale:
+        return ref.t('boxBreathing.phaseExhale');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Box breathing')),
+      appBar: AppBar(title: Text(ref.t('boxBreathing.title'))),
       body: Center(
         child: AnimatedBuilder(
           animation: _controller,
@@ -99,7 +107,7 @@ class _BoxBreathingScreenState extends State<BoxBreathingScreen>
                   ),
                 ),
                 const SizedBox(height: 32),
-                Text(_phaseLabel[_phase]!, style: Theme.of(context).textTheme.headlineSmall),
+                Text(_phaseLabel(_phase), style: Theme.of(context).textTheme.headlineSmall),
               ],
             );
           },
