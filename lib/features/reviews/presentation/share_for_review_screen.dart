@@ -34,7 +34,9 @@ class _ShareForReviewScreenState extends ConsumerState<ShareForReviewScreen> {
       _error = null;
     });
     try {
-      await ref.read(reviewsRepositoryProvider).createReview(
+      await ref
+          .read(reviewsRepositoryProvider)
+          .createReview(
             scenarioSessionId: widget.scenarioSessionId,
             note: _noteController.text.trim(),
           );

@@ -1,0 +1,248 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../reactions/data/reactions_repository.dart';
+import '../data/review_models.dart';
+import '../data/reviews_repository.dart';
+
+const _availableReactions = ['👍', '❤️', '😂', '🎉', '👏'];
+
+/// Port of ally-mobile (React Native)'s thread-detail view — a transcript-
+/// anchored discussion (`Thread`/`MessageThreadComment`): the anchor
+/// message, the root comment, further replies (paginated via
+/// `getCommentReplies`), a reply box, and a per-comment reaction picker
+/// (`addReactionToComment`). Starting a brand-new thread from a fresh
+/// transcript selection isn't wired here — see
+/// `reviews_repository.dart`'s `addThreadReply` doc comment for why.
+class ThreadDetailScreen extends ConsumerStatefulWidget {
+  const ThreadDetailScreen({
+    super.key,
+    required this.reviewId,
+    required this.thread,
+  });
+
+  final String reviewId;
+  final ReviewThread thread;
+
+  @override
+  ConsumerState<ThreadDetailScreen> createState() => _ThreadDetailScreenState();
+}
+
+class _ThreadDetailScreenState extends ConsumerState<ThreadDetailScreen> {
+  final _replyController = TextEditingController();
+  late List<ThreadComment> _comments;
+  bool _isLoadingReplies = false;
+  bool _hasLoadedReplies = false;
+  bool _isSubmitting = false;
+
+  ThreadComment? get _rootComment => widget.thread.comments.firstOrNull;
+
+  @override
+  void initState() {
+    super.initState();
+    _comments = List.of(widget.thread.comments);
+    if (widget.thread.commentCount > _comments.length) _loadReplies();
+  }
+
+  @override
+  void dispose() {
+    _replyController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadReplies() async {
+    final root = _rootComment;
+    if (root == null || _isLoadingReplies) return;
+    setState(() => _isLoadingReplies = true);
+    try {
+      final result = await ref
+          .read(reviewsRepositoryProvider)
+          .getCommentReplies(root.id, limit: 50);
+      setState(() {
+        final seenIds = _comments.map((c) => c.id).toSet();
+        _comments.addAll(result.replies.where((r) => !seenIds.contains(r.id)));
+        _hasLoadedReplies = true;
+      });
+    } catch (_) {
+      // Stays retryable via the "Load replies" button below.
+    } finally {
+      if (mounted) setState(() => _isLoadingReplies = false);
+    }
+  }
+
+  Future<void> _submitReply() async {
+    final content = _replyController.text.trim();
+    if (content.isEmpty) return;
+    setState(() => _isSubmitting = true);
+    try {
+      await ref
+          .read(reviewsRepositoryProvider)
+          .addThreadReply(
+            reviewId: widget.reviewId,
+            threadId: widget.thread.id,
+            content: content,
+          );
+      _replyController.clear();
+      _hasLoadedReplies = false;
+      await _loadReplies();
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  Future<void> _react(ThreadComment comment, String emoji) async {
+    await ref
+        .read(reactionsRepositoryProvider)
+        .addReactionToComment(
+          commentId: comment.id,
+          reaction: emoji,
+          action: ReactionAction.add,
+        );
+    if (mounted) setState(() => _hasLoadedReplies = false);
+    await _loadReplies();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final message = widget.thread.message;
+    final remainingCount = widget.thread.commentCount - _comments.length;
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Thread')),
+      body: Column(
+        children: [
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                if (message != null)
+                  Card(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .surfaceContainerHighest,
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            message.senderId == -1
+                                ? 'Client said'
+                                : 'Learner said',
+                            style: Theme.of(context).textTheme.labelSmall,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            message.content,
+                            style: const TextStyle(fontStyle: FontStyle.italic),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 16),
+                for (final comment in _comments)
+                  _CommentTile(comment: comment, onReact: _react),
+                if (remainingCount > 0 && !_hasLoadedReplies)
+                  Center(
+                    child: TextButton(
+                      onPressed: _isLoadingReplies ? null : _loadReplies,
+                      child: _isLoadingReplies
+                          ? const SizedBox(
+                              height: 16,
+                              width: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Text(
+                              'Load $remainingCount more repl${remainingCount == 1 ? 'y' : 'ies'}',
+                            ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _replyController,
+                      decoration: const InputDecoration(
+                        hintText: 'Reply...',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.send),
+                    onPressed: _isSubmitting ? null : _submitReply,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CommentTile extends StatelessWidget {
+  const _CommentTile({required this.comment, required this.onReact});
+
+  final ThreadComment comment;
+  final void Function(ThreadComment comment, String emoji) onReact;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              comment.authorName,
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            const SizedBox(height: 4),
+            Text(comment.content),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                for (final entry in comment.reactions.entries)
+                  Chip(
+                    label: Text('${entry.key} ${entry.value}'),
+                    visualDensity: VisualDensity.compact,
+                    backgroundColor: comment.myReaction == entry.key
+                        ? Theme.of(context).colorScheme.primaryContainer
+                        : null,
+                  ),
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.add_reaction_outlined, size: 18),
+                  onSelected: (emoji) => onReact(comment, emoji),
+                  itemBuilder: (context) => [
+                    for (final emoji in _availableReactions)
+                      PopupMenuItem(
+                        value: emoji,
+                        child: Text(
+                          emoji,
+                          style: const TextStyle(fontSize: 18),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

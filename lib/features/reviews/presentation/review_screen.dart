@@ -18,7 +18,8 @@ class ReviewScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('Reviews')),
       body: reviewsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(child: Text('Failed to load reviews: $error')),
+        error: (error, _) =>
+            Center(child: Text('Failed to load reviews: $error')),
         data: (reviews) {
           if (reviews.isEmpty) {
             return const Center(child: Text('No reviews yet.'));
@@ -34,18 +35,26 @@ class ReviewScreen extends ConsumerWidget {
                       ? NetworkImage(review.createdBy.profileImage)
                       : null,
                   child: review.createdBy.profileImage.isEmpty
-                      ? Text(review.createdBy.name.isNotEmpty
-                          ? review.createdBy.name[0].toUpperCase()
-                          : '?')
+                      ? Text(
+                          review.createdBy.name.isNotEmpty
+                              ? review.createdBy.name[0].toUpperCase()
+                              : '?',
+                        )
                       : null,
                 ),
                 title: Text(review.summaryName ?? review.createdBy.name),
-                subtitle: Text(review.note, maxLines: 2, overflow: TextOverflow.ellipsis),
+                subtitle: Text(
+                  review.note,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
                 trailing: review.commentsCount > 0
                     ? Chip(label: Text('${review.commentsCount}'))
                     : null,
                 onTap: () async {
-                  await ref.read(reviewsRepositoryProvider).markAsRead(review.id);
+                  await ref
+                      .read(reviewsRepositoryProvider)
+                      .markAsRead(review.id);
                   if (context.mounted) context.push('/reviews/${review.id}');
                 },
               );

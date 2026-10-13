@@ -25,12 +25,15 @@ class ReviewsRepository {
       },
     );
     final data = response.data?['data'] as List<dynamic>? ?? [];
-    return data.map((e) => ReviewItem.fromJson(e as Map<String, dynamic>)).toList();
+    return data
+        .map((e) => ReviewItem.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   Future<ReviewItem> getReview(String reviewId) async {
-    final response =
-        await _dio.get<Map<String, dynamic>>('/scenario-session-reviews/$reviewId');
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/scenario-session-reviews/$reviewId',
+    );
     return ReviewItem.fromJson(response.data!);
   }
 
@@ -53,16 +56,85 @@ class ReviewsRepository {
   /// Flat, non-transcript-anchored discussion on a review — matches
   /// `generalCommentsApi.ts`'s scope exactly (no threading/reply params).
   Future<List<ReviewComment>> getGeneralComments(String reviewId) async {
-    final response =
-        await _dio.get<Map<String, dynamic>>('/scenario-session-reviews/$reviewId/general-comments');
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/scenario-session-reviews/$reviewId/general-comments',
+    );
     final data = response.data?['data'] as List<dynamic>? ?? [];
-    return data.map((e) => ReviewComment.fromJson(e as Map<String, dynamic>)).toList();
+    return data
+        .map((e) => ReviewComment.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
-  Future<void> addGeneralComment({required String reviewId, required String content}) async {
+  Future<void> addGeneralComment({
+    required String reviewId,
+    required String content,
+  }) async {
     await _dio.post<void>(
       '/scenario-session-reviews/$reviewId/general-comments',
       data: {'content': content},
+    );
+  }
+
+  /// Transcript-anchored discussion threads — matches `reviewThreadsApi.ts`'s
+  /// `getThreads` (`includeMessage: true`, same as the RN screen always
+  /// passes, so each thread carries its anchor message).
+  Future<({List<ReviewThread> threads, int count})> getThreads(
+    String reviewId, {
+    int offset = 0,
+    int limit = 20,
+  }) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/scenario-session-reviews/$reviewId/threads',
+      queryParameters: {
+        'offset': offset,
+        'limit': limit,
+        'includeMessage': true,
+      },
+    );
+    final data = response.data?['data'] as List<dynamic>? ?? [];
+    return (
+      threads: data
+          .map((e) => ReviewThread.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      count: (response.data?['count'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  /// Replies beyond whatever page `getThreads` included inline — matches
+  /// `getCommentReplies`.
+  Future<({List<ThreadComment> replies, int count})> getCommentReplies(
+    String commentId, {
+    int offset = 0,
+    int limit = 20,
+  }) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/scenario-session-reviews/comments/$commentId/replies',
+      queryParameters: {'offset': offset, 'limit': limit},
+    );
+    final data = response.data?['data'] as List<dynamic>? ?? [];
+    return (
+      replies: data
+          .map((e) => ThreadComment.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      count: (response.data?['count'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  /// Matches `addReviewComment` — a reply within an existing thread
+  /// (`threadId` set). Starting a *new* thread anchored to a fresh
+  /// transcript selection (`messageId`/`selection`, no `threadId`) isn't
+  /// wired here: that needs a transcript view with tappable message
+  /// selection inside the review context, which doesn't exist yet (the
+  /// Transcript tab ported for `SimulationFeedbackScreen` is a different
+  /// screen, for the learner's own post-session view, not the reviewer's).
+  Future<void> addThreadReply({
+    required String reviewId,
+    required String threadId,
+    required String content,
+  }) async {
+    await _dio.post<void>(
+      '/scenario-session-reviews/$reviewId/comments',
+      data: {'threadId': threadId, 'content': content},
     );
   }
 }
@@ -75,12 +147,23 @@ final reviewsListProvider = FutureProvider<List<ReviewItem>>((ref) {
   return ref.watch(reviewsRepositoryProvider).getReviews();
 });
 
-final reviewDetailProvider =
-    FutureProvider.family<ReviewItem, String>((ref, reviewId) {
+final reviewDetailProvider = FutureProvider.family<ReviewItem, String>((
+  ref,
+  reviewId,
+) {
   return ref.watch(reviewsRepositoryProvider).getReview(reviewId);
 });
 
 final generalCommentsProvider =
     FutureProvider.family<List<ReviewComment>, String>((ref, reviewId) {
-  return ref.watch(reviewsRepositoryProvider).getGeneralComments(reviewId);
-});
+      return ref.watch(reviewsRepositoryProvider).getGeneralComments(reviewId);
+    });
+
+final reviewThreadsProvider = FutureProvider.family<List<ReviewThread>, String>(
+  (ref, reviewId) async {
+    final result = await ref
+        .watch(reviewsRepositoryProvider)
+        .getThreads(reviewId);
+    return result.threads;
+  },
+);

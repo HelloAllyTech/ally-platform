@@ -31,7 +31,9 @@ class ReactionsScreen extends ConsumerWidget {
                   ActionChip(
                     label: Text(emoji, style: const TextStyle(fontSize: 20)),
                     onPressed: () async {
-                      await ref.read(reactionsRepositoryProvider).addReactionToReview(
+                      await ref
+                          .read(reactionsRepositoryProvider)
+                          .addReactionToReview(
                             reviewId: reviewId,
                             reaction: emoji,
                             action: ReactionAction.add,
@@ -62,7 +64,8 @@ class ReactionsScreen extends ConsumerWidget {
           Expanded(
             child: reactionsAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, _) => Center(child: Text('Failed to load reactions: $error')),
+              error: (error, _) =>
+                  Center(child: Text('Failed to load reactions: $error')),
               data: (reactions) {
                 if (reactions.isEmpty) {
                   return const Center(child: Text('No reactions yet.'));
@@ -72,7 +75,10 @@ class ReactionsScreen extends ConsumerWidget {
                   itemBuilder: (context, index) {
                     final reaction = reactions[index];
                     return ListTile(
-                      leading: Text(reaction.reaction, style: const TextStyle(fontSize: 24)),
+                      leading: Text(
+                        reaction.reaction,
+                        style: const TextStyle(fontSize: 24),
+                      ),
                       title: Text(reaction.createdBy.name),
                     );
                   },
