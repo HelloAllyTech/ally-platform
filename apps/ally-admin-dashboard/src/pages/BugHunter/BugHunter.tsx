@@ -14,6 +14,7 @@ import { AboutAgent } from "./AboutAgent";
 import { AgentProfileCard } from "./AgentProfileCard";
 import { BugFindingsTable } from "./BugFindingsTable";
 import { useBugHunterUrlState } from "./bugHunterUrlState";
+import { FeatureMapPanel } from "./FeatureMapPanel";
 import { KeyboardShortcutSheet } from "./KeyboardShortcutSheet";
 import { LiveWorkBoard } from "./LiveWorkBoard";
 import { NotebookPanel } from "./NotebookPanel";
@@ -242,6 +243,7 @@ export const BugHunter: FC = () => {
       {section === SECTION.notebook && (
         <div className="mt-6 flex-1">
           <NotebookPanel canTriage={canTriage} />
+          <FeatureMapPanel canTriage={canTriage} />
         </div>
       )}
 

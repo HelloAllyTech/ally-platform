@@ -128,6 +128,7 @@ export const TRIGGER_LABELS: Record<BugHuntTrigger, string> = {
   [BugHuntTrigger.VERIFY_FIX]: "Verifier (fixes)",
   [BugHuntTrigger.VERIFY_FINDINGS]: "Verifier (findings)",
   [BugHuntTrigger.PR_REVIEW]: "PR review",
+  [BugHuntTrigger.FEATURE_MAP]: "Feature map",
 };
 
 export const TRIGGER_SCALE: ColorScale = {
@@ -137,6 +138,7 @@ export const TRIGGER_SCALE: ColorScale = {
   [TRIGGER_LABELS[BugHuntTrigger.VERIFY_FIX]]: PALETTE.purple,
   [TRIGGER_LABELS[BugHuntTrigger.VERIFY_FINDINGS]]: PALETTE.magenta,
   [TRIGGER_LABELS[BugHuntTrigger.PR_REVIEW]]: PALETTE.green,
+  [TRIGGER_LABELS[BugHuntTrigger.FEATURE_MAP]]: PALETTE.gold,
 };
 
 /* ── spend over time ─────────────────────────────────────────────────── */

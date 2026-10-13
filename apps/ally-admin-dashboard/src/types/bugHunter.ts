@@ -14,6 +14,34 @@ export enum BugHuntTrigger {
   VERIFY_FINDINGS = "verify_findings",
   /** A read-only review of one open pull request a person opened, on its head (OPP-0785). */
   PR_REVIEW = "pr_review",
+  /** The weekly read-only run that writes the feature map for one repo (2026-10-13). */
+  FEATURE_MAP = "feature_map",
+}
+
+/**
+ * One feature card: how a user-facing feature works across repos, written by
+ * the weekly read-only map run and read by every study before it opens a
+ * file. `GET /v1/bug-hunter/feature-maps`.
+ */
+export interface BugHunterFeatureCard {
+  id: string;
+  repo: string;
+  slug: string;
+  title: string;
+  summary: string;
+  entryPoints: string[];
+  endpoints: string[];
+  dataHomes: string[];
+  writtenBy: string | null;
+  relatedRepos: string[];
+  gotchas: string[];
+  sourceSha: string | null;
+  runId: string | null;
+  updatedAt: string;
+}
+
+export interface ListBugHunterFeatureMapsResponse {
+  cards: BugHunterFeatureCard[];
 }
 
 /**

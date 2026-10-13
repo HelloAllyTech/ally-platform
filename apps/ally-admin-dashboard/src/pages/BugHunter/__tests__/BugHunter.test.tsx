@@ -30,6 +30,12 @@ vi.mock("@api", () => ({
   useMergeBugFindingMutation: vi.fn(() => [vi.fn(), { isLoading: false }]),
   // The Notebook tab's own hooks. Empty rather than absent: mounted only when
   // that section is open, but the module mock has to supply them.
+  useGetBugHunterFeatureMapsQuery: () => ({
+    data: { cards: [] },
+    isLoading: false,
+    isError: false,
+  }),
+  useRefreshBugHunterFeatureMapsMutation: () => [vi.fn(), { isLoading: false }],
   useGetBugHunterMemoryQuery: vi.fn(() => ({
     data: { items: [] },
     isLoading: false,

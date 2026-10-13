@@ -583,6 +583,8 @@ export const ApiEndpoints = {
     // The notebook Bug Hunter reads before hunting and writes at close —
     // ally-be src/agent-memory, docs/bug-hunter-memory-adr.md.
     MEMORY: "/v1/bug-hunter/memory",
+    FEATURE_MAPS: "/v1/bug-hunter/feature-maps",
+    FEATURE_MAPS_REFRESH: "/v1/bug-hunter/feature-maps/refresh",
     MEMORY_RETIRE: (id: string) => `/v1/bug-hunter/memory/${id}/retire`,
     // What the agent retired on its own recently, with its reason (OPP-0752), and the undo.
     MEMORY_RETIRED: "/v1/bug-hunter/memory/retired",
@@ -949,6 +951,8 @@ export const TAG_TYPES = {
   BUG_HUNTER_NOTIFICATIONS: "bugHunterNotifications",
   // Bug Hunter's notebook. Also registered in baseApi.ts's `tagTypes`.
   BUG_HUNTER_MEMORY: "bugHunterMemory",
+  // Bug Hunter's feature map. Also registered in baseApi.ts's `tagTypes`.
+  BUG_HUNTER_FEATURE_MAP: "bugHunterFeatureMap",
   // Who owns each orchestration decision point (OPP-0783). Also registered in baseApi.ts's `tagTypes`.
   BUG_HUNTER_DECISION_OWNERS: "bugHunterDecisionOwners",
   // UX Signals scan log. Also registered in baseApi.ts's `tagTypes`.

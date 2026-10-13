@@ -23,6 +23,7 @@ import {
   BugHuntRunDetail,
   ListBugFindingsQuery,
   ListBugFindingsResponse,
+  ListBugHunterFeatureMapsResponse,
   ListBugHunterMemoryResponse,
   ListBugHunterNotificationsResponse,
   ListBugHuntRunsResponse,
@@ -398,6 +399,32 @@ export const bugHunterAPI = baseAPI.injectEndpoints({
     // ── The notebook ────────────────────────────────────────────────────────
     // What past sweeps and admins wrote down for the next one. Active entries
     // for a repo (plus platform-wide ones), strongest evidence first.
+    /**
+     * Bug Hunter's feature map: one card per user-facing feature, how it works
+     * across repos. Written by a weekly read-only run; read by every study.
+     */
+    getBugHunterFeatureMaps: builder.query<
+      ListBugHunterFeatureMapsResponse,
+      { repo?: string } | void
+    >({
+      query: params => ({
+        url: ApiEndpoints.BUG_HUNTER.FEATURE_MAPS,
+        method: HttpMethod.GET,
+        params: params || undefined,
+      }),
+      providesTags: [{ type: TAG_TYPES.BUG_HUNTER_FEATURE_MAP, id: "LIST" }],
+    }),
+
+    /** Start a read-only map run now, for one repo or all of them. Returns the run ids started. */
+    refreshBugHunterFeatureMaps: builder.mutation<{ runIds: string[] }, { repo?: string }>({
+      query: body => ({
+        url: ApiEndpoints.BUG_HUNTER.FEATURE_MAPS_REFRESH,
+        method: HttpMethod.POST,
+        body,
+      }),
+      invalidatesTags: [{ type: TAG_TYPES.BUG_HUNTER_RUNS, id: "LIST" }],
+    }),
+
     getBugHunterMemory: builder.query<
       ListBugHunterMemoryResponse,
       { repo?: string; limit?: number } | void
@@ -561,6 +588,8 @@ export const {
   useGetBugHunterNotificationsQuery,
   useMarkBugHunterNotificationReadMutation,
   useMarkAllBugHunterNotificationsReadMutation,
+  useGetBugHunterFeatureMapsQuery,
+  useRefreshBugHunterFeatureMapsMutation,
   useGetBugHunterMemoryQuery,
   useAddBugHunterMemoryMutation,
   useRetireBugHunterMemoryMutation,
