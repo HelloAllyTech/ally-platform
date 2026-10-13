@@ -27,6 +27,7 @@ import {
   getSimulationEvents,
   INTERACTION_MODE,
   isTextChatSession,
+  classifyMicrophoneError,
 } from "./lib/simulation";
 import { SimulationDetailsModal } from "./lib/simulation-details-modal";
 import SkeletonLoader from "./lib/skeleton-loader";
@@ -53,6 +54,8 @@ export type {
   TurnIndicatorTranslations,
   TextChatTranslations,
   InteractionMode,
+  MicrophoneError,
+  MicrophoneErrorKind,
 } from "./lib/simulation";
 export type {
   ProgressVideoPlayerProps,
@@ -118,6 +121,7 @@ export {
   getSimulationEvents,
   INTERACTION_MODE,
   isTextChatSession,
+  classifyMicrophoneError,
   SimulationDetailsModal,
   FEATURE_FLAGS_MAP,
   ImageUpload,

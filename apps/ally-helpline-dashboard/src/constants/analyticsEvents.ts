@@ -26,6 +26,9 @@ export const ANALYTICS_EVENTS = {
   // Splits the wait into "we were told about the track" vs "we subscribed to it",
   // so a silent-agent report can be attributed instead of guessed at.
   SIMULATION_AGENT_AUDIO_TIMING: "simulation_agent_audio_timing",
+  // A session the learner could not start: the connect failed, the browser
+  // refused the microphone, or no agent joined. Carries failure_kind + the error.
+  SIMULATION_CONNECTION_FAILED: "simulation_connection_failed",
 
   // Audio
   AUDIO_UPLOADED: "audio_uploaded",
@@ -194,6 +197,9 @@ export const ANALYTICS_PROPS = {
   HAS_COMPLETED_BEFORE: "has_completed_before",
   SCENARIO_ID: "scenario_id",
   CREDITS_CONSUMED: "credits_consumed",
+  // simulation_connection_failed: connect | microphone | agent_absent
+  FAILURE_KIND: "failure_kind",
+  ERROR_NAME: "error_name",
 
   // Page context
   PAGE_PATH: "page_path",

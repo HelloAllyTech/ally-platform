@@ -230,4 +230,88 @@ describe("SimulationInterface", () => {
       expect(screen.queryByText(/microphone/i)).not.toBeInTheDocument();
     });
   });
+
+  describe("start failures", () => {
+    it("shows a microphone failure as its own state with steps for that cause", () => {
+      render(
+        <SimulationInterface
+          {...baseProps}
+          roomStatus={RoomStatus.DISCONNECTED}
+          microphoneError={{
+            kind: "inUse",
+            name: "NotReadableError",
+            message: "Could not start audio source",
+          }}
+          onRetryConnection={vi.fn()}
+          onExitSimulation={vi.fn()}
+        />,
+      );
+
+      const alert = screen.getByTestId("simulation-interface-connection-error");
+      expect(alert).toHaveAttribute("data-failure-kind", "microphone");
+      expect(screen.getByText("We couldn't use your microphone")).toBeInTheDocument();
+      expect(screen.getByText(/another app such as Teams/)).toBeInTheDocument();
+      // Not the network copy that sent the learner after the wrong problem.
+      expect(screen.queryByText(/internet connection/)).not.toBeInTheDocument();
+      expect(screen.getByTestId("simulation-connection-error-detail")).toHaveTextContent(
+        "NotReadableError: Could not start audio source",
+      );
+      expect(screen.getByTestId("simulation-retry-connection")).toBeInTheDocument();
+    });
+
+    it("gives a blocked microphone the unblock steps", () => {
+      render(
+        <SimulationInterface
+          {...baseProps}
+          roomStatus={RoomStatus.DISCONNECTED}
+          microphoneError={{
+            kind: "blocked",
+            name: "NotAllowedError",
+            message: "Permission denied",
+          }}
+        />,
+      );
+
+      expect(screen.getByText(/set Microphone to Allow/)).toBeInTheDocument();
+    });
+
+    it("keeps a failed connect on the connection copy", () => {
+      render(
+        <SimulationInterface
+          {...baseProps}
+          roomStatus={RoomStatus.DISCONNECTED}
+          connectionError="could not establish signal connection"
+        />,
+      );
+
+      expect(screen.getByTestId("simulation-interface-connection-error")).toHaveAttribute(
+        "data-failure-kind",
+        "connect-failed",
+      );
+      expect(screen.getByText("We couldn't connect you to this session")).toBeInTheDocument();
+    });
+
+    it("uses the translated microphone copy when provided", () => {
+      render(
+        <SimulationInterface
+          {...baseProps}
+          roomStatus={RoomStatus.DISCONNECTED}
+          microphoneError={{
+            kind: "notFound",
+            name: "NotFoundError",
+            message: "Requested device not found",
+          }}
+          translations={
+            {
+              microphoneFailedTitle: "ಮೈಕ್ರೋಫೋನ್ ಶೀರ್ಷಿಕೆ",
+              microphoneNotFoundMessage: "ಮೈಕ್ರೋಫೋನ್ ಕಂಡುಬಂದಿಲ್ಲ",
+            } as any
+          }
+        />,
+      );
+
+      expect(screen.getByText("ಮೈಕ್ರೋಫೋನ್ ಶೀರ್ಷಿಕೆ")).toBeInTheDocument();
+      expect(screen.getByText("ಮೈಕ್ರೋಫೋನ್ ಕಂಡುಬಂದಿಲ್ಲ")).toBeInTheDocument();
+    });
+  });
 });

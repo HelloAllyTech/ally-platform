@@ -2,6 +2,8 @@ import type { MutableRefObject, ReactNode } from "react";
 
 import { RoomStatus } from "./SimulationInterface";
 
+import type { MicrophoneError } from "./microphoneError";
+
 export type AgentTurnStatus = "thinking" | "speaking" | "user_turn";
 
 export interface StateInstruction {
@@ -111,6 +113,12 @@ export interface SimulationTranslations {
   connectionFailedMessage?: string;
   agentNotJoinedTitle?: string;
   agentNotJoinedMessage?: string;
+  /** The room connected but the browser refused the microphone. */
+  microphoneFailedTitle?: string;
+  microphoneBlockedMessage?: string;
+  microphoneNotFoundMessage?: string;
+  microphoneInUseMessage?: string;
+  microphoneUnknownMessage?: string;
   retryConnection?: string;
   exitSimulation?: string;
   reconnecting?: string;
@@ -258,6 +266,8 @@ export interface SimulationPageProps {
    * never shows the failure UI, exactly as before.
    */
   connectionError?: string | null;
+  /** The browser refused the microphone; see microphoneError.ts. */
+  microphoneError?: MicrophoneError | null;
   agentJoinTimedOut?: boolean;
   onRetryConnection?: () => void;
   onExitSimulation?: () => void;
