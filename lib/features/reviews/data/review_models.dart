@@ -42,3 +42,30 @@ class ReviewItem {
   final int commentsCount;
   final String? summaryName;
 }
+
+/// Mirrors ally-mobile (React Native)'s `MessageThreadComment` — used here
+/// for general (not transcript-anchored) review comments only. Replies
+/// (`parentCommentId` threading) and reactions on individual comments
+/// aren't modeled — this is a flat discussion list, matching the scope of
+/// `generalCommentsApi.ts`'s `addGeneralComment` (reviewId + content only,
+/// no threading params).
+class ReviewComment {
+  ReviewComment({
+    required this.id,
+    required this.content,
+    required this.createdAt,
+    required this.authorName,
+  });
+
+  factory ReviewComment.fromJson(Map<String, dynamic> json) => ReviewComment(
+        id: json['id'] as String,
+        content: json['content'] as String? ?? '',
+        createdAt: json['createdAt'] as String?,
+        authorName: (json['createdBy'] as Map<String, dynamic>?)?['name'] as String? ?? 'Unknown',
+      );
+
+  final String id;
+  final String content;
+  final String? createdAt;
+  final String authorName;
+}

@@ -49,6 +49,22 @@ class ReviewsRepository {
       data: {'scenarioSessionId': scenarioSessionId, 'note': note},
     );
   }
+
+  /// Flat, non-transcript-anchored discussion on a review — matches
+  /// `generalCommentsApi.ts`'s scope exactly (no threading/reply params).
+  Future<List<ReviewComment>> getGeneralComments(String reviewId) async {
+    final response =
+        await _dio.get<Map<String, dynamic>>('/scenario-session-reviews/$reviewId/general-comments');
+    final data = response.data?['data'] as List<dynamic>? ?? [];
+    return data.map((e) => ReviewComment.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  Future<void> addGeneralComment({required String reviewId, required String content}) async {
+    await _dio.post<void>(
+      '/scenario-session-reviews/$reviewId/general-comments',
+      data: {'content': content},
+    );
+  }
 }
 
 final reviewsRepositoryProvider = Provider<ReviewsRepository>((ref) {
@@ -62,4 +78,9 @@ final reviewsListProvider = FutureProvider<List<ReviewItem>>((ref) {
 final reviewDetailProvider =
     FutureProvider.family<ReviewItem, String>((ref, reviewId) {
   return ref.watch(reviewsRepositoryProvider).getReview(reviewId);
+});
+
+final generalCommentsProvider =
+    FutureProvider.family<List<ReviewComment>, String>((ref, reviewId) {
+  return ref.watch(reviewsRepositoryProvider).getGeneralComments(reviewId);
 });
