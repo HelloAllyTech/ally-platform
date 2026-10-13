@@ -7,6 +7,7 @@ import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../../../core/auth/auth_state.dart';
 import '../../../core/config/app_config.dart';
+import '../../../core/localization/translate_ref.dart';
 import '../data/auth_repository.dart';
 
 /// Real email+OTP, Google, and Apple sign-in, matching ally-mobile (React
@@ -90,10 +91,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           );
     } on GoogleSignInException catch (e) {
       if (e.code != GoogleSignInExceptionCode.canceled) {
-        setState(() => _error = 'Failed to sign in with Google: ${e.description ?? e.code}');
+        setState(() => _error = '${ref.tr('auth.login.google.error')}: ${e.description ?? e.code}');
       }
     } catch (e) {
-      setState(() => _error = 'Failed to sign in with Google: $e');
+      setState(() => _error = '${ref.tr('auth.login.google.error')}: $e');
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -124,10 +125,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           );
     } on SignInWithAppleAuthorizationException catch (e) {
       if (e.code != AuthorizationErrorCode.canceled) {
-        setState(() => _error = 'Failed to sign in with Apple: ${e.message}');
+        setState(() => _error = '${ref.tr('auth.login.apple.error')}: ${e.message}');
       }
     } catch (e) {
-      setState(() => _error = 'Failed to sign in with Apple: $e');
+      setState(() => _error = '${ref.tr('auth.login.apple.error')}: $e');
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -136,7 +137,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _sendCode() async {
     final email = _emailController.text.trim();
     if (email.isEmpty) {
-      setState(() => _error = 'Enter your email.');
+      setState(() => _error = ref.tr('auth.login.email.error'));
       return;
     }
     setState(() {
@@ -147,7 +148,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       await ref.read(authRepositoryProvider).generateOtp(email);
       setState(() => _step = _Step.otp);
     } catch (e) {
-      setState(() => _error = 'Failed to send code: $e');
+      setState(() => _error = '${ref.tr('auth.login.errors.generateOtp')}: $e');
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -156,7 +157,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _verifyCode() async {
     final otp = _otpController.text.trim();
     if (otp.isEmpty) {
-      setState(() => _error = 'Enter the code.');
+      setState(() => _error = ref.tr('auth.login.otp.emptyCodeError'));
       return;
     }
     setState(() {
@@ -173,7 +174,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             refreshToken: refreshToken,
           );
     } catch (e) {
-      setState(() => _error = 'Invalid code: $e');
+      setState(() => _error = '${ref.tr('auth.login.errors.verifyOtp')}: $e');
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -188,13 +189,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('Ally', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+              Text(ref.t('common.appName'), style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
               const SizedBox(height: 24),
               if (_step == _Step.email) ...[
                 TextField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(labelText: 'Email', border: OutlineInputBorder()),
+                  decoration: InputDecoration(
+                    labelText: ref.t('auth.login.email.label'),
+                    border: const OutlineInputBorder(),
+                  ),
                 ),
                 const SizedBox(height: 16),
                 if (_error != null)
@@ -207,35 +211,35 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   child: _isSubmitting
                       ? const SizedBox(
                           width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Text('Send code'),
+                      : Text(ref.t('common.next')),
                 ),
                 const SizedBox(height: 24),
-                const Row(
+                Row(
                   children: [
-                    Expanded(child: Divider()),
+                    const Expanded(child: Divider()),
                     Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 12),
-                      child: Text('or'),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Text(ref.t('common.or')),
                     ),
-                    Expanded(child: Divider()),
+                    const Expanded(child: Divider()),
                   ],
                 ),
                 const SizedBox(height: 16),
                 OutlinedButton.icon(
                   onPressed: (_isSubmitting || _googleInitFuture == null) ? null : _signInWithGoogle,
                   icon: const Icon(Icons.g_mobiledata),
-                  label: const Text('Continue with Google'),
+                  label: Text(ref.t('auth.login.google.button')),
                 ),
                 if (Platform.isIOS) ...[
                   const SizedBox(height: 8),
                   OutlinedButton.icon(
                     onPressed: _isSubmitting ? null : _signInWithApple,
                     icon: const Icon(Icons.apple),
-                    label: const Text('Continue with Apple'),
+                    label: Text(ref.t('auth.login.apple.button')),
                   ),
                 ],
               ] else ...[
-                Text('Enter the code sent to ${_emailController.text.trim()}'),
+                Text('${ref.t('auth.login.otp.enterCode')} ${_emailController.text.trim()}'),
                 const SizedBox(height: 16),
                 TextField(
                   controller: _otpController,
@@ -253,11 +257,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   child: _isSubmitting
                       ? const SizedBox(
                           width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Text('Verify'),
+                      : Text(ref.t('auth.login.otp.verify')),
                 ),
                 TextButton(
                   onPressed: () => setState(() => _step = _Step.email),
-                  child: const Text('Use a different email'),
+                  child: Text(ref.t('auth.login.otp.useDifferentEmail')),
                 ),
               ],
             ],

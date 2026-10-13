@@ -182,11 +182,17 @@
         "resend": "Resend",
         "resendWithCountdown": "Resend ({{seconds}})",
         "verify": "Verify",
-        "signingIn": "Signing in..."
+        "signingIn": "Signing in...",
+        "emptyCodeError": "Enter the code.",
+        "useDifferentEmail": "Use a different email"
       },
       "google": {
         "button": "Continue with Google",
         "error": "Failed to sign in with Google"
+      },
+      "apple": {
+        "button": "Continue with Apple",
+        "error": "Failed to sign in with Apple"
       },
       "errors": {
         "generateOtp": "Failed to generate OTP. Please try again.",

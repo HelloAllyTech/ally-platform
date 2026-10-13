@@ -32,8 +32,16 @@ class AuthController extends Notifier<AuthState> {
   TokenStorage get _tokenStorage => ref.read(tokenStorageProvider);
 
   Future<void> _restore() async {
-    final accessToken = await _tokenStorage.accessToken;
-    state = AuthState(isAuthenticated: accessToken != null);
+    try {
+      final accessToken = await _tokenStorage.accessToken;
+      state = AuthState(isAuthenticated: accessToken != null);
+    } catch (_) {
+      // Secure storage unreadable (corrupted keychain, a platform issue,
+      // or — in tests — no plugin registered at all). Falls back to
+      // "not authenticated", same as `build()`'s initial state, rather
+      // than leaving an unhandled rejection floating in the zone.
+      state = AuthState.unknown;
+    }
   }
 
   Future<void> signIn({
