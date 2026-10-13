@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/localization/translate_ref.dart';
 import '../../data/courses_repository.dart';
 import '../../data/start_item_payload.dart';
 import '../../data/video_watch_progress.dart';
@@ -168,12 +169,12 @@ class _VideoItemPlayerState extends ConsumerState<VideoItemPlayer> {
         Padding(
           padding: const EdgeInsets.all(16),
           child: _completed
-              ? const Row(
+              ? Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.check_circle, color: Colors.green),
-                    SizedBox(width: 8),
-                    Text('Watched'),
+                    const Icon(Icons.check_circle, color: Colors.green),
+                    const SizedBox(width: 8),
+                    Text(ref.t('courses.video.watched')),
                   ],
                 )
               : SizedBox(

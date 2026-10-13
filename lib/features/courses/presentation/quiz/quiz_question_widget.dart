@@ -5,7 +5,9 @@
 // ignore_for_file: deprecated_member_use
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/localization/translate_ref.dart';
 import '../../data/quiz_models.dart';
 
 /// Renders the right interactive control for each of the 8 quiz question
@@ -19,7 +21,7 @@ import '../../data/quiz_models.dart';
 /// up/down buttons rather than drag handles, matching uses per-row
 /// dropdowns rather than a draw-a-line interface. Same data captured, same
 /// submission shape, simpler interaction.
-class QuizQuestionWidget extends StatefulWidget {
+class QuizQuestionWidget extends ConsumerStatefulWidget {
   const QuizQuestionWidget({
     super.key,
     required this.question,
@@ -33,10 +35,10 @@ class QuizQuestionWidget extends StatefulWidget {
   final QuizQuestionResult? showResult;
 
   @override
-  State<QuizQuestionWidget> createState() => _QuizQuestionWidgetState();
+  ConsumerState<QuizQuestionWidget> createState() => _QuizQuestionWidgetState();
 }
 
-class _QuizQuestionWidgetState extends State<QuizQuestionWidget> {
+class _QuizQuestionWidgetState extends ConsumerState<QuizQuestionWidget> {
   // mcq
   final Set<String> _selectedOptionIds = {};
   // true_false
@@ -187,7 +189,7 @@ class _QuizQuestionWidgetState extends State<QuizQuestionWidget> {
                         setState(() => _booleanAnswer = true);
                         _emit();
                       },
-                child: const Text('True'),
+                child: Text(ref.t('courses.quiz.question.true')),
               ),
             ),
             const SizedBox(width: 12),
@@ -204,7 +206,7 @@ class _QuizQuestionWidgetState extends State<QuizQuestionWidget> {
                         setState(() => _booleanAnswer = false);
                         _emit();
                       },
-                child: const Text('False'),
+                child: Text(ref.t('courses.quiz.question.false')),
               ),
             ),
           ],
@@ -311,7 +313,9 @@ class _QuizQuestionWidgetState extends State<QuizQuestionWidget> {
           maxLines: 4,
           decoration: InputDecoration(
             border: const OutlineInputBorder(),
-            helperText: q.minWords != null ? 'At least ${q.minWords} words' : null,
+            helperText: q.minWords != null
+                ? ref.t('courses.quiz.question.minWordsHint', {'min': q.minWords})
+                : null,
           ),
           onChanged: (_) => _emit(),
         );
@@ -351,19 +355,24 @@ class _QuizQuestionWidgetState extends State<QuizQuestionWidget> {
           ],
         );
       case QuizQuestionType.unknown:
-        return const Text('Unsupported question type.');
+        return Text(ref.t('courses.quiz.question.unsupportedType'));
     }
   }
 }
 
-class _ResultBanner extends StatelessWidget {
+class _ResultBanner extends ConsumerWidget {
   const _ResultBanner({required this.result});
 
   final QuizQuestionResult result;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final correct = result.correct;
+    final statusKey = correct == null
+        ? 'courses.quiz.results.pendingGrading'
+        : correct
+            ? 'courses.quiz.results.correct'
+            : 'courses.quiz.results.incorrect';
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
@@ -378,11 +387,11 @@ class _ResultBanner extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            correct == null
-                ? 'Pending grading — ${result.pointsAwarded}/${result.pointsPossible} pts'
-                : correct
-                    ? 'Correct — ${result.pointsAwarded}/${result.pointsPossible} pts'
-                    : 'Incorrect — ${result.pointsAwarded}/${result.pointsPossible} pts',
+            ref.t('courses.quiz.question.resultBanner', {
+              'status': ref.t(statusKey),
+              'awarded': result.pointsAwarded,
+              'possible': result.pointsPossible,
+            }),
           ),
           if (result.explanation != null) Text(result.explanation!),
         ],

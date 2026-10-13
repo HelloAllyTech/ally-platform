@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/localization/translate_ref.dart';
 import '../data/courses_repository.dart';
 
 /// Scoped port of ally-mobile (React Native)'s `CourseProgressScreen`.
@@ -19,10 +20,12 @@ class CourseProgressScreen extends ConsumerWidget {
     final progressAsync = ref.watch(trackProgressProvider(trackId));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Progress')),
+      appBar: AppBar(title: Text(ref.t('courses.progressDashboard.title'))),
       body: progressAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(child: Text('Failed to load progress: $error')),
+        error: (error, _) => Center(
+          child: Text('${ref.t('courses.progressDashboard.notFound')}: $error'),
+        ),
         data: (progress) => Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -32,8 +35,13 @@ class CourseProgressScreen extends ConsumerWidget {
               const SizedBox(height: 24),
               LinearProgressIndicator(value: progress.completionPct / 100),
               const SizedBox(height: 8),
-              Text('${progress.completionPct.toStringAsFixed(0)}% complete'),
-              Text('${progress.completedItems} of ${progress.totalItems} items'),
+              Text(ref.t('courses.player.overallProgress', {
+                'pct': progress.completionPct.toStringAsFixed(0),
+              })),
+              Text(ref.t('simulations.progressCompleted', {
+                'current': progress.completedItems,
+                'total': progress.totalItems,
+              })),
             ],
           ),
         ),

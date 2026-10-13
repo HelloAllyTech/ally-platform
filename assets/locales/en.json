@@ -707,6 +707,8 @@
     "lockedTooltip": "Complete the previous items to unlock this",
     "notFound": "Course not found",
     "viewProgress": "View progress",
+    "enroll": "Enroll",
+    "listLoadFailed": "Couldn't load your courses.",
     "progressDashboard": {
       "title": "Progress",
       "tapHint": "Tap to see your progress and feedback",
@@ -817,11 +819,13 @@
       "markWatched": "Mark as watched",
       "watched": "Watched",
       "openVideo": "Open video",
+      "loadFailed": "Couldn't load this video.",
       "interjection": {
         "title": "Quick check",
         "submit": "Submit",
         "continue": "Continue",
-        "continueBody": "Keep going with the video."
+        "continueBody": "Keep going with the video.",
+        "submitError": "Failed to submit."
       }
     },
     "journal": {
@@ -870,7 +874,12 @@
         "wordCount_one": "{{count}}/{{min}} word",
         "wordCount_other": "{{count}}/{{min}} words",
         "aiGraded": "This answer is graded by AI",
-        "likertHint": "Select one response per statement"
+        "likertHint": "Select one response per statement",
+        "answerAllError": "Please answer every question before submitting.",
+        "submitError": "Failed to submit quiz.",
+        "minWordsHint": "At least {{min}} words",
+        "unsupportedType": "Unsupported question type.",
+        "resultBanner": "{{status}} — {{awarded}}/{{possible}} pts"
       },
       "results": {
         "title": "Results",
@@ -886,10 +895,12 @@
         "retry": "Retry quiz",
         "next": "Next",
         "attemptsUsed": "Attempt {{used}} of {{max}}",
+        "attemptsUsedNoMax": "Attempt {{used}}",
         "notScored": "Not scored",
         "correctAnswer": "Correct answer",
         "yourResponses": "Your responses",
-        "responsesSubmitted": "Responses submitted"
+        "responsesSubmitted": "Responses submitted",
+        "scoreSummary": "Score: {{score}}% (pass: {{pass}}%)"
       }
     },
     "language": {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/localization/translate_ref.dart';
 import '../data/course_models.dart';
 import '../data/courses_repository.dart';
 
@@ -44,19 +45,20 @@ class CourseDetailScreen extends ConsumerWidget {
       appBar: AppBar(
         title: detailAsync.maybeWhen(
           data: (detail) => Text(detail.title),
-          orElse: () => const Text('Course'),
+          orElse: () => Text(ref.t('learn.choose.course')),
         ),
         actions: [
           IconButton(
             icon: const Icon(Icons.bar_chart),
-            tooltip: 'Progress',
+            tooltip: ref.t('courses.viewProgress'),
             onPressed: () => context.push('/courses/$trackId/progress'),
           ),
         ],
       ),
       body: detailAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(child: Text('Failed to load course: $error')),
+        error: (error, _) =>
+            Center(child: Text('${ref.t('courses.notFound')}: $error')),
         data: (detail) => ListView(
           padding: const EdgeInsets.all(16),
           children: [
@@ -93,10 +95,9 @@ class CourseDetailScreen extends ConsumerWidget {
                               );
                             } else {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
+                                SnackBar(
                                   content: Text(
-                                    'This item type isn\'t ported yet in '
-                                    'this build.',
+                                    ref.tr('courses.player.unsupportedBody'),
                                   ),
                                 ),
                               );

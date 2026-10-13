@@ -7,6 +7,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/localization/translate_ref.dart';
 import '../../../core/widgets/html_rich_text.dart';
 import '../data/course_models.dart';
 import '../data/courses_repository.dart';
@@ -54,7 +55,7 @@ class _CourseItemPlayerScreenState extends ConsumerState<CourseItemPlayerScreen>
       });
     } catch (e) {
       setState(() {
-        _error = 'Failed to load item: $e';
+        _error = '${ref.tr('courses.player.loadFailed')}: $e';
         _isLoading = false;
       });
     }
@@ -116,7 +117,7 @@ class _CourseItemPlayerScreenState extends ConsumerState<CourseItemPlayerScreen>
           onCompleted: () => setState(() => _completed = true),
         );
       default:
-        return const Center(child: Text('Unsupported item type.'));
+        return Center(child: Text(ref.t('courses.player.unsupportedTitle')));
     }
   }
 }
@@ -187,7 +188,9 @@ class _ArticleViewState extends ConsumerState<_ArticleView> {
                     ),
                   if (_results[question.id] != null)
                     Text(
-                      _results[question.id]!.correct ? 'Correct!' : 'Not quite.',
+                      _results[question.id]!.correct
+                          ? ref.t('courses.article.question.correct')
+                          : ref.t('courses.article.question.incorrect'),
                       style: TextStyle(
                         color: _results[question.id]!.correct ? Colors.green : Colors.red,
                       ),
@@ -198,15 +201,18 @@ class _ArticleViewState extends ConsumerState<_ArticleView> {
           ),
         const SizedBox(height: 16),
         if (widget.completed)
-          const Row(
+          Row(
             children: [
-              Icon(Icons.check_circle, color: Colors.green),
-              SizedBox(width: 8),
-              Text('Completed'),
+              const Icon(Icons.check_circle, color: Colors.green),
+              const SizedBox(width: 8),
+              Text(ref.t('courses.article.read')),
             ],
           )
         else
-          FilledButton(onPressed: widget.onMarkComplete, child: const Text('Mark as read')),
+          FilledButton(
+            onPressed: widget.onMarkComplete,
+            child: Text(ref.t('courses.article.markRead')),
+          ),
       ],
     );
   }

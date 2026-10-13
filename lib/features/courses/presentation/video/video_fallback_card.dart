@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
+
+import '../../../../core/localization/translate_ref.dart';
 
 /// Port of ally-mobile (React Native)'s `VideoFallbackCard` — fallback for
 /// youtube/vimeo/loom sources: no native SDK integration for these hosts on
@@ -9,14 +12,14 @@ import 'package:url_launcher/url_launcher.dart';
 /// estimate — faking a percentage without a real playback signal isn't
 /// worth doing, so the button is available as soon as the learner's had a
 /// chance to open the video, same as the RN original.
-class VideoFallbackCard extends StatelessWidget {
+class VideoFallbackCard extends ConsumerWidget {
   const VideoFallbackCard({super.key, required this.url, required this.onMarkWatched});
 
   final String url;
   final VoidCallback onMarkWatched;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -24,17 +27,20 @@ class VideoFallbackCard extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'This video opens in your browser.',
+              ref.t('courses.meta.video'),
               style: Theme.of(context).textTheme.bodyMedium,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
             OutlinedButton(
               onPressed: () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
-              child: const Text('Open video'),
+              child: Text(ref.t('courses.video.openVideo')),
             ),
             const SizedBox(height: 8),
-            FilledButton(onPressed: onMarkWatched, child: const Text('Mark as watched')),
+            FilledButton(
+              onPressed: onMarkWatched,
+              child: Text(ref.t('courses.video.markWatched')),
+            ),
           ],
         ),
       ),
