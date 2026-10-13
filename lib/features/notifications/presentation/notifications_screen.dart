@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/localization/translate_ref.dart';
 import '../data/notifications_repository.dart';
 
 /// Port of ally-mobile (React Native)'s `NotificationsScreen` — list, mark
@@ -14,24 +15,24 @@ class NotificationsScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Notifications'),
+        title: Text(ref.t('notifications.title')),
         actions: [
           TextButton(
             onPressed: () async {
               await ref.read(notificationsRepositoryProvider).markAllRead();
               ref.invalidate(notificationsListProvider);
             },
-            child: const Text('Mark all read'),
+            child: Text(ref.t('notifications.markAllRead')),
           ),
         ],
       ),
       body: notificationsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) =>
-            Center(child: Text('Failed to load notifications: $error')),
+            Center(child: Text('${ref.t('notifications.loadError')}: $error')),
         data: (notifications) {
           if (notifications.isEmpty) {
-            return const Center(child: Text('No notifications yet.'));
+            return Center(child: Text(ref.t('notifications.empty')));
           }
           return RefreshIndicator(
             onRefresh: () => ref.refresh(notificationsListProvider.future),

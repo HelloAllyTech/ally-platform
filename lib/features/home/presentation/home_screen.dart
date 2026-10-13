@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/auth/auth_state.dart';
+import '../../../core/localization/translate_ref.dart';
 import '../../../core/push/push_notification_service.dart';
 import '../../notifications/data/notifications_repository.dart';
 
@@ -34,81 +35,81 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Ally')),
+      appBar: AppBar(title: Text(ref.t('common.appName'))),
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Phase 0 shell — authenticated.'),
+            Text(ref.t('home.phase0Shell')),
             const SizedBox(height: 16),
             FilledButton(
               onPressed: () => context.push('/courses'),
-              child: const Text('Phase 2: Courses'),
+              child: Text(ref.t('home.courses')),
             ),
             const SizedBox(height: 8),
             FilledButton(
               onPressed: () => context.push('/profile'),
-              child: const Text('Phase 2: Profile'),
+              child: Text(ref.t('home.profile')),
             ),
             const SizedBox(height: 8),
             FilledButton(
               onPressed: () => context.push('/notifications'),
-              child: const Text('Phase 2: Notifications'),
+              child: Text(ref.t('home.notifications')),
             ),
             const SizedBox(height: 8),
             FilledButton(
               onPressed: () => context.push('/simulations'),
-              child: const Text('Phase 3: Simulations'),
+              child: Text(ref.t('home.simulations')),
             ),
             const SizedBox(height: 8),
             FilledButton(
               onPressed: () => context.push('/leaderboard'),
-              child: const Text('Phase 4: Leaderboard'),
+              child: Text(ref.t('home.leaderboard')),
             ),
             const SizedBox(height: 8),
             FilledButton(
               onPressed: () => context.push('/achievements'),
-              child: const Text('Phase 4: Achievements'),
+              child: Text(ref.t('home.achievements')),
             ),
             const SizedBox(height: 8),
             FilledButton(
               onPressed: () => context.push('/bug-report'),
-              child: const Text('Phase 4: Report a bug'),
+              child: Text(ref.t('home.bugReport')),
             ),
             const SizedBox(height: 8),
             FilledButton(
               onPressed: () => context.push('/search'),
-              child: const Text('Phase 4: Search'),
+              child: Text(ref.t('home.search')),
             ),
             const SizedBox(height: 8),
             FilledButton(
               onPressed: () => context.push('/reviews'),
-              child: const Text('Phase 4: Reviews'),
+              child: Text(ref.t('home.reviews')),
             ),
             const SizedBox(height: 8),
             FilledButton(
               onPressed: () => context.push('/call-log'),
-              child: const Text('Phase 4: Call log'),
+              child: Text(ref.t('home.callLog')),
             ),
             const SizedBox(height: 8),
             FilledButton(
               onPressed: () => context.push('/community'),
-              child: const Text('Phase 4: Community'),
+              child: Text(ref.t('home.community')),
             ),
             const SizedBox(height: 8),
             FilledButton(
               onPressed: () => context.push('/box-breathing'),
-              child: const Text('Phase 4: Box breathing'),
+              child: Text(ref.t('home.boxBreathing')),
             ),
             const SizedBox(height: 8),
             FilledButton(
               onPressed: () => context.push('/cases'),
-              child: const Text('Phase 4: Cases'),
+              child: Text(ref.t('home.cases')),
             ),
             const SizedBox(height: 8),
             FilledButton(
               onPressed: () => context.push('/scribe'),
-              child: const Text('Phase 1: Scribe recording'),
+              child: Text(ref.t('home.scribe')),
             ),
             const SizedBox(height: 8),
             FilledButton(
@@ -116,12 +117,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 '/roleplay',
                 extra: const <String, String>{},
               ),
-              child: const Text('Phase 1: Roleplay voice'),
+              child: Text(ref.t('home.roleplay')),
             ),
             const SizedBox(height: 16),
             OutlinedButton(
               onPressed: () => ref.read(authControllerProvider.notifier).logout(),
-              child: const Text('Log out'),
+              child: Text(ref.t('user.logout')),
             ),
           ],
         ),

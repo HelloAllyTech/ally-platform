@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/auth/auth_state.dart';
+import '../../../core/localization/translate_ref.dart';
 
 /// Port of ally-mobile (React Native)'s `SuspendedAccountScreen` — static
 /// message + a button that signs out back to the login screen (the RN
@@ -23,19 +24,19 @@ class SuspendedAccountScreen extends ConsumerWidget {
                 const Icon(Icons.block, size: 64, color: Colors.grey),
                 const SizedBox(height: 16),
                 Text(
-                  'Your account has been suspended',
+                  ref.t('suspended.title'),
                   style: Theme.of(context).textTheme.titleLarge,
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
-                const Text(
-                  'Contact your administrator if you believe this is a mistake.',
+                Text(
+                  '${ref.t('suspended.description.line1')}${ref.t('suspended.description.line2')}',
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 32),
                 FilledButton(
                   onPressed: () => ref.read(authControllerProvider.notifier).logout(),
-                  child: const Text('Go to login'),
+                  child: Text(ref.t('suspended.goToLogin')),
                 ),
               ],
             ),

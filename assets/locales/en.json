@@ -220,7 +220,8 @@
     "exhale": "Exhale",
     "phaseHold": "Hold",
     "phaseInhale": "Inhale",
-    "phaseExhale": "Exhale"
+    "phaseExhale": "Exhale",
+    "title": "Box breathing"
   },
   "callFeedback": {
     "rateTitle": "Rate the AI-generated summary?",
@@ -2002,6 +2003,52 @@
     "placeholder": "Tell us what you were doing when the issue happened...",
     "submit": "Submit",
     "successMessage": "Thanks — your report has been submitted.",
-    "rateLimitMessage": "You've submitted a few reports recently — please try again in a bit."
+    "rateLimitMessage": "You've submitted a few reports recently — please try again in a bit.",
+    "emptyError": "Please describe the issue."
+  },
+  "home": {
+    "phase0Shell": "Phase 0 shell — authenticated.",
+    "courses": "Phase 2: Courses",
+    "profile": "Phase 2: Profile",
+    "notifications": "Phase 2: Notifications",
+    "simulations": "Phase 3: Simulations",
+    "leaderboard": "Phase 4: Leaderboard",
+    "achievements": "Phase 4: Achievements",
+    "bugReport": "Phase 4: Report a bug",
+    "search": "Phase 4: Search",
+    "reviews": "Phase 4: Reviews",
+    "callLog": "Phase 4: Call log",
+    "community": "Phase 4: Community",
+    "boxBreathing": "Phase 4: Box breathing",
+    "cases": "Phase 4: Cases",
+    "scribe": "Phase 1: Scribe recording",
+    "roleplay": "Phase 1: Roleplay voice"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "markAllRead": "Mark all read",
+    "empty": "You're all caught up — no notifications yet.",
+    "loadError": "Failed to load notifications"
+  },
+  "roleplayVoice": {
+    "title": "Roleplay voice",
+    "connect": "Connect",
+    "disconnect": "Disconnect",
+    "connectedToRoom": "Connected to room",
+    "notConnected": "Not connected"
+  },
+  "scribe": {
+    "title": "Scribe recording (Phase 1)",
+    "notificationTitle": "Recording session",
+    "notificationText": "Ally is recording this session.",
+    "recording": "Recording",
+    "notRecording": "Not recording",
+    "socketLabel": "Socket",
+    "connected": "connected",
+    "disconnected": "disconnected",
+    "chunksSent": "Audio chunks sent: {{count}}",
+    "startRecording": "Start recording",
+    "stop": "Stop",
+    "testingHint": "Lock the screen or switch apps while recording to verify the foreground service keeps audio chunks flowing — this is the exact failure mode this rewrite exists to fix."
   }
 }

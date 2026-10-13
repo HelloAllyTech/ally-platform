@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../../core/localization/translate_ref.dart';
 import '../../../core/realtime/livekit_room_service.dart';
 import '../../simulations/data/simulations_repository.dart';
 
@@ -55,7 +56,7 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
 
     final micStatus = await Permission.microphone.request();
     if (!micStatus.isGranted) {
-      setState(() => _error = 'Microphone permission denied.');
+      setState(() => _error = ref.tr('errors.permission'));
       return;
     }
 
@@ -71,7 +72,7 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
         _isMicEnabled = true;
       });
     } catch (e) {
-      setState(() => _error = 'Failed to connect: $e');
+      setState(() => _error = '${ref.tr('errors.connect')}: $e');
     }
   }
 
@@ -98,7 +99,7 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
       await _disconnect();
       if (mounted) context.pushReplacement('/simulations/feedback/$sessionId');
     } catch (e) {
-      setState(() => _error = 'Failed to end session: $e');
+      setState(() => _error = '${ref.tr('errors.endSimulation')}: $e');
     } finally {
       if (mounted) setState(() => _isEnding = false);
     }
@@ -107,7 +108,7 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Roleplay voice')),
+      appBar: AppBar(title: Text(ref.t('roleplayVoice.title'))),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -120,7 +121,11 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
                 color: _isConnected ? Colors.green : null,
               ),
               const SizedBox(height: 16),
-              Text(_isConnected ? 'Connected to room' : 'Not connected'),
+              Text(
+                _isConnected
+                    ? ref.t('roleplayVoice.connectedToRoom')
+                    : ref.t('roleplayVoice.notConnected'),
+              ),
               if (_error != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
@@ -128,12 +133,14 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
                 ),
               const SizedBox(height: 24),
               if (!_isConnected)
-                FilledButton(onPressed: _connect, child: const Text('Connect'))
+                FilledButton(onPressed: _connect, child: Text(ref.t('roleplayVoice.connect')))
               else ...[
                 FilledButton.icon(
                   onPressed: _toggleMic,
                   icon: Icon(_isMicEnabled ? Icons.mic : Icons.mic_off),
-                  label: Text(_isMicEnabled ? 'Mute' : 'Unmute'),
+                  label: Text(
+                    _isMicEnabled ? ref.t('simulationPage.mute') : ref.t('simulationPage.unmute'),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 if (widget.scenarioSessionId != null)
@@ -146,12 +153,12 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
                             height: 20,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Text('End session'),
+                        : Text(ref.t('simulationPage.endSession')),
                   )
                 else
                   OutlinedButton(
                     onPressed: _disconnect,
-                    child: const Text('Disconnect'),
+                    child: Text(ref.t('roleplayVoice.disconnect')),
                   ),
               ],
             ],
