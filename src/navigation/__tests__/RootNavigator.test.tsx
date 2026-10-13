@@ -37,6 +37,8 @@ jest.mock('@react-navigation/native', () => {
     createNavigationContainerRef: () => ({
       current: null,
       isReady: () => false,
+      // The pending course-link replay listens for navigation state changes.
+      addListener: jest.fn(() => jest.fn()),
       navigate: jest.fn(),
       reset: jest.fn(),
       dispatch: jest.fn(),

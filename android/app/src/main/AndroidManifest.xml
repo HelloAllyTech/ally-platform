@@ -36,6 +36,8 @@
             <category android:name="android.intent.category.DEFAULT" />
             <category android:name="android.intent.category.BROWSABLE" />
             <data android:scheme="https" android:host="${appLinkHost}" android:pathPrefix="/summary" />
+            <!-- Course share links: must match the web app's /course route and its .well-known files. -->
+            <data android:scheme="https" android:host="${appLinkHost}" android:pathPrefix="/course" />
         </intent-filter>
       </activity>
     </application>

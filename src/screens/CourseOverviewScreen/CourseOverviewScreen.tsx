@@ -219,7 +219,21 @@ export const CourseOverviewScreen: React.FC<
           testID="activity-indicator"
         />
       ) : error || !track ? (
-        <EmptyState icon={DataUnavailableIcon} title={t('courses.notFound')} />
+        // 403 = the course exists but is not assigned to this learner's
+        // organisation or group — typically someone opening a shared course
+        // link. Say so, rather than claim the course does not exist.
+        error && 'status' in error && error.status === 403 ? (
+          <EmptyState
+            icon={DataUnavailableIcon}
+            title={t('courses.notAvailable.title')}
+            description={t('courses.notAvailable.body')}
+          />
+        ) : (
+          <EmptyState
+            icon={DataUnavailableIcon}
+            title={t('courses.notFound')}
+          />
+        )
       ) : (
         <FlatList
           data={sortedSections}
