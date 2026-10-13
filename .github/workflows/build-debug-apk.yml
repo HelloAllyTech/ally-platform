@@ -23,6 +23,27 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      # The second build attempt failed with "No space left on device" —
+      # LiveKit/flutter_webrtc's per-ABI native libraries plus the Android
+      # NDK exhaust ubuntu-latest's default free disk space. This well-known
+      # community action removes large pre-installed toolchains (.NET,
+      # Haskell, CodeQL, Docker images, etc.) this build never uses, buying
+      # back several GB before Gradle even starts.
+      - name: Free up disk space
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          # This action defaults to also removing the Android SDK (most of
+          # its users aren't building Android apps) — explicitly false here
+          # since this build needs it. Everything else freed is safe: none
+          # of it is something a Flutter/Android build touches.
+          android: false
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+          tool-cache: true
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -43,7 +64,13 @@ jobs:
 
       - name: Build debug APK
         run: |
-          flutter build apk --debug \
+          # Single-ABI build: this is for sideloading onto one real test
+          # phone, not a store release, and LiveKit/flutter_webrtc's native
+          # libraries are the actual reason earlier attempts ran out of
+          # disk — building all ABIs multiplies that several times over
+          # for no benefit here. arm64 covers virtually every Android phone
+          # from 2017 onward.
+          flutter build apk --debug --target-platform android-arm64 \
             --dart-define=API_BASE_URL=https://api.helloally.dev \
             --dart-define=MICROPHONE_SOCKET_PATH=/microphone-chat
 
