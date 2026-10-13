@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/localization/translate_ref.dart';
 import '../data/simulations_repository.dart';
 import 'learning_path_detail_view.dart';
 
@@ -20,10 +21,12 @@ class SimulationPathDetailsScreen extends ConsumerWidget {
     final detailsAsync = ref.watch(simulationPathDetailsProvider(pathId));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Learning path')),
+      appBar: AppBar(title: Text(ref.t('learn.choose.track'))),
       body: detailsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(child: Text('Failed to load path: $error')),
+        error: (error, _) => Center(
+          child: Text('${ref.t('simulationPage.failedToLoadPathDetails')}: $error'),
+        ),
         data: (details) => LearningPathDetailView(
           details: details,
           onEnsureSession: () async {

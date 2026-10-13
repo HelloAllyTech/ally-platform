@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/localization/translate_ref.dart';
 import '../data/simulation_models.dart';
 import '../data/simulations_repository.dart';
 import 'simulation_transcript_tab.dart';
@@ -44,7 +45,7 @@ class _SimulationFeedbackScreenState
 
   Future<void> _submit() async {
     if (_rating == 0) {
-      setState(() => _error = 'Please select a rating.');
+      setState(() => _error = ref.tr('postSim.feedback.ratingRequired'));
       return;
     }
     setState(() {
@@ -61,7 +62,7 @@ class _SimulationFeedbackScreenState
           );
       if (mounted) setState(() => _submitted = true);
     } catch (e) {
-      setState(() => _error = 'Failed to submit feedback: $e');
+      setState(() => _error = '${ref.tr('callFeedback.failSubmitFeedback')}: $e');
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -73,11 +74,11 @@ class _SimulationFeedbackScreenState
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Session feedback'),
-          bottom: const TabBar(
+          title: Text(ref.t('postSim.feedback.sessionFeedback')),
+          bottom: TabBar(
             tabs: [
-              Tab(text: 'Debrief'),
-              Tab(text: 'Transcript'),
+              Tab(text: ref.t('postSim.tabs.debrief')),
+              Tab(text: ref.t('postSim.tabs.transcript')),
             ],
           ),
         ),
@@ -114,18 +115,18 @@ class _SimulationFeedbackScreenState
             children: [
               const Icon(Icons.check_circle, color: Colors.green, size: 64),
               const SizedBox(height: 16),
-              const Text('Thanks for your feedback!'),
+              Text(ref.t('callFeedback.submitted')),
               const SizedBox(height: 24),
               OutlinedButton(
                 onPressed: () => context.push(
                   '/share-for-review/${widget.scenarioSessionId}',
                 ),
-                child: const Text('Share this session for review'),
+                child: Text(ref.t('postSim.common.shareForReview')),
               ),
               const SizedBox(height: 12),
               FilledButton(
                 onPressed: () => context.go('/home'),
-                child: const Text('Back to home'),
+                child: Text(ref.t('common.backToHome')),
               ),
             ],
           )
@@ -134,7 +135,7 @@ class _SimulationFeedbackScreenState
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'How did that session go?',
+                ref.t('postSim.feedback.ratingPrompt'),
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 16),
@@ -156,9 +157,9 @@ class _SimulationFeedbackScreenState
               TextField(
                 controller: _commentController,
                 maxLines: 4,
-                decoration: const InputDecoration(
-                  labelText: 'Any comments? (optional)',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: ref.t('postSim.feedback.commentLabel'),
+                  border: const OutlineInputBorder(),
                 ),
               ),
               if (_error != null) ...[
@@ -174,7 +175,7 @@ class _SimulationFeedbackScreenState
                         height: 20,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Text('Submit feedback'),
+                    : Text(ref.t('common.submit')),
               ),
             ],
           ),
@@ -183,13 +184,13 @@ class _SimulationFeedbackScreenState
   }
 }
 
-class _SummarySection extends StatelessWidget {
+class _SummarySection extends ConsumerWidget {
   const _SummarySection({required this.summary});
 
   final SimulationSummary summary;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final duration = summary.endedAt != null
         ? DateTime.parse(summary.endedAt!)
               .difference(DateTime.parse(summary.startedAt))
@@ -219,13 +220,16 @@ class _SummarySection extends StatelessWidget {
                   ),
                   const SizedBox(width: 16),
                 ],
-                if (duration != null) Text('${duration.inMinutes} min session'),
+                if (duration != null)
+                  Text(
+                    ref.t('postSim.feedback.sessionDuration', {'minutes': duration.inMinutes}),
+                  ),
               ],
             ),
             if (summary.whatWentWell.isNotEmpty) ...[
               const SizedBox(height: 16),
               Text(
-                'What went well',
+                ref.t('postSim.feedback.whatWentWell'),
                 style: Theme.of(context).textTheme.titleSmall,
               ),
               for (final item in summary.whatWentWell)
@@ -244,7 +248,7 @@ class _SummarySection extends StatelessWidget {
             if (summary.areasForImprovement.isNotEmpty) ...[
               const SizedBox(height: 16),
               Text(
-                'Areas for improvement',
+                ref.t('postSim.feedback.areasForImprovement'),
                 style: Theme.of(context).textTheme.titleSmall,
               ),
               for (final item in summary.areasForImprovement)

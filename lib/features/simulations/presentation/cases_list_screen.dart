@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/localization/translate_ref.dart';
 import '../data/simulations_repository.dart';
 
 /// List entry point for CaseDetailsScreen — ally-mobile (React Native)
@@ -16,14 +17,15 @@ class CasesListScreen extends ConsumerWidget {
     final casesAsync = ref.watch(casesProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Cases')),
+      appBar: AppBar(title: Text(ref.t('simulations.cases'))),
       body: casesAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) =>
-            Center(child: Text('Failed to load cases: $error')),
+        error: (error, _) => Center(
+          child: Text('${ref.t('simulations.failedToLoadCases')}: $error'),
+        ),
         data: (cases) {
           if (cases.isEmpty) {
-            return const Center(child: Text('No cases available yet.'));
+            return Center(child: Text(ref.t('simulationPage.noCasesAvailable')));
           }
           return ListView.builder(
             padding: const EdgeInsets.all(16),

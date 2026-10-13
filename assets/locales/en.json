@@ -520,6 +520,7 @@
       "autoRetry": "We'll automatically retry in {{seconds}}s"
     },
     "backToLearn": "Back to Learn",
+    "backToHome": "Back to home",
     "errors": {
       "locked": "Upcoming simulation is locked"
     },
@@ -1085,6 +1086,12 @@
       "generating": "Generating your feedback…",
       "sessionFeedback": "Session Feedback",
       "noData": "No data found",
+      "ratingRequired": "Please select a rating.",
+      "ratingPrompt": "How did that session go?",
+      "commentLabel": "Any comments? (optional)",
+      "sessionDuration": "{{minutes}} min session",
+      "whatWentWell": "What went well",
+      "areasForImprovement": "Areas for improvement",
       "dialog": {
         "header": "Did this feel like useful practice for real sessions?",
         "rating": {
@@ -1874,7 +1881,12 @@
     "completed_one": "Completed",
     "completed_other": "Completed · {{count}}×",
     "completedChip_one": "Completed once",
-    "completedChip_other": "Completed {{count}} times"
+    "completedChip_other": "Completed {{count}} times",
+    "failedToLoadCases": "Failed to load cases",
+    "failedToLoadScenarios": "Failed to load scenarios",
+    "creditsRemaining": "{{count}} credits",
+    "scenarioFallbackTitle": "Scenario {{id}}",
+    "viewFeedback": "View feedback"
   },
   "replyBottomSheet": {
     "title": "Replies",
@@ -1899,6 +1911,7 @@
     }
   },
   "errors": {
+    "loadSession": "Failed to load session",
     "startSimulation": "Failed to start simulation",
     "navigateAssistant": "Failed to open simulation assistant",
     "attachListeners": "Failed to attach room listeners",

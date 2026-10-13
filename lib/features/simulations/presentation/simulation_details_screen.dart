@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/localization/translate_ref.dart';
 import '../data/simulations_repository.dart';
 
 /// Port of ally-mobile (React Native)'s `SimulationDetailsScreen` — scenario
@@ -44,7 +45,7 @@ class _SimulationDetailsScreenState
         );
       }
     } catch (e) {
-      setState(() => _error = 'Failed to start simulation: $e');
+      setState(() => _error = '${ref.tr('errors.startSimulation')}: $e');
     } finally {
       if (mounted) setState(() => _isStarting = false);
     }
@@ -55,11 +56,12 @@ class _SimulationDetailsScreenState
     final scenarioAsync = ref.watch(scenarioByIdProvider(widget.scenarioId));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Scenario')),
+      appBar: AppBar(title: Text(ref.t('common.startSimulation'))),
       body: scenarioAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) =>
-            Center(child: Text('Failed to load scenario: $error')),
+        error: (error, _) => Center(
+          child: Text('${ref.t('learn.details.loadingDetailsError')}: $error'),
+        ),
         data: (scenario) => Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -86,7 +88,7 @@ class _SimulationDetailsScreenState
                         height: 20,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Text('Start simulation'),
+                    : Text(ref.t('common.startSimulation')),
               ),
             ],
           ),
