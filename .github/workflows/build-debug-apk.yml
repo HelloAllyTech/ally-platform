@@ -1,0 +1,55 @@
+name: Build debug APK
+#
+# Manual-only test build — NOT a release pipeline. Produces a debug APK
+# (no signing config needed) for sideloading onto a real Android device to
+# validate Phase 1's actual fix: whether the foreground-service + Socket.IO
+# transport layer survives the app being backgrounded/screen-locked, which
+# is the entire reason this Flutter rewrite exists. See
+# Flutter-Migration-Plan.pdf for the full phase plan.
+#
+# This app's package name (com.helloally.ally_mobile_flutter) is completely
+# distinct from the real production app (com.helloally.app) — installing
+# this build never touches, overwrites, or interacts with the real app, and
+# this workflow never publishes anywhere (no Play Store, no App Store,
+# nothing — it's a local artifact download only).
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.7
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test
+
+      - name: Build debug APK
+        run: |
+          flutter build apk --debug \
+            --dart-define=API_BASE_URL=https://api.helloally.dev \
+            --dart-define=MICROPHONE_SOCKET_PATH=/microphone-chat
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ally-mobile-flutter-debug-apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 14
