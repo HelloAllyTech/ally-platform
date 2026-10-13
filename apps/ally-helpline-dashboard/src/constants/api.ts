@@ -112,6 +112,10 @@ export const ApiEndpoints = {
   TRACKS: {
     GET_TRACKS: "/v1/learn/tracks",
     GET_TRACK_DETAIL: (trackId: string) => `/v1/learn/tracks/${trackId}`,
+    /** No login: the outline behind a course's public share link. */
+    PUBLIC_OUTLINE: (trackId: string) => `/v1/learn/tracks/${trackId}/public`,
+    /** Can the signed-in learner take this course — `{hasAccess, enrolled, reason}`. */
+    ACCESS: (trackId: string) => `/v1/learn/tracks/${trackId}/access`,
     GET_PROGRESS: (trackId: string) => `/v1/learn/tracks/${trackId}/progress`,
     ENROLL: (trackId: string) => `/v1/learn/tracks/${trackId}/enroll`,
     LANGUAGES: (trackId: string) => `/v1/learn/tracks/${trackId}/languages`,

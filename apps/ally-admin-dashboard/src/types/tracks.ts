@@ -400,6 +400,8 @@ export interface TrackListItem {
   coverImageUrl: string;
   status: SimulationStatus;
   isGlobal: boolean;
+  /** Share link shows the outline to logged-out visitors. Absent on older backends. */
+  isPublicView?: boolean;
   totalItems: number;
   estimatedDurationMinutes?: number;
   isAssignedToTenant?: boolean;
@@ -452,6 +454,11 @@ export interface TrackDetail {
   coverImageUrl: string;
   status: SimulationStatus;
   isGlobal: boolean;
+  /**
+   * `tracks.isPublicView`: the course's share link (`/course/:id` on the learner app) shows its
+   * outline to anyone while the course is published. Absent on a backend that predates the column.
+   */
+  isPublicView?: boolean;
   totalItems: number;
   estimatedDurationMinutes?: number;
   /**
@@ -469,6 +476,7 @@ export interface TrackMetadataInput {
   description?: string;
   coverImageUrl?: string;
   isGlobal?: boolean;
+  isPublicView?: boolean;
   estimatedDurationMinutes?: number;
   /**
    * Omit to leave the tag unchanged; `[]` clears it (stored as null). New ids
@@ -581,6 +589,8 @@ export interface TrackFormValues {
   description: string;
   coverImageUrl: string;
   isGlobal: boolean;
+  /** Public view: the share link shows the outline to logged-out visitors. Off by default. */
+  isPublicView: boolean;
   estimatedDurationMinutes?: number | null;
   /** Competency ids this course teaches; `[]` = untagged. */
   competencyIds?: string[];

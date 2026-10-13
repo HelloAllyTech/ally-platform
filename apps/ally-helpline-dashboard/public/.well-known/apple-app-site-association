@@ -5,7 +5,8 @@
       {
         "appID": "W3ZL4N9N9J.com.helloally.app",
         "paths": [
-          "/summary/*"
+          "/summary/*",
+          "/course/*"
         ]
       }
     ]

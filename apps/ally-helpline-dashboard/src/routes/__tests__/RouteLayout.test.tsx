@@ -15,6 +15,7 @@ vi.mock("@pages", () => ({
   TrackOverview: () => <div data-testid="track-overview-page">Track Overview Page</div>,
   TrackPlayer: () => <div data-testid="track-player-page">Track Player Page</div>,
   TrackProgress: () => <div data-testid="track-progress-page">Track Progress Page</div>,
+  CourseLanding: () => <div data-testid="course-landing-page">Course Landing Page</div>,
   SuspendedUser: () => <div data-testid="suspended-user-page">Suspended User Page</div>,
   ImpersonateHandler: () => <div data-testid="impersonate-page">Impersonate Page</div>,
   Terms: () => <div data-testid="terms-page">Terms Page</div>,
@@ -69,6 +70,7 @@ vi.mock("@constants", () => ({
     TRACK: "/track/:trackId",
     TRACK_ITEM: "/track/:trackId/item/:itemId",
     TRACK_PROGRESS: "/track/:trackId/progress",
+    COURSE_LANDING: "/course/:trackId",
     SUSPENDED_USER: "/suspended-user",
     IMPERSONATE: "/impersonate",
     TERMS: "/terms",
@@ -161,6 +163,16 @@ describe("RouteLayout", () => {
 
     expect(screen.getByTestId("public-layout")).toBeInTheDocument();
     // Not behind the catch-all: a school leader opens it without signing in.
+    expect(screen.queryByTestId("private-layout")).not.toBeInTheDocument();
+  });
+
+  it("serves a course's share link in the hybrid layout, outside the sign-in catch-all", () => {
+    window.history.pushState({}, "", "/course/96d570f0-14b6-42d7-8e78-79d7520c7f69");
+    renderWithRouter(<RouteLayout />);
+
+    // Hybrid, not private: a logged-out visitor reads the outline before
+    // logging in; a signed-in learner keeps the app's navbar.
+    expect(screen.getByTestId("hybrid-layout")).toBeInTheDocument();
     expect(screen.queryByTestId("private-layout")).not.toBeInTheDocument();
   });
 });

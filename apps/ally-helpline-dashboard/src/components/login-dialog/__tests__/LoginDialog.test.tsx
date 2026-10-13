@@ -1,6 +1,6 @@
 import React from "react";
 
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 import LoginDialog from "../LoginDialog";
@@ -18,16 +18,35 @@ vi.mock("@assets", () => ({
 }));
 
 // Mock API hooks
-const mockGenerate = vi.fn();
-const mockVerify = vi.fn();
+const { mockGenerate, mockVerify, mockPutTerms, mockCheckAuth, verifyState } = vi.hoisted(() => ({
+  mockGenerate: vi.fn(),
+  mockVerify: vi.fn(),
+  mockPutTerms: vi.fn(),
+  mockCheckAuth: vi.fn(),
+  // What the verify mutation reports; a test flips it to a verified code.
+  verifyState: {
+    current: { isLoading: false, isSuccess: false } as Record<string, unknown>,
+  },
+}));
 vi.mock("@api", () => ({
   useGenerateOTPMutation: () => [mockGenerate, { isLoading: false, isSuccess: false }],
-  useVerifyOTPMutation: () => [mockVerify, { isLoading: false, isSuccess: false }],
+  useVerifyOTPMutation: () => [mockVerify, verifyState.current],
+  usePutTermsAndAgreementMutation: () => [mockPutTerms],
 }));
 
 // Mock user hook
 vi.mock("@hooks", () => ({
-  useUser: () => ({ checkAuth: vi.fn() }),
+  useUser: () => ({ checkAuth: mockCheckAuth }),
+}));
+
+// The terms modal pulls in the whole components barrel; stand in for it.
+vi.mock("../../terms-and-agreement/TermsAndAgreement", () => ({
+  default: ({ isOpen, handleAgreeButtonClick }: any) =>
+    isOpen ? (
+      <div data-testid="terms">
+        <button onClick={handleAgreeButtonClick}>agree-to-terms</button>
+      </div>
+    ) : null,
 }));
 
 // Mock utils
@@ -82,6 +101,72 @@ describe("LoginDialog", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    verifyState.current = { isLoading: false, isSuccess: false };
+  });
+
+  const verifiedCode = () => {
+    verifyState.current = {
+      isLoading: false,
+      isSuccess: true,
+      data: { accessToken: "access", refreshToken: "refresh" },
+    };
+  };
+
+  it("signs in as soon as the code is verified by default", async () => {
+    verifiedCode();
+    const onSuccess = vi.fn();
+    render(<LoginDialog isOpen onClose={vi.fn()} onSuccess={onSuccess} />);
+
+    await waitFor(() => expect(onSuccess).toHaveBeenCalled());
+    expect(localStorage.getItem("accessToken")).toBe("access");
+    expect(screen.queryByTestId("terms")).toBeNull();
+  });
+
+  it("with requireTerms, signs in only once the terms are accepted", async () => {
+    verifiedCode();
+    mockPutTerms.mockResolvedValue({ data: { success: true } });
+    const onSuccess = vi.fn();
+    render(<LoginDialog isOpen onClose={vi.fn()} onSuccess={onSuccess} requireTerms />);
+
+    await waitFor(() => expect(screen.getByTestId("terms")).toBeTruthy());
+    expect(localStorage.getItem("accessToken")).toBeNull();
+    expect(onSuccess).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByText("agree-to-terms"));
+
+    await waitFor(() => expect(onSuccess).toHaveBeenCalled());
+    expect(mockPutTerms).toHaveBeenCalledWith({ token: "access" });
+    expect(mockCheckAuth).toHaveBeenCalled();
+    expect(localStorage.getItem("accessToken")).toBe("access");
+    expect(localStorage.getItem("refreshToken")).toBe("refresh");
+  });
+
+  it("with requireTerms, stays signed out when accepting the terms fails", async () => {
+    verifiedCode();
+    mockPutTerms.mockResolvedValue({ data: { success: false } });
+    const onSuccess = vi.fn();
+    render(<LoginDialog isOpen onClose={vi.fn()} onSuccess={onSuccess} requireTerms />);
+
+    await waitFor(() => expect(screen.getByTestId("terms")).toBeTruthy());
+    fireEvent.click(screen.getByText("agree-to-terms"));
+
+    await waitFor(() => expect(mockPutTerms).toHaveBeenCalled());
+    expect(onSuccess).not.toHaveBeenCalled();
+    expect(localStorage.getItem("accessToken")).toBeNull();
+    expect(screen.getByTestId("terms")).toBeTruthy();
+  });
+
+  it("renders the email footer under the email step", () => {
+    render(
+      <LoginDialog
+        isOpen
+        onClose={vi.fn()}
+        onSuccess={vi.fn()}
+        emailFooter={<span>ask your admin</span>}
+      />,
+    );
+
+    expect(screen.getByText("ask your admin")).toBeTruthy();
   });
 
   it("renders email section and validates email before generating OTP", () => {

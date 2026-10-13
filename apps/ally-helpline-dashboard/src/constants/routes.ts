@@ -64,6 +64,10 @@ export const ROUTES = {
   TRACK: "/track/:trackId",
   TRACK_ITEM: "/track/:trackId/item/:itemId",
   TRACK_PROGRESS: "/track/:trackId/progress",
+  // A course's public share link. Must match `getCourseSharePath` in
+  // ally-admin-dashboard and the `/course` entries in public/.well-known
+  // (they hand the link to the mobile app when it is installed).
+  COURSE_LANDING: "/course/:trackId",
   SIMULATION: "/simulation/:id/:scenarioTitle",
   SIMULATION_SUMMARY: "/simulation-summary",
   SIMULATION_SUMMARY_FULL: "/simulation-summary/:sessionId",
@@ -90,6 +94,7 @@ export const ROUTES = {
 // Route builders for the Track 2.0 parameterised routes (string-only — this
 // file must not gain component/icon imports, see @assets mock note below).
 export const buildTrackRoute = (trackId: string) => `/track/${trackId}`;
+export const buildCourseLandingRoute = (trackId: string) => `/course/${trackId}`;
 export const buildTrackItemRoute = (trackId: string, itemId: string) =>
   `/track/${trackId}/item/${itemId}`;
 /** Query param pointing the track player at a discussion post to highlight. */
@@ -133,6 +138,7 @@ export const navBarOptions = [
       ROUTES.TRACK,
       ROUTES.TRACK_ITEM,
       ROUTES.TRACK_PROGRESS,
+      ROUTES.COURSE_LANDING,
     ],
     permissions: [Permissions.EDIT_SCENARIO_SESSION],
   },
