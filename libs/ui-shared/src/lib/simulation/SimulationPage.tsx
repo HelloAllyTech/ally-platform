@@ -90,6 +90,7 @@ export const SimulationPage: FC<SimulationPageProps> = ({
   score,
   isPreview = false,
   connectionError = null,
+  microphoneError = null,
   agentJoinTimedOut = false,
   onRetryConnection,
   onExitSimulation,
@@ -474,6 +475,7 @@ export const SimulationPage: FC<SimulationPageProps> = ({
           isEndingSession={isEndingSession}
           onEnableMicrophone={onEnableMicrophone}
           connectionError={connectionError}
+          microphoneError={microphoneError}
           agentJoinTimedOut={agentJoinTimedOut}
           onRetryConnection={onRetryConnection}
           onExitSimulation={onExitSimulation}

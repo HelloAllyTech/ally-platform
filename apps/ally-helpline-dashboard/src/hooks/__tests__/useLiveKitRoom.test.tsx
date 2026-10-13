@@ -43,8 +43,14 @@ vi.mock("react-router-dom", () => ({
   useNavigate: () => vi.fn(),
 }));
 
-vi.mock("@ally-ui-mono/ui-shared", () => ({
+vi.mock("@ally-ui-mono/ui-shared", async () => ({
   logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn() },
+  // The real classifier: it is pure, and the hook's behaviour depends on it.
+  classifyMicrophoneError: (
+    await vi.importActual<
+      typeof import("../../../../../libs/ui-shared/src/lib/simulation/microphoneError")
+    >("../../../../../libs/ui-shared/src/lib/simulation/microphoneError")
+  ).classifyMicrophoneError,
 }));
 
 vi.mock("@ally-ui-mono/ui-shared/assets", () => ({
@@ -87,11 +93,15 @@ vi.mock("@constants/analyticsEvents", () => ({
     SIMULATION_AGENT_AUDIO_TIMING: "simulation_agent_audio_timing",
     SIMULATION_STARTED: "simulation_started",
     SIMULATION_COMPLETED: "simulation_completed",
+    SIMULATION_CONNECTION_FAILED: "simulation_connection_failed",
   },
   ANALYTICS_PROPS: {
     SIMULATION_ID: "simulation_id",
     SCENARIO_ID: "scenario_id",
     INTERACTION_MODE: "interaction_mode",
+    FAILURE_KIND: "failure_kind",
+    ERROR_NAME: "error_name",
+    ERROR_MESSAGE: "error_message",
   },
 }));
 
@@ -403,5 +413,113 @@ describe("useLiveKitRoom", () => {
       "simulation_started",
       expect.not.objectContaining({ interaction_mode: expect.anything() }),
     );
+  });
+
+  describe("start failures", () => {
+    const micRefused = (name: string, message: string) =>
+      Object.assign(new Error(message), { name });
+
+    it("reports a refused microphone as a microphone failure, not a connection error", async () => {
+      mockRoom.localParticipant.setMicrophoneEnabled.mockRejectedValue(
+        micRefused("NotReadableError", "Could not start audio source"),
+      );
+      const { result } = renderHook(() => useLiveKitRoom(handleDisconnect, endSessionButtonRef));
+      await waitForConnection();
+
+      expect(result.current.error).toBeNull();
+      expect(result.current.microphoneError).toEqual({
+        kind: "inUse",
+        name: "NotReadableError",
+        message: "Could not start audio source",
+      });
+    });
+
+    it("leaves the room after a refused microphone so the agent is not left talking to nobody", async () => {
+      mockRoom.localParticipant.setMicrophoneEnabled.mockRejectedValue(
+        micRefused("NotAllowedError", "Permission denied"),
+      );
+      const { result } = renderHook(() => useLiveKitRoom(handleDisconnect, endSessionButtonRef));
+      await waitForConnection();
+
+      expect(mockRoom.removeAllListeners).toHaveBeenCalled();
+      expect(mockRoom.disconnect).toHaveBeenCalled();
+      expect(result.current.roomStatus).toBe("disconnected");
+      // Listeners came off first, so the teardown is not treated as a session ending.
+      expect(handleDisconnect).not.toHaveBeenCalled();
+    });
+
+    it("does not report a never-joined agent after the microphone failure tore the room down", async () => {
+      mockRoom.localParticipant.setMicrophoneEnabled.mockRejectedValue(
+        micRefused("NotFoundError", "Requested device not found"),
+      );
+      const { result } = renderHook(() => useLiveKitRoom(handleDisconnect, endSessionButtonRef));
+      await waitForConnection();
+      await act(async () => {
+        vi.advanceTimersByTime(60000);
+      });
+
+      expect(result.current.agentJoinTimedOut).toBe(false);
+    });
+
+    it("sends the microphone failure to analytics with the browser's error", async () => {
+      mockRoom.localParticipant.setMicrophoneEnabled.mockRejectedValue(
+        micRefused("NotReadableError", "Could not start audio source"),
+      );
+      renderHook(() => useLiveKitRoom(handleDisconnect, endSessionButtonRef));
+      await waitForConnection();
+
+      expect(captureEvent).toHaveBeenCalledWith("simulation_connection_failed", {
+        simulation_id: "session-123",
+        scenario_id: null,
+        failure_kind: "microphone",
+        error_name: "NotReadableError",
+        error_message: "Could not start audio source",
+      });
+    });
+
+    it("sends a failed connect to analytics and keeps it as a connection error", async () => {
+      mockRoom.connect.mockRejectedValue(new Error("could not establish signal connection"));
+      const { result } = renderHook(() => useLiveKitRoom(handleDisconnect, endSessionButtonRef));
+      await waitForConnection();
+
+      expect(result.current.error).toBe("could not establish signal connection");
+      expect(result.current.microphoneError).toBeNull();
+      expect(captureEvent).toHaveBeenCalledWith(
+        "simulation_connection_failed",
+        expect.objectContaining({ failure_kind: "connect" }),
+      );
+    });
+
+    it("sends a never-joined agent to analytics", async () => {
+      const { result } = renderHook(() => useLiveKitRoom(handleDisconnect, endSessionButtonRef));
+      await waitForConnection();
+      await act(async () => {
+        vi.advanceTimersByTime(30000);
+      });
+
+      expect(result.current.agentJoinTimedOut).toBe(true);
+      expect(captureEvent).toHaveBeenCalledWith(
+        "simulation_connection_failed",
+        expect.objectContaining({ failure_kind: "agent_absent" }),
+      );
+    });
+
+    it("clears the microphone failure when the learner retries", async () => {
+      mockRoom.localParticipant.setMicrophoneEnabled.mockRejectedValueOnce(
+        micRefused("NotReadableError", "Could not start audio source"),
+      );
+      const { result } = renderHook(() => useLiveKitRoom(handleDisconnect, endSessionButtonRef));
+      await waitForConnection();
+      expect(result.current.microphoneError).not.toBeNull();
+
+      await act(async () => {
+        result.current.handleRetryConnection();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(result.current.microphoneError).toBeNull();
+      expect(result.current.roomStatus).toBe("connected");
+    });
   });
 });

@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Room, RoomEvent, Participant, RemoteTrackPublication, Track } from "livekit-client";
 import { useParams, useNavigate } from "react-router-dom";
 
-import { logger } from "@ally-ui-mono/ui-shared";
+import { classifyMicrophoneError, logger } from "@ally-ui-mono/ui-shared";
+import type { MicrophoneError } from "@ally-ui-mono/ui-shared";
 import { AutoTermination } from "@ally-ui-mono/ui-shared/assets";
 import { LIVEKIT_CONFIG, LOCAL_STORAGE_KEYS, ROUTES } from "@constants";
 import {
@@ -67,6 +68,9 @@ export const useLiveKitRoom = (
   const [room] = useState(() => new Room(LIVEKIT_CONFIG));
   const [roomStatus, setRoomStatus] = useState<RoomStatus>(RoomStatus.DISCONNECTED);
   const [error, setError] = useState<string | null>(null);
+  // The room connected but the browser refused the microphone. Separate from
+  // `error` so the learner is told about their mic, not their internet.
+  const [microphoneError, setMicrophoneError] = useState<MicrophoneError | null>(null);
   const [events, setEvents] = useState<LiveKitEvent[]>([]);
   const [score, setScore] = useState<number>(0);
   const [detectedEventIds, setDetectedEventIds] = useState<string[]>([]);
@@ -289,6 +293,27 @@ export const useLiveKitRoom = (
 
   // Arm the "agent never joined" cap. Called once the room connection itself
   // has succeeded, so it measures only the wait for the agent.
+  // Every way a session can fail to start, in one event, so a learner who
+  // reports "it wouldn't connect" can be looked up instead of reconstructed
+  // from server logs. Only failures the learner actually saw are reported.
+  const captureConnectionFailure = useCallback(
+    (
+      failureKind: "connect" | "microphone" | "agent_absent",
+      errorName?: string,
+      errorMessage?: string,
+    ) => {
+      captureEvent(ANALYTICS_EVENTS.SIMULATION_CONNECTION_FAILED, {
+        [ANALYTICS_PROPS.SIMULATION_ID]: sessionIdsRef.current.simulationId,
+        [ANALYTICS_PROPS.SCENARIO_ID]: sessionIdsRef.current.scenarioId,
+        [ANALYTICS_PROPS.FAILURE_KIND]: failureKind,
+        ...(errorName ? { [ANALYTICS_PROPS.ERROR_NAME]: errorName } : {}),
+        ...(errorMessage ? { [ANALYTICS_PROPS.ERROR_MESSAGE]: errorMessage } : {}),
+        ...interactionModeProps(sessionIdsRef.current.isTextChat),
+      });
+    },
+    [],
+  );
+
   const armAgentJoinTimeout = useCallback(() => {
     clearAgentJoinTimer();
     agentJoinTimerRef.current = setTimeout(() => {
@@ -296,8 +321,9 @@ export const useLiveKitRoom = (
       if (agentJoinedRef.current || agentParticipantSeenRef.current) return;
       logger.error(`No agent participant joined the room within ${AGENT_JOIN_TIMEOUT_MS}ms`);
       setAgentJoinTimedOut(true);
+      captureConnectionFailure("agent_absent");
     }, AGENT_JOIN_TIMEOUT_MS);
-  }, [clearAgentJoinTimer]);
+  }, [clearAgentJoinTimer, captureConnectionFailure]);
 
   // LiveKit reconnects transparently on a network blip. Surfacing it is not
   // cosmetic: data-channel packets (supervisor hints) are dropped for the
@@ -484,6 +510,25 @@ export const useLiveKitRoom = (
     captureSimulationCompleted,
   ]);
 
+  /**
+   * Leave a start attempt that has failed. Without this a refused microphone
+   * left the room connected behind the failure screen: the agent joined, spoke
+   * its opener to nobody and kept the session open until the learner gave up
+   * (one ran 10 minutes). Listeners come off first so the disconnect is not
+   * mistaken for the end of a real session and routed to the summary.
+   */
+  const abandonFailedAttempt = () => {
+    clearAgentJoinTimer();
+    detachRoomListeners();
+    try {
+      room.disconnect();
+    } catch (disconnectError) {
+      logger.warn(`Error disconnecting after a failed start: ${disconnectError}`);
+    }
+    updateAgentTurnStatus("user_turn");
+    setRoomStatus(RoomStatus.DISCONNECTED);
+  };
+
   // `force` bypasses the already-connected/connecting guard. Only the retry
   // path sets it: after a failed agent-join the room IS connected, so the guard
   // would silently make the retry button do nothing.
@@ -498,6 +543,7 @@ export const useLiveKitRoom = (
       if (force || (!isConnected && !isConnecting)) {
         setRoomStatus(RoomStatus.CONNECTING);
         setError(null);
+        setMicrophoneError(null);
         setAgentJoinTimedOut(false);
 
         const token = roomData?.accessToken;
@@ -562,7 +608,21 @@ export const useLiveKitRoom = (
         if (isTextChat) {
           logger.info("Text-chat roleplay: microphone left off");
         } else {
-          await room.localParticipant.setMicrophoneEnabled(true);
+          try {
+            await room.localParticipant.setMicrophoneEnabled(true);
+          } catch (micError) {
+            // The connection is fine; the browser refused the mic (blocked,
+            // missing, or held by another app). Not a connect failure, so it
+            // must not fall through to the generic catch below.
+            const classified = classifyMicrophoneError(micError);
+            logger.error(
+              `Microphone could not be enabled: ${classified.name}: ${classified.message}`,
+            );
+            abandonFailedAttempt();
+            setMicrophoneError(classified);
+            captureConnectionFailure("microphone", classified.name, classified.message);
+            return;
+          }
           logger.info("Microphone enabled");
         }
 
@@ -571,9 +631,10 @@ export const useLiveKitRoom = (
       }
     } catch (error) {
       logger.error(`Failed to connect to LiveKit room: ${error}`);
-      clearAgentJoinTimer();
-      setRoomStatus(RoomStatus.DISCONNECTED);
-      setError(error instanceof Error ? error.message : "Failed to connect to room");
+      abandonFailedAttempt();
+      const message = error instanceof Error ? error.message : "Failed to connect to room";
+      setError(message);
+      captureConnectionFailure("connect", error instanceof Error ? error.name : undefined, message);
     }
   };
 
@@ -588,6 +649,7 @@ export const useLiveKitRoom = (
   const handleRetryConnection = () => {
     logger.info("Retrying simulation connection");
     setError(null);
+    setMicrophoneError(null);
     setAgentJoinTimedOut(false);
     agentJoinedRef.current = false;
     agentParticipantSeenRef.current = false;
@@ -650,6 +712,7 @@ export const useLiveKitRoom = (
 
   return {
     error,
+    microphoneError,
     agentJoinTimedOut,
     missedSupervisorNoteCount,
     events,

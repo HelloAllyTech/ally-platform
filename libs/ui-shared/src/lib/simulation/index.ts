@@ -14,6 +14,7 @@ export { SessionTimeBar } from "./SessionTimeBar";
 export { TextChatPanel } from "./TextChatPanel";
 export * from "./useTextChat";
 export * from "./utils";
+export * from "./microphoneError";
 export * from "./types";
 export * from "./constants";
 export * from "./waveformConstants";

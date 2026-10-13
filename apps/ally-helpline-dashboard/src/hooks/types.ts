@@ -1,5 +1,6 @@
 import { Room } from "livekit-client";
 
+import type { MicrophoneError } from "@ally-ui-mono/ui-shared";
 import { RoomStatus } from "@types";
 
 export type AgentTurnStatus = "thinking" | "speaking" | "user_turn";
@@ -31,6 +32,8 @@ export interface SupervisorNote {
 
 export interface UseLiveKitRoomReturn {
   error: string | null;
+  /** The room connected but the browser refused the microphone. */
+  microphoneError: MicrophoneError | null;
   /** The room connected but no agent participant ever joined within the cap. */
   agentJoinTimedOut: boolean;
   /**

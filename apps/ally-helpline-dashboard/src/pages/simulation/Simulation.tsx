@@ -58,6 +58,11 @@ export const Simulation = () => {
     connectionFailedMessage: t("simulationPage.connectionFailedMessage"),
     agentNotJoinedTitle: t("simulationPage.agentNotJoinedTitle"),
     agentNotJoinedMessage: t("simulationPage.agentNotJoinedMessage"),
+    microphoneFailedTitle: t("simulationPage.microphoneFailedTitle"),
+    microphoneBlockedMessage: t("simulationPage.microphoneBlockedMessage"),
+    microphoneNotFoundMessage: t("simulationPage.microphoneNotFoundMessage"),
+    microphoneInUseMessage: t("simulationPage.microphoneInUseMessage"),
+    microphoneUnknownMessage: t("simulationPage.microphoneUnknownMessage"),
     retryConnection: t("simulationPage.retryConnection"),
     exitSimulation: t("simulationPage.exitSimulation"),
     reconnecting: t("simulationPage.reconnecting"),
@@ -109,6 +114,7 @@ export const Simulation = () => {
     // UI never read and offered a retry nothing could call — the learner just
     // watched "Connecting…" forever.
     error,
+    microphoneError,
     agentJoinTimedOut,
     missedSupervisorNoteCount,
     handleRetryConnection,
@@ -180,6 +186,7 @@ export const Simulation = () => {
           roomStatus !== RoomStatus.RECONNECTING
         }
         connectionError={error}
+        microphoneError={microphoneError}
         agentJoinTimedOut={agentJoinTimedOut}
         onRetryConnection={handleRetryConnection}
         onExitSimulation={handleExitSimulation}

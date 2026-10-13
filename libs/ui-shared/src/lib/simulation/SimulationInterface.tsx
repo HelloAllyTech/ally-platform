@@ -26,6 +26,8 @@ import { UserCallCard } from "./UserCallCard";
 import { TextChatController } from "./useTextChat";
 import { FEATURE_FLAGS_MAP } from "../../featureFlag";
 
+import type { MicrophoneError, MicrophoneErrorKind } from "./microphoneError";
+
 export enum RoomStatus {
   CONNECTED = "connected",
   CONNECTING = "connecting",
@@ -81,6 +83,12 @@ export interface SimulationInterfaceProps {
    * renderConnectionFailedContent.
    */
   connectionError?: string | null;
+  /**
+   * The room connected but the browser refused the microphone. Its own state,
+   * not a connectionError: the learner's network is fine and telling them to
+   * check it sends them after the wrong problem.
+   */
+  microphoneError?: MicrophoneError | null;
   /** The room connected but no agent participant ever joined within the cap. */
   agentJoinTimedOut?: boolean;
   /** Start the whole connection attempt over. */
@@ -126,6 +134,7 @@ export const SimulationInterface: FC<SimulationInterfaceProps> = ({
   isMicrophoneGranted,
   onEnableMicrophone,
   connectionError = null,
+  microphoneError = null,
   agentJoinTimedOut = false,
   onRetryConnection,
   onExitSimulation,
@@ -179,7 +188,7 @@ export const SimulationInterface: FC<SimulationInterfaceProps> = ({
   // Two genuinely different failures, both of which used to render as
   // "Connecting…" forever. Kept separate because the fix a learner should try
   // differs: a failed connect is usually their network, a no-show agent is us.
-  const hasConnectionFailure = !!connectionError || agentJoinTimedOut;
+  const hasConnectionFailure = !!connectionError || !!microphoneError || agentJoinTimedOut;
 
   // Debounce remote speaking to avoid flickering on natural pauses
   const [debouncedRemoteSpeaking, setDebouncedRemoteSpeaking] = useState(false);
@@ -435,21 +444,63 @@ export const SimulationInterface: FC<SimulationInterfaceProps> = ({
    * role="alert", apologises, says which of the two things failed, and offers
    * both a retry and a way out of the page. Never a dead end.
    */
+  const microphoneMessage = (kind: MicrophoneErrorKind): string => {
+    switch (kind) {
+      case "blocked":
+        return (
+          translations?.microphoneBlockedMessage ??
+          "Your browser or computer is blocking the microphone for this site. Click the lock icon next to the web address and set Microphone to Allow. On Windows, also check Settings → Privacy → Microphone. Then try again."
+        );
+      case "notFound":
+        return (
+          translations?.microphoneNotFoundMessage ??
+          "We couldn't find a microphone on this device. Plug in a headset or microphone, check it is selected in your computer's sound settings, then try again."
+        );
+      case "inUse":
+        return (
+          translations?.microphoneInUseMessage ??
+          "Your microphone is busy, usually because another app such as Teams, Zoom or Meet is using it. Close those apps (or leave the call), then try again."
+        );
+      default:
+        return (
+          translations?.microphoneUnknownMessage ??
+          "Your browser wouldn't let us use your microphone. Check that a microphone is connected and allowed for this site, then try again."
+        );
+    }
+  };
+
   const renderConnectionFailedContent = () => {
-    const isAgentAbsent = agentJoinTimedOut && !connectionError;
-    const title = isAgentAbsent
-      ? (translations?.agentNotJoinedTitle ?? "Your practice partner didn't join")
-      : (translations?.connectionFailedTitle ?? "We couldn't connect you to this session");
-    const message = isAgentAbsent
-      ? (translations?.agentNotJoinedMessage ??
-        "Sorry — we reached the session but no one picked up on the other side. Trying again usually sorts it.")
-      : (translations?.connectionFailedMessage ??
-        "Sorry — something went wrong setting up this roleplay. Check your internet connection and try again.");
+    // Order matters: a failed connect makes the other two meaningless, and a
+    // refused microphone is what actually broke a session the agent did join.
+    const failureKind = connectionError
+      ? "connect-failed"
+      : microphoneError
+        ? "microphone"
+        : "agent-absent";
+    const title =
+      failureKind === "connect-failed"
+        ? (translations?.connectionFailedTitle ?? "We couldn't connect you to this session")
+        : failureKind === "microphone"
+          ? (translations?.microphoneFailedTitle ?? "We couldn't use your microphone")
+          : (translations?.agentNotJoinedTitle ?? "Your practice partner didn't join");
+    const message =
+      failureKind === "connect-failed"
+        ? (translations?.connectionFailedMessage ??
+          "Sorry — something went wrong setting up this roleplay. Check your internet connection and try again.")
+        : failureKind === "microphone" && microphoneError
+          ? microphoneMessage(microphoneError.kind)
+          : (translations?.agentNotJoinedMessage ??
+            "Sorry — we reached the session but no one picked up on the other side. Trying again usually sorts it.");
+    const errorDetail = connectionError
+      ? connectionError
+      : microphoneError
+        ? `${microphoneError.name}: ${microphoneError.message}`
+        : null;
 
     return (
       <div
         data-testid="simulation-interface-connection-error"
-        data-failure-kind={isAgentAbsent ? "agent-absent" : "connect-failed"}
+        data-failure-kind={failureKind}
         role="alert"
         className="flex flex-col items-center text-center font-['IBM_Plex_Serif'] gap-4 max-w-[440px] px-4"
       >
@@ -479,12 +530,12 @@ export const SimulationInterface: FC<SimulationInterfaceProps> = ({
         </div>
         {/* The underlying message, kept small: useless to most learners but the
             one thing that makes a bug report actionable. */}
-        {!!connectionError && (
+        {!!errorDetail && (
           <p
             data-testid="simulation-connection-error-detail"
             className="text-[11px] text-[#8A8A8F] font-['Roboto'] break-words"
           >
-            {connectionError}
+            {errorDetail}
           </p>
         )}
       </div>
