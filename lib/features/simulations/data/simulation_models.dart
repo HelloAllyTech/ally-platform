@@ -110,6 +110,45 @@ class PathScenario {
   final String? description;
 }
 
+/// Mirrors ally-mobile (React Native)'s `SimulationSummaryData` —
+/// the post-session debrief ally-be's AI judge generates. Only the fields
+/// SessionSummaryScreen renders; `events` (turn-by-turn transcript) and
+/// `metadata` are not modeled in this pass — a full transcript view is
+/// separate, substantial work (ally-mobile's own `TranscriptTab.tsx`).
+class SimulationSummary {
+  SimulationSummary({
+    required this.id,
+    required this.score,
+    required this.startedAt,
+    required this.endedAt,
+    required this.whatWentWell,
+    required this.areasForImprovement,
+    required this.hasFeedback,
+    required this.feedbackRating,
+  });
+
+  factory SimulationSummary.fromJson(Map<String, dynamic> json) => SimulationSummary(
+        id: json['id'] as String,
+        score: (json['score'] as num?)?.toDouble(),
+        startedAt: json['startedAt'] as String,
+        endedAt: json['endedAt'] as String?,
+        whatWentWell: (json['whatWentWell'] as List<dynamic>?)?.cast<String>() ?? [],
+        areasForImprovement:
+            (json['areasForImprovement'] as List<dynamic>?)?.cast<String>() ?? [],
+        hasFeedback: json['hasFeedback'] as bool? ?? false,
+        feedbackRating: (json['feedbackRating'] as num?)?.toInt(),
+      );
+
+  final String id;
+  final double? score;
+  final String startedAt;
+  final String? endedAt;
+  final List<String> whatWentWell;
+  final List<String> areasForImprovement;
+  final bool hasFeedback;
+  final int? feedbackRating;
+}
+
 class SimulationPathDetails {
   SimulationPathDetails({
     required this.id,

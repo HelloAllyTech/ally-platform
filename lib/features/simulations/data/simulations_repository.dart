@@ -16,6 +16,16 @@ class SimulationsRepository {
 
   final Dio _dio;
 
+  /// Matches ally-mobile (React Native)'s `getSimulationDetails` query
+  /// exactly: same route, same `enableRecommendations=true` param.
+  Future<SimulationSummary> getSimulationDetails(String scenarioSessionId) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/learn/scenario-session/$scenarioSessionId',
+      queryParameters: {'enableRecommendations': true},
+    );
+    return SimulationSummary.fromJson(response.data!);
+  }
+
   Future<List<Scenario>> getScenarios() async {
     final response = await _dio.get<List<dynamic>>('/learn/scenarios');
     return (response.data ?? [])
@@ -142,4 +152,9 @@ final casesProvider = FutureProvider<List<SimulationPath>>((ref) {
 final caseDetailsProvider =
     FutureProvider.family<SimulationPathDetails, String>((ref, caseId) {
   return ref.watch(simulationsRepositoryProvider).getCaseDetails(caseId);
+});
+
+final simulationSummaryProvider =
+    FutureProvider.family<SimulationSummary, String>((ref, scenarioSessionId) {
+  return ref.watch(simulationsRepositoryProvider).getSimulationDetails(scenarioSessionId);
 });
