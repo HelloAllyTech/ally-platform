@@ -9,6 +9,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/widgets/html_rich_text.dart';
 import '../data/course_models.dart';
 import '../data/courses_repository.dart';
 import '../data/quiz_models.dart';
@@ -194,11 +195,7 @@ class _ArticleViewState extends ConsumerState<_ArticleView> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // The real article body is server-rendered HTML — a proper
-        // flutter_html render is later work; this pass shows it as plain
-        // text so the reading flow (and the inline questions, which are
-        // the part with real submission logic) is still exercisable.
-        Text(payload.html ?? ''),
+        HtmlRichText(html: payload.html),
         const SizedBox(height: 24),
         for (final question in payload.articleQuestions ?? [])
           Card(
