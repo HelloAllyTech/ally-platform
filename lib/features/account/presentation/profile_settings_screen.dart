@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/auth/auth_state.dart';
@@ -9,8 +10,8 @@ import '../data/account_repository.dart';
 
 /// Port of ally-mobile (React Native)'s `ProfileSettingsScreen` — real
 /// profile (GET /users/me), profile image upload (full presigned-S3-URL
-/// flow, same as the RN app) and removal, and sign-out. The preferences
-/// screen (`userApi.ts`'s get/updateUserPreferences) is not ported yet.
+/// flow, same as the RN app) and removal, a link to PreferencesScreen, and
+/// sign-out.
 class ProfileSettingsScreen extends ConsumerStatefulWidget {
   const ProfileSettingsScreen({super.key});
 
@@ -105,7 +106,14 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
             ),
             Center(child: Text(user.email)),
             if (user.phone.isNotEmpty) Center(child: Text(user.phone)),
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
+            ListTile(
+              leading: const Icon(Icons.tune),
+              title: const Text('Preferences'),
+              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+              onTap: () => context.push('/preferences'),
+            ),
+            const SizedBox(height: 8),
             OutlinedButton(
               onPressed: () => ref.read(authControllerProvider.notifier).logout(),
               child: const Text('Log out'),

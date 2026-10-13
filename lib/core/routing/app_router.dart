@@ -21,6 +21,7 @@ import '../../features/courses/presentation/course_progress_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/leaderboard/presentation/leaderboard_screen.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
+import '../../features/preferences/presentation/preferences_screen.dart';
 import '../../features/reactions/presentation/reactions_screen.dart';
 import '../../features/reviews/presentation/review_details_screen.dart';
 import '../../features/reviews/presentation/review_screen.dart';
@@ -82,6 +83,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/profile',
         builder: (context, state) => const ProfileSettingsScreen(),
+      ),
+      GoRoute(
+        path: '/preferences',
+        builder: (context, state) => const PreferencesScreen(),
       ),
       GoRoute(
         path: '/notifications',
