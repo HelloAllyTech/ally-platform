@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/account/data/account_repository.dart';
 import '../../features/account/presentation/complete_profile_screen.dart';
 import '../../features/account/presentation/profile_settings_screen.dart';
 import '../../features/achievements/presentation/achievements_screen.dart';
@@ -41,16 +42,34 @@ import '../auth/auth_state.dart';
 /// flips") using go_router's `redirect`, re-evaluated via `refreshListenable`
 /// whenever auth state changes — no manual navigation calls scattered around
 /// sign-in/logout call sites.
+///
+/// Also enforces the real app's first-login gate: a bulk-created account
+/// with `profileCompleted == false` (per `src/types/user.ts`'s own comment)
+/// gets forced to CompleteProfileScreen before reaching anything else,
+/// same as RootNavigator does. Previously a documented TODO; now wired.
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/login',
-    refreshListenable: _AuthStateListenable(ref),
+    refreshListenable: _RouterRefreshListenable(ref),
     redirect: (context, state) {
       final isAuthenticated = ref.read(authControllerProvider).isAuthenticated;
       final isLoggingIn = state.matchedLocation == '/login';
+      final isCompletingProfile = state.matchedLocation == '/complete-profile';
 
       if (!isAuthenticated && !isLoggingIn) return '/login';
-      if (isAuthenticated && isLoggingIn) return '/home';
+      if (!isAuthenticated) return null;
+
+      // Profile-completion status isn't known synchronously — read
+      // whatever's currently cached (null while the very first fetch is
+      // still in flight) rather than block routing on it. A `null` here
+      // means "not yet known", not "incomplete", so no redirect fires
+      // until there's a real answer.
+      final user = ref.read(currentUserProvider).value;
+      final profileIncomplete = user != null && !user.profileCompleted;
+
+      if (isLoggingIn) return profileIncomplete ? '/complete-profile' : '/home';
+      if (profileIncomplete && !isCompletingProfile) return '/complete-profile';
+      if (!profileIncomplete && isCompletingProfile) return '/home';
       return null;
     },
     routes: [
@@ -205,12 +224,20 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   );
 });
 
-/// Bridges Riverpod's StateNotifier to a plain ChangeNotifier, which is what
-/// go_router's `refreshListenable` expects.
-class _AuthStateListenable extends ChangeNotifier {
-  _AuthStateListenable(Ref ref) {
+/// Bridges Riverpod state to a plain ChangeNotifier, which is what
+/// go_router's `refreshListenable` expects. Listens to both auth state
+/// (sign-in/out) and the current user fetch (so the profileCompleted gate
+/// above re-evaluates the moment that resolves, rather than only on the
+/// next unrelated navigation).
+class _RouterRefreshListenable extends ChangeNotifier {
+  _RouterRefreshListenable(Ref ref) {
     ref.listen(authControllerProvider, (previous, next) {
       if (previous?.isAuthenticated != next.isAuthenticated) {
+        notifyListeners();
+      }
+    });
+    ref.listen(currentUserProvider, (previous, next) {
+      if (previous?.value?.profileCompleted != next.value?.profileCompleted) {
         notifyListeners();
       }
     });
