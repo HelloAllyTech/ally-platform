@@ -572,7 +572,9 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
           align="bottom"
           renderIcon={ThreeDot}
           iconDescription={en.bugHunter.drawerMoreActions}
-          menuOptionsClass="!z-[9100]"
+          // Above the panel (which sits at z-index 9001), and wide enough
+          // that "Rewrite the description" and the engine line aren't cut off.
+          menuOptionsClass="!z-[9100] !w-64 [&_.cds--overflow-menu-options\_\_btn]:!max-w-none"
         >
           <OverflowMenuItem
             itemText={en.bugHunter.drawerCopyLink}
@@ -619,6 +621,7 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
             <OverflowMenuItem
               hasDivider
               disabled
+              requireTitle
               itemText={en.bugHunter.drawerLastRunOn.replace("{model}", engineLabel)}
             />
           )}

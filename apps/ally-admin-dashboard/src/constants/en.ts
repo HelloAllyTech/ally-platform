@@ -2781,7 +2781,7 @@ export const en = {
     drawerDescriptionHideOriginal: "Hide what I originally found",
     drawerDescriptionOriginalTitle: "Originally",
     drawerDescriptionSettleFirst:
-      "Save or cancel your rewrite first — right now I'd still be working from the description above it.",
+      "Save or cancel your rewrite first — right now I'd still be working from the old description.",
     drawerEvidenceTitle: "Evidence",
     drawerTimelineTitle: "My work log",
     drawerTimelineEmpty: "I haven't touched this one yet.",
