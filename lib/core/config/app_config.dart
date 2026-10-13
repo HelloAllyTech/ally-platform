@@ -38,6 +38,24 @@ class AppConfig {
     'LANGUAGE_SELECTOR_FLAG',
   );
 
+  /// Mirrors `Config.GOOGLE_WEB_CLIENT_ID` — used as `serverClientId` so the
+  /// ID token's audience is the one ally-be's `/auth/google` verifies
+  /// against (the same value regardless of platform, same as the RN app).
+  /// Empty until this app's own distinct package name has an OAuth client
+  /// registered in Google Cloud Console — see `auth_repository.dart`.
+  static const String googleWebClientId = String.fromEnvironment(
+    'GOOGLE_WEB_CLIENT_ID',
+    defaultValue: '',
+  );
+
+  /// Mirrors `Config.GOOGLE_IOS_CLIENT_ID` — the iOS-platform OAuth client,
+  /// passed as `clientId` (Android has no equivalent; it resolves its
+  /// client config from `google-services.json` instead).
+  static const String googleIosClientId = String.fromEnvironment(
+    'GOOGLE_IOS_CLIENT_ID',
+    defaultValue: '',
+  );
+
   static String get requireApiBaseUrl {
     if (apiBaseUrl.isEmpty) {
       throw StateError(

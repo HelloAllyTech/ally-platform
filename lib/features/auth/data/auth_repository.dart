@@ -15,14 +15,18 @@ const _allowedRoles = [
   'EVALUATOR',
 ];
 
-/// Ported from ally-mobile (React Native)'s `src/services/authApi.ts` —
-/// email+OTP only. Google/Apple sign-in aren't ported: they need native
-/// OAuth client configuration (SHA-1 fingerprint, bundle ID) registered
-/// against this app's own distinct package name/bundle ID before they'd
-/// work at all, which is Google Cloud/Apple Developer Portal setup, not
-/// something fixable in code alone. OTP needs none of that — plain REST
-/// calls — so it's the fast path to a real, backend-accepted session for
-/// testing every other screen.
+/// Ported from ally-mobile (React Native)'s `src/services/authApi.ts`.
+/// Email+OTP, Google, and Apple all hit the same real backend contract.
+///
+/// Google/Apple sign-in still can't complete an actual round-trip on a
+/// released build of this app until its own distinct package name/bundle ID
+/// has an OAuth client registered (SHA-1 fingerprint for Android, bundle ID
+/// for iOS) in Google Cloud/Apple Developer Portal — that's console setup,
+/// not something fixable in code. `AppConfig.googleWebClientId` being empty
+/// is how the login screen detects that and disables the button rather
+/// than launching a flow that can only fail. OTP needs none of that —
+/// plain REST calls — so it remains the fast path to a real session for
+/// testing every other screen in the meantime.
 class AuthRepository {
   AuthRepository(this._dio);
 
@@ -43,6 +47,42 @@ class AuthRepository {
     final response = await _dio.post<Map<String, dynamic>>(
       ApiRoutes.authVerifyOtp,
       data: {'email': email, 'otp': otp, 'allowedRoles': _allowedRoles},
+    );
+    return (
+      response.data!['accessToken'] as String,
+      response.data!['refreshToken'] as String,
+    );
+  }
+
+  Future<(String accessToken, String refreshToken)> loginWithGoogle(String idToken) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      ApiRoutes.authGoogleLogin,
+      data: {'idToken': idToken, 'allowedRoles': _allowedRoles},
+    );
+    return (
+      response.data!['accessToken'] as String,
+      response.data!['refreshToken'] as String,
+    );
+  }
+
+  Future<(String accessToken, String refreshToken)> loginWithApple({
+    required String identityToken,
+    String? authorizationCode,
+    String? givenName,
+    String? familyName,
+  }) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      ApiRoutes.authAppleLogin,
+      data: {
+        'identityToken': identityToken,
+        'authorizationCode': ?authorizationCode,
+        if (givenName != null || familyName != null)
+          'fullName': {
+            'givenName': ?givenName,
+            'familyName': ?familyName,
+          },
+        'allowedRoles': _allowedRoles,
+      },
     );
     return (
       response.data!['accessToken'] as String,

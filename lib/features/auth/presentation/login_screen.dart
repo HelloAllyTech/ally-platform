@@ -1,13 +1,22 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../../../core/auth/auth_state.dart';
+import '../../../core/config/app_config.dart';
 import '../data/auth_repository.dart';
 
-/// Real email+OTP sign-in, matching ally-mobile (React Native)'s
-/// `generateOtp`/`verifyOtp` contract exactly. Google/Apple sign-in aren't
-/// ported — see auth_repository.dart's doc comment for why (native OAuth
-/// client setup this app's distinct package name doesn't have yet).
+/// Real email+OTP, Google, and Apple sign-in, matching ally-mobile (React
+/// Native)'s `generateOtp`/`verifyOtp`/`loginWithGoogle`/`loginWithApple`
+/// contracts (`useGoogleLogin`/`useAppleLogin` hooks). Google/Apple can't
+/// complete a real round-trip until this app's own distinct package name
+/// has an OAuth client registered — see auth_repository.dart's doc comment
+/// — so those buttons disable themselves (Google) or surface the backend's
+/// real rejection (Apple, which has no equivalent "is configured" check
+/// client-side) rather than pretending to work.
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -24,11 +33,104 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _isSubmitting = false;
   String? _error;
 
+  /// `GoogleSignIn.instance.initialize` must be called exactly once and
+  /// awaited before any other call on the singleton — scheduled on mount
+  /// (same timing as the RN hook's `useEffect`), only actually awaited
+  /// when the learner taps the button.
+  Future<void>? _googleInitFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    if (AppConfig.googleWebClientId.isNotEmpty) {
+      _googleInitFuture = GoogleSignIn.instance.initialize(
+        clientId: Platform.isIOS && AppConfig.googleIosClientId.isNotEmpty
+            ? AppConfig.googleIosClientId
+            : null,
+        serverClientId: AppConfig.googleWebClientId,
+      );
+    }
+  }
+
   @override
   void dispose() {
     _emailController.dispose();
     _otpController.dispose();
     super.dispose();
+  }
+
+  Future<void> _signInWithGoogle() async {
+    final initFuture = _googleInitFuture;
+    if (initFuture == null) {
+      setState(() => _error = 'Google sign-in isn\'t configured for this build.');
+      return;
+    }
+    setState(() {
+      _isSubmitting = true;
+      _error = null;
+    });
+    try {
+      await initFuture;
+      try {
+        await GoogleSignIn.instance.signOut();
+      } catch (_) {
+        // Optional, same as the RN hook: forces the account picker instead
+        // of silently reusing a stale cached session.
+      }
+      final account = await GoogleSignIn.instance.authenticate();
+      final idToken = account.authentication.idToken;
+      if (idToken == null) {
+        throw StateError('No ID token returned from Google');
+      }
+      final (accessToken, refreshToken) =
+          await ref.read(authRepositoryProvider).loginWithGoogle(idToken);
+      await ref.read(authControllerProvider.notifier).signIn(
+            accessToken: accessToken,
+            refreshToken: refreshToken,
+          );
+    } on GoogleSignInException catch (e) {
+      if (e.code != GoogleSignInExceptionCode.canceled) {
+        setState(() => _error = 'Failed to sign in with Google: ${e.description ?? e.code}');
+      }
+    } catch (e) {
+      setState(() => _error = 'Failed to sign in with Google: $e');
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  Future<void> _signInWithApple() async {
+    setState(() {
+      _isSubmitting = true;
+      _error = null;
+    });
+    try {
+      final credential = await SignInWithApple.getAppleIDCredential(
+        scopes: [AppleIDAuthorizationScopes.email, AppleIDAuthorizationScopes.fullName],
+      );
+      final identityToken = credential.identityToken;
+      if (identityToken == null) {
+        throw StateError('No identity token returned from Apple');
+      }
+      final (accessToken, refreshToken) = await ref.read(authRepositoryProvider).loginWithApple(
+            identityToken: identityToken,
+            authorizationCode: credential.authorizationCode,
+            givenName: credential.givenName,
+            familyName: credential.familyName,
+          );
+      await ref.read(authControllerProvider.notifier).signIn(
+            accessToken: accessToken,
+            refreshToken: refreshToken,
+          );
+    } on SignInWithAppleAuthorizationException catch (e) {
+      if (e.code != AuthorizationErrorCode.canceled) {
+        setState(() => _error = 'Failed to sign in with Apple: ${e.message}');
+      }
+    } catch (e) {
+      setState(() => _error = 'Failed to sign in with Apple: $e');
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
   }
 
   Future<void> _sendCode() async {
@@ -107,6 +209,31 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
                       : const Text('Send code'),
                 ),
+                const SizedBox(height: 24),
+                const Row(
+                  children: [
+                    Expanded(child: Divider()),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 12),
+                      child: Text('or'),
+                    ),
+                    Expanded(child: Divider()),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                OutlinedButton.icon(
+                  onPressed: (_isSubmitting || _googleInitFuture == null) ? null : _signInWithGoogle,
+                  icon: const Icon(Icons.g_mobiledata),
+                  label: const Text('Continue with Google'),
+                ),
+                if (Platform.isIOS) ...[
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: _isSubmitting ? null : _signInWithApple,
+                    icon: const Icon(Icons.apple),
+                    label: const Text('Continue with Apple'),
+                  ),
+                ],
               ] else ...[
                 Text('Enter the code sent to ${_emailController.text.trim()}'),
                 const SizedBox(height: 16),

@@ -8,6 +8,8 @@ class ApiRoutes {
   static const authRefresh = '/auth/refresh';
   static const authGenerateOtp = '/auth/generate-otp';
   static const authVerifyOtp = '/auth/verify-otp';
+  static const authGoogleLogin = '/auth/google';
+  static const authAppleLogin = '/auth/apple';
   static const learnScenarios = '/learn/scenarios';
 }
 
