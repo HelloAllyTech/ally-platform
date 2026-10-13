@@ -52,15 +52,19 @@ class BadgeCategoryGroup {
 }
 
 /// Ported from ally-mobile (React Native)'s `src/services/badgesApi.ts`.
-/// `viewedStatus` filtering (the RN API supports filtering the list by
-/// viewed/unviewed) is not exposed here — this always fetches the full list.
+/// `getAvailableBadges` (grouped, with lockStatus — what the Achievements
+/// grid actually renders) hits `/badges/me/available`, distinct from the
+/// flat `viewedStatus`-filtered `/badges/me` the RN app's `useBadgePopup`
+/// hook polls app-wide to drive an unlock-celebration popup — that global
+/// popup system is a separate, not-yet-ported feature, not just a filter
+/// on this screen.
 class AchievementsRepository {
   AchievementsRepository(this._dio);
 
   final Dio _dio;
 
   Future<List<BadgeCategoryGroup>> getBadges() async {
-    final response = await _dio.get<List<dynamic>>('/badges/me');
+    final response = await _dio.get<List<dynamic>>('/badges/me/available');
     return (response.data ?? [])
         .map((e) => BadgeCategoryGroup.fromJson(e as Map<String, dynamic>))
         .toList();
