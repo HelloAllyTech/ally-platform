@@ -13,6 +13,7 @@ vi.hoisted(() => {
 const progressMock = vi.fn();
 const benchmarkMock = vi.fn();
 const behavioursMock = vi.fn();
+const advancedMock = vi.fn();
 const tenantsMock = vi.fn();
 // The "Time, breaks and difficulty" section's four queries share one spy.
 const timeMock = vi.fn();
@@ -36,6 +37,7 @@ vi.mock("@api", () => ({
   useGetFoundationalSkillsProgressQuery: (args: unknown) => progressMock(args),
   useGetFoundationalSkillsBenchmarkQuery: (args: unknown) => benchmarkMock(args),
   useGetFoundationalSkillsBehavioursQuery: (args: unknown) => behavioursMock(args),
+  useGetFoundationalSkillsAdvancedBehavioursQuery: (args: unknown) => advancedMock(args),
   useGetFoundationalSkillsLearnerQuery: () => idleQuery(),
   useGetTenantsQuery: (args: unknown) => tenantsMock(args),
   useGetFoundationalSkillsTimeToCompetenceQuery: (args: unknown) => timeMock(args),
@@ -70,7 +72,14 @@ const lastArgs = (mock: ReturnType<typeof vi.fn>) =>
 
 describe("FoundationalSkillsSubTab — org filter", () => {
   beforeEach(() => {
-    for (const mock of [progressMock, benchmarkMock, behavioursMock, timeMock, validityMock]) {
+    for (const mock of [
+      progressMock,
+      benchmarkMock,
+      behavioursMock,
+      advancedMock,
+      timeMock,
+      validityMock,
+    ]) {
       mock.mockReset();
       mock.mockReturnValue(idleQuery());
     }
@@ -85,6 +94,8 @@ describe("FoundationalSkillsSubTab — org filter", () => {
     expect(lastArgs(progressMock)).not.toHaveProperty("tenantId");
     expect(lastArgs(benchmarkMock)).not.toHaveProperty("tenantId");
     expect(lastArgs(behavioursMock)).not.toHaveProperty("tenantId");
+    // AAQ-237 opens on slice 2, the server's default.
+    expect(lastArgs(advancedMock)).toEqual({ baselineFrom: 2 });
   });
 
   it("lists live orgs by name and leaves test orgs out", async () => {
@@ -105,6 +116,7 @@ describe("FoundationalSkillsSubTab — org filter", () => {
     expect(lastArgs(progressMock)).toMatchObject({ tenantId: "t-alpha", cuts: undefined });
     expect(lastArgs(benchmarkMock)).toEqual({ tenantId: "t-alpha" });
     expect(lastArgs(behavioursMock)).toEqual({ tenantId: "t-alpha" });
+    expect(lastArgs(advancedMock)).toEqual({ tenantId: "t-alpha", baselineFrom: 2 });
     expect(lastArgs(timeMock)).toMatchObject({ tenantId: "t-alpha" });
     expect(lastArgs(validityMock)).toEqual({ tenantId: "t-alpha" });
 

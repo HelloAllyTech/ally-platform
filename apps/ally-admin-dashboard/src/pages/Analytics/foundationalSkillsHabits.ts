@@ -1,4 +1,6 @@
+import type { WhiskerRow } from "./ChangeWhiskers";
 import { CONTEXT, STAT } from "./chartScales";
+import { ciText, signed } from "./foundationalSkillsProgressChart";
 
 /**
  * Types and pure helpers for the Habits views on Highlights → Helping skills,
@@ -171,4 +173,121 @@ export const habitsTakeaway = (data: FoundationalSkillsBehavioursResponse): stri
   }
   const up = credible.filter(b => (b.change.changePts ?? 0) > 0).length;
   return `${credible.length} behaviour(s) changed beyond chance (${up} up, ${credible.length - up} down) across ${data.comparableLearners} learners.`;
+};
+
+/**
+ * Advanced behaviours by practice depth (AAQ-237), backed by
+ * `GET /v1/analytics/foundational-skills/advanced-behaviours`.
+ *
+ * Added after a one-off analysis (2026-10-12) found a rise among heavier
+ * practisers that did not hold across all learners, so this is a hypothesis
+ * being re-tested on later practice — the wording below never calls a tier's
+ * change a result. Tiers are NESTED (4+ slices contains 6+ contains 8+ …), so
+ * rows are not independent groups. The server owns the floors: averages, CIs
+ * and p are null below `minSampleSize`, but the rose/fell counts always travel.
+ */
+export interface FhsAdvancedTier {
+  /** 4, 6, 8, 10 — learners with this many scored slices or more. */
+  minSlices: number;
+  /** Comparable learners in the tier (always at least `minCohortSize`). */
+  learners: number;
+  /** Raw mean advanced-behaviour rate, first half then last half, % (null below the floor). */
+  startPct: number | null;
+  nowPct: number | null;
+  /** Raw mean advanced behaviours per slice, first half then last half. */
+  startPerSlice: number | null;
+  nowPerSlice: number | null;
+  /** Unadjusted paired change, pts. */
+  rawChangePts: number | null;
+  /** Scenario-adjusted paired mean change, pts. */
+  changePts: number | null;
+  ciPts: [number, number] | null;
+  up: number;
+  down: number;
+  tied: number;
+  signP: number | null;
+  /** The interval excludes zero (false when withheld). */
+  detectable: boolean;
+}
+
+export interface FoundationalSkillsAdvancedBehavioursResponse {
+  rubricVersion: string;
+  minSampleSize: number;
+  minCohortSize: number;
+  baselineFrom: 1 | 2;
+  thresholds: { depths: number[]; minComparedSlices: number; minOtherLearnersPerScenario: number };
+  measuredLearners: number;
+  /** Ascending `minSlices`; may be empty. */
+  tiers: FhsAdvancedTier[];
+  provenance: { derivation: string; note: string };
+  computedAt: string;
+}
+
+/**
+ * One whisker row per depth tier. A tier under the floor keeps its row — the
+ * rose/fell counts are still true — but has no average to plot, so the sublabel
+ * says why in plain words.
+ */
+export const advancedTierRows = (
+  data: FoundationalSkillsAdvancedBehavioursResponse,
+): WhiskerRow[] =>
+  data.tiers.map(t => {
+    const parts = [`${t.learners} learners`];
+    if (t.startPct !== null && t.nowPct !== null) {
+      parts.push(`${t.startPct.toFixed(0)}% → ${t.nowPct.toFixed(0)}% of chances`);
+    }
+    if (t.startPerSlice !== null && t.nowPerSlice !== null) {
+      parts.push(`${t.startPerSlice.toFixed(1)} → ${t.nowPerSlice.toFixed(1)} per slice`);
+    }
+    parts.push(`${t.up} rose, ${t.down} fell`);
+    if (t.changePts === null) {
+      parts.push(`average withheld below ${data.minSampleSize} learners`);
+    }
+    return {
+      key: `tier-${t.minSlices}`,
+      label: `${t.minSlices}+ slices`,
+      sublabel: parts.join(" · "),
+      change: t.changePts,
+      ci: t.ciPts,
+      n: t.learners,
+      detectable: t.detectable,
+    };
+  });
+
+/**
+ * One honest sentence, built only from the data. Describes the largest tier
+ * that has an average, then — if deeper tiers are withheld — points at their
+ * rose/fell counts in the rows rather than quoting one: picking a single
+ * withheld tier to name would be choosing the most flattering. Never says a
+ * tier "improved": the most it claims is that a behaviour showed up more or
+ * less often.
+ */
+export const advancedTakeaway = (
+  data: FoundationalSkillsAdvancedBehavioursResponse,
+): string | undefined => {
+  if (data.tiers.length === 0) return undefined;
+  const tiers = [...data.tiers].sort((a, b) => a.minSlices - b.minSlices);
+  const countsOnly = `only who rose and who fell is shown, a hint only`;
+
+  const withAverage = tiers.filter(t => t.changePts !== null);
+  if (withAverage.length === 0) {
+    return `Averages need ${data.minSampleSize} learners and no depth tier has that yet; ${countsOnly}.`;
+  }
+
+  // Nested tiers: the largest is the shallowest one that still has an average.
+  const main = withAverage.reduce((best, t) => (t.learners > best.learners ? t : best));
+  const change = main.changePts ?? 0;
+  const detail = `${signed(change, 1)} pts, 95% CI ${ciText(main.ciPts, 1)}`;
+  const who = `${main.learners} learners with ${main.minSlices}+ scored slices`;
+  const lead =
+    main.detectable && change > 0
+      ? `Advanced behaviours showed up more often in later practice across the ${who} (${detail})`
+      : main.detectable && change < 0
+        ? `Advanced behaviours showed up less often in later practice across the ${who} (${detail})`
+        : `No clear change in how often advanced behaviours showed up across the ${who} (${detail})`;
+
+  const deeperWithheld = tiers.some(t => t.minSlices > main.minSlices && t.changePts === null);
+  return deeperWithheld
+    ? `${lead}. Deeper tiers have under ${data.minSampleSize} learners: ${countsOnly}.`
+    : `${lead}.`;
 };

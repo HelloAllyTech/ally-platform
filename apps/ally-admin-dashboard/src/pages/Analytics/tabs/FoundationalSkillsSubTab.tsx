@@ -5,6 +5,7 @@ import { AreaChart, DonutChart, StackedBarChart } from "@carbon/charts-react";
 
 import { CarbonDropdown as Dropdown, InlineNotification } from "@ally-ui-mono/ui-shared";
 import {
+  useGetFoundationalSkillsAdvancedBehavioursQuery,
   useGetFoundationalSkillsBehavioursQuery,
   useGetFoundationalSkillsBenchmarkQuery,
   useGetFoundationalSkillsJudgeAgreementQuery,
@@ -21,6 +22,8 @@ import { CONTEXT, ColorScale, PALETTE } from "../chartScales";
 import {
   HABIT_FILTER_LABELS,
   HabitFilter,
+  advancedTakeaway,
+  advancedTierRows,
   habitRows,
   habitsTakeaway,
   trackabilityLabel,
@@ -87,6 +90,12 @@ type SortKey = "change" | "cuts" | "flags" | "name";
 const BASELINE_ITEMS: { id: "1" | "2"; label: string }[] = [
   { id: "1", label: "Start at cut 1" },
   { id: "2", label: "Start at cut 2 (skip warm-up)" },
+];
+
+// AAQ-237 opens on slice 2 (the server's default): slice 1 behaves like a warm-up.
+const ADVANCED_BASELINE_ITEMS: { id: "1" | "2"; label: string }[] = [
+  { id: "2", label: "Start at slice 2 (skip warm-up)" },
+  { id: "1", label: "Start at slice 1" },
 ];
 
 const WINDOW_ITEMS: { id: WindowKey; label: string }[] = [
@@ -288,6 +297,7 @@ export const FoundationalSkillsSubTab = () => {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [habitFilter, setHabitFilter] = useState<HabitFilter>("trackable");
   const [gridAll, setGridAll] = useState(false);
+  const [advancedBaseline, setAdvancedBaseline] = useState<"1" | "2">("2");
 
   // A failed or forbidden org list leaves only "All orgs" — the tab still works.
   const { data: tenantData } = useGetTenantsQuery({ limit: TENANT_PAGE_SIZE });
@@ -319,6 +329,17 @@ export const FoundationalSkillsSubTab = () => {
     loading: habits.isLoading && !hb,
     error: habits.isError,
     onRetry: habits.refetch,
+  };
+  // AAQ-237 has its own baseline picker; the org filter narrows it like the habits above.
+  const advanced = useGetFoundationalSkillsAdvancedBehavioursQuery({
+    baselineFrom: advancedBaseline === "1" ? 1 : 2,
+    ...org,
+  });
+  const adv = advanced.data;
+  const advancedCommon = {
+    loading: advanced.isLoading && !adv,
+    error: advanced.isError,
+    onRetry: advanced.refetch,
   };
 
   const loading = isLoading && !data;
@@ -639,6 +660,45 @@ export const FoundationalSkillsSubTab = () => {
                   n: b.change.n,
                   detectable: b.change.credible,
                 }))}
+              />
+            )}
+          </ChartCard>
+
+          <ChartCard
+            wide
+            title="Advanced behaviours by practice depth"
+            caption="Each learner's later practice against their own earlier practice: how often they showed an advanced helping behaviour — such as summarising the client's feedback and checking it, or exploring hope — where the slice gave them a chance. Rows are nested: everyone with 4+ scored slices, then 6+, 8+ and 10+. The dot is the change after adjusting for which roleplays were played, ± 95% interval; grey when the interval crosses zero. Averages need 20 learners; below that only the counts of who rose and fell are shown. Added on 12 Oct 2026 after a one-off analysis found a rise among heavier practisers that does not hold across everyone: a hypothesis being re-tested on later practice, not a result."
+            source={buildSource({
+              derivation:
+                "Advanced behaviour rates from stored, quote-checked behaviour codes, adjusted for which roleplays were played",
+              window: allTime,
+              // Tiers are ascending, so the first is the widest (4+ slices).
+              n: adv?.tiers[0]?.learners,
+              nUnit: "learners with enough practice",
+              asOf: asOfStamp(adv?.computedAt),
+            })}
+            takeaway={adv ? advancedTakeaway(adv) : undefined}
+            {...advancedCommon}
+            errorSubtitle="The advanced-behaviour endpoint did not respond — it may not be deployed yet."
+            empty={!advancedCommon.loading && !!adv && adv.tiers.length === 0}
+            emptyText="Not enough learners with 4+ scored slices yet"
+            controls={
+              <InlinePicker
+                id="fhs-advanced-baseline"
+                label="Baseline"
+                items={ADVANCED_BASELINE_ITEMS}
+                selected={advancedBaseline}
+                onChange={setAdvancedBaseline}
+              />
+            }
+            chartId="AAQ-237"
+          >
+            {adv && (
+              <ChangeWhiskers
+                decimals={1}
+                unit=" pts"
+                rows={advancedTierRows(adv)}
+                emptyLabel="average withheld"
               />
             )}
           </ChartCard>
