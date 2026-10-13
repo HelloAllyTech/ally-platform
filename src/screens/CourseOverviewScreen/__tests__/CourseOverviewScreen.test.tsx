@@ -42,6 +42,8 @@ jest.mock('@/hooks', () => ({
         'common.start': 'Start',
         'common.continue': 'Continue',
         'courses.notFound': 'Course not found',
+        'courses.notAvailable.title':
+          "This course isn't available for your account",
       };
       return translations[key] || key;
     },
@@ -237,6 +239,34 @@ describe('CourseOverviewScreen', () => {
 
     const {getByTestId} = renderScreen();
     expect(getByTestId('empty-state')).toBeTruthy();
+  });
+
+  it('says the course is not available, not missing, on a 403', () => {
+    // A shared course link opened by someone whose organisation or group the
+    // course is not assigned to.
+    useGetLearnTrackDetailQuery.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      error: {status: 403, data: {message: 'Forbidden'}},
+      refetch: jest.fn(),
+    });
+
+    const {getByTestId} = renderScreen();
+    expect(getByTestId('empty-state').props.children).toBe(
+      "This course isn't available for your account",
+    );
+  });
+
+  it('keeps the not-found state for other errors', () => {
+    useGetLearnTrackDetailQuery.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      error: {status: 404, data: {message: 'Track not found'}},
+      refetch: jest.fn(),
+    });
+
+    const {getByTestId} = renderScreen();
+    expect(getByTestId('empty-state').props.children).toBe('Course not found');
   });
 
   it('renders section items with their titles once loaded', () => {
