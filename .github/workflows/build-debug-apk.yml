@@ -22,6 +22,13 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Third attempt ran for 40+ minutes with no completion and had to be
+    # manually cancelled — GitHub's API doesn't expose live logs for an
+    # in-progress job, so there was no way to tell genuine (if slow) native
+    # compilation from an actual hang. Bounding this so a repeat fails fast
+    # with a clear timeout instead of silently consuming CI minutes for
+    # hours (the default job timeout is 360 minutes).
+    timeout-minutes: 25
     steps:
       # The second build attempt failed with "No space left on device" —
       # LiveKit/flutter_webrtc's per-ABI native libraries plus the Android
@@ -70,7 +77,13 @@ jobs:
           # disk — building all ABIs multiplies that several times over
           # for no benefit here. arm64 covers virtually every Android phone
           # from 2017 onward.
-          flutter build apk --debug --target-platform android-arm64 \
+          #
+          # --verbose: the third attempt gave no signal for 40+ minutes
+          # before being cancelled, and GitHub's API doesn't expose partial
+          # logs for an in-progress job — verbose Gradle/task-level output
+          # is the only way to tell real (if slow) progress from an actual
+          # hang if this happens again.
+          flutter build apk --debug --target-platform android-arm64 --verbose \
             --dart-define=API_BASE_URL=https://api.helloally.dev \
             --dart-define=MICROPHONE_SOCKET_PATH=/microphone-chat
 
