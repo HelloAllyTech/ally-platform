@@ -59,9 +59,8 @@ class SimulationsRepository {
       '/learn/scenario-session-start',
       data: {
         'scenarioId': scenarioId,
-        if (scenarioPathSessionItemId != null)
-          'scenarioPathSessionItemId': scenarioPathSessionItemId,
-        if (languageId != null) 'languageId': languageId,
+        'scenarioPathSessionItemId': ?scenarioPathSessionItemId,
+        'languageId': ?languageId,
       },
     );
     return SessionData.fromJson(response.data!);

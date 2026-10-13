@@ -37,7 +37,7 @@ class NotificationsScreen extends ConsumerWidget {
             onRefresh: () => ref.refresh(notificationsListProvider.future),
             child: ListView.separated(
               itemCount: notifications.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
+              separatorBuilder: (_, _) => const Divider(height: 1),
               itemBuilder: (context, index) {
                 final item = notifications[index];
                 return ListTile(

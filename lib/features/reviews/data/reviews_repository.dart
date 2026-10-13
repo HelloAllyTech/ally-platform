@@ -21,7 +21,7 @@ class ReviewsRepository {
         'order': 'DESC',
         'limit': 25,
         'offset': 0,
-        if (readFilter != null) 'readFilter': readFilter,
+        'readFilter': ?readFilter,
       },
     );
     final data = response.data?['data'] as List<dynamic>? ?? [];

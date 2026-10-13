@@ -21,7 +21,7 @@ class AccountRepository {
   Future<void> completeProfile({required String name, String? phone}) async {
     await _dio.patch<void>(
       '/users/me/complete-profile',
-      data: {'name': name, if (phone != null) 'phone': phone},
+      data: {'name': name, 'phone': ?phone},
     );
   }
 }

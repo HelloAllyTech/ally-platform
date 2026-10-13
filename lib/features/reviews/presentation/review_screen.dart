@@ -25,7 +25,7 @@ class ReviewScreen extends ConsumerWidget {
           }
           return ListView.separated(
             itemCount: reviews.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
+            separatorBuilder: (_, _) => const Divider(height: 1),
             itemBuilder: (context, index) {
               final review = reviews[index];
               return ListTile(
