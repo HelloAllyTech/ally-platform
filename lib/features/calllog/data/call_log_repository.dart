@@ -32,10 +32,60 @@ class CallLogItem {
   final double? score;
 }
 
-/// Ported from ally-mobile (React Native)'s `src/services/callsApi.ts` —
-/// list + archive only. Tag filtering and the full call-details/transcript
-/// fetch (CallSummaryScreen is ~7,000 lines in the original, covering
-/// transcript, notes, export) are real further work.
+/// Mirrors ally-mobile (React Native)'s `src/services/callTranscriptApi.ts`
+/// `ChatMessage`.
+class ChatMessage {
+  ChatMessage({
+    required this.messageId,
+    required this.content,
+    required this.createdAt,
+    required this.senderId,
+  });
+
+  factory ChatMessage.fromJson(Map<String, dynamic> json) => ChatMessage(
+        messageId: (json['messageId'] as num).toInt(),
+        content: json['content'] as String,
+        createdAt: json['createdAt'] as String,
+        senderId: (json['senderId'] as num).toInt(),
+      );
+
+  final int messageId;
+  final String content;
+  final String createdAt;
+  final int senderId;
+}
+
+/// Scoped subset of ally-mobile (React Native)'s `SummaryDetails` — the
+/// original has ~20 structured clinical fields (demographics, flow,
+/// assessment, plan). This surfaces the narrative fields a counsellor
+/// actually reads back, not the full structured clinical documentation
+/// form — that's real further work.
+class CallSummaryDetails {
+  CallSummaryDetails({
+    required this.sessionSummary,
+    required this.keyConcerns,
+    required this.counselorId,
+  });
+
+  factory CallSummaryDetails.fromJson(Map<String, dynamic> json) {
+    final details = json['details'] as Map<String, dynamic>?;
+    final summary = details?['summary'] as Map<String, dynamic>?;
+    return CallSummaryDetails(
+      sessionSummary: summary?['sessionSummary'] as String?,
+      keyConcerns: summary?['keyConcerns'] as String?,
+      counselorId: (json['counselorId'] as num?)?.toInt(),
+    );
+  }
+
+  final String? sessionSummary;
+  final String? keyConcerns;
+  final int? counselorId;
+}
+
+/// Ported from ally-mobile (React Native)'s `src/services/callsApi.ts` +
+/// `callTranscriptApi.ts` + `callSummaryApi.ts` (scoped subset — see
+/// CallSummaryDetails doc comment). Tag filtering, summary editing,
+/// export, and feedback/rating are real further work.
 class CallLogRepository {
   CallLogRepository(this._dio);
 
@@ -56,6 +106,17 @@ class CallLogRepository {
       data: {'archive': archive},
     );
   }
+
+  Future<CallSummaryDetails> getCallSummary(int chatId) async {
+    final response = await _dio.get<Map<String, dynamic>>('/chats/$chatId');
+    return CallSummaryDetails.fromJson(response.data!);
+  }
+
+  Future<List<ChatMessage>> getChatMessages(int chatId) async {
+    final response = await _dio.get<Map<String, dynamic>>('/chats/$chatId/messages');
+    final data = response.data?['data'] as List<dynamic>? ?? [];
+    return data.map((e) => ChatMessage.fromJson(e as Map<String, dynamic>)).toList();
+  }
 }
 
 final callLogRepositoryProvider = Provider<CallLogRepository>((ref) {
@@ -64,4 +125,12 @@ final callLogRepositoryProvider = Provider<CallLogRepository>((ref) {
 
 final callLogsProvider = FutureProvider<List<CallLogItem>>((ref) {
   return ref.watch(callLogRepositoryProvider).getCallLogs();
+});
+
+final callSummaryProvider = FutureProvider.family<CallSummaryDetails, int>((ref, chatId) {
+  return ref.watch(callLogRepositoryProvider).getCallSummary(chatId);
+});
+
+final chatMessagesProvider = FutureProvider.family<List<ChatMessage>, int>((ref, chatId) {
+  return ref.watch(callLogRepositoryProvider).getChatMessages(chatId);
 });
