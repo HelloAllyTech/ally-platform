@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/localization/translate_ref.dart';
 import '../../reactions/data/reactions_repository.dart';
 import '../data/review_models.dart';
 import '../data/reviews_repository.dart';
@@ -108,7 +109,7 @@ class _ThreadDetailScreenState extends ConsumerState<ThreadDetailScreen> {
     final remainingCount = widget.thread.commentCount - _comments.length;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Thread')),
+      appBar: AppBar(title: Text(ref.t('commentThreadBottomSheet.title'))),
       body: Column(
         children: [
           Expanded(
@@ -127,8 +128,8 @@ class _ThreadDetailScreenState extends ConsumerState<ThreadDetailScreen> {
                         children: [
                           Text(
                             message.senderId == -1
-                                ? 'Client said'
-                                : 'Learner said',
+                                ? ref.t('review.details.clientSaid')
+                                : ref.t('review.details.learnerSaid'),
                             style: Theme.of(context).textTheme.labelSmall,
                           ),
                           const SizedBox(height: 4),
@@ -154,7 +155,12 @@ class _ThreadDetailScreenState extends ConsumerState<ThreadDetailScreen> {
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : Text(
-                              'Load $remainingCount more repl${remainingCount == 1 ? 'y' : 'ies'}',
+                              remainingCount == 1
+                                  ? ref.t('review.details.loadMoreRepliesOne')
+                                  : ref.t(
+                                      'review.details.loadMoreReplies',
+                                      {'count': remainingCount},
+                                    ),
                             ),
                     ),
                   ),
@@ -169,9 +175,9 @@ class _ThreadDetailScreenState extends ConsumerState<ThreadDetailScreen> {
                   Expanded(
                     child: TextField(
                       controller: _replyController,
-                      decoration: const InputDecoration(
-                        hintText: 'Reply...',
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        hintText: ref.t('review.details.replyPlaceholder'),
+                        border: const OutlineInputBorder(),
                         isDense: true,
                       ),
                     ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/localization/translate_ref.dart';
 import '../data/reviews_repository.dart';
 
 /// Port of ally-mobile (React Native)'s `ReviewScreen` — review list with
@@ -15,14 +16,15 @@ class ReviewScreen extends ConsumerWidget {
     final reviewsAsync = ref.watch(reviewsListProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Reviews')),
+      appBar: AppBar(title: Text(ref.t('review.title'))),
       body: reviewsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) =>
-            Center(child: Text('Failed to load reviews: $error')),
+        error: (error, _) => Center(
+          child: Text('${ref.t('review.error.title')}: $error'),
+        ),
         data: (reviews) {
           if (reviews.isEmpty) {
-            return const Center(child: Text('No reviews yet.'));
+            return Center(child: Text(ref.t('review.empty.title')));
           }
           return ListView.separated(
             itemCount: reviews.length,

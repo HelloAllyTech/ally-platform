@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/localization/translate_ref.dart';
 import '../data/reactions_repository.dart';
 
 const _availableReactions = ['👍', '❤️', '😂', '🎉', '👏'];
@@ -19,7 +20,7 @@ class ReactionsScreen extends ConsumerWidget {
     final countsAsync = ref.watch(reactionsCountProvider(reviewId));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Reactions')),
+      appBar: AppBar(title: Text(ref.t('review.reactionsModal.title'))),
       body: Column(
         children: [
           Padding(
@@ -64,11 +65,16 @@ class ReactionsScreen extends ConsumerWidget {
           Expanded(
             child: reactionsAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, _) =>
-                  Center(child: Text('Failed to load reactions: $error')),
+              error: (error, _) => Center(
+                child: Text(
+                  '${ref.t('review.error.loadReactionsFailed')}: $error',
+                ),
+              ),
               data: (reactions) {
                 if (reactions.isEmpty) {
-                  return const Center(child: Text('No reactions yet.'));
+                  return Center(
+                    child: Text(ref.t('review.reactionsModal.noReactionsYet')),
+                  );
                 }
                 return ListView.builder(
                   itemCount: reactions.length,
