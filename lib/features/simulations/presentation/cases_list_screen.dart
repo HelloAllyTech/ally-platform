@@ -19,7 +19,8 @@ class CasesListScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('Cases')),
       body: casesAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(child: Text('Failed to load cases: $error')),
+        error: (error, _) =>
+            Center(child: Text('Failed to load cases: $error')),
         data: (cases) {
           if (cases.isEmpty) {
             return const Center(child: Text('No cases available yet.'));
@@ -33,8 +34,12 @@ class CasesListScreen extends ConsumerWidget {
                 margin: const EdgeInsets.only(bottom: 12),
                 child: ListTile(
                   title: Text(caseItem.title),
-                  subtitle: caseItem.description != null ? Text(caseItem.description!) : null,
-                  trailing: Text('${caseItem.completedScenarios}/${caseItem.totalScenarios}'),
+                  subtitle: caseItem.description != null
+                      ? Text(caseItem.description!)
+                      : null,
+                  trailing: Text(
+                    '${caseItem.completedScenarios}/${caseItem.totalScenarios}',
+                  ),
                   onTap: () => context.push('/cases/${caseItem.id}'),
                 ),
               );

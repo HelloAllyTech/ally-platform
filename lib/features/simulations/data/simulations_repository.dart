@@ -6,11 +6,12 @@ import 'simulation_models.dart';
 
 /// Ported from ally-mobile (React Native)'s `src/services/simulationsApi.ts`
 /// — same routes (`API_ROUTES.LEARN`). This is a large API surface in the
-/// original (rooms, cases, checklist events, upcoming-path/case-scenario
-/// lookups); scoped here to what SimulationsScreen, SimulationDetailsScreen,
-/// SimulationPathDetailsScreen, and SimulationFeedbackScreen actually need.
-/// Case-based sessions (as opposed to scenario-path sessions) are not
-/// ported in this pass.
+/// original (rooms, checklist events, upcoming-path/case-scenario lookups —
+/// a separate "what's next" card shown elsewhere, not the same as
+/// `SimulationPathDetails.nextScenario`'s client-side computation);
+/// scoped here to what SimulationsScreen, SimulationDetailsScreen,
+/// SimulationPathDetailsScreen, CaseDetailsScreen, and
+/// SimulationFeedbackScreen actually need.
 class SimulationsRepository {
   SimulationsRepository(this._dio);
 
@@ -18,7 +19,9 @@ class SimulationsRepository {
 
   /// Matches ally-mobile (React Native)'s `getSimulationDetails` query
   /// exactly: same route, same `enableRecommendations=true` param.
-  Future<SimulationSummary> getSimulationDetails(String scenarioSessionId) async {
+  Future<SimulationSummary> getSimulationDetails(
+    String scenarioSessionId,
+  ) async {
     final response = await _dio.get<Map<String, dynamic>>(
       '/learn/scenario-session/$scenarioSessionId',
       queryParameters: {'enableRecommendations': true},
@@ -34,20 +37,23 @@ class SimulationsRepository {
   }
 
   Future<Scenario> getScenarioById(int id) async {
-    final response =
-        await _dio.get<Map<String, dynamic>>('/learn/scenarios/$id');
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/learn/scenarios/$id',
+    );
     return Scenario.fromJson(response.data!);
   }
 
   Future<SimulationCredits> getSimulationCredits() async {
-    final response =
-        await _dio.get<Map<String, dynamic>>('/simulation-credits');
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/simulation-credits',
+    );
     return SimulationCredits.fromJson(response.data!);
   }
 
   Future<List<SimulationPath>> getScenarioPaths() async {
-    final response =
-        await _dio.get<Map<String, dynamic>>('/learn/scenario-paths');
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/learn/scenario-paths',
+    );
     final data = response.data?['data'] as List<dynamic>? ?? [];
     return data
         .map((e) => SimulationPath.fromJson(e as Map<String, dynamic>))
@@ -55,14 +61,29 @@ class SimulationsRepository {
   }
 
   Future<SimulationPathDetails> getSimulationPathDetails(String pathId) async {
-    final response = await _dio
-        .get<Map<String, dynamic>>('/learn/scenario-paths/$pathId');
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/learn/scenario-paths/$pathId',
+    );
     return SimulationPathDetails.fromJson(response.data!);
+  }
+
+  Future<void> createPathSession(String pathId) async {
+    await _dio.post<void>('/learn/scenario-paths/$pathId/create-session');
+  }
+
+  /// Looks up the real session id behind a completed path scenario item —
+  /// same purpose as `getScenarioSessionByCaseItem`, for paths.
+  Future<String?> getScenarioSessionByPathItem(String pathSessionItemId) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/learn/scenario-session/scenario-path-session-item/$pathSessionItemId',
+    );
+    return response.data?['id'] as String?;
   }
 
   Future<SessionData> startScenarioSession({
     required int scenarioId,
     String? scenarioPathSessionItemId,
+    String? caseSessionItemId,
     int? languageId,
   }) async {
     final response = await _dio.post<Map<String, dynamic>>(
@@ -70,6 +91,7 @@ class SimulationsRepository {
       data: {
         'scenarioId': scenarioId,
         'scenarioPathSessionItemId': ?scenarioPathSessionItemId,
+        'caseSessionItemId': ?caseSessionItemId,
         'languageId': ?languageId,
       },
     );
@@ -94,12 +116,24 @@ class SimulationsRepository {
   }
 
   Future<SimulationPathDetails> getCaseDetails(String caseId) async {
-    final response = await _dio.get<Map<String, dynamic>>('/learn/cases/$caseId');
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/learn/cases/$caseId',
+    );
     return SimulationPathDetails.fromJson(response.data!);
   }
 
   Future<void> createCaseSession(String caseId) async {
     await _dio.post<void>('/learn/cases/$caseId/create-session');
+  }
+
+  /// Looks up the real session id behind a completed case scenario item —
+  /// used to open that scenario's feedback screen (the RN screen's
+  /// "file icon" / view-completed-session action).
+  Future<String?> getScenarioSessionByCaseItem(String caseSessionItemId) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/learn/scenario-session/case-session-item/$caseSessionItemId',
+    );
+    return response.data?['id'] as String?;
   }
 
   Future<void> addSimulationFeedback({
@@ -131,8 +165,7 @@ final simulationCreditsProvider = FutureProvider<SimulationCredits>((ref) {
   return ref.watch(simulationsRepositoryProvider).getSimulationCredits();
 });
 
-final scenarioByIdProvider =
-    FutureProvider.family<Scenario, int>((ref, id) {
+final scenarioByIdProvider = FutureProvider.family<Scenario, int>((ref, id) {
   return ref.watch(simulationsRepositoryProvider).getScenarioById(id);
 });
 
@@ -142,8 +175,10 @@ final scenarioPathsProvider = FutureProvider<List<SimulationPath>>((ref) {
 
 final simulationPathDetailsProvider =
     FutureProvider.family<SimulationPathDetails, String>((ref, pathId) {
-  return ref.watch(simulationsRepositoryProvider).getSimulationPathDetails(pathId);
-});
+      return ref
+          .watch(simulationsRepositoryProvider)
+          .getSimulationPathDetails(pathId);
+    });
 
 final casesProvider = FutureProvider<List<SimulationPath>>((ref) {
   return ref.watch(simulationsRepositoryProvider).getCases();
@@ -151,10 +186,12 @@ final casesProvider = FutureProvider<List<SimulationPath>>((ref) {
 
 final caseDetailsProvider =
     FutureProvider.family<SimulationPathDetails, String>((ref, caseId) {
-  return ref.watch(simulationsRepositoryProvider).getCaseDetails(caseId);
-});
+      return ref.watch(simulationsRepositoryProvider).getCaseDetails(caseId);
+    });
 
 final simulationSummaryProvider =
     FutureProvider.family<SimulationSummary, String>((ref, scenarioSessionId) {
-  return ref.watch(simulationsRepositoryProvider).getSimulationDetails(scenarioSessionId);
-});
+      return ref
+          .watch(simulationsRepositoryProvider)
+          .getSimulationDetails(scenarioSessionId);
+    });

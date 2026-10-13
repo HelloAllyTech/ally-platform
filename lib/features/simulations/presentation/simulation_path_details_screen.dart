@@ -3,13 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../data/simulations_repository.dart';
+import 'learning_path_detail_view.dart';
 
 /// Port of ally-mobile (React Native)'s `SimulationPathDetailsScreen` —
-/// an ordered list of scenarios within a path, each navigable into
-/// SimulationDetailsScreen. Path-session-specific start (via
-/// `scenarioPathSessionItemId`, which threads a path session through the
-/// scenario start call) is not wired yet — tapping a scenario here starts
-/// it as a standalone session, same as from SimulationsScreen.
+/// same resumption flow as CaseDetailsScreen (continue at the next
+/// unlocked/incomplete scenario via `scenarioPathSessionItemId`), per-
+/// scenario start, and view-feedback-for-a-completed-scenario action. See
+/// [LearningPathDetailView] for the shared body both screens render.
 class SimulationPathDetailsScreen extends ConsumerWidget {
   const SimulationPathDetailsScreen({super.key, required this.pathId});
 
@@ -24,26 +24,41 @@ class SimulationPathDetailsScreen extends ConsumerWidget {
       body: detailsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(child: Text('Failed to load path: $error')),
-        data: (details) => ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            if (details.title != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text(details.title!, style: Theme.of(context).textTheme.headlineSmall),
-              ),
-            Text('${details.completedScenarios}/${details.scenarios.length} completed'),
-            const SizedBox(height: 16),
-            for (final scenario in details.scenarios)
-              Card(
-                child: ListTile(
-                  leading: CircleAvatar(child: Text('${scenario.order}')),
-                  title: Text(scenario.title ?? 'Scenario ${scenario.scenarioId}'),
-                  subtitle: scenario.description != null ? Text(scenario.description!) : null,
-                  onTap: () => context.push('/simulations/${scenario.scenarioId}'),
-                ),
-              ),
-          ],
+        data: (details) => LearningPathDetailView(
+          details: details,
+          onEnsureSession: () async {
+            if (details.scenarioPathSessionId != null) return;
+            await ref
+                .read(simulationsRepositoryProvider)
+                .createPathSession(pathId);
+            ref.invalidate(simulationPathDetailsProvider(pathId));
+          },
+          onStartScenario: (scenario) async {
+            final session = await ref
+                .read(simulationsRepositoryProvider)
+                .startScenarioSession(
+                  scenarioId: scenario.scenarioId,
+                  scenarioPathSessionItemId: scenario.sessionId,
+                );
+            if (context.mounted) {
+              context.push(
+                '/roleplay',
+                extra: {
+                  'liveKitServerUrl': session.liveKitServerUrl,
+                  'accessToken': session.accessToken,
+                  'scenarioSessionId': session.id,
+                },
+              );
+            }
+          },
+          onViewFeedback: (scenario) async {
+            final sessionId = await ref
+                .read(simulationsRepositoryProvider)
+                .getScenarioSessionByPathItem(scenario.sessionId!);
+            if (sessionId != null && context.mounted) {
+              context.push('/simulations/feedback/$sessionId');
+            }
+          },
         ),
       ),
     );

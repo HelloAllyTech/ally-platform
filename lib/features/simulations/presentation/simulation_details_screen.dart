@@ -58,13 +58,17 @@ class _SimulationDetailsScreenState
       appBar: AppBar(title: const Text('Scenario')),
       body: scenarioAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(child: Text('Failed to load scenario: $error')),
+        error: (error, _) =>
+            Center(child: Text('Failed to load scenario: $error')),
         data: (scenario) => Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(scenario.title, style: Theme.of(context).textTheme.headlineSmall),
+              Text(
+                scenario.title,
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
               if (scenario.description != null) ...[
                 const SizedBox(height: 12),
                 Text(scenario.description!),

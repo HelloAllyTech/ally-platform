@@ -11,11 +11,11 @@ class Scenario {
   });
 
   factory Scenario.fromJson(Map<String, dynamic> json) => Scenario(
-        id: (json['id'] as num).toInt(),
-        title: json['title'] as String,
-        description: json['description'] as String?,
-        coverImageUrl: json['coverImageUrl'] as String?,
-      );
+    id: (json['id'] as num).toInt(),
+    title: json['title'] as String,
+    description: json['description'] as String?,
+    coverImageUrl: json['coverImageUrl'] as String?,
+  );
 
   final int id;
   final String title;
@@ -34,10 +34,10 @@ class SessionData {
   });
 
   factory SessionData.fromJson(Map<String, dynamic> json) => SessionData(
-        id: json['id'] as String,
-        accessToken: json['accessToken'] as String,
-        liveKitServerUrl: json['liveKitServerUrl'] as String,
-      );
+    id: json['id'] as String,
+    accessToken: json['accessToken'] as String,
+    liveKitServerUrl: json['liveKitServerUrl'] as String,
+  );
 
   final String id;
   final String accessToken;
@@ -45,10 +45,7 @@ class SessionData {
 }
 
 class SimulationCredits {
-  SimulationCredits({
-    required this.creditLimit,
-    required this.consumedCredits,
-  });
+  SimulationCredits({required this.creditLimit, required this.consumedCredits});
 
   factory SimulationCredits.fromJson(Map<String, dynamic> json) =>
       SimulationCredits(
@@ -72,18 +69,51 @@ class SimulationPath {
   });
 
   factory SimulationPath.fromJson(Map<String, dynamic> json) => SimulationPath(
-        id: json['id'] as String,
-        title: json['title'] as String,
-        description: json['description'] as String?,
-        totalScenarios: (json['totalScenarios'] as num?)?.toInt() ?? 0,
-        completedScenarios: (json['completedScenarios'] as num?)?.toInt() ?? 0,
-      );
+    id: json['id'] as String,
+    title: json['title'] as String,
+    description: json['description'] as String?,
+    totalScenarios: (json['totalScenarios'] as num?)?.toInt() ?? 0,
+    completedScenarios: (json['completedScenarios'] as num?)?.toInt() ?? 0,
+  );
 
   final String id;
   final String title;
   final String? description;
   final int totalScenarios;
   final int completedScenarios;
+}
+
+/// Mirrors ally-mobile (React Native)'s `SessionItemStatus` — a path/case
+/// scenario's progress state within that path/case.
+enum SessionItemStatus { locked, unlocked, completed, unknown }
+
+SessionItemStatus _sessionItemStatusFromString(String? value) {
+  switch (value) {
+    case 'LOCKED':
+      return SessionItemStatus.locked;
+    case 'UNLOCKED':
+      return SessionItemStatus.unlocked;
+    case 'COMPLETED':
+      return SessionItemStatus.completed;
+    default:
+      return SessionItemStatus.unknown;
+  }
+}
+
+/// Mirrors `src/types/simulations.ts`'s `LanguageOption` — kept local to
+/// this feature rather than reusing `preferences`' identical shape, same
+/// as the rest of this port's per-feature model scoping.
+class SimulationLanguageOption {
+  SimulationLanguageOption({required this.languageId, required this.label});
+
+  factory SimulationLanguageOption.fromJson(Map<String, dynamic> json) =>
+      SimulationLanguageOption(
+        languageId: (json['language_id'] as num).toInt(),
+        label: json['label'] as String,
+      );
+
+  final int languageId;
+  final String label;
 }
 
 class PathScenario {
@@ -93,21 +123,37 @@ class PathScenario {
     required this.order,
     required this.title,
     required this.description,
+    required this.coverImageUrl,
+    required this.sessionId,
+    required this.status,
+    required this.availableLanguages,
   });
 
   factory PathScenario.fromJson(Map<String, dynamic> json) => PathScenario(
-        id: json['id'] as String,
-        scenarioId: (json['scenarioId'] as num).toInt(),
-        order: (json['order'] as num?)?.toInt() ?? 0,
-        title: json['title'] as String?,
-        description: json['description'] as String?,
-      );
+    id: json['id'] as String,
+    scenarioId: (json['scenarioId'] as num).toInt(),
+    order: (json['order'] as num?)?.toInt() ?? 0,
+    title: json['title'] as String?,
+    description: json['description'] as String?,
+    coverImageUrl: json['coverImageUrl'] as String?,
+    sessionId: json['sessionId'] as String?,
+    status: _sessionItemStatusFromString(json['status'] as String?),
+    availableLanguages: (json['availableLanguages'] as List<dynamic>?)
+        ?.map(
+          (e) => SimulationLanguageOption.fromJson(e as Map<String, dynamic>),
+        )
+        .toList(),
+  );
 
   final String id;
   final int scenarioId;
   final int order;
   final String? title;
   final String? description;
+  final String? coverImageUrl;
+  final String? sessionId;
+  final SessionItemStatus status;
+  final List<SimulationLanguageOption>? availableLanguages;
 }
 
 /// Mirrors ally-mobile (React Native)'s `SimulationSummaryData` —
@@ -127,14 +173,17 @@ class SimulationSummary {
     required this.feedbackRating,
   });
 
-  factory SimulationSummary.fromJson(Map<String, dynamic> json) => SimulationSummary(
+  factory SimulationSummary.fromJson(Map<String, dynamic> json) =>
+      SimulationSummary(
         id: json['id'] as String,
         score: (json['score'] as num?)?.toDouble(),
         startedAt: json['startedAt'] as String,
         endedAt: json['endedAt'] as String?,
-        whatWentWell: (json['whatWentWell'] as List<dynamic>?)?.cast<String>() ?? [],
+        whatWentWell:
+            (json['whatWentWell'] as List<dynamic>?)?.cast<String>() ?? [],
         areasForImprovement:
-            (json['areasForImprovement'] as List<dynamic>?)?.cast<String>() ?? [],
+            (json['areasForImprovement'] as List<dynamic>?)?.cast<String>() ??
+            [],
         hasFeedback: json['hasFeedback'] as bool? ?? false,
         feedbackRating: (json['feedbackRating'] as num?)?.toInt(),
       );
@@ -153,7 +202,12 @@ class SimulationPathDetails {
   SimulationPathDetails({
     required this.id,
     required this.title,
+    required this.description,
+    required this.coverImageUrl,
     required this.completedScenarios,
+    required this.completedAt,
+    required this.scenarioPathSessionId,
+    required this.caseSessionId,
     required this.scenarios,
   });
 
@@ -161,7 +215,12 @@ class SimulationPathDetails {
       SimulationPathDetails(
         id: json['id'] as String,
         title: json['title'] as String?,
+        description: json['description'] as String?,
+        coverImageUrl: json['coverImageUrl'] as String?,
         completedScenarios: (json['completedScenarios'] as num?)?.toInt() ?? 0,
+        completedAt: json['completedAt'] as String?,
+        scenarioPathSessionId: json['scenarioPathSessionId'] as String?,
+        caseSessionId: json['caseSessionId'] as String?,
         scenarios: (json['scenarios'] as List<dynamic>? ?? [])
             .map((e) => PathScenario.fromJson(e as Map<String, dynamic>))
             .toList(),
@@ -169,6 +228,22 @@ class SimulationPathDetails {
 
   final String id;
   final String? title;
+  final String? description;
+  final String? coverImageUrl;
   final int completedScenarios;
+  final String? completedAt;
+  final String? scenarioPathSessionId;
+  final String? caseSessionId;
   final List<PathScenario> scenarios;
+
+  /// First scenario not yet completed and not locked — same definition as
+  /// the RN screen's `nextSimulation`, used to resume a case/path exactly
+  /// where the learner left off.
+  PathScenario? get nextScenario => scenarios
+      .where(
+        (s) =>
+            s.status != SessionItemStatus.completed &&
+            s.status != SessionItemStatus.locked,
+      )
+      .firstOrNull;
 }

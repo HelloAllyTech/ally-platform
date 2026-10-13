@@ -30,7 +30,8 @@ class SimulationsScreen extends ConsumerWidget {
       ),
       body: scenariosAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(child: Text('Failed to load scenarios: $error')),
+        error: (error, _) =>
+            Center(child: Text('Failed to load scenarios: $error')),
         data: (scenarios) {
           if (scenarios.isEmpty) {
             return const Center(child: Text('No scenarios available yet.'));
@@ -45,7 +46,11 @@ class SimulationsScreen extends ConsumerWidget {
                 child: ListTile(
                   title: Text(scenario.title),
                   subtitle: scenario.description != null
-                      ? Text(scenario.description!, maxLines: 2, overflow: TextOverflow.ellipsis)
+                      ? Text(
+                          scenario.description!,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        )
                       : null,
                   trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                   onTap: () => context.push('/simulations/${scenario.id}'),
