@@ -6,12 +6,19 @@ plugins {
 
 android {
     namespace = "com.helloally.ally_mobile_flutter"
-    compileSdk = flutter.compileSdkVersion
+    // permission_handler_android requires compiling against API 37; the
+    // Flutter-default flutter.compileSdkVersion (36 as of this Flutter
+    // version) isn't enough. compileSdk is backward-compatible with lower
+    // minSdk/targetSdk, so bumping it alone is safe.
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // flutter_local_notifications needs this for the java.time APIs it
+        // uses under the hood on API levels below 26.
+        isCoreLibraryDesugaringEnabled = true
     }
 
     defaultConfig {
@@ -46,4 +53,10 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // Pairs with isCoreLibraryDesugaringEnabled above — required by
+    // flutter_local_notifications.
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
