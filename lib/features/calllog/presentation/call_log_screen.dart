@@ -17,7 +17,8 @@ class CallLogScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('Call log')),
       body: callLogsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(child: Text('Failed to load call log: $error')),
+        error: (error, _) =>
+            Center(child: Text('Failed to load call log: $error')),
         data: (logs) {
           if (logs.isEmpty) {
             return const Center(child: Text('No calls yet.'));
@@ -42,7 +43,9 @@ class CallLogScreen extends ConsumerWidget {
                   leading: const Icon(Icons.call),
                   title: Text(log.sessionName ?? 'Session #${log.id}'),
                   subtitle: Text('${log.status} · ${log.startedAt}'),
-                  trailing: log.score != null ? Text('${log.score!.round()}') : null,
+                  trailing: log.score != null
+                      ? Text('${log.score!.round()}')
+                      : null,
                   onTap: () => context.push('/call-log/${log.id}', extra: log),
                 ),
               );
