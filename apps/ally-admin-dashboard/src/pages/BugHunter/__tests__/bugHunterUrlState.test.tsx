@@ -40,6 +40,7 @@ const Probe: FC = () => {
       <p data-testid="has-filters">{String(hasFilterParams(state))}</p>
 
       <button onClick={() => state.setBug("bug-1")}>open bug</button>
+      <button onClick={() => state.setBug(null)}>close bug</button>
       <button onClick={() => state.setSearch("terms")}>search terms</button>
       <button onClick={() => state.setSearch("all")}>search all</button>
       <button onClick={() => state.setBucket("needs_you")}>bucket needs_you</button>
@@ -123,6 +124,16 @@ describe("reading the query string", () => {
    * "all" rather than reaching a filter that then matches nothing and looks
    * broken — and the page is not the place to complain about a mistyped link.
    */
+  it("opens the bug a fix-PR link names with the old `?finding=` param", () => {
+    mount("/?finding=abc");
+    expect(parsed().bug).toBe("abc");
+  });
+
+  it("prefers `bug` when a link carries both", () => {
+    mount("/?bug=abc&finding=old");
+    expect(parsed().bug).toBe("abc");
+  });
+
   it("falls back to the default for a value that isn't in the enum", () => {
     mount("/?bucket=urgent&sev=critical&src=telepathy&age=eternal&size=7&sort=vibes");
     const state = parsed();
@@ -238,6 +249,19 @@ describe("writing the query string", () => {
    * cost four presses of Back to undo. Replacing means there is nothing behind
    * the first entry to go back to.
    */
+  it("closes a drawer opened from `?finding=`, rather than leaving the alias to reopen it", () => {
+    mount("/?finding=abc&repo=ally-be");
+    fireEvent.click(screen.getByText("close bug"));
+    expect(parsed().bug).toBeNull();
+    expect(search()).toBe("?repo=ally-be");
+  });
+
+  it("opens another bug from a `?finding=` link under `bug`, dropping the alias", () => {
+    mount("/?finding=abc");
+    fireEvent.click(screen.getByText("open bug"));
+    expect(search()).toBe("?bug=bug-1");
+  });
+
   it("replaces history when the search changes", () => {
     mount();
     fireEvent.click(screen.getByText("search terms"));

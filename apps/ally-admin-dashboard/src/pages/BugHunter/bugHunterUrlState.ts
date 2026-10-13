@@ -75,6 +75,13 @@ export const BUG_HUNTER_PARAM = {
   /** The finding whose drawer is open. */
   bug: "bug",
   /**
+   * Read-only alias for `bug`. Bug Hunter's fix-PR bodies linked to
+   * `?finding=<id>` until ally-be#625, and those PRs are still on GitHub.
+   * Read only when `bug` is absent and never written; opening or closing a
+   * drawer drops it, so closing a bug opened this way actually closes it.
+   */
+  legacyBug: "finding",
+  /**
    * The open tab. Still spelled `bucket` so links from before the tabs keep
    * working: the old chip values (`problem`, `in_review`, …) are read through
    * `parseBucket`, which maps each onto the tab it now lives under.
@@ -269,7 +276,10 @@ export const useBugHunterUrlState = (): BugHunterUrlState & BugHunterUrlActions 
     const rawAge = readFacet<AgeFilter>(searchParams, BUG_HUNTER_PARAM.age, AGE_VALUES);
 
     return {
-      bug: searchParams.get(BUG_HUNTER_PARAM.bug) || null,
+      bug:
+        searchParams.get(BUG_HUNTER_PARAM.bug) ||
+        searchParams.get(BUG_HUNTER_PARAM.legacyBug) ||
+        null,
       bucket: parseBucket(searchParams.get(BUG_HUNTER_PARAM.bucket)),
       search: searchParams.get(BUG_HUNTER_PARAM.search) ?? "",
       // Unvalidated for the same reason as `repos`: this hook cannot see the
@@ -343,7 +353,8 @@ export const useBugHunterUrlState = (): BugHunterUrlState & BugHunterUrlActions 
   );
 
   const setBug = useCallback(
-    (id: string | null) => write({ [BUG_HUNTER_PARAM.bug]: id }, { push: true }),
+    (id: string | null) =>
+      write({ [BUG_HUNTER_PARAM.bug]: id, [BUG_HUNTER_PARAM.legacyBug]: null }, { push: true }),
     [write],
   );
 
