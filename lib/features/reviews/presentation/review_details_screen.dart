@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../data/reviews_repository.dart';
 
@@ -16,7 +17,16 @@ class ReviewDetailsScreen extends ConsumerWidget {
     final reviewAsync = ref.watch(reviewDetailProvider(reviewId));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Review')),
+      appBar: AppBar(
+        title: const Text('Review'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.emoji_emotions_outlined),
+            tooltip: 'Reactions',
+            onPressed: () => context.push('/reactions/$reviewId'),
+          ),
+        ],
+      ),
       body: reviewAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(child: Text('Failed to load review: $error')),

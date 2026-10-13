@@ -71,6 +71,12 @@ class _SimulationFeedbackScreenState
                   const SizedBox(height: 16),
                   const Text('Thanks for your feedback!'),
                   const SizedBox(height: 24),
+                  OutlinedButton(
+                    onPressed: () =>
+                        context.push('/share-for-review/${widget.scenarioSessionId}'),
+                    child: const Text('Share this session for review'),
+                  ),
+                  const SizedBox(height: 12),
                   FilledButton(
                     onPressed: () => context.go('/home'),
                     child: const Text('Back to home'),

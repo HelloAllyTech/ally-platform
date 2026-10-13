@@ -37,6 +37,18 @@ class ReviewsRepository {
   Future<void> markAsRead(String reviewId) async {
     await _dio.patch<void>('/scenario-session-reviews/$reviewId/mark-read');
   }
+
+  /// Matches ally-mobile (React Native)'s `CreateReviewRequest` exactly:
+  /// just the session being shared plus a note.
+  Future<void> createReview({
+    required String scenarioSessionId,
+    required String note,
+  }) async {
+    await _dio.post<void>(
+      '/scenario-session-reviews',
+      data: {'scenarioSessionId': scenarioSessionId, 'note': note},
+    );
+  }
 }
 
 final reviewsRepositoryProvider = Provider<ReviewsRepository>((ref) {

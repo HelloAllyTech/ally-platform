@@ -20,11 +20,15 @@ import '../../features/courses/presentation/course_progress_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/leaderboard/presentation/leaderboard_screen.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
+import '../../features/reactions/presentation/reactions_screen.dart';
 import '../../features/reviews/presentation/review_details_screen.dart';
 import '../../features/reviews/presentation/review_screen.dart';
+import '../../features/reviews/presentation/share_for_review_screen.dart';
 import '../../features/roleplay/presentation/roleplay_voice_screen.dart';
 import '../../features/scribe/presentation/scribe_recording_screen.dart';
 import '../../features/search/presentation/search_screen.dart';
+import '../../features/simulations/presentation/case_details_screen.dart';
+import '../../features/simulations/presentation/cases_list_screen.dart';
 import '../../features/suspended/presentation/suspended_account_screen.dart';
 import '../../features/simulations/presentation/simulation_details_screen.dart';
 import '../../features/simulations/presentation/simulation_feedback_screen.dart';
@@ -176,6 +180,26 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/box-breathing',
         builder: (context, state) => const BoxBreathingScreen(),
+      ),
+      GoRoute(
+        path: '/cases',
+        builder: (context, state) => const CasesListScreen(),
+      ),
+      GoRoute(
+        path: '/cases/:caseId',
+        builder: (context, state) =>
+            CaseDetailsScreen(caseId: state.pathParameters['caseId']!),
+      ),
+      GoRoute(
+        path: '/share-for-review/:scenarioSessionId',
+        builder: (context, state) => ShareForReviewScreen(
+          scenarioSessionId: state.pathParameters['scenarioSessionId']!,
+        ),
+      ),
+      GoRoute(
+        path: '/reactions/:reviewId',
+        builder: (context, state) =>
+            ReactionsScreen(reviewId: state.pathParameters['reviewId']!),
       ),
     ],
   );

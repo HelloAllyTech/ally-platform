@@ -71,6 +71,28 @@ class SimulationsRepository {
     await _dio.post<void>('/learn/scenario-session/$scenarioSessionId/end');
   }
 
+  /// Cases (`/learn/cases`) are structurally identical to scenario paths in
+  /// the backend contract — ally-mobile (React Native)'s `src/types/
+  /// simulations.ts` literally defines `Case = SimulationPath` and
+  /// `CaseDetails = SimulationPathDetails` as type aliases, not separate
+  /// shapes. Reusing the same models here rather than duplicating them.
+  Future<List<SimulationPath>> getCases() async {
+    final response = await _dio.get<Map<String, dynamic>>('/learn/cases');
+    final data = response.data?['data'] as List<dynamic>? ?? [];
+    return data
+        .map((e) => SimulationPath.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<SimulationPathDetails> getCaseDetails(String caseId) async {
+    final response = await _dio.get<Map<String, dynamic>>('/learn/cases/$caseId');
+    return SimulationPathDetails.fromJson(response.data!);
+  }
+
+  Future<void> createCaseSession(String caseId) async {
+    await _dio.post<void>('/learn/cases/$caseId/create-session');
+  }
+
   Future<void> addSimulationFeedback({
     required String scenarioSessionId,
     required int rating,
@@ -112,4 +134,13 @@ final scenarioPathsProvider = FutureProvider<List<SimulationPath>>((ref) {
 final simulationPathDetailsProvider =
     FutureProvider.family<SimulationPathDetails, String>((ref, pathId) {
   return ref.watch(simulationsRepositoryProvider).getSimulationPathDetails(pathId);
+});
+
+final casesProvider = FutureProvider<List<SimulationPath>>((ref) {
+  return ref.watch(simulationsRepositoryProvider).getCases();
+});
+
+final caseDetailsProvider =
+    FutureProvider.family<SimulationPathDetails, String>((ref, caseId) {
+  return ref.watch(simulationsRepositoryProvider).getCaseDetails(caseId);
 });
