@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/auth/auth_state.dart';
+import '../../../core/localization/translate_ref.dart';
 import '../data/account_repository.dart';
 
 /// Port of ally-mobile (React Native)'s `ProfileSettingsScreen` — real
@@ -35,7 +36,7 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
       await ref.read(accountRepositoryProvider).uploadProfileImage(File(picked.path));
       ref.invalidate(currentUserProvider);
     } catch (e) {
-      setState(() => _error = 'Failed to upload photo: $e');
+      setState(() => _error = '${ref.tr('errors.uploadProfileImage')}: $e');
     } finally {
       if (mounted) setState(() => _isUploading = false);
     }
@@ -47,7 +48,7 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
       await ref.read(accountRepositoryProvider).deleteProfileImage(profileImageUrl);
       ref.invalidate(currentUserProvider);
     } catch (e) {
-      setState(() => _error = 'Failed to remove photo: $e');
+      setState(() => _error = '${ref.tr('errors.removeProfileImage')}: $e');
     } finally {
       if (mounted) setState(() => _isUploading = false);
     }
@@ -58,10 +59,11 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
     final userAsync = ref.watch(currentUserProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Profile')),
+      appBar: AppBar(title: Text(ref.t('profile.settings.title'))),
       body: userAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(child: Text('Failed to load profile: $error')),
+        error: (error, _) =>
+            Center(child: Text('${ref.t('common.somethingWentWrong')} $error')),
         data: (user) => ListView(
           padding: const EdgeInsets.all(24),
           children: [
@@ -86,11 +88,14 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
               child: Wrap(
                 spacing: 8,
                 children: [
-                  TextButton(onPressed: _isUploading ? null : _pickAndUpload, child: const Text('Change photo')),
+                  TextButton(
+                    onPressed: _isUploading ? null : _pickAndUpload,
+                    child: Text(ref.t('profile.settings.changeImage')),
+                  ),
                   if (user.profileImageUrl != null)
                     TextButton(
                       onPressed: _isUploading ? null : () => _removePhoto(user.profileImageUrl!),
-                      child: const Text('Remove'),
+                      child: Text(ref.t('profile.settings.removeImage')),
                     ),
                 ],
               ),
@@ -100,7 +105,7 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
             const SizedBox(height: 16),
             Center(
               child: Text(
-                user.name.isNotEmpty ? user.name : '(name not set)',
+                user.name.isNotEmpty ? user.name : ref.t('profile.settings.nameNotSet'),
                 style: Theme.of(context).textTheme.titleLarge,
               ),
             ),
@@ -109,14 +114,14 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
             const SizedBox(height: 24),
             ListTile(
               leading: const Icon(Icons.tune),
-              title: const Text('Preferences'),
+              title: Text(ref.t('preferences.title')),
               trailing: const Icon(Icons.arrow_forward_ios, size: 16),
               onTap: () => context.push('/preferences'),
             ),
             const SizedBox(height: 8),
             OutlinedButton(
               onPressed: () => ref.read(authControllerProvider.notifier).logout(),
-              child: const Text('Log out'),
+              child: Text(ref.t('user.logout')),
             ),
           ],
         ),

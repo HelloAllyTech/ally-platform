@@ -210,7 +210,9 @@
     "namePlaceholder": "Enter your full name",
     "submit": "Continue",
     "errorTitle": "Something went wrong",
-    "errorDescription": "We couldn't save your profile. Please try again."
+    "errorDescription": "We couldn't save your profile. Please try again.",
+    "phoneLabel": "Phone (optional)",
+    "required": "Required"
   },
   "boxBreathing": {
     "inhale": "Inhale now",
@@ -267,6 +269,7 @@
   },
   "calls": {
     "title": "Session Logs",
+    "sessionNumber": "Session #{{id}}",
     "header": {
       "title": "Session",
       "subtitle": "Logs"
@@ -578,9 +581,11 @@
   "community": {
     "title": "Community",
     "you": "You",
+    "yourRank": "Your rank",
     "emptyLeaderboard": "No leaderboard data available",
     "emptyLeaderBoardDescription": "Start practicing to see your progress and compete with others",
     "loadingMore": "Loading more...",
+    "loadError": "Failed to load leaderboard",
     "filters": {
       "last7days": "Last 7 days",
       "last28days": "Last 28 days",
@@ -1166,8 +1171,13 @@
       "error_image_size": "Image must be under 2MB and have the correct aspect ratio.",
       "upload_hint": "PNG or JPG files only 1:1 ratio (max 2mb)",
       "language": "Language",
-      "leaderboardNotification": "Leaderboard Notification"
+      "leaderboardNotification": "Leaderboard Notification",
+      "nameNotSet": "(name not set)"
     }
+  },
+  "preferences": {
+    "title": "Preferences",
+    "defaultLanguage": "Default simulation language"
   },
   "review": {
     "title": "Review",
@@ -1737,6 +1747,11 @@
   },
   "callSummary": {
     "enterDetail": "Enter detail",
+    "startedLabel": "Started",
+    "endedLabel": "Ended",
+    "scoreLabel": "Score",
+    "saveChanges": "Save changes",
+    "noChanges": "No changes",
     "header": {
       "title": "Session",
       "subtitle": "Summary",

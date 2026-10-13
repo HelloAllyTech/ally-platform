@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/localization/translate_ref.dart';
 import '../data/leaderboard_repository.dart';
 
 /// Port of ally-mobile (React Native)'s `LeaderboardScreen` — ranked list,
@@ -17,7 +18,7 @@ class LeaderboardScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Leaderboard'),
+        title: Text(ref.t('community.title')),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 8),
@@ -41,7 +42,7 @@ class LeaderboardScreen extends ConsumerWidget {
       ),
       body: leaderboardAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(child: Text('Failed to load leaderboard: $error')),
+        error: (error, _) => Center(child: Text('${ref.t('community.loadError')}: $error')),
         data: (entries) => Column(
           children: [
             myRankAsync.maybeWhen(
@@ -52,8 +53,11 @@ class LeaderboardScreen extends ConsumerWidget {
                       color: Theme.of(context).colorScheme.primaryContainer,
                       child: ListTile(
                         leading: CircleAvatar(child: Text('${myRank.rank}')),
-                        title: const Text('Your rank'),
-                        subtitle: Text('${myRank.minutesPlayed} min · ${myRank.badgeCount} badges'),
+                        title: Text(ref.t('community.yourRank')),
+                        subtitle: Text(
+                          '${myRank.minutesPlayed} ${ref.t('community.duration.minute')} · '
+                          '${myRank.badgeCount} ${ref.t('community.table.badges')}',
+                        ),
                       ),
                     ),
               orElse: () => const SizedBox.shrink(),
@@ -73,7 +77,7 @@ class LeaderboardScreen extends ConsumerWidget {
                           : null,
                     ),
                     title: Text(entry.name),
-                    trailing: Text('${entry.minutesPlayed} min'),
+                    trailing: Text('${entry.minutesPlayed} ${ref.t('community.duration.minute')}'),
                   );
                 },
               ),

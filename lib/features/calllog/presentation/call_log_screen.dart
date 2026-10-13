@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/localization/translate_ref.dart';
 import '../data/call_log_repository.dart';
 
 /// Scoped port of ally-mobile (React Native)'s `CallLog` screen — list of
@@ -14,14 +15,14 @@ class CallLogScreen extends ConsumerWidget {
     final callLogsAsync = ref.watch(callLogsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Call log')),
+      appBar: AppBar(title: Text(ref.t('calls.title'))),
       body: callLogsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) =>
-            Center(child: Text('Failed to load call log: $error')),
+            Center(child: Text('${ref.t('common.somethingWentWrong')} $error')),
         data: (logs) {
           if (logs.isEmpty) {
-            return const Center(child: Text('No calls yet.'));
+            return Center(child: Text(ref.t('calls.fallback.callEmptyTitle')));
           }
           return ListView.separated(
             itemCount: logs.length,
@@ -41,7 +42,9 @@ class CallLogScreen extends ConsumerWidget {
                     ref.read(callLogRepositoryProvider).archiveCallLog(log.id),
                 child: ListTile(
                   leading: const Icon(Icons.call),
-                  title: Text(log.sessionName ?? 'Session #${log.id}'),
+                  title: Text(
+                    log.sessionName ?? ref.t('calls.sessionNumber', {'id': log.id}),
+                  ),
                   subtitle: Text('${log.status} · ${log.startedAt}'),
                   trailing: log.score != null
                       ? Text('${log.score!.round()}')
