@@ -15,6 +15,15 @@ class AppConfig {
     defaultValue: '',
   );
 
+  /// Mirrors `env.MICROPHONE_SOCKET_PATH` — the Socket.IO namespace Scribe's
+  /// live recording connects to (ally-be's CLAUDE.md lists it as
+  /// `/microphone-chat`), configurable rather than hardcoded for the same
+  /// reason the RN app keeps it in env rather than a constant.
+  static const String microphoneSocketPath = String.fromEnvironment(
+    'MICROPHONE_SOCKET_PATH',
+    defaultValue: '/microphone-chat',
+  );
+
   static String get requireApiBaseUrl {
     if (apiBaseUrl.isEmpty) {
       throw StateError(

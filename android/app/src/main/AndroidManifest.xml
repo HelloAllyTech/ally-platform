@@ -1,4 +1,24 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+      The central architectural fix this rewrite exists to validate: the
+      React Native app (android/app/src/main/AndroidManifest.xml in
+      ally-mobile) declares NO foreground service at all. On Android 14+
+      (API 34), the OS can silently stop microphone capture once the app is
+      backgrounded unless a foreground service with the "microphone" type is
+      both declared here and actively running during recording. This is the
+      most likely root cause of the live recording reliability problems that
+      motivated the whole migration — not something fixable by better JS/
+      bridge code, since RN never had a path to declare this at all.
+    -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
     <application
         android:label="ally_mobile_flutter"
         android:name="${applicationName}"
@@ -30,6 +50,15 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <!-- flutter_foreground_task's own service class — do not rename.
+             foregroundServiceType="microphone" is the specific declaration
+             Android 14+ checks for before allowing background mic capture;
+             see the top-of-file comment for why this is the whole point. -->
+        <service
+            android:name="com.pravera.flutter_foreground_task.service.ForegroundService"
+            android:foregroundServiceType="microphone"
+            android:exported="false" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

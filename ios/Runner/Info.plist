@@ -26,6 +26,17 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<!-- iOS's side of the same fix as the Android foreground-service
+	     declaration below: without the "audio" background mode, both Scribe
+	     recording and LiveKit roleplay voice would be suspended the moment
+	     the app backgrounds. LiveKit's own docs list this as required setup
+	     for background audio on iOS (see Flutter-Migration-Plan.pdf). -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+	</array>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Ally needs microphone access to record counselling sessions and power live roleplay practice.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

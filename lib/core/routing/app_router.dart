@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
+import '../../features/roleplay/presentation/roleplay_voice_screen.dart';
+import '../../features/scribe/presentation/scribe_recording_screen.dart';
 import '../auth/auth_state.dart';
 
 /// Mirrors RootNavigator's behavior (mentioned in `api.ts`'s logout comment:
@@ -26,6 +28,28 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(path: '/home', builder: (context, state) => const HomeScreen()),
+      GoRoute(
+        path: '/scribe',
+        builder: (context, state) {
+          // Dev-only: real navigation will carry the actual signed-in
+          // user's id once auth/profile screens are ported.
+          return const ScribeRecordingScreen(userId: 'dev-user');
+        },
+      ),
+      GoRoute(
+        path: '/roleplay',
+        builder: (context, state) {
+          // `extra` mirrors RN's route.params for liveKitServerUrl/
+          // accessToken — a real session-creation screen supplies these in
+          // a later phase; this route exists to exercise the connection
+          // itself against a real backend-issued pair.
+          final params = state.extra as Map<String, String>? ?? const {};
+          return RoleplayVoiceScreen(
+            liveKitServerUrl: params['liveKitServerUrl'] ?? '',
+            accessToken: params['accessToken'] ?? '',
+          );
+        },
+      ),
     ],
   );
 });
