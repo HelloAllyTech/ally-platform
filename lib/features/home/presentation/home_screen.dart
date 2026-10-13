@@ -23,6 +23,11 @@ class HomeScreen extends ConsumerWidget {
             const Text('Phase 0 shell — authenticated.'),
             const SizedBox(height: 16),
             FilledButton(
+              onPressed: () => context.push('/courses'),
+              child: const Text('Phase 2: Courses'),
+            ),
+            const SizedBox(height: 8),
+            FilledButton(
               onPressed: () => context.push('/scribe'),
               child: const Text('Phase 1: Scribe recording'),
             ),

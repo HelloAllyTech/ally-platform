@@ -3,6 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/auth/presentation/login_screen.dart';
+import '../../features/courses/data/course_models.dart';
+import '../../features/courses/presentation/course_detail_screen.dart';
+import '../../features/courses/presentation/course_item_player_screen.dart';
+import '../../features/courses/presentation/course_overview_screen.dart';
+import '../../features/courses/presentation/course_progress_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/roleplay/presentation/roleplay_voice_screen.dart';
 import '../../features/scribe/presentation/scribe_recording_screen.dart';
@@ -34,6 +39,27 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           // Dev-only: real navigation will carry the actual signed-in
           // user's id once auth/profile screens are ported.
           return const ScribeRecordingScreen(userId: 'dev-user');
+        },
+      ),
+      GoRoute(
+        path: '/courses',
+        builder: (context, state) => const CourseOverviewScreen(),
+      ),
+      GoRoute(
+        path: '/courses/:trackId',
+        builder: (context, state) =>
+            CourseDetailScreen(trackId: state.pathParameters['trackId']!),
+      ),
+      GoRoute(
+        path: '/courses/:trackId/progress',
+        builder: (context, state) =>
+            CourseProgressScreen(trackId: state.pathParameters['trackId']!),
+      ),
+      GoRoute(
+        path: '/courses/item/:itemId',
+        builder: (context, state) {
+          final item = state.extra as TrackDetailItem;
+          return CourseItemPlayerScreen(item: item);
         },
       ),
       GoRoute(
