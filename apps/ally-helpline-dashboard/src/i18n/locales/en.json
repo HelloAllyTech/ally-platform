@@ -1689,6 +1689,7 @@
       "answerQuestionsToContinue": "Answer the questions to continue",
       "resourcesHeading": "Resources",
       "openInNewTab": "Open in new tab",
+      "embedTimedOut": "This page couldn't load here — opened in a new tab instead.",
       "question": {
         "title": "Quick check",
         "submit": "Check answer",
