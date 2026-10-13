@@ -89,7 +89,15 @@ class _VideoInterjectionDialogState extends ConsumerState<VideoInterjectionDialo
                     child: QuizQuestionWidget(
                       question: widget.interjection.question,
                       showResult: _result,
-                      onChanged: (answer) => _answer = answer,
+                      // Must trigger a rebuild of *this* widget, not just
+                      // mutate the field — `QuizQuestionWidget`'s own
+                      // `setState()` only rebuilds its own subtree, so
+                      // without this the Submit button below (built here,
+                      // not inside QuizQuestionWidget) never reflects that
+                      // an answer was chosen and stays permanently
+                      // disabled. Found via widget testing — see
+                      // video_interjection_dialog_test.dart.
+                      onChanged: (answer) => setState(() => _answer = answer),
                     ),
                   ),
                 ),

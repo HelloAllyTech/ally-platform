@@ -70,6 +70,13 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
   mocktail: ^1.0.5
+  # Used directly in tests to fake the `video_player`/`url_launcher`
+  # platform channels that don't exist under `flutter test` (see
+  # test/features/courses/presentation/video/fake_video_player_platform.dart
+  # and video_fallback_card_test.dart) — previously only transitive
+  # dependencies of video_player/url_launcher.
+  video_player_platform_interface: ^6.9.0
+  url_launcher_platform_interface: ^2.3.2
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
