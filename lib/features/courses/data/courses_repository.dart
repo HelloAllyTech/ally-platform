@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
 import 'course_models.dart';
+import 'quiz_models.dart';
+import 'start_item_payload.dart';
 
 /// Ported from ally-mobile (React Native)'s `src/services/coursesApi.ts` —
 /// same routes (`src/constants/general.ts`'s `API_ROUTES.TRACKS`), same
@@ -11,11 +13,9 @@ import 'course_models.dart';
 /// provider after a mutation instead, which is the Riverpod-idiomatic
 /// equivalent for the mutations this phase actually needs.
 ///
-/// Scope for this pass: the core read/progress endpoints and the mutations
-/// needed for a working article/video flow. Quiz submission (multiple
-/// question types: MCQ, Likert, matching, fill-blank), interjections, and
-/// journal drafts are real further work — CourseItemPlayerScreen's ported
-/// version here only handles ARTICLE and VIDEO items end-to-end.
+/// Scope: ARTICLE, VIDEO, and QUIZ items end-to-end (all 8 quiz question
+/// types). JOURNAL and GAME item players are real further work —
+/// CourseDetailScreen routes those to a "not ported yet" message.
 class CoursesRepository {
   CoursesRepository(this._dio);
 
@@ -45,8 +45,12 @@ class CoursesRepository {
     await _dio.post<void>('/learn/tracks/$trackId/enroll');
   }
 
-  Future<void> startTrackItem(String itemId) async {
-    await _dio.post<void>('/learn/tracks/items/$itemId/start');
+  /// Returns the real per-type content payload (quiz questions, article
+  /// HTML + inline questions, video URL + interjections) — same
+  /// discriminated-union contract as RN's `StartTrackItemResponse`.
+  Future<StartItemPayload> startTrackItem(String itemId) async {
+    final response = await _dio.post<Map<String, dynamic>>('/learn/tracks/items/$itemId/start');
+    return StartItemPayload.fromJson(response.data!);
   }
 
   Future<void> markArticleRead(String itemId) async {
@@ -63,6 +67,49 @@ class CoursesRepository {
       '/learn/tracks/items/$itemId/video-progress',
       data: {'watchedPct': watchedPct},
     );
+  }
+
+  Future<({bool correct, String correctOptionId, String? explanation})> submitArticleQuestionAnswer({
+    required String itemId,
+    required String questionId,
+    required String selectedOptionId,
+  }) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/learn/tracks/items/$itemId/article-questions/$questionId/answer',
+      data: {'selectedOptionId': selectedOptionId},
+    );
+    return (
+      correct: response.data!['correct'] as bool,
+      correctOptionId: response.data!['correctOptionId'] as String,
+      explanation: response.data!['explanation'] as String?,
+    );
+  }
+
+  Future<({bool? correct, int pointsAwarded})> submitInterjectionAnswer({
+    required String itemId,
+    required String interjectionId,
+    required QuizAnswerInput answer,
+  }) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/learn/tracks/items/$itemId/interjections/$interjectionId/answer',
+      data: answer.toJson(),
+    );
+    final grading = response.data!['grading'] as Map<String, dynamic>;
+    return (
+      correct: response.data!['correct'] as bool?,
+      pointsAwarded: (grading['pointsAwarded'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  Future<QuizAttemptResult> submitQuizAttempt({
+    required String itemId,
+    required List<QuizAnswerInput> answers,
+  }) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/learn/tracks/items/$itemId/quiz-attempts',
+      data: {'answers': answers.map((a) => a.toJson()).toList()},
+    );
+    return QuizAttemptResult.fromJson(response.data!);
   }
 }
 

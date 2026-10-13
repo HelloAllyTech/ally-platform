@@ -82,7 +82,8 @@ class CourseDetailScreen extends ConsumerWidget {
                         ? null
                         : () {
                             if (item.type == TrackItemType.article ||
-                                item.type == TrackItemType.video) {
+                                item.type == TrackItemType.video ||
+                                item.type == TrackItemType.quiz) {
                               context.push(
                                 '/courses/item/${item.id}',
                                 extra: item,
