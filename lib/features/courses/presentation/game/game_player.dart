@@ -83,8 +83,19 @@ class _GamePlayerState extends ConsumerState<GamePlayer> {
     super.initState();
     _bestScore = widget.payload.gameBestScore;
     // The server already completed this item by the time startTrackItem
-    // returned — tell the player immediately so Next unlocks.
-    widget.onCompleted();
+    // returned — tell the player immediately so Next unlocks. Deferred to
+    // a post-frame callback rather than called synchronously here: the
+    // parent (`CourseItemPlayerScreenState`)'s `onCompleted` calls its own
+    // `setState()`, and calling that synchronously from this child's
+    // `initState` — i.e. while the parent is still partway through
+    // mounting the tree it just built, not itself "currently building" —
+    // throws "setState() or markNeedsBuild() called during build" (found
+    // via widget testing; see game_player_test.dart). A post-frame
+    // callback still fires effectively immediately (before the next
+    // frame), just safely outside the build phase.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) widget.onCompleted();
+    });
     _loadGame();
   }
 
