@@ -485,6 +485,13 @@ export interface BugFinding {
   /** The finder's or reporter's own words, before an admin rewrote them. Null when nobody has edited this bug. */
   originalDescription: string | null;
   descriptionEditedBy: number | null;
+  /**
+   * The names behind the five "who did this" ids, resolved server-side in the
+   * same lookup as `stageOverriddenByName`. Optional because a backend older
+   * than this build omits them; the drawer then says "An admin" rather than
+   * printing a raw user id.
+   */
+  descriptionEditedByName?: string | null;
   descriptionEditedAt: string | null;
   file: string | null;
   evidence: string | null;
@@ -506,8 +513,10 @@ export interface BugFinding {
   escalationQuestion: string | null;
   escalationAnswer: string | null;
   escalationAnsweredBy: number | null;
+  escalationAnsweredByName?: string | null;
   escalationAnsweredAt: string | null;
   decidedBy: number | null;
+  decidedByName?: string | null;
   decidedAt: string | null;
   /** Why this was declined. Null on anything not declined, and on rows declined before the reason was recorded. */
   decisionReason: BugFindingDecisionReason | null;
@@ -573,9 +582,11 @@ export interface BugFinding {
   releaseTag: string | null;
   releaseRunUrl: string | null;
   releasedBy: number | null;
+  releasedByName?: string | null;
   releasedAt: string | null;
   /** The admin who pressed "Stop fix session". */
   cancelledBy: number | null;
+  cancelledByName?: string | null;
   cancelledAt: string | null;
   createdAt: string;
   updatedAt: string;

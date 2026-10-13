@@ -52,7 +52,7 @@ describe("PipelineRail", () => {
   });
 
   it("does not travel while the bug is stopped on a failure or a question", () => {
-    (["error", "waiting"] as const).forEach(variant => {
+    (["error", "waiting", "done", "stopped"] as const).forEach(variant => {
       const { queryByTestId, unmount } = render(
         <PipelineRail stage="fix" dense flowing variant={variant} />,
       );
@@ -67,12 +67,39 @@ describe("PipelineRail", () => {
     expect(queryByTestId("pipeline-rail-flow")).not.toBeInTheDocument();
   });
 
+  /**
+   * A released bug has finished the last stage, and a declined or stopped one
+   * is going nowhere — so neither may sit on the rail pulsing amber as if work
+   * were still under way. RELEASED used to show Ship as the live current node,
+   * and DISMISSED/REJECTED pulsed at Verify forever.
+   */
+  it("settles a released bug: every node done, nothing pulsing", () => {
+    const { container } = render(<PipelineRail stage="ship" variant="done" />);
+
+    expect(screen.queryByTestId("pipeline-rail-pulse")).not.toBeInTheDocument();
+    // Six filled green nodes, the last one included.
+    expect(container.querySelectorAll(".bg-green-500.border-green-500")).toHaveLength(6);
+  });
+
+  it("settles a stopped bug where it stopped, greyed and still", () => {
+    const { container } = render(<PipelineRail stage="verify" variant="stopped" />);
+
+    expect(screen.queryByTestId("pipeline-rail-pulse")).not.toBeInTheDocument();
+    expect(container.querySelectorAll(".bg-green-500.border-green-500")).toHaveLength(1);
+    expect(container.querySelector(".bg-neutral-100.border-neutral-400")).not.toBeNull();
+  });
+
+  it("still pulses on a bug that is live at its stage", () => {
+    render(<PipelineRail stage="fix" />);
+    expect(screen.getByTestId("pipeline-rail-pulse")).toBeInTheDocument();
+  });
+
   it("renders every stage and every variant without throwing, dense and regular alike", () => {
     PIPELINE_STAGES.forEach(stage => {
       const { unmount } = render(<PipelineRail stage={stage} dense />);
       unmount();
     });
-    (["error", "waiting"] as const).forEach(variant => {
+    (["error", "waiting", "done", "stopped"] as const).forEach(variant => {
       const { unmount } = render(<PipelineRail stage="fix" variant={variant} dense />);
       unmount();
     });
@@ -83,7 +110,7 @@ describe("PipelineRail", () => {
       const { unmount } = render(<PipelineRail stage={stage} />);
       unmount();
     });
-    (["error", "waiting"] as const).forEach(variant => {
+    (["error", "waiting", "done", "stopped"] as const).forEach(variant => {
       const { unmount } = render(<PipelineRail stage="fix" variant={variant} />);
       unmount();
     });

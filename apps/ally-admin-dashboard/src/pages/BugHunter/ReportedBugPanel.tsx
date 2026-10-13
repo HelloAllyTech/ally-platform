@@ -74,11 +74,6 @@ export const ReportedBugPanel: React.FC<{ report: ReportedBugContext }> = ({ rep
         <span className="text-xs text-typography-500">
           · {new Date(report.reportedAt).toLocaleString()}
         </span>
-        {report.tenantId && (
-          <span className="text-xs text-typography-500">
-            · {en.bugHunter.reporterTenant}: {report.tenantId}
-          </span>
-        )}
       </div>
 
       <p className="text-xs font-semibold text-typography-600 mt-2">
