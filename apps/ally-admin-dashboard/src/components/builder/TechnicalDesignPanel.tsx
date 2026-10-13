@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -44,6 +44,8 @@ interface TechnicalDesignPanelProps {
   prdReady: boolean;
   /** True while a build is running: the design is what it is working to. */
   locked?: boolean;
+  /** Scroll to this panel when it mounts — it sits at the foot of a long PRD. */
+  scrollIntoViewOnMount?: boolean;
 }
 
 /** The 400 message the backend sends names the real reason; prefer it. */
@@ -70,8 +72,13 @@ export const TechnicalDesignPanel: React.FC<TechnicalDesignPanelProps> = ({
   designReadiness,
   prdReady,
   locked = false,
+  scrollIntoViewOnMount = false,
 }) => {
   const strings = en.builder.design;
+  const sectionRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (scrollIntoViewOnMount) sectionRef.current?.scrollIntoView?.({ block: "start" });
+  }, [scrollIntoViewOnMount]);
   const [startDesign, { isLoading: isStarting }] = useStartBuilderDesignMutation();
   const [approveDesign, { isLoading: isApproving }] = useApproveBuilderDesignMutation();
   const [actionError, setActionError] = useState<string | null>(null);
@@ -157,6 +164,7 @@ export const TechnicalDesignPanel: React.FC<TechnicalDesignPanelProps> = ({
 
   return (
     <section
+      ref={sectionRef}
       aria-label={strings.heading}
       className="mt-2 border-t-2 border-neutral-200 pt-4"
       data-testid="technical-design-panel"

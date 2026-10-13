@@ -3904,7 +3904,8 @@ export const en = {
       retrySubmit: "Retry build",
       designNotApprovedTitle: "Approve the technical design first",
       designNotApprovedBody:
-        "A build is held to an approved design's scope and test map. Draft the design from the PRD panel, read it, and approve it.",
+        "A build is held to an approved design's scope and test map. Read the design, then approve it — or draft one if there is none yet.",
+      reviewDesign: "Review the design",
       designStaleTitle: "The design is out of date",
       designStaleBody:
         "The PRD changed after the technical design was approved. Redraft and approve it again before building.",

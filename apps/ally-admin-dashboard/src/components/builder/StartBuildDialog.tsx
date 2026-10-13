@@ -48,6 +48,12 @@ interface StartBuildDialogProps {
    * fresh.
    */
   designBlock?: "notApproved" | "stale" | null;
+  /**
+   * Opens the technical design, where Approve and Redraft live. Without it a
+   * blocked dialog names the fix and offers no way to it: once a session has
+   * run, the PRD (and the design inside it) sits folded in a side rail.
+   */
+  onReviewDesign?: () => void;
   onStarted: () => void;
 }
 
@@ -77,6 +83,7 @@ export const StartBuildDialog: React.FC<StartBuildDialogProps> = ({
   readiness,
   retryError,
   designBlock = null,
+  onReviewDesign,
   onStarted,
 }) => {
   const strings = en.builder.startBuildDialog;
@@ -190,7 +197,13 @@ export const StartBuildDialog: React.FC<StartBuildDialogProps> = ({
               subtitle={
                 designBlock === "stale" ? strings.designStaleBody : strings.designNotApprovedBody
               }
-            />
+            >
+              {onReviewDesign && (
+                <Button kind="tertiary" size="sm" className="mt-2" onClick={onReviewDesign}>
+                  {strings.reviewDesign}
+                </Button>
+              )}
+            </InlineNotification>
           )}
 
           {!readiness.ready && unreadySections.length > 0 && (

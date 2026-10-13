@@ -157,6 +157,9 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   // Below `lg` both PRD asides are hidden, so the document opens as a sheet instead.
   const [showPrdSheet, setShowPrdSheet] = useState(false);
+  // Opened from the start dialog's "Review the design": the sheet lands on the
+  // design rather than the top of the PRD above it.
+  const [focusDesign, setFocusDesign] = useState(false);
   // Set when the server session vanishes mid-turn (SSE `session_not_found`,
   // e.g. a local DB reset) — the interview can't continue against an id that
   // no longer exists, so the composer is replaced by a "start over" state
@@ -335,15 +338,19 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
   const technicalDesign = session.prd?.technicalDesign ?? null;
   const designReadiness = session.designReadiness ?? null;
   const designBlock = designBuildBlock(technicalDesign, designReadiness);
-  const designSection = (
-    <TechnicalDesignPanel
-      sessionId={sessionId}
-      design={technicalDesign}
-      designReadiness={designReadiness}
-      prdReady={readiness.ready}
-      locked={PRD_FROZEN.includes(effectiveStatus)}
-    />
-  );
+  const designPanelProps = {
+    sessionId,
+    design: technicalDesign,
+    designReadiness,
+    prdReady: readiness.ready,
+    locked: PRD_FROZEN.includes(effectiveStatus),
+  };
+  const designSection = <TechnicalDesignPanel {...designPanelProps} />;
+  const handleReviewDesign = () => {
+    setShowStartDialog(false);
+    setFocusDesign(true);
+    setShowPrdSheet(true);
+  };
 
   const startBuildAction = (
     <Button
@@ -575,12 +582,16 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
         readiness={readiness}
         retryError={retryError}
         designBlock={designBlock}
+        onReviewDesign={handleReviewDesign}
         onStarted={() => setStatus("BUILDING")}
       />
       {showPrdSheet && (
         <SidePanel
           open
-          onClose={() => setShowPrdSheet(false)}
+          onClose={() => {
+            setShowPrdSheet(false);
+            setFocusDesign(false);
+          }}
           title={en.builder.prd.heading}
           className="w-[32rem]"
           bodyClassName="!p-0"
@@ -597,7 +608,9 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
               repos={session.repos ?? []}
               createdByName={session.createdByName}
               transcript={messages}
-              designSection={designSection}
+              designSection={
+                <TechnicalDesignPanel {...designPanelProps} scrollIntoViewOnMount={focusDesign} />
+              }
             />
           </ErrorBoundary>
         </SidePanel>

@@ -200,6 +200,24 @@ describe("StartBuildDialog", () => {
     expect(startBuild).not.toHaveBeenCalled();
   });
 
+  it("offers a way to the design when it blocks the start", () => {
+    // Once a session has run, the PRD and its design sit folded in a side
+    // rail; a block that names the fix must also lead to it.
+    const onReviewDesign = vi.fn();
+    render(
+      <StartBuildDialog {...baseProps} designBlock="notApproved" onReviewDesign={onReviewDesign} />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Review the design" }));
+    expect(onReviewDesign).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers no design link when nothing blocks", () => {
+    render(<StartBuildDialog {...baseProps} onReviewDesign={vi.fn()} />);
+
+    expect(screen.queryByRole("button", { name: "Review the design" })).not.toBeInTheDocument();
+  });
+
   it("says the design is out of date when the PRD changed after approval", () => {
     render(<StartBuildDialog {...baseProps} designBlock="stale" />);
 
