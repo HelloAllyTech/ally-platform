@@ -24,6 +24,20 @@ class AppConfig {
     defaultValue: '/microphone-chat',
   );
 
+  /// Mirrors `env.I18N_BASE_URL` — the dynamic translation CDN this app's
+  /// real counterpart polls at runtime (manifest.json + per-namespace JSON),
+  /// with the bundled locale assets as the offline/zero-delay fallback only.
+  static const String i18nBaseUrl = String.fromEnvironment(
+    'I18N_BASE_URL',
+    defaultValue: 'https://api.helloally.dev/i18n',
+  );
+
+  /// Mirrors `env.LANGUAGE_SELECTOR_FLAG` — gates the dynamic sync exactly
+  /// like the RN app does, defaulting off until explicitly enabled.
+  static const bool languageSelectorEnabled = bool.fromEnvironment(
+    'LANGUAGE_SELECTOR_FLAG',
+  );
+
   static String get requireApiBaseUrl {
     if (apiBaseUrl.isEmpty) {
       throw StateError(
