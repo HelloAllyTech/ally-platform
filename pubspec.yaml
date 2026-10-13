@@ -56,6 +56,7 @@ dependencies:
   flutter_foreground_task: ^11.0.3
   url_launcher: ^6.3.3
   image_picker: ^1.2.4
+  webview_flutter: ^4.13.0
 
 dev_dependencies:
   flutter_test:
@@ -85,12 +86,27 @@ flutter:
   # dynamic CDN sync at runtime (see core/localization/ for why — these
   # files are not run through gen-l10n/ARB, which can't represent a
   # runtime-refreshable translation source).
+  #
+  # Also includes self-contained HTML5 game bundles for GAME course items —
+  # extracted verbatim (byte-identical) from ally-mobile (React Native)'s
+  # `src/screens/CourseItemPlayerScreen/components/players/games/*Html.ts`,
+  # which in turn are the same files ally-web serves from
+  # `public/games/*/index.html`. Each bundle detects its host at runtime
+  # (posts to `window.ReactNativeWebView` if present, `window.parent`
+  # otherwise) so no fork was needed for this Flutter host — see
+  # GamePlayer's doc comment for the webview_flutter bridge shim.
   assets:
     - assets/locales/en.json
     - assets/locales/hi.json
     - assets/locales/kn.json
     - assets/locales/mr.json
     - assets/locales/ta.json
+    - assets/games/trex_runner.html
+    - assets/games/tic_tac_toe.html
+    - assets/games/memory_match.html
+    - assets/games/cub_n_pup.html
+    - assets/games/snake.html
+    - assets/games/sprout.html
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

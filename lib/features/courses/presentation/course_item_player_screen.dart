@@ -13,15 +13,17 @@ import '../data/course_models.dart';
 import '../data/courses_repository.dart';
 import '../data/quiz_models.dart';
 import '../data/start_item_payload.dart';
+import 'game/game_player.dart';
+import 'journal/journal_player.dart';
 import 'quiz/quiz_player.dart';
 
 /// Full port of ally-mobile (React Native)'s `CourseItemPlayerScreen`
-/// (7,700 lines in the original) for ARTICLE, VIDEO, and QUIZ item types —
-/// real `startTrackItem` content (not a stub), inline article questions,
-/// video interjections, and the complete 8-question-type quiz engine.
-/// ROLEPLAY/CASE route elsewhere; JOURNAL/GAME item players are real
-/// further work — CourseDetailScreen shows "not ported yet" for those
-/// rather than opening this screen.
+/// (7,700 lines in the original) for ARTICLE, VIDEO, QUIZ, JOURNAL, and
+/// GAME item types — real `startTrackItem` content (not a stub), inline
+/// article questions, video interjections, the complete 8-question-type
+/// quiz engine, debounced journal autosave, and the same HTML5 game
+/// bundles the RN and web apps embed. ROLEPLAY/CASE route elsewhere via
+/// the existing Simulations/Cases screens, same as the RN app.
 class CourseItemPlayerScreen extends ConsumerStatefulWidget {
   const CourseItemPlayerScreen({super.key, required this.item});
 
@@ -128,6 +130,19 @@ class _CourseItemPlayerScreenState extends ConsumerState<CourseItemPlayerScreen>
           itemId: widget.item.id,
           watchedPct: _watchedPct,
           completed: _completed,
+        );
+      case 'JOURNAL':
+        return JournalPlayer(
+          payload: payload,
+          itemId: widget.item.id,
+          alreadyCompleted: _completed,
+          onCompleted: () => setState(() => _completed = true),
+        );
+      case 'GAME':
+        return GamePlayer(
+          payload: payload,
+          itemId: widget.item.id,
+          onCompleted: () => setState(() => _completed = true),
         );
       default:
         return const Center(child: Text('Unsupported item type.'));

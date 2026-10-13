@@ -1,13 +1,42 @@
 import 'quiz_models.dart';
 
-/// Covers the ARTICLE, VIDEO, and QUIZ variants of ally-mobile (React
-/// Native)'s `StartTrackItemResponse` discriminated union
-/// (`src/types/courses.ts`) — the three item types this Flutter port's
-/// course player actually renders. ROLEPLAY/CASE items are opened via the
+/// Covers the ARTICLE, VIDEO, QUIZ, JOURNAL, and GAME variants of
+/// ally-mobile (React Native)'s `StartTrackItemResponse` discriminated
+/// union (`src/types/courses.ts`). ROLEPLAY/CASE items are opened via the
 /// existing Simulations/Cases screens instead (same as the RN app routes
-/// them elsewhere), and JOURNAL/GAME aren't modeled — CourseDetailScreen
-/// already shows "not ported yet" for those item types rather than opening
-/// this screen for them.
+/// them elsewhere).
+class JournalPrompt {
+  JournalPrompt({
+    required this.id,
+    required this.prompt,
+    required this.required,
+    required this.placeholder,
+  });
+
+  factory JournalPrompt.fromJson(Map<String, dynamic> json) => JournalPrompt(
+        id: json['id'] as String,
+        prompt: json['prompt'] as String,
+        required: json['required'] as bool? ?? false,
+        placeholder: json['placeholder'] as String?,
+      );
+
+  final String id;
+  final String prompt;
+  final bool required;
+  final String? placeholder;
+}
+
+class JournalSavedResponse {
+  JournalSavedResponse({required this.promptId, required this.response});
+
+  factory JournalSavedResponse.fromJson(Map<String, dynamic> json) => JournalSavedResponse(
+        promptId: json['promptId'] as String,
+        response: json['response'] as String? ?? '',
+      );
+
+  final String promptId;
+  final String response;
+}
 class ArticleQuestion {
   ArticleQuestion({
     required this.id,
@@ -74,6 +103,11 @@ class StartItemPayload {
     this.requiredWatchPct,
     this.maxWatchedPct,
     this.interjections,
+    this.journalPrompts,
+    this.journalSavedResponses,
+    this.gameKey,
+    this.gameIntro,
+    this.gameBestScore,
   });
 
   factory StartItemPayload.fromJson(Map<String, dynamic> json) {
@@ -100,6 +134,19 @@ class StartItemPayload {
               .map((e) => VideoInterjection.fromJson(e as Map<String, dynamic>))
               .toList()
           : null,
+      journalPrompts: type == 'JOURNAL'
+          ? (json['prompts'] as List<dynamic>? ?? [])
+              .map((e) => JournalPrompt.fromJson(e as Map<String, dynamic>))
+              .toList()
+          : null,
+      journalSavedResponses: type == 'JOURNAL'
+          ? (json['savedResponses'] as List<dynamic>? ?? [])
+              .map((e) => JournalSavedResponse.fromJson(e as Map<String, dynamic>))
+              .toList()
+          : null,
+      gameKey: type == 'GAME' ? json['gameKey'] as String? : null,
+      gameIntro: type == 'GAME' ? json['intro'] as String? : null,
+      gameBestScore: (json['bestScore'] as num?)?.toInt(),
     );
   }
 
@@ -122,4 +169,13 @@ class StartItemPayload {
   final double? requiredWatchPct;
   final double? maxWatchedPct;
   final List<VideoInterjection>? interjections;
+
+  // JOURNAL
+  final List<JournalPrompt>? journalPrompts;
+  final List<JournalSavedResponse>? journalSavedResponses;
+
+  // GAME
+  final String? gameKey;
+  final String? gameIntro;
+  final int? gameBestScore;
 }

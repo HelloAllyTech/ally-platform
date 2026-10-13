@@ -26,10 +26,11 @@ IconData _iconForType(TrackItemType type) {
   }
 }
 
-/// Track detail — sections + items, with entry into each item. ARTICLE and
-/// VIDEO items open the real ported player; everything else (quiz,
-/// roleplay, case, journal, game) is a later-phase port, shown as locked/
-/// not-yet-available here rather than a broken tap.
+/// Track detail — sections + items, with entry into each item. ARTICLE,
+/// VIDEO, QUIZ, JOURNAL, and GAME items open the real ported player;
+/// ROLEPLAY/CASE route through the existing Simulations/Cases screens
+/// instead (not wired from here yet), shown as not-yet-available rather
+/// than a broken tap.
 class CourseDetailScreen extends ConsumerWidget {
   const CourseDetailScreen({super.key, required this.trackId});
 
@@ -83,7 +84,9 @@ class CourseDetailScreen extends ConsumerWidget {
                         : () {
                             if (item.type == TrackItemType.article ||
                                 item.type == TrackItemType.video ||
-                                item.type == TrackItemType.quiz) {
+                                item.type == TrackItemType.quiz ||
+                                item.type == TrackItemType.journal ||
+                                item.type == TrackItemType.game) {
                               context.push(
                                 '/courses/item/${item.id}',
                                 extra: item,

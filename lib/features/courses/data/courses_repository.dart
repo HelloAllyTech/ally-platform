@@ -13,9 +13,8 @@ import 'start_item_payload.dart';
 /// provider after a mutation instead, which is the Riverpod-idiomatic
 /// equivalent for the mutations this phase actually needs.
 ///
-/// Scope: ARTICLE, VIDEO, and QUIZ items end-to-end (all 8 quiz question
-/// types). JOURNAL and GAME item players are real further work —
-/// CourseDetailScreen routes those to a "not ported yet" message.
+/// Scope: ARTICLE, VIDEO, QUIZ (all 8 question types), JOURNAL, and GAME
+/// items end-to-end.
 class CoursesRepository {
   CoursesRepository(this._dio);
 
@@ -110,6 +109,35 @@ class CoursesRepository {
       data: {'answers': answers.map((a) => a.toJson()).toList()},
     );
     return QuizAttemptResult.fromJson(response.data!);
+  }
+
+  Future<void> saveJournalDraft({
+    required String itemId,
+    required List<({String promptId, String response})> responses,
+  }) async {
+    await _dio.post<void>(
+      '/learn/tracks/items/$itemId/journal',
+      data: {
+        'responses': [
+          for (final r in responses) {'promptId': r.promptId, 'response': r.response},
+        ],
+      },
+    );
+  }
+
+  Future<void> submitJournal(String itemId) async {
+    await _dio.post<void>('/learn/tracks/items/$itemId/journal/submit');
+  }
+
+  /// A game item is already complete server-side by the time this fires
+  /// (the server marks it done the moment it's opened) — this just records
+  /// a personal-best run, same as the RN screen's own doc comment.
+  Future<int> recordGameResult({required String itemId, required int score}) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/learn/tracks/items/$itemId/game-result',
+      data: {'score': score},
+    );
+    return (response.data?['bestScore'] as num?)?.toInt() ?? score;
   }
 }
 

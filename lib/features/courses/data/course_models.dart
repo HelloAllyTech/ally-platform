@@ -1,7 +1,7 @@
 /// Mirrors ally-mobile (React Native)'s `src/types/courses.ts` — Track 2.0
 /// learner types. Only the fields the ported screens actually use are
-/// modeled; the RN type file has more (games, journal, discussion flags)
-/// that later screens will need as they're ported.
+/// modeled; the RN type file has more (discussion flags) that later
+/// screens will need as they're ported.
 enum TrackItemType { roleplay, caseItem, quiz, article, video, journal, game, unknown }
 
 TrackItemType trackItemTypeFromString(String? value) {
