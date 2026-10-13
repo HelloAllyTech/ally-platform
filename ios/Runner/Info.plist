@@ -37,6 +37,8 @@
 	</array>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Ally needs microphone access to record counselling sessions and power live roleplay practice.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Ally needs access to your photos so you can set a profile picture.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

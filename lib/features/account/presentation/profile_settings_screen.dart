@@ -1,18 +1,59 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../core/auth/auth_state.dart';
 import '../data/account_repository.dart';
 
-/// Scoped port of ally-mobile (React Native)'s `ProfileSettingsScreen` —
-/// shows the real profile (GET /users/me) and the sign-out action. Profile
-/// image upload/edit and the preferences screen (`userApi.ts`'s
-/// get/updateUserPreferences) are not ported yet.
-class ProfileSettingsScreen extends ConsumerWidget {
+/// Port of ally-mobile (React Native)'s `ProfileSettingsScreen` — real
+/// profile (GET /users/me), profile image upload (full presigned-S3-URL
+/// flow, same as the RN app) and removal, and sign-out. The preferences
+/// screen (`userApi.ts`'s get/updateUserPreferences) is not ported yet.
+class ProfileSettingsScreen extends ConsumerStatefulWidget {
   const ProfileSettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProfileSettingsScreen> createState() => _ProfileSettingsScreenState();
+}
+
+class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
+  bool _isUploading = false;
+  String? _error;
+
+  Future<void> _pickAndUpload() async {
+    final picked = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 85);
+    if (picked == null) return;
+
+    setState(() {
+      _isUploading = true;
+      _error = null;
+    });
+    try {
+      await ref.read(accountRepositoryProvider).uploadProfileImage(File(picked.path));
+      ref.invalidate(currentUserProvider);
+    } catch (e) {
+      setState(() => _error = 'Failed to upload photo: $e');
+    } finally {
+      if (mounted) setState(() => _isUploading = false);
+    }
+  }
+
+  Future<void> _removePhoto(String profileImageUrl) async {
+    setState(() => _isUploading = true);
+    try {
+      await ref.read(accountRepositoryProvider).deleteProfileImage(profileImageUrl);
+      ref.invalidate(currentUserProvider);
+    } catch (e) {
+      setState(() => _error = 'Failed to remove photo: $e');
+    } finally {
+      if (mounted) setState(() => _isUploading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final userAsync = ref.watch(currentUserProvider);
 
     return Scaffold(
@@ -23,15 +64,38 @@ class ProfileSettingsScreen extends ConsumerWidget {
         data: (user) => ListView(
           padding: const EdgeInsets.all(24),
           children: [
-            CircleAvatar(
-              radius: 40,
-              backgroundImage: user.profileImageUrl != null
-                  ? NetworkImage(user.profileImageUrl!)
-                  : null,
-              child: user.profileImageUrl == null
-                  ? Text(user.name.isNotEmpty ? user.name[0].toUpperCase() : '?')
-                  : null,
+            Center(
+              child: Stack(
+                children: [
+                  CircleAvatar(
+                    radius: 40,
+                    backgroundImage:
+                        user.profileImageUrl != null ? NetworkImage(user.profileImageUrl!) : null,
+                    child: user.profileImageUrl == null
+                        ? Text(user.name.isNotEmpty ? user.name[0].toUpperCase() : '?')
+                        : null,
+                  ),
+                  if (_isUploading)
+                    const Positioned.fill(child: Center(child: CircularProgressIndicator())),
+                ],
+              ),
             ),
+            const SizedBox(height: 8),
+            Center(
+              child: Wrap(
+                spacing: 8,
+                children: [
+                  TextButton(onPressed: _isUploading ? null : _pickAndUpload, child: const Text('Change photo')),
+                  if (user.profileImageUrl != null)
+                    TextButton(
+                      onPressed: _isUploading ? null : () => _removePhoto(user.profileImageUrl!),
+                      child: const Text('Remove'),
+                    ),
+                ],
+              ),
+            ),
+            if (_error != null)
+              Center(child: Text(_error!, style: const TextStyle(color: Colors.red))),
             const SizedBox(height: 16),
             Center(
               child: Text(
