@@ -3,9 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/leaderboard_repository.dart';
 
-/// Port of ally-mobile (React Native)'s `LeaderboardScreen` — ranked list +
-/// the current user's own rank pinned at top. Window-period filtering
-/// (weekly/monthly/all-time toggle, if the RN screen has one) not ported.
+/// Port of ally-mobile (React Native)'s `LeaderboardScreen` — ranked list,
+/// the current user's own rank pinned at top, and the same window-period
+/// dropdown (last 7/28/364 days, all time; defaults to last 7 days).
 class LeaderboardScreen extends ConsumerWidget {
   const LeaderboardScreen({super.key});
 
@@ -13,9 +13,32 @@ class LeaderboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final leaderboardAsync = ref.watch(leaderboardProvider);
     final myRankAsync = ref.watch(myRankProvider);
+    final selectedWindow = ref.watch(leaderboardWindowProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Leaderboard')),
+      appBar: AppBar(
+        title: const Text('Leaderboard'),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Center(
+              child: DropdownButton<LeaderboardWindow>(
+                value: selectedWindow,
+                underline: const SizedBox.shrink(),
+                onChanged: (window) {
+                  if (window != null) {
+                    ref.read(leaderboardWindowProvider.notifier).select(window);
+                  }
+                },
+                items: [
+                  for (final window in LeaderboardWindow.values)
+                    DropdownMenuItem(value: window, child: Text(window.label)),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
       body: leaderboardAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(child: Text('Failed to load leaderboard: $error')),
