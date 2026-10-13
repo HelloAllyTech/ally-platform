@@ -1193,7 +1193,11 @@
     "error": {
       "title": "Unable to Load Reviews",
       "description": "Something went wrong while loading reviews. Please try again.",
-      "retry": "Retry"
+      "retry": "Retry",
+      "loadReviewFailed": "Failed to load review",
+      "loadCommentsFailed": "Failed to load comments",
+      "loadThreadsFailed": "Failed to load threads",
+      "loadReactionsFailed": "Failed to load reactions"
     },
     "privacy": {
       "private": "Keep it private",
@@ -1251,7 +1255,12 @@
       "replyUpdateFailed": "Failed to update reply",
       "replyCreatedSuccessfully": "Reply created successfully",
       "replyCreateFailed": "Failed to create reply",
-      "callTitle": "CALL-{{id}}"
+      "callTitle": "CALL-{{id}}",
+      "threadsTab": "Threads",
+      "clientSaid": "Client said",
+      "learnerSaid": "Learner said",
+      "loadMoreRepliesOne": "Load 1 more reply",
+      "loadMoreReplies": "Load {{count}} more replies"
     },
     "reactionsModal": {
       "title": "Reactions",
@@ -1301,7 +1310,9 @@
       "simulation": "Simulation"
     },
     "byAuthor": "By {{name}}",
-    "addNotePlaceholder": "Add a note..."
+    "addNotePlaceholder": "Add a note...",
+    "addNoteCaption": "Add a note for your reviewer (optional):",
+    "shareFailed": "Failed to share for review"
   },
   "search": {
     "placeholder": "Need guidance? Search here..",

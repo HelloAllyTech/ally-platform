@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/localization/translate_ref.dart';
 import '../data/reviews_repository.dart';
 import 'thread_detail_screen.dart';
 
@@ -56,25 +57,26 @@ class _ReviewDetailsScreenState extends ConsumerState<ReviewDetailsScreen> {
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Review'),
+          title: Text(ref.t('review.title')),
           actions: [
             IconButton(
               icon: const Icon(Icons.emoji_emotions_outlined),
-              tooltip: 'Reactions',
+              tooltip: ref.t('review.reactionsModal.title'),
               onPressed: () => context.push('/reactions/${widget.reviewId}'),
             ),
           ],
-          bottom: const TabBar(
+          bottom: TabBar(
             tabs: [
-              Tab(text: 'Discussion'),
-              Tab(text: 'Threads'),
+              Tab(text: ref.t('courses.discussion.heading')),
+              Tab(text: ref.t('review.details.threadsTab')),
             ],
           ),
         ),
         body: reviewAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, _) =>
-              Center(child: Text('Failed to load review: $error')),
+          error: (error, _) => Center(
+            child: Text('${ref.t('review.error.loadReviewFailed')}: $error'),
+          ),
           data: (review) => Column(
             children: [
               Padding(
@@ -126,10 +128,13 @@ class _ReviewDetailsScreenState extends ConsumerState<ReviewDetailsScreen> {
         Expanded(
           child: commentsAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (error, _) =>
-                Center(child: Text('Failed to load comments: $error')),
+            error: (error, _) => Center(
+              child: Text(
+                '${ref.t('review.error.loadCommentsFailed')}: $error',
+              ),
+            ),
             data: (comments) => comments.isEmpty
-                ? const Center(child: Text('No comments yet.'))
+                ? Center(child: Text(ref.t('review.details.noCommentsYet')))
                 : ListView.builder(
                     padding: const EdgeInsets.all(16),
                     itemCount: comments.length,
@@ -153,9 +158,9 @@ class _ReviewDetailsScreenState extends ConsumerState<ReviewDetailsScreen> {
                 Expanded(
                   child: TextField(
                     controller: _commentController,
-                    decoration: const InputDecoration(
-                      hintText: 'Add a comment...',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      hintText: ref.t('review.details.addCommentPlaceholder'),
+                      border: const OutlineInputBorder(),
                       isDense: true,
                     ),
                   ),
@@ -184,10 +189,11 @@ class _ThreadsTab extends ConsumerWidget {
 
     return threadsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, _) =>
-          Center(child: Text('Failed to load threads: $error')),
+      error: (error, _) => Center(
+        child: Text('${ref.t('review.error.loadThreadsFailed')}: $error'),
+      ),
       data: (threads) => threads.isEmpty
-          ? const Center(child: Text('No transcript discussions yet.'))
+          ? Center(child: Text(ref.t('threadsBottomSheet.noThreads')))
           : ListView.builder(
               padding: const EdgeInsets.all(16),
               itemCount: threads.length,

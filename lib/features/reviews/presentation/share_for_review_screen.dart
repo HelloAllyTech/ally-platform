@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/localization/translate_ref.dart';
 import '../data/reviews_repository.dart';
 
 /// Port of ally-mobile (React Native)'s `ShareForReviewScreen` — a note
@@ -42,7 +43,7 @@ class _ShareForReviewScreenState extends ConsumerState<ShareForReviewScreen> {
           );
       if (mounted) context.go('/home');
     } catch (e) {
-      setState(() => _error = 'Failed to share for review: $e');
+      setState(() => _error = '${ref.tr('review.shareFailed')}: $e');
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -51,13 +52,13 @@ class _ShareForReviewScreenState extends ConsumerState<ShareForReviewScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Share for review')),
+      appBar: AppBar(title: Text(ref.t('review.privacy.share'))),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('Add a note for your reviewer (optional):'),
+            Text(ref.t('review.addNoteCaption')),
             const SizedBox(height: 12),
             TextField(
               controller: _noteController,
@@ -77,7 +78,7 @@ class _ShareForReviewScreenState extends ConsumerState<ShareForReviewScreen> {
                       height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Text('Share'),
+                  : Text(ref.t('common.share')),
             ),
           ],
         ),
