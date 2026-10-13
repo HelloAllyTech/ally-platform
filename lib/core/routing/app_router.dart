@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/account/presentation/complete_profile_screen.dart';
+import '../../features/account/presentation/profile_settings_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/courses/data/course_models.dart';
 import '../../features/courses/presentation/course_detail_screen.dart';
@@ -9,6 +11,7 @@ import '../../features/courses/presentation/course_item_player_screen.dart';
 import '../../features/courses/presentation/course_overview_screen.dart';
 import '../../features/courses/presentation/course_progress_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
+import '../../features/notifications/presentation/notifications_screen.dart';
 import '../../features/roleplay/presentation/roleplay_voice_screen.dart';
 import '../../features/scribe/presentation/scribe_recording_screen.dart';
 import '../auth/auth_state.dart';
@@ -33,6 +36,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(path: '/home', builder: (context, state) => const HomeScreen()),
+      GoRoute(
+        path: '/complete-profile',
+        builder: (context, state) => const CompleteProfileScreen(),
+      ),
+      GoRoute(
+        path: '/profile',
+        builder: (context, state) => const ProfileSettingsScreen(),
+      ),
+      GoRoute(
+        path: '/notifications',
+        builder: (context, state) => const NotificationsScreen(),
+      ),
       GoRoute(
         path: '/scribe',
         builder: (context, state) {
