@@ -37,6 +37,20 @@ class NotificationsRepository {
   Future<void> markAllRead() async {
     await _dio.patch<void>('/notifications/read-all');
   }
+
+  /// Matches ally-mobile (React Native)'s `registerDeviceToken` exactly:
+  /// same route (PUT, idempotent — safe to call on every app start), same
+  /// {token, platform} body shape.
+  Future<void> registerDeviceToken({required String token, required String platform}) async {
+    await _dio.put<void>(
+      '/notifications/device-tokens',
+      data: {'token': token, 'platform': platform},
+    );
+  }
+
+  Future<void> deleteDeviceToken(String token) async {
+    await _dio.delete<void>('/notifications/device-tokens/${Uri.encodeComponent(token)}');
+  }
 }
 
 final notificationsRepositoryProvider = Provider<NotificationsRepository>((ref) {
