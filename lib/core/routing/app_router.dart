@@ -14,6 +14,10 @@ import '../../features/home/presentation/home_screen.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
 import '../../features/roleplay/presentation/roleplay_voice_screen.dart';
 import '../../features/scribe/presentation/scribe_recording_screen.dart';
+import '../../features/simulations/presentation/simulation_details_screen.dart';
+import '../../features/simulations/presentation/simulation_feedback_screen.dart';
+import '../../features/simulations/presentation/simulation_path_details_screen.dart';
+import '../../features/simulations/presentation/simulations_screen.dart';
 import '../auth/auth_state.dart';
 
 /// Mirrors RootNavigator's behavior (mentioned in `api.ts`'s logout comment:
@@ -88,8 +92,30 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           return RoleplayVoiceScreen(
             liveKitServerUrl: params['liveKitServerUrl'] ?? '',
             accessToken: params['accessToken'] ?? '',
+            scenarioSessionId: params['scenarioSessionId'],
           );
         },
+      ),
+      GoRoute(
+        path: '/simulations',
+        builder: (context, state) => const SimulationsScreen(),
+      ),
+      GoRoute(
+        path: '/simulations/:scenarioId',
+        builder: (context, state) => SimulationDetailsScreen(
+          scenarioId: int.parse(state.pathParameters['scenarioId']!),
+        ),
+      ),
+      GoRoute(
+        path: '/simulation-paths/:pathId',
+        builder: (context, state) =>
+            SimulationPathDetailsScreen(pathId: state.pathParameters['pathId']!),
+      ),
+      GoRoute(
+        path: '/simulations/feedback/:sessionId',
+        builder: (context, state) => SimulationFeedbackScreen(
+          scenarioSessionId: state.pathParameters['sessionId']!,
+        ),
       ),
     ],
   );

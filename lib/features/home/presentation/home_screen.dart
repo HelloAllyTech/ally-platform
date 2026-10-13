@@ -38,6 +38,11 @@ class HomeScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 8),
             FilledButton(
+              onPressed: () => context.push('/simulations'),
+              child: const Text('Phase 3: Simulations'),
+            ),
+            const SizedBox(height: 8),
+            FilledButton(
               onPressed: () => context.push('/scribe'),
               child: const Text('Phase 1: Scribe recording'),
             ),

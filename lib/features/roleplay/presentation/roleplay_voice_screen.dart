@@ -1,18 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/realtime/livekit_room_service.dart';
+import '../../simulations/data/simulations_repository.dart';
 
 /// Phase 1's other half: live roleplay voice, mirroring ally-mobile (React
 /// Native)'s `SimulationAssistantScreen.tsx` connection flow —
 /// `room.connect(liveKitServerUrl, accessToken)`, both values owned by the
 /// backend's session-creation response (unchanged by this rewrite).
 ///
-/// [liveKitServerUrl]/[accessToken] are passed in as real session data, same
-/// as the RN screen receives them via route params from whatever started
-/// the session (SimulationDetailsScreen's "start simulation" call) — not
-/// fetched here, since that's a different screen's job in a later phase.
+/// [scenarioSessionId], when provided (set by SimulationDetailsScreen's real
+/// "start simulation" flow), enables the "End session" action, which calls
+/// the same `endScenarioSession` endpoint the RN screen uses and routes to
+/// SimulationFeedbackScreen — closing the real scenario → session →
+/// feedback loop end to end, not just proving the LiveKit connection in
+/// isolation as Phase 1 originally scoped it.
 ///
 /// Scoped to proving the connection + background-audio claim, not the full
 /// SimulationAssistantScreen UI (live transcript, feedback nudges, AI
@@ -22,10 +26,12 @@ class RoleplayVoiceScreen extends ConsumerStatefulWidget {
     super.key,
     required this.liveKitServerUrl,
     required this.accessToken,
+    this.scenarioSessionId,
   });
 
   final String liveKitServerUrl;
   final String accessToken;
+  final String? scenarioSessionId;
 
   @override
   ConsumerState<RoleplayVoiceScreen> createState() =>
@@ -35,6 +41,7 @@ class RoleplayVoiceScreen extends ConsumerStatefulWidget {
 class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
   bool _isConnected = false;
   bool _isMicEnabled = false;
+  bool _isEnding = false;
   String? _error;
 
   @override
@@ -82,10 +89,25 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
     setState(() => _isMicEnabled = next);
   }
 
+  Future<void> _endSession() async {
+    final sessionId = widget.scenarioSessionId;
+    if (sessionId == null) return;
+    setState(() => _isEnding = true);
+    try {
+      await ref.read(simulationsRepositoryProvider).endScenarioSession(sessionId);
+      await _disconnect();
+      if (mounted) context.pushReplacement('/simulations/feedback/$sessionId');
+    } catch (e) {
+      setState(() => _error = 'Failed to end session: $e');
+    } finally {
+      if (mounted) setState(() => _isEnding = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Roleplay voice (Phase 1)')),
+      appBar: AppBar(title: const Text('Roleplay voice')),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -114,10 +136,23 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
                   label: Text(_isMicEnabled ? 'Mute' : 'Unmute'),
                 ),
                 const SizedBox(height: 12),
-                OutlinedButton(
-                  onPressed: _disconnect,
-                  child: const Text('Disconnect'),
-                ),
+                if (widget.scenarioSessionId != null)
+                  FilledButton(
+                    onPressed: _isEnding ? null : _endSession,
+                    style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                    child: _isEnding
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('End session'),
+                  )
+                else
+                  OutlinedButton(
+                    onPressed: _disconnect,
+                    child: const Text('Disconnect'),
+                  ),
               ],
             ],
           ),
