@@ -492,6 +492,8 @@ export const ApiEndpoints = {
     FOUNDATIONAL_SKILLS_LEARNERS: "/v1/analytics/foundational-skills/learners",
     FOUNDATIONAL_SKILLS_BENCHMARK: "/v1/analytics/foundational-skills/benchmark",
     FOUNDATIONAL_SKILLS_BEHAVIOURS: "/v1/analytics/foundational-skills/behaviours",
+    FOUNDATIONAL_SKILLS_ADVANCED_BEHAVIOURS:
+      "/v1/analytics/foundational-skills/advanced-behaviours",
     // Highlights → Effectiveness (AAQ-203/204) and Helping skills' time,
     // breaks and difficulty cards (AAQ-205/206/207/219). All-time; tenantId only.
     EFFECTIVENESS_FUNNEL: "/v1/analytics/effectiveness/funnel",

@@ -2,8 +2,12 @@ import { fireEvent, render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  FhsAdvancedTier,
   FhsBehaviourRate,
+  FoundationalSkillsAdvancedBehavioursResponse,
   FoundationalSkillsBehavioursResponse,
+  advancedTakeaway,
+  advancedTierRows,
   behaviourShort,
   countRate,
   countText,
@@ -114,6 +118,123 @@ describe("habit helpers", () => {
         data([rate("rapport.b1", {}, { credible: true, changePts: 20 }), rate("hope.b2")]),
       ),
     ).toBe("1 behaviour(s) changed beyond chance (1 up, 0 down) across 26 learners.");
+  });
+});
+
+// A tier that cleared the floor (29 learners, no clear change) unless overridden.
+const tier = (minSlices: number, extra: Partial<FhsAdvancedTier> = {}): FhsAdvancedTier => ({
+  minSlices,
+  learners: 29,
+  startPct: 12.4,
+  nowPct: 17.2,
+  startPerSlice: 3.14,
+  nowPerSlice: 4.2,
+  rawChangePts: 4.8,
+  changePts: 0.9,
+  ciPts: [-2.1, 3.8],
+  up: 18,
+  down: 11,
+  tied: 0,
+  signP: 0.26,
+  detectable: false,
+  ...extra,
+});
+
+// A tier under the 20-learner floor: counts travel, every average is null.
+const withheld = (minSlices: number, learners: number, up: number, down: number) =>
+  tier(minSlices, {
+    learners,
+    startPct: null,
+    nowPct: null,
+    startPerSlice: null,
+    nowPerSlice: null,
+    rawChangePts: null,
+    changePts: null,
+    ciPts: null,
+    up,
+    down,
+    signP: null,
+    detectable: false,
+  });
+
+const advancedData = (tiers: FhsAdvancedTier[]): FoundationalSkillsAdvancedBehavioursResponse => ({
+  rubricVersion: "fhs-text-v1",
+  minSampleSize: 20,
+  minCohortSize: 5,
+  baselineFrom: 2,
+  thresholds: { depths: [4, 6, 8, 10], minComparedSlices: 2, minOtherLearnersPerScenario: 2 },
+  measuredLearners: 74,
+  tiers,
+  provenance: { derivation: "", note: "" },
+  computedAt: "2026-10-12T00:00:00Z",
+});
+
+describe("advanced behaviours by depth", () => {
+  it("words a tier that has an average in plain terms", () => {
+    const [row] = advancedTierRows(advancedData([tier(4)]));
+    expect(row).toEqual({
+      key: "tier-4",
+      label: "4+ slices",
+      sublabel: "29 learners · 12% → 17% of chances · 3.1 → 4.2 per slice · 18 rose, 11 fell",
+      change: 0.9,
+      ci: [-2.1, 3.8],
+      n: 29,
+      detectable: false,
+    });
+  });
+
+  it("keeps a withheld tier's counts and says why there is no average", () => {
+    const [row] = advancedTierRows(advancedData([withheld(6, 19, 15, 4)]));
+    expect(row.sublabel).toBe("19 learners · 15 rose, 4 fell · average withheld below 20 learners");
+    expect(row).toMatchObject({ key: "tier-6", label: "6+ slices", change: null, ci: null, n: 19 });
+    expect(row.detectable).toBe(false);
+  });
+
+  it("has no rows and no takeaway when no tier is returned", () => {
+    const empty = advancedData([]);
+    expect(advancedTierRows(empty)).toEqual([]);
+    expect(advancedTakeaway(empty)).toBeUndefined();
+  });
+
+  it("calls a change inside the interval no clear change, and points at deeper withheld tiers without quoting one", () => {
+    const d = advancedData([
+      tier(4),
+      withheld(6, 19, 15, 4),
+      withheld(8, 13, 9, 4),
+      withheld(10, 11, 8, 3),
+    ]);
+    expect(advancedTakeaway(d)).toBe(
+      "No clear change in how often advanced behaviours showed up across the 29 learners with 4+ scored slices (+0.9 pts, 95% CI −2.1 to +3.8). Deeper tiers have under 20 learners: only who rose and who fell is shown, a hint only.",
+    );
+  });
+
+  it("says more often when the interval excludes zero upward, less often downward", () => {
+    const up = advancedData([tier(4, { changePts: 2.5, ciPts: [0.6, 4.4], detectable: true })]);
+    expect(advancedTakeaway(up)).toBe(
+      "Advanced behaviours showed up more often in later practice across the 29 learners with 4+ scored slices (+2.5 pts, 95% CI +0.6 to +4.4).",
+    );
+    const down = advancedData([
+      tier(4, { changePts: -2.5, ciPts: [-4.4, -0.6], detectable: true }),
+    ]);
+    expect(advancedTakeaway(down)).toContain("showed up less often in later practice");
+  });
+
+  it("with no average anywhere, states the floor and points at the counts", () => {
+    const d = advancedData([withheld(6, 19, 15, 4), withheld(10, 11, 8, 3)]);
+    expect(advancedTakeaway(d)).toBe(
+      "Averages need 20 learners and no depth tier has that yet; only who rose and who fell is shown, a hint only.",
+    );
+  });
+
+  it("never claims improvement, proof or impact", () => {
+    const sentences = [
+      advancedTakeaway(
+        advancedData([tier(4, { changePts: 2.5, ciPts: [0.6, 4.4], detectable: true })]),
+      ),
+      advancedTakeaway(advancedData([tier(4), withheld(10, 11, 8, 3)])),
+      advancedTakeaway(advancedData([withheld(10, 11, 8, 3)])),
+    ];
+    for (const sentence of sentences) expect(sentence).not.toMatch(/improv|prove|proof|impact/i);
   });
 });
 

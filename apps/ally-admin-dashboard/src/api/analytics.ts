@@ -83,7 +83,10 @@ import {
   FoundationalSkillsSegmentsResponse,
 } from "../pages/Analytics/effectivenessChart";
 import { FoundationalSkillsResponse } from "../pages/Analytics/foundationalSkillsChart";
-import { FoundationalSkillsBehavioursResponse } from "../pages/Analytics/foundationalSkillsHabits";
+import {
+  FoundationalSkillsAdvancedBehavioursResponse,
+  FoundationalSkillsBehavioursResponse,
+} from "../pages/Analytics/foundationalSkillsHabits";
 import {
   FoundationalSkillsBenchmarkResponse,
   FoundationalSkillsLearnersResponse,
@@ -737,6 +740,22 @@ export const analyticsAPI = baseAPI.injectEndpoints({
         },
       }),
     }),
+    // Advanced behaviours by practice depth (AAQ-237): nested depth tiers, each a
+    // paired later-vs-earlier change. `baselineFrom` 2 (the server default)
+    // treats the first slice as warm-up.
+    getFoundationalSkillsAdvancedBehaviours: builder.query<
+      FoundationalSkillsAdvancedBehavioursResponse,
+      { tenantId?: string; baselineFrom?: 1 | 2 } | void
+    >({
+      query: arg => ({
+        url: ApiEndpoints.ANALYTICS.FOUNDATIONAL_SKILLS_ADVANCED_BEHAVIOURS,
+        method: HttpMethod.GET,
+        params: {
+          ...(arg && arg.tenantId ? { tenantId: arg.tenantId } : {}),
+          ...(arg && arg.baselineFrom ? { baselineFrom: arg.baselineFrom } : {}),
+        },
+      }),
+    }),
     // Highlights → Effectiveness: account → measured improvement, all time (AAQ-203).
     getEffectivenessFunnel: builder.query<
       EffectivenessFunnelResponse,
@@ -1176,6 +1195,7 @@ export const {
   useGetFoundationalSkillsLearnerQuery,
   useGetFoundationalSkillsBenchmarkQuery,
   useGetFoundationalSkillsBehavioursQuery,
+  useGetFoundationalSkillsAdvancedBehavioursQuery,
   useGetEffectivenessFunnelQuery,
   useGetFoundationalSkillsSegmentsQuery,
   useGetFoundationalSkillsTimeToCompetenceQuery,
