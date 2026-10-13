@@ -38,6 +38,35 @@ import '../../features/simulations/presentation/simulation_path_details_screen.d
 import '../../features/simulations/presentation/simulations_screen.dart';
 import '../auth/auth_state.dart';
 
+/// The redirect gate's actual decision logic, extracted to a pure top-level
+/// function so it's testable without constructing a real [GoRouterState]
+/// (whose constructor needs a private `RouteConfiguration` not obtainable
+/// outside go_router) or a full widget tree. Mechanical extraction only —
+/// same branches, same order, same outputs as before; see
+/// `test/core/routing/app_router_test.dart` for the behavior this locks in.
+@visibleForTesting
+String? computeRedirect({
+  required bool isAuthenticated,
+  required String matchedLocation,
+  required bool? profileCompleted,
+}) {
+  final isLoggingIn = matchedLocation == '/login';
+  final isCompletingProfile = matchedLocation == '/complete-profile';
+
+  if (!isAuthenticated && !isLoggingIn) return '/login';
+  if (!isAuthenticated) return null;
+
+  // `profileCompleted == null` means "not yet known" (the very first
+  // `/users/me` fetch is still in flight) rather than "incomplete", so no
+  // redirect fires on it until there's a real answer.
+  final profileIncomplete = profileCompleted != null && !profileCompleted;
+
+  if (isLoggingIn) return profileIncomplete ? '/complete-profile' : '/home';
+  if (profileIncomplete && !isCompletingProfile) return '/complete-profile';
+  if (!profileIncomplete && isCompletingProfile) return '/home';
+  return null;
+}
+
 /// Mirrors RootNavigator's behavior (mentioned in `api.ts`'s logout comment:
 /// "the navigator swaps to the auth stack the moment `isAuthenticated`
 /// flips") using go_router's `redirect`, re-evaluated via `refreshListenable`
@@ -54,24 +83,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     refreshListenable: _RouterRefreshListenable(ref),
     redirect: (context, state) {
       final isAuthenticated = ref.read(authControllerProvider).isAuthenticated;
-      final isLoggingIn = state.matchedLocation == '/login';
-      final isCompletingProfile = state.matchedLocation == '/complete-profile';
-
-      if (!isAuthenticated && !isLoggingIn) return '/login';
-      if (!isAuthenticated) return null;
-
       // Profile-completion status isn't known synchronously — read
       // whatever's currently cached (null while the very first fetch is
-      // still in flight) rather than block routing on it. A `null` here
-      // means "not yet known", not "incomplete", so no redirect fires
-      // until there's a real answer.
+      // still in flight) rather than block routing on it.
       final user = ref.read(currentUserProvider).value;
-      final profileIncomplete = user != null && !user.profileCompleted;
-
-      if (isLoggingIn) return profileIncomplete ? '/complete-profile' : '/home';
-      if (profileIncomplete && !isCompletingProfile) return '/complete-profile';
-      if (!profileIncomplete && isCompletingProfile) return '/home';
-      return null;
+      return computeRedirect(
+        isAuthenticated: isAuthenticated,
+        matchedLocation: state.matchedLocation,
+        profileCompleted: user?.profileCompleted,
+      );
     },
     routes: [
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
