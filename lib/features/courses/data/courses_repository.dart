@@ -56,15 +56,22 @@ class CoursesRepository {
     await _dio.post<void>('/learn/tracks/items/$itemId/article-read');
   }
 
-  /// Fires roughly every 10s during video playback, matching the RN
-  /// screen's own cadence comment in `coursesApi.ts`.
-  Future<void> reportVideoProgress({
+  /// Fires via [VideoWatchProgressTracker]'s own throttling (every ~10s or
+  /// a +10% jump), matching the RN screen's own cadence comment in
+  /// `coursesApi.ts`. The response's `completed` flips once the server's
+  /// `requiredWatchPct` threshold is crossed — server-side monotonic max,
+  /// so a dropped report is recovered by the next one.
+  Future<({bool completed, double maxWatchedPct})> reportVideoProgress({
     required String itemId,
     required double watchedPct,
   }) async {
-    await _dio.post<void>(
+    final response = await _dio.post<Map<String, dynamic>>(
       '/learn/tracks/items/$itemId/video-progress',
       data: {'watchedPct': watchedPct},
+    );
+    return (
+      completed: response.data?['completed'] as bool? ?? false,
+      maxWatchedPct: (response.data?['maxWatchedPct'] as num?)?.toDouble() ?? watchedPct,
     );
   }
 
@@ -84,7 +91,7 @@ class CoursesRepository {
     );
   }
 
-  Future<({bool? correct, int pointsAwarded})> submitInterjectionAnswer({
+  Future<({bool? correct, int pointsAwarded, int pointsPossible})> submitInterjectionAnswer({
     required String itemId,
     required String interjectionId,
     required QuizAnswerInput answer,
@@ -97,6 +104,7 @@ class CoursesRepository {
     return (
       correct: response.data!['correct'] as bool?,
       pointsAwarded: (grading['pointsAwarded'] as num?)?.toInt() ?? 0,
+      pointsPossible: (grading['pointsPossible'] as num?)?.toInt() ?? 0,
     );
   }
 

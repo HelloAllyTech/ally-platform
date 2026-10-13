@@ -1,0 +1,123 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../data/courses_repository.dart';
+import '../../data/quiz_models.dart';
+import '../../data/start_item_payload.dart';
+import '../quiz/quiz_question_widget.dart';
+
+/// Port of ally-mobile (React Native)'s `VideoInterjectionModal` — a
+/// blocking dialog for a video interjection, reusing the same
+/// [QuizQuestionWidget] the standalone quiz player uses (one question, no
+/// back/skip). The learner cannot dismiss it without submitting, same as
+/// the RN original having no `onRequestClose` handling.
+///
+/// Returns `true` once the learner has submitted and tapped Continue —
+/// the caller (the video item player) resumes playback on that signal.
+class VideoInterjectionDialog extends ConsumerStatefulWidget {
+  const VideoInterjectionDialog({
+    super.key,
+    required this.itemId,
+    required this.interjection,
+  });
+
+  final String itemId;
+  final VideoInterjection interjection;
+
+  @override
+  ConsumerState<VideoInterjectionDialog> createState() => _VideoInterjectionDialogState();
+}
+
+class _VideoInterjectionDialogState extends ConsumerState<VideoInterjectionDialog> {
+  QuizAnswerInput? _answer;
+  QuizQuestionResult? _result;
+  bool _isSubmitting = false;
+  String? _error;
+
+  Future<void> _submit() async {
+    final answer = _answer;
+    if (answer == null || _isSubmitting) return;
+    setState(() {
+      _isSubmitting = true;
+      _error = null;
+    });
+    try {
+      final result = await ref.read(coursesRepositoryProvider).submitInterjectionAnswer(
+            itemId: widget.itemId,
+            interjectionId: widget.interjection.id,
+            answer: answer,
+          );
+      setState(() {
+        _result = QuizQuestionResult(
+          questionId: widget.interjection.question.id,
+          correct: result.correct,
+          pointsAwarded: result.pointsAwarded,
+          pointsPossible: result.pointsPossible,
+          explanation: null,
+        );
+      });
+    } catch (e) {
+      setState(() => _error = 'Failed to submit: $e');
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      child: Dialog(
+        insetPadding: const EdgeInsets.all(24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Quick check',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 12),
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: QuizQuestionWidget(
+                      question: widget.interjection.question,
+                      showResult: _result,
+                      onChanged: (answer) => _answer = answer,
+                    ),
+                  ),
+                ),
+                if (_error != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Text(_error!, style: const TextStyle(color: Colors.red)),
+                  ),
+                if (_result == null)
+                  FilledButton(
+                    onPressed: (_answer == null || _isSubmitting) ? null : _submit,
+                    child: _isSubmitting
+                        ? const SizedBox(
+                            height: 16,
+                            width: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Submit'),
+                  )
+                else
+                  FilledButton(
+                    onPressed: () => Navigator.of(context).pop(true),
+                    child: const Text('Continue'),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

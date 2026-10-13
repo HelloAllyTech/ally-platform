@@ -98,6 +98,7 @@ class StartItemPayload {
     this.html,
     this.minReadSeconds,
     this.articleQuestions,
+    this.videoSource,
     this.videoUrl,
     this.durationSeconds,
     this.requiredWatchPct,
@@ -125,6 +126,7 @@ class StartItemPayload {
               .map((e) => ArticleQuestion.fromJson(e as Map<String, dynamic>))
               .toList()
           : null,
+      videoSource: type == 'VIDEO' ? json['source'] as String? : null,
       videoUrl: json['url'] as String?,
       durationSeconds: (json['durationSeconds'] as num?)?.toDouble(),
       requiredWatchPct: (json['requiredWatchPct'] as num?)?.toDouble(),
@@ -164,6 +166,10 @@ class StartItemPayload {
   final List<ArticleQuestion>? articleQuestions;
 
   // VIDEO
+  /// 's3' gets real native playback; 'youtube'/'vimeo'/'loom' fall back to
+  /// open-externally-and-mark-watched — same split as the RN app's
+  /// `TrackVideoSource` (no native SDK integration for those hosts).
+  final String? videoSource;
   final String? videoUrl;
   final double? durationSeconds;
   final double? requiredWatchPct;

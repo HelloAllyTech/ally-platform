@@ -4,19 +4,17 @@
 // deprecated API still works correctly.
 // ignore_for_file: deprecated_member_use
 
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/widgets/html_rich_text.dart';
 import '../data/course_models.dart';
 import '../data/courses_repository.dart';
-import '../data/quiz_models.dart';
 import '../data/start_item_payload.dart';
 import 'game/game_player.dart';
 import 'journal/journal_player.dart';
 import 'quiz/quiz_player.dart';
+import 'video/video_item_player.dart';
 
 /// Full port of ally-mobile (React Native)'s `CourseItemPlayerScreen`
 /// (7,700 lines in the original) for ARTICLE, VIDEO, QUIZ, JOURNAL, and
@@ -39,8 +37,6 @@ class _CourseItemPlayerScreenState extends ConsumerState<CourseItemPlayerScreen>
   StartItemPayload? _payload;
   bool _isLoading = true;
   String? _error;
-  double _watchedPct = 0;
-  Timer? _progressTimer;
   bool _completed = false;
 
   @override
@@ -54,10 +50,8 @@ class _CourseItemPlayerScreenState extends ConsumerState<CourseItemPlayerScreen>
       final payload = await ref.read(coursesRepositoryProvider).startTrackItem(widget.item.id);
       setState(() {
         _payload = payload;
-        _watchedPct = payload.maxWatchedPct ?? 0;
         _isLoading = false;
       });
-      if (payload.type == 'VIDEO') _startVideoProgressTimer();
     } catch (e) {
       setState(() {
         _error = 'Failed to load item: $e';
@@ -66,33 +60,9 @@ class _CourseItemPlayerScreenState extends ConsumerState<CourseItemPlayerScreen>
     }
   }
 
-  void _startVideoProgressTimer() {
-    // Matches the RN screen's own ~10s video-progress reporting cadence
-    // (see coursesRepository.dart's doc comment).
-    _progressTimer = Timer.periodic(const Duration(seconds: 10), (_) {
-      if (_completed) return;
-      setState(() => _watchedPct = (_watchedPct + 0.2).clamp(0, 1));
-      ref
-          .read(coursesRepositoryProvider)
-          .reportVideoProgress(itemId: widget.item.id, watchedPct: _watchedPct);
-      final required = _payload?.requiredWatchPct ?? 1.0;
-      if (_watchedPct >= required) _markVideoComplete();
-    });
-  }
-
-  Future<void> _markVideoComplete() async {
-    if (mounted) setState(() => _completed = true);
-  }
-
   Future<void> _markArticleComplete() async {
     await ref.read(coursesRepositoryProvider).markArticleRead(widget.item.id);
     if (mounted) setState(() => _completed = true);
-  }
-
-  @override
-  void dispose() {
-    _progressTimer?.cancel();
-    super.dispose();
   }
 
   @override
@@ -126,11 +96,11 @@ class _CourseItemPlayerScreenState extends ConsumerState<CourseItemPlayerScreen>
           onMarkComplete: _markArticleComplete,
         );
       case 'VIDEO':
-        return _VideoView(
+        return VideoItemPlayer(
           payload: payload,
           itemId: widget.item.id,
-          watchedPct: _watchedPct,
-          completed: _completed,
+          alreadyCompleted: _completed,
+          onCompleted: () => setState(() => _completed = true),
         );
       case 'JOURNAL':
         return JournalPlayer(
@@ -242,109 +212,3 @@ class _ArticleViewState extends ConsumerState<_ArticleView> {
   }
 }
 
-class _VideoView extends ConsumerStatefulWidget {
-  const _VideoView({
-    required this.payload,
-    required this.itemId,
-    required this.watchedPct,
-    required this.completed,
-  });
-
-  final StartItemPayload payload;
-  final String itemId;
-  final double watchedPct;
-  final bool completed;
-
-  @override
-  ConsumerState<_VideoView> createState() => _VideoViewState();
-}
-
-class _VideoViewState extends ConsumerState<_VideoView> {
-  final Map<String, QuizAnswerInput> _pendingAnswers = {};
-  final Set<String> _answeredInterjectionIds = {};
-
-  Future<void> _answerInterjection(VideoInterjection interjection) async {
-    final answer = _pendingAnswers[interjection.id];
-    if (answer == null) return;
-    try {
-      await ref.read(coursesRepositoryProvider).submitInterjectionAnswer(
-            itemId: widget.itemId,
-            interjectionId: interjection.id,
-            answer: answer,
-          );
-      setState(() => _answeredInterjectionIds.add(interjection.id));
-    } catch (_) {
-      // Swallowed for this pass, same reasoning as article questions above.
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final payload = widget.payload;
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Container(
-          height: 200,
-          alignment: Alignment.center,
-          color: Colors.black12,
-          child: const Text(
-            'Video playback not ported yet — this simulates watch progress '
-            'to exercise the real video-progress and interjection endpoints.',
-            textAlign: TextAlign.center,
-          ),
-        ),
-        const SizedBox(height: 16),
-        LinearProgressIndicator(value: widget.watchedPct),
-        Text('${(widget.watchedPct * 100).round()}% watched'),
-        const SizedBox(height: 24),
-        if ((payload.interjections ?? []).isNotEmpty) ...[
-          Text('Interjections', style: Theme.of(context).textTheme.titleMedium),
-          for (final interjection in payload.interjections!)
-            Card(
-              margin: const EdgeInsets.only(top: 8),
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('At ${interjection.timestampSeconds.round()}s'),
-                    Text(interjection.question.prompt),
-                    for (final option in interjection.question.options ?? [])
-                      RadioListTile<String>(
-                        dense: true,
-                        title: Text(option.text),
-                        value: option.id,                        groupValue:
-                            _pendingAnswers[interjection.id]?.selectedOptionIds?.firstOrNull,                        onChanged: _answeredInterjectionIds.contains(interjection.id)
-                            ? null
-                            : (value) {
-                                setState(() {
-                                  _pendingAnswers[interjection.id] =
-                                      QuizAnswerInput(
-                                    questionId: interjection.question.id,
-                                    selectedOptionIds: [value!],
-                                  );
-                                });
-                                _answerInterjection(interjection);
-                              },
-                      ),
-                    if (_answeredInterjectionIds.contains(interjection.id))
-                      const Text('Answered', style: TextStyle(color: Colors.green)),
-                  ],
-                ),
-              ),
-            ),
-        ],
-        const SizedBox(height: 16),
-        if (widget.completed)
-          const Row(
-            children: [
-              Icon(Icons.check_circle, color: Colors.green),
-              SizedBox(width: 8),
-              Text('Completed'),
-            ],
-          ),
-      ],
-    );
-  }
-}
