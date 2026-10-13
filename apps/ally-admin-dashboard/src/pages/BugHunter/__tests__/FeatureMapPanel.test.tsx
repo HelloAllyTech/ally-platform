@@ -5,11 +5,13 @@ import { FeatureMapPanel } from "../FeatureMapPanel";
 
 const getMaps = vi.fn();
 const refresh = vi.fn();
+const removeCard = vi.fn();
 const toast = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
 
 vi.mock("@api", () => ({
   useGetBugHunterFeatureMapsQuery: (...args: unknown[]) => getMaps(...args),
   useRefreshBugHunterFeatureMapsMutation: () => [refresh, { isLoading: false }],
+  useRemoveBugHunterFeatureMapMutation: () => [removeCard, { isLoading: false }],
 }));
 vi.mock("sonner", () => ({
   toast: {
@@ -47,12 +49,26 @@ vi.mock("@ally-ui-mono/ui-shared", () => ({
     </label>
   ),
   SelectItem: ({ value, text }: any) => <option value={value}>{text}</option>,
+  SidePanel: ({ open, title, children }: any) =>
+    open ? (
+      <div data-testid="side-panel">
+        <h2>{title}</h2>
+        {children}
+      </div>
+    ) : null,
+  TextArea: ({ id, labelText, value, onChange }: any) => (
+    <label>
+      {labelText}
+      <textarea id={id} value={value} onChange={onChange} />
+    </label>
+  ),
 }));
 
 const card = {
   id: "c-1",
   repo: "ally-be",
-  slug: "simulation-translations",
+  slug: "simulation-titles-translated",
+  valueSource: "database",
   title: "Simulation titles in the learner's language",
   summary:
     "Stored in scenarios.translations, written by persistTranslationsForScenarios, served by GET /v2/learn/scenarios.",
@@ -112,5 +128,34 @@ describe("FeatureMapPanel", () => {
     expect(screen.queryByText("Map now")).toBeNull();
     expect(screen.getByText(/No cards yet/)).toBeTruthy();
     expect(screen.getByText(/needs triage access/)).toBeTruthy();
+  });
+
+  it("labels where the card's value comes from", () => {
+    render(<FeatureMapPanel canTriage />);
+    expect(screen.getByTestId("feature-card-source").textContent).toBe("From the database");
+  });
+
+  it("removes a wrong card only with a reason, and sends the reason", async () => {
+    removeCard.mockReturnValue({ unwrap: () => Promise.resolve({ removed: true }) });
+    render(<FeatureMapPanel canTriage />);
+    fireEvent.click(screen.getByText("Wrong card"));
+    const submit = screen.getByText("Remove card") as HTMLButtonElement;
+    expect(submit.disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText("What's wrong with it"), {
+      target: { value: "Describes labels, not simulation titles" },
+    });
+    fireEvent.click(screen.getByText("Remove card"));
+    await waitFor(() =>
+      expect(removeCard).toHaveBeenCalledWith({
+        id: "c-1",
+        reason: "Describes labels, not simulation titles",
+      }),
+    );
+    await waitFor(() => expect(toast.success).toHaveBeenCalled());
+  });
+
+  it("offers no Wrong card button without triage access", () => {
+    render(<FeatureMapPanel canTriage={false} />);
+    expect(screen.queryByText("Wrong card")).toBeNull();
   });
 });

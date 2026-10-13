@@ -2,8 +2,12 @@ import { FC, useMemo, useState } from "react";
 
 import { toast } from "sonner";
 
-import { Button, Select, SelectItem, Tooltip } from "@ally-ui-mono/ui-shared";
-import { useGetBugHunterFeatureMapsQuery, useRefreshBugHunterFeatureMapsMutation } from "@api";
+import { Button, Select, SelectItem, SidePanel, TextArea, Tooltip } from "@ally-ui-mono/ui-shared";
+import {
+  useGetBugHunterFeatureMapsQuery,
+  useRefreshBugHunterFeatureMapsMutation,
+  useRemoveBugHunterFeatureMapMutation,
+} from "@api";
 import { TooltipIcon } from "@assets";
 import { ActionConfirmationPopup } from "@components/action-confirmation-popup";
 import { en } from "@constants";
@@ -37,6 +41,21 @@ export const FeatureMapPanel: FC<FeatureMapPanelProps> = ({ canTriage }) => {
   const [refresh, { isLoading: isRefreshing }] = useRefreshBugHunterFeatureMapsMutation();
   const [confirming, setConfirming] = useState(false);
   const cards = useMemo(() => data?.cards ?? [], [data]);
+  const [removeCard, { isLoading: isRemoving }] = useRemoveBugHunterFeatureMapMutation();
+  const [wrongCard, setWrongCard] = useState<BugHunterFeatureCard | null>(null);
+  const [reason, setReason] = useState("");
+
+  const handleRemove = async () => {
+    if (!wrongCard || !reason.trim()) return;
+    try {
+      await removeCard({ id: wrongCard.id, reason: reason.trim() }).unwrap();
+      toast.success(en.bugHunter.featureMapWrongDone);
+      setWrongCard(null);
+      setReason("");
+    } catch {
+      toast.error(en.bugHunter.featureMapWrongFailed);
+    }
+  };
 
   const handleRefresh = async () => {
     setConfirming(false);
@@ -104,7 +123,11 @@ export const FeatureMapPanel: FC<FeatureMapPanelProps> = ({ canTriage }) => {
         ) : (
           <ul>
             {cards.map(card => (
-              <FeatureCard key={card.id} card={card} />
+              <FeatureCard
+                key={card.id}
+                card={card}
+                onWrong={canTriage ? () => setWrongCard(card) : undefined}
+              />
             ))}
           </ul>
         )}
@@ -112,6 +135,36 @@ export const FeatureMapPanel: FC<FeatureMapPanelProps> = ({ canTriage }) => {
 
       {!canTriage && (
         <p className="mt-4 text-xs text-typography-500">{en.bugHunter.featureMapReadOnly}</p>
+      )}
+
+      {wrongCard && (
+        <SidePanel
+          open
+          onClose={() => setWrongCard(null)}
+          title={en.bugHunter.featureMapWrongTitle}
+          className="w-[28rem]"
+        >
+          <p className="text-sm font-semibold text-typography-900">{wrongCard.title}</p>
+          <p className="text-xs text-typography-600 mt-1">{en.bugHunter.featureMapWrongIntro}</p>
+          <div className="mt-4">
+            <TextArea
+              id="bug-hunter-feature-map-wrong-reason"
+              labelText={en.bugHunter.featureMapWrongReasonLabel}
+              placeholder={en.bugHunter.featureMapWrongReasonPlaceholder}
+              value={reason}
+              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setReason(e.target.value)}
+              rows={4}
+            />
+          </div>
+          <div className="mt-4 flex justify-end gap-2">
+            <Button kind="secondary" onClick={() => setWrongCard(null)}>
+              {en.bugHunter.cancel}
+            </Button>
+            <Button kind="danger" disabled={!reason.trim() || isRemoving} onClick={handleRemove}>
+              {en.bugHunter.featureMapWrongSubmit}
+            </Button>
+          </div>
+        </SidePanel>
       )}
 
       {confirming && (
@@ -139,16 +192,36 @@ const Row: FC<{ label: string; items: string[] }> = ({ label, items }) =>
     </div>
   ) : null;
 
-const FeatureCard: FC<{ card: BugHunterFeatureCard }> = ({ card }) => (
+const FeatureCard: FC<{ card: BugHunterFeatureCard; onWrong?: () => void }> = ({
+  card,
+  onWrong,
+}) => (
   <li
     className="px-4 py-3 border-b border-b-border-light last:border-b-0"
     data-testid="feature-card"
   >
-    <div className="flex flex-wrap items-baseline gap-x-2">
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
       <h3 className="text-sm font-semibold text-typography-900">{card.title}</h3>
       <span className="rounded bg-neutral-100 px-1.5 py-0.5 text-xs text-typography-700">
         {card.repo}
       </span>
+      {card.valueSource && (
+        <Tooltip label={en.bugHunter.featureMapSourceTooltip} align="top">
+          <span
+            className="rounded bg-blue-50 px-1.5 py-0.5 text-xs text-blue-800"
+            data-testid="feature-card-source"
+          >
+            {en.bugHunter.featureMapSource[card.valueSource] ?? card.valueSource}
+          </span>
+        </Tooltip>
+      )}
+      {onWrong && (
+        <span className="ml-auto">
+          <Button size="sm" kind="ghost" onClick={onWrong}>
+            {en.bugHunter.featureMapWrong}
+          </Button>
+        </span>
+      )}
     </div>
     <p className="mt-1 text-sm text-typography-800 break-words">{card.summary}</p>
     <div className="mt-2 flex flex-col gap-1">

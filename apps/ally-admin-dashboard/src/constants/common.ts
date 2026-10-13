@@ -587,6 +587,7 @@ export const ApiEndpoints = {
     MEMORY: "/v1/bug-hunter/memory",
     FEATURE_MAPS: "/v1/bug-hunter/feature-maps",
     FEATURE_MAPS_REFRESH: "/v1/bug-hunter/feature-maps/refresh",
+    FEATURE_MAP_REMOVE: (id: string) => `/v1/bug-hunter/feature-maps/${id}/remove`,
     MEMORY_RETIRE: (id: string) => `/v1/bug-hunter/memory/${id}/retire`,
     // What the agent retired on its own recently, with its reason (OPP-0752), and the undo.
     MEMORY_RETIRED: "/v1/bug-hunter/memory/retired",

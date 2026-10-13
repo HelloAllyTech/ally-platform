@@ -29,6 +29,8 @@ export interface BugHunterFeatureCard {
   slug: string;
   title: string;
   summary: string;
+  /** Where the value the user sees comes from — labels and content are different cards. */
+  valueSource: "database" | "locale_file" | "config" | "code" | "external";
   entryPoints: string[];
   endpoints: string[];
   dataHomes: string[];

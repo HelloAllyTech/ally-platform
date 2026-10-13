@@ -36,6 +36,7 @@ vi.mock("@api", () => ({
     isError: false,
   }),
   useRefreshBugHunterFeatureMapsMutation: () => [vi.fn(), { isLoading: false }],
+  useRemoveBugHunterFeatureMapMutation: () => [vi.fn(), { isLoading: false }],
   useGetBugHunterMemoryQuery: vi.fn(() => ({
     data: { items: [] },
     isLoading: false,

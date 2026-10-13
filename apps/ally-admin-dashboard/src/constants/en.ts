@@ -3293,6 +3293,25 @@ export const en = {
     featureMapGotchas: "Gotchas",
     featureMapMappedAt: "Mapped at {sha} on {when}",
     featureMapReadOnly: "You can read the feature map. Starting a map run needs triage access.",
+    featureMapSource: {
+      database: "From the database",
+      locale_file: "From translation files",
+      config: "From config",
+      code: "From code",
+      external: "From a third-party service",
+    } as Record<string, string>,
+    featureMapSourceTooltip:
+      "Where the value this card is about comes from. Content from the database is fixed at its writer or its data, never on the screen; labels are fixed in the translation files.",
+    featureMapWrong: "Wrong card",
+    featureMapWrongTitle: "Remove this card as wrong",
+    featureMapWrongIntro:
+      "The card is deleted. Your reason goes into my notebook, and the next map run reads it so it doesn't write the same card again.",
+    featureMapWrongReasonLabel: "What's wrong with it",
+    featureMapWrongReasonPlaceholder:
+      "e.g. Describes UI label bundles, but simulation titles come translated from ally-be's database.",
+    featureMapWrongSubmit: "Remove card",
+    featureMapWrongDone: "Card removed. The next map run will read your reason.",
+    featureMapWrongFailed: "Couldn't remove the card.",
     statusRunning: "Running",
     statusCompleted: "Completed",
     statusFailed: "Failed",

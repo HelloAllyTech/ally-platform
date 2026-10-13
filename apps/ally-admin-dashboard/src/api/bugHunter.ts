@@ -415,6 +415,19 @@ export const bugHunterAPI = baseAPI.injectEndpoints({
       providesTags: [{ type: TAG_TYPES.BUG_HUNTER_FEATURE_MAP, id: "LIST" }],
     }),
 
+    /** Remove a wrong card; the reason becomes a notebook lesson the next map run reads. */
+    removeBugHunterFeatureMap: builder.mutation<{ removed: true }, { id: string; reason: string }>({
+      query: ({ id, reason }) => ({
+        url: ApiEndpoints.BUG_HUNTER.FEATURE_MAP_REMOVE(id),
+        method: HttpMethod.POST,
+        body: { reason },
+      }),
+      invalidatesTags: [
+        { type: TAG_TYPES.BUG_HUNTER_FEATURE_MAP, id: "LIST" },
+        { type: TAG_TYPES.BUG_HUNTER_MEMORY, id: "LIST" },
+      ],
+    }),
+
     /** Start a read-only map run now, for one repo or all of them. Returns the run ids started. */
     refreshBugHunterFeatureMaps: builder.mutation<{ runIds: string[] }, { repo?: string }>({
       query: body => ({
@@ -590,6 +603,7 @@ export const {
   useMarkAllBugHunterNotificationsReadMutation,
   useGetBugHunterFeatureMapsQuery,
   useRefreshBugHunterFeatureMapsMutation,
+  useRemoveBugHunterFeatureMapMutation,
   useGetBugHunterMemoryQuery,
   useAddBugHunterMemoryMutation,
   useRetireBugHunterMemoryMutation,
