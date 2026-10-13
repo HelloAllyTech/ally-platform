@@ -4,16 +4,20 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/account/presentation/complete_profile_screen.dart';
 import '../../features/account/presentation/profile_settings_screen.dart';
+import '../../features/achievements/presentation/achievements_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
+import '../../features/bugreport/presentation/bug_report_screen.dart';
 import '../../features/courses/data/course_models.dart';
 import '../../features/courses/presentation/course_detail_screen.dart';
 import '../../features/courses/presentation/course_item_player_screen.dart';
 import '../../features/courses/presentation/course_overview_screen.dart';
 import '../../features/courses/presentation/course_progress_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
+import '../../features/leaderboard/presentation/leaderboard_screen.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
 import '../../features/roleplay/presentation/roleplay_voice_screen.dart';
 import '../../features/scribe/presentation/scribe_recording_screen.dart';
+import '../../features/search/presentation/search_screen.dart';
 import '../../features/simulations/presentation/simulation_details_screen.dart';
 import '../../features/simulations/presentation/simulation_feedback_screen.dart';
 import '../../features/simulations/presentation/simulation_path_details_screen.dart';
@@ -110,6 +114,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/simulation-paths/:pathId',
         builder: (context, state) =>
             SimulationPathDetailsScreen(pathId: state.pathParameters['pathId']!),
+      ),
+      GoRoute(
+        path: '/leaderboard',
+        builder: (context, state) => const LeaderboardScreen(),
+      ),
+      GoRoute(
+        path: '/achievements',
+        builder: (context, state) => const AchievementsScreen(),
+      ),
+      GoRoute(
+        path: '/bug-report',
+        builder: (context, state) => const BugReportScreen(),
+      ),
+      GoRoute(
+        path: '/search',
+        builder: (context, state) => const SearchScreen(),
       ),
       GoRoute(
         path: '/simulations/feedback/:sessionId',

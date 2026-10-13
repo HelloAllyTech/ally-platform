@@ -43,6 +43,26 @@ class HomeScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 8),
             FilledButton(
+              onPressed: () => context.push('/leaderboard'),
+              child: const Text('Phase 4: Leaderboard'),
+            ),
+            const SizedBox(height: 8),
+            FilledButton(
+              onPressed: () => context.push('/achievements'),
+              child: const Text('Phase 4: Achievements'),
+            ),
+            const SizedBox(height: 8),
+            FilledButton(
+              onPressed: () => context.push('/bug-report'),
+              child: const Text('Phase 4: Report a bug'),
+            ),
+            const SizedBox(height: 8),
+            FilledButton(
+              onPressed: () => context.push('/search'),
+              child: const Text('Phase 4: Search'),
+            ),
+            const SizedBox(height: 8),
+            FilledButton(
               onPressed: () => context.push('/scribe'),
               child: const Text('Phase 1: Scribe recording'),
             ),
