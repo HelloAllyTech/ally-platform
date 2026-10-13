@@ -1,8 +1,133 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/localization/translate_ref.dart';
 import '../data/call_log_repository.dart';
 import '../data/call_summary_fields.dart';
+
+/// Maps each [SummarySection] to its real translation key, taken from
+/// ally-mobile (React Native)'s `src/constants/summary.ts` `SECTION_LIST`
+/// (`labelKey` property) — the authoritative key for every section title in
+/// this form.
+const _sectionLabelKeys = <SummarySection, String>{
+  SummarySection.featuresAndDemographics: 'summary.sections.featuresAndDemographics',
+  SummarySection.sessionSummary: 'summary.sections.sessionSummary',
+  SummarySection.flow: 'summary.sections.flow',
+  SummarySection.keyConcern: 'summary.sections.keyConcerns',
+  SummarySection.objectiveObservations: 'summary.sections.objectiveObservations',
+  SummarySection.subjectiveObservations: 'summary.sections.subjectiveObservations',
+  SummarySection.assessment: 'summary.sections.assessment',
+  SummarySection.dominantFeelings: 'summary.sections.dominantFeelings',
+  SummarySection.issuesWorkedOn: 'summary.sections.issuesWorkedOn',
+  SummarySection.keyTherapeuticTechniques: 'summary.sections.keyTherapeuticTechniques',
+  SummarySection.referralsProvided: 'summary.sections.referralsProvided',
+  SummarySection.homeworkRecommended: 'summary.sections.homeworkRecommended',
+  SummarySection.planForNextCall: 'summary.sections.plansForNextCall',
+  SummarySection.tags: 'summary.sections.tags',
+  SummarySection.metrics: 'summary.sections.metrics',
+  SummarySection.intake: 'summary.sections.intake',
+  SummarySection.ongoingRisks: 'summary.sections.ongoingRisks',
+  SummarySection.additionalNotes: 'summary.sections.additionalNotes',
+};
+
+/// Maps each [SummaryFieldDef.key] to its real translation key, taken from
+/// ally-mobile (React Native)'s `src/constants/summary.ts` `FIELD_LABEL_KEYS`
+/// map — the authoritative key for every field label in this form. The
+/// field keys themselves (`callId`, `clientId`, `homework`, ...) are ported
+/// 1:1 from `SUMMARY_FIELDS` there, so this map's left-hand side lines up
+/// exactly with `call_summary_fields.dart`'s `SummaryFieldDef.key` values.
+const _fieldLabelKeys = <String, String>{
+  'callId': 'summary.fields.callId',
+  'callDuration': 'summary.fields.callDuration',
+  'callDate': 'summary.fields.callDate',
+  'callTime': 'summary.fields.callTime',
+  'clientId': 'summary.fields.callerId',
+  'callType': 'summary.fields.callerType',
+  'mode': 'summary.fields.mode',
+  'age': 'summary.fields.age',
+  'gender': 'summary.fields.gender',
+  'profession': 'summary.fields.profession',
+  'relationshipStatus': 'summary.fields.relationshipStatus',
+  'languages': 'summary.fields.languages',
+  'location': 'summary.fields.location',
+  'codeOfConcern': 'summary.fields.concernCode',
+  'counsellor': 'summary.fields.counsellor',
+  'newCallFollowUp': 'summary.fields.newCallFollowUp',
+  'sessionSummary': 'summary.fields.sessionSummary',
+  'counselingProcessFlow': 'summary.fields.flow',
+  'keyConcerns': 'summary.fields.keyConcerns',
+  'objectiveObservations': 'summary.fields.objectiveObservations',
+  'subjectiveObservations': 'summary.fields.subjectiveObservations',
+  'assessment': 'summary.fields.assessment',
+  'dominantFeelings': 'summary.fields.dominantFeelings',
+  'issuesWorkedOn': 'summary.fields.issuesWorkedOn',
+  'keyTherapeuticTechniques': 'summary.fields.keyTherapeuticTechniques',
+  'referralsProvided': 'summary.fields.referralsProvided',
+  'homework': 'summary.fields.homeworkRecommended',
+  'planForNextCall': 'summary.fields.plansForNextCall',
+  'tags': 'summary.fields.tags',
+  'listeningShare': 'summary.fields.listeningRatio',
+  'reflectiveQuestionsAsked': 'summary.fields.reflectiveQuestions',
+  'emotionalLift': 'summary.fields.emotionsLift',
+  'openEndedQuestionsAsked': 'summary.fields.openEndedQuestions',
+  'intakeNotes': 'summary.fields.intakeNotes',
+  'riskSelfHarm': 'summary.fields.riskSelfHarm',
+  'riskSelfHarmNotes': 'summary.fields.riskSelfHarmNotes',
+  'riskSuicidalThoughts': 'summary.fields.riskSuicidalThoughts',
+  'riskSuicidalThoughtsNotes': 'summary.fields.riskSuicidalThoughtsNotes',
+  'riskSuicidalPlan': 'summary.fields.riskSuicidalPlan',
+  'riskSuicidalAction': 'summary.fields.riskSuicidalAction',
+  'riskRunningAway': 'summary.fields.riskRunningAway',
+  'riskRunningAwayNotes': 'summary.fields.riskRunningAwayNotes',
+  'traumaPhysicalAbuse': 'summary.fields.traumaPhysicalAbuse',
+  'traumaSexualAbuse': 'summary.fields.traumaSexualAbuse',
+  'traumaVerbalAbuse': 'summary.fields.traumaVerbalAbuse',
+  'traumaNeglect': 'summary.fields.traumaNeglect',
+  'traumaSeparationFromCaregiverParent': 'summary.fields.traumaSeparation',
+  'traumaWitnessedDomesticViolence': 'summary.fields.traumaDomesticViolence',
+  'traumaNotes': 'summary.fields.traumaNotes',
+  'assessmentPsychologicalDiagnosis': 'summary.fields.assessmentPsychDiagnosis',
+  'assessmentPsychologicalDiagnosisNotes': 'summary.fields.assessmentPsychDiagnosisNotes',
+  'assessmentUseOfPsychotropicMedications': 'summary.fields.assessmentPsychotropicMeds',
+  'assessmentUseOfPsychotropicMedicationsNotes':
+      'summary.fields.assessmentPsychotropicMedsNotes',
+  'assessmentHallucinations': 'summary.fields.assessmentHallucinations',
+  'assessmentHallucinationsNotes': 'summary.fields.assessmentHallucinationsNotes',
+  'assessmentAffect': 'summary.fields.assessmentAffect',
+  'assessmentSpeech': 'summary.fields.assessmentSpeech',
+  'ongoingRiskSelfHarm': 'summary.fields.ongoingRiskSelfHarm',
+  'ongoingRiskSelfHarmNotes': 'summary.fields.ongoingRiskSelfHarmNotes',
+  'ongoingRiskSuicidalThoughts': 'summary.fields.ongoingRiskSuicidalThoughts',
+  'ongoingRiskSuicidalPlan': 'summary.fields.ongoingRiskSuicidalPlan',
+  'ongoingRiskSuicidalAction': 'summary.fields.ongoingRiskSuicidalAction',
+  'ongoingRiskSuicidalThoughtsNotes': 'summary.fields.ongoingRiskSuicidalThoughtsNotes',
+  'additionalNotes': 'summary.fields.additionalNotes',
+};
+
+/// Maps each hardcoded dropdown option literal (the data value stored in
+/// the form, e.g. `'Male'`/`'Yes'`) to its real translation key, taken from
+/// ally-mobile (React Native)'s `summary.options` locale namespace. The
+/// stored/submitted option value is left exactly as-is (same wire contract);
+/// only the on-screen label is translated. Age-range options (`'0-5'`, ...)
+/// aren't in this map — they're numeric codes with no RN translation
+/// precedent, same as upstream.
+const _fieldOptionLabelKeys = <String, String>{
+  'Male': 'summary.options.gender.male',
+  'Female': 'summary.options.gender.female',
+  'Non-binary': 'summary.options.gender.nonBinary',
+  'Client Prefers Not to Say': 'summary.options.gender.preferNotToSay',
+  'Yes': 'summary.options.risk.yes',
+  'No': 'summary.options.risk.no',
+  'Congruent': 'summary.options.affect.congruent',
+  'Incongruent': 'summary.options.affect.incongruent',
+  'Flat': 'summary.options.affect.flat',
+  'Blunted': 'summary.options.affect.blunted',
+  'Clear & Coherent': 'summary.options.speech.clearCoherent',
+  'Sluttering': 'summary.options.speech.sluttering',
+  'Fast': 'summary.options.speech.fast',
+  'Slow': 'summary.options.speech.slow',
+  'Difficult to Understand': 'summary.options.speech.difficultToUnderstand',
+};
 
 /// Scoped port of ally-mobile (React Native)'s `CallSummaryScreen` — the
 /// full structured clinical documentation form (`summaryFieldDefs`,
@@ -27,11 +152,11 @@ class CallSummaryScreen extends ConsumerWidget {
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: Text(log.sessionName ?? 'Session #${log.id}'),
-          bottom: const TabBar(
+          title: Text(log.sessionName ?? ref.t('calls.sessionNumber', {'id': log.id})),
+          bottom: TabBar(
             tabs: [
-              Tab(text: 'Summary'),
-              Tab(text: 'Transcript'),
+              Tab(text: ref.t('postCallSummary.header.summary')),
+              Tab(text: ref.t('summary.tabs.transcript')),
             ],
           ),
         ),
@@ -97,11 +222,12 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
       _dirtyKeys.clear();
       ref.invalidate(callSummaryProvider(widget.log.id));
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('Summary saved.')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(ref.tr('callSummary.info.summaryUpdatedSuccess'))),
+        );
       }
     } catch (e) {
-      setState(() => _error = 'Failed to save: $e');
+      setState(() => _error = '${ref.tr('callSummary.info.summaryUpdateFailed')}: $e');
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -112,7 +238,7 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
     return widget.summaryAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, _) =>
-          Center(child: Text('Failed to load summary: $error')),
+          Center(child: Text('${ref.t('common.somethingWentWrong')} $error')),
       data: (summary) {
         _seedIfNeeded(summary);
         return Column(
@@ -121,12 +247,12 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
-                  Text('Status: ${widget.log.status}'),
-                  Text('Started: ${widget.log.startedAt}'),
+                  Text('${ref.t('calls.table.summaryStatus')}: ${widget.log.status}'),
+                  Text('${ref.t('callSummary.startedLabel')}: ${widget.log.startedAt}'),
                   if (widget.log.endedAt.isNotEmpty)
-                    Text('Ended: ${widget.log.endedAt}'),
+                    Text('${ref.t('callSummary.endedLabel')}: ${widget.log.endedAt}'),
                   if (widget.log.score != null)
-                    Text('Score: ${widget.log.score}'),
+                    Text('${ref.t('callSummary.scoreLabel')}: ${widget.log.score}'),
                   const SizedBox(height: 16),
                   for (final section in SummarySection.values)
                     _SectionCard(
@@ -156,7 +282,9 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : Text(
-                            _dirtyKeys.isEmpty ? 'No changes' : 'Save changes',
+                            _dirtyKeys.isEmpty
+                                ? ref.t('callSummary.noChanges')
+                                : ref.t('callSummary.saveChanges'),
                           ),
                   ),
                 ),
@@ -169,7 +297,7 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
   }
 }
 
-class _SectionCard extends StatelessWidget {
+class _SectionCard extends ConsumerWidget {
   const _SectionCard({
     required this.section,
     required this.formValues,
@@ -181,7 +309,7 @@ class _SectionCard extends StatelessWidget {
   final void Function(String fieldKey, dynamic value) onFieldChanged;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final fields = summaryFieldDefs.where((f) => f.section == section).toList();
     // The RN screen also hides a section with no tenant-configured
     // "visible fields" (a backend-driven per-org form config, Redux
@@ -191,7 +319,7 @@ class _SectionCard extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: ExpansionTile(
-        title: Text(section.label),
+        title: Text(ref.t(_sectionLabelKeys[section] ?? section.label)),
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -213,7 +341,7 @@ class _SectionCard extends StatelessWidget {
   }
 }
 
-class _FieldEditor extends StatelessWidget {
+class _FieldEditor extends ConsumerWidget {
   const _FieldEditor({
     required this.field,
     required this.formValues,
@@ -225,8 +353,9 @@ class _FieldEditor extends StatelessWidget {
   final void Function(String fieldKey, dynamic value) onChanged;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final value = formValues[field.key];
+    final label = ref.t(_fieldLabelKeys[field.key] ?? field.label);
 
     if (!field.editable) {
       final display = value == null || value.toString().trim().isEmpty
@@ -237,7 +366,7 @@ class _FieldEditor extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(field.label, style: Theme.of(context).textTheme.labelMedium),
+            Text(label, style: Theme.of(context).textTheme.labelMedium),
             Text(display),
           ],
         ),
@@ -252,12 +381,15 @@ class _FieldEditor extends StatelessWidget {
         child: DropdownButtonFormField<String>(
           initialValue: currentValue,
           decoration: InputDecoration(
-            labelText: field.label,
+            labelText: label,
             border: const OutlineInputBorder(),
           ),
           items: [
             for (final option in options)
-              DropdownMenuItem(value: option, child: Text(option)),
+              DropdownMenuItem(
+                value: option,
+                child: Text(ref.t(_fieldOptionLabelKeys[option] ?? option)),
+              ),
           ],
           onChanged: (selected) => onChanged(field.key, selected),
         ),
@@ -271,7 +403,7 @@ class _FieldEditor extends StatelessWidget {
         initialValue: value?.toString() ?? '',
         maxLines: field.type == SummaryFieldType.multilineText ? 4 : 1,
         decoration: InputDecoration(
-          labelText: field.label,
+          labelText: label,
           border: const OutlineInputBorder(),
         ),
         onChanged: (text) => onChanged(field.key, text),
@@ -280,7 +412,7 @@ class _FieldEditor extends StatelessWidget {
   }
 }
 
-class _TranscriptTab extends StatelessWidget {
+class _TranscriptTab extends ConsumerWidget {
   const _TranscriptTab({
     required this.messagesAsync,
     required this.counselorId,
@@ -290,14 +422,14 @@ class _TranscriptTab extends StatelessWidget {
   final int? counselorId;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return messagesAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, _) =>
-          Center(child: Text('Failed to load transcript: $error')),
+          Center(child: Text('${ref.t('common.somethingWentWrong')} $error')),
       data: (messages) {
         if (messages.isEmpty) {
-          return const Center(child: Text('No transcript available.'));
+          return Center(child: Text(ref.t('transcription.empty')));
         }
         return ListView.builder(
           padding: const EdgeInsets.all(16),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/localization/translate_ref.dart';
 import '../data/preferences_repository.dart';
 
 /// Port of ally-mobile (React Native)'s preferences screen
@@ -16,20 +17,20 @@ class PreferencesScreen extends ConsumerWidget {
     final languagesAsync = ref.watch(availableLanguagesProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Preferences')),
+      appBar: AppBar(title: Text(ref.t('preferences.title'))),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Default simulation language', style: Theme.of(context).textTheme.titleMedium),
+            Text(ref.t('preferences.defaultLanguage'), style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 12),
             languagesAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, _) => Text('Failed to load languages: $error'),
+              error: (error, _) => Text('${ref.t('common.somethingWentWrong')} $error'),
               data: (languages) => currentAsync.when(
                 loading: () => const Center(child: CircularProgressIndicator()),
-                error: (error, _) => Text('Failed to load preferences: $error'),
+                error: (error, _) => Text('${ref.t('common.somethingWentWrong')} $error'),
                 data: (currentId) => DropdownButtonFormField<int>(
                   initialValue: currentId,
                   isExpanded: true,

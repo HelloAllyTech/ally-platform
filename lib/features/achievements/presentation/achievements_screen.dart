@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/localization/translate_ref.dart';
 import '../data/achievements_repository.dart';
 
 enum _AchievementsFilter { all, unlocked }
@@ -25,10 +26,11 @@ class _AchievementsScreenState extends ConsumerState<AchievementsScreen> {
     final badgesAsync = ref.watch(badgesProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Achievements')),
+      appBar: AppBar(title: Text(ref.t('achievements.title'))),
       body: badgesAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(child: Text('Failed to load achievements: $error')),
+        error: (error, _) =>
+            Center(child: Text('${ref.t('achievements.errors.title')}: $error')),
         data: (groups) {
           final filteredGroups = _filter == _AchievementsFilter.all
               ? groups
@@ -48,9 +50,15 @@ class _AchievementsScreenState extends ConsumerState<AchievementsScreen> {
               Padding(
                 padding: const EdgeInsets.only(bottom: 16),
                 child: SegmentedButton<_AchievementsFilter>(
-                  segments: const [
-                    ButtonSegment(value: _AchievementsFilter.all, label: Text('All')),
-                    ButtonSegment(value: _AchievementsFilter.unlocked, label: Text('Unlocked')),
+                  segments: [
+                    ButtonSegment(
+                      value: _AchievementsFilter.all,
+                      label: Text(ref.t('achievements.filters.all')),
+                    ),
+                    ButtonSegment(
+                      value: _AchievementsFilter.unlocked,
+                      label: Text(ref.t('achievements.filters.unlocked')),
+                    ),
                   ],
                   selected: {_filter},
                   onSelectionChanged: (selection) => setState(() => _filter = selection.first),

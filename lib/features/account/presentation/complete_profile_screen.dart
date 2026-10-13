@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/localization/translate_ref.dart';
 import '../data/account_repository.dart';
 
 /// Port of ally-mobile (React Native)'s `CompleteProfileScreen` — the
@@ -47,7 +48,7 @@ class _CompleteProfileScreenState
       ref.invalidate(currentUserProvider);
       if (mounted) context.go('/home');
     } catch (e) {
-      setState(() => _error = 'Failed to save profile: $e');
+      setState(() => _error = '${ref.tr('completeProfile.errorDescription')}: $e');
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -56,7 +57,7 @@ class _CompleteProfileScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Complete your profile')),
+      appBar: AppBar(title: Text(ref.t('completeProfile.title'))),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Form(
@@ -66,14 +67,15 @@ class _CompleteProfileScreenState
             children: [
               TextFormField(
                 controller: _nameController,
-                decoration: const InputDecoration(labelText: 'Full name'),
-                validator: (value) =>
-                    (value == null || value.trim().isEmpty) ? 'Required' : null,
+                decoration: InputDecoration(labelText: ref.t('completeProfile.nameLabel')),
+                validator: (value) => (value == null || value.trim().isEmpty)
+                    ? ref.t('completeProfile.required')
+                    : null,
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _phoneController,
-                decoration: const InputDecoration(labelText: 'Phone (optional)'),
+                decoration: InputDecoration(labelText: ref.t('completeProfile.phoneLabel')),
                 keyboardType: TextInputType.phone,
               ),
               if (_error != null) ...[
@@ -89,7 +91,7 @@ class _CompleteProfileScreenState
                         height: 20,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Text('Continue'),
+                    : Text(ref.t('completeProfile.submit')),
               ),
             ],
           ),
