@@ -1,0 +1,78 @@
+import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../core/network/api_client.dart';
+
+/// Mirrors ally-mobile (React Native)'s `src/services/
+/// simulationTranscriptApi.ts` `SimulationMessage`. `senderId == -1` is the
+/// AI client speaking — any other sender id is the learner (same
+/// convention as `useSimulationTranscriptDetails.ts`'s `isLearner`).
+class SimulationTranscriptMessage {
+  SimulationTranscriptMessage({
+    required this.id,
+    required this.content,
+    required this.startSeconds,
+    required this.senderId,
+  });
+
+  factory SimulationTranscriptMessage.fromJson(Map<String, dynamic> json) =>
+      SimulationTranscriptMessage(
+        id: (json['id'] as num).toInt(),
+        content: json['content'] as String? ?? '',
+        startSeconds: (json['startSeconds'] as num?)?.toDouble() ?? 0,
+        senderId: (json['senderId'] as num).toInt(),
+      );
+
+  final int id;
+  final String content;
+  final double startSeconds;
+  final int senderId;
+
+  bool get isLearner => senderId != -1;
+
+  String get formattedTime {
+    final totalSeconds = startSeconds.round();
+    final minutes = totalSeconds ~/ 60;
+    final seconds = totalSeconds % 60;
+    return '$minutes:${seconds.toString().padLeft(2, '0')}';
+  }
+}
+
+/// Ported from ally-mobile (React Native)'s `useSimulationTranscriptDetails`
+/// + `simulationTranscriptApi.ts` — paginated, chronological (sortBy
+/// startSeconds, ASC), same page size as the RN hook's `LIMIT`.
+class SimulationTranscriptRepository {
+  SimulationTranscriptRepository(this._dio);
+
+  final Dio _dio;
+
+  static const pageSize = 10;
+
+  Future<({List<SimulationTranscriptMessage> messages, int count})>
+  getMessages({required String scenarioSessionId, required int offset}) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/learn/scenario-session/$scenarioSessionId/messages',
+      queryParameters: {
+        'limit': pageSize,
+        'offset': offset,
+        'sortBy': 'startSeconds',
+        'sortOrder': 'ASC',
+      },
+    );
+    final messages = (response.data?['messages'] as List<dynamic>? ?? [])
+        .map(
+          (e) =>
+              SimulationTranscriptMessage.fromJson(e as Map<String, dynamic>),
+        )
+        .toList();
+    return (
+      messages: messages,
+      count: (response.data?['count'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
+final simulationTranscriptRepositoryProvider =
+    Provider<SimulationTranscriptRepository>((ref) {
+      return SimulationTranscriptRepository(ref.watch(apiClientProvider));
+    });
