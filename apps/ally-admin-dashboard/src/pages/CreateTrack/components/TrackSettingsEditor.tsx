@@ -11,22 +11,47 @@ import { ButtonVariant } from "@components/types";
 import { TrackFormValues } from "@types";
 
 import { useTrackMediaUpload } from "../useTrackMediaUpload";
+import { CourseShareLink, CourseShareLinkState } from "./CourseShareLink";
 import { TrackCompetenciesField } from "./TrackCompetenciesField";
 
 const labelClass = "text-sm font-medium text-typography-800";
 const inputClass =
   "w-full border border-border-light rounded-md px-3 py-2 text-sm outline-none focus:border-primary-400";
 
+interface TrackSettingsEditorProps {
+  /** Null until a brand-new course is first saved. */
+  trackId?: string | null;
+  /** The saved course is published (ACTIVE) — its share link only resolves then. */
+  isPublished?: boolean;
+}
+
 /**
  * Editor for track-level metadata: title, description, cover image, visibility,
- * duration, and the competencies the course teaches.
+ * public view (share link), duration, and the competencies the course teaches.
  */
-export const TrackSettingsEditor: FC = () => {
-  const { control, setValue } = useFormContext<TrackFormValues>();
+export const TrackSettingsEditor: FC<TrackSettingsEditorProps> = ({
+  trackId = null,
+  isPublished = false,
+}) => {
+  const {
+    control,
+    setValue,
+    formState: { dirtyFields },
+  } = useFormContext<TrackFormValues>();
   const { upload, isUploading } = useTrackMediaUpload();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const coverImageUrl = useWatch({ control, name: "coverImageUrl" });
+  const isPublicView = useWatch({ control, name: "isPublicView" }) ?? false;
+  const publicViewUnsaved = !!dirtyFields.isPublicView;
+
+  const shareLinkState: CourseShareLinkState = !trackId
+    ? "unsaved"
+    : publicViewUnsaved
+      ? "pending"
+      : isPublished
+        ? "live"
+        : "draft";
 
   const handleCoverChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -141,6 +166,43 @@ export const TrackSettingsEditor: FC = () => {
             <ToggleSwitch enabled={field.value ?? false} onChange={field.onChange} />
           )}
         />
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-col">
+            <span className="inline-flex items-center gap-1">
+              <span className={labelClass}>Public view</span>
+              <Tooltip
+                label="Gives the course a link anyone can open to see its outline, without logging in. They log in when they press Start, and only learners the course is assigned to can take it."
+                align="top"
+              >
+                <button type="button" className="cursor-pointer inline-flex items-center">
+                  <TooltipIcon />
+                </button>
+              </Tooltip>
+            </span>
+            <span className="text-xs text-typography-500">
+              {isPublicView
+                ? "Anyone with the link can see this course's outline."
+                : publicViewUnsaved
+                  ? "Save your changes to turn the link off. Anyone who opens it after that is told the course isn't available."
+                  : "Off — the course has no public link."}
+            </span>
+          </div>
+          <Controller
+            control={control}
+            name="isPublicView"
+            render={({ field }) => (
+              <ToggleSwitch
+                enabled={field.value ?? false}
+                onChange={field.onChange}
+                label="Public view"
+              />
+            )}
+          />
+        </div>
+        {isPublicView && <CourseShareLink trackId={trackId} state={shareLinkState} />}
       </div>
 
       <div className="flex flex-col gap-1.5">

@@ -169,6 +169,55 @@ export interface EnrollTrackResponse {
   alreadyEnrolled: boolean;
 }
 
+// ---------------------------------------------------------------------------
+// Public share link (`/course/:trackId`)
+// ---------------------------------------------------------------------------
+
+/** A component as the public outline shows it: no content, no progress. */
+export interface PublicTrackOutlineItem {
+  id: string;
+  type: TrackItemType;
+  order: number;
+  title: string;
+  description: string | null;
+  contentMeta: TrackItemContentMeta | null;
+}
+
+export interface PublicTrackOutlineSection {
+  id: string;
+  title: string;
+  description: string | null;
+  order: number;
+  items: PublicTrackOutlineItem[];
+}
+
+/** `GET /v1/learn/tracks/:id/public` — served only while public view is on and the course is published. */
+export interface PublicTrackOutline {
+  id: string;
+  title: string;
+  description: string | null;
+  coverImageUrl: string | null;
+  totalItems: number;
+  simulationsCount: number;
+  estimatedDurationMinutes: number | null;
+  languageCode: string;
+  sections: PublicTrackOutlineSection[];
+}
+
+/** Why a signed-in learner cannot take a course (mirrors ally-be `TrackAccessDenialReason`). */
+export enum TrackAccessDenialReason {
+  NOT_AVAILABLE = "NOT_AVAILABLE",
+  NO_ORGANIZATION = "NO_ORGANIZATION",
+  NOT_IN_ORGANIZATION = "NOT_IN_ORGANIZATION",
+  NOT_IN_GROUP = "NOT_IN_GROUP",
+}
+
+export interface TrackAccessResponse {
+  hasAccess: boolean;
+  enrolled: boolean;
+  reason: TrackAccessDenialReason | null;
+}
+
 export interface NextTrackItem extends TrackDetailItem {
   sectionId: string;
   sectionTitle: string;
