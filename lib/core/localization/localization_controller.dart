@@ -51,6 +51,12 @@ class _Manifest {
 /// `t()` instead — that's separate, substantial follow-up work across
 /// ~30 screens. This is the real, working infrastructure for it.
 class LocalizationController extends AsyncNotifier<Translations> with WidgetsBindingObserver {
+  /// [dio] is injectable (rather than always a bare `Dio()`) purely so tests
+  /// can supply a mock for the CDN sync calls in [_refresh] — no behavior
+  /// change for real callers, which all use the `Dio()` default.
+  LocalizationController({Dio? dio}) : _dio = dio ?? Dio();
+
+  final Dio _dio;
   String _language = _defaultLanguage;
   Timer? _pollTimer;
   Future<void>? _refreshInFlight;
@@ -113,9 +119,8 @@ class LocalizationController extends AsyncNotifier<Translations> with WidgetsBin
     final baseUrl = AppConfig.i18nBaseUrl.replaceAll(RegExp(r'/+$'), '');
     if (baseUrl.isEmpty) return;
 
-    final dio = Dio();
     try {
-      final manifestResponse = await dio.get<Map<String, dynamic>>('$baseUrl/manifest.json');
+      final manifestResponse = await _dio.get<Map<String, dynamic>>('$baseUrl/manifest.json');
       final manifest = _Manifest.fromJson(manifestResponse.data!);
       final language = manifest.languages.contains(_language) ? _language : _defaultLanguage;
 
@@ -127,7 +132,7 @@ class LocalizationController extends AsyncNotifier<Translations> with WidgetsBin
 
       final resource = <String, dynamic>{};
       for (final namespace in manifest.namespaces) {
-        final response = await dio.get<Map<String, dynamic>>(
+        final response = await _dio.get<Map<String, dynamic>>(
           '$baseUrl/${manifest.currentVersion}/$language/$namespace.json',
         );
         resource[namespace] = response.data;
