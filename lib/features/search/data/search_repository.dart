@@ -26,24 +26,52 @@ class ResourceArticle {
   final String category;
 }
 
-/// Ported from ally-mobile (React Native)'s `src/services/searchApi.ts`.
-/// Category filtering and pagination (`excludedIds`, tab-based results the
-/// RN screen builds from `SearchResult.categories`) not ported — this
-/// issues a single query and shows a flat result list.
+/// Mirrors `src/screens/SearchScreen/types.ts`'s `SearchResult` — the
+/// per-category counts drive the tab bar ("All (12)", "Anxiety (4)", ...),
+/// `total` drives `hasMore` for pagination.
+class SearchResult {
+  SearchResult({required this.documents, required this.categoryCounts, required this.total});
+
+  factory SearchResult.fromJson(Map<String, dynamic> json) => SearchResult(
+        documents: (json['documents'] as List<dynamic>? ?? [])
+            .map((e) => ResourceArticle.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        categoryCounts: (json['categories'] as Map<String, dynamic>? ?? {})
+            .map((key, value) => MapEntry(key, (value as num).toInt())),
+        total: (json['total'] as num?)?.toInt() ?? 0,
+      );
+
+  final List<ResourceArticle> documents;
+  final Map<String, int> categoryCounts;
+  final int total;
+}
+
+/// Ported from ally-mobile (React Native)'s `src/services/searchApi.ts` +
+/// `useSearch.ts`'s page size. `category` of `null`/`'All'` omits the
+/// `filters` field, same as the RN hook. `excludedIds` drives
+/// "load more" pagination — the backend's own offset-free dedup strategy.
 class SearchRepository {
   SearchRepository(this._dio);
 
   final Dio _dio;
 
-  Future<List<ResourceArticle>> search(String query) async {
+  static const pageSize = 6;
+
+  Future<SearchResult> search(
+    String query, {
+    String? category,
+    List<String> excludedIds = const [],
+  }) async {
     final response = await _dio.post<Map<String, dynamic>>(
       '/reference-document/search',
-      data: {'query': query},
+      data: {
+        'query': query,
+        'limit': pageSize,
+        if (category != null && category != 'All') 'filters': {'category': category},
+        if (excludedIds.isNotEmpty) 'excludedIds': excludedIds,
+      },
     );
-    final documents = response.data?['documents'] as List<dynamic>? ?? [];
-    return documents
-        .map((e) => ResourceArticle.fromJson(e as Map<String, dynamic>))
-        .toList();
+    return SearchResult.fromJson(response.data!);
   }
 }
 
