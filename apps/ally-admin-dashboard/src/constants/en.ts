@@ -2650,7 +2650,7 @@ export const en = {
     stageAutoLabel: "Following the pipeline",
     stageEditLabel: "Set stage by hand",
     stageEditHint:
-      "Use this when the bug was fixed outside Bug Hunter — a hand-written PR, a config change, a fix that came along with other work. Once set by hand, the stage stops following the pipeline.",
+      "For a bug fixed outside Bug Hunter; a stage set by hand stops following the pipeline.",
     stageSelectLabel: "Stage",
     stageSave: "Set stage",
     stageBackToAuto: "Back to automatic",
@@ -2680,7 +2680,6 @@ export const en = {
     reporterContextOs: "OS",
     reporterContextAppVersion: "App version",
     reporterContextClientTimestamp: "Reported at (their clock)",
-    reporterTenant: "Tenant",
     findingsEmptyTitle: "No bugs yet",
     findingsEmptySubtitle:
       "Once I'm on duty, anything I find — or your team reports — shows up here.",
@@ -2764,9 +2763,8 @@ export const en = {
     // Written from Bug Hunter's side of the exchange, like the rest of this
     // tab: what the admin is changing is what I will be told to fix, and
     // saying so is the whole justification for the control existing.
-    drawerDescriptionEdit: "Rewrite this for me",
-    drawerDescriptionEditTooltip:
-      "This description is the entire brief I work from — I'm told the bug in these words and nothing else, and I use them to work out which codebase it's even in. If it's vague, say what breaks, when, and what should happen instead. Rewriting doesn't approve anything or start anything; it just means I'll be better briefed when you do.",
+    drawerDescriptionEdit: "Rewrite the description",
+    drawerDescriptionEditHelp: "I work from these words and nothing else.",
     drawerDescriptionEditLabel: "The bug, as you want me to understand it",
     drawerDescriptionEditPlaceholder:
       "What breaks, when it breaks, and what should happen instead…",
@@ -2775,16 +2773,47 @@ export const en = {
     drawerDescriptionEditFailed: "Couldn't save that description. Try again.",
     drawerDescriptionEditTooLong:
       "That's longer than I can take as a brief ({length} of {max} characters). Paste raw output into a comment on the PR instead — this field is what I read before I start.",
-    drawerDescriptionEditedBy: "Rewritten by user #{userId}",
+    drawerDescriptionEditedBy: "Rewritten by {name}",
     drawerDescriptionShowOriginal: "See what I originally found",
     drawerDescriptionHideOriginal: "Hide what I originally found",
     drawerDescriptionOriginalTitle: "Originally",
     drawerDescriptionSettleFirst:
-      "Save or cancel your rewrite first — right now I'd still be working from the description above it.",
+      "Save or cancel your rewrite first — right now I'd still be working from the old description.",
     drawerEvidenceTitle: "Evidence",
     drawerTimelineTitle: "My work log",
     drawerTimelineEmpty: "I haven't touched this one yet.",
     drawerLoadFailed: "Couldn't load this bug's details.",
+    drawerLoading: "Loading this bug…",
+    // ── The header: one meta line, and a menu for everything that isn't the decision ──
+    drawerMoreActions: "More actions",
+    drawerFoundAgo: "found {age} ago",
+    drawerFoundJustNow: "found just now",
+    drawerLastRunOn: "Last run on {model}",
+    // ── The decision block's one status sentence, per lifecycle state ─────────
+    // One sentence that says where the bug is and what happens next, in place
+    // of the badge, banner and spinner that used to each say part of it.
+    drawerStatusNew: "I haven't looked at this one yet.",
+    drawerStatusPendingApproval: "Waiting for your call before I fix it.",
+    drawerStatusApproved: "Approved. I'll fix it on my next sweep, or put me on it now.",
+    drawerStatusFixing: "I'm working on the fix now.",
+    drawerStatusCoordinating: "I'm working through a fix that spans several repos, one at a time.",
+    drawerStatusBlocked: "Waiting for an earlier step of this fix to land first.",
+    drawerStatusAnswerReceived: "Thanks. I'll carry on with your answer.",
+    drawerStatusPrOpened: "My fix is in a pull request, waiting for your merge.",
+    drawerStatusMerged: "The fix is merged. Users get it once it's released.",
+    drawerStatusCancelled: "You stopped my fix session. Nothing from it was merged.",
+    drawerStatusDismissed: "I dropped this one.",
+    drawerStatusRejected: "You turned this down.",
+    // ── Collapsed sections ───────────────────────────────────────────────────
+    drawerSectionConfidence: "How sure I am",
+    drawerSectionPlan: "How I planned the fix",
+    // ── Who did what, merged into the work log ───────────────────────────────
+    drawerAuditApproved: "approved it",
+    drawerAuditDeclined: "turned it down",
+    drawerAuditReleased: "released it to production",
+    drawerAuditStopped: "stopped the fix session",
+    drawerAuditAnswered: "answered: {answer}",
+    drawerAuditSomeone: "An admin",
     drawerReportedBugNotice: "Your team reported this. I haven't triaged it yet.",
     drawerGuardedPathNotice:
       "This touches a guarded path — migrations, auth or payments — so I'll never merge it myself, however small the fix turns out to be.",
@@ -2793,6 +2822,8 @@ export const en = {
     drawerApproveConfirmTitle: "Approve this bug for me to fix?",
     drawerApproveConfirmBody:
       'I\'ll pick it up in the fix stage of my next sweep for this repo. If you want it done now, use "Put me on it" instead.',
+    drawerApproveConfirmBodyNoRush:
+      "I'll pick it up in the fix stage of my next sweep for this repo. Once it's approved you can also put me on it straight away.",
     drawerRejectConfirmTitle: "Reject this bug?",
     drawerRejectConfirmBody: "I'll never pick it up. This can't be undone.",
     // ── declining a bug: the reason, and what it is for ────────────────────
@@ -2965,20 +2996,18 @@ export const en = {
       "Only if you already know the fault is in this repo's code. A fix that starts from the symptom alone is how the wrong layer gets fixed.",
     drawerLocateFirstStart: "Locate the fault",
     drawerIndependentTooltip:
-      "After a sweep closes, a separate run on a different model reproduces each unproven finding and tries to refute it. I fix nothing in AI mode until it has confirmed the bug.",
+      "A separate run on a different model tries to reproduce this and refute it.",
 
     // ── the Verifier's verdict on a fix (OPP-0779) ────────────────────────
     drawerVerdictPass: "My Verifier passed this fix",
     drawerVerdictFail: "My Verifier refused this fix",
-    drawerVerdictTooltip:
-      "After I open a fix PR, a separate run on a different model reads it with fresh eyes: does the regression test fail before and pass after, is the suite green, does the diff do only what the bug needs, do data files keep their counts. I merge only on a pass, and only where this repo lets me.",
+    drawerVerdictTooltip: "A separate run on a different model checks my PR before it's merged.",
     drawerVerdictBy: "Read on {engine}",
     drawerVerdictCheckSkipped: "skipped: {reason}",
 
     // ── the case file's budget (OPP-0775) ─────────────────────────────────
     drawerBudgetLabel: "What I've spent on this bug",
-    drawerBudgetTooltip:
-      "Every bug has a budget: fix sessions, attempts, times I asked for help, dollars and minutes. I stop starting new sessions once any of them is spent, so trying again is a decision you make, not a reflex I have.",
+    drawerBudgetTooltip: "I stop starting sessions on my own once any cap is spent.",
     drawerBudgetSummary:
       "{sessions} of {sessionsCap} sessions · {attempts} of {attemptsCap} attempts · ${usd} of ${usdCap}",
     drawerBudgetExhausted: "Budget spent ({kind}). I won't start another session on my own.",
@@ -2992,8 +3021,7 @@ export const en = {
     // reader is whoever decides what Bug Hunter should learn to look at next,
     // so the sense is named as a thing to build or fix, not as an enum.
     drawerMissTitle: "Why I didn't find this first",
-    drawerMissTooltip:
-      "Every bug a person reports is one I should have caught. I write down which kind of miss it was and which sense would have seen it, so the next thing I learn to look at is the thing people keep finding for me.",
+    drawerMissTooltip: "Which sense would have caught it, so I learn to look there next.",
     drawerMissWouldNeed: "What would have caught it: {sense}",
     drawerMissSeeMatched: "See what I had already found",
     missNoSense: "I have no sense that could have seen this",
@@ -3021,8 +3049,9 @@ export const en = {
     // try again", and (through the dossier) the session that retries. The
     // labels name what each line is FOR, not the field it came from.
     drawerPostmortemTitle: "Why my last fix session failed",
-    drawerPostmortemTooltip:
-      "I write this when I give up on a fix: what kept failing, what I think is really wrong, and what a retry should do differently. The next session reads it before it starts, so a retry doesn't repeat this one.",
+    drawerPostmortemTooltip: "The next session reads this before it starts.",
+    drawerPostmortemShowAll: "Show the full post-mortem",
+    drawerPostmortemHideAll: "Hide the full post-mortem",
     drawerPostmortemRecorded: "From my session of {date}",
     drawerPostmortemAttempts: "{count} attempt(s) · {check}",
     drawerPostmortemLastFailure: "Last failure",
@@ -3036,8 +3065,7 @@ export const en = {
     // diff: where I said the value lives decides whether the fix is the
     // right shape at all.
     drawerStudyTitle: "How I understood it before fixing",
-    drawerStudyTooltip:
-      "Before I change any code I read the feature end to end — where the value lives, what carries it to the screen, what the client sends — and write it down. A second model reviews it, the Verifier compares my diff with it, and a retry reads it to see where I went wrong.",
+    drawerStudyTooltip: "What I read and planned before changing any code.",
     drawerStudyRecorded: "From my session of {date}",
     drawerStudyFeature: "The feature",
     drawerStudyHowItWorks: "How it works today",
@@ -3061,14 +3089,14 @@ export const en = {
     drawerStudyPreviousWrong: "What my earlier study got wrong",
     drawerStudyReviewNone: "Reviewed by {model}: no concerns.",
     drawerStudyReviewConcerns: "Reviewed by {model} — concerns I had to answer:",
+    drawerStudyReviewUnknownModel: "a second model",
 
     // ── confidence and regressions ─────────────────────────────────────────
     drawerConfidenceLabel: "How sure my checkers were",
-    drawerConfidenceTooltip:
-      "Two verifiers read the code separately, without seeing my reasoning. This is the LOWER of their two scores — if one of them was unsure, the finding is unsure.",
+    drawerConfidenceTooltip: "The lower of two independent verifiers' scores.",
     drawerConfidenceUnscored: "Not scored",
     drawerConfidenceUnscoredTooltip:
-      "Either this was proven outright (a failing test or a real production error, so there was nothing to argue about), or I found it before I started scoring.",
+      "Proven outright by a failing test or a real error, or found before I scored findings.",
     findingLowConfidenceChip: "Low confidence",
     findingLowConfidenceTooltip:
       "Both checkers accepted it but at least one wasn't sure. I hold these for you rather than fixing them myself.",
@@ -3081,8 +3109,6 @@ export const en = {
 
     // ── merging a green PR from here ───────────────────────────────────────
     drawerMerge: "Merge it",
-    drawerMergeTooltip:
-      "I can't merge in this repo — master needs a review and I only have push access — so my PR is sitting green and waiting. This merges it as you, without leaving the tab. I check the PR's own CI first and refuse if anything is red.",
     drawerMergeConfirmTitle: "Merge this fix to master?",
     drawerMergeConfirmBody:
       "I'll merge the PR as you. This does NOT deploy it — releasing to production is still a separate press.",
@@ -3093,8 +3119,7 @@ export const en = {
     drawerMergeForceHelp:
       "Recorded with the merge. This is how #792 landed with the wrong layer fixed; please read first.",
     drawerChainTitle: "The chain",
-    drawerChainTooltip:
-      "A fix is a chain of evidence from the symptom to the change: observed, reproduced, located, changed in that mechanism, resolved for the reporter, held after release. I merge only when the first five hold; the sixth is checked after release. A missing or broken link is what to look at before any diff.",
+    drawerChainTooltip: "I merge only when the first five links hold.",
     drawerChainLinks: {
       observed: "Observed",
       reproduced: "Reproduced",
@@ -3117,8 +3142,6 @@ export const en = {
     drawerAnswerPlaceholder: "Answer my question…",
     drawerAnswerSubmit: "Send answer",
     drawerAnswerFailed: "Couldn't send that answer. Try again.",
-    drawerAnsweredBy: "Answered by user #{userId}",
-    drawerDecidedBy: "Decided by user #{userId}",
     // ── The notebook ─────────────────────────────────────────────────────────
     notebookTitle: "My notebook",
     notebookIntro:
@@ -3176,8 +3199,6 @@ export const en = {
     // ── Fix session (on-demand) ──────────────────────────────────────────────
     drawerStartFixSession: "Put me on it",
     drawerRetryFixSession: "Ask me to try again",
-    drawerFixSessionTooltip:
-      "Puts me on this one bug now, instead of waiting for tonight's sweep. I write a failing test that reproduces it, fix it, check the whole suite is still green, and open a PR — merging it myself only if nothing guarded is involved. I don't deploy: releasing is a separate button once the fix is merged.",
     drawerFixSessionConfirmTitle: "Put Bug Hunter on this bug?",
     drawerFixSessionConfirmBody:
       "I'll work on this in {repo} on my own: a regression test first, then the smallest fix that makes it pass, then the full suite. If everything is green I open a PR and merge it — unless the fix touches migrations, auth or payments, which always stay a PR for you to review. I won't deploy anything in this step.",
@@ -3197,8 +3218,6 @@ export const en = {
     drawerWatchSession: "Watch me work",
     // ── Stop fix session (manual kill switch) ────────────────────────────────
     drawerStopFixSession: "Stop fix session",
-    drawerStopFixSessionTooltip:
-      "Cancels the running GitHub Actions job right away instead of waiting out its 60-minute cap — real compute and token savings, not just a status change. Use this when a session is clearly stuck or looping. You can put me on this bug again afterward, the same as after a failed attempt.",
     drawerStopFixSessionConfirmTitle: "Stop this fix session?",
     drawerStopFixSessionConfirmBody:
       "I'll cancel the GitHub Actions run in progress right away. Whatever I've done so far is lost — nothing partial gets merged. You can put me back on this bug afterward, the same as after a failed attempt.",
@@ -3207,12 +3226,9 @@ export const en = {
     // ambiguous which one you're confirming.
     drawerStopFixSessionConfirm: "Stop it",
     drawerStopFixSessionFailed: "Couldn't stop the fix session.",
-    drawerCancelledBy: "Stopped by user #{userId}",
     // ── Release to production ────────────────────────────────────────────────
     drawerRelease: "Release to production",
     drawerReleaseRetry: "Retry release",
-    drawerReleaseTooltip:
-      "Cuts the next patch version and runs that service's production release pipeline — for the backend that includes a database migration and an ECS rollout. This is the step where the fix actually reaches users.",
     drawerReleaseConfirmTitle: "Release this fix to production?",
     drawerReleaseConfirmBody:
       "This deploys {target} to production at the next patch version, running its full release pipeline — tests, build, database migration where applicable, and rollout. It affects live users. The fix is already merged to master either way; releasing is what puts it in front of people.",
@@ -3225,12 +3241,12 @@ export const en = {
     // and the run does not say which version it shipped — so the banner says
     // how it went live rather than printing "as —".
     drawerReleasedOutOfBandNotice:
-      "This is live in production. It went out in a release somebody ran from GitHub after the fix merged — I didn't start that release. The run is linked below.",
+      "This is live in production. It went out in a release somebody ran from GitHub after the fix merged — I didn't start that release.",
     drawerReleaseFailedNotice:
       "Release {tag} went red. The fix is still merged to master — it just isn't deployed. Check the run, then ask me to retry.",
     drawerFixSessionFailedNotice: "The fix session failed. Start a new session to retry.",
     drawerReleaseBlocked: "Why I can't release this from here",
-    drawerReleasedBy: "Released by user #{userId}",
+    drawerReleaseTargetFallback: "this service",
     drawerViewReleaseRun: "View release run",
     // ── Shift log (was run history) ──────────────────────────────────────────
     historyTitle: "My shift log",
@@ -3443,8 +3459,6 @@ export const en = {
     shortcutHelp: "Show this list",
     // ── Deep link ────────────────────────────────────────────
     drawerCopyLink: "Copy link",
-    drawerCopyLinkTooltip:
-      "Copies a link that opens this exact bug for whoever you send it to — the address bar carries the open bug and your filters, so a bookmark of this page is a bookmark of this view.",
     drawerCopyLinkDone: "Link copied.",
     drawerCopyLinkFailed: "Couldn't copy the link.",
   },

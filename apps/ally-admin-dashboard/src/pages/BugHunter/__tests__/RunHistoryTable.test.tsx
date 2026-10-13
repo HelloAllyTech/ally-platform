@@ -149,7 +149,8 @@ describe("RunHistoryTable — expanded run detail", () => {
       </MemoryRouter>,
     );
     const log = screen.getByTestId("run-decisions");
-    expect(log).toHaveTextContent("D1");
+    expect(log).toHaveTextContent("Which senses");
+    expect(log).not.toHaveTextContent("D1");
     expect(log).toHaveTextContent("code_review");
     expect(log).toHaveTextContent("by the model");
     expect(log).toHaveTextContent("the rule would have: code_review, tests");

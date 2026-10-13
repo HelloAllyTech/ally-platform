@@ -1,6 +1,6 @@
 import { FC } from "react";
 
-import { useGetBugFindingDecisionsQuery, useGetBugHuntRunDecisionsQuery } from "@api";
+import { useGetBugHuntRunDecisionsQuery } from "@api";
 import { en } from "@constants";
 import { BugHuntDecision } from "@types";
 import { formatTimestamp } from "@utils";
@@ -13,6 +13,8 @@ import {
   formatDecisionPick,
   sortDecisions,
 } from "./bugDecisionLabels";
+
+const sentenceCase = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);
 
 /**
  * The decision log (OPP-0776): every orchestration choice Bug Hunter made
@@ -45,8 +47,11 @@ export const DecisionLogList: FC<{ decisions: BugHuntDecision[]; emptyText?: str
             className="text-xs text-typography-800 flex flex-col gap-0.5"
           >
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-              <span className="font-mono font-semibold text-typography-900">{d.point}</span>
-              <span className="text-typography-600">{DECISION_POINT_LABELS[d.point]}</span>
+              {/* The plain question this point answers, not its D-number: the
+                  codes are the pipeline's vocabulary, not the reader's. */}
+              <span className="font-semibold text-typography-900">
+                {sentenceCase(DECISION_POINT_LABELS[d.point])}
+              </span>
               <span className="font-mono">{formatDecisionPick(d.pick)}</span>
               <span className="text-typography-600">
                 {t.byOwner.replace("{owner}", DECISION_OWNER_LABELS[d.owner])}
@@ -83,20 +88,6 @@ export const DecisionLogList: FC<{ decisions: BugHuntDecision[]; emptyText?: str
         );
       })}
     </ul>
-  );
-};
-
-/** The log for one bug, fetched on its own so the drawer stays one request for everything else. */
-export const FindingDecisions: FC<{ findingId: string }> = ({ findingId }) => {
-  const { data, isError } = useGetBugFindingDecisionsQuery(findingId);
-  if (isError || !data || data.length === 0) return null;
-  return (
-    <div data-testid="finding-decisions" className="flex flex-col gap-1">
-      <span className="text-xs font-medium text-typography-900">
-        {en.bugHunter.decisions.title}
-      </span>
-      <DecisionLogList decisions={data} />
-    </div>
   );
 };
 

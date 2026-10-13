@@ -35,8 +35,8 @@ export const PIPELINE_STAGES: PipelineStage[] = [
  * "ship" (a release attempt is what failed). Both pair with the drawer's own
  * `error` variant override rather than this function inventing a seventh
  * stage for them. CANCELLED sits at "fix" too — a fix session in progress is
- * what an admin stopped — but pairs with no variant override, the same as
- * DISMISSED/REJECTED: it is a deliberate human stop, not a failure.
+ * what an admin stopped — and pairs with the `stopped` variant, the same as
+ * DISMISSED/REJECTED: a deliberate human stop, not a failure, and not live.
  */
 export const stageFromFindingStatus = (status: BugFindingStatus): PipelineStage => {
   switch (status) {

@@ -1,29 +1,30 @@
-import { FC, useEffect, useState } from "react";
+import { FC, ReactNode, useEffect, useState } from "react";
 
-import { Launch } from "@icons";
+import { Launch, ThreeDot } from "@icons";
 import { toast } from "sonner";
 
 import {
   Button,
   Checkbox,
+  OverflowMenu,
+  OverflowMenuItem,
   Select,
   SelectItem,
   SidePanel,
   TextArea,
-  Tooltip,
 } from "@ally-ui-mono/ui-shared";
 import {
   useAnswerBugFindingMutation,
   useApproveBugFindingMutation,
   useCancelBugFixSessionMutation,
   useEditBugFindingDescriptionMutation,
+  useGetBugFindingDecisionsQuery,
   useGetBugFindingQuery,
   useMergeBugFindingMutation,
   useRejectBugFindingMutation,
   useReleaseBugFindingMutation,
   useStartBugFixSessionMutation,
 } from "@api";
-import { TooltipIcon } from "@assets";
 import { ActionConfirmationPopup } from "@components/action-confirmation-popup";
 import { AgentAvatar } from "@components/agent-avatar";
 import { en } from "@constants";
@@ -31,32 +32,35 @@ import {
   BUG_FINDING_DESCRIPTION_EDITABLE_STATUSES,
   BUG_FINDING_DESCRIPTION_MAX_LENGTH,
   BUG_FINDING_FIX_SESSION_START_STATUSES,
-  BUG_FINDING_LOW_CONFIDENCE_THRESHOLD,
   BugFindingDecisionReason,
+  BugFindingDetail,
   BugFindingSource,
   BugFindingStatus,
   BugHuntEventStage,
 } from "@types";
-import { formatDateTime, formatTimestamp } from "@utils";
+import { formatDateTime } from "@utils";
 
 import { BrailleSpinner } from "./BrailleSpinner";
 import {
   BUG_FINDING_DECISION_REASON_LABELS,
-  BUG_FINDING_MISS_REASON_LABELS,
-  BUG_FINDING_MISS_SENSE_LABELS,
   BUG_FINDING_SEVERITY_LABELS,
   BUG_FINDING_SOURCE_LABELS,
+  BUG_FINDING_STAGE_LABELS,
   engineModelLabel,
 } from "./bugFindingLabels";
 import { BugFindingStageEditor } from "./BugFindingStageEditor";
 import { BugFindingStatusBadge } from "./BugFindingStatusBadge";
-import { BUG_HUNT_EVENT_STAGE_LABELS } from "./bugHuntEventLabels";
-import { FindingDecisions } from "./DecisionLog";
+import { DecisionLogList } from "./DecisionLog";
 import { canSubmitDecline, DeclineReasonPicker } from "./DeclineReasonPicker";
+import { DrawerSection } from "./DrawerSection";
+import { FindingConfidence, hasConfidenceDetails } from "./FindingConfidence";
+import { PostmortemDetails, StudyDetails } from "./FindingStudy";
+import { FindingWorkLog, workLogEntries } from "./FindingWorkLog";
 import { PipelineRail } from "./PipelineRail";
 import { stageFromFindingStatus } from "./pipelineStage";
 import { ReportedBugPanel } from "./ReportedBugPanel";
 import { BUG_HUNTER_REPOS } from "./repos";
+import { ageInDays, formatAge } from "./triage";
 
 interface BugFindingDrawerProps {
   id: string;
@@ -70,15 +74,15 @@ interface BugFindingDrawerProps {
   canTriage: boolean;
 }
 
-/** Statuses where something is in flight and the drawer should poll rather than sit stale. */
 /**
- * One item of the drawer's meta line. The dot trails each item rather than
+ * One item of the header's meta line. The dot trails each item rather than
  * leading the next, so when the line wraps the dot stays at the end of a line
  * instead of opening the following one. The last item carries none.
  */
 const DRAWER_META_ITEM =
-  "text-xs text-typography-600 after:ml-2 after:text-typography-400 after:content-['·'] last-of-type:after:hidden";
+  "text-xs font-normal text-typography-600 after:ml-2 after:text-typography-400 after:content-['·'] last:after:hidden";
 
+/** Statuses where something is in flight and the drawer should poll rather than sit stale. */
 const IN_FLIGHT_STATUSES: BugFindingStatus[] = [
   BugFindingStatus.QUEUED,
   BugFindingStatus.FIXING,
@@ -86,12 +90,41 @@ const IN_FLIGHT_STATUSES: BugFindingStatus[] = [
   BugFindingStatus.COORDINATING,
 ];
 
+/** Nothing left to decide: a guarded-path warning or a "settle your rewrite" note means nothing here. */
+const SETTLED_STATUSES: BugFindingStatus[] = [
+  BugFindingStatus.RELEASED,
+  BugFindingStatus.DISMISSED,
+  BugFindingStatus.REJECTED,
+];
+
 /**
- * The rail's colour override for a finding stuck at the same stage for two
- * different reasons: an outright failure, or an open question it's waiting
- * on you to answer. Everything else stays plain "working" amber.
+ * Where "Put me on it" is the decision block's one primary action. Everywhere
+ * else it can start (NEEDS_INPUT, PR_OPENED) something else is the decision —
+ * answer the question, merge the PR — so a fresh session moves to the "⋯"
+ * menu, worded as the retry it is. At PENDING_APPROVAL it is not offered at
+ * all: Approve is the decision there, and once approved the button is back.
  */
-const railVariantForStatus = (status: BugFindingStatus): "error" | "waiting" | undefined => {
+const FIX_SESSION_PRIMARY_STATUSES: BugFindingStatus[] = [
+  BugFindingStatus.NEW,
+  BugFindingStatus.APPROVED,
+  BugFindingStatus.FAILED,
+  BugFindingStatus.CANCELLED,
+];
+const FIX_SESSION_MENU_STATUSES: BugFindingStatus[] = [
+  BugFindingStatus.NEEDS_INPUT,
+  BugFindingStatus.PR_OPENED,
+];
+
+/**
+ * The rail's colour override for the current node. A bug can sit at one stage
+ * for different reasons: an outright failure, an open question it's waiting on
+ * you for, or nothing left to happen at all. Released finishes the rail;
+ * declined and stopped bugs settle where they stopped. Neither of those pulses,
+ * since nothing about them is live. Everything else is plain "working" amber.
+ */
+const railVariantForStatus = (
+  status: BugFindingStatus,
+): "error" | "waiting" | "done" | "stopped" | undefined => {
   switch (status) {
     case BugFindingStatus.FAILED:
     case BugFindingStatus.RELEASE_FAILED:
@@ -99,22 +132,136 @@ const railVariantForStatus = (status: BugFindingStatus): "error" | "waiting" | u
     case BugFindingStatus.NEEDS_INPUT:
     case BugFindingStatus.PENDING_APPROVAL:
       return "waiting";
+    case BugFindingStatus.RELEASED:
+      return "done";
+    case BugFindingStatus.DISMISSED:
+    case BugFindingStatus.REJECTED:
+    case BugFindingStatus.CANCELLED:
+      return "stopped";
     default:
       return undefined;
   }
 };
 
 /**
- * The comprehensive table's row detail: full description/evidence, its event
- * timeline across however many runs touched it, the Manual-mode approve/reject
- * decision, the answer to an open escalation question — and the two on-demand
- * actions that take one bug from here to production.
+ * The decision block's one sentence: where the bug is and what happens next.
  *
- * Those two are deliberately separate buttons rather than one. "Start fix
- * session" is autonomous: an agent writes a failing test, fixes it, keeps the
- * suite green and merges. "Release to production" deploys — for the backend
- * that means a production database migration and an ECS rollout — so it stays
- * a human decision, made after the fix is visibly merged. See ally-be's
+ * It replaces the queued/releasing/released/failed banners and the meta-row
+ * spinner, which each stated a piece of the same fact in a different place
+ * (Stacks: *Balance Transparency with Cognitive Load in Agent UX*). Returns
+ * null only for an open question, where the question itself is the sentence.
+ */
+const statusSentence = (
+  finding: BugFindingDetail,
+  latestFailureReason: string | undefined,
+): string | null => {
+  const declined = finding.decisionReason
+    ? en.bugHunter.drawerDeclinedAs.replace(
+        "{reason}",
+        BUG_FINDING_DECISION_REASON_LABELS[finding.decisionReason],
+      )
+    : null;
+  switch (finding.status) {
+    case BugFindingStatus.NEW:
+      return finding.source === BugFindingSource.REPORTED_BUG
+        ? en.bugHunter.drawerReportedBugNotice
+        : en.bugHunter.drawerStatusNew;
+    case BugFindingStatus.PENDING_APPROVAL:
+      return en.bugHunter.drawerStatusPendingApproval;
+    case BugFindingStatus.APPROVED:
+      return en.bugHunter.drawerStatusApproved;
+    case BugFindingStatus.QUEUED:
+      return en.bugHunter.drawerFixSessionQueued;
+    case BugFindingStatus.FIXING:
+      return en.bugHunter.drawerStatusFixing;
+    case BugFindingStatus.COORDINATING:
+      return en.bugHunter.drawerStatusCoordinating;
+    case BugFindingStatus.BLOCKED:
+      return en.bugHunter.drawerStatusBlocked;
+    case BugFindingStatus.NEEDS_INPUT:
+      if (finding.escalationAnswer) return en.bugHunter.drawerStatusAnswerReceived;
+      return finding.escalationQuestion ? null : en.bugHunter.drawerEscalationQuestionTitle;
+    case BugFindingStatus.PR_OPENED:
+      return en.bugHunter.drawerStatusPrOpened;
+    case BugFindingStatus.MERGED:
+      return en.bugHunter.drawerStatusMerged;
+    case BugFindingStatus.RELEASING:
+      return en.bugHunter.drawerReleasingNotice.replace("{tag}", finding.releaseTag ?? "—");
+    case BugFindingStatus.RELEASED:
+      // No tag: the release was cut from GitHub by a person, not from this
+      // tab, and the run does not say which version it shipped.
+      return finding.releaseTag
+        ? en.bugHunter.drawerReleasedNotice.replace("{tag}", finding.releaseTag)
+        : en.bugHunter.drawerReleasedOutOfBandNotice;
+    case BugFindingStatus.RELEASE_FAILED:
+      return en.bugHunter.drawerReleaseFailedNotice.replace("{tag}", finding.releaseTag ?? "—");
+    case BugFindingStatus.FAILED:
+      // A plain FAILED carries no reason field of its own; the failure text
+      // only ever lands as an ERROR-stage timeline event.
+      return latestFailureReason || en.bugHunter.drawerFixSessionFailedNotice;
+    case BugFindingStatus.CANCELLED:
+      return en.bugHunter.drawerStatusCancelled;
+    case BugFindingStatus.DISMISSED:
+      return declined ?? en.bugHunter.drawerStatusDismissed;
+    case BugFindingStatus.REJECTED:
+      return declined ?? en.bugHunter.drawerStatusRejected;
+    default:
+      return null;
+  }
+};
+
+/** The decision block's tint: red when something broke, green once it shipped, plain otherwise. */
+const decisionTone = (status: BugFindingStatus): string => {
+  switch (status) {
+    case BugFindingStatus.FAILED:
+    case BugFindingStatus.RELEASE_FAILED:
+      return "border-destructive-200 bg-destructive-50";
+    case BugFindingStatus.RELEASED:
+      return "border-green-200 bg-green-50";
+    default:
+      return "border-border-light bg-white";
+  }
+};
+
+/**
+ * Carbon's menu item types no `target`, so its links open a new tab by hand —
+ * a PR or a GitHub run should never replace the console the reader came from.
+ */
+const openInNewTab = (url: string | null) => {
+  if (url) window.open(url, "_blank", "noopener,noreferrer");
+};
+
+/** "found 3d ago", from the same compact age the table's Age column shows. */
+const foundAgo = (finding: BugFindingDetail): string | null => {
+  const days = ageInDays(finding);
+  if (days == null) return null;
+  const age = formatAge(days);
+  return age === "now"
+    ? en.bugHunter.drawerFoundJustNow
+    : en.bugHunter.drawerFoundAgo.replace("{age}", age);
+};
+
+/**
+ * One bug, decision first.
+ *
+ * Top to bottom: the title and one meta line (with everything occasional in a
+ * "⋯" menu), then the decision this bug is waiting on — one status sentence
+ * and at most one primary button — then where it is on the pipeline, then the
+ * brief and who reported it. Everything else is the audit trail and sits in
+ * collapsed sections below: evidence, how sure Bug Hunter is, how it planned
+ * the fix, how it decided, and its work log.
+ *
+ * The order is the reader's: someone opening a bug wants to know what it needs
+ * from them, and the evidence for that decision is a click away rather than
+ * between them and the button (Stacks: *Desert Oasis: Isolating the Primary
+ * Call-to-Action*; *Progressive Disclosure and Contextual Relevance in Agent
+ * Interfaces*).
+ *
+ * "Put me on it" and "Release to production" stay separate decisions. A fix
+ * session is autonomous: an agent writes a failing test, fixes it, keeps the
+ * suite green and merges. A release deploys — for the backend that means a
+ * production database migration and an ECS rollout — so it stays a human
+ * decision, made after the fix is visibly merged. See ally-be's
  * BugFixSessionService for the full reasoning.
  */
 export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTriage }) => {
@@ -129,6 +276,7 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
     isLoading,
     isError,
   } = useGetBugFindingQuery(id, { pollingInterval, skipPollingIfUnfocused: true });
+  const { data: decisions } = useGetBugFindingDecisionsQuery(id);
   const [approve, { isLoading: isApproving }] = useApproveBugFindingMutation();
   const [reject, { isLoading: isRejecting }] = useRejectBugFindingMutation();
   const [answer, { isLoading: isAnswering }] = useAnswerBugFindingMutation();
@@ -137,8 +285,13 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
   // Hunter classify it. The API has always taken the override; the dialog
   // never offered it, which left a failed classification as a dead end.
   const [fixRepo, setFixRepo] = useState<string>("");
-  // The admin's explicit "past the budget" tick for this dialog only (OPP-0775).
-  const [forceFix, setForceFix] = useState(false);
+  // Two different overrides, ticked separately in the fix-session dialog. They
+  // used to share one state, so ticking "past the budget" also ticked "skip
+  // locating" — and a report nobody had located went straight to a fix
+  // session. The API takes one `force` for both, so they only meet in the
+  // request.
+  const [skipLocating, setSkipLocating] = useState(false);
+  const [overrideBudget, setOverrideBudget] = useState(false);
   const budgetSpent = Boolean(finding?.budget?.exhausted);
   const chainBlocked = Boolean(finding?.chain && !finding.chain.mergeable);
   // A human report nobody has located yet: "Put me on it" locates first
@@ -146,6 +299,7 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
   const needsLocating =
     finding?.source === BugFindingSource.REPORTED_BUG &&
     finding?.independentVerification !== "confirmed";
+  const willLocate = needsLocating && !skipLocating;
   const [cancelFixSession, { isLoading: isCancellingSession }] = useCancelBugFixSessionMutation();
   const [merge, { isLoading: isMerging }] = useMergeBugFindingMutation();
   const [forceMerge, setForceMerge] = useState(false);
@@ -165,10 +319,12 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
   // an empty box would invite retyping what is already there.
   const [descriptionDraft, setDescriptionDraft] = useState<string | null>(null);
   const [showOriginalDescription, setShowOriginalDescription] = useState(false);
+  const [stageEditorOpen, setStageEditorOpen] = useState(false);
 
   useEffect(() => {
     setFixRepo("");
-    setForceFix(false);
+    setSkipLocating(false);
+    setOverrideBudget(false);
     setForceMerge(false);
     setConfirmAction(null);
     setDeclineReason(null);
@@ -176,15 +332,13 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
     setAnswerText("");
     setDescriptionDraft(null);
     setShowOriginalDescription(false);
+    setStageEditorOpen(false);
   }, [id]);
 
   /**
-   * Copies the address bar, which now identifies this exact bug.
-   *
-   * The whole point of moving the open bug into `?bug=<id>` was that "take a
-   * look at this one" becomes a link rather than a description of how to find a
-   * row. This is that link, made reachable without teaching anyone that the
-   * address bar changed.
+   * Copies the address bar, which identifies this exact bug (`?bug=<id>`), so
+   * "take a look at this one" is a link rather than a description of how to
+   * find a row.
    *
    * `navigator.clipboard` is unavailable on an insecure origin and can be
    * refused by permissions policy, so the failure is reported rather than
@@ -207,11 +361,8 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
   const steps = finding?.steps ?? [];
   const events = finding?.events ?? [];
 
-  // A plain fix-session FAILED carries no reason field of its own — unlike
-  // RELEASE_FAILED, which has a dedicated banner reading `releaseTag`, the
-  // failure text only ever lands as an ERROR-stage timeline event (see
-  // ally-be's BugFixSessionService). Events are returned oldest-first, so the
-  // last ERROR entry is the one that actually explains this state.
+  // Events are returned oldest-first, so the last ERROR entry is the one that
+  // explains a FAILED bug.
   const latestFailureReason = [...events]
     .reverse()
     .find(event => event.stage === BugHuntEventStage.ERROR)?.summary;
@@ -234,30 +385,25 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
     : false;
 
   // Mirrors the backend's own gate (QUEUED or FIXING) so a stale click never
-  // makes a round trip just to be told 403 — the same reasoning as
-  // `canStartSession` above.
+  // makes a round trip just to be told 403.
   const canStopSession = finding
     ? canTriage &&
       (finding.status === BugFindingStatus.QUEUED || finding.status === BugFindingStatus.FIXING)
     : false;
 
   // The description is the fix agent's whole brief (see ally-be's
-  // `buildFixSessionPrompt`), so the edit is offered exactly where "Put me on
-  // it" is and nowhere else — mirroring the backend's own gate so a stale
-  // click never makes a round trip just to be told 403. `canTriage` narrows it
-  // further for a SUPER_ADMIN, who can read this drawer but not act in it.
+  // `buildFixSessionPrompt`), so the edit is offered exactly where a fix
+  // session can still start from it, mirroring the backend's own gate.
   const canEditDescription = finding
     ? canTriage && BUG_FINDING_DESCRIPTION_EDITABLE_STATUSES.includes(finding.status)
     : false;
 
   const draftTooLong = (descriptionDraft?.trim().length ?? 0) > BUG_FINDING_DESCRIPTION_MAX_LENGTH;
 
-  // An open draft closes the decisions below it. "Put me on it" would dispatch
-  // a session reading the OLD description while the admin's rewrite sat
-  // unsaved in the box above — the rewrite silently discarded and the fix
-  // briefed on the text they had just decided was wrong. Approving has the
-  // same shape: the next sweep would pick up the old words. So the actions
-  // wait for the brief to be settled, and say why.
+  // An open draft closes the decisions. "Put me on it" would dispatch a
+  // session reading the OLD description while the admin's rewrite sat unsaved
+  // — the fix briefed on the text they had just decided was wrong. Approving
+  // has the same shape: the next sweep would pick up the old words.
   const isDraftingDescription = descriptionDraft !== null;
 
   const handleSaveDescription = async () => {
@@ -318,13 +464,19 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
   };
 
   const handleStartFixSession = async () => {
+    // One `force` on the wire for two separate ticks: skipping the locate step
+    // and starting past a spent budget. Start stays disabled past the budget
+    // until its own box is ticked, so a skip-locating tick alone never spends
+    // past the budget unasked.
+    const force = (needsLocating && skipLocating) || (budgetSpent && overrideBudget);
     try {
       await startFixSession({
         id,
         ...(fixRepo ? { repo: fixRepo } : {}),
-        ...(forceFix ? { force: true } : {}),
+        ...(force ? { force: true } : {}),
       }).unwrap();
-      setForceFix(false);
+      setSkipLocating(false);
+      setOverrideBudget(false);
       setConfirmAction(null);
     } catch (error) {
       // The backend's own message is the useful one here — "Bug Hunter is
@@ -374,122 +526,411 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
     }
   };
 
-  return (
-    <SidePanel
-      open
-      onClose={onClose}
-      // The panel renders its title as plain bold text; a long bug title wrapped
-      // to three lines at the panel's default size and ran into the close
-      // button. Two clamped lines, with the full title a hover away.
-      title={
+  const engineLabel = finding ? engineModelLabel(finding.engine, finding.model) : null;
+  const age = finding ? foundAgo(finding) : null;
+  const sentence = finding ? statusSentence(finding, latestFailureReason) : null;
+  const logEntries = finding ? workLogEntries(finding) : [];
+  const decisionList = decisions ?? [];
+
+  const header = (
+    <div className="flex items-start gap-2">
+      <div className="min-w-0 flex-1">
+        {/* Two clamped lines, with the full title a hover away: a long bug
+            title at three lines ran into the close button. */}
         <span
           title={finding?.title}
           className="block text-base font-semibold leading-snug text-typography-900 line-clamp-2"
         >
-          {finding?.title ?? "…"}
+          {finding?.title}
         </span>
-      }
-      className="w-[32rem]"
-    >
-      {isLoading ? (
-        <p className="text-sm text-typography-600">…</p>
-      ) : isError || !finding ? (
-        <p className="text-sm text-destructive-600">{en.bugHunter.drawerLoadFailed}</p>
-      ) : (
-        <div className="flex flex-col gap-5">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-            <BugFindingStatusBadge status={finding.status} />
-            {IN_FLIGHT_STATUSES.includes(finding.status) && (
-              <BrailleSpinner className="text-amber-600" />
-            )}
-            {/* The separators are drawn by the layout, not typed into the
-                text, so a wrap never starts a line with a stray dot. The copy
-                link below is a div, so `last-of-type` lands on the last of
-                these spans. */}
-            <span className={DRAWER_META_ITEM}>{BUG_FINDING_SOURCE_LABELS[finding.source]}</span>
+        {finding && (
+          <p data-testid="drawer-meta" className="mt-1 flex flex-wrap items-center gap-x-2">
             {finding.repo && <span className={DRAWER_META_ITEM}>{finding.repo}</span>}
+            <span className={DRAWER_META_ITEM}>{BUG_FINDING_SOURCE_LABELS[finding.source]}</span>
+            {/* Kept beside the source: severity is an input to the decision
+                below it, not audit detail. */}
             {finding.severity && (
               <span className={DRAWER_META_ITEM}>
                 {BUG_FINDING_SEVERITY_LABELS[finding.severity]}
               </span>
             )}
-            {engineModelLabel(finding.engine, finding.model) && (
-              <span className={DRAWER_META_ITEM}>
-                {engineModelLabel(finding.engine, finding.model)}
+            {age && (
+              <span className={DRAWER_META_ITEM} title={formatDateTime(finding.createdAt)}>
+                {age}
               </span>
             )}
+          </p>
+        )}
+      </div>
+      {finding && (
+        // Everything here is occasional — a link, a rewrite, a hand-set stage,
+        // somewhere to watch — so it waits behind one icon instead of sitting
+        // between the reader and the decision.
+        <OverflowMenu
+          size="sm"
+          flipped
+          align="bottom"
+          renderIcon={ThreeDot}
+          iconDescription={en.bugHunter.drawerMoreActions}
+          // Above the panel (which sits at z-index 9001), and wide enough
+          // that "Rewrite the description" and the engine line aren't cut off.
+          menuOptionsClass="!z-[9100] !w-64 [&_.cds--overflow-menu-options\_\_btn]:!max-w-none"
+        >
+          <OverflowMenuItem
+            itemText={en.bugHunter.drawerCopyLink}
+            onClick={() => void copyLink()}
+          />
+          {canEditDescription && !isDraftingDescription && (
+            <OverflowMenuItem
+              itemText={en.bugHunter.drawerDescriptionEdit}
+              onClick={() => setDescriptionDraft(finding.description)}
+            />
+          )}
+          {canTriage && (
+            <OverflowMenuItem
+              itemText={en.bugHunter.stageEditLabel}
+              onClick={() => setStageEditorOpen(true)}
+            />
+          )}
+          {canStartSession && FIX_SESSION_MENU_STATUSES.includes(finding.status) && (
+            <OverflowMenuItem
+              itemText={en.bugHunter.drawerRetryFixSession}
+              disabled={isStartingSession || isDraftingDescription}
+              onClick={() => setConfirmAction("fixSession")}
+            />
+          )}
+          {finding.prUrl && (
+            <OverflowMenuItem
+              itemText={en.bugHunter.viewPr}
+              onClick={() => openInNewTab(finding.prUrl)}
+            />
+          )}
+          {finding.sessionRunUrl && (
+            <OverflowMenuItem
+              itemText={en.bugHunter.drawerWatchSession}
+              onClick={() => openInNewTab(finding.sessionRunUrl)}
+            />
+          )}
+          {finding.releaseRunUrl && (
+            <OverflowMenuItem
+              itemText={en.bugHunter.drawerViewReleaseRun}
+              onClick={() => openInNewTab(finding.releaseRunUrl)}
+            />
+          )}
+          {engineLabel && (
+            <OverflowMenuItem
+              hasDivider
+              disabled
+              requireTitle
+              itemText={en.bugHunter.drawerLastRunOn.replace("{model}", engineLabel)}
+            />
+          )}
+        </OverflowMenu>
+      )}
+    </div>
+  );
 
-            {/* Pushed to the end of the row rather than given a place among the
-                actions below: this is about the bug's address, not about its
-                state, and it is safe to press at any point in the lifecycle. */}
-            <div className="ml-auto">
-              <Tooltip label={en.bugHunter.drawerCopyLinkTooltip} align="bottom">
-                <span className="inline-flex">
-                  <Button size="sm" kind="ghost" onClick={() => void copyLink()}>
-                    {en.bugHunter.drawerCopyLink}
+  return (
+    <SidePanel open onClose={onClose} title={header} className="w-[32rem]">
+      {isLoading ? (
+        <p className="text-sm text-typography-600">{en.bugHunter.drawerLoading}</p>
+      ) : isError || !finding ? (
+        <p className="text-sm text-destructive-600">{en.bugHunter.drawerLoadFailed}</p>
+      ) : (
+        // Keyed by bug so every collapsed section and toggle starts closed
+        // again when the drawer moves to another bug.
+        <div key={finding.id} className="flex flex-col gap-5">
+          {/* ── 1. The decision ──────────────────────────────────────────── */}
+          <div
+            data-testid="decision-block"
+            className={`rounded-lg border p-4 flex flex-col gap-3 ${decisionTone(finding.status)}`}
+          >
+            {sentence && (
+              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                <BugFindingStatusBadge status={finding.status} />
+                <p data-testid="status-sentence" className="text-sm text-typography-900">
+                  {sentence}
+                </p>
+              </div>
+            )}
+
+            {/* A decline's own note and how often the bug has come back since:
+                what anyone reconsidering this decision reads first. */}
+            {finding.decisionNote &&
+              (finding.status === BugFindingStatus.REJECTED ||
+                finding.status === BugFindingStatus.DISMISSED) && (
+                <p className="text-xs text-typography-600 whitespace-pre-wrap break-words">
+                  {finding.decisionNote}
+                </p>
+              )}
+            {finding.rediscoveredCount > 0 && (
+              <p className="text-xs text-typography-600">
+                {en.bugHunter.drawerRediscovered.replace(
+                  "{count}",
+                  String(finding.rediscoveredCount),
+                )}
+              </p>
+            )}
+
+            {/* The open question, asked and signed by Bug Hunter, with the
+                answer box right under it rather than below the audit trail. */}
+            {finding.status === BugFindingStatus.NEEDS_INPUT && finding.escalationQuestion && (
+              <div className="flex flex-col gap-2">
+                {!sentence && (
+                  <div className="flex items-center gap-2">
+                    <AgentAvatar
+                      size="sm"
+                      presence="waiting_on_you"
+                      label={en.bugHunter.agentName}
+                    />
+                    <h3 className="text-xs font-semibold text-typography-700">
+                      {en.bugHunter.drawerEscalationQuestionTitle}
+                    </h3>
+                  </div>
+                )}
+                <p className="text-sm text-typography-900">{finding.escalationQuestion}</p>
+                {finding.escalationAnswer ? (
+                  <p className="text-sm text-typography-700 whitespace-pre-wrap break-words border-l-2 border-border-light pl-3">
+                    {finding.escalationAnswer}
+                  </p>
+                ) : canTriage ? (
+                  <TextArea
+                    id={`bug-finding-answer-${finding.id}`}
+                    labelText={en.bugHunter.drawerAnswerLabel}
+                    hideLabel
+                    placeholder={en.bugHunter.drawerAnswerPlaceholder}
+                    value={answerText}
+                    onChange={e => setAnswerText(e.target.value)}
+                    rows={3}
+                  />
+                ) : null}
+              </div>
+            )}
+
+            {/* Beside the retry, the post-mortem is the decision: whether
+                trying again is worth it. */}
+            {finding.postmortem &&
+              (finding.status === BugFindingStatus.FAILED ||
+                finding.status === BugFindingStatus.CANCELLED) && (
+                <PostmortemDetails postmortem={finding.postmortem} />
+              )}
+
+            {/* Merged but not releasable from here — say why rather than just
+                omitting the button the admin came looking for. */}
+            {finding.releaseBlockedReason && (
+              <p className="text-xs text-typography-700">
+                <span className="font-semibold">{en.bugHunter.drawerReleaseBlocked}: </span>
+                {finding.releaseBlockedReason}
+              </p>
+            )}
+
+            {finding.touchesGuardedPath && !SETTLED_STATUSES.includes(finding.status) && (
+              <p className="text-xs text-destructive-600">{en.bugHunter.drawerGuardedPathNotice}</p>
+            )}
+
+            <DecisionActions>
+              {canTriage && finding.status === BugFindingStatus.PENDING_APPROVAL && (
+                <>
+                  <Button
+                    size="sm"
+                    kind="primary"
+                    disabled={isApproving || isDraftingDescription}
+                    onClick={() => setConfirmAction("approve")}
+                  >
+                    {en.bugHunter.drawerApprove}
                   </Button>
-                </span>
-              </Tooltip>
-            </div>
+                  <Button
+                    size="sm"
+                    kind="danger--tertiary"
+                    disabled={isRejecting || isDraftingDescription}
+                    onClick={() => setConfirmAction("reject")}
+                  >
+                    {en.bugHunter.drawerReject}
+                  </Button>
+                </>
+              )}
+
+              {canTriage &&
+                finding.status === BugFindingStatus.NEEDS_INPUT &&
+                finding.escalationQuestion &&
+                !finding.escalationAnswer && (
+                  <Button
+                    size="sm"
+                    kind="primary"
+                    disabled={isAnswering || !answerText.trim()}
+                    onClick={handleSubmitAnswer}
+                  >
+                    {en.bugHunter.drawerAnswerSubmit}
+                  </Button>
+                )}
+
+              {/* The merge Bug Hunter cannot do itself on a protected repo.
+                  The backend re-checks the PR's own CI and refuses a red one,
+                  so this is a shortcut past a trip to GitHub, not past a gate. */}
+              {canTriage && finding.status === BugFindingStatus.PR_OPENED && finding.prUrl && (
+                <Button
+                  size="sm"
+                  kind="primary"
+                  disabled={isMerging || isDraftingDescription}
+                  onClick={() => setConfirmAction("merge")}
+                >
+                  {en.bugHunter.drawerMerge}
+                </Button>
+              )}
+
+              {canTriage && finding.releasable && (
+                <Button
+                  size="sm"
+                  kind="primary"
+                  disabled={isReleasing}
+                  onClick={() => setConfirmAction("release")}
+                >
+                  {finding.status === BugFindingStatus.RELEASE_FAILED
+                    ? en.bugHunter.drawerReleaseRetry
+                    : en.bugHunter.drawerRelease}
+                </Button>
+              )}
+
+              {canStartSession && FIX_SESSION_PRIMARY_STATUSES.includes(finding.status) && (
+                <Button
+                  size="sm"
+                  kind="primary"
+                  disabled={isStartingSession || isDraftingDescription}
+                  onClick={() => setConfirmAction("fixSession")}
+                >
+                  {/* CANCELLED reads as a retry too — same story as FAILED,
+                      just stopped on purpose rather than given up on. */}
+                  {finding.status === BugFindingStatus.FAILED ||
+                  finding.status === BugFindingStatus.CANCELLED
+                    ? en.bugHunter.drawerRetryFixSession
+                    : en.bugHunter.drawerStartFixSession}
+                </Button>
+              )}
+
+              {canStopSession && (
+                <Button
+                  size="sm"
+                  kind="danger--tertiary"
+                  disabled={isCancellingSession}
+                  onClick={() => setConfirmAction("stopFixSession")}
+                >
+                  {en.bugHunter.drawerStopFixSession}
+                </Button>
+              )}
+            </DecisionActions>
+
+            {isDraftingDescription && !SETTLED_STATUSES.includes(finding.status) && (
+              <p className="text-xs text-typography-600">
+                {en.bugHunter.drawerDescriptionSettleFirst}
+              </p>
+            )}
           </div>
 
-          <PipelineRail
-            stage={stageFromFindingStatus(finding.status)}
-            variant={railVariantForStatus(finding.status)}
-          />
+          {/* ── 2. Where it is ──────────────────────────────────────────────
+              The rail alone: no Stage line and no spinner beside it, which
+              were two more ways of saying the same thing. A stage pinned by
+              hand is the exception — then the rail and the stage disagree,
+              and the reader needs to know why. */}
+          <div className="flex flex-col gap-2">
+            <PipelineRail
+              stage={stageFromFindingStatus(finding.status)}
+              variant={railVariantForStatus(finding.status)}
+            />
+            {!finding.stageIsAuto && (
+              <p data-testid="stage-pinned" className="text-xs text-typography-500">
+                {BUG_FINDING_STAGE_LABELS[finding.stage]} ·{" "}
+                {en.bugHunter.findingStagePinnedTooltip
+                  .replace("{name}", finding.stageOverriddenByName ?? en.bugHunter.reporterUnknown)
+                  .replace(
+                    "{date}",
+                    finding.stageOverriddenAt ? formatDateTime(finding.stageOverriddenAt) : "—",
+                  )}
+              </p>
+            )}
+            {stageEditorOpen && (
+              <BugFindingStageEditor
+                id={finding.id}
+                stage={finding.stage}
+                isAuto={finding.stageIsAuto}
+                pinnedByName={finding.stageOverriddenByName}
+                pinnedAt={finding.stageOverriddenAt}
+                canEdit={canTriage}
+                startEditing
+                onDone={() => setStageEditorOpen(false)}
+              />
+            )}
 
-          {/* The coarse roadmap ladder, below the pipeline rail rather than
-              beside the status badge above: the rail is the fine-grained
-              picture, this is the one-word summary of it, and the two belong
-              together. Bugs are no longer on the roadmap board, so this is the
-              only screen that shows a bug's stage at all. */}
-          <BugFindingStageEditor
-            id={finding.id}
-            stage={finding.stage}
-            isAuto={finding.stageIsAuto}
-            pinnedByName={finding.stageOverriddenByName}
-            pinnedAt={finding.stageOverriddenAt}
-            canEdit={canTriage}
-          />
+            {/* The plan, when this bug needs more than one repo. */}
+            {steps.length > 0 && (
+              <div className="border border-border-light rounded p-3">
+                <h3 className="text-xs font-semibold text-typography-900">
+                  {en.bugHunter.planTitle.replace("{count}", String(steps.length))}
+                </h3>
+                <p className="text-xs text-typography-600 mt-0.5 mb-3">
+                  {en.bugHunter.planSubtitle}
+                </p>
+                <ol className="flex flex-col gap-2">
+                  {steps.map(step => (
+                    <li key={step.id} className="flex items-start gap-2">
+                      <span className="text-xs text-typography-500 whitespace-nowrap mt-0.5 tabular-nums">
+                        {en.bugHunter.planStepLabel.replace("{n}", String(step.stepIndex + 1))}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-medium text-typography-900">
+                            {step.repo}
+                          </span>
+                          <BugFindingStatusBadge status={step.status} />
+                          {IN_FLIGHT_STATUSES.includes(step.status) && (
+                            <BrailleSpinner className="text-amber-600" />
+                          )}
+                          {step.releaseTag && (
+                            <span className="text-xs text-typography-600">{step.releaseTag}</span>
+                          )}
+                        </div>
+                        {step.stepSummary && (
+                          <p className="text-xs text-typography-700 mt-0.5">{step.stepSummary}</p>
+                        )}
+                        <div className="flex gap-3 mt-0.5">
+                          {step.prUrl && (
+                            <a
+                              href={step.prUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center text-primary-600 hover:text-primary-800"
+                              aria-label={en.bugHunter.viewPr}
+                              title={en.bugHunter.viewPr}
+                            >
+                              <Launch className="h-3.5 w-3.5" aria-hidden="true" />
+                            </a>
+                          )}
+                          {step.sessionRunUrl && (
+                            <a
+                              href={step.sessionRunUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-xs text-primary-600 underline"
+                            >
+                              {en.bugHunter.drawerWatchSession}
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            )}
+          </div>
 
-          {finding.source === "reported_bug" && finding.status === BugFindingStatus.NEW && (
-            <p className="text-xs text-typography-500 italic">
-              {en.bugHunter.drawerReportedBugNotice}
-            </p>
-          )}
-          {finding.touchesGuardedPath && (
-            <p className="text-xs text-destructive-600">{en.bugHunter.drawerGuardedPathNotice}</p>
-          )}
-
-          {/* ── The brief ───────────────────────────────────────────────────
+          {/* ── 3. The brief, and who reported it ───────────────────────────
               Editable, because this text is not a record of the bug — it is
               the instruction a fix session runs on. See ally-be's
               BugFindingService.editDescription. */}
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <h3 className="text-xs font-semibold text-typography-700">
-                {en.bugHunter.drawerDescriptionTitle}
-              </h3>
-              {canEditDescription && descriptionDraft === null && (
-                <>
-                  <Button
-                    size="sm"
-                    kind="ghost"
-                    onClick={() => setDescriptionDraft(finding.description)}
-                  >
-                    {en.bugHunter.drawerDescriptionEdit}
-                  </Button>
-                  <Tooltip label={en.bugHunter.drawerDescriptionEditTooltip} align="bottom">
-                    <button
-                      type="button"
-                      className="cursor-pointer inline-flex items-center -m-1 p-1 md:m-0 md:p-0"
-                    >
-                      <TooltipIcon />
-                    </button>
-                  </Tooltip>
-                </>
-              )}
-            </div>
+            <h3 className="text-xs font-semibold text-typography-700 mb-1">
+              {en.bugHunter.drawerDescriptionTitle}
+            </h3>
 
             {descriptionDraft === null ? (
               <p className="text-sm text-typography-900 whitespace-pre-wrap break-words">
@@ -500,10 +941,14 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
                 <TextArea
                   id={`bug-finding-description-${finding.id}`}
                   labelText={en.bugHunter.drawerDescriptionEditLabel}
+                  helperText={en.bugHunter.drawerDescriptionEditHelp}
                   placeholder={en.bugHunter.drawerDescriptionEditPlaceholder}
                   value={descriptionDraft}
                   onChange={e => setDescriptionDraft(e.target.value)}
                   rows={8}
+                  // Opened from the header menu, so the field is usually
+                  // below the fold: focusing it brings it into view.
+                  autoFocus
                   invalid={draftTooLong}
                   invalidText={en.bugHunter.drawerDescriptionEditTooLong
                     .replace("{length}", String(descriptionDraft.trim().length))
@@ -526,16 +971,15 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
             )}
 
             {/* What Bug Hunter originally found stays reachable once an admin
-                has rewritten it — collapsed, because the current brief is what
-                matters day to day, but never dropped: when a fix goes wrong the
-                first question is whether the agent misread the bug or was
-                handed a different one. */}
+                has rewritten it: when a fix goes wrong the first question is
+                whether the agent misread the bug or was handed a different
+                one. */}
             {finding.originalDescription && descriptionDraft === null && (
               <div className="mt-2">
                 <p className="text-xs text-typography-500">
                   {en.bugHunter.drawerDescriptionEditedBy.replace(
-                    "{userId}",
-                    String(finding.descriptionEditedBy ?? "—"),
+                    "{name}",
+                    finding.descriptionEditedByName || en.bugHunter.drawerAuditSomeone,
                   )}
                   {finding.descriptionEditedAt
                     ? ` · ${formatDateTime(finding.descriptionEditedAt)}`
@@ -564,974 +1008,78 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
             )}
           </div>
 
-          {/* Placed with the evidence, not with the brief. The reporter's own
-              sentence is the brief; this is the silently-captured circumstance
-              around it, which is evidence in exactly the sense a failing test's
-              output is. */}
           {finding.report && <ReportedBugPanel report={finding.report} />}
 
-          {finding.evidence && (
-            <div>
-              <h3 className="text-xs font-semibold text-typography-700 mb-1">
-                {en.bugHunter.drawerEvidenceTitle}
-              </h3>
-              <pre className="text-xs bg-neutral-50 border border-border-light rounded p-2 whitespace-pre-wrap overflow-x-auto">
-                {finding.evidence}
-              </pre>
-            </div>
-          )}
+          {/* ── 4. The audit trail, closed ──────────────────────────────── */}
+          <div className="border-b border-border-light">
+            {finding.evidence && (
+              <DrawerSection title={en.bugHunter.drawerEvidenceTitle} testId="section-evidence">
+                <pre className="text-xs bg-neutral-50 border border-border-light rounded p-2 whitespace-pre-wrap overflow-x-auto">
+                  {finding.evidence}
+                </pre>
+              </DrawerSection>
+            )}
 
-          {/* ── How sure the checkers were, and what happened to it before ──
-              Placed under the evidence because it IS evidence about the
-              finding rather than an action on it: the reader's next question
-              after "what is the bug" is "how confident should I be", and until
-              now the answer was nowhere on the page. */}
-          {/* `!finding.proven` belongs in this condition, not only in the
-              branch below it: an unproven finding with no score means nobody
-              verified this one, which is exactly the case a reader must be
-              able to tell apart from a verified-and-confident finding. Left
-              out of the outer test, that branch could never render at all. */}
-          {(finding.confidence != null ||
-            !finding.proven ||
-            finding.decisionReason ||
-            finding.regressed ||
-            finding.regressionOf ||
-            finding.rediscoveredCount > 0 ||
-            finding.miss ||
-            finding.latestFixVerdict ||
-            finding.independentVerification ||
-            finding.budget) && (
-            <div className="border border-border-light rounded p-3 flex flex-col gap-2">
-              {finding.confidence != null && (
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs text-typography-700">
-                    {en.bugHunter.drawerConfidenceLabel}:
-                  </span>
-                  <span
-                    className={`text-xs font-medium tabular-nums ${
-                      finding.confidence < BUG_FINDING_LOW_CONFIDENCE_THRESHOLD
-                        ? "text-amber-700"
-                        : "text-typography-900"
-                    }`}
-                  >
-                    {Math.round(finding.confidence * 100)}%
-                  </span>
-                  <Tooltip label={en.bugHunter.drawerConfidenceTooltip} align="top">
-                    <button
-                      type="button"
-                      className="cursor-pointer inline-flex items-center -m-1 p-1 md:m-0 md:p-0"
-                    >
-                      <TooltipIcon />
-                    </button>
-                  </Tooltip>
-                  {finding.confidence < BUG_FINDING_LOW_CONFIDENCE_THRESHOLD && (
-                    <span className="text-[11px] text-amber-700">
-                      {en.bugHunter.findingLowConfidenceTooltip}
-                    </span>
-                  )}
-                </div>
-              )}
-
-              {/* An unproven finding with no score is a different fact from a
-                  proven one with no score, and neither is "0% confident". */}
-              {finding.confidence == null && !finding.proven && (
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs text-typography-600">
-                    {en.bugHunter.drawerConfidenceUnscored}
-                  </span>
-                  <Tooltip label={en.bugHunter.drawerConfidenceUnscoredTooltip} align="top">
-                    <button
-                      type="button"
-                      className="cursor-pointer inline-flex items-center -m-1 p-1 md:m-0 md:p-0"
-                    >
-                      <TooltipIcon />
-                    </button>
-                  </Tooltip>
-                </div>
-              )}
-
-              {finding.decisionReason && (
-                <div>
-                  <p className="text-xs text-typography-900">
-                    {en.bugHunter.drawerDeclinedAs.replace(
-                      "{reason}",
-                      BUG_FINDING_DECISION_REASON_LABELS[finding.decisionReason],
-                    )}
-                  </p>
-                  {finding.decisionNote && (
-                    <p className="text-xs text-typography-600 mt-0.5 whitespace-pre-wrap break-words">
-                      {finding.decisionNote}
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {finding.rediscoveredCount > 0 && (
-                <p className="text-xs text-typography-600">
-                  {en.bugHunter.drawerRediscovered.replace(
-                    "{count}",
-                    String(finding.rediscoveredCount),
-                  )}
-                </p>
-              )}
-
-              {/* A finding from a PR review run (OPP-0785): the PR it is about. */}
-              {finding.pr && (
-                <div data-testid="finding-pr" className="flex items-center gap-1 text-xs">
-                  <a
-                    href={finding.pr.commentUrl ?? finding.pr.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-primary-600 underline inline-flex items-center gap-1"
-                  >
-                    {en.bugHunter.drawerPrReview.replace("{number}", String(finding.pr.number))}
-                    <Launch aria-hidden="true" />
-                  </a>
-                  {finding.pr.commentUrl && (
-                    <span className="text-typography-600">
-                      {en.bugHunter.drawerPrReviewCommented}
-                    </span>
-                  )}
-                </div>
-              )}
-
-              {/* Where the independent finding verifier stands (OPP-0780). */}
-              {finding.independentVerification && (
-                <div data-testid="independent-verification" className="flex items-center gap-1">
-                  <span
-                    className={`text-xs font-medium ${
-                      finding.independentVerification === "confirmed"
-                        ? "text-green-700"
-                        : finding.independentVerification === "pending"
-                          ? "text-typography-600"
-                          : "text-amber-700"
-                    }`}
-                  >
-                    {finding.independentVerification === "pending"
-                      ? en.bugHunter.drawerIndependentPending
-                      : finding.independentVerification === "confirmed"
-                        ? en.bugHunter.drawerIndependentConfirmed
-                        : finding.independentVerification === "refuted"
-                          ? en.bugHunter.drawerIndependentRefuted
-                          : en.bugHunter.drawerIndependentUnsure}
-                  </span>
-                  <Tooltip label={en.bugHunter.drawerIndependentTooltip} align="top">
-                    <button type="button" className="cursor-pointer inline-flex items-center">
-                      <TooltipIcon />
-                    </button>
-                  </Tooltip>
-                </div>
-              )}
-
-              {/* The case chain (2026-10-12): six links from the symptom to
-                  the change. Read before the diff; a missing or broken link
-                  is what a wrong-layer fix looks like before it merges. */}
-              {finding.chain && (
-                <div data-testid="case-chain" className="flex flex-col gap-1">
-                  <div className="flex items-center gap-1">
-                    <p className="text-xs font-medium text-typography-900">
-                      {en.bugHunter.drawerChainTitle}
-                    </p>
-                    <Tooltip label={en.bugHunter.drawerChainTooltip} align="top">
-                      <button type="button" className="cursor-pointer inline-flex items-center">
-                        <TooltipIcon />
-                      </button>
-                    </Tooltip>
-                  </div>
-                  <ol className="flex flex-col gap-0.5">
-                    {finding.chain.links.map(l => (
-                      <li
-                        key={l.link}
-                        data-testid={`chain-${l.link}`}
-                        data-status={l.status}
-                        className="flex items-start gap-2 text-xs"
-                      >
-                        <span
-                          aria-hidden="true"
-                          className={`mt-1 inline-block h-2.5 w-2.5 shrink-0 rounded-full ${
-                            l.status === "present"
-                              ? "bg-green-600"
-                              : l.status === "weak"
-                                ? "bg-amber-400"
-                                : l.status === "broken"
-                                  ? "bg-red-600"
-                                  : "border border-gray-400 bg-transparent"
-                          }`}
-                        />
-                        <span className="min-w-0">
-                          <span className="font-medium text-typography-900">
-                            {en.bugHunter.drawerChainLinks[l.link]}
-                          </span>{" "}
-                          <span className="text-typography-600">
-                            {en.bugHunter.drawerChainStatus[l.status]}
-                            {l.evidence ? ` — ${l.evidence}` : ""}
-                          </span>
-                        </span>
-                      </li>
-                    ))}
-                  </ol>
-                </div>
-              )}
-
-              {/* Where the verifier located the fault (locate before fixing,
-                  2026-10-12): the line a reviewer reads before any diff, and
-                  the reason a data or config fault never gets a session. */}
-              {finding.faultLocation && finding.faultLocation.layer !== "unknown" && (
-                <div
-                  data-testid="fault-location"
-                  className={`flex flex-col gap-1 rounded border p-2 ${
-                    finding.faultLocation.layer === "code"
-                      ? "border-border-light bg-neutral-50"
-                      : "border-amber-200 bg-amber-50"
-                  }`}
-                >
-                  <p className="text-xs font-medium text-typography-900">
-                    {(finding.faultLocation.repo
-                      ? en.bugHunter.drawerFaultLocatedRepo
-                      : en.bugHunter.drawerFaultLocated
-                    )
-                      .replace("{layer}", finding.faultLocation.layer)
-                      .replace("{repo}", finding.faultLocation.repo ?? "")}
-                  </p>
-                  {finding.faultLocation.evidence && (
-                    <PostmortemLine
-                      label={en.bugHunter.drawerFaultEvidence}
-                      value={finding.faultLocation.evidence}
-                      mono
-                    />
-                  )}
-                  {finding.faultLocation.repair && (
-                    <PostmortemLine
-                      label={en.bugHunter.drawerFaultRepair}
-                      value={finding.faultLocation.repair}
-                      emphasis
-                    />
-                  )}
-                  {finding.faultLocation.layer !== "code" && (
-                    <p className="text-[11px] text-amber-800">{en.bugHunter.drawerFaultDataNote}</p>
-                  )}
-                </div>
-              )}
-
-              {/* The Verifier's verdict on the current fix PR (OPP-0779): the
-                  second opinion a reviewer reads before the diff. */}
-              {finding.latestFixVerdict && (
-                <div data-testid="fix-verdict" className="flex flex-col gap-0.5">
-                  <div className="flex items-center gap-1">
-                    <span
-                      className={`text-xs font-medium ${
-                        finding.latestFixVerdict.verdict === "pass"
-                          ? "text-green-700"
-                          : "text-amber-700"
-                      }`}
-                    >
-                      {finding.latestFixVerdict.verdict === "pass"
-                        ? en.bugHunter.drawerVerdictPass
-                        : en.bugHunter.drawerVerdictFail}
-                    </span>
-                    {finding.latestFixVerdict.by.engine && (
-                      <span className="text-xs text-typography-600">
-                        ·{" "}
-                        {en.bugHunter.drawerVerdictBy.replace(
-                          "{engine}",
-                          finding.latestFixVerdict.by.engine,
-                        )}
-                      </span>
-                    )}
-                    <Tooltip label={en.bugHunter.drawerVerdictTooltip} align="top">
-                      <button type="button" className="cursor-pointer inline-flex items-center">
-                        <TooltipIcon />
-                      </button>
-                    </Tooltip>
-                  </div>
-                  {finding.latestFixVerdict.summary && (
-                    <p className="text-xs text-typography-700">
-                      {finding.latestFixVerdict.summary}
-                    </p>
-                  )}
-                  <ul className="text-xs text-typography-600 flex flex-col gap-0.5">
-                    {finding.latestFixVerdict.checks.map(check => (
-                      <li key={check.name} className="flex gap-1.5">
-                        <span className={`font-mono ${check.ok === false ? "text-amber-700" : ""}`}>
-                          {check.skipped ? "–" : check.ok ? "✓" : "✗"}
-                        </span>
-                        <span className="font-mono">{check.name}</span>
-                        <span className="min-w-0 break-words">
-                          {check.skipped
-                            ? en.bugHunter.drawerVerdictCheckSkipped.replace(
-                                "{reason}",
-                                check.skipped,
-                              )
-                            : (check.evidence ?? "")}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {/* The decision log (OPP-0776): every orchestration choice
-                  about this bug, with the pick not taken beside the pick. */}
-              <FindingDecisions findingId={finding.id} />
-
-              {/* The case file's budget (OPP-0775): what this bug has cost so
-                  far against its caps. Always shown, because "nothing spent"
-                  is itself a fact a reader wants before pressing Start. */}
-              {finding.budget && (
-                <div data-testid="budget" className="flex flex-col gap-0.5">
-                  <div className="flex items-center gap-1">
-                    <span className="text-xs text-typography-700">
-                      {en.bugHunter.drawerBudgetLabel}:
-                    </span>
-                    <span className="text-xs font-medium tabular-nums text-typography-900">
-                      {en.bugHunter.drawerBudgetSummary
-                        .replace("{sessions}", String(finding.budget.used.sessions))
-                        .replace("{sessionsCap}", String(finding.budget.caps.sessions))
-                        .replace("{attempts}", String(finding.budget.used.attempts))
-                        .replace("{attemptsCap}", String(finding.budget.caps.attempts))
-                        .replace("{usd}", finding.budget.used.usd.toFixed(2))
-                        .replace("{usdCap}", finding.budget.caps.usd.toFixed(2))}
-                    </span>
-                    <Tooltip label={en.bugHunter.drawerBudgetTooltip} align="top">
-                      <button type="button" className="cursor-pointer inline-flex items-center">
-                        <TooltipIcon />
-                      </button>
-                    </Tooltip>
-                  </div>
-                  {finding.budget.exhausted && (
-                    <p className="text-xs text-amber-700">
-                      {en.bugHunter.drawerBudgetExhausted.replace(
-                        "{kind}",
-                        finding.budget.exhausted.kind,
-                      )}
-                    </p>
-                  )}
-                  {finding.budget.overriddenAt && (
-                    <p className="text-xs text-typography-600">
-                      {en.bugHunter.drawerBudgetOverridden.replace(
-                        "{date}",
-                        formatDateTime(finding.budget.overriddenAt),
-                      )}
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* The miss record (OPP-0774). Only reported bugs carry one; it
-                  sits with the other evidence about how far to trust this row
-                  because the reader's question is the same: what does Bug
-                  Hunter itself know about how this bug reached a person. */}
-              {finding.miss && (
-                <div data-testid="miss-record" className="flex flex-col gap-0.5">
-                  <div className="flex items-center gap-1">
-                    <span className="text-xs text-typography-700">
-                      {en.bugHunter.drawerMissTitle}:
-                    </span>
-                    <span className="text-xs font-medium text-typography-900">
-                      {BUG_FINDING_MISS_REASON_LABELS[finding.miss.reason] ?? finding.miss.reason}
-                    </span>
-                    <Tooltip label={en.bugHunter.drawerMissTooltip} align="top">
-                      <button type="button" className="cursor-pointer inline-flex items-center">
-                        <TooltipIcon />
-                      </button>
-                    </Tooltip>
-                  </div>
-                  {finding.miss.sense && (
-                    <p className="text-xs text-typography-600">
-                      {en.bugHunter.drawerMissWouldNeed.replace(
-                        "{sense}",
-                        BUG_FINDING_MISS_SENSE_LABELS[finding.miss.sense] ?? finding.miss.sense,
-                      )}
-                    </p>
-                  )}
-                  {finding.miss.rationale && (
-                    <p className="text-xs text-typography-600 whitespace-pre-wrap">
-                      {finding.miss.rationale}
-                    </p>
-                  )}
-                  {finding.miss.matchedFindingId && (
-                    <a
-                      href={`?bug=${finding.miss.matchedFindingId}`}
-                      className="text-xs text-primary-600 underline w-fit"
-                    >
-                      {en.bugHunter.drawerMissSeeMatched}
-                    </a>
-                  )}
-                </div>
-              )}
-
-              {finding.regressionOf && (
-                <a
-                  href={`?bug=${finding.regressionOf}`}
-                  className="text-xs text-primary-600 underline w-fit"
-                >
-                  {en.bugHunter.drawerRegressionOfLink}
-                </a>
-              )}
-
-              {finding.regressed && (
-                <p className="text-xs text-amber-700">{en.bugHunter.findingRegressedTooltip}</p>
-              )}
-            </div>
-          )}
-
-          {/* What the session read and planned BEFORE it changed code. Sits
-              ahead of the post-mortem because it is the earlier record: a
-              reviewer asking "is this diff the right shape" reads where the
-              value lives and the working sibling first, and a wrong fix is
-              usually traceable to a line in here. */}
-          {finding.study && (
-            <div
-              data-testid="finding-study"
-              className="border border-sky-200 bg-sky-50 rounded p-3 flex flex-col gap-1.5"
-            >
-              <div className="flex items-center gap-1">
-                <p className="text-xs font-medium text-sky-900">{en.bugHunter.drawerStudyTitle}</p>
-                <Tooltip label={en.bugHunter.drawerStudyTooltip} align="top">
-                  <button
-                    type="button"
-                    className="cursor-pointer inline-flex items-center -m-1 p-1 md:m-0 md:p-0"
-                  >
-                    <TooltipIcon />
-                  </button>
-                </Tooltip>
-              </div>
-              {finding.study.recordedAt && (
-                <p className="text-[11px] text-typography-500">
-                  {en.bugHunter.drawerStudyRecorded.replace(
-                    "{date}",
-                    formatDateTime(finding.study.recordedAt),
-                  )}
-                </p>
-              )}
-              <PostmortemLine
-                label={en.bugHunter.drawerStudyFeature}
-                value={finding.study.feature}
-              />
-              <div>
-                <p className="text-[11px] text-typography-500">
-                  {en.bugHunter.drawerStudyHowItWorks}
-                </p>
-                <ol className="list-decimal pl-5 text-xs text-typography-700 flex flex-col gap-0.5">
-                  {finding.study.howItWorksToday.map((step, i) => (
-                    <li key={i} className="break-words">
-                      {step}
-                    </li>
-                  ))}
-                </ol>
-              </div>
-              <PostmortemLine
-                label={en.bugHunter.drawerStudyValueLivesIn}
-                value={
-                  en.bugHunter.drawerStudyValueHomes[finding.study.valueLivesIn] ??
-                  finding.study.valueLivesIn
+            {hasConfidenceDetails(finding) && (
+              <DrawerSection
+                title={en.bugHunter.drawerSectionConfidence}
+                hint={
+                  finding.confidence != null ? `${Math.round(finding.confidence * 100)}%` : null
                 }
-                emphasis
-              />
-              {finding.study.workingSibling && (
-                <PostmortemLine
-                  label={en.bugHunter.drawerStudySibling}
-                  value={finding.study.workingSibling}
-                  mono
-                />
-              )}
-              <PostmortemLine
-                label={en.bugHunter.drawerStudyRootCause}
-                value={finding.study.rootCause}
-              />
-              <PostmortemLine
-                label={en.bugHunter.drawerStudyApproach}
-                value={finding.study.approach}
-                emphasis
-              />
-              <PostmortemLine
-                label={en.bugHunter.drawerStudyFiles}
-                value={finding.study.filesToChange.join("\n")}
-                mono
-              />
-              {finding.study.leaveAlone.length > 0 && (
-                <PostmortemLine
-                  label={en.bugHunter.drawerStudyLeaveAlone}
-                  value={finding.study.leaveAlone.join("\n")}
-                />
-              )}
-              {finding.study.otherRepos.length > 0 && (
-                <PostmortemLine
-                  label={en.bugHunter.drawerStudyOtherRepos}
-                  value={finding.study.otherRepos.join(", ")}
-                  mono
-                />
-              )}
-              {finding.study.risks.length > 0 && (
-                <PostmortemLine
-                  label={en.bugHunter.drawerStudyRisks}
-                  value={finding.study.risks.join("\n")}
-                />
-              )}
-              <PostmortemLine
-                label={en.bugHunter.drawerStudyTestPlan}
-                value={finding.study.testPlan}
-              />
-              {finding.study.previousStudyWasWrongBecause && (
-                <PostmortemLine
-                  label={en.bugHunter.drawerStudyPreviousWrong}
-                  value={finding.study.previousStudyWasWrongBecause}
-                  emphasis
-                />
-              )}
-              {finding.study.review && (
-                <div>
-                  <p className="text-[11px] text-typography-500">
-                    {(finding.study.review.concerns.length
-                      ? en.bugHunter.drawerStudyReviewConcerns
-                      : en.bugHunter.drawerStudyReviewNone
-                    ).replace("{model}", finding.study.review.model ?? "a second model")}
-                  </p>
-                  {finding.study.review.concerns.length > 0 && (
-                    <ul className="list-disc pl-5 text-xs text-typography-700">
-                      {finding.study.review.concerns.map((c, i) => (
-                        <li key={i} className="break-words">
-                          {c}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
+                testId="section-confidence"
+              >
+                <FindingConfidence finding={finding} />
+              </DrawerSection>
+            )}
 
-          {/* What the last failed session wrote for whoever retries. Its own
-              box, after the confidence/history evidence and before the actions:
-              the reader's next question after "how sure should I be" is
-              "what happened last time", and the answer decides whether
-              "Ask me to try again" is worth pressing. */}
-          {finding.postmortem && (
-            <div className="border border-amber-200 bg-amber-50 rounded p-3 flex flex-col gap-1.5">
-              <div className="flex items-center gap-1">
-                <p className="text-xs font-medium text-amber-800">
-                  {en.bugHunter.drawerPostmortemTitle}
-                </p>
-                <Tooltip label={en.bugHunter.drawerPostmortemTooltip} align="top">
-                  <button
-                    type="button"
-                    className="cursor-pointer inline-flex items-center -m-1 p-1 md:m-0 md:p-0"
-                  >
-                    <TooltipIcon />
-                  </button>
-                </Tooltip>
-              </div>
-              {finding.postmortem.recordedAt && (
-                <p className="text-[11px] text-typography-500">
-                  {en.bugHunter.drawerPostmortemRecorded.replace(
-                    "{date}",
-                    formatDateTime(finding.postmortem.recordedAt),
+            {(finding.study ||
+              (finding.postmortem &&
+                finding.status !== BugFindingStatus.FAILED &&
+                finding.status !== BugFindingStatus.CANCELLED)) && (
+              <DrawerSection title={en.bugHunter.drawerSectionPlan} testId="section-plan">
+                {finding.study && <StudyDetails study={finding.study} />}
+                {/* An earlier attempt's post-mortem, once a later one moved
+                    on: history now, read beside the plan that followed it. */}
+                {finding.postmortem &&
+                  finding.status !== BugFindingStatus.FAILED &&
+                  finding.status !== BugFindingStatus.CANCELLED && (
+                    <PostmortemDetails postmortem={finding.postmortem} />
                   )}
-                </p>
-              )}
-              {(finding.postmortem.attempts != null || finding.postmortem.failingCheck) && (
-                <p className="text-xs text-typography-700">
-                  {en.bugHunter.drawerPostmortemAttempts
-                    .replace("{count}", String(finding.postmortem.attempts ?? "?"))
-                    .replace("{check}", finding.postmortem.failingCheck ?? "")}
-                </p>
-              )}
-              {finding.postmortem.lastFailure && (
-                <PostmortemLine
-                  label={en.bugHunter.drawerPostmortemLastFailure}
-                  value={finding.postmortem.lastFailure}
-                  mono
-                />
-              )}
-              {finding.postmortem.rootCauseHypothesis && (
-                <PostmortemLine
-                  label={en.bugHunter.drawerPostmortemRootCause}
-                  value={finding.postmortem.rootCauseHypothesis}
-                />
-              )}
-              {finding.postmortem.whyItFailed && (
-                <PostmortemLine
-                  label={en.bugHunter.drawerPostmortemWhyFailed}
-                  value={finding.postmortem.whyItFailed}
-                />
-              )}
-              {finding.postmortem.tryNext && (
-                <PostmortemLine
-                  label={en.bugHunter.drawerPostmortemTryNext}
-                  value={finding.postmortem.tryNext}
-                  emphasis
-                />
-              )}
-              {finding.postmortem.repoGotcha && (
-                <PostmortemLine
-                  label={en.bugHunter.drawerPostmortemGotcha}
-                  value={finding.postmortem.repoGotcha}
-                />
-              )}
-            </div>
-          )}
+              </DrawerSection>
+            )}
 
-          {finding.prUrl && (
-            <a
-              href={finding.prUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 self-start text-sm text-primary-600 hover:text-primary-800"
-              aria-label={en.bugHunter.viewPr}
-              title={en.bugHunter.viewPr}
+            {decisionList.length > 0 && (
+              <DrawerSection
+                title={en.bugHunter.decisions.title}
+                hint={String(decisionList.length)}
+                testId="finding-decisions"
+              >
+                <DecisionLogList decisions={decisionList} />
+              </DrawerSection>
+            )}
+
+            <DrawerSection
+              title={en.bugHunter.drawerTimelineTitle}
+              hint={logEntries.length ? String(logEntries.length) : null}
+              testId="section-work-log"
             >
-              <Launch className="h-4 w-4" aria-hidden="true" />
-            </a>
-          )}
-
-          {/* ── The plan, when this bug needs more than one repo ────────────── */}
-          {steps.length > 0 && (
-            <div className="border border-border-light rounded p-3">
-              <h3 className="text-xs font-semibold text-typography-900">
-                {en.bugHunter.planTitle.replace("{count}", String(steps.length))}
-              </h3>
-              <p className="text-xs text-typography-600 mt-0.5 mb-3">{en.bugHunter.planSubtitle}</p>
-              <ol className="flex flex-col gap-2">
-                {steps.map(step => (
-                  <li key={step.id} className="flex items-start gap-2">
-                    <span className="text-xs text-typography-500 whitespace-nowrap mt-0.5 tabular-nums">
-                      {en.bugHunter.planStepLabel.replace("{n}", String(step.stepIndex + 1))}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-sm font-medium text-typography-900">{step.repo}</span>
-                        <BugFindingStatusBadge status={step.status} />
-                        {IN_FLIGHT_STATUSES.includes(step.status) && (
-                          <BrailleSpinner className="text-amber-600" />
-                        )}
-                        {step.releaseTag && (
-                          <span className="text-xs text-typography-600">{step.releaseTag}</span>
-                        )}
-                      </div>
-                      {step.stepSummary && (
-                        <p className="text-xs text-typography-700 mt-0.5">{step.stepSummary}</p>
-                      )}
-                      <div className="flex gap-3 mt-0.5">
-                        {step.prUrl && (
-                          <a
-                            href={step.prUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center text-primary-600 hover:text-primary-800"
-                            aria-label={en.bugHunter.viewPr}
-                            title={en.bugHunter.viewPr}
-                          >
-                            <Launch className="h-3.5 w-3.5" aria-hidden="true" />
-                          </a>
-                        )}
-                        {step.sessionRunUrl && (
-                          <a
-                            href={step.sessionRunUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-xs text-primary-600 underline"
-                          >
-                            {en.bugHunter.drawerWatchSession}
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            </div>
-          )}
-
-          {/* ── Release state: what happened, or is happening, to the deploy ── */}
-          {finding.status === BugFindingStatus.RELEASING && (
-            <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded p-3">
-              {en.bugHunter.drawerReleasingNotice.replace("{tag}", finding.releaseTag ?? "—")}
-            </p>
-          )}
-          {finding.status === BugFindingStatus.RELEASED && (
-            <p className="text-sm text-green-700 bg-green-50 border border-green-200 rounded p-3">
-              {finding.releaseTag
-                ? en.bugHunter.drawerReleasedNotice.replace("{tag}", finding.releaseTag)
-                : en.bugHunter.drawerReleasedOutOfBandNotice}
-            </p>
-          )}
-          {finding.status === BugFindingStatus.RELEASE_FAILED && (
-            <p className="text-sm text-destructive-700 bg-destructive-50 border border-destructive-200 rounded p-3">
-              {en.bugHunter.drawerReleaseFailedNotice.replace("{tag}", finding.releaseTag ?? "—")}
-            </p>
-          )}
-          {/* A plain fix-session failure used to surface only as buried
-              timeline text — promoted to the same dedicated-banner treatment
-              RELEASE_FAILED gets, since both are "this needs a look" states. */}
-          {finding.status === BugFindingStatus.FAILED && (
-            <p className="text-sm text-destructive-700 bg-destructive-50 border border-destructive-200 rounded p-3">
-              {latestFailureReason || en.bugHunter.drawerFixSessionFailedNotice}
-            </p>
-          )}
-          {finding.status === BugFindingStatus.QUEUED && (
-            <p className="text-sm text-typography-600">{en.bugHunter.drawerFixSessionQueued}</p>
-          )}
-
-          {(finding.sessionRunUrl || finding.releaseRunUrl) && (
-            <div className="flex gap-4">
-              {finding.sessionRunUrl && (
-                <a
-                  href={finding.sessionRunUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-sm text-primary-600 underline"
-                >
-                  {en.bugHunter.drawerWatchSession}
-                </a>
-              )}
-              {finding.releaseRunUrl && (
-                <a
-                  href={finding.releaseRunUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-sm text-primary-600 underline"
-                >
-                  {en.bugHunter.drawerViewReleaseRun}
-                </a>
-              )}
-            </div>
-          )}
-
-          {/* ── The two on-demand actions ──────────────────────────────────── */}
-          <div className="flex flex-wrap items-center gap-2">
-            {canTriage && finding.status === BugFindingStatus.PENDING_APPROVAL && (
-              <>
-                <Button
-                  size="sm"
-                  kind="primary"
-                  disabled={isApproving || isDraftingDescription}
-                  onClick={() => setConfirmAction("approve")}
-                >
-                  {en.bugHunter.drawerApprove}
-                </Button>
-                <Button
-                  size="sm"
-                  kind="danger--tertiary"
-                  disabled={isRejecting || isDraftingDescription}
-                  onClick={() => setConfirmAction("reject")}
-                >
-                  {en.bugHunter.drawerReject}
-                </Button>
-              </>
-            )}
-
-            {canStartSession && (
-              <>
-                <Button
-                  size="sm"
-                  kind={
-                    finding.status === BugFindingStatus.PENDING_APPROVAL ? "tertiary" : "primary"
-                  }
-                  disabled={isStartingSession || isDraftingDescription}
-                  onClick={() => setConfirmAction("fixSession")}
-                >
-                  {/* CANCELLED reads as a retry too — same story as FAILED,
-                      just stopped on purpose rather than given up on. */}
-                  {finding.status === BugFindingStatus.FAILED ||
-                  finding.status === BugFindingStatus.CANCELLED
-                    ? en.bugHunter.drawerRetryFixSession
-                    : en.bugHunter.drawerStartFixSession}
-                </Button>
-                <Tooltip label={en.bugHunter.drawerFixSessionTooltip} align="top">
-                  <button
-                    type="button"
-                    className="cursor-pointer inline-flex items-center -m-1 p-1 md:m-0 md:p-0"
-                  >
-                    <TooltipIcon />
-                  </button>
-                </Tooltip>
-              </>
-            )}
-
-            {canStopSession && (
-              <>
-                <Button
-                  size="sm"
-                  kind="danger--tertiary"
-                  disabled={isCancellingSession}
-                  onClick={() => setConfirmAction("stopFixSession")}
-                >
-                  {en.bugHunter.drawerStopFixSession}
-                </Button>
-                <Tooltip label={en.bugHunter.drawerStopFixSessionTooltip} align="top">
-                  <button
-                    type="button"
-                    className="cursor-pointer inline-flex items-center -m-1 p-1 md:m-0 md:p-0"
-                  >
-                    <TooltipIcon />
-                  </button>
-                </Tooltip>
-              </>
-            )}
-
-            {/* The merge Bug Hunter cannot do itself on a protected repo.
-                Offered from PR_OPENED only: before that there is nothing to
-                merge, and after it the fix is already on master. The backend
-                re-checks the PR's own CI and refuses a red one, so this button
-                is a shortcut past a trip to GitHub, not past a gate. */}
-            {canTriage && finding.status === BugFindingStatus.PR_OPENED && finding.prUrl && (
-              <>
-                <Button
-                  size="sm"
-                  kind="primary"
-                  disabled={isMerging || isDraftingDescription}
-                  onClick={() => setConfirmAction("merge")}
-                >
-                  {en.bugHunter.drawerMerge}
-                </Button>
-                <Tooltip label={en.bugHunter.drawerMergeTooltip} align="top">
-                  <button
-                    type="button"
-                    className="cursor-pointer inline-flex items-center -m-1 p-1 md:m-0 md:p-0"
-                  >
-                    <TooltipIcon />
-                  </button>
-                </Tooltip>
-              </>
-            )}
-
-            {canTriage && finding.releasable && (
-              <>
-                <Button
-                  size="sm"
-                  kind="primary"
-                  disabled={isReleasing}
-                  onClick={() => setConfirmAction("release")}
-                >
-                  {finding.status === BugFindingStatus.RELEASE_FAILED
-                    ? en.bugHunter.drawerReleaseRetry
-                    : en.bugHunter.drawerRelease}
-                </Button>
-                <Tooltip label={en.bugHunter.drawerReleaseTooltip} align="top">
-                  <button
-                    type="button"
-                    className="cursor-pointer inline-flex items-center -m-1 p-1 md:m-0 md:p-0"
-                  >
-                    <TooltipIcon />
-                  </button>
-                </Tooltip>
-              </>
-            )}
-          </div>
-
-          {isDraftingDescription && (
-            <p className="text-xs text-typography-600">
-              {en.bugHunter.drawerDescriptionSettleFirst}
-            </p>
-          )}
-
-          {/* Merged but not releasable from here — say why rather than just
-              omitting the button the admin came looking for. */}
-          {finding.releaseBlockedReason && (
-            <div className="text-xs text-typography-600 border border-border-light rounded p-3">
-              <span className="font-semibold">{en.bugHunter.drawerReleaseBlocked}: </span>
-              {finding.releaseBlockedReason}
-            </div>
-          )}
-
-          {finding.releasedBy != null && (
-            <p className="text-xs text-typography-500">
-              {en.bugHunter.drawerReleasedBy.replace("{userId}", String(finding.releasedBy))}
-              {finding.releasedAt ? ` · ${formatDateTime(finding.releasedAt)}` : ""}
-            </p>
-          )}
-
-          {finding.decidedBy != null && (
-            <p className="text-xs text-typography-500">
-              {en.bugHunter.drawerDecidedBy.replace("{userId}", String(finding.decidedBy))}
-              {finding.decidedAt ? ` · ${formatDateTime(finding.decidedAt)}` : ""}
-            </p>
-          )}
-
-          {finding.cancelledBy != null && (
-            <p className="text-xs text-typography-500">
-              {en.bugHunter.drawerCancelledBy.replace("{userId}", String(finding.cancelledBy))}
-              {finding.cancelledAt ? ` · ${formatDateTime(finding.cancelledAt)}` : ""}
-            </p>
-          )}
-
-          {finding.escalationQuestion && (
-            <div className="border border-orange-200 bg-orange-50 rounded p-3">
-              {/* Bug Hunter asked this, and it is blocked until you answer —
-                  so it is signed, the way a message from a person would be. */}
-              <div className="flex items-center gap-2 mb-1">
-                <AgentAvatar size="sm" presence="waiting_on_you" label={en.bugHunter.agentName} />
-                <h3 className="text-xs font-semibold text-typography-700">
-                  {en.bugHunter.drawerEscalationQuestionTitle}
-                </h3>
-              </div>
-              <p className="text-sm text-typography-900 mb-3">{finding.escalationQuestion}</p>
-
-              {finding.escalationAnswer ? (
-                <div>
-                  <p className="text-sm text-typography-900 whitespace-pre-wrap break-words">
-                    {finding.escalationAnswer}
+              {/* A question answered and moved past is history, not a
+                  decision: it reads here, above the log that followed it. */}
+              {finding.escalationQuestion && finding.status !== BugFindingStatus.NEEDS_INPUT && (
+                <div className="border-l-2 border-orange-200 pl-3">
+                  <p className="text-xs font-semibold text-typography-700">
+                    {en.bugHunter.drawerEscalationQuestionTitle}
                   </p>
-                  {finding.escalationAnsweredBy != null && (
-                    <p className="text-xs text-typography-500 mt-1">
-                      {en.bugHunter.drawerAnsweredBy.replace(
-                        "{userId}",
-                        String(finding.escalationAnsweredBy),
-                      )}
-                      {finding.escalationAnsweredAt
-                        ? ` · ${formatDateTime(finding.escalationAnsweredAt)}`
-                        : ""}
+                  <p className="text-sm text-typography-900">{finding.escalationQuestion}</p>
+                  {finding.escalationAnswer && (
+                    <p className="text-sm text-typography-700 whitespace-pre-wrap break-words mt-1">
+                      {finding.escalationAnswer}
                     </p>
                   )}
                 </div>
-              ) : finding.status === BugFindingStatus.NEEDS_INPUT && canTriage ? (
-                <div className="flex flex-col gap-2">
-                  <TextArea
-                    id={`bug-finding-answer-${finding.id}`}
-                    labelText={en.bugHunter.drawerAnswerLabel}
-                    hideLabel
-                    placeholder={en.bugHunter.drawerAnswerPlaceholder}
-                    value={answerText}
-                    onChange={e => setAnswerText(e.target.value)}
-                    rows={3}
-                  />
-                  <Button
-                    size="sm"
-                    kind="primary"
-                    disabled={isAnswering || !answerText.trim()}
-                    onClick={handleSubmitAnswer}
-                    className="self-start"
-                  >
-                    {en.bugHunter.drawerAnswerSubmit}
-                  </Button>
-                </div>
-              ) : null}
-            </div>
-          )}
-
-          <div>
-            <h3 className="text-xs font-semibold text-typography-700 mb-2">
-              {en.bugHunter.drawerTimelineTitle}
-            </h3>
-            {events.length === 0 ? (
-              <p className="text-sm text-typography-500">{en.bugHunter.drawerTimelineEmpty}</p>
-            ) : (
-              <ul className="flex flex-col gap-1">
-                {events.map(event => (
-                  <li
-                    key={event.id}
-                    className="text-sm text-typography-800 flex flex-wrap gap-x-2 md:flex-nowrap md:gap-2"
-                  >
-                    <span className="text-typography-500 whitespace-nowrap tabular-nums">
-                      {formatTimestamp(event.createdAt)}
-                    </span>
-                    <span className="font-medium text-typography-700 whitespace-nowrap">
-                      {BUG_HUNT_EVENT_STAGE_LABELS[event.stage]}
-                    </span>
-                    <span className="min-w-0 break-words">{event.summary}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
+              )}
+              <FindingWorkLog entries={logEntries} />
+            </DrawerSection>
           </div>
         </div>
       )}
@@ -1547,7 +1095,7 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
           }
           description={
             confirmAction === "approve"
-              ? en.bugHunter.drawerApproveConfirmBody
+              ? en.bugHunter.drawerApproveConfirmBodyNoRush
               : en.bugHunter.drawerRejectConfirmBody
           }
           primaryButton={{
@@ -1623,21 +1171,16 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
               : en.bugHunter.drawerFixSessionConfirmBodyUnknownRepo
           }
           primaryButton={{
-            label:
-              needsLocating && !forceFix
-                ? en.bugHunter.drawerLocateFirstStart
-                : en.bugHunter.drawerFixSessionStart,
+            label: willLocate
+              ? en.bugHunter.drawerLocateFirstStart
+              : en.bugHunter.drawerFixSessionStart,
             onClick: handleStartFixSession,
-            disabled: isStartingSession || (budgetSpent && !forceFix),
+            // Locating runs the Verifier, not a fix session, so a spent
+            // budget only holds Start once the session would actually run.
+            disabled: isStartingSession || (!willLocate && budgetSpent && !overrideBudget),
           }}
           secondaryButton={{ label: en.bugHunter.cancel, onClick: () => setConfirmAction(null) }}
         >
-          {/* Only for a bug with no repo. One with a repo already says where
-              it will work, and a picker beside that would be a second answer
-              to a question already settled. */}
-          {/* Past the budget, Start is disabled until the admin ticks the
-              override: the refusal the server would give is shown here first,
-              so nobody learns about the budget from an error toast. */}
           {needsLocating && (
             <div className="mt-3 text-left" data-testid="locate-first">
               <p className="text-xs text-typography-700 mb-2">
@@ -1647,12 +1190,17 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
                 id={`drawer-${id}-locate-force`}
                 labelText={en.bugHunter.drawerLocateFirstForceLabel}
                 helperText={en.bugHunter.drawerLocateFirstForceHelp}
-                checked={forceFix}
-                onChange={(_e: unknown, { checked }: { checked: boolean }) => setForceFix(checked)}
+                checked={skipLocating}
+                onChange={(_e: unknown, { checked }: { checked: boolean }) =>
+                  setSkipLocating(checked)
+                }
               />
             </div>
           )}
-          {budgetSpent && (
+          {/* Past the budget, Start is disabled until the admin ticks the
+              override: the refusal the server would give is shown here first,
+              so nobody learns about the budget from an error toast. */}
+          {budgetSpent && !willLocate && (
             <div className="mt-3 text-left" data-testid="budget-override">
               <p className="text-xs text-amber-700 mb-2">
                 {en.bugHunter.drawerBudgetExhausted.replace(
@@ -1664,11 +1212,16 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
                 id={`drawer-${id}-force`}
                 labelText={en.bugHunter.drawerFixSessionForceLabel}
                 helperText={en.bugHunter.drawerFixSessionForceHelp}
-                checked={forceFix}
-                onChange={(_e: unknown, { checked }: { checked: boolean }) => setForceFix(checked)}
+                checked={overrideBudget}
+                onChange={(_e: unknown, { checked }: { checked: boolean }) =>
+                  setOverrideBudget(checked)
+                }
               />
             </div>
           )}
+          {/* Only for a bug with no repo. One with a repo already says where
+              it will work, and a picker beside that would be a second answer
+              to a question already settled. */}
           {!finding?.repo && (
             <div className="mt-3 text-left" data-testid="repo-picker">
               <Select
@@ -1710,7 +1263,7 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
           title={en.bugHunter.drawerReleaseConfirmTitle}
           description={en.bugHunter.drawerReleaseConfirmBody.replace(
             "{target}",
-            finding?.releaseTarget ?? finding?.repo ?? "this service",
+            finding?.releaseTarget ?? finding?.repo ?? en.bugHunter.drawerReleaseTargetFallback,
           )}
           primaryButton={{
             label: en.bugHunter.drawerReleaseConfirm,
@@ -1724,26 +1277,12 @@ export const BugFindingDrawer: FC<BugFindingDrawerProps> = ({ id, onClose, canTr
   );
 };
 
-/** One labelled line of the post-mortem box. `emphasis` marks the line written for the retry. */
-const PostmortemLine = ({
-  label,
-  value,
-  mono,
-  emphasis,
-}: {
-  label: string;
-  value: string;
-  mono?: boolean;
-  emphasis?: boolean;
-}) => (
-  <div>
-    <p className="text-[11px] text-typography-500">{label}</p>
-    <p
-      className={`text-xs whitespace-pre-wrap break-words ${mono ? "font-mono" : ""} ${
-        emphasis ? "text-typography-900 font-medium" : "text-typography-700"
-      }`}
-    >
-      {value}
-    </p>
-  </div>
-);
+/**
+ * The decision block's button row. Renders nothing when there is nothing to
+ * press — a fixing, releasing or settled bug has a sentence and no buttons,
+ * not an empty row of whitespace.
+ */
+const DecisionActions: FC<{ children: ReactNode }> = ({ children }) => {
+  const hasAny = (Array.isArray(children) ? children : [children]).some(Boolean);
+  return hasAny ? <div className="flex flex-wrap items-center gap-2">{children}</div> : null;
+};
