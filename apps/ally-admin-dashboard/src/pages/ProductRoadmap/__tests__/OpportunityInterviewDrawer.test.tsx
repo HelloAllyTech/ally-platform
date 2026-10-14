@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
-const takeTurn = vi.hoisted(() => vi.fn());
+const runTurn = vi.hoisted(() => vi.fn());
 const createOpportunity = vi.hoisted(() => vi.fn());
 const checkDuplicates = vi.hoisted(() => vi.fn());
 // One trigger for every render, as RTK Query's is: the drawer's duplicate effect depends on it,
@@ -43,6 +43,12 @@ vi.mock("@components/types", () => ({
 
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
+// The stream itself is covered by useRoadmapCopilotStream's own tests; here `runTurn` is the
+// seam, with the same contract — resolve with the turn and its lookups, or reject.
+vi.mock("@hooks/useRoadmapCopilotStream", () => ({
+  useRoadmapCopilotStream: () => ({ runTurn, activity: [], isThinking: false }),
+}));
+
 vi.mock("@api", () => ({
   useGetRoadmapReadinessCriteriaQuery: () => ({
     data: {
@@ -53,10 +59,6 @@ vi.mock("@api", () => ({
       fileableEfforts: ["s", "m"],
     },
   }),
-  useRoadmapOpportunityInterviewTurnMutation: () => [
-    (args: unknown) => ({ unwrap: () => takeTurn(args) }),
-    { isLoading: false },
-  ],
   useCreateRoadmapOpportunityMutation: () => [
     (args: unknown) => ({ unwrap: () => createOpportunity(args) }),
     { isLoading: false },
@@ -66,134 +68,187 @@ vi.mock("@api", () => ({
 
 import { OpportunityInterviewDrawer } from "../OpportunityInterviewDrawer";
 
-const turn = (over: Record<string, unknown> = {}) => ({
-  reply: "Who is this for?",
-  gates: [
-    { id: "who_it_affects", met: false, note: "No user group named yet." },
-    { id: "outcome", met: false, note: "No outcome stated yet." },
+const BRIEF = {
+  strategicFit: [{ goal: "Cut time-to-first-value", why: "One less screen before practice." }],
+  reach: { howMany: "~40 counsellors (analytics, 30 days)", howOften: "Every session" },
+  evidence: [
+    { source: "analytics", claim: "40 counsellors retyped names last month.", ref: "q: retypes" },
   ],
-  draft: null,
-  readinessToken: null,
-  ...over,
+  successMetric: "Time from call end to saved note",
+  assumptions: ["Retyping is the slow step, not finding the field."],
+  alternativesDropped: ["A full CRM sync"],
+  assessment: {
+    rating: "promising",
+    summary: "Clear and on-strategy; no baseline yet.",
+    openRecommendations: ["Measure today's time-to-note."],
+  },
+};
+
+const turn = (over: Record<string, unknown> = {}) => ({
+  turn: {
+    reply: "Who is this for?",
+    gates: [
+      { id: "who_it_affects", met: false, note: "No user group named yet." },
+      { id: "outcome", met: false, note: "No outcome stated yet." },
+    ],
+    draft: null,
+    readinessToken: null,
+    brief: null,
+    ...over,
+  },
+  activity: [],
 });
 
 const readyTurn = turn({
-  reply: "All covered — check the draft.",
+  reply: "All covered — you can file it. A baseline would make it stronger.",
   gates: [
     { id: "who_it_affects", met: true, note: "Counsellors." },
     { id: "outcome", met: true, note: "A minute saved per note." },
   ],
   draft: { description: "As a counsellor, …", productGoal: "Scribe", effort: "s" },
   readinessToken: "signed-token",
+  brief: BRIEF,
 });
+
+const renderDrawer = (
+  props: Partial<React.ComponentProps<typeof OpportunityInterviewDrawer>> = {},
+) =>
+  render(
+    <OpportunityInterviewDrawer
+      onClose={vi.fn()}
+      onCreated={vi.fn()}
+      onOpenExisting={vi.fn()}
+      {...props}
+    />,
+  );
+
+const answer = (text: string) => {
+  fireEvent.change(screen.getByRole("textbox"), { target: { value: text } });
+  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+};
 
 describe("OpportunityInterviewDrawer", () => {
   beforeEach(() => {
-    takeTurn.mockReset();
+    runTurn.mockReset();
     createOpportunity.mockReset();
     checkDuplicates.mockReset();
     checkDuplicates.mockResolvedValue({ matches: [] });
   });
 
-  it("opens the interview itself, with no transcript, so the agent writes the first question", async () => {
-    // The alternative — a hardcoded greeting in the drawer — drifts from the prompt the moment
-    // the interview's opening changes, and nobody notices because both look fine alone.
-    takeTurn.mockResolvedValue(turn());
-    render(
-      <OpportunityInterviewDrawer onClose={vi.fn()} onCreated={vi.fn()} onOpenExisting={vi.fn()} />,
-    );
+  it("opens the conversation itself, with no transcript, so the copilot writes the first line", async () => {
+    // A hardcoded greeting in the drawer would drift from the prompt the moment its opening
+    // changed, and nobody would notice because both look fine alone.
+    runTurn.mockResolvedValue(turn());
+    renderDrawer();
 
-    await waitFor(() => expect(takeTurn).toHaveBeenCalledWith({ messages: [] }));
+    await waitFor(() => expect(runTurn).toHaveBeenCalledWith({ messages: [], brief: null }));
     expect(await screen.findByText("Who is this for?")).toBeInTheDocument();
   });
 
   it("fires the opening turn exactly once", async () => {
-    // React's development double-invoke would otherwise open two interviews, and the admin would
-    // read two different first questions.
-    takeTurn.mockResolvedValue(turn());
-    render(
-      <OpportunityInterviewDrawer onClose={vi.fn()} onCreated={vi.fn()} onOpenExisting={vi.fn()} />,
-    );
+    runTurn.mockResolvedValue(turn());
+    renderDrawer();
 
-    await waitFor(() => expect(takeTurn).toHaveBeenCalled());
-    expect(takeTurn).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(runTurn).toHaveBeenCalled());
+    expect(runTurn).toHaveBeenCalledTimes(1);
   });
 
-  it("sends the whole transcript each turn, since the server keeps none of it", async () => {
-    takeTurn.mockResolvedValue(turn());
-    render(
-      <OpportunityInterviewDrawer onClose={vi.fn()} onCreated={vi.fn()} onOpenExisting={vi.fn()} />,
-    );
-    await waitFor(() => expect(takeTurn).toHaveBeenCalledTimes(1));
+  it("sends the whole transcript and the last brief each turn, since the server keeps neither", async () => {
+    runTurn.mockResolvedValueOnce(turn({ brief: BRIEF })).mockResolvedValueOnce(turn());
+    renderDrawer();
+    await waitFor(() => expect(runTurn).toHaveBeenCalledTimes(1));
 
-    fireEvent.change(screen.getByPlaceholderText("Type your answer…"), {
-      target: { value: "Counsellors on the helpline." },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    answer("Counsellors on the helpline.");
 
     await waitFor(() =>
-      expect(takeTurn).toHaveBeenLastCalledWith({
+      expect(runTurn).toHaveBeenLastCalledWith({
         messages: [
           { role: "agent", content: "Who is this for?" },
           { role: "admin", content: "Counsellors on the helpline." },
         ],
+        brief: BRIEF,
       }),
     );
   });
 
   it("keeps the admin's words on screen when a turn fails, and retries the same transcript", async () => {
-    // Re-typing an answer because the model timed out is the fastest way to lose someone.
-    takeTurn.mockResolvedValueOnce(turn()).mockRejectedValueOnce(new Error("boom"));
-    render(
-      <OpportunityInterviewDrawer onClose={vi.fn()} onCreated={vi.fn()} onOpenExisting={vi.fn()} />,
-    );
-    await waitFor(() => expect(takeTurn).toHaveBeenCalledTimes(1));
+    runTurn
+      .mockResolvedValueOnce(turn())
+      .mockRejectedValueOnce(new Error("That answer did not go through."));
+    renderDrawer();
+    await waitFor(() => expect(runTurn).toHaveBeenCalledTimes(1));
 
-    fireEvent.change(screen.getByPlaceholderText("Type your answer…"), {
-      target: { value: "Counsellors." },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    answer("Counsellors.");
 
     expect(await screen.findByText(/did not go through/)).toBeInTheDocument();
     expect(screen.getByText("Counsellors.")).toBeInTheDocument();
 
-    takeTurn.mockResolvedValueOnce(turn());
+    runTurn.mockResolvedValueOnce(turn());
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
 
     await waitFor(() =>
-      expect(takeTurn).toHaveBeenLastCalledWith({
+      expect(runTurn).toHaveBeenLastCalledWith({
         messages: [
           { role: "agent", content: "Who is this for?" },
           { role: "admin", content: "Counsellors." },
         ],
+        brief: null,
       }),
     );
   });
 
   it("shows each criterion's live verdict and how many are met", async () => {
-    takeTurn.mockResolvedValue(readyTurn);
-    render(
-      <OpportunityInterviewDrawer onClose={vi.fn()} onCreated={vi.fn()} onOpenExisting={vi.fn()} />,
-    );
+    runTurn.mockResolvedValue(readyTurn);
+    renderDrawer();
 
     expect(await screen.findByText("2 of 2")).toBeInTheDocument();
     expect(screen.getAllByTestId("met")).toHaveLength(2);
-    // The agent's note, not the static hint — mid-interview "Counsellors." is worth more.
     expect(screen.getByText("Counsellors.")).toBeInTheDocument();
   });
 
-  it("files with the interview's own token and hands the id to the page", async () => {
-    // The token is signed over this exact description, which is why the panel is read-only.
-    takeTurn.mockResolvedValue(readyTurn);
+  it("keeps what the copilot looked up with the answer it informed", async () => {
+    runTurn.mockResolvedValue({
+      ...turn({ reply: "OPP-0714 already covers this — what does it miss?" }),
+      activity: [
+        { id: "a", label: 'Searching the roadmap for "names"', summary: "2 related", ok: true },
+        { id: "b", label: "Asking analytics: how many", summary: "Couldn't check", ok: false },
+      ],
+    });
+    renderDrawer();
+
+    expect(await screen.findByText("Looked at 2 things")).toBeInTheDocument();
+    expect(screen.getByText('Searching the roadmap for "names"')).toBeInTheDocument();
+  });
+
+  it("shows the case so far: the copilot's assessment and what would make it stronger", async () => {
+    runTurn.mockResolvedValue(readyTurn);
+    renderDrawer();
+
+    expect(await screen.findByText("Promising")).toBeInTheDocument();
+    expect(screen.getByText("Ways to make it stronger")).toBeInTheDocument();
+    expect(screen.getByText("Measure today's time-to-note.")).toBeInTheDocument();
+    expect(screen.getByText("Cut time-to-first-value")).toBeInTheDocument();
+  });
+
+  /**
+   * The copilot advises; it does not block. Once the five are met the draft is fileable whatever
+   * the copilot rates it — and the conversation stays open, because it keeps suggesting.
+   */
+  it("lets the admin file a draft the copilot does not yet rate strong, or keep talking", async () => {
+    runTurn.mockResolvedValue(readyTurn);
+    renderDrawer();
+
+    expect(await screen.findByRole("button", { name: "File and review" })).toBeEnabled();
+    expect(screen.getByRole("textbox")).toBeInTheDocument();
+    expect(screen.getByText(/Ready to file/)).toBeInTheDocument();
+  });
+
+  it("files with the copilot's own token and brief, and hands the id to the page", async () => {
+    // Both are signed together, which is why neither is editable here.
+    runTurn.mockResolvedValue(readyTurn);
     createOpportunity.mockResolvedValue({ id: "opp-1" });
     const onCreated = vi.fn();
-    render(
-      <OpportunityInterviewDrawer
-        onClose={vi.fn()}
-        onCreated={onCreated}
-        onOpenExisting={vi.fn()}
-      />,
-    );
+    renderDrawer({ onCreated });
 
     fireEvent.click(await screen.findByRole("button", { name: "File and review" }));
 
@@ -204,24 +259,30 @@ describe("OpportunityInterviewDrawer", () => {
         productGoal: "Scribe",
         effort: "s",
         readinessToken: "signed-token",
+        brief: BRIEF,
       }),
     );
     expect(onCreated).toHaveBeenCalledWith("opp-1");
   });
 
+  it("files without a brief when the copilot produced none", async () => {
+    runTurn.mockResolvedValue(turn({ ...readyTurn.turn, brief: null }));
+    createOpportunity.mockResolvedValue({ id: "opp-1" });
+    renderDrawer();
+
+    fireEvent.click(await screen.findByRole("button", { name: "File and review" }));
+
+    await waitFor(() => expect(createOpportunity).toHaveBeenCalled());
+    expect(createOpportunity.mock.calls[0][0]).not.toHaveProperty("brief");
+  });
+
   it("checks the draft for duplicates, and not the answers that led to it", async () => {
-    // Answers are fragments that match on vocabulary; the draft is what would land on the board.
-    takeTurn.mockResolvedValueOnce(turn()).mockResolvedValueOnce(readyTurn);
-    render(
-      <OpportunityInterviewDrawer onClose={vi.fn()} onCreated={vi.fn()} onOpenExisting={vi.fn()} />,
-    );
-    await waitFor(() => expect(takeTurn).toHaveBeenCalledTimes(1));
+    runTurn.mockResolvedValueOnce(turn()).mockResolvedValueOnce(readyTurn);
+    renderDrawer();
+    await waitFor(() => expect(runTurn).toHaveBeenCalledTimes(1));
     expect(checkDuplicates).not.toHaveBeenCalled();
 
-    fireEvent.change(screen.getByPlaceholderText("Type your answer…"), {
-      target: { value: "Counsellors." },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    answer("Counsellors.");
 
     await waitFor(() =>
       expect(checkDuplicates).toHaveBeenCalledWith({
@@ -233,7 +294,7 @@ describe("OpportunityInterviewDrawer", () => {
   });
 
   it("offers an existing match to upvote instead of filing a second copy", async () => {
-    takeTurn.mockResolvedValue(readyTurn);
+    runTurn.mockResolvedValue(readyTurn);
     checkDuplicates.mockResolvedValue({
       matches: [
         {
@@ -247,35 +308,20 @@ describe("OpportunityInterviewDrawer", () => {
       ],
     });
     const onOpenExisting = vi.fn();
-    render(
-      <OpportunityInterviewDrawer
-        onClose={vi.fn()}
-        onCreated={vi.fn()}
-        onOpenExisting={onOpenExisting}
-      />,
-    );
+    renderDrawer({ onOpenExisting });
 
     expect(await screen.findByText("This may already exist")).toBeInTheDocument();
-    expect(screen.getByText("Same user group and outcome.")).toBeInTheDocument();
-
     fireEvent.click(screen.getByRole("button", { name: "Upvote this instead →" }));
     expect(onOpenExisting).toHaveBeenCalledWith("opp-9");
     expect(createOpportunity).not.toHaveBeenCalled();
   });
 
   it("still files when the duplicate check fails", async () => {
-    // Best-effort by contract: a dead vector service must not stop anyone filing an idea.
-    takeTurn.mockResolvedValue(readyTurn);
+    runTurn.mockResolvedValue(readyTurn);
     checkDuplicates.mockRejectedValue(new Error("ally-ai down"));
     createOpportunity.mockResolvedValue({ id: "opp-1" });
     const onCreated = vi.fn();
-    render(
-      <OpportunityInterviewDrawer
-        onClose={vi.fn()}
-        onCreated={onCreated}
-        onOpenExisting={vi.fn()}
-      />,
-    );
+    renderDrawer({ onCreated });
 
     await waitFor(() => expect(checkDuplicates).toHaveBeenCalled());
     expect(screen.queryByText("This may already exist")).not.toBeInTheDocument();
@@ -285,32 +331,24 @@ describe("OpportunityInterviewDrawer", () => {
   });
 
   it('is titled plainly "New opportunity" — it is the only way to file one', async () => {
-    takeTurn.mockResolvedValue(turn());
-    render(
-      <OpportunityInterviewDrawer onClose={vi.fn()} onCreated={vi.fn()} onOpenExisting={vi.fn()} />,
-    );
+    runTurn.mockResolvedValue(turn());
+    renderDrawer();
 
     expect(screen.getByRole("heading", { name: "New opportunity" })).toBeInTheDocument();
-    await waitFor(() => expect(takeTurn).toHaveBeenCalled());
+    await waitFor(() => expect(runTurn).toHaveBeenCalled());
   });
 
-  it("asks before discarding answers, because nothing about the interview is saved", async () => {
-    takeTurn.mockResolvedValue(turn());
+  it("asks before discarding answers, because nothing about the conversation is saved", async () => {
+    runTurn.mockResolvedValue(turn());
     const onClose = vi.fn();
-    render(
-      <OpportunityInterviewDrawer onClose={onClose} onCreated={vi.fn()} onOpenExisting={vi.fn()} />,
-    );
-    await waitFor(() => expect(takeTurn).toHaveBeenCalledTimes(1));
+    renderDrawer({ onClose });
+    await waitFor(() => expect(runTurn).toHaveBeenCalledTimes(1));
 
-    fireEvent.change(screen.getByPlaceholderText("Type your answer…"), {
-      target: { value: "Counsellors." },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Send" }));
-    await waitFor(() => expect(takeTurn).toHaveBeenCalledTimes(2));
+    answer("Counsellors.");
+    await waitFor(() => expect(runTurn).toHaveBeenCalledTimes(2));
 
     fireEvent.click(screen.getByLabelText("Close"));
-
-    expect(screen.getByText("Leave this interview?")).toBeInTheDocument();
+    expect(screen.getByText("Leave this conversation?")).toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: "Discard" }));
@@ -318,16 +356,14 @@ describe("OpportunityInterviewDrawer", () => {
   });
 
   it("closes without asking when nothing has been answered", async () => {
-    takeTurn.mockResolvedValue(turn());
+    runTurn.mockResolvedValue(turn());
     const onClose = vi.fn();
-    render(
-      <OpportunityInterviewDrawer onClose={onClose} onCreated={vi.fn()} onOpenExisting={vi.fn()} />,
-    );
-    await waitFor(() => expect(takeTurn).toHaveBeenCalledTimes(1));
+    renderDrawer({ onClose });
+    await waitFor(() => expect(runTurn).toHaveBeenCalledTimes(1));
 
     fireEvent.click(screen.getByLabelText("Close"));
 
     expect(onClose).toHaveBeenCalled();
-    expect(screen.queryByText("Leave this interview?")).not.toBeInTheDocument();
+    expect(screen.queryByText("Leave this conversation?")).not.toBeInTheDocument();
   });
 });

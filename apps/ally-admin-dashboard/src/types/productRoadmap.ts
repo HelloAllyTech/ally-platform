@@ -130,6 +130,8 @@ export interface RoadmapOpportunity {
    * `[]` rather than null, so no caller has to handle both.
    */
   referenceImages: RoadmapReferenceImage[];
+  /** Whether the copilot filed a brief with it — fetch it with getRoadmapOpportunityBrief. */
+  hasBrief?: boolean;
   /**
    * The Builder session started from this opportunity, or null.
    *
@@ -426,6 +428,65 @@ export interface RoadmapInterviewTurn {
   draft: RoadmapInterviewDraft | null;
   /** Hand back as `readinessToken` when filing the draft. Null unless `draft` is set. */
   readinessToken: string | null;
+  /**
+   * The copilot's working brief. Send it back unchanged on the next turn, and with the draft
+   * when filing — the token is minted over it. Null until there is anything in it.
+   */
+  brief?: RoadmapOpportunityBrief | null;
+}
+
+/** The copilot's verdict on how strong the case is. Three words, never a score. */
+export type RoadmapBriefRating = "needs_work" | "promising" | "strong";
+
+export type RoadmapBriefEvidenceSource =
+  | "admin"
+  | "analytics"
+  | "ux_signals"
+  | "bug_findings"
+  | "user_interviews"
+  | "roadmap"
+  | "codebase"
+  | "wiki"
+  | "stacks"
+  | "strategy";
+
+/**
+ * The case behind an opportunity, as the copilot built it with the filer: strategic fit, reach,
+ * evidence with sources, how we would know it worked, what has to be true, what was dropped,
+ * and its assessment. Filed with the opportunity and never edited afterwards.
+ */
+export interface RoadmapOpportunityBrief {
+  strategicFit: { goal: string; why: string }[];
+  reach: { howMany: string | null; howOften: string | null };
+  evidence: { source: RoadmapBriefEvidenceSource; claim: string; ref: string | null }[];
+  successMetric: string | null;
+  assumptions: string[];
+  alternativesDropped: string[];
+  assessment: {
+    rating: RoadmapBriefRating;
+    summary: string;
+    openRecommendations: string[];
+  };
+}
+
+/** One research lookup the copilot ran during a turn, as the activity feed shows it. */
+export interface RoadmapCopilotActivity {
+  id: string;
+  label: string;
+  /** Null while it is still running. */
+  summary: string | null;
+  ok: boolean | null;
+}
+
+/** The roadmap's Vision & strategy page. Every field is a string, empty when unwritten. */
+export interface RoadmapStrategyContext {
+  vision: string;
+  audience: string;
+  bets: string;
+  nonGoals: string;
+  metrics: string;
+  updatedAt: string | null;
+  updatedByName: string | null;
 }
 
 /** One admin's vote total on one opportunity, across every period. Highest votes first. */

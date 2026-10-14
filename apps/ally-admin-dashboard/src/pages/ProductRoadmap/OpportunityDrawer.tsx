@@ -16,6 +16,7 @@ import {
   useUpdateRoadmapOpportunityMutation,
   useOpenRoadmapBuilderSessionMutation,
   useGetRoadmapGoalImpactQuery,
+  useGetRoadmapOpportunityBriefQuery,
   useReassessRoadmapGoalImpactMutation,
 } from "@api";
 import { ActionConfirmationPopup, Button } from "@components";
@@ -33,6 +34,7 @@ import {
 } from "@types";
 import { hasFeature } from "@utils";
 
+import { CopilotBrief } from "./CopilotBrief";
 import { RankBreakdownPanel } from "./RankBreakdown";
 import { ReferenceImagesField } from "./ReferenceImagesField";
 import { AllocationTarget, useSetVotes } from "./useSetVotes";
@@ -247,6 +249,15 @@ export const OpportunityDrawer: React.FC<OpportunityDrawerProps> = ({
     { skip: !opportunity || isBug },
   );
   const [reassessGoalImpact, { isLoading: isReassessing }] = useReassessRoadmapGoalImpactMutation();
+
+  /**
+   * The copilot's brief, fetched only for an opportunity that has one. It does not ride on the
+   * opportunity itself — every board card would pay for it — so this is the one read for it.
+   */
+  const { data: briefData, isLoading: isBriefLoading } = useGetRoadmapOpportunityBriefQuery(
+    opportunityId,
+    { skip: !opportunity?.hasBrief },
+  );
 
   /**
    * Re-run the assessment against the CURRENT description. This is the only correction path for
@@ -933,6 +944,34 @@ export const OpportunityDrawer: React.FC<OpportunityDrawerProps> = ({
                   isReassessing={isReassessing}
                   onReassess={handleReassess}
                 />
+              </div>
+            )}
+
+            {/*
+              The case for it: the copilot's brief, as filed. Under the rank breakdown because
+              both answer "why should this be done" — one with the board's numbers, one with the
+              strategy, evidence and assumptions the filer and the copilot worked out.
+
+              Read-only for everyone, managers included: it is a record of the case made at
+              filing, signed into the readiness token, and editing it afterwards would let a filer
+              rewrite the copilot's assessment. The description above can move on; this says so.
+            */}
+            {opportunity.hasBrief && (
+              <div className="border-border-light flex flex-col gap-2 border-t pt-4">
+                <h3 className="text-typography-primary text-sm">The case for it</h3>
+                <p className="text-typography-secondary text-xs">
+                  Built by the opportunity copilot with the filer, as it stood when this was filed.
+                  Later edits to the description above are not reflected here.
+                </p>
+                {isBriefLoading ? (
+                  <SkeletonText paragraph lineCount={4} />
+                ) : briefData?.brief ? (
+                  <CopilotBrief brief={briefData.brief} variant="filed" />
+                ) : (
+                  <p className="text-typography-secondary text-xs">
+                    The brief could not be loaded.
+                  </p>
+                )}
               </div>
             )}
 

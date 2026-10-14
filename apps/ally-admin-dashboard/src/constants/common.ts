@@ -340,6 +340,8 @@ export const ApiEndpoints = {
     REFERENCE_IMAGE_UPLOAD_URL: "/v1/product-roadmap/reference-images/upload-url",
     OPPORTUNITY_COMMENTS: (id: string) => `/v1/product-roadmap/opportunities/${id}/comments`,
     OPPORTUNITY_VOTERS: (id: string) => `/v1/product-roadmap/opportunities/${id}/voters`,
+    /** The copilot's brief, as filed. Fetched by the drawer only when `hasBrief` is true. */
+    OPPORTUNITY_BRIEF: (id: string) => `/v1/product-roadmap/opportunities/${id}/brief`,
     COMMENT_BY_ID: (id: string) => `/v1/product-roadmap/comments/${id}`,
     BOARD: "/v1/product-roadmap/board",
     BOARD_LANE: "/v1/product-roadmap/board/lane",
@@ -357,6 +359,8 @@ export const ApiEndpoints = {
     STRATEGY_GOALS_ORDER: "/v1/product-roadmap/strategy-goals/order",
     STRATEGY_GOALS_ASSESS_MISSING: "/v1/product-roadmap/strategy-goals/assess-missing",
     RANK_WEIGHTS: "/v1/product-roadmap/rank-weights",
+    /** The Vision & strategy page the opportunity copilot reads on every turn. */
+    STRATEGY_CONTEXT: "/v1/product-roadmap/strategy-context",
     OPPORTUNITY_GOAL_IMPACT: (id: string) => `/v1/product-roadmap/opportunities/${id}/goal-impact`,
     OWNERS: "/v1/product-roadmap/opportunity-owners",
     OWNERS_ELIGIBLE: "/v1/product-roadmap/opportunity-owners/eligible",
@@ -373,8 +377,11 @@ export const ApiEndpoints = {
     AI_DUPLICATES: "/v1/product-roadmap/ai/duplicates",
     AI_CLASSIFY: "/v1/product-roadmap/ai/classify",
     AI_SUMMARISE: "/v1/product-roadmap/ai/summarise",
-    /** One turn of the guided interview. Stateless — the whole conversation goes with each call. */
-    AI_OPPORTUNITY_INTERVIEW: "/v1/product-roadmap/ai/opportunity-interview",
+    /**
+     * One turn of the opportunity copilot, as Server-Sent Events — research progress, then the
+     * turn. Stateless: the whole conversation and the previous brief go with each call.
+     */
+    AI_OPPORTUNITY_INTERVIEW_STREAM: "/v1/product-roadmap/ai/opportunity-interview/stream",
     /**
      * Open or resume the Builder session for an opportunity. Replaced
      * AI_GENERATE_CLAUDE_PROMPT, whose output a human pasted into a terminal by hand.
@@ -944,6 +951,7 @@ export const TAG_TYPES = {
   PRODUCT_ROADMAP_GOALS: "productRoadmapGoals",
   PRODUCT_ROADMAP_STRATEGY_GOALS: "productRoadmapStrategyGoals",
   PRODUCT_ROADMAP_RANK_WEIGHTS: "productRoadmapRankWeights",
+  PRODUCT_ROADMAP_STRATEGY_CONTEXT: "productRoadmapStrategyContext",
   PRODUCT_ROADMAP_GOAL_IMPACT: "productRoadmapGoalImpact",
   PRODUCT_ROADMAP_OWNERS: "productRoadmapOwners",
   PRODUCT_ROADMAP_COMMENTS: "productRoadmapComments",
