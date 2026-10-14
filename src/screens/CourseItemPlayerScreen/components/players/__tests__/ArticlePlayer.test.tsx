@@ -1,9 +1,26 @@
 import React from 'react';
+import {Linking} from 'react-native';
 import {fireEvent, render, waitFor} from '@testing-library/react-native';
 
 import {TrackItemType} from '@/types';
 
 import {ArticlePlayer} from '../ArticlePlayer';
+
+jest.mock('@/components/BottomSheet', () => {
+  const RN = require('react-native');
+  return {
+    BottomSheet: ({visible, children}: any) =>
+      visible ? <RN.View testID="bottom-sheet">{children}</RN.View> : null,
+  };
+});
+
+jest.mock('react-native-webview', () => {
+  const RN = require('react-native');
+  return {
+    __esModule: true,
+    default: (props: any) => <RN.View testID={props.testID} />,
+  };
+});
 
 jest.mock('@/hooks', () => ({
   useTranslate: jest.fn(() => ({
@@ -117,5 +134,85 @@ describe('ArticlePlayer', () => {
     );
     expect(queryByTestId('article-mark-read')).toBeNull();
     expect(getByText('courses.article.read')).toBeTruthy();
+  });
+
+  describe('resources', () => {
+    const resource = {
+      id: 'r1',
+      title: 'Mental Health First Aid Guide',
+      url: 'https://example.com/guide',
+    };
+
+    it('renders a resource row and opens the in-app sheet on press', () => {
+      const {getByText, getByTestId} = render(
+        <ArticlePlayer
+          payload={{...buildPayload(), resources: [resource]}}
+          itemId="item-1"
+          alreadyCompleted={false}
+          onCompleted={jest.fn()}
+        />,
+      );
+
+      fireEvent.press(getByText(resource.title));
+
+      expect(getByTestId('bottom-sheet')).toBeTruthy();
+      expect(getByTestId('external-resource-webview')).toBeTruthy();
+    });
+
+    it('opens a document-extension link with the OS instead of the in-app sheet', () => {
+      const openUrlSpy = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+      const pdfResource = {...resource, url: 'https://example.com/guide.pdf'};
+      const {getByText, queryByTestId} = render(
+        <ArticlePlayer
+          payload={{...buildPayload(), resources: [pdfResource]}}
+          itemId="item-1"
+          alreadyCompleted={false}
+          onCompleted={jest.fn()}
+        />,
+      );
+
+      fireEvent.press(getByText(pdfResource.title));
+
+      expect(openUrlSpy).toHaveBeenCalledWith(pdfResource.url);
+      expect(queryByTestId('bottom-sheet')).toBeNull();
+      openUrlSpy.mockRestore();
+    });
+
+    it('does not require scrolling past the Resources section to mark the article read', () => {
+      const {getByTestId} = render(
+        <ArticlePlayer
+          payload={{...buildPayload(), resources: [resource]}}
+          itemId="item-1"
+          alreadyCompleted={false}
+          onCompleted={jest.fn()}
+        />,
+      );
+
+      // Scroll position lands right at the end of the (short) article body,
+      // well short of 95% of the total content (article + resources) height —
+      // if Resources counted toward the completion threshold this would still
+      // be disabled.
+      fireEvent(getByTestId('article-scroll'), 'scroll', {
+        nativeEvent: {
+          contentOffset: {y: 40},
+          contentSize: {height: 400},
+          layoutMeasurement: {height: 40},
+        },
+      });
+      fireEvent(getByTestId('article-end-sentinel'), 'layout', {
+        nativeEvent: {layout: {y: 50, height: 1, x: 0, width: 0}},
+      });
+      fireEvent(getByTestId('article-scroll'), 'scroll', {
+        nativeEvent: {
+          contentOffset: {y: 40},
+          contentSize: {height: 400},
+          layoutMeasurement: {height: 40},
+        },
+      });
+
+      expect(getByTestId('article-mark-read').props.accessibilityState?.disabled).not.toBe(
+        true,
+      );
+    });
   });
 });

@@ -1,13 +1,6 @@
 import React, {useState} from 'react';
-import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import {ActivityIndicator, Text, TouchableOpacity, View} from 'react-native';
+import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {Button} from '@/components/Button';
@@ -26,8 +19,6 @@ import {getErrorDetails} from '@/utils/error';
 
 import {DiscussionPost} from '../DiscussionPost';
 import {PostInput} from '../PostInput';
-
-const isIOS = Platform.OS === 'ios';
 
 export interface DiscussionThreadProps {
   itemId: string;
@@ -141,7 +132,11 @@ export const DiscussionThread: React.FC<DiscussionThreadProps> = ({
           />
         </View>
       ) : (
-        <ScrollView style={styles.list} testID="discussion-post-list">
+        <KeyboardAwareScrollView
+          style={styles.flex}
+          contentContainerStyle={styles.listContent}
+          keyboardShouldPersistTaps="handled"
+          testID="keyboard-aware-scroll-view">
           {(data?.posts.length ?? 0) === 0 ? (
             <View style={styles.emptyState} testID="discussion-empty-state">
               <Text style={styles.emptyTitle}>
@@ -174,36 +169,34 @@ export const DiscussionThread: React.FC<DiscussionThreadProps> = ({
               color={colors.ds.theme.primary}
             />
           ) : null}
-        </ScrollView>
+
+          {mutationError ? (
+            <Text
+              style={styles.mutationError}
+              testID="discussion-mutation-error">
+              {mutationError}
+            </Text>
+          ) : null}
+
+          {data && !isLoading && !isError ? (
+            data.isLocked ? (
+              <Text style={styles.lockedNote} testID="discussion-locked-note">
+                {t('courses.discussion.discussionLocked')}
+              </Text>
+            ) : data.viewer.canPost ? (
+              <PostInput
+                testID="discussion-composer"
+                value={draft}
+                onChangeText={setDraft}
+                onSubmit={handleSubmitPost}
+                maxLength={data.viewer.maxLength}
+                isSubmitting={isPosting}
+                submitLabel={t('courses.discussion.post')}
+              />
+            ) : null
+          ) : null}
+        </KeyboardAwareScrollView>
       )}
-
-      {mutationError ? (
-        <Text style={styles.mutationError} testID="discussion-mutation-error">
-          {mutationError}
-        </Text>
-      ) : null}
-
-      {data && !isLoading && !isError ? (
-        data.isLocked ? (
-          <Text style={styles.lockedNote} testID="discussion-locked-note">
-            {t('courses.discussion.discussionLocked')}
-          </Text>
-        ) : data.viewer.canPost ? (
-          <KeyboardAvoidingView
-            behavior={isIOS ? 'padding' : undefined}
-            keyboardVerticalOffset={isIOS ? 80 : 0}>
-            <PostInput
-              testID="discussion-composer"
-              value={draft}
-              onChangeText={setDraft}
-              onSubmit={handleSubmitPost}
-              maxLength={data.viewer.maxLength}
-              isSubmitting={isPosting}
-              submitLabel={t('courses.discussion.post')}
-            />
-          </KeyboardAvoidingView>
-        ) : null
-      ) : null}
     </View>
   );
 };
@@ -216,6 +209,9 @@ const styles = ScaledSheet.create({
     paddingTop: '12@mvs',
     paddingBottom: '12@mvs',
     gap: '8@mvs',
+  },
+  flex: {
+    flex: 1,
   },
   headerRow: {
     flexDirection: 'row',
@@ -243,8 +239,8 @@ const styles = ScaledSheet.create({
     color: colors.ds.typography.mediumEmphasis,
     textAlign: 'center',
   },
-  list: {
-    maxHeight: '260@vs',
+  listContent: {
+    flexGrow: 1,
   },
   emptyState: {
     paddingVertical: '20@mvs',
