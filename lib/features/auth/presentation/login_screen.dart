@@ -1,5 +1,4 @@
-import 'dart:io';
-
+import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -45,7 +44,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     super.initState();
     if (AppConfig.googleWebClientId.isNotEmpty) {
       _googleInitFuture = GoogleSignIn.instance.initialize(
-        clientId: Platform.isIOS && AppConfig.googleIosClientId.isNotEmpty
+        clientId: defaultTargetPlatform == TargetPlatform.iOS && AppConfig.googleIosClientId.isNotEmpty
             ? AppConfig.googleIosClientId
             : null,
         serverClientId: AppConfig.googleWebClientId,
@@ -230,7 +229,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   icon: const Icon(Icons.g_mobiledata),
                   label: Text(ref.t('auth.login.google.button')),
                 ),
-                if (Platform.isIOS) ...[
+                if (defaultTargetPlatform == TargetPlatform.iOS) ...[
                   const SizedBox(height: 8),
                   OutlinedButton.icon(
                     onPressed: _isSubmitting ? null : _signInWithApple,

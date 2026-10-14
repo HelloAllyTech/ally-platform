@@ -1,7 +1,6 @@
-import 'dart:io';
-
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/notifications/data/notifications_repository.dart';
@@ -54,7 +53,10 @@ class PushNotificationService {
     }
   }
 
-  String get _platform => Platform.isIOS ? 'IOS' : 'ANDROID';
+  // `defaultTargetPlatform`, not `dart:io`'s `Platform` — the latter throws
+  // `UnsupportedError` on web (no OS concept in a browser), and this getter
+  // needs to stay callable on every target this app builds for.
+  String get _platform => defaultTargetPlatform == TargetPlatform.iOS ? 'IOS' : 'ANDROID';
 }
 
 final pushNotificationServiceProvider = Provider<PushNotificationService>((ref) {
