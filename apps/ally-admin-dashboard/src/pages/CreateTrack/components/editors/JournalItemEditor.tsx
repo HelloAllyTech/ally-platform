@@ -92,7 +92,7 @@ export const JournalItemEditor: FC<JournalItemEditorProps> = ({
                 name={`${promptBase}.promptHtml`}
                 render={({ field: promptField }) => (
                   <RichTextEditor
-                    value={field.value ?? fields[promptIndex].prompt ?? ""}
+                    value={promptField.value ?? field.prompt ?? ""}
                     onChange={html => {
                       promptField.onChange(html);
                       setValue(`${promptBase}.prompt`, htmlToPlainText(html), {

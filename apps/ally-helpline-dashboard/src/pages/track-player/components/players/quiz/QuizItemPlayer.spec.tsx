@@ -16,7 +16,7 @@ vi.mock("react-i18next", () => ({
 }));
 
 vi.mock("@ally-ui-mono/ui-shared", () => ({
-  RichTextRenderer: ({ html }: { html: string }) => <div data-testid="rich-text">{html}</div>,
+  RichTextRenderer: ({ content }: { content: string }) => <div data-testid="rich-text">{content}</div>,
 }));
 
 vi.mock("../QuestionMedia", () => ({

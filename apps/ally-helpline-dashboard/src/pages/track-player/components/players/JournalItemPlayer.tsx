@@ -156,7 +156,7 @@ export const JournalItemPlayer: FC<JournalItemPlayerProps> = ({
                 <div className="flex flex-col gap-1 pt-1">
                   <div className="text-base font-medium leading-relaxed text-typography-900">
                     {prompt.promptHtml ? (
-                      <RichTextRenderer html={prompt.promptHtml} />
+                      <RichTextRenderer content={prompt.promptHtml} />
                     ) : (
                       prompt.prompt
                     )}

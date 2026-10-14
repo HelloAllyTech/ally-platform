@@ -659,7 +659,7 @@ const FieldGroup: FC<FieldGroupProps> = ({
                 </div>
                 {field.kind === "HTML" ? (
                   <div className="prose prose-sm max-w-none text-xs text-typography-600 border border-border-light rounded p-2 bg-gray-50/30">
-                    <RichTextRenderer html={field.english} />
+                    <RichTextRenderer content={field.english} />
                   </div>
                 ) : (
                   <p className="whitespace-pre-wrap text-xs text-typography-600">

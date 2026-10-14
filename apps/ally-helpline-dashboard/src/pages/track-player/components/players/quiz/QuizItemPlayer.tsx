@@ -309,7 +309,7 @@ export const QuizItemPlayer: FC<QuizItemPlayerProps> = ({
               )}
               <h2 className="mb-4 text-lg font-semibold text-typography-900">
                 {question.promptHtml ? (
-                  <RichTextRenderer html={question.promptHtml} />
+                  <RichTextRenderer content={question.promptHtml} />
                 ) : (
                   question.prompt
                 )}
