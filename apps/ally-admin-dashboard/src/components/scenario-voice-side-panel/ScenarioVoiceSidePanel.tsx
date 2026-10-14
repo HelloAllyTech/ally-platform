@@ -22,7 +22,7 @@ import {
   getUnknownConfigKeys,
   isMissingGender,
   getElevenLabsV3Warning,
-  isElevenLabsV3Model,
+  isElevenLabsGenerativeModel,
   VOICE_TYPE_SUMMARY,
   isSupportedProvider,
   readConfigField,
@@ -366,12 +366,12 @@ export const ScenarioVoiceSidePanel: React.FC<ScenarioVoiceSidePanelProps> = ({
    * fall back on voice type.
    *
    * Read off whichever model string is selected rather than a fixed key,
-   * because "is this a v3 model" is a pattern, not one id.
+   * because "is this a v3/v4 model" is a pattern, not one id.
    */
   const elevenLabsV3Verdict = useMemo(() => {
     if (!isElevenLabsForm) return undefined;
     const model = String(config.model ?? "").trim();
-    if (!model || !isElevenLabsV3Model(model)) return undefined;
+    if (!model || !isElevenLabsGenerativeModel(model)) return undefined;
 
     const source = syncResult?.modelOptions?.length ? syncResult.modelOptions : catalogEntries;
     const entry = source?.find(option => option.value === model);

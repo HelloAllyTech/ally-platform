@@ -192,7 +192,7 @@ export const VOICE_TYPE_SUMMARY: Record<string, { title: string }> = {
   unknown: { title: "How it was created is unclear" },
 };
 
-/** Voice types eleven_v3 can render from. */
+/** Voice types the generative models (eleven_v3, eleven_v4) can render from. */
 const V3_COMPATIBLE_VOICE_TYPES = ["ivc", "voice_design", "premade"];
 
 /** Whether a model string names an ElevenLabs v3 model. */
@@ -200,7 +200,21 @@ export const isElevenLabsV3Model = (model?: string | null): boolean =>
   /v3/i.test(String(model ?? ""));
 
 /**
- * Advisory for an ElevenLabs voice whose training eleven_v3 cannot use.
+ * Whether a model string names one of ElevenLabs' generative families — v3
+ * (eleven_v3, eleven_v3_conversational) or v4 (eleven_v4, eleven_v4_turbo).
+ * Both skip a voice's per-voice training unless ElevenLabs has retrained the
+ * voice for that family, which is what the advisory below is about.
+ */
+export const isElevenLabsGenerativeModel = (model?: string | null): boolean =>
+  /v3|v4/i.test(String(model ?? ""));
+
+/** "v3" or "v4" — the family name the advisory should use for this model. */
+export const elevenLabsModelFamilyLabel = (model?: string | null): "v3" | "v4" =>
+  /v4/i.test(String(model ?? "")) ? "v4" : "v3";
+
+/**
+ * Advisory for an ElevenLabs voice whose training the generative models
+ * (eleven_v3, eleven_v4) cannot use.
  *
  * v3 does not support fine-tuned models, and a Professional clone is one — so it
  * silently renders from the first ~30-90s of training audio and still returns
@@ -217,7 +231,7 @@ export const getElevenLabsV3Warning = (
   provider: string | undefined,
   config: Record<string, any> | undefined,
   /**
-   * ElevenLabs' own verdict on v3 for THIS voice, when ally-be has supplied
+   * ElevenLabs' own verdict on v3/v4 for THIS voice, when ally-be has supplied
    * one: `false` flagged, `null` no objection, `true` their recommendation.
    * `undefined` means we have no verdict — a brand-new voice, or a catalog
    * request that failed — and the voice-type rule below stands in.
@@ -231,9 +245,20 @@ export const getElevenLabsV3Warning = (
   v3Verdict?: boolean | null,
 ): string | null => {
   if (String(provider ?? "").toUpperCase() !== TtsProvider.ELEVENLABS) return null;
-  if (!isElevenLabsV3Model(config?.model)) return null;
+  if (!isElevenLabsGenerativeModel(config?.model)) return null;
 
   if (v3Verdict !== undefined && v3Verdict !== false) return null;
+
+  const family = elevenLabsModelFamilyLabel(config?.model);
+  // v4 is the one family ElevenLabs lets you retrain a custom voice for (from
+  // My Voices in their workspace); v3 never was. Once that retraining exists,
+  // ElevenLabs lists v4 among the voice's models, the verdict above turns
+  // silent, and this note disappears on the next re-check — so the v4 wording
+  // tells the reader that route exists instead of leaving them with a dead end.
+  const v4Remedy =
+    family === "v4"
+      ? ' ElevenLabs can retrain this voice for v4 from its workspace; once that is done, click "Re-check with ElevenLabs" and this note goes away.'
+      : "";
 
   const type = String(config?.voice_type ?? "").trim();
   if (!type) {
@@ -241,13 +266,13 @@ export const getElevenLabsV3Warning = (
     // renamed to "Re-check with ElevenLabs" when it was demoted from a primary
     // button, and these two hints kept pointing at the old name — sending the
     // reader looking for a button that is not on the screen.
-    return 'We do not know how this voice was created, so we cannot say how it will sound on the v3 model. Click "Re-check with ElevenLabs" to check.';
+    return `We do not know how this voice was created, so we cannot say how it will sound on the ${family} model. Click "Re-check with ElevenLabs" to check.`;
   }
   if (type === "unknown") {
-    return "ElevenLabs did not tell us how this voice was created. Check in the ElevenLabs workspace whether it was trained from recordings — if it was, v3 will not sound as close to the original person.";
+    return `ElevenLabs did not tell us how this voice was created. Check in the ElevenLabs workspace whether it was trained from recordings — if it was, ${family} will not sound as close to the original person.${v4Remedy}`;
   }
   if (!V3_COMPATIBLE_VOICE_TYPES.includes(type)) {
-    return "This voice was custom-trained from real recordings. The v3 model cannot use that training — it will still speak, but it will not sound as close to the original person. Listen to it before you use it.";
+    return `This voice was custom-trained from real recordings. The ${family} model cannot use that training — it will still speak, but it will not sound as close to the original person. Listen to it before you use it.${v4Remedy}`;
   }
   return null;
 };
@@ -312,7 +337,7 @@ export const VOICE_CONFIG_SCHEMA: Record<TtsProvider, VoiceConfigField[]> = {
         { value: "premade", label: "ElevenLabs stock voice" },
         { value: "unknown", label: "Unclear — needs checking" },
       ],
-      hint: 'Decides how this voice sounds on the v3 model. Use "Re-check with ElevenLabs" to fill it in rather than guessing.',
+      hint: 'Decides how this voice sounds on the v3 and v4 models. Use "Re-check with ElevenLabs" to fill it in rather than guessing.',
     },
   ],
   [TtsProvider.SARVAM]: [

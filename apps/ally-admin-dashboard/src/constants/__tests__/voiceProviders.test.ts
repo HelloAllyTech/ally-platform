@@ -339,6 +339,43 @@ describe("getElevenLabsV3Warning", () => {
     expect(getElevenLabsV3Warning("ELEVENLABS", config("eleven_flash_v2_5", null))).toBeNull();
   });
 
+  // v4 skips a custom voice's training the same way v3 does, until ElevenLabs
+  // retrains the voice for v4 — and that is the one route out, so the v4 text
+  // names it. Same jargon rules as the v3 messages.
+  it.each(["eleven_v4", "eleven_v4_turbo"])(
+    "warns for a PVC on %s and names the v4 route out",
+    model => {
+      const w = getElevenLabsV3Warning("ELEVENLABS", config(model, "pvc")) ?? "";
+      expect(w).toMatch(/custom-trained from real recordings/i);
+      expect(w).toMatch(/The v4 model cannot use that training/);
+      expect(w).not.toMatch(/\bv3\b/);
+      expect(w).toMatch(/retrain this voice for v4/i);
+      expect(w).toMatch(/Re-check with ElevenLabs/);
+      expect(w).not.toMatch(/\bPVC\b|fine-tun|\brender|eleven_/i);
+    },
+  );
+
+  it("says v4, not v3, when the type is unrecorded on a v4 model", () => {
+    expect(getElevenLabsV3Warning("ELEVENLABS", config("eleven_v4", null))).toMatch(
+      /sound on the v4 model/,
+    );
+  });
+
+  it.each(["ivc", "voice_design", "premade"])("stays silent for %s on v4", type => {
+    expect(getElevenLabsV3Warning("ELEVENLABS", config("eleven_v4", type))).toBeNull();
+  });
+
+  it("keeps the v3 wording free of the v4 route, which v3 does not have", () => {
+    expect(getElevenLabsV3Warning("ELEVENLABS", config("eleven_v3", "pvc"))).not.toMatch(
+      /retrain/i,
+    );
+  });
+
+  it("is silenced on v4 by ElevenLabs' own verdict just like v3", () => {
+    expect(getElevenLabsV3Warning("ELEVENLABS", config("eleven_v4", "pvc"), null)).toBeNull();
+    expect(getElevenLabsV3Warning("ELEVENLABS", config("eleven_v4", "pvc"), false)).not.toBeNull();
+  });
+
   // Only ElevenLabs has a v3, so no other provider's config can trigger this —
   // a stray "v3" in another provider's model string must not produce advice
   // about a model that provider does not have.
