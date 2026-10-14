@@ -42,18 +42,11 @@ const member = (overrides: Partial<TeamMemberDto>): TeamMemberDto => ({
   email: "someone@example.test",
   isListener: false,
   isSupervisor: false,
-  isAdmin: false,
   ...overrides,
 });
 
 const TEAM = [
-  member({
-    userId: 42,
-    name: "Asha Admin",
-    email: "asha@example.test",
-    isAdmin: true,
-    isSupervisor: true,
-  }),
+  member({ userId: 42, name: "Asha Admin", email: "asha@example.test", isSupervisor: true }),
   member({ userId: 7, name: "Meera", email: "meera@example.test", isListener: true }),
   member({ userId: 8, name: "Zoya", email: "zoya@example.test" }),
 ];
@@ -92,19 +85,22 @@ describe("HelplineTeam", () => {
     vi.unstubAllGlobals();
   });
 
-  it("explains who can do what, and fixes an admin's switches", async () => {
+  it("explains who can do what, and switches an admin like anyone else", async () => {
     renderTeam(store);
     expect(screen.getByTestId("team-explainer")).toHaveTextContent(
       "Everything a listener can do, plus: monitors live chats, whispers to listeners",
     );
+    // Asha is the signed-in org admin (roles: ["ADMIN"]) and a supervisor by
+    // grant, not by being an admin — so her Supervisor switch is hers to turn off.
     const admin = await screen.findByTestId("team-row-42");
-    expect(within(admin).getByText("Admin")).toBeInTheDocument();
-    expect(within(admin).getByRole("switch", { name: "Supervisor: Asha Admin" })).toBeDisabled();
-    expect(within(admin).getByRole("switch", { name: "Supervisor: Asha Admin" })).toHaveAttribute(
-      "aria-checked",
-      "true",
-    );
-    expect(within(admin).getByRole("switch", { name: "Listener: Asha Admin" })).toBeDisabled();
+    expect(within(admin).queryByText("Admin")).not.toBeInTheDocument();
+    const supervisor = within(admin).getByRole("switch", { name: "Supervisor: Asha Admin" });
+    expect(supervisor).toBeEnabled();
+    expect(supervisor).toHaveAttribute("aria-checked", "true");
+    // Listener is implied by Supervisor, so it reads on and stays fixed.
+    const listener = within(admin).getByRole("switch", { name: "Listener: Asha Admin" });
+    expect(listener).toBeDisabled();
+    expect(listener).toHaveAttribute("aria-checked", "true");
   });
 
   it("a switch moves at once and stays when the server agrees", async () => {

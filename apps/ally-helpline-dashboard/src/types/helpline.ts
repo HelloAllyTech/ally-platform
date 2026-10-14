@@ -496,7 +496,6 @@ export interface TeamMemberDto {
   email: string;
   isListener: boolean;
   isSupervisor: boolean;
-  isAdmin: boolean;
 }
 
 export interface UpdateTeamMemberBody {

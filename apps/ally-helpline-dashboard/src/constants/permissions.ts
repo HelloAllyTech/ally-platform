@@ -63,8 +63,10 @@ export enum Permissions {
 
   // Text helpline (ally-be docs/text-helpline.md §2). LISTENER holds the first
   // eight; HELPLINE_SUPERVISOR adds monitor/whisper/transfer/qa; tenant ADMIN
-  // adds team. Every one of them is also behind the tenant's
-  // TEXT_HELPLINE_ENABLED toggle on the server — see useCanUseTextHelpline.
+  // holds team alone, which it can only use once it also holds one of those two
+  // groups (Team lives inside the workspace). Every one of them is also behind
+  // the tenant's TEXT_HELPLINE_ENABLED toggle on the server — see
+  // useCanUseTextHelpline.
   VIEW_HELPLINE_LOBBY = "view:helpline:lobby",
   EDIT_HELPLINE_PRESENCE = "edit:helpline:presence",
   EDIT_HELPLINE_CLAIM = "edit:helpline:claim",

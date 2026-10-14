@@ -60,10 +60,6 @@ const MemberRow: FC<{
   const { t } = useTranslation();
   const listener = member.isListener;
   const supervisor = member.isSupervisor;
-  const adminHint = member.isAdmin ? t("helplineWorkspace.team.adminHint") : null;
-  // Supervisor already includes everything a listener can do, so Listener
-  // reads on (and fixed) while Supervisor is on.
-  const listenerViaSupervisor = !member.isAdmin && supervisor;
 
   return (
     <li
@@ -75,27 +71,19 @@ const MemberRow: FC<{
           <span className="min-w-0 max-w-full truncate font-primary text-base font-medium text-typography-900">
             {member.name || member.email}
           </span>
-          {member.isAdmin && (
-            <span className="inline-flex items-center rounded-full bg-status-sandBg px-2 py-0.5 font-primary text-xs text-status-sandFg">
-              {t("helplineWorkspace.team.adminChip")}
-            </span>
-          )}
         </div>
         {member.name && (
           <p className="truncate font-primary text-sm text-typography-700">{member.email}</p>
         )}
       </div>
       <div className="flex flex-wrap items-center gap-5">
-        <WithTooltip
-          label={
-            adminHint ??
-            (listenerViaSupervisor ? t("helplineWorkspace.team.listenerViaSupervisor") : null)
-          }
-        >
+        {/* Supervisor already includes everything a listener can do, so
+            Listener reads on (and fixed) while Supervisor is on. */}
+        <WithTooltip label={supervisor ? t("helplineWorkspace.team.listenerViaSupervisor") : null}>
           <label className="inline-flex min-h-[44px] items-center gap-2 font-primary text-sm text-typography-900 md:min-h-0">
             <Switch
-              checked={member.isAdmin || listener || supervisor}
-              disabled={member.isAdmin || supervisor}
+              checked={listener || supervisor}
+              disabled={supervisor}
               label={t("helplineWorkspace.team.listenerFor", { name: member.name || member.email })}
               onChange={next => onToggle(member, { listener: next, supervisor })}
               testId={`team-listener-${member.userId}`}
@@ -103,20 +91,17 @@ const MemberRow: FC<{
             {t("helplineWorkspace.team.listener")}
           </label>
         </WithTooltip>
-        <WithTooltip label={adminHint}>
-          <label className="inline-flex min-h-[44px] items-center gap-2 font-primary text-sm text-typography-900 md:min-h-0">
-            <Switch
-              checked={member.isAdmin || supervisor}
-              disabled={member.isAdmin}
-              label={t("helplineWorkspace.team.supervisorFor", {
-                name: member.name || member.email,
-              })}
-              onChange={next => onToggle(member, { listener, supervisor: next })}
-              testId={`team-supervisor-${member.userId}`}
-            />
-            {t("helplineWorkspace.team.supervisor")}
-          </label>
-        </WithTooltip>
+        <label className="inline-flex min-h-[44px] items-center gap-2 font-primary text-sm text-typography-900 md:min-h-0">
+          <Switch
+            checked={supervisor}
+            label={t("helplineWorkspace.team.supervisorFor", {
+              name: member.name || member.email,
+            })}
+            onChange={next => onToggle(member, { listener, supervisor: next })}
+            testId={`team-supervisor-${member.userId}`}
+          />
+          {t("helplineWorkspace.team.supervisor")}
+        </label>
       </div>
     </li>
   );
@@ -125,7 +110,8 @@ const MemberRow: FC<{
 /**
  * `/helpline/team` — tenant admins (`edit:helpline:team`) decide who can take
  * chats (Listener) and who also supervises (Supervisor). Exactly those two
- * groups; tenant admins are supervisors by role, so their switches are fixed.
+ * groups. Being an admin grants neither — an admin reaches this page only
+ * once they hold one of them, and their own row switches like anyone else's.
  * Changes apply at once, optimistically, and roll back with a message if the
  * server refuses.
  */
