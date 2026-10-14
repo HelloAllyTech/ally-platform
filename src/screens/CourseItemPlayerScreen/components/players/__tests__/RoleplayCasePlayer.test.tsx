@@ -42,13 +42,41 @@ jest.mock('@/components', () => {
         <RN.Text>{title}</RN.Text>
       </RN.TouchableOpacity>
     ),
+    CustomDropdown: ({value, options, onSelect}: any) => (
+      <RN.View testID="language-dropdown">
+        <RN.Text testID="language-dropdown-value">{value}</RN.Text>
+        {options.map((option: string) => (
+          <RN.TouchableOpacity
+            key={option}
+            testID={`language-option-${option}`}
+            onPress={() => onSelect(option)}>
+            <RN.Text>{option}</RN.Text>
+          </RN.TouchableOpacity>
+        ))}
+      </RN.View>
+    ),
   };
 });
 
+const mockUseGetScenarioByIdQuery = jest.fn();
+
 jest.mock('@/services', () => ({
-  useGetScenarioByIdQuery: jest.fn(() => ({data: {coverImageUrl: 'cover.jpg', description: 'desc', triggerWarnings: []}})),
+  useGetScenarioByIdQuery: (...args: unknown[]) =>
+    mockUseGetScenarioByIdQuery(...args),
   useGetCaseDetailsQuery: jest.fn(() => ({data: undefined})),
 }));
+
+const scenarioDetail = (overrides: Record<string, unknown> = {}) => ({
+  coverImageUrl: 'cover.jpg',
+  description: 'desc',
+  triggerWarnings: [],
+  ...overrides,
+});
+
+const languages = [
+  {language_id: 1, label: 'English', value: 'en', active: true},
+  {language_id: 2, label: 'Hindi', value: 'hi', active: true},
+];
 
 const buildItem = (overrides: Record<string, unknown> = {}) => ({
   id: 'item-1',
@@ -86,7 +114,10 @@ const casePayload = () => ({
 });
 
 describe('RoleplayCasePlayer', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseGetScenarioByIdQuery.mockReturnValue({data: scenarioDetail()});
+  });
 
   it('launching a roleplay stashes the active-track context and starts the simulation', async () => {
     const {getByTestId} = render(
@@ -110,6 +141,55 @@ describe('RoleplayCasePlayer', () => {
       expect(mockStartSimulation).toHaveBeenCalledWith({
         scenarioId: 42,
         trackItemProgressId: 'progress-1',
+      }),
+    );
+  });
+
+  it('shows no language picker when the scenario offers no languages', () => {
+    const {queryByTestId} = render(
+      <RoleplayCasePlayer
+        payload={roleplayPayload()}
+        item={buildItem() as any}
+        trackId="track-1"
+        alreadyCompleted={false}
+      />,
+    );
+
+    expect(queryByTestId('language-dropdown')).toBeNull();
+  });
+
+  it('offers the scenario languages, defaults to the first, and starts in the picked one', async () => {
+    mockUseGetScenarioByIdQuery.mockReturnValue({
+      data: scenarioDetail({availableLanguages: languages}),
+    });
+
+    const {getByTestId} = render(
+      <RoleplayCasePlayer
+        payload={roleplayPayload()}
+        item={buildItem() as any}
+        trackId="track-1"
+        alreadyCompleted={false}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(getByTestId('language-dropdown-value').props.children).toBe(
+        'English',
+      ),
+    );
+
+    fireEvent.press(getByTestId('language-option-Hindi'));
+    expect(getByTestId('language-dropdown-value').props.children).toBe(
+      'Hindi',
+    );
+
+    fireEvent.press(getByTestId('roleplay-case-launch'));
+
+    await waitFor(() =>
+      expect(mockStartSimulation).toHaveBeenCalledWith({
+        scenarioId: 42,
+        trackItemProgressId: 'progress-1',
+        languageId: 2,
       }),
     );
   });

@@ -86,12 +86,26 @@ on:
         required: false
         type: string
         description: 'Base URL of ally-be. Defaults to the ALLY_BE_API_URL variable.'
+      mode:
+        required: false
+        type: string
+        default: "sweep"
+        description: >
+          "sweep" (default) runs the nightly protocol. "pr_review" (OPP-0785)
+          reviews one open pull request on its head, read-only, and files
+          findings linked to it; needs pr_number and a run_id from ally-be.
+          "map" writes Bug Hunter's feature map for this repo, read-only
+          (one card per user-facing feature); needs a run_id from ally-be.
+      pr_number:
+        required: false
+        type: string
+        description: "With mode=pr_review: the pull request to review."
 
 concurrency:
   # One sweep per repo. A cron firing while a human-triggered sweep is still
   # running would put two agents in the same checkout opening PRs for the same
   # findings.
-  group: bug-hunt-sweep-${{ github.repository }}
+  group: bug-hunt-sweep-${{ github.repository }}-${{ inputs.mode || 'sweep' }}-${{ inputs.pr_number || 'all' }}
   cancel-in-progress: false
 
 jobs:
@@ -109,6 +123,18 @@ jobs:
           ref: master
           fetch-depth: 0
           token: ${{ secrets.BUG_HUNTER_GH_TOKEN }}
+
+      - name: Check out the pull request head (PR review)
+        # OPP-0785: a pr_review run reviews an open pull request on ITS head,
+        # not master. Read-only toward the repo: the brief files findings with
+        # Bug Hunter and never pushes, comments or merges.
+        if: inputs.mode == 'pr_review'
+        run: |
+          set -euo pipefail
+          test -n "${{ inputs.pr_number }}" || { echo "::error::mode=pr_review needs pr_number."; exit 1; }
+          git fetch origin "pull/${{ inputs.pr_number }}/head:bug-hunter-pr-review"
+          git checkout bug-hunter-pr-review
+          echo "Reviewing PR #${{ inputs.pr_number }} at $(git rev-parse --short HEAD)."
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -138,6 +164,12 @@ jobs:
           test -n "$API" || { echo "::error::No ally-be base URL — set the ALLY_BE_API_URL variable."; exit 1; }
 
           RUN_ID="${{ inputs.run_id }}"
+          if [ "${{ inputs.mode }}" = "pr_review" ] && [ -z "$RUN_ID" ]; then
+            echo "::error::A PR review run is only ever started by ally-be, which supplies run_id."; exit 1
+          fi
+          if [ "${{ inputs.mode }}" = "map" ] && [ -z "$RUN_ID" ]; then
+            echo "::error::A feature-map run is only ever started by ally-be, which supplies run_id."; exit 1
+          fi
           if [ -z "$RUN_ID" ]; then
             # The scheduled path. ally-be opens the run for a human-triggered
             # sweep so the tab can show it straight away; a cron has to open its
@@ -180,9 +212,16 @@ jobs:
           # ally-be builds the prompt: it embeds this repo's test and lint
           # commands, the live mode (MANUAL stops at pending_approval, AI carries
           # on into Fix), and the merge cap.
+          if [ "${{ inputs.mode }}" = "map" ]; then
+            PROMPT_URL="${{ steps.cfg.outputs.api }}/api/v1/bug-hunter/pipeline/runs/${{ steps.cfg.outputs.run_id }}/feature-map-prompt?repo=${{ steps.cfg.outputs.repo }}"
+          elif [ "${{ inputs.mode }}" = "pr_review" ]; then
+            PROMPT_URL="${{ steps.cfg.outputs.api }}/api/v1/bug-hunter/pipeline/pr-review-prompt?repo=${{ steps.cfg.outputs.repo }}&runId=${{ steps.cfg.outputs.run_id }}"
+          else
+            PROMPT_URL="${{ steps.cfg.outputs.api }}/api/v1/bug-hunter/pipeline/sweep-prompt?repo=${{ steps.cfg.outputs.repo }}&runId=${{ steps.cfg.outputs.run_id }}&deep=${{ inputs.deep || 'false' }}"
+          fi
           curl -sSf \
             -H "x-api-key: $ALLY_BE_API_KEY" \
-            "${{ steps.cfg.outputs.api }}/api/v1/bug-hunter/pipeline/sweep-prompt?repo=${{ steps.cfg.outputs.repo }}&runId=${{ steps.cfg.outputs.run_id }}&deep=${{ inputs.deep || 'false' }}" \
+            "$PROMPT_URL" \
             -o /tmp/sweep-prompt.txt
           test -s /tmp/sweep-prompt.txt
           echo "Fetched $(wc -c < /tmp/sweep-prompt.txt) bytes of protocol."
@@ -217,23 +256,9 @@ jobs:
           # Also the model a gemini-engine sweep falls back to if it gets
           # stuck — see "Run the sweep"'s own fallback logic.
           echo "escalation_model=$ESCALATION_MODEL" >> "$GITHUB_OUTPUT"
-          if [ "$ENGINE" = "gemini" ]; then
-            echo "Engine is gemini — bug-escalation.md is only read if this run falls back to Claude below."
-          fi
-          # Rewritten unconditionally, even on a pure gemini run that never
-          # falls back: Gemini CLI has no equivalent to the Task-tool subagent
-          # dispatch this file's frontmatter drives, so gemini never reads it
-          # either way — cheap to keep current regardless, and it means a
-          # gemini-engine sweep that DOES fall back to Claude below always
-          # finds it already pointing at the right model, with no extra step.
-          #
-          # The committed frontmatter becomes just a fallback the moment this
-          # runs — this endpoint is now the one source of truth for the
-          # escalation model too, so it can no longer drift across this
-          # file's five otherwise-identical copies the way it used to be able
-          # to (nothing kept them in sync before).
-          sed -i.bak "s/^model: .*/model: $ESCALATION_MODEL/" .claude/agents/bug-escalation.md
-          rm -f .claude/agents/bug-escalation.md.bak
+          # The Finder's D1 senses (OPP-0781), comma-joined. Empty on an ally-be
+          # that predates it. Read by the script-driven senses below (OPP-0782).
+          echo "senses=$(printf '%s' "$RESP" | jq -r '(.senses // []) | join(",")')" >> "$GITHUB_OUTPUT"
           # opencode: a multi-provider harness with the one thing Gemini CLI lacks —
           # Task-tool subagents — so Verify and escalation come back on any
           # vendor's model (spike, 2026-09-30). It names models as
@@ -280,6 +305,47 @@ jobs:
             -H "Content-Type: application/json" -H "x-api-key: $ALLY_BE_API_KEY" \
             -d "{\"engine\":\"$ENGINE\",\"model\":\"$DEFAULT_MODEL\"}" || true
 
+      - name: Locale parity sense (a script, no model)
+        # OPP-0782. The Finder's D1 chose `locale_parity` for this run, so the
+        # workflow runs it here, before any engine starts: every locale file
+        # against en.json, one proven finding per file out of parity, posted
+        # straight to Bug Hunter with the key list as evidence. Deterministic
+        # and seconds long. It exists because on 2026-10-01 keys added to
+        # en.json alone, and then a sync that wrote 385 blanks per language,
+        # threw nothing, failed no test and were found by a person. A failure
+        # in this step never stops the sweep: the sense reports and moves on.
+        if: steps.cfg.outputs.skip != 'true' && contains(steps.models.outputs.senses, 'locale_parity')
+        env:
+          ALLY_BE_API_KEY: ${{ secrets.ALLY_BE_API_KEY }}
+        run: |
+          API="${{ steps.cfg.outputs.api }}/api/v1/bug-hunter"
+          RUN="${{ steps.cfg.outputs.run_id }}"
+          REPO="${{ steps.cfg.outputs.repo }}"
+          report() {
+            curl -sS -m 20 -X POST "$API/runs/$RUN/report" -H "Content-Type: application/json" -H "x-api-key: $ALLY_BE_API_KEY" \
+              -d "{\"repo\":\"$REPO\",\"stage\":\"$1\",\"summary\":\"$2\"}" || true
+          }
+          if ! node scripts/i18n-parity.mjs --findings "$REPO" > /tmp/locale-parity.json; then
+            echo "::warning::scripts/i18n-parity.mjs failed to run; the sense reports the error and the sweep goes on"
+            report error "locale_parity: scripts/i18n-parity.mjs failed to run"
+            exit 0
+          fi
+          node scripts/i18n-parity.mjs || true
+          COUNT=$(jq '.findings | length' /tmp/locale-parity.json)
+          if [ "$COUNT" -gt 0 ]; then
+            if curl -sS -m 30 -f -X POST "$API/runs/$RUN/findings" -H "Content-Type: application/json" -H "x-api-key: $ALLY_BE_API_KEY" \
+                 --data-binary @/tmp/locale-parity.json > /tmp/locale-parity-filed.json; then
+              SUMMARY="locale_parity: $COUNT locale file(s) out of parity with en.json, filed"
+            else
+              echo "::warning::could not file the locale parity findings with Bug Hunter"
+              SUMMARY="locale_parity: $COUNT locale file(s) out of parity with en.json, but filing them failed"
+            fi
+          else
+            SUMMARY="locale_parity: every locale file matches en.json"
+          fi
+          report finder_result "$SUMMARY"
+          echo "$SUMMARY"
+
       - name: Install the coding engine
         if: steps.cfg.outputs.skip != 'true'
         run: |
@@ -295,6 +361,34 @@ jobs:
             echo "::error::Bug Hunter engine is '${{ steps.models.outputs.engine }}' — expected gemini or opencode. Claude Code is off the platform."
             exit 1
           fi
+
+      - name: Check out the other Ally repos, read-only
+        if: steps.cfg.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.BUG_HUNTER_GH_TOKEN }}
+        run: |
+          set -uo pipefail
+          # The fix belongs where the fault is, and the fault is often in
+          # another repo: on 2026-10-12 a session "fixed" untranslated titles
+          # in the frontend because it could not see that the backend never
+          # generated them. Every other Ally repo is cloned at its default
+          # branch under /tmp/siblings/<repo> for the agent to READ with
+          # shell tools. Outside the workspace so nothing here is ever
+          # committed or linted; .git removed so no token is left on disk;
+          # write permission dropped. A repo that cannot be fetched is a
+          # warning, never a failure: the protocol tells the agent to say so.
+          mkdir -p /tmp/siblings
+          for r in ally-be ally-web ally-mobile ally-ai ally-ai-learn; do
+            [ "$r" = "${GITHUB_REPOSITORY##*/}" ] && continue
+            if git clone --quiet --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/HelloAllyTech/$r.git" "/tmp/siblings/$r" 2>/dev/null; then
+              rm -rf "/tmp/siblings/$r/.git"
+              echo "sibling $r ready"
+            else
+              rm -rf "/tmp/siblings/$r"
+              echo "::warning::Could not clone $r; the session continues without it."
+            fi
+          done
+          chmod -R a-w /tmp/siblings 2>/dev/null || true
 
       - name: Persist credentials to disk for the agent's own shell
         if: steps.cfg.outputs.skip != 'true'
@@ -362,7 +456,12 @@ jobs:
           # saying "Done" and running `exit 0`, resending the whole session to
           # the model each turn, until the job's timeout-minutes killed it.
           # That timeout is the safety net; this is the budget.
-          ENGINE_CAP_SECONDS=3600
+          # A PR review is a 20-minute read, not a night's sweep (OPP-0785).
+          case "${{ inputs.mode }}" in
+            pr_review) ENGINE_CAP_SECONDS=1500 ;;
+            map)       ENGINE_CAP_SECONDS=1800 ;;
+            *)         ENGINE_CAP_SECONDS=3600 ;;
+          esac
           RUN_STATUS_URL="${{ steps.cfg.outputs.api }}/api/v1/bug-hunter/runs/${{ steps.cfg.outputs.run_id }}/status"
           RUN_REPORT_URL="${{ steps.cfg.outputs.api }}/api/v1/bug-hunter/runs/${{ steps.cfg.outputs.run_id }}/report"
           supervise() {

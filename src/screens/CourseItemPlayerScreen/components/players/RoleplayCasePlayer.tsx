@@ -1,14 +1,15 @@
-import React from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {TickRoundIcon} from '@/assets';
-import {Button, SimulationCard} from '@/components';
+import {Button, CustomDropdown, SimulationCard} from '@/components';
 import {SCREEN_NAMES} from '@/constants';
 import {useAppNavigation, useStartSimulation, useTranslate} from '@/hooks';
 import {useGetCaseDetailsQuery, useGetScenarioByIdQuery} from '@/services';
 import {colors} from '@/theme';
 import {
+  LanguageOption,
   StartCaseItemPayload,
   StartRoleplayItemPayload,
   TrackDetailItem,
@@ -63,6 +64,37 @@ export const RoleplayCasePlayer: React.FC<RoleplayCasePlayerProps> = ({
     {skip: !isCase},
   );
 
+  // Same picker as the standalone simulation screen. The detail endpoint
+  // carries `availableLanguages` for exactly this surface (a course item
+  // reaches its scenario by id alone, never through the catalog list).
+  const availableLanguages = useMemo<LanguageOption[]>(
+    () => (isCase ? [] : (scenario?.availableLanguages ?? [])),
+    [isCase, scenario?.availableLanguages],
+  );
+  const [selectedLanguage, setSelectedLanguage] =
+    useState<LanguageOption | null>(null);
+  const [isLanguageDropdownOpen, setIsLanguageDropdownOpen] = useState(false);
+
+  // Default to the first offered language, but only while there is no valid
+  // selection, so a refetch never silently reverts the learner's pick.
+  useEffect(() => {
+    if (!availableLanguages.length) {
+      return;
+    }
+    const stillOffered =
+      selectedLanguage !== null &&
+      availableLanguages.some(lang => lang.label === selectedLanguage.label);
+    if (!stillOffered) {
+      setSelectedLanguage(availableLanguages[0]);
+    }
+  }, [availableLanguages, selectedLanguage]);
+
+  const handleLanguageSelect = (selectedLabel: string) => {
+    setSelectedLanguage(
+      availableLanguages.find(lang => lang.label === selectedLabel) ?? null,
+    );
+  };
+
   const coverImageUrl = isCase
     ? caseDetails?.coverImageUrl
     : scenario?.coverImageUrl;
@@ -82,6 +114,9 @@ export const RoleplayCasePlayer: React.FC<RoleplayCasePlayerProps> = ({
     await startSimulation({
       scenarioId: payload.scenarioId,
       trackItemProgressId: payload.trackItemProgressId,
+      ...(selectedLanguage?.language_id
+        ? {languageId: selectedLanguage.language_id}
+        : {}),
     });
   };
 
@@ -116,6 +151,20 @@ export const RoleplayCasePlayer: React.FC<RoleplayCasePlayerProps> = ({
         </View>
       )}
 
+      {availableLanguages.length > 0 && (
+        <View style={styles.languageDropdownContainer}>
+          <CustomDropdown
+            value={selectedLanguage?.label ?? ''}
+            options={availableLanguages.map(lang => lang.label)}
+            onSelect={handleLanguageSelect}
+            placeholder={t('nav.language.label')}
+            isOpen={isLanguageDropdownOpen}
+            setIsOpen={setIsLanguageDropdownOpen}
+            disabled={isCreatingRoom}
+          />
+        </View>
+      )}
+
       <Button
         testID="roleplay-case-launch"
         label={primaryLabel}
@@ -137,6 +186,11 @@ const styles = ScaledSheet.create({
   intro: {
     color: colors.ds.typography.mediumEmphasis,
     textAlign: 'center',
+  },
+  languageDropdownContainer: {
+    alignSelf: 'stretch',
+    // Keep the open menu above the launch button and card below it.
+    zIndex: 10,
   },
   completedChip: {
     flexDirection: 'row',
