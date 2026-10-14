@@ -19,6 +19,7 @@ import {
   Blog,
   BlogPost,
   Changelog,
+  Roadmap,
   Sjt1,
   SjtEdit,
   SjtReport1,
@@ -49,6 +50,7 @@ const RouteLayout = () => {
           <Route path={ROUTES.BLOG} element={<Blog />} />
           <Route path={ROUTES.BLOG_POST} element={<BlogPost />} />
           <Route path={ROUTES.CHANGELOG} element={<Changelog />} />
+          <Route path={ROUTES.ROADMAP} element={<Roadmap />} />
           {/* Standalone situational-judgement self-check — no nav, no sign-in */}
           <Route path={ROUTES.SJT1} element={<Sjt1 />} />
           {/* Same page, every line editable in place — see SjtEdit */}

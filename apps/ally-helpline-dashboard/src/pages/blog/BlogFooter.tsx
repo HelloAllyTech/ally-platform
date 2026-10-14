@@ -35,6 +35,12 @@ export const BlogFooter: FC<{ containerClassName?: string; className?: string }>
         >
           Changelog
         </Link>
+        <Link
+          to={ROUTES.ROADMAP}
+          className="inline-flex min-h-[44px] items-center transition-colors hover:text-[#29261f] md:min-h-0"
+        >
+          Roadmap
+        </Link>
         <a
           href={ALLY_PRIVACY_POLICY_URL}
           target="_blank"

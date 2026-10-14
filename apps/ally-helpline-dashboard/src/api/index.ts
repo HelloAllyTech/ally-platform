@@ -25,5 +25,6 @@ export * from "./bugReport";
 export * from "./characterLibrary";
 export * from "./characterInterview";
 export * from "./productUpdates";
+export * from "./publicRoadmap";
 export * from "./helpline";
 export * from "./helplineGuest";

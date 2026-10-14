@@ -23,6 +23,7 @@ vi.mock("@pages", () => ({
   Blog: () => <div data-testid="blog-page">Blog Page</div>,
   BlogPost: () => <div data-testid="blog-post-page">Blog Post Page</div>,
   Changelog: () => <div data-testid="changelog-page">Changelog Page</div>,
+  Roadmap: () => <div data-testid="roadmap-page">Roadmap Page</div>,
   Sjt1: () => <div data-testid="sjt1-page">SJT1 Page</div>,
   SjtEdit: () => <div data-testid="sjt1-edit-page">SJT1 Edit Page</div>,
   SjtReport1: () => <div data-testid="sjt-report1-page">SJT Report 1 Page</div>,
@@ -51,11 +52,18 @@ vi.mock("../PrivateRouteLayout", () => ({
   ),
 }));
 
-vi.mock("../PublicRouteLayout", () => ({
-  default: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="public-layout">{children}</div>
-  ),
-}));
+// Renders the matched child route, as the real layout does, so a test can tell
+// which public page a URL reached — not just that it landed in this layout.
+vi.mock("../PublicRouteLayout", async () => {
+  const { Outlet } = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
+  return {
+    default: () => (
+      <div data-testid="public-layout">
+        <Outlet />
+      </div>
+    ),
+  };
+});
 
 // Mock constants
 vi.mock("@constants", () => ({
@@ -78,6 +86,7 @@ vi.mock("@constants", () => ({
     BLOG: "/blog",
     BLOG_POST: "/blog/:slug",
     CHANGELOG: "/blog/changelog",
+    ROADMAP: "/blog/roadmap",
     SJT1: "/SJT1",
     SJT1_EDIT: "/SJT1/edit",
     SJT_REPORT1: "/sjtreport1",
@@ -99,6 +108,14 @@ describe("RouteLayout", () => {
     renderWithRouter(<RouteLayout />);
     // Should render the private layout as it's the catch-all route
     expect(screen.getByTestId("private-layout")).toBeInTheDocument();
+  });
+
+  it("serves /blog/roadmap the roadmap, not a blog post with the slug 'roadmap'", () => {
+    window.history.pushState({}, "", "/blog/roadmap");
+    renderWithRouter(<RouteLayout />);
+
+    expect(screen.getByTestId("roadmap-page")).toBeInTheDocument();
+    expect(screen.queryByTestId("blog-post-page")).not.toBeInTheDocument();
   });
 
   it("renders private routes with PrivateRouteLayout", () => {

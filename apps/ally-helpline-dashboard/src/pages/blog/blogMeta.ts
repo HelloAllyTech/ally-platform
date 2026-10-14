@@ -14,6 +14,11 @@ export const CHANGELOG_TITLE = `Changelog | ${BLOG_SITE_NAME}`;
 
 export const CHANGELOG_DESCRIPTION = "Every update we've shipped, in plain language.";
 
+export const ROADMAP_TITLE = `Roadmap | ${BLOG_SITE_NAME}`;
+
+export const ROADMAP_DESCRIPTION =
+  "What we are building to prepare frontline mental health workers, and to support them as they perform — voice-first, in their own languages.";
+
 export const blogPostTitle = (postTitle: string) => `${postTitle} | ${BLOG_NAME}`;
 
 const MAX_EXCERPT_LENGTH = 200;
