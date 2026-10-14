@@ -7,6 +7,8 @@ import {
   BuilderExemplar,
   BuilderLesson,
   BuilderLessonStatus,
+  BuilderDispatch,
+  BuilderMilestone,
   BuilderNotification,
   BuilderPendingQuestion,
   BuilderPrdVersion,
@@ -194,6 +196,8 @@ export const builderAPI = baseAPI.injectEndpoints({
         plannerModel?: string;
         verifierModel?: string;
         budgetUsd?: number;
+        /** `issue` makes the server ignore the model fields and the budget. */
+        dispatch?: BuilderDispatch;
       }
     >({
       query: ({ id, ...body }) => ({
@@ -294,6 +298,20 @@ export const builderAPI = baseAPI.injectEndpoints({
         url: ApiEndpoints.BUILDER.SESSION_RUNS(id),
         method: HttpMethod.GET,
       }),
+      providesTags: (result, error, id) => [{ type: TAG_TYPES.BUILDER_SESSION, id }],
+    }),
+
+    /**
+     * The session's milestones, ordered by position. Tagged like the runs: a
+     * start-build or cancel moves both together.
+     */
+    getBuilderMilestones: builder.query<BuilderMilestone[], string>({
+      query: id => ({
+        url: ApiEndpoints.BUILDER.SESSION_MILESTONES(id),
+        method: HttpMethod.GET,
+      }),
+      transformResponse: (milestones: BuilderMilestone[]) =>
+        [...(milestones ?? [])].sort((a, b) => a.position - b.position),
       providesTags: (result, error, id) => [{ type: TAG_TYPES.BUILDER_SESSION, id }],
     }),
 
@@ -510,6 +528,7 @@ export const {
   useSteerBuilderSessionMutation,
   useRaiseBuilderSessionBudgetMutation,
   useGetBuilderRunsQuery,
+  useGetBuilderMilestonesQuery,
   useLazyGetBuilderRunEventsQuery,
   useGetBuilderPendingQuestionsQuery,
   useAnswerBuilderQuestionMutation,

@@ -8,6 +8,12 @@ interface ConfirmCancelDialogProps {
   onClose: () => void;
   onConfirm: () => void;
   isLoading: boolean;
+  /**
+   * Set when the build being stopped is an issue build: stopping it means
+   * something different — opencode's run in that repo is cancelled and the
+   * issue closed, while an opened pull request is left for a person.
+   */
+  issueBuild?: { repo: string | null } | null;
 }
 
 /**
@@ -22,6 +28,7 @@ export const ConfirmCancelDialog: React.FC<ConfirmCancelDialogProps> = ({
   onClose,
   onConfirm,
   isLoading,
+  issueBuild = null,
 }) => {
   const strings = en.builder;
 
@@ -30,7 +37,11 @@ export const ConfirmCancelDialog: React.FC<ConfirmCancelDialogProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title={strings.cancelSessionConfirm}
-      description={strings.cancelSessionConfirmBody}
+      description={
+        issueBuild
+          ? strings.cancelSessionConfirmBodyIssue(issueBuild.repo)
+          : strings.cancelSessionConfirmBody
+      }
       primaryButton={{
         label: strings.cancelSession,
         onClick: onConfirm,

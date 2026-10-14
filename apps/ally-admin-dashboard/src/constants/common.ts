@@ -617,6 +617,8 @@ export const ApiEndpoints = {
     SESSION_DESIGN: (id: string) => `/v1/builder/sessions/${id}/design`,
     SESSION_DESIGN_APPROVE: (id: string) => `/v1/builder/sessions/${id}/design/approve`,
     SESSION_RUNS: (id: string) => `/v1/builder/sessions/${id}/runs`,
+    // The per-repo chain an issue build walks, in build order.
+    SESSION_MILESTONES: (id: string) => `/v1/builder/sessions/${id}/milestones`,
     // Raising the ceiling is a POST, not part of the session PATCH: it is
     // allowed mid-build (which is the case it exists for) and authorises
     // spend, so it stands on its own.

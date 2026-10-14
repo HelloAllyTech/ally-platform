@@ -328,8 +328,69 @@ export interface BuilderBuildRun {
   startedAt: string | null;
   completedAt: string | null;
   lastEventSeq: number;
+  /** Null for issue builds: no cost or runner time is reported for them. */
   costUsd: string | null;
   runnerMinutes: number | null;
+  error: string | null;
+  /**
+   * Set only on an issue build — Builder raised a GitHub issue and opencode
+   * works it in the repo's own Actions. `issueNumber != null` is THE test for
+   * one (see `isIssueRun`). On such a run `githubRunUrl` is the issue, not a
+   * log; the opencode log is `cost.issueWorkflowRunUrl`.
+   */
+  issueNumber?: number | null;
+  issueUrl?: string | null;
+  /** The one repo an issue build targets; null on legacy runs. */
+  repos?: string[] | null;
+  /** The repo milestone this run builds, when the design was split per repo. */
+  milestoneId?: string | null;
+  /**
+   * Legacy runs keep spend bookkeeping here. Issue runs reuse the column for
+   * where the issue has got to — see `issueProgress`.
+   */
+  cost?: BuilderRunCost | null;
+}
+
+export interface BuilderRunCost {
+  /**
+   * Ordered, each key once: `issue`, `working:<actionsRunId>`, `pr:<n>`,
+   * `ci-pending:<sha>`, `ci-fail:<sha>`, `fix:<sha>`, `ci-pass:<sha>`.
+   */
+  issueTimeline?: string[];
+  /** Commits Builder asked opencode to fix CI on. At most two per build. */
+  issueFixRequests?: string[];
+  /** opencode's Actions run — absent until opencode starts. */
+  issueWorkflowRunUrl?: string;
+  [key: string]: unknown;
+}
+
+/** How a build is carried out: Builder's own runner, or an issue opencode works. */
+export type BuilderDispatch = "workflow" | "issue";
+
+export type BuilderMilestoneStatus =
+  | "PENDING"
+  | "BUILDING"
+  | "WAITING_FOR_INPUT"
+  | "COMPLETED"
+  | "FAILED"
+  | "SKIPPED";
+
+/**
+ * A slice of a session's work. A design that changes several repos becomes one
+ * milestone per repo (`repos` = [thatRepo]), built in a fixed order; an epic
+ * milestone has `repos` null.
+ */
+export interface BuilderMilestone {
+  id: string;
+  sessionId: string;
+  position: number;
+  title: string;
+  summaryMd: string;
+  repos: string[] | null;
+  status: BuilderMilestoneStatus;
+  branchSlug: string;
+  startedAt: string | null;
+  completedAt: string | null;
   error: string | null;
 }
 
@@ -345,6 +406,8 @@ export type BuilderEventType =
   | "verification"
   /** A machine-run check result — verified, not self-reported. */
   | "gate_result"
+  /** The target repo's own CI verdict on an issue build's pull request. */
+  | "ci_result"
   | "phase_cost"
   /**
    * A run parked at a phase boundary because the spend ceiling is gone.
@@ -458,6 +521,8 @@ export interface BuilderSettings {
   plannerModel: string | null;
   coderModel: string | null;
   verifierModel: string | null;
+  /** The server's default for new builds; `workflow` is the legacy runner. */
+  dispatch?: BuilderDispatch;
 }
 
 export interface BuilderNotification {

@@ -17,11 +17,18 @@ vi.mock("@ally-ui-mono/ui-shared", () => ({
 // SteerComposer and CollapsibleAside render only in the build layout, which no
 // test reached until the restart cases below.
 let startDialogProps: any;
+let steerHintProps: any = null;
 let prdPanelProps: any[] = [];
 vi.mock("@components/builder", async () => ({
   // The real rule, not a stub: it is what decides whether Start is blocked.
   designBuildBlock: (await vi.importActual<any>("../../../components/builder/designGate"))
     .designBuildBlock,
+  // The real issue-build rules, for the same reason.
+  ...(await vi.importActual<any>("../../../components/builder/issueBuild")),
+  IssueSteerHint: (props: any) => {
+    steerHintProps = props;
+    return <div>IssueSteerHint</div>;
+  },
   TechnicalDesignPanel: () => <div>TechnicalDesignPanel</div>,
   BuildView: () => <div>BuildView</div>,
   ChatComposer: () => <div>ChatComposer</div>,
@@ -77,12 +84,18 @@ vi.mock("@hooks", () => ({
 
 let sessionResult: any;
 let pullRequests: any[] = [];
+let runs: any[] = [];
+let milestones: any[] = [];
+const startBuild = vi.fn().mockReturnValue({ unwrap: () => Promise.resolve({}) });
 vi.mock("@api", () => ({
   useGetBuilderSessionQuery: () => sessionResult,
   useGetBuilderSettingsQuery: () => ({ data: undefined }),
   usePatchBuilderPrdMutation: () => [vi.fn()],
   useCancelBuilderSessionMutation: () => [vi.fn(), { isLoading: false }],
   useGetBuilderPullRequestsQuery: () => ({ data: pullRequests }),
+  useGetBuilderRunsQuery: () => ({ data: runs }),
+  useGetBuilderMilestonesQuery: () => ({ data: milestones }),
+  useStartBuilderBuildMutation: () => [startBuild, { isLoading: false }],
 }));
 
 // eslint-disable-next-line import/first
@@ -108,6 +121,9 @@ describe("BuilderSession", () => {
     onSessionInvalid = undefined;
     sessionResult = { data: baseSession, isLoading: false, isError: false };
     pullRequests = [];
+    runs = [];
+    milestones = [];
+    startBuild.mockClear();
   });
 
   it("closes the embedded drawer instead of navigating away when the session is lost and 'New session' is clicked", async () => {
@@ -265,5 +281,157 @@ describe("BuilderSession", () => {
 
     expect(screen.getByText("Done")).toBeTruthy();
     expect(screen.queryByText("Building")).toBeNull();
+  });
+
+  describe("issue builds", () => {
+    const issueRun = (overrides: any = {}) => ({
+      id: "run-1",
+      mode: "build",
+      status: "RUNNING",
+      issueNumber: 7,
+      issueUrl: "https://github.com/org/ally-be/issues/7",
+      repos: ["ally-be"],
+      milestoneId: "m-1",
+      cost: { issueTimeline: ["issue"] },
+      ...overrides,
+    });
+
+    it("replaces the steering composer with the /oc hint when the latest run is an issue build", () => {
+      runs = [issueRun()];
+      sessionResult = {
+        data: { ...baseSession, status: "BUILDING", currentStage: "CODING" },
+        isLoading: false,
+        isError: false,
+      };
+      render(<BuilderSession />);
+      expect(screen.getByText("IssueSteerHint")).toBeTruthy();
+      expect(screen.queryByText("SteerComposer")).toBeNull();
+    });
+
+    it("keeps the /oc hint when a review ran on the runner after the issue build", () => {
+      // Ankita's session: the old "Read at ralph / gate" notes came back because
+      // a review run, not a build, was the newest run.
+      runs = [
+        issueRun({ status: "SUCCEEDED" }),
+        { id: "run-2", mode: "review", status: "SUCCEEDED", issueNumber: null },
+      ];
+      sessionResult = {
+        data: { ...baseSession, status: "COMPLETED", currentStage: "DONE" },
+        isLoading: false,
+        isError: false,
+      };
+      render(<BuilderSession />);
+      expect(screen.getByText("IssueSteerHint")).toBeTruthy();
+      expect(screen.queryByText("SteerComposer")).toBeNull();
+    });
+
+    it("keeps the steering composer for a legacy run", () => {
+      runs = [{ id: "run-1", mode: "build", status: "RUNNING", issueNumber: null }];
+      sessionResult = {
+        data: { ...baseSession, status: "BUILDING", currentStage: "CODING" },
+        isLoading: false,
+        isError: false,
+      };
+      render(<BuilderSession />);
+      expect(screen.getByText("SteerComposer")).toBeTruthy();
+      expect(screen.queryByText("IssueSteerHint")).toBeNull();
+    });
+
+    it("offers to continue the chain with an issue build when a repo is still to build", async () => {
+      pullRequests = [{ id: "pr-1" }];
+      runs = [issueRun({ status: "SUCCEEDED" })];
+      milestones = [
+        { id: "m-1", position: 0, repos: ["ally-be"], status: "COMPLETED" },
+        { id: "m-2", position: 1, repos: ["ally-web"], status: "PENDING" },
+      ];
+      terminal("COMPLETED");
+
+      fireEvent.click(screen.getByText("Continue (next: ally-web)"));
+      await vi.waitFor(() =>
+        expect(startBuild).toHaveBeenCalledWith({ id: "session-1", dispatch: "issue" }),
+      );
+    });
+
+    it("does not offer to continue once every repo is done or skipped", () => {
+      pullRequests = [{ id: "pr-1" }];
+      runs = [issueRun({ status: "SUCCEEDED" })];
+      milestones = [
+        { id: "m-1", position: 0, repos: ["ally-be"], status: "COMPLETED" },
+        { id: "m-2", position: 1, repos: ["ally-web"], status: "SKIPPED" },
+      ];
+      terminal("COMPLETED");
+      expect(screen.queryByText(/Continue \(next/)).toBeNull();
+    });
+
+    describe("in a repo chain", () => {
+      const chainRuns = () => [
+        issueRun({ id: "run-1", status: "SUCCEEDED", milestoneId: "m-be", repos: ["ally-be"] }),
+        issueRun({ id: "run-2", status: "SUCCEEDED", milestoneId: "m-web", repos: ["ally-web"] }),
+      ];
+
+      it("sums up the chain in the header instead of listing its repos", () => {
+        runs = chainRuns().map(run => ({ ...run, mode: "build" }));
+        milestones = [
+          { id: "m-be", position: 0, repos: ["ally-be"], status: "COMPLETED" },
+          { id: "m-web", position: 1, repos: ["ally-web"], status: "COMPLETED" },
+          { id: "m-mobile", position: 2, repos: ["ally-mobile"], status: "COMPLETED" },
+        ];
+        pullRequests = [{ id: "pr-1" }];
+        sessionResult = {
+          data: {
+            ...baseSession,
+            status: "COMPLETED",
+            currentStage: "DONE",
+            repos: ["ally-be", "ally-web", "ally-mobile"],
+          },
+          isLoading: false,
+          isError: false,
+        };
+        render(<BuilderSession />);
+
+        expect(screen.getByText("3 of 3 repos built")).toBeTruthy();
+        expect(screen.queryByText("ally-be, ally-web, ally-mobile")).toBeNull();
+        expect(steerHintProps.chained).toBe(true);
+      });
+
+      it("names the repo being built, and where a failed chain stopped", () => {
+        runs = chainRuns().map(run => ({ ...run, mode: "build" }));
+        milestones = [
+          { id: "m-be", position: 0, repos: ["ally-be"], status: "COMPLETED" },
+          { id: "m-web", position: 1, repos: ["ally-web"], status: "BUILDING" },
+          { id: "m-mobile", position: 2, repos: ["ally-mobile"], status: "PENDING" },
+        ];
+        sessionResult = {
+          data: { ...baseSession, status: "BUILDING", currentStage: "SETUP" },
+          isLoading: false,
+          isError: false,
+        };
+        const { unmount } = render(<BuilderSession />);
+        expect(screen.getByText("Building ally-web (2 of 3)")).toBeTruthy();
+        unmount();
+
+        milestones[1].status = "FAILED";
+        sessionResult = {
+          data: { ...baseSession, status: "FAILED", currentStage: "GATE" },
+          isLoading: false,
+          isError: false,
+        };
+        render(<BuilderSession />);
+        expect(screen.getByText("Stopped at ally-web")).toBeTruthy();
+      });
+
+      it("keeps the repo list for a session without a chain", () => {
+        runs = [{ ...issueRun(), mode: "build" }];
+        milestones = [];
+        sessionResult = {
+          data: { ...baseSession, status: "BUILDING", currentStage: "CODING", repos: ["ally-be"] },
+          isLoading: false,
+          isError: false,
+        };
+        render(<BuilderSession />);
+        expect(screen.getByText("ally-be")).toBeTruthy();
+        expect(steerHintProps.chained).toBe(false);
+      });
+    });
   });
 });

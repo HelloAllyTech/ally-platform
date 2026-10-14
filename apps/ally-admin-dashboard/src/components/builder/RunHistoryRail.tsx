@@ -5,6 +5,7 @@ import { en } from "@constants";
 import { BuilderBuildRun } from "@types";
 
 import { CollapsibleSection } from "./CollapsibleSection";
+import { isIssueRun, issueRunRepo } from "./issueBuild";
 import { formatCostUsd, formatRunDuration, runDidNothing, totalCostUsd } from "./runFormat";
 import { BUILDER_RUN_STATUS_TAG_TYPE } from "../../pages/Builder/builderMotion";
 
@@ -12,6 +13,11 @@ interface RunHistoryRailProps {
   runs: BuilderBuildRun[];
   selectedRunId: string | null;
   onSelect: (runId: string) => void;
+  /**
+   * Start folded. A repo chain shows each repo's build and switches the feed
+   * itself, so every run — reviews and retries included — is detail there.
+   */
+  folded?: boolean;
 }
 
 /**
@@ -38,6 +44,7 @@ export const RunHistoryRail: React.FC<RunHistoryRailProps> = ({
   runs,
   selectedRunId,
   onSelect,
+  folded = false,
 }) => {
   const strings = en.builder.build;
 
@@ -45,18 +52,26 @@ export const RunHistoryRail: React.FC<RunHistoryRailProps> = ({
 
   // The number worth seeing while the strip is folded is what it all cost, not
   // how many attempts there were. Seven runs said nothing about eleven dollars.
-  const spent = totalCostUsd(runs);
+  // Issue runs carry no cost, so they are left out rather than counted as $0.
+  const spent = totalCostUsd(runs.filter(run => !isIssueRun(run)));
   const meta = spent > 0 ? `${runs.length} · ${formatCostUsd(String(spent))}` : String(runs.length);
 
   return (
-    <CollapsibleSection heading={strings.runHistoryHeading} meta={meta}>
+    <CollapsibleSection
+      heading={folded ? strings.runHistoryAllHeading : strings.runHistoryHeading}
+      meta={meta}
+      defaultOpen={!folded}
+    >
       <div className="flex gap-2 overflow-x-auto pb-1">
         {runs.map(run => {
           const isSelected = run.id === selectedRunId;
           const duration = run.completedAt
             ? (formatRunDuration(run.dispatchedAt, run.completedAt) ?? strings.runDurationUnknown)
             : strings.runDurationLive;
-          const cost = formatCostUsd(run.costUsd);
+          const issue = isIssueRun(run);
+          // No cost is reported for issue builds. Saying so beats a blank,
+          // which reads as free.
+          const cost = issue ? strings.costNotTracked : formatCostUsd(run.costUsd);
           // See runDidNothing: a run that ended in seconds having spent nothing
           // is a footnote, and should not compete with one that spent an hour.
           const quiet = runDidNothing(run) && !isSelected;
@@ -77,7 +92,9 @@ export const RunHistoryRail: React.FC<RunHistoryRailProps> = ({
             >
               <div className="flex items-center gap-1.5">
                 <span className="min-w-0 truncate text-xs font-medium text-typography-900">
-                  {strings.runLabel(run.sequence, run.mode)}
+                  {issue
+                    ? strings.issueRunLabel(run.sequence, issueRunRepo(run), run.issueNumber ?? 0)
+                    : strings.runLabel(run.sequence, run.mode)}
                 </span>
                 <Tag type={BUILDER_RUN_STATUS_TAG_TYPE[run.status]} size="sm" className="shrink-0">
                   {run.status === "QUEUED" && run.githubRunUrl

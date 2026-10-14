@@ -318,20 +318,25 @@ export const VOICE_CONFIG_SCHEMA: Record<TtsProvider, VoiceConfigField[]> = {
   [TtsProvider.SARVAM]: [
     GENDER_FIELD,
     AGE_FIELD,
+    // Model first because it decides which speaker ids are even valid:
+    // bulbul:v3 takes bare names ("ishita"), bulbul:v4-flash takes persona
+    // ids ("ishita_hi_ads") and rejects the bare v3 names. bulbul:v2 is
+    // retired and returns a 400.
     {
       key: "model",
       label: "Model",
       required: true,
       type: "string",
-      placeholder: "bulbul:v2",
+      placeholder: "bulbul:v4-flash",
+      hint: 'Live models: "bulbul:v3" (classic speakers) or "bulbul:v4-flash" (persona voices). "bulbul:v2" is retired.',
     },
     {
       key: "speaker",
       label: "Speaker",
       required: true,
       type: "string",
-      placeholder: "abhilash",
-      hint: "Sarvam speaker name, lower-case.",
+      placeholder: "ishita_hi_ads",
+      hint: 'Lower-case Sarvam speaker id. bulbul:v3 uses bare names like "ishita"; bulbul:v4-flash uses persona ids like "ishita_hi_ads" from Sarvam\'s voices page. Each model has its own list.',
     },
   ],
   [TtsProvider.GOOGLE]: [

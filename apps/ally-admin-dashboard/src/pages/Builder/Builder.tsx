@@ -111,7 +111,11 @@ const SessionCard: React.FC<{
         </div>
       </div>
       {session.currentStage && session.status === "BUILDING" && (
-        <p className="mt-2 text-xs text-typography-600">{session.currentStage}</p>
+        // The raw enum (GATE, REMEDIATING) is plumbing; the stage labels are
+        // what the rest of Builder calls these.
+        <p className="mt-2 text-xs text-typography-600">
+          {strings.stages[session.currentStage] ?? session.currentStage}
+        </p>
       )}
       {isArchived ? (
         <div className="mt-2 flex justify-end">

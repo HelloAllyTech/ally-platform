@@ -9,6 +9,8 @@ import {
   InlineNotification,
   ModalBody,
   NumberInput,
+  RadioButton,
+  RadioButtonGroup,
   TextInput,
   Tooltip,
 } from "@ally-ui-mono/ui-shared";
@@ -19,7 +21,7 @@ import {
 } from "@api";
 import { TooltipIcon } from "@assets";
 import { en } from "@constants";
-import { BuilderPrdReadiness, BuilderRepoCommand } from "@types";
+import { BuilderDispatch, BuilderPrdReadiness, BuilderRepoCommand } from "@types";
 
 import { suggestNewCeiling } from "./RaiseBudgetDialog";
 
@@ -58,8 +60,16 @@ interface StartBuildDialogProps {
 }
 
 /**
- * Collects what a build needs before it can dispatch: which repos it may
- * touch, a spend ceiling, and optional per-tier model overrides.
+ * Collects what a build needs before it can dispatch: how it is built, which
+ * repos it may touch, and — for Builder's own (legacy) runner only — a spend
+ * ceiling and optional per-tier model overrides.
+ *
+ * "How to build" defaults to an issue build every time the dialog opens,
+ * whatever the server's default: it is the recommended path, and an issue
+ * build has no budget or model fields because the server ignores them — the
+ * model is a per-repo GitHub variable and no cost is reported. Hiding them
+ * rather than greying them out keeps the dialog from asking for decisions
+ * that change nothing.
  *
  * Repos are saved onto the session (`updateBuilderSession`) before start-build
  * is called, not alongside it — the backend refuses to start a build with an
@@ -101,6 +111,8 @@ export const StartBuildDialog: React.FC<StartBuildDialogProps> = ({
   const [coderModel, setCoderModel] = useState("");
   const [verifierModel, setVerifierModel] = useState("");
   const [reposError, setReposError] = useState(false);
+  const [dispatch, setDispatch] = useState<BuilderDispatch>("issue");
+  const isIssue = dispatch === "issue";
 
   // Re-seed every time the dialog opens rather than once on mount — a second
   // open (e.g. retry after an earlier cancel) should reflect the session's
@@ -124,6 +136,7 @@ export const StartBuildDialog: React.FC<StartBuildDialogProps> = ({
     setCoderModel("");
     setVerifierModel("");
     setReposError(false);
+    setDispatch("issue");
   }, [isOpen, currentRepos, initialBudgetUsd, defaultBudgetUsd, spentUsd]);
 
   const selectedRepoCommands = repos.filter(repo => selectedRepos.includes(repo.repo));
@@ -143,13 +156,18 @@ export const StartBuildDialog: React.FC<StartBuildDialogProps> = ({
     }
 
     try {
-      await startBuild({
-        id: sessionId,
-        ...(budgetUsd.trim() ? { budgetUsd: Number(budgetUsd) } : {}),
-        ...(plannerModel.trim() ? { plannerModel: plannerModel.trim() } : {}),
-        ...(coderModel.trim() ? { model: coderModel.trim() } : {}),
-        ...(verifierModel.trim() ? { verifierModel: verifierModel.trim() } : {}),
-      }).unwrap();
+      await startBuild(
+        isIssue
+          ? { id: sessionId, dispatch }
+          : {
+              id: sessionId,
+              dispatch,
+              ...(budgetUsd.trim() ? { budgetUsd: Number(budgetUsd) } : {}),
+              ...(plannerModel.trim() ? { plannerModel: plannerModel.trim() } : {}),
+              ...(coderModel.trim() ? { model: coderModel.trim() } : {}),
+              ...(verifierModel.trim() ? { verifierModel: verifierModel.trim() } : {}),
+            },
+      ).unwrap();
       onStarted();
       onClose();
     } catch (error) {
@@ -224,13 +242,10 @@ export const StartBuildDialog: React.FC<StartBuildDialogProps> = ({
 
           <div>
             <div className="mb-1 flex items-center gap-1.5">
-              <label
-                className="text-sm font-medium text-typography-900"
-                htmlFor="builder-start-repos"
-              >
-                {strings.reposLabel}
-              </label>
-              <Tooltip label={strings.reposHint} align="top">
+              <span className="text-sm font-medium text-typography-900">
+                {strings.dispatchLabel}
+              </span>
+              <Tooltip label={strings.dispatchIssueHint} align="top">
                 <button
                   type="button"
                   className="-m-1 inline-flex cursor-pointer items-center p-1 md:m-0 md:p-0"
@@ -238,6 +253,48 @@ export const StartBuildDialog: React.FC<StartBuildDialogProps> = ({
                   <TooltipIcon />
                 </button>
               </Tooltip>
+            </div>
+            <RadioButtonGroup
+              name="builder-start-dispatch"
+              legendText=""
+              orientation="vertical"
+              valueSelected={dispatch}
+              onChange={(value: unknown) =>
+                setDispatch(value === "workflow" ? "workflow" : "issue")
+              }
+            >
+              <RadioButton
+                id="builder-start-dispatch-issue"
+                labelText={strings.dispatchIssue}
+                value="issue"
+              />
+              <RadioButton
+                id="builder-start-dispatch-workflow"
+                labelText={strings.dispatchWorkflow}
+                value="workflow"
+              />
+            </RadioButtonGroup>
+          </div>
+
+          <div>
+            <div className="mb-1 flex items-center gap-1.5">
+              <label
+                className="text-sm font-medium text-typography-900"
+                htmlFor="builder-start-repos"
+              >
+                {strings.reposLabel}
+              </label>
+              {/* Issue mode states its rule under the field instead. */}
+              {!isIssue && (
+                <Tooltip label={strings.reposHint} align="top">
+                  <button
+                    type="button"
+                    className="-m-1 inline-flex cursor-pointer items-center p-1 md:m-0 md:p-0"
+                  >
+                    <TooltipIcon />
+                  </button>
+                </Tooltip>
+              )}
             </div>
             <FilterableMultiSelect
               id="builder-start-repos"
@@ -263,71 +320,85 @@ export const StartBuildDialog: React.FC<StartBuildDialogProps> = ({
                 ))}
               </ul>
             )}
+            {/* Said in the open, not only in the tooltip: in issue mode the
+                selection is no longer a boundary Builder enforces, and the
+                order matters to whoever reviews the pull requests. */}
+            {isIssue && (
+              <p className="mt-2 text-xs text-typography-600">{strings.reposHintIssue}</p>
+            )}
           </div>
 
-          <div>
-            <div className="mb-1 flex items-center gap-1.5">
-              <span className="text-sm font-medium text-typography-900">{strings.budgetLabel}</span>
-              <Tooltip label={strings.budgetHint} align="top">
-                <button
-                  type="button"
-                  className="-m-1 inline-flex cursor-pointer items-center p-1 md:m-0 md:p-0"
-                >
-                  <TooltipIcon />
-                </button>
-              </Tooltip>
-            </div>
-            <NumberInput
-              id="builder-start-budget"
-              label={strings.budgetLabel}
-              hideLabel
-              hideSteppers
-              min={0}
-              value={budgetUsd}
-              onChange={(_event: unknown, state: { value: number | string } | undefined) =>
-                setBudgetUsd(state?.value === undefined ? "" : String(state.value))
-              }
-            />
-          </div>
+          {isIssue ? (
+            <p className="text-xs text-typography-600">{strings.issueModelNote}</p>
+          ) : (
+            <>
+              <div>
+                <div className="mb-1 flex items-center gap-1.5">
+                  <span className="text-sm font-medium text-typography-900">
+                    {strings.budgetLabel}
+                  </span>
+                  <Tooltip label={strings.budgetHint} align="top">
+                    <button
+                      type="button"
+                      className="-m-1 inline-flex cursor-pointer items-center p-1 md:m-0 md:p-0"
+                    >
+                      <TooltipIcon />
+                    </button>
+                  </Tooltip>
+                </div>
+                <NumberInput
+                  id="builder-start-budget"
+                  label={strings.budgetLabel}
+                  hideLabel
+                  hideSteppers
+                  min={0}
+                  value={budgetUsd}
+                  onChange={(_event: unknown, state: { value: number | string } | undefined) =>
+                    setBudgetUsd(state?.value === undefined ? "" : String(state.value))
+                  }
+                />
+              </div>
 
-          <div>
-            <div className="mb-2 flex items-center gap-1.5">
-              <span className="text-sm font-medium text-typography-900">
-                {strings.modelOverridesHeading}
-              </span>
-              <Tooltip label={strings.modelOverridesHint} align="top">
-                <button
-                  type="button"
-                  className="-m-1 inline-flex cursor-pointer items-center p-1 md:m-0 md:p-0"
-                >
-                  <TooltipIcon />
-                </button>
-              </Tooltip>
-            </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <TextInput
-                id="builder-start-planner-model"
-                labelText={strings.plannerModelLabel}
-                placeholder={strings.modelPlaceholder}
-                value={plannerModel}
-                onChange={event => setPlannerModel(event.target.value)}
-              />
-              <TextInput
-                id="builder-start-coder-model"
-                labelText={strings.coderModelLabel}
-                placeholder={strings.modelPlaceholder}
-                value={coderModel}
-                onChange={event => setCoderModel(event.target.value)}
-              />
-              <TextInput
-                id="builder-start-verifier-model"
-                labelText={strings.verifierModelLabel}
-                placeholder={strings.modelPlaceholder}
-                value={verifierModel}
-                onChange={event => setVerifierModel(event.target.value)}
-              />
-            </div>
-          </div>
+              <div>
+                <div className="mb-2 flex items-center gap-1.5">
+                  <span className="text-sm font-medium text-typography-900">
+                    {strings.modelOverridesHeading}
+                  </span>
+                  <Tooltip label={strings.modelOverridesHint} align="top">
+                    <button
+                      type="button"
+                      className="-m-1 inline-flex cursor-pointer items-center p-1 md:m-0 md:p-0"
+                    >
+                      <TooltipIcon />
+                    </button>
+                  </Tooltip>
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <TextInput
+                    id="builder-start-planner-model"
+                    labelText={strings.plannerModelLabel}
+                    placeholder={strings.modelPlaceholder}
+                    value={plannerModel}
+                    onChange={event => setPlannerModel(event.target.value)}
+                  />
+                  <TextInput
+                    id="builder-start-coder-model"
+                    labelText={strings.coderModelLabel}
+                    placeholder={strings.modelPlaceholder}
+                    value={coderModel}
+                    onChange={event => setCoderModel(event.target.value)}
+                  />
+                  <TextInput
+                    id="builder-start-verifier-model"
+                    labelText={strings.verifierModelLabel}
+                    placeholder={strings.modelPlaceholder}
+                    value={verifierModel}
+                    onChange={event => setVerifierModel(event.target.value)}
+                  />
+                </div>
+              </div>
+            </>
+          )}
 
           <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
             <Button kind="tertiary" className="max-sm:!w-full max-sm:!max-w-none" onClick={onClose}>

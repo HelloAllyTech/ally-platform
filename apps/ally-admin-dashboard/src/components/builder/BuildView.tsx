@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { ActionableNotification, Button, Tag } from "@ally-ui-mono/ui-shared";
 import {
   useAnswerBuilderQuestionMutation,
+  useGetBuilderMilestonesQuery,
   useGetBuilderPendingQuestionsQuery,
   useGetBuilderPullRequestsQuery,
   useMergeBuilderPullRequestMutation,
@@ -15,13 +16,33 @@ import {
 } from "@api";
 import { en } from "@constants";
 import { useBuilderSocket } from "@hooks";
-import { BuilderBuildEvent, BuilderSessionStatus, BuilderStage, BuilderTodoItem } from "@types";
+import {
+  BuilderBuildEvent,
+  BuilderBuildRun,
+  BuilderPullRequest,
+  BuilderSessionStatus,
+  BuilderStage,
+  BuilderTodoItem,
+} from "@types";
 
-import { BuildActivityFeed } from "./BuildActivityFeed";
+import { BuildActivityFeed, countFeedUpdates } from "./BuildActivityFeed";
 import { CollapsibleSection } from "./CollapsibleSection";
+import {
+  isChainedIssueSession,
+  isIssueRun,
+  isRunActive,
+  issueRunPullRequest,
+  issueRunRepo,
+  latestBuildRun,
+  repoMilestones,
+  sameRepo,
+  withoutRestatedStatus,
+} from "./issueBuild";
+import { IssueRail } from "./IssueRail";
 import { PhaseRail } from "./PhaseRail";
 import { BuilderAnswerPayload, QuestionCard } from "./QuestionCard";
 import { RaiseBudgetDialog } from "./RaiseBudgetDialog";
+import { RepoChain } from "./RepoChain";
 import { RunHistoryRail } from "./RunHistoryRail";
 import { TodoPanel } from "./TodoPanel";
 
@@ -42,6 +63,22 @@ const POLL_WITHOUT_SOCKET_MS = 4000;
  * is in whole minutes, so anything finer would repaint for nothing.
  */
 const BUDGET_COUNTDOWN_TICK_MS = 20000;
+
+const CI_TAG_TYPE: Record<string, "green" | "red" | "blue" | "gray"> = {
+  success: "green",
+  failure: "red",
+  pending: "blue",
+  none: "gray",
+};
+
+/** The newest issue run that targets this pull request's repo, if any. */
+const issueRunFor = (
+  pullRequest: BuilderPullRequest,
+  runs: BuilderBuildRun[] | undefined,
+): BuilderBuildRun | null =>
+  [...(runs ?? [])]
+    .reverse()
+    .find(run => isIssueRun(run) && sameRepo(issueRunRepo(run), pullRequest.repo)) ?? null;
 
 interface BuildViewProps {
   sessionId: string;
@@ -90,6 +127,12 @@ export const BuildView: React.FC<BuildViewProps> = ({
   // minute justifies.
   const { data: runs } = useGetBuilderRunsQuery(sessionId, {
     pollingInterval: isLive || isWaiting ? POLL_WITHOUT_SOCKET_MS : 0,
+    skipPollingIfUnfocused: true,
+  });
+  // Polled with the runs: the chain moves on when a run's CI goes green, and
+  // the session row alone does not say which repo is next.
+  const { data: milestones } = useGetBuilderMilestonesQuery(sessionId, {
+    pollingInterval: isLive || isWaiting ? POLL_WITH_SOCKET_MS : 0,
     skipPollingIfUnfocused: true,
   });
   const { data: pendingQuestions } = useGetBuilderPendingQuestionsQuery(sessionId, {
@@ -170,6 +213,17 @@ export const BuildView: React.FC<BuildViewProps> = ({
     [runs, selectedRunId],
   );
   const isViewingLive = selectedRunId !== null && selectedRunId === newestRun?.id;
+  // The latest build — reviews and design drafts run on Builder's runner
+  // after and before it, and must not decide what kind of build this is.
+  const latestBuild = useMemo(() => latestBuildRun(runs), [runs]);
+  // The run the rail and links describe: the one on screen, or the latest
+  // build before anything is selected.
+  const displayRun = selectedRun ?? latestBuild ?? newestRun;
+  const displayIsIssue = isIssueRun(displayRun);
+  const chain = useMemo(() => repoMilestones(milestones), [milestones]);
+  // The consolidated layout: the repo table carries every repo's PR, CI and
+  // merge, so the rail row, the link row and the pull-request panel go.
+  const chained = useMemo(() => isChainedIssueSession(runs, milestones), [runs, milestones]);
 
   // Merge a batch of events into whichever run each one belongs to — the
   // socket and the polling fallback both deliver events already carrying
@@ -267,11 +321,16 @@ export const BuildView: React.FC<BuildViewProps> = ({
     prevNewestIdRef.current = newestRun.id;
 
     setSelectedRunId(previous => {
-      if (previous === null) return newestRun.id;
+      // First look: the newest run if it is still working, otherwise the
+      // latest build. A finished review or design draft is newer than the
+      // build it was about, and opening the session on its transcript buried
+      // the build itself.
+      if (previous === null)
+        return isRunActive(newestRun) ? newestRun.id : (latestBuild ?? newestRun).id;
       if (isNewRun && followLive) return newestRun.id;
       return previous;
     });
-  }, [newestRun, followLive]);
+  }, [newestRun, latestBuild, followLive]);
 
   const handleSelectRun = useCallback((runId: string) => {
     setSelectedRunId(runId);
@@ -302,8 +361,6 @@ export const BuildView: React.FC<BuildViewProps> = ({
     );
     return () => window.clearInterval(interval);
   }, [newestRun?.id, connected, isLive, isWaiting, fetchRunEvents]);
-
-  const displayedEvents = selectedRunId ? (eventsByRun[selectedRunId] ?? []) : [];
 
   /** The newest todo snapshot from the LIVE run — the agent replaces the list
    *  wholesale, and the checklist is current-progress, not a transcript, so it
@@ -349,7 +406,9 @@ export const BuildView: React.FC<BuildViewProps> = ({
   // A hold is a live thing — a run sitting on the ceiling, counting down —
   // so it goes stale the moment the run ends, and a terminal session can still
   // be holding a cached one from before it stopped.
-  const budgetHeld = Boolean(budget?.hold) && (isLive || isWaiting);
+  // An issue build reports no spend, so a ceiling cannot hold or stop it.
+  const newestIsIssue = isIssueRun(latestBuild);
+  const budgetHeld = Boolean(budget?.hold) && (isLive || isWaiting) && !newestIsIssue;
 
   /**
    * Being over the ceiling is not a live thing, and this is shown on a stopped
@@ -377,7 +436,19 @@ export const BuildView: React.FC<BuildViewProps> = ({
     [pullRequests],
   );
 
-  const budgetOver = Boolean(budget?.exceeded) && status !== "COMPLETED" && status !== "CANCELLED";
+  const budgetOver =
+    Boolean(budget?.exceeded) && status !== "COMPLETED" && status !== "CANCELLED" && !newestIsIssue;
+
+  // In a chain, lines that only restate the table ("CI passed on …") are
+  // dropped; failures, fix requests and failing-check cards stay.
+  const displayedEvents = useMemo(() => {
+    const selectedEvents = selectedRunId ? (eventsByRun[selectedRunId] ?? []) : [];
+    return chained && displayIsIssue ? withoutRestatedStatus(selectedEvents) : selectedEvents;
+  }, [chained, displayIsIssue, eventsByRun, selectedRunId]);
+
+  const displayPr =
+    displayRun && displayIsIssue ? issueRunPullRequest(displayRun, pullRequests) : null;
+  const actionsLogUrl = displayIsIssue ? (displayRun?.cost?.issueWorkflowRunUrl ?? null) : null;
 
   // Only for a run you are actually looking at. Scrolling back to an earlier,
   // successful run of a session that later failed should not stamp this
@@ -389,6 +460,23 @@ export const BuildView: React.FC<BuildViewProps> = ({
   // null — which offered a "Details" expander onto a verbatim copy of the line
   // above it.
   const failureDetail = runError && failureTitle !== runError ? runError : null;
+
+  const feedElement = (
+    <BuildActivityFeed
+      events={displayedEvents}
+      isLive={isLive && isViewingLive}
+      isLoading={!!selectedRunId && !loadedRuns.has(selectedRunId)}
+      issueBuild={displayIsIssue ? { actionsLogUrl } : null}
+      failure={
+        failureTitle
+          ? {
+              title: failureTitle,
+              detail: failureDetail,
+            }
+          : null
+      }
+    />
+  );
 
   return (
     <div className="flex min-h-0 flex-1 flex-col max-md:flex-none">
@@ -430,25 +518,89 @@ export const BuildView: React.FC<BuildViewProps> = ({
           full-width bar at the foot of the page. It is a way out to the raw
           logs — useful, occasionally, to one person debugging — and it was
           taking more vertical space than the pull requests. */}
-      <div className="flex items-center gap-2">
-        <div className="min-w-0 flex-1">
-          <PhaseRail currentStage={currentStage} active={isLive} failed={status === "FAILED"} />
-        </div>
-        {selectedRun?.githubRunUrl && (
-          <a
-            href={selectedRun.githubRunUrl}
-            target="_blank"
-            rel="noreferrer"
-            title={strings.watchOnGithub}
-            aria-label={strings.watchOnGithub}
-            className="mr-3 shrink-0 rounded p-1.5 text-typography-500 hover:bg-neutral-100 hover:text-typography-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500"
-          >
-            <LogoGithub size={16} />
-          </a>
-        )}
-      </div>
+      <RepoChain
+        milestones={milestones ?? []}
+        runs={runs ?? []}
+        pullRequests={pullRequests ?? []}
+        selectedRunId={displayRun?.id ?? null}
+        onSelectRun={handleSelectRun}
+        {...(chained ? { onMerge: handleMerge, mergingId, isMerging } : {})}
+      />
 
-      <RunHistoryRail runs={runs ?? []} selectedRunId={selectedRunId} onSelect={handleSelectRun} />
+      {!chained && (
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="min-w-0 flex-1">
+            {/* An issue build's progress lives on its run, not on the session's
+              stage, which sits at SETUP between two repos of a chain. */}
+            {displayRun && displayIsIssue ? (
+              <IssueRail run={displayRun} />
+            ) : (
+              <PhaseRail currentStage={currentStage} active={isLive} failed={status === "FAILED"} />
+            )}
+          </div>
+          {displayRun && displayIsIssue ? (
+            // Three places to go, each named — a lone GitHub icon cannot say
+            // whether it opens the issue, the log or the pull request.
+            <div className="mr-3 flex shrink-0 flex-wrap items-center gap-3 text-xs">
+              {displayRun.issueUrl && (
+                <a
+                  href={displayRun.issueUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-primary-700 hover:underline"
+                >
+                  {strings.issueLink(issueRunRepo(displayRun), displayRun.issueNumber ?? 0)}
+                </a>
+              )}
+              {actionsLogUrl && (
+                <a
+                  href={actionsLogUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-primary-700 hover:underline"
+                >
+                  {strings.actionsLogLink}
+                </a>
+              )}
+              {displayPr?.url && (
+                <a
+                  href={displayPr.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-primary-700 hover:underline"
+                >
+                  {strings.prLink(displayPr.number)}
+                </a>
+              )}
+            </div>
+          ) : (
+            selectedRun?.githubRunUrl && (
+              <a
+                href={selectedRun.githubRunUrl}
+                target="_blank"
+                rel="noreferrer"
+                title={strings.watchOnGithub}
+                aria-label={strings.watchOnGithub}
+                className="mr-3 shrink-0 rounded p-1.5 text-typography-500 hover:bg-neutral-100 hover:text-typography-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500"
+              >
+                <LogoGithub size={16} />
+              </a>
+            )
+          )}
+        </div>
+      )}
+
+      {!chained && (
+        <RunHistoryRail
+          runs={runs ?? []}
+          selectedRunId={selectedRunId}
+          onSelect={handleSelectRun}
+          // A repo chain lists each repo's build above, and picking a repo there
+          // switches the feed: every run, reviews and retries included, is then
+          // detail, kept one click away rather than a row of cards on top.
+          folded={chain.length > 0}
+        />
+      )}
 
       {isWaiting && pendingQuestions?.length ? (
         <section className="border-y border-primary-200 bg-primary-50/40 px-4 py-3">
@@ -479,19 +631,33 @@ export const BuildView: React.FC<BuildViewProps> = ({
           `sessionError` is the session's account and `selectedRun.error` the
           runner's; when they differ the second is the technical one, so it
           becomes the detail behind the expander rather than a row of its own. */}
-      <BuildActivityFeed
-        events={displayedEvents}
-        isLive={isLive && isViewingLive}
-        isLoading={!!selectedRunId && !loadedRuns.has(selectedRunId)}
-        failure={
-          failureTitle
-            ? {
-                title: failureTitle,
-                detail: failureDetail,
-              }
-            : null
-        }
-      />
+      {chained ? (
+        <>
+          {/* Folded unless a repo is building: on a finished chain the table
+              says everything, and the transcript is reference. */}
+          <CollapsibleSection
+            heading={
+              displayRun && displayIsIssue
+                ? en.builder.repoChain.activityHeading(issueRunRepo(displayRun) ?? "")
+                : en.builder.repoChain.activityHeading(
+                    displayRun ? strings.runLabel(displayRun.sequence, displayRun.mode) : "",
+                  )
+            }
+            meta={en.builder.repoChain.activityMeta(countFeedUpdates(displayedEvents))}
+            defaultOpen={isLive}
+          >
+            <div className="flex max-h-[60vh] min-h-[8rem] flex-col">{feedElement}</div>
+          </CollapsibleSection>
+          <RunHistoryRail
+            runs={runs ?? []}
+            selectedRunId={selectedRunId}
+            onSelect={handleSelectRun}
+            folded
+          />
+        </>
+      ) : (
+        feedElement
+      )}
 
       {/* Pull requests, split by whether they still want something from you.
           Stacks' "Unattended Execution: Risk-Based Action Gating" is the frame:
@@ -503,7 +669,8 @@ export const BuildView: React.FC<BuildViewProps> = ({
           Before this they were identical tiles in a collapsed section, so the
           single thing a build exists to produce — a pull request somebody has
           to look at — looked exactly like the three already merged above it. */}
-      {awaitingMerge.length > 0 && (
+      {/* A chain's pull requests live in its table rows. */}
+      {!chained && awaitingMerge.length > 0 && (
         <section className="mx-3 mt-3 rounded border border-primary-200 bg-primary-50/50 p-3">
           <h2 className="flex items-center gap-1.5 text-sm font-semibold text-typography-900">
             <PullRequestIcon size={16} />
@@ -512,32 +679,70 @@ export const BuildView: React.FC<BuildViewProps> = ({
               : strings.prAwaitingMany(awaitingMerge.length)}
           </h2>
           <ul className="mt-2 flex flex-col gap-2">
-            {awaitingMerge.map(pullRequest => (
-              <li key={pullRequest.id} className="flex items-center gap-3">
-                <a
-                  href={pullRequest.prUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="min-w-0 flex-1 text-sm text-primary-700 hover:underline"
-                >
-                  <span className="block truncate font-medium">
-                    {pullRequest.title ?? `${pullRequest.repo} #${pullRequest.prNumber}`}
-                  </span>
-                  <span className="block truncate text-xs text-typography-600">
-                    {pullRequest.repo} #{pullRequest.prNumber}
-                  </span>
-                </a>
-                <Button size="sm" disabled={isMerging} onClick={() => handleMerge(pullRequest.id)}>
-                  {mergingId === pullRequest.id ? strings.prMerging : strings.prMerge}
-                </Button>
-              </li>
-            ))}
+            {awaitingMerge.map(pullRequest => {
+              // An issue build's pull request is opencode's until CI is green:
+              // merging it mid-fix would ship whatever commit happened to be
+              // on it. Nothing auto-approves either, so once green the copy
+              // says the approval is the reader's, on GitHub.
+              const issueRun = issueRunFor(pullRequest, runs);
+              const ciGreen = pullRequest.ciStatus === "success";
+              const issueWorking = Boolean(issueRun) && isRunActive(issueRun);
+              const mergeBlocked = Boolean(issueRun) && (issueWorking || !ciGreen);
+
+              return (
+                <li key={pullRequest.id} className="flex flex-col gap-1">
+                  <div className="flex items-center gap-3">
+                    <a
+                      href={pullRequest.prUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="min-w-0 flex-1 text-sm text-primary-700 hover:underline"
+                    >
+                      <span className="block truncate font-medium">
+                        {pullRequest.title ?? `${pullRequest.repo} #${pullRequest.prNumber}`}
+                      </span>
+                      <span className="block truncate text-xs text-typography-600">
+                        {pullRequest.repo} #{pullRequest.prNumber}
+                      </span>
+                    </a>
+                    {pullRequest.ciStatus && (
+                      <Tag type={CI_TAG_TYPE[pullRequest.ciStatus] ?? "gray"} size="sm">
+                        {strings.ciStatus[pullRequest.ciStatus] ?? pullRequest.ciStatus}
+                      </Tag>
+                    )}
+                    <Button
+                      size="sm"
+                      disabled={isMerging || mergeBlocked}
+                      onClick={() => handleMerge(pullRequest.id)}
+                    >
+                      {mergingId === pullRequest.id ? strings.prMerging : strings.prMerge}
+                    </Button>
+                  </div>
+                  {issueRun && issueWorking && (
+                    <p className="text-xs text-typography-600">{strings.prIssueWorking}</p>
+                  )}
+                  {issueRun && !issueWorking && ciGreen && (
+                    <p className="text-xs text-typography-600">
+                      {strings.prIssueReady}{" "}
+                      <a
+                        href={pullRequest.prUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-primary-700 hover:underline"
+                      >
+                        {strings.prIssueOpenOnGithub}
+                      </a>
+                    </p>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </section>
       )}
 
       {/* Settled ones are a record, not a task: one quiet line each, collapsed. */}
-      {settledPrs.length > 0 && (
+      {!chained && settledPrs.length > 0 && (
         <CollapsibleSection heading={strings.pullRequestsHeading} meta={String(settledPrs.length)}>
           <ul className="flex flex-col gap-1">
             {settledPrs.map(pullRequest => (

@@ -44,6 +44,13 @@ export const toolLabel = (name: string) => TOOL_LABELS[name.toLowerCase()] ?? na
  */
 const HIDDEN_TYPES = new Set(["cost", "phase_cost", "done", "tool_result", "todo"]);
 
+/**
+ * How many rows the feed would show — the count a folded feed puts beside its
+ * heading. Stage dividers are not updates, so they are not counted.
+ */
+export const countFeedUpdates = (events: BuilderBuildEvent[]): number =>
+  events.filter(event => !HIDDEN_TYPES.has(event.type) && event.type !== "stage_change").length;
+
 interface BuildActivityFeedProps {
   events: BuilderBuildEvent[];
   /** True while the run is live — drives auto-scroll and the live pill. */
@@ -59,6 +66,13 @@ interface BuildActivityFeedProps {
    * of events, for as long as the first fetch took.
    */
   isLoading?: boolean;
+  /**
+   * Set when the run on screen is an issue build. opencode does the work in
+   * the target repo's Actions, so this feed only gets what Builder's 5-minute
+   * check sees — the copy says so and points at the live log, and stage
+   * dividers use issue wording ("CI running", not "Running the checks").
+   */
+  issueBuild?: { actionsLogUrl: string | null } | null;
 }
 
 /**
@@ -146,7 +160,11 @@ const FailureRow: React.FC<{ title: string; detail?: string | null }> = ({ title
           ⊘
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-sm text-typography-800">{title}</p>
+          {/* Markdown, so a URL in the error (an issue, a log) is a link
+              rather than text to copy out by hand. */}
+          <div className="prose prose-sm max-w-none text-sm text-typography-800">
+            <Markdown>{title}</Markdown>
+          </div>
           {detail && (
             <button
               type="button"
@@ -317,8 +335,12 @@ export const BuildActivityFeed: React.FC<BuildActivityFeedProps> = ({
   isLive,
   isLoading = false,
   failure,
+  issueBuild = null,
 }) => {
   const strings = en.builder.build;
+  const stageLabels = issueBuild
+    ? { ...en.builder.stages, ...en.builder.issueStages }
+    : en.builder.stages;
   const budgetFeed = en.builder.budget.feed;
   const containerRef = useRef<HTMLDivElement>(null);
   const [pinnedToBottom, setPinnedToBottom] = useState(true);
@@ -403,7 +425,7 @@ export const BuildActivityFeed: React.FC<BuildActivityFeedProps> = ({
           <div key={event.id} style={style} className="flex items-center gap-2 py-1">
             <span className="h-px flex-1 bg-neutral-200" />
             <span className="text-xs font-medium uppercase tracking-wide text-typography-500">
-              {en.builder.stages[asAgentText(payload.stage)] ?? asAgentText(payload.stage)}
+              {stageLabels[asAgentText(payload.stage)] ?? asAgentText(payload.stage)}
             </span>
             <span className="h-px flex-1 bg-neutral-200" />
           </div>
@@ -493,6 +515,77 @@ export const BuildActivityFeed: React.FC<BuildActivityFeedProps> = ({
                   summary={strings.gateOutput}
                   detail={asAgentText(payload.outputTail)}
                 />
+              </div>
+            ) : null}
+          </Tile>
+        );
+      }
+
+      case "ci_result": {
+        // The repo's own CI on the pull request opencode opened — modelled on
+        // the gate card above, and like it, a checked fact rather than the
+        // agent's account of itself.
+        const state = asAgentText(payload.state);
+        const failedChecks = asAgentTextList(payload.failed);
+        const tone =
+          state === "success" ? "green" : state === "failure" ? "red" : ("blue" as const);
+        const prNumber = asAgentText(payload.prNumber);
+        const prUrl = asAgentText(payload.prUrl);
+        const sha = asAgentText(payload.sha);
+
+        return (
+          <Tile
+            key={event.id}
+            style={style}
+            className={[
+              "border-l-4 text-sm",
+              state === "success"
+                ? "border-l-support-success"
+                : state === "failure"
+                  ? "border-l-support-error"
+                  : "border-l-primary-500",
+            ].join(" ")}
+          >
+            <div className="mb-1 flex flex-wrap items-center gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-typography-500">
+                {asAgentText(payload.repo)}
+                {prNumber ? ` · ` : ""}
+              </span>
+              {prNumber ? (
+                prUrl ? (
+                  <a
+                    href={prUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs font-semibold text-primary-700 hover:underline"
+                  >
+                    {strings.prLink(Number(prNumber))}
+                  </a>
+                ) : (
+                  <span className="text-xs font-semibold">{strings.prLink(Number(prNumber))}</span>
+                )
+              ) : null}
+              <Tag type={tone} size="sm" className="shrink-0">
+                {strings.ciStatus[state] ?? state}
+              </Tag>
+              <span className="text-xs text-typography-400">{strings.ciResultVerified}</span>
+              <span className="ml-auto">
+                <EventTimestamp createdAt={event.createdAt} />
+              </span>
+            </div>
+            {sha ? (
+              <p className="font-mono text-xs text-typography-500">{sha.slice(0, 7)}</p>
+            ) : null}
+            {failedChecks.length ? (
+              <div className="mt-2">
+                <p className="text-xs font-medium text-support-error">
+                  {strings.ciResultFailedChecks(failedChecks.length)}
+                </p>
+                <ul className="mt-1 list-inside list-disc font-mono text-xs text-typography-600">
+                  {failedChecks.map((check, checkIndex) => (
+                    <li key={`${event.id}-ci-${checkIndex}`}>{check}</li>
+                  ))}
+                </ul>
               </div>
             ) : null}
           </Tile>
@@ -678,16 +771,36 @@ export const BuildActivityFeed: React.FC<BuildActivityFeedProps> = ({
         onScroll={handleScroll}
         className="flex-1 overflow-y-auto px-4 py-3 max-md:max-h-[60dvh] max-md:min-h-[12rem]"
       >
-        {visible.length === 0 && !failure ? (
-          <p className="mt-8 text-center text-sm text-typography-500">
-            {isLoading
-              ? strings.feedLoading
-              : events.length > 0
-                ? strings.feedWorking(events.length)
-                : isLive
-                  ? strings.feedStarting
-                  : strings.feedEmpty}
+        {/* An issue build's feed is sparse by nature — the work happens in
+            the repo's Actions — so while it is live the way to watch it is
+            stated up top, not only when the feed is empty. */}
+        {issueBuild && isLive && !isLoading && (
+          <p className="mb-2 text-xs text-typography-500">
+            {issueBuild.actionsLogUrl ? strings.feedIssue : strings.feedIssueNoLog}{" "}
+            {issueBuild.actionsLogUrl && (
+              <a
+                href={issueBuild.actionsLogUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-primary-700 hover:underline"
+              >
+                {strings.feedIssueLogLink}
+              </a>
+            )}
           </p>
+        )}
+        {visible.length === 0 && !failure ? (
+          issueBuild && isLive && !isLoading ? null : (
+            <p className="mt-8 text-center text-sm text-typography-500">
+              {isLoading
+                ? strings.feedLoading
+                : events.length > 0
+                  ? strings.feedWorking(events.length)
+                  : isLive
+                    ? strings.feedStarting
+                    : strings.feedEmpty}
+            </p>
+          )
         ) : (
           <div className="flex flex-col gap-2">
             {visible.map((event, index) => {
