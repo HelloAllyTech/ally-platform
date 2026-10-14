@@ -204,24 +204,33 @@ export const StartBuildDialog: React.FC<StartBuildDialogProps> = ({
             />
           )}
 
+          {/* The action sits under the notification, not inside it: Carbon's InlineNotification
+              throws on a control among its children (a notification is announced as one block of
+              text, so a control in it is unreachable), and since this dialog stays mounted while
+              closed, that took the whole session page down on load. Not ActionableNotification
+              either, as BuildView uses: as an alertdialog it pulls focus to its button on every
+              render and traps it there, which inside a form dialog would hold focus hostage. */}
           {designBlock && (
-            <InlineNotification
-              kind="error"
-              lowContrast
-              hideCloseButton
-              title={
-                designBlock === "stale" ? strings.designStaleTitle : strings.designNotApprovedTitle
-              }
-              subtitle={
-                designBlock === "stale" ? strings.designStaleBody : strings.designNotApprovedBody
-              }
-            >
+            <div>
+              <InlineNotification
+                kind="error"
+                lowContrast
+                hideCloseButton
+                title={
+                  designBlock === "stale"
+                    ? strings.designStaleTitle
+                    : strings.designNotApprovedTitle
+                }
+                subtitle={
+                  designBlock === "stale" ? strings.designStaleBody : strings.designNotApprovedBody
+                }
+              />
               {onReviewDesign && (
                 <Button kind="tertiary" size="sm" className="mt-2" onClick={onReviewDesign}>
                   {strings.reviewDesign}
                 </Button>
               )}
-            </InlineNotification>
+            </div>
           )}
 
           {!readiness.ready && unreadySections.length > 0 && (
