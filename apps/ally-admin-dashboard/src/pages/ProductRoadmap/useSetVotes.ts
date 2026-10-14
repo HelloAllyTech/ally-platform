@@ -7,16 +7,22 @@ import { store } from "@store";
 import { RoadmapBoardQuery, RoadmapOpportunitiesQuery, RoadmapOpportunity } from "@types";
 
 /**
- * Which cached read to patch: the table's flat list, or the month board's lanes.
+ * Which cached read to patch: the table's flat list, the month board's lanes, or the single row
+ * the opportunity drawer reads.
  *
  * Generalised rather than copied when month boards arrived. The vote path has three non-obvious
  * invariants (below) and a second hook would be a second place for each of them to rot — the ONLY
- * thing that differs between the two layouts is how you reach an opportunity inside the cached
+ * thing that differs between the layouts is how you reach an opportunity inside the cached
  * response, so that is the only thing injected.
+ *
+ * "detail" carries no args because it needs none: `getRoadmapOpportunity` is keyed by the id
+ * itself, so the entry the drawer subscribed to is the one patched, and the args trap below
+ * cannot bite it.
  */
 export type AllocationTarget =
   | { kind: "list"; args: RoadmapOpportunitiesQuery }
-  | { kind: "board"; args: RoadmapBoardQuery };
+  | { kind: "board"; args: RoadmapBoardQuery }
+  | { kind: "detail" };
 
 /**
  * Commit a vote total optimistically.
@@ -51,6 +57,11 @@ export const useSetVotes = (target: AllocationTarget) => {
    */
   const patchOpportunity = useCallback(
     (opportunityId: string, mutate: (row: RoadmapOpportunity) => void) => {
+      if (target.kind === "detail") {
+        return store.dispatch(
+          productRoadmapAPI.util.updateQueryData("getRoadmapOpportunity", opportunityId, mutate),
+        );
+      }
       if (target.kind === "list") {
         return store.dispatch(
           productRoadmapAPI.util.updateQueryData("getRoadmapOpportunities", target.args, draft => {

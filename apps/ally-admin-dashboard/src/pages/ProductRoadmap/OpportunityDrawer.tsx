@@ -29,15 +29,19 @@ import {
   RoadmapOpportunityType,
   RoadmapReferenceImage,
   RoadmapTaxonomyItem,
+  RoadmapVoteBudget,
 } from "@types";
 import { hasFeature } from "@utils";
 
 import { RankBreakdownPanel } from "./RankBreakdown";
 import { ReferenceImagesField } from "./ReferenceImagesField";
+import { AllocationTarget, useSetVotes } from "./useSetVotes";
 import { monthKeyOf, monthLabel, shiftMonthKey } from "./utils/monthBoard";
 import { personName } from "./utils/people";
 import { sameReferenceImages } from "./utils/referenceImages";
 import { EFFORT_LABEL, STAGE_LABEL } from "./utils/stages";
+import { isVotable } from "./utils/votes";
+import { VoteButton } from "./VoteButton";
 
 const PRD_MAX = 20000;
 
@@ -65,6 +69,12 @@ const EFFORTS = Object.values(RoadmapOpportunityEffort);
 const PLANNED_MONTHS_BACK = 2;
 const PLANNED_MONTHS_FORWARD = 12;
 
+/**
+ * Votes cast here patch the drawer's own cache entry rather than the board's — see
+ * AllocationTarget. Module-level so useSetVotes hands back the same callback every render.
+ */
+const DRAWER_VOTE_TARGET: AllocationTarget = { kind: "detail" };
+
 interface OpportunityDrawerProps {
   opportunityId: string;
   /**
@@ -76,6 +86,8 @@ interface OpportunityDrawerProps {
    */
   onOpenBuilderSession: (handle: RoadmapBuilderSessionHandle) => void;
   goals: RoadmapTaxonomyItem[];
+  /** The caller's spendable votes. Undefined while it loads, which hides the vote control. */
+  budget?: RoadmapVoteBudget;
   canVote: boolean;
   canManage: boolean;
   /**
@@ -109,12 +121,14 @@ export const OpportunityDrawer: React.FC<OpportunityDrawerProps> = ({
   opportunityId,
   onOpenBuilderSession,
   goals,
+  budget,
   canVote,
   canManage,
   hasBuilderAccess,
   onClose,
 }) => {
   const navigate = useNavigate();
+  const setVotes = useSetVotes(DRAWER_VOTE_TARGET);
   const { data: opportunity, isLoading, isError } = useGetRoadmapOpportunityQuery(opportunityId);
   const { data: eligibleOwners } = useGetRoadmapEligibleOwnersQuery();
   const { data: comments } = useGetRoadmapCommentsQuery(opportunityId);
@@ -580,6 +594,30 @@ export const OpportunityDrawer: React.FC<OpportunityDrawerProps> = ({
             )}
           </div>
           <div className="flex shrink-0 items-center gap-1 md:gap-2">
+            {/*
+              The vote control, so a shared `?opportunity=` link can be voted on where it lands
+              rather than by closing the drawer and hunting for the row — which may not even be
+              on the current page of results, the case this drawer fetches by id for.
+
+              The same VoteButton the board and list use, so the cap, the debounce and the
+              optimistic patch are the ones already proven there; only the cache it patches
+              differs (DRAWER_VOTE_TARGET).
+
+              Shown ONLY while votes can move — vote permission, a loaded budget, and an
+              opportunity VoteButton itself would accept (stage `new`, not a bug). Unlike a board
+              row, the drawer does not render the padlock otherwise: the line under the title
+              already says what the votes are, and the Stage field below says why they're
+              frozen, so a locked control here would be a third copy of the same fact.
+
+              First in the set and fenced off from the drawer-level icons by a rule: it acts on
+              the opportunity, they act on the drawer.
+            */}
+            {canVote && budget && opportunity && isVotable(opportunity) && (
+              <>
+                <VoteButton opportunity={opportunity} budget={budget} onSetVotes={setVotes} />
+                <span aria-hidden className="bg-border-light hidden h-5 w-px md:block" />
+              </>
+            )}
             {/*
               Delete, as an icon, up here with the other two drawer-level actions.
 

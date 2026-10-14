@@ -353,8 +353,15 @@ export const productRoadmapAPI = baseAPI.injectEndpoints({
       // The LIST tag is shared by the table, the list feed and the board (see getRoadmapBoard),
       // so all three pick up the new ranks and ordering from one invalidation. The per-opportunity
       // VOTERS tag is separate: only this one opportunity's breakdown just changed.
+      //
+      // The opportunity's OWN tag is for getRoadmapOpportunity, which provides only that and so
+      // is untouched by LIST. Without it the drawer's rank breakdown would not move after a vote
+      // cast in the drawer, and — worse — a copy cached by an earlier visit would reopen with
+      // last visit's `myVotes`. The drawer's vote control sends an ABSOLUTE total, so one tap on
+      // that stale count would silently take back votes cast on the board in between.
       invalidatesTags: (_r, _e, { opportunityId }) => [
         { type: TAG_TYPES.PRODUCT_ROADMAP_OPPORTUNITIES, id: "LIST" },
+        { type: TAG_TYPES.PRODUCT_ROADMAP_OPPORTUNITIES, id: opportunityId },
         { type: TAG_TYPES.PRODUCT_ROADMAP_VOTERS, id: opportunityId },
       ],
     }),
