@@ -227,6 +227,7 @@ export const baseAPI = createApi({
     TAG_TYPES.MIN_APP_VERSION,
     TAG_TYPES.HELPLINE_ADMIN_SETTINGS,
     TAG_TYPES.SKILL_EXPERIMENTS,
+    TAG_TYPES.PUBLIC_ROADMAP,
   ],
   endpoints: () => ({}),
 });

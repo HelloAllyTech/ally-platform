@@ -25,10 +25,12 @@ vi.mock("@constants", () => ({
         comfortAudio: "Comfort Audio",
         turnDetection: "Turn Detection",
         aiModels: "AI Models",
+        roadmap: "Roadmap",
       },
       legalDescription: "Edit the content shown on the public legal pages.",
       turnDetectionDescription: "How long a roleplay agent waits before replying.",
       aiModelsDescription: "Which models Bug Hunter and Builder run on.",
+      roadmapDescription: "The cards on the public product roadmap.",
     },
     comfortAudio: {
       description: "Upload ambient audio tracks scenario authors can play under a roleplay.",
@@ -71,6 +73,7 @@ vi.mock("../TurnDetectionTab", () => ({
   TurnDetectionTab: () => <div data-testid="turn-detection-panel" />,
 }));
 vi.mock("../AiModelsTab", () => ({ AiModelsTab: () => <div data-testid="ai-models-panel" /> }));
+vi.mock("../RoadmapTab", () => ({ RoadmapTab: () => <div data-testid="roadmap-panel" /> }));
 
 const { Settings } = await import("../Settings");
 
@@ -153,13 +156,21 @@ describe("Settings shell", () => {
       expect(screen.getByText("Which models Bug Hunter and Builder run on.")).toBeTruthy();
       expect(screen.queryByText("Edit the content shown on the public legal pages.")).toBeNull();
     });
+
+    it("describes the public roadmap cards on the Roadmap tab", () => {
+      renderAt("/settings?tab=roadmap");
+
+      expect(screen.getByTestId("roadmap-panel")).toBeTruthy();
+      expect(screen.getByText("The cards on the public product roadmap.")).toBeTruthy();
+      expect(screen.queryByText("Edit the content shown on the public legal pages.")).toBeNull();
+    });
   });
 
   it("leaves showCount OFF, so no tab renders a stray zero", () => {
     renderAt();
 
     expect(screen.getByTestId("tabs").dataset.showCount).toBe("false");
-    for (const id of ["legal", "comfort-audio", "turn-detection", "ai-models"]) {
+    for (const id of ["legal", "comfort-audio", "turn-detection", "ai-models", "roadmap"]) {
       expect(screen.getByTestId(`tab-${id}`).textContent?.trim()).not.toMatch(/\b0$/);
     }
   });

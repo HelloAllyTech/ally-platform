@@ -8,6 +8,7 @@ import { en } from "@constants";
 import { AiModelsTab } from "./AiModelsTab";
 import { ComfortAudioTab } from "./ComfortAudioTab";
 import { LegalTab } from "./LegalTab";
+import { RoadmapTab } from "./RoadmapTab";
 import { TurnDetectionTab } from "./TurnDetectionTab";
 
 /**
@@ -30,6 +31,7 @@ enum SettingsTab {
   COMFORT_AUDIO = "comfort-audio",
   TURN_DETECTION = "turn-detection",
   AI_MODELS = "ai-models",
+  ROADMAP = "roadmap",
 }
 
 /**
@@ -58,6 +60,11 @@ const TAB_ITEMS: { id: SettingsTab; label: string; description: string }[] = [
     label: en.settings.tabs.aiModels,
     description: en.settings.aiModelsDescription,
   },
+  {
+    id: SettingsTab.ROADMAP,
+    label: en.settings.tabs.roadmap,
+    description: en.settings.roadmapDescription,
+  },
 ];
 
 const TABS_BY_ID = new Map(TAB_ITEMS.map(item => [item.id as string, item]));
@@ -85,6 +92,8 @@ export const Settings: React.FC = () => {
         return <TurnDetectionTab />;
       case SettingsTab.AI_MODELS:
         return <AiModelsTab />;
+      case SettingsTab.ROADMAP:
+        return <RoadmapTab />;
       case SettingsTab.LEGAL:
       default:
         return <LegalTab />;
