@@ -1599,10 +1599,6 @@
     "loginHint": "You'll log in to start.",
     "logIn": "Log in",
     "goToCourses": "Go to my courses",
-    "login": {
-      "noAccount": "Don't have an account? Ask your organisation's admin to add you.",
-      "moreOptions": "More ways to log in"
-    },
     "unavailable": {
       "title": "This course isn't available",
       "body": "The link may have been switched off, or the course is no longer published. Check with whoever shared it with you."

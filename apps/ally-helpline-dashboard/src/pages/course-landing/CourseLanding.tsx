@@ -2,7 +2,7 @@ import { FC, useCallback, useEffect, useRef, useState } from "react";
 
 import { FetchBaseQueryError } from "@reduxjs/toolkit/query";
 import { useTranslation } from "react-i18next";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 
 import { CustomImage } from "@ally-ui-mono/ui-shared";
@@ -13,13 +13,7 @@ import {
   useLazyGetTrackAccessQuery,
 } from "@api";
 import { LoginDialog } from "@components";
-import {
-  LOCAL_STORAGE_KEYS,
-  ROUTES,
-  buildCourseLandingRoute,
-  buildTrackItemRoute,
-  buildTrackRoute,
-} from "@constants";
+import { LOCAL_STORAGE_KEYS, ROUTES, buildTrackItemRoute, buildTrackRoute } from "@constants";
 import { useUser } from "@hooks";
 import { TrackAccessDenialReason } from "@types";
 import { sanitizeHtml } from "@utils";
@@ -172,17 +166,6 @@ export const CourseLanding: FC = () => {
       onClose={() => setIsLoginOpen(false)}
       onSuccess={handleLoginSuccess}
       requireTerms
-      emailFooter={
-        <div className="flex flex-col gap-1 border-t border-border-light pt-3 text-xs text-typography-700">
-          <span>{t("courseLanding.login.noAccount")}</span>
-          <Link
-            to={`${ROUTES.LOGIN}?returnTo=${encodeURIComponent(buildCourseLandingRoute(trackId))}`}
-            className="text-primary-500 hover:underline"
-          >
-            {t("courseLanding.login.moreOptions")}
-          </Link>
-        </div>
-      }
     />
   );
 
