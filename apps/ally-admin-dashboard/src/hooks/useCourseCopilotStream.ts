@@ -129,6 +129,20 @@ const ANSWER_SUFFIX_RE = /\s*\[(?:none of these|selected ids:|custom:)[^\]]*\]\s
 const answerText = (content: string | null | undefined): string =>
   (content ?? "").replace(ANSWER_PREFIX_RE, "").replace(ANSWER_SUFFIX_RE, "");
 
+/**
+ * The newest question card in the feed for `questionId` — the one an answer to it is for. Marking
+ * and rolling back both look the card up this way, so they always agree on which card it is.
+ */
+const latestCardFor = (
+  messages: CourseCopilotFeedMessage[],
+  questionId: string,
+): CourseCopilotFeedMessage | undefined => {
+  for (let index = messages.length - 1; index >= 0; index--) {
+    if (messages[index].question?.id === questionId) return messages[index];
+  }
+  return undefined;
+};
+
 /** A persisted tool result's `summary`, when it has one — the resume path's version of a tool note. */
 const summaryOf = (result: unknown): string | null => {
   if (!result || typeof result !== "object") return null;
@@ -529,8 +543,8 @@ export const useCourseCopilotStream = ({
     ): Promise<{
       userMsgId: string | null;
       assistantId: string;
-      /** The question card this turn answered (marked answered instead of adding a bubble). */
-      cardId: string | null;
+      /** The question this turn answered — its card is marked answered instead of adding a bubble. */
+      questionId: string | null;
       sessionLost: boolean;
       /** The server refused the turn outright — nothing of it was recorded. */
       refused: boolean;
@@ -548,11 +562,8 @@ export const useCourseCopilotStream = ({
       // a reload drew the answer in two places.
       // Ids are minted outside the updater, which React may run twice.
       const userMsgId = hideUserBubble ? null : nextMessageId();
-      const marked: { cardId: string | null } = { cardId: null };
       setMessages(prev => {
-        const card = opts?.questionId
-          ? prev.find(message => message.question?.id === opts.questionId)
-          : undefined;
+        const card = opts?.questionId ? latestCardFor(prev, opts.questionId) : undefined;
         const assistant: CourseCopilotFeedMessage = {
           id: assistantId,
           role: "assistant",
@@ -560,7 +571,6 @@ export const useCourseCopilotStream = ({
           isStreaming: true,
         };
         if (card) {
-          marked.cardId = card.id;
           return [
             ...prev.map(message =>
               message.id === card.id
@@ -570,7 +580,6 @@ export const useCourseCopilotStream = ({
             assistant,
           ];
         }
-        marked.cardId = null;
         if (!userMsgId) return [...prev, assistant];
         return [...prev, { id: userMsgId, role: "user" as const, content: text }, assistant];
       });
@@ -658,7 +667,7 @@ export const useCourseCopilotStream = ({
       return {
         userMsgId,
         assistantId,
-        cardId: marked.cardId,
+        questionId: opts?.questionId ?? null,
         sessionLost,
         refused,
         aborted: controller.signal.aborted,
@@ -667,18 +676,26 @@ export const useCourseCopilotStream = ({
     [fetchStreamWithReauth, flushTokens, handleEvent, patchMessage],
   );
 
-  /** Takes a turn's bubbles back out, and unmarks the card it answered. */
+  /**
+   * Takes a turn's bubbles back out, and unmarks the card it answered.
+   *
+   * The card is found again here, by question, rather than remembered from `runStream`: the update
+   * that marked it runs when React renders, which can be after a refusal has already come back — a
+   * card id captured inside that update would still be empty, and the card would stay locked on an
+   * answer the copilot never received. Updates run in order, so this one always sees the mark.
+   */
   const rollBackTurn = useCallback(
-    (turn: { userMsgId: string | null; assistantId: string; cardId: string | null }) => {
-      setMessages(prev =>
-        prev
+    (turn: { userMsgId: string | null; assistantId: string; questionId: string | null }) => {
+      setMessages(prev => {
+        const card = turn.questionId ? latestCardFor(prev, turn.questionId) : undefined;
+        return prev
           .filter(message => message.id !== turn.userMsgId && message.id !== turn.assistantId)
           .map(message =>
-            message.id === turn.cardId
+            message === card
               ? { ...message, answeredWith: undefined, answeredAnswer: undefined }
               : message,
-          ),
-      );
+          );
+      });
     },
     [],
   );
