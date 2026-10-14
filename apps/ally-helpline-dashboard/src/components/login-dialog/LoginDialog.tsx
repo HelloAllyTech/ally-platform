@@ -5,9 +5,10 @@ import { motion } from "framer-motion";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
-import { ComposedModal, ModalBody } from "@ally-ui-mono/ui-shared";
+import { ComposedModal, GoogleSignInButton, ModalBody } from "@ally-ui-mono/ui-shared";
 import {
   useGenerateOTPMutation,
+  useGoogleSignInMutation,
   usePutTermsAndAgreementMutation,
   useVerifyOTPMutation,
 } from "@api";
@@ -27,13 +28,7 @@ import OTP from "../otp";
 import TermsAndAgreement from "../terms-and-agreement/TermsAndAgreement";
 import TextField from "../text-field";
 
-const LoginDialog: FC<LoginPopupProps> = ({
-  isOpen,
-  onClose,
-  onSuccess,
-  requireTerms = false,
-  emailFooter,
-}) => {
+const LoginDialog: FC<LoginPopupProps> = ({ isOpen, onClose, onSuccess, requireTerms = false }) => {
   const { t } = useTranslation();
   // Held until the terms are accepted when `requireTerms` is on, so nothing is
   // signed in (tokens stored) before the learner has agreed.
@@ -45,7 +40,6 @@ const LoginDialog: FC<LoginPopupProps> = ({
   const [emailError, setEmailError] = useState<string>("");
   const [otp, setOtp] = useState<string>("");
   const [countdown, setCountdown] = useState<number>(0);
-  const [rememberMe, setRememberMe] = useState<boolean>(false);
 
   const [
     generateOTP,
@@ -65,6 +59,7 @@ const LoginDialog: FC<LoginPopupProps> = ({
       error: verifyOTPError,
     },
   ] = useVerifyOTPMutation();
+  const [googleSignIn, { isLoading: isGoogleSigningIn }] = useGoogleSignInMutation();
 
   const { checkAuth } = useUser();
 
@@ -111,18 +106,24 @@ const LoginDialog: FC<LoginPopupProps> = ({
         const errorMessage = errorData?.message ?? t("auth.login.errors.verifyOtp");
         toast.error(errorMessage);
       } else if (isVerifyOTPSuccess && verifyOTPData) {
-        if (requireTerms) {
-          pendingTokensRef.current = {
-            accessToken: verifyOTPData.accessToken,
-            refreshToken: verifyOTPData.refreshToken,
-          };
-          setIsTermsOpen(true);
-          return;
-        }
-        await signIn(verifyOTPData.accessToken, verifyOTPData.refreshToken);
+        await completeSignIn(verifyOTPData);
       }
     })();
   }, [isVerifyOTPSuccess, verifyOTPError, verifyOTPData]);
+
+  // Both the code and Google end here, so either way the terms step (when
+  // required) comes before anything is signed in.
+  const completeSignIn = async (tokens: { accessToken: string; refreshToken: string }) => {
+    if (requireTerms) {
+      pendingTokensRef.current = {
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+      };
+      setIsTermsOpen(true);
+      return;
+    }
+    await signIn(tokens.accessToken, tokens.refreshToken);
+  };
 
   const signIn = async (accessToken: string, refreshToken: string) => {
     localStorage.setItem(LOCAL_STORAGE_KEYS.ACCESS_TOKEN, accessToken);
@@ -160,9 +161,9 @@ const LoginDialog: FC<LoginPopupProps> = ({
       setEmailError(t("auth.login.email.error"));
       return;
     }
-    if (rememberMe) {
-      localStorage.setItem("rememberedEmail", email.trim());
-    }
+    // The popup has no "Remember me" box: the email is always kept for next
+    // time. It only prefills this field — sessions don't depend on it.
+    localStorage.setItem("rememberedEmail", email.trim());
     generateOTP({ email: email.trim() });
   };
 
@@ -179,6 +180,26 @@ const LoginDialog: FC<LoginPopupProps> = ({
 
   const handleVerify = () => {
     verifyOTP({ email: email.trim(), otp });
+  };
+
+  const handleGoogleSuccess = async (tokenData: { accessToken?: string; credential?: string }) => {
+    try {
+      const response = await googleSignIn(
+        tokenData.credential
+          ? { idToken: tokenData.credential }
+          : { accessToken: tokenData.accessToken },
+      );
+      if (response.data) {
+        await completeSignIn(response.data);
+        return;
+      }
+      const errorData = (response.error as FetchBaseQueryError | undefined)?.data as
+        | { message: string }
+        | undefined;
+      toast.error(errorData?.message ?? t("auth.login.google.error"));
+    } catch {
+      toast.error(t("auth.login.google.error"));
+    }
   };
 
   const getLoginSection = () => {
@@ -200,38 +221,23 @@ const LoginDialog: FC<LoginPopupProps> = ({
             </h1>
             <span className="text-2xl mt-[24px]">{t("auth.login.subtitle")}</span>
           </div>
-          <div className="flex flex-col gap-1">
-            <TextField
-              fieldSize="medium"
-              type="email"
-              inputMode="email"
-              autoComplete="email"
-              label={t("auth.login.email.label")}
-              value={email}
-              onChange={handleEmailChange}
-              errorMessage={emailError}
-              hideError={false}
-              placeholder={t("auth.login.email.placeholder")}
-              className="w-full rounded-xs"
-            />
-
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="remember"
-                className="h-4 w-4 rounded border-2 border-[#e3dbce] text-primary-500 focus:ring-primary-500 cursor-pointer"
-                checked={rememberMe}
-                onChange={e => setRememberMe(e.target.checked)}
-              />
-              <label htmlFor="remember" className="text-sm text-typography-700 cursor-pointer">
-                {t("auth.login.rememberMe")}
-              </label>
-            </div>
-          </div>
+          <TextField
+            fieldSize="medium"
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            label={t("auth.login.email.label")}
+            value={email}
+            onChange={handleEmailChange}
+            errorMessage={emailError}
+            hideError={false}
+            placeholder={t("auth.login.email.placeholder")}
+            className="w-full rounded-xs"
+          />
           <Button
             type="button"
-            className="w-full rounded-[5px] mt-6"
-            disabled={isLoading || isSubmitDisabled}
+            className="w-full rounded-[5px] mt-2"
+            disabled={isLoading || isGoogleSigningIn || isSubmitDisabled}
             onClick={handleNext}
           >
             {isLoading ? (
@@ -243,6 +249,21 @@ const LoginDialog: FC<LoginPopupProps> = ({
               t("common.next")
             )}
           </Button>
+          {import.meta.env.VITE_GOOGLE_AUTH_CLIENT_ID ? (
+            <>
+              <div className="flex items-center">
+                <div className="flex-grow border-t border-gray-300" />
+                <span className="mx-3 text-xs text-gray-500">{t("auth.login.divider")}</span>
+                <div className="flex-grow border-t border-gray-300" />
+              </div>
+              <GoogleSignInButton
+                onSuccess={handleGoogleSuccess}
+                onError={() => toast.error(t("auth.login.google.error"))}
+                text={t("auth.login.google.button")}
+                disabled={isLoading || isGoogleSigningIn}
+              />
+            </>
+          ) : null}
           <div className="text-xs text-typography-800 mt-2">
             {t("auth.login.proceedAgree")}{" "}
             <span
@@ -258,9 +279,7 @@ const LoginDialog: FC<LoginPopupProps> = ({
             >
               {t("auth.login.privacy")}
             </span>
-            .
           </div>
-          {emailFooter}
         </motion.div>
       );
     }

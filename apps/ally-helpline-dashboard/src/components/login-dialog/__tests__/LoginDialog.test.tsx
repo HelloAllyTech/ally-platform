@@ -1,7 +1,7 @@
 import React from "react";
 
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import LoginDialog from "../LoginDialog";
 
@@ -18,11 +18,21 @@ vi.mock("@assets", () => ({
 }));
 
 // Mock API hooks
-const { mockGenerate, mockVerify, mockPutTerms, mockCheckAuth, verifyState } = vi.hoisted(() => ({
+const {
+  mockGenerate,
+  mockVerify,
+  mockPutTerms,
+  mockCheckAuth,
+  mockGoogleSignIn,
+  mockToastError,
+  verifyState,
+} = vi.hoisted(() => ({
   mockGenerate: vi.fn(),
   mockVerify: vi.fn(),
   mockPutTerms: vi.fn(),
   mockCheckAuth: vi.fn(),
+  mockGoogleSignIn: vi.fn(),
+  mockToastError: vi.fn(),
   // What the verify mutation reports; a test flips it to a verified code.
   verifyState: {
     current: { isLoading: false, isSuccess: false } as Record<string, unknown>,
@@ -32,6 +42,18 @@ vi.mock("@api", () => ({
   useGenerateOTPMutation: () => [mockGenerate, { isLoading: false, isSuccess: false }],
   useVerifyOTPMutation: () => [mockVerify, verifyState.current],
   usePutTermsAndAgreementMutation: () => [mockPutTerms],
+  useGoogleSignInMutation: () => [mockGoogleSignIn, { isLoading: false }],
+}));
+
+vi.mock("sonner", () => ({ toast: { error: mockToastError } }));
+
+// Google's popup hands back an access token as soon as the button is pressed.
+vi.mock("@react-oauth/google", () => ({
+  useGoogleLogin:
+    ({ onSuccess }: any) =>
+    () =>
+      onSuccess({ access_token: "google-access-token" }),
+  GoogleLogin: () => null,
 }));
 
 // Mock user hook
@@ -102,6 +124,11 @@ describe("LoginDialog", () => {
     vi.clearAllMocks();
     localStorage.clear();
     verifyState.current = { isLoading: false, isSuccess: false };
+    vi.stubEnv("VITE_GOOGLE_AUTH_CLIENT_ID", "test-client-id");
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   const verifiedCode = () => {
@@ -156,17 +183,64 @@ describe("LoginDialog", () => {
     expect(screen.getByTestId("terms")).toBeTruthy();
   });
 
-  it("renders the email footer under the email step", () => {
-    render(
-      <LoginDialog
-        isOpen
-        onClose={vi.fn()}
-        onSuccess={vi.fn()}
-        emailFooter={<span>ask your admin</span>}
-      />,
-    );
+  it("signs in with Google straight away by default", async () => {
+    mockGoogleSignIn.mockResolvedValue({
+      data: { accessToken: "g-access", refreshToken: "g-refresh" },
+    });
+    const onSuccess = vi.fn();
+    render(<LoginDialog isOpen onClose={vi.fn()} onSuccess={onSuccess} />);
 
-    expect(screen.getByText("ask your admin")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Continue with Google" }));
+
+    await waitFor(() => expect(onSuccess).toHaveBeenCalled());
+    expect(mockGoogleSignIn).toHaveBeenCalledWith({ accessToken: "google-access-token" });
+    expect(localStorage.getItem("accessToken")).toBe("g-access");
+    expect(localStorage.getItem("refreshToken")).toBe("g-refresh");
+  });
+
+  it("with requireTerms, a Google sign-in waits for the terms like the code does", async () => {
+    mockGoogleSignIn.mockResolvedValue({
+      data: { accessToken: "g-access", refreshToken: "g-refresh" },
+    });
+    mockPutTerms.mockResolvedValue({ data: { success: true } });
+    const onSuccess = vi.fn();
+    render(<LoginDialog isOpen onClose={vi.fn()} onSuccess={onSuccess} requireTerms />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Continue with Google" }));
+
+    await waitFor(() => expect(screen.getByTestId("terms")).toBeTruthy());
+    expect(localStorage.getItem("accessToken")).toBeNull();
+    expect(onSuccess).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByText("agree-to-terms"));
+
+    await waitFor(() => expect(onSuccess).toHaveBeenCalled());
+    expect(mockPutTerms).toHaveBeenCalledWith({ token: "g-access" });
+    expect(localStorage.getItem("accessToken")).toBe("g-access");
+  });
+
+  it("shows the server's reason when a Google sign-in is refused, and stays signed out", async () => {
+    mockGoogleSignIn.mockResolvedValue({
+      error: { status: 404, data: { message: "No account found associated with this email" } },
+    });
+    const onSuccess = vi.fn();
+    render(<LoginDialog isOpen onClose={vi.fn()} onSuccess={onSuccess} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Continue with Google" }));
+
+    await waitFor(() =>
+      expect(mockToastError).toHaveBeenCalledWith("No account found associated with this email"),
+    );
+    expect(onSuccess).not.toHaveBeenCalled();
+    expect(localStorage.getItem("accessToken")).toBeNull();
+  });
+
+  it("leaves Google out when no Google client is configured", () => {
+    vi.stubEnv("VITE_GOOGLE_AUTH_CLIENT_ID", "");
+    render(<LoginDialog isOpen onClose={vi.fn()} onSuccess={vi.fn()} />);
+
+    expect(screen.queryByRole("button", { name: "Continue with Google" })).toBeNull();
+    expect(screen.queryByText("OR")).toBeNull();
   });
 
   it("renders email section and validates email before generating OTP", () => {
@@ -183,15 +257,13 @@ describe("LoginDialog", () => {
     expect(mockGenerate).not.toHaveBeenCalled();
   });
 
-  it("remembers email and calls generateOTP with trimmed lowercase email", () => {
+  it("always remembers the email, with no Remember me box to tick", () => {
     render(<LoginDialog isOpen onClose={vi.fn()} onSuccess={vi.fn()} />);
+
+    expect(screen.queryByLabelText(/Remember me/i)).toBeNull();
 
     const emailInput = screen.getByLabelText("Email");
     fireEvent.change(emailInput, { target: { value: "  USER@EXAMPLE.COM  " } });
-
-    // check remember me
-    const remember = screen.getByLabelText(/Remember me/i);
-    fireEvent.click(remember);
 
     const nextBtn = screen.getByRole("button", { name: "Next" });
     fireEvent.click(nextBtn);
@@ -208,6 +280,13 @@ describe("LoginDialog", () => {
 
     fireEvent.click(screen.getByText(/Privacy Policy/i));
     expect(openLinkSpy).toHaveBeenCalledWith("https://example.com/privacy");
+  });
+
+  it("prefills the email remembered from last time", () => {
+    localStorage.setItem("rememberedEmail", "back@example.com");
+    render(<LoginDialog isOpen onClose={vi.fn()} onSuccess={vi.fn()} />);
+
+    expect(screen.getByLabelText("Email")).toHaveValue("back@example.com");
   });
 
   it("close icon and Escape both trigger onClose callback", () => {
