@@ -27,3 +27,17 @@ class UserProfile {
   final String? profileImageUrl;
   final bool profileCompleted;
 }
+
+/// Mirrors ally-mobile (React Native)'s `authApi.ts` `LogoUrlResponse` —
+/// the signed-in user's organization, shown in the drawer header.
+class TenantInfo {
+  TenantInfo({required this.name, required this.logoUrl});
+
+  factory TenantInfo.fromJson(Map<String, dynamic> json) => TenantInfo(
+        name: json['name'] as String? ?? '',
+        logoUrl: json['logoUrl'] as String?,
+      );
+
+  final String name;
+  final String? logoUrl;
+}

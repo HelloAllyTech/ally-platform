@@ -77,6 +77,41 @@ void main() {
 
       expect(credits.remaining, 0);
     });
+
+    test('usagePercentage rounds consumed/limit to a whole percent', () {
+      final credits = SimulationCredits.fromJson({
+        'creditLimit': 3,
+        'consumedCredits': 1,
+      });
+
+      expect(credits.usagePercentage, 33);
+    });
+
+    test('usagePercentage is 0 when creditLimit is 0 (avoids divide-by-zero)', () {
+      final credits = SimulationCredits.fromJson(const {});
+      expect(credits.usagePercentage, 0);
+    });
+
+    test(
+      'isLow is true once remaining time drops under the 20-minute auto-end threshold',
+      () {
+        // 2 remaining credits * 700s/credit = 1400s >= 1200s threshold -> not low.
+        final notLow = SimulationCredits.fromJson({
+          'creditLimit': 2,
+          'consumedCredits': 0,
+          'secondsAllowedPerCredit': 700,
+        });
+        expect(notLow.isLow, isFalse);
+
+        // 1 remaining credit * 60s/credit = 60s < 1200s threshold -> low.
+        final low = SimulationCredits.fromJson({
+          'creditLimit': 2,
+          'consumedCredits': 1,
+          'secondsAllowedPerCredit': 60,
+        });
+        expect(low.isLow, isTrue);
+      },
+    );
   });
 
   group('SimulationPath.fromJson', () {

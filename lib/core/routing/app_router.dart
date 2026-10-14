@@ -18,7 +18,6 @@ import '../../features/courses/presentation/course_detail_screen.dart';
 import '../../features/courses/presentation/course_item_player_screen.dart';
 import '../../features/courses/presentation/course_overview_screen.dart';
 import '../../features/courses/presentation/course_progress_screen.dart';
-import '../../features/home/presentation/home_screen.dart';
 import '../../features/leaderboard/presentation/leaderboard_screen.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
 import '../../features/preferences/presentation/preferences_screen.dart';
@@ -37,6 +36,7 @@ import '../../features/simulations/presentation/simulation_feedback_screen.dart'
 import '../../features/simulations/presentation/simulation_path_details_screen.dart';
 import '../../features/simulations/presentation/simulations_screen.dart';
 import '../auth/auth_state.dart';
+import '../navigation/app_shell_screen.dart';
 
 /// The redirect gate's actual decision logic, extracted to a pure top-level
 /// function so it's testable without constructing a real [GoRouterState]
@@ -95,7 +95,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     },
     routes: [
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
-      GoRoute(path: '/home', builder: (context, state) => const HomeScreen()),
+      GoRoute(path: '/home', builder: (context, state) => const AppShellScreen()),
       GoRoute(
         path: '/complete-profile',
         builder: (context, state) => const CompleteProfileScreen(),

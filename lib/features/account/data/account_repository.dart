@@ -17,6 +17,11 @@ class AccountRepository {
     return UserProfile.fromJson(response.data!);
   }
 
+  Future<TenantInfo> getTenant() async {
+    final response = await _dio.get<Map<String, dynamic>>('/users/tenant');
+    return TenantInfo.fromJson(response.data!);
+  }
+
   Future<void> completeProfile({required String name, String? phone}) async {
     await _dio.patch<void>(
       '/users/me/complete-profile',
@@ -78,4 +83,8 @@ final accountRepositoryProvider = Provider<AccountRepository>((ref) {
 
 final currentUserProvider = FutureProvider<UserProfile>((ref) {
   return ref.watch(accountRepositoryProvider).getUser();
+});
+
+final tenantInfoProvider = FutureProvider<TenantInfo>((ref) {
+  return ref.watch(accountRepositoryProvider).getTenant();
 });

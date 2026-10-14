@@ -117,6 +117,22 @@ void main() {
     });
   });
 
+  group('getUnreadCount', () {
+    test('returns the unread review count for the bottom-bar badge', () async {
+      when(() => dio.get<Map<String, dynamic>>('/scenario-session-reviews/unread-count'))
+          .thenAnswer((_) async => _response({'count': 3}));
+
+      expect(await repository.getUnreadCount(), 3);
+    });
+
+    test('defaults to 0 when count is absent', () async {
+      when(() => dio.get<Map<String, dynamic>>('/scenario-session-reviews/unread-count'))
+          .thenAnswer((_) async => _response(const {}));
+
+      expect(await repository.getUnreadCount(), 0);
+    });
+  });
+
   group('markAsRead', () {
     test('patches the mark-read endpoint', () async {
       when(() => dio.patch<void>('/scenario-session-reviews/rev-1/mark-read'))

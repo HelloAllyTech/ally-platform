@@ -44,6 +44,19 @@ void main() {
     });
   });
 
+  group('getTenant', () {
+    test('parses the signed-in org from /users/tenant', () async {
+      when(() => dio.get<Map<String, dynamic>>('/users/tenant')).thenAnswer(
+        (_) async => _response({'name': 'Acme Health', 'logoUrl': 'https://cdn.example.com/logo.png'}),
+      );
+
+      final tenant = await repository.getTenant();
+
+      expect(tenant.name, 'Acme Health');
+      expect(tenant.logoUrl, 'https://cdn.example.com/logo.png');
+    });
+  });
+
   group('completeProfile', () {
     test('patches name only when phone is omitted', () async {
       when(

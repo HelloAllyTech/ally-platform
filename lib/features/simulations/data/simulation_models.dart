@@ -44,19 +44,42 @@ class SessionData {
   final String liveKitServerUrl;
 }
 
+/// `secondsAllowedPerCredit` + the `isLow` threshold mirror ally-mobile
+/// (React Native)'s `src/utils/credits.ts` exactly: a credit is "low" once
+/// the remaining allotted time drops under `SESSION_AUTO_END_MINUTES` (20
+/// minutes), not under some fraction of the limit — a session could time
+/// out mid-call otherwise.
 class SimulationCredits {
-  SimulationCredits({required this.creditLimit, required this.consumedCredits});
+  SimulationCredits({
+    required this.creditLimit,
+    required this.consumedCredits,
+    this.secondsAllowedPerCredit = 0,
+  });
 
   factory SimulationCredits.fromJson(Map<String, dynamic> json) =>
       SimulationCredits(
         creditLimit: (json['creditLimit'] as num?)?.toInt() ?? 0,
         consumedCredits: (json['consumedCredits'] as num?)?.toInt() ?? 0,
+        secondsAllowedPerCredit:
+            (json['secondsAllowedPerCredit'] as num?)?.toInt() ?? 0,
       );
 
   final int creditLimit;
   final int consumedCredits;
+  final int secondsAllowedPerCredit;
 
   int get remaining => (creditLimit - consumedCredits).clamp(0, creditLimit);
+
+  int get usagePercentage =>
+      creditLimit == 0 ? 0 : ((consumedCredits / creditLimit) * 100).round();
+
+  static const _sessionAutoEndMinutes = 20;
+  static const _minutesInSeconds = 60;
+
+  bool get isLow {
+    final remainingTimeInSeconds = remaining * secondsAllowedPerCredit;
+    return remainingTimeInSeconds < _sessionAutoEndMinutes * _minutesInSeconds;
+  }
 }
 
 class SimulationPath {

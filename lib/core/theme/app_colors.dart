@@ -64,4 +64,8 @@ class AppColors {
   static const strokePrimary = Color(0xFFD2D2D2);
   static const strokeLightGray = Color(0xFFC8C5D0);
   static const iconDefault = Color(0xFF757575);
+
+  // misc (src/theme/colors.ts)
+  static const lightGray2 = Color(0xFFE5E7EB);
+  static const softCoralRed = Color(0xFFFE6F64);
 }

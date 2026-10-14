@@ -37,6 +37,14 @@ class ReviewsRepository {
     return ReviewItem.fromJson(response.data!);
   }
 
+  /// Drives the unread-review dot on the Review tab's bottom-bar icon.
+  Future<int> getUnreadCount() async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/scenario-session-reviews/unread-count',
+    );
+    return (response.data?['count'] as num?)?.toInt() ?? 0;
+  }
+
   Future<void> markAsRead(String reviewId) async {
     await _dio.patch<void>('/scenario-session-reviews/$reviewId/mark-read');
   }
@@ -145,6 +153,14 @@ final reviewsRepositoryProvider = Provider<ReviewsRepository>((ref) {
 
 final reviewsListProvider = FutureProvider<List<ReviewItem>>((ref) {
   return ref.watch(reviewsRepositoryProvider).getReviews();
+});
+
+/// Simulation-review half of RN's `hasUnreadReviews` (`simUnread.count +
+/// scribeUnread.count > 0`) — the scribe-review half isn't modeled yet
+/// since scribe review browsing itself isn't ported, only Scribe
+/// recording. Revisit once that lands.
+final unreadReviewCountProvider = FutureProvider<int>((ref) {
+  return ref.watch(reviewsRepositoryProvider).getUnreadCount();
 });
 
 final reviewDetailProvider = FutureProvider.family<ReviewItem, String>((
