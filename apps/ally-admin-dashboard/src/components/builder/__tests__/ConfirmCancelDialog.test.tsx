@@ -47,6 +47,23 @@ describe("ConfirmCancelDialog", () => {
     expect(screen.getByText("Stop it?")).toBeInTheDocument();
   });
 
+  it("says what stopping an issue build does to opencode, the issue and the pull request", () => {
+    render(
+      <ConfirmCancelDialog
+        isOpen
+        onClose={vi.fn()}
+        onConfirm={vi.fn()}
+        isLoading={false}
+        issueBuild={{ repo: "ally-web" }}
+      />,
+    );
+
+    expect(
+      screen.getByText(/cancels opencode's run in ally-web and closes the issue/),
+    ).toBeTruthy();
+    expect(screen.getByText(/stays open for you to close/)).toBeTruthy();
+  });
+
   it("only calls onConfirm when the confirm button is pressed", () => {
     const onConfirm = vi.fn();
     const onClose = vi.fn();

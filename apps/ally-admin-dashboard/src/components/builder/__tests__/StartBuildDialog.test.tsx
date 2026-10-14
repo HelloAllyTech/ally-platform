@@ -1,3 +1,5 @@
+import React from "react";
+
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -40,6 +42,23 @@ vi.mock("@ally-ui-mono/ui-shared", () => ({
     />
   ),
   Tooltip: ({ children }: any) => <>{children}</>,
+  // The group hands its onChange down so each radio can report its value.
+  RadioButtonGroup: ({ children, onChange, valueSelected }: any) => (
+    <div role="radiogroup">
+      {React.Children.map(children, (child: any) =>
+        React.cloneElement(child, {
+          checked: child.props.value === valueSelected,
+          onSelect: () => onChange(child.props.value),
+        }),
+      )}
+    </div>
+  ),
+  RadioButton: ({ labelText, value, checked, onSelect }: any) => (
+    <label>
+      <input type="radio" value={value} checked={checked} onChange={onSelect} />
+      {labelText}
+    </label>
+  ),
   FilterableMultiSelect: ({ items, selectedItems, onChange, invalid, invalidText }: any) => (
     <div>
       {invalid && <p>{invalidText}</p>}
@@ -162,6 +181,43 @@ describe("StartBuildDialog", () => {
     expect(screen.getByText("Start anyway")).toBeInTheDocument();
   });
 
+  it("defaults to an issue build, sends dispatch 'issue' and no model or budget", async () => {
+    render(<StartBuildDialog {...baseProps} currentRepos={["ally-be"]} initialBudgetUsd="15" />);
+
+    expect(screen.getByLabelText("GitHub issue + opencode (recommended)")).toBeChecked();
+    expect(screen.queryByLabelText("builder-start-budget")).toBeNull();
+    expect(screen.queryByLabelText("Planner model")).toBeNull();
+    expect(screen.queryByLabelText("Coder model")).toBeNull();
+    expect(screen.queryByLabelText("Verifier model")).toBeNull();
+    expect(screen.getByText(/BUILDER_MODEL variable/)).toBeInTheDocument();
+    expect(screen.getByText(/built one after another/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Start build" }));
+
+    await vi.waitFor(() => {
+      expect(startBuild).toHaveBeenCalledWith({ id: "session-1", dispatch: "issue" });
+    });
+  });
+
+  it("brings the budget and model fields back for the legacy runner", async () => {
+    render(<StartBuildDialog {...baseProps} currentRepos={["ally-be"]} initialBudgetUsd="15" />);
+
+    fireEvent.click(screen.getByLabelText("Builder runner (legacy)"));
+
+    expect(screen.getByLabelText("builder-start-budget")).toHaveValue("15");
+    expect(screen.getByLabelText("Coder model")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Start build" }));
+
+    await vi.waitFor(() => {
+      expect(startBuild).toHaveBeenCalledWith({
+        id: "session-1",
+        dispatch: "workflow",
+        budgetUsd: 15,
+      });
+    });
+  });
+
   it("seeds a retry above the spend, so the dispatch is not refused by the ceiling that stopped it", () => {
     // The live failure this came from: $16.77 spent against a $15 ceiling.
     // Seeding "15" hands back the figure the backend refuses, and "Retry
@@ -174,6 +230,8 @@ describe("StartBuildDialog", () => {
         spentUsd="16.7668"
       />,
     );
+    // The budget belongs to the legacy runner; issue builds have none.
+    fireEvent.click(screen.getByLabelText("Builder runner (legacy)"));
 
     expect(screen.getByLabelText("builder-start-budget")).toHaveValue("30");
   });
