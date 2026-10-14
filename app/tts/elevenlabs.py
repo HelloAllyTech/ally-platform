@@ -308,21 +308,26 @@ class ElevenLabsTTSClient(BaseTTSClient):
                 return
 
             # ElevenLabs requires speed to be in VoiceSettings object
-            # VoiceSettings requires stability and similarity_boost as
-            # required arguments
-            # Use values from params_dict if available, otherwise use
-            # LiveKit defaults
-            speed_value = params_dict.get("speed")
-            if speed_value is None:
-                speed_value = 1.0
+            # required arguments. Use values from params_dict if available, otherwise
+            # use the existing settings from the TTS instance to avoid incorrectly
+            # reverting generative-model defaults.
+            current_settings = getattr(
+                getattr(target, "options", None), "voice_settings", None
+            )
 
-            stability_value = params_dict.get("stability")
-            if stability_value is None:
-                stability_value = 0.71  # LiveKit default
+            current_stability = getattr(
+                current_settings, "stability", 0.71
+            )  # LiveKit default
+            current_similarity_boost = getattr(
+                current_settings, "similarity_boost", 0.5
+            )  # LiveKit default
+            current_speed = getattr(current_settings, "speed", 1.0)
 
-            similarity_boost_value = params_dict.get("similarity_boost")
-            if similarity_boost_value is None:
-                similarity_boost_value = 0.5  # LiveKit default
+            speed_value = params_dict.get("speed", current_speed)
+            stability_value = params_dict.get("stability", current_stability)
+            similarity_boost_value = params_dict.get(
+                "similarity_boost", current_similarity_boost
+            )
 
             voice_settings = VoiceSettings(
                 stability=stability_value,
