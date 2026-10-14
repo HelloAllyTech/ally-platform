@@ -61,11 +61,19 @@ class ElevenLabsTTSClient(BaseTTSClient):
         },
     }
 
-    # Inline audio tags (v3 models only). The instruction TEXT lives in prompt
+    # Inline audio tags (v3/v4 models only). The instruction TEXT lives in prompt
     # management — prompt code `ally_ai_learn_system_audio_tag_guidance`, local
     # fallback `app/prompts/system/audio_tag_guidance.txt` — so superadmins can
     # edit it. This client only advertises the capability via
     # supports_text_enhancement(); callers resolve the text from prompt management.
+
+    # Model-id markers for ElevenLabs' generative (v3/v4) families.
+    GENERATIVE_MODEL_MARKERS = ("v3", "v4")
+
+    @property
+    def _is_v3_model(self) -> bool:
+        """Back-compat alias: True for every generative (v3 or v4) model."""
+        return self._is_generative_model
 
     def __init__(
         self,
@@ -94,8 +102,16 @@ class ElevenLabsTTSClient(BaseTTSClient):
         self._tts_instance: Optional[agents_tts.TTS] = None
         self._base_tts: Optional[elevenlabs.TTS] = None
 
-        self._is_v3_model = "v3" in model.lower()
-        self._supports_audio_tags = self._is_v3_model
+        # v3 and v4 families (eleven_v3, eleven_v3_conversational, eleven_v4,
+        # eleven_v4_turbo) are generative "dialogue" models: ElevenLabs serves
+        # them only over HTTP /stream and the text-to-dialogue socket, never the
+        # text-to-speech multi-stream-input socket the plugin uses. Verified
+        # live 2026-10-14: v4 and v4_turbo fail the WS connect and succeed on
+        # the HTTP StreamAdapter path. Both families take inline audio tags.
+        self._is_generative_model = any(
+            marker in model.lower() for marker in self.GENERATIVE_MODEL_MARKERS
+        )
+        self._supports_audio_tags = self._is_generative_model
 
     @staticmethod
     def validate_voice(voice_id: str, api_key: Optional[str] = None) -> bool:
@@ -204,12 +220,12 @@ class ElevenLabsTTSClient(BaseTTSClient):
             )
             self._base_tts = base
             self._wrap_stream_with_timeout(base)
-            if self._is_v3_model:
-                # v3 models are generative and sentence-streamed, so they need
+            if self._is_generative_model:
+                # v3/v4 models are generative and sentence-streamed, so they need
                 # higher stability to avoid noticeable voice shifts mid-reply.
                 voice_settings = VoiceSettings(stability=0.95, similarity_boost=0.75)
                 base.update_options(voice_settings=voice_settings)
-                # eleven_v3 has no WebSocket multi-stream-input support
+                # v3/v4 have no WebSocket multi-stream-input support
                 # (livekit/agents#4901). StreamAdapter sentence-streams via
                 # the plugin's HTTP /stream chunked path instead.
                 self._tts_instance = agents_tts.StreamAdapter(tts=base)
@@ -218,9 +234,9 @@ class ElevenLabsTTSClient(BaseTTSClient):
         return self._tts_instance
 
     def allows_clip_synthesis(self) -> bool:
-        """Clips for flash, turbo, multilingual_v2 and the v3 models.
+        """Clips for flash, turbo, multilingual_v2 and the v3/v4 models.
 
-        v3 is generative, but the live reply on v3 is ALREADY one independent
+        v3/v4 are generative, but the live reply on v3 is ALREADY one independent
         generation per sentence (StreamAdapter over the HTTP path), held to one
         speaker only by the fixed voice settings in ``tts_instance``. A clip
         built by ``create_clip_tts`` gets the same voice id, model and settings,
@@ -228,20 +244,20 @@ class ElevenLabsTTSClient(BaseTTSClient):
         on a DIFFERENT model (multilingual_v2/flash for a v3 voice) would be,
         and is never done. Other models are unclassified and fail closed (see
         BaseTTSClient.allows_clip_synthesis)."""
-        if self._is_v3_model:
+        if self._is_generative_model:
             return True
         model = self._model.lower()
         return any(family in model for family in ("flash", "turbo", "multilingual_v2"))
 
     def supports_text_enhancement(self) -> bool:
         """
-        Whether inline audio tags are supported (ElevenLabs v3 models only).
+        Whether inline audio tags are supported (ElevenLabs v3/v4 models only).
 
         Capability flag only — the tag instruction text lives in prompt
         management (see the class comment above).
 
         Returns:
-            True for v3 models, False for v2/turbo/flash.
+            True for v3/v4 models, False for v2/turbo/flash.
         """
         return self._supports_audio_tags
 

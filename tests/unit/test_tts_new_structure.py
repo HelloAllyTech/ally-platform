@@ -207,6 +207,35 @@ class TestElevenLabsProvider:
         assert client._base_tts is base_tts
 
     @pytest.mark.unit
+    @pytest.mark.parametrize("model", ["eleven_v4", "eleven_v4_turbo"])
+    @patch("app.tts.elevenlabs.ElevenLabsTTSClient.validate_voice")
+    @patch("app.tts.elevenlabs.agents_tts.StreamAdapter")
+    @patch("livekit.plugins.elevenlabs.TTS")
+    @patch("app.tts.elevenlabs.settings")
+    def test_v4_models_wrap_with_stream_adapter(
+        self, mock_settings, mock_tts_class, mock_stream_adapter, mock_validate, model
+    ):
+        """eleven_v4 / eleven_v4_turbo must take the same HTTP StreamAdapter
+        path as v3: the multi-stream-input socket rejects them (verified live)."""
+        mock_settings.ELEVEN_API_KEY = "test-api-key"
+        mock_validate.return_value = True
+        base_tts = Mock()
+        mock_tts_class.return_value = base_tts
+        wrapped = Mock()
+        mock_stream_adapter.return_value = wrapped
+        client = ElevenLabsTTSClient(
+            model=model,
+            voice_id="test-voice-id",
+            language_code="en-IN",
+            api_key="test-api-key",
+        )
+        assert client._is_generative_model is True
+        assert client.tts_instance is wrapped
+        mock_stream_adapter.assert_called_once_with(tts=base_tts)
+        _, kwargs = base_tts.update_options.call_args
+        assert kwargs["voice_settings"].stability == 0.95
+
+    @pytest.mark.unit
     @patch("app.tts.elevenlabs.ElevenLabsTTSClient.validate_voice")
     @patch("app.tts.elevenlabs.agents_tts.StreamAdapter")
     @patch("livekit.plugins.elevenlabs.TTS")
@@ -277,6 +306,9 @@ class TestElevenLabsProvider:
             ("eleven_v3", True),
             ("eleven_multilingual_v3", True),
             ("Eleven_V3", True),  # case-insensitive
+            ("eleven_v3_conversational", True),
+            ("eleven_v4", True),
+            ("eleven_v4_turbo", True),
             ("eleven_multilingual_v2", False),
             ("eleven_turbo_v2_5", False),
             ("eleven_flash_v2_5", False),
@@ -284,7 +316,8 @@ class TestElevenLabsProvider:
     )
     @patch("app.tts.elevenlabs.ElevenLabsTTSClient.validate_voice")
     def test_v3_detection(self, mock_validate, model, expected_v3):
-        """_is_v3_model must detect v3 variants and reject v2/turbo/flash."""
+        """Generative detection must accept v3 and v4 variants and reject
+        v2/turbo/flash (eleven_v4 / eleven_v4_turbo fail the WS path live)."""
         mock_validate.return_value = True
         client = ElevenLabsTTSClient(
             model=model,
@@ -293,6 +326,7 @@ class TestElevenLabsProvider:
             api_key="test-api-key",
         )
         assert client._is_v3_model is expected_v3
+        assert client._is_generative_model is expected_v3
         assert client._supports_audio_tags is expected_v3
 
 

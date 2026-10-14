@@ -2671,7 +2671,7 @@ class AgentWorker:
 
     def _is_generative_elevenlabs(self) -> bool:
         model = str(getattr(self, "_tts_model", "") or "").lower()
-        return "eleven" in model and "v3" in model
+        return "eleven" in model and ("v3" in model or "v4" in model)
 
     def _interim_tts_timeout_ms(self) -> float:
         """How long the interim's render may take for this voice."""
