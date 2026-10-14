@@ -72,6 +72,9 @@ vi.mock("@pages", () => ({
   BuilderPipeline: () => <div>BuilderPipelinePage</div>,
   BuilderScoreboard: () => <div>BuilderScoreboardPage</div>,
   BuilderKnowledge: () => <div>BuilderKnowledgePage</div>,
+  CourseCopilotSessions: () => <div>CourseCopilotSessionsPage</div>,
+  CourseCopilotNew: () => <div>CourseCopilotNewPage</div>,
+  CourseCopilotSession: () => <div>CourseCopilotSessionPage</div>,
 }));
 
 describe("RouteLayout", () => {
@@ -134,6 +137,28 @@ describe("RouteLayout", () => {
     window.history.pushState({}, "", ROUTES.BUILDER_KNOWLEDGE);
     render(<RouteLayout />);
     expect(screen.getByText("BuilderKnowledgePage")).toBeInTheDocument();
+  });
+
+  it("renders Course Copilot sessions route", () => {
+    window.history.pushState({}, "", ROUTES.COURSE_COPILOT);
+    render(<RouteLayout />);
+    expect(screen.getByText("CourseCopilotSessionsPage")).toBeInTheDocument();
+  });
+
+  // `new` is a static segment beside `:sessionId`; this fails if the two are ever mis-ordered or
+  // the param pattern swallows it, which would send every "Course with Copilot" click to a
+  // session lookup for an id of "new".
+  it("renders Course Copilot new route, not the session route", () => {
+    window.history.pushState({}, "", `${ROUTES.COURSE_COPILOT_NEW}?trackId=abc`);
+    render(<RouteLayout />);
+    expect(screen.getByText("CourseCopilotNewPage")).toBeInTheDocument();
+    expect(screen.queryByText("CourseCopilotSessionPage")).not.toBeInTheDocument();
+  });
+
+  it("renders Course Copilot session route with id", () => {
+    window.history.pushState({}, "", ROUTES.COURSE_COPILOT_SESSION("abc-123"));
+    render(<RouteLayout />);
+    expect(screen.getByText("CourseCopilotSessionPage")).toBeInTheDocument();
   });
 
   it("renders Component Library route", () => {

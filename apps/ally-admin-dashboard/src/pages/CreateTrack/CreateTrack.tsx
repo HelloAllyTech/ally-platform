@@ -4,6 +4,7 @@ import { FormProvider, useFieldArray, useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 
+import { Tooltip } from "@ally-ui-mono/ui-shared";
 import {
   useCreateTrackMutation,
   useGetTrackTranslationsQuery,
@@ -11,10 +12,11 @@ import {
   useUpdateTrackByIdMutation,
   useUpdateTrackStructureMutation,
 } from "@api";
-import { WarningAlt } from "@assets";
-import { ActionConfirmationPopup, Header } from "@components";
+import { WandStars, WarningAlt } from "@assets";
+import { ActionConfirmationPopup, Button, Header } from "@components";
 import { ButtonVariant } from "@components/types";
-import { DEFAULT_TRACK_FORM_VALUES, TRACK_ENTITY_LABEL, en } from "@constants";
+import { DEFAULT_TRACK_FORM_VALUES, ROUTES, TRACK_ENTITY_LABEL, en } from "@constants";
+import { useCanUseCourseCopilot } from "@hooks";
 import {
   CompletionCriteria,
   SimulationStatus,
@@ -48,6 +50,7 @@ export const CreateTrack: FC = () => {
   const { id } = useParams<{ id: string }>();
 
   const [trackId, setTrackId] = useState<string | null>(id ?? null);
+  const canUseCourseCopilot = useCanUseCourseCopilot();
   const [selection, setSelection] = useState<TrackSelection>("settings");
   const [showDiscardPopup, setShowDiscardPopup] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -292,6 +295,29 @@ export const CreateTrack: FC = () => {
     );
   };
 
+  // Only for a course that exists on the server: the copilot binds to the saved course, not to
+  // whatever is in the form. Unsaved edits would be dropped on the way out (or the copilot would
+  // edit a stale version), so the button waits for a save and says why.
+  const askCopilotButton =
+    trackId && canUseCourseCopilot ? (
+      <Tooltip
+        label={isDirty ? en.courseCopilot.askCopilotUnsaved : en.courseCopilot.askCopilotHint}
+        align="top"
+      >
+        <span>
+          <Button
+            variant={ButtonVariant.TEXT}
+            disabled={isDirty}
+            onClick={() => navigate(`${ROUTES.COURSE_COPILOT_NEW}?trackId=${trackId}`)}
+            className="inline-flex items-center gap-1 px-4 py-1 h-[36px] text-primary-500"
+          >
+            <WandStars className="w-4 h-4" />
+            {en.courseCopilot.askCopilot}
+          </Button>
+        </span>
+      </Tooltip>
+    ) : undefined;
+
   return (
     <FormProvider {...formMethods}>
       {/* Below lg the outline rail sits above the editor and the page scrolls as
@@ -307,6 +333,7 @@ export const CreateTrack: FC = () => {
             title={title}
             showPreview={false}
             type="Track"
+            extraActions={askCopilotButton}
           />
           {!canPublish && (
             <div className="relative pb-2 lg:pb-0 lg:absolute lg:right-2 lg:top-[92px] z-20">

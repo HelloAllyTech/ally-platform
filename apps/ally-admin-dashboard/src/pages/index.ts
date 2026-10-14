@@ -33,6 +33,7 @@ export * from "./Logs/Logs";
 export * from "./MobileReleases/MobileReleases";
 export * from "./BugHunter";
 export * from "./Builder";
+export * from "./CourseCopilot";
 export * from "./AgentTestCases/AgentTestCases";
 export * from "./Competencies/Competencies";
 export * from "./RoleplaySessionLogs/RoleplaySessionLogs";

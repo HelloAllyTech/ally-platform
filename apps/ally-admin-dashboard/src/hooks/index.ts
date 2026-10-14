@@ -2,8 +2,11 @@ import { AllySocketStatus, useAllySocket } from "./useAllySocket";
 import { useBuilderSocket } from "./useBuilderSocket";
 import { useBuilderStream } from "./useBuilderStream";
 import { useCanCurateCharacterCorpus } from "./useCanCurateCharacterCorpus";
+import { useCanUseCourseCopilot } from "./useCanUseCourseCopilot";
 import { useCanViewComponentLibrary } from "./useCanViewComponentLibrary";
 import { useClickOutside } from "./useClickOutside";
+import { useCourseCopilotSocket } from "./useCourseCopilotSocket";
+import { useCourseCopilotStream } from "./useCourseCopilotStream";
 import { useCreatePortal } from "./useCreatePortal";
 import { useDebounce } from "./useDebounce";
 import { useIsPlaceholderUsed } from "./useIsPlaceholderUsed";
@@ -43,4 +46,7 @@ export {
   useTrackTranslationsSocket,
   useCanCurateCharacterCorpus,
   useCanViewComponentLibrary,
+  useCanUseCourseCopilot,
+  useCourseCopilotStream,
+  useCourseCopilotSocket,
 };

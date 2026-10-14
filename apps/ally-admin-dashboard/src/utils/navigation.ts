@@ -160,6 +160,11 @@ const buildNavigationItems = (): NavigationItem[] => [
     path: ROUTES.BUILDER,
   },
   {
+    id: SIDEBAR_ITEMS.COURSE_COPILOT,
+    label: en.courseCopilot.tabLabel,
+    path: ROUTES.COURSE_COPILOT,
+  },
+  {
     id: SIDEBAR_ITEMS.WHATSAPP_BOT,
     label: en.whatsappBot.navLabel,
     path: ROUTES.WHATSAPP_BOT,
@@ -262,6 +267,13 @@ export const deriveNavigationItems = ({
             return (
               permissions!.includes(Permissions.EDIT_SCENARIO) &&
               hasFeature(features, FeatureToggleKey.CONTENT_MANAGEMENT)
+            );
+          // Toggle AND edit grant, like Simulation Studio, so deliberately NOT in
+          // buildSidebarItemFeatureKeyMap (which would make it feature-only and drop the grant).
+          case SIDEBAR_ITEMS.COURSE_COPILOT:
+            return (
+              permissions!.includes(Permissions.EDIT_COURSE_COPILOT) &&
+              hasFeature(features, FeatureToggleKey.COURSE_COPILOT)
             );
           case SIDEBAR_ITEMS.EVENTS:
             return permissions!.includes(Permissions.EDIT_EVENT);

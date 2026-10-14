@@ -4380,6 +4380,199 @@ export const en = {
       },
     },
   },
+  // Course Copilot — the chat-first course authoring agent. The right-hand work pane's copy lives
+  // under `courseCopilotPane` (end of this file); everything the shell, the session list and the
+  // shared chat primitives say lives here.
+  //
+  // Voice follows Builder: the copilot speaks about the course in the first person, the app speaks
+  // about itself ("Couldn't load your sessions"). Copy marked "decided" was fixed in the product
+  // plan and is repeated verbatim — change the plan first.
+  courseCopilot: {
+    tabLabel: "Course Copilot",
+    title: "Course Copilot",
+    newCourse: "New course",
+    // Decided: the Simulation Studio create option and the CreateTrack header button.
+    createOption: "Course with Copilot",
+    askCopilot: "Ask Copilot",
+    askCopilotHint: "Open this course in Course Copilot and revise it by chatting.",
+    // Shown instead when the form has unsaved changes: the copilot reads and edits the SAVED
+    // course, so leaving now would drop them (or have the copilot edit a stale version).
+    askCopilotUnsaved:
+      "Save your changes first — the copilot works on the saved version of this course.",
+
+    // Session states, as a trainer would say them
+    status: {
+      INTERVIEWING: "Interview",
+      AWAITING_BLUEPRINT: "Blueprint ready",
+      BUILDING: "Building",
+      BUILD_FAILED: "Build failed",
+      EDITING: "Editing",
+      ARCHIVED: "Archived",
+    } as Record<string, string>,
+    mode: {
+      CREATE: "New course",
+      EDIT: "Editing a course",
+    } as Record<string, string>,
+
+    // Sessions list
+    list: {
+      subtitle: "Pick up where you left off, or start a new course.",
+      // Decided.
+      empty:
+        "No copilot sessions yet. Start one from Simulation Studio → New → Course with Copilot.",
+      loadFailed: "Couldn't load your Course Copilot sessions.",
+      updatedLabel: "Last updated",
+      noCourseYet: "Not built yet",
+      open: "Open",
+      archive: "Archive",
+      archiveConfirmTitle: "Archive this session?",
+      // Said plainly because "archive" next to a course invites the fear that the course goes too.
+      archiveConfirmBody:
+        "The conversation is closed. The course itself is never deleted — anything already built stays in your Courses.",
+      archiveConfirm: "Archive",
+      archiveCancel: "Keep it",
+      archiveSuccess: "Session archived.",
+      archiveFailed: "Couldn't archive that session.",
+      createFailed: "Couldn't start a new Course Copilot session.",
+    },
+
+    // /course-copilot/new
+    start: {
+      starting: "Starting your session…",
+      failed: "Couldn't start a Course Copilot session.",
+      // The server's own message wins (it says which limit was hit); this is the fallback for a 409.
+      capReached: "You already have two active sessions. Archive one to start another.",
+      backToList: "Back to my sessions",
+    },
+
+    // One session
+    session: {
+      backLabel: "Back to Course Copilot sessions",
+      untitled: "Untitled course",
+      loadFailed: "Couldn't load this Course Copilot session.",
+      openInEditor: "Open in editor",
+      // Decided.
+      openInEditorBuilding:
+        "Wait for the build to finish — the copilot overwrites edits made during the build.",
+      openInEditorNoCourse: "The course is created when you approve the blueprint.",
+      archive: "Archive",
+      archiveBuilding:
+        "Stop the build first. Archiving closes the conversation, and the build is still running.",
+      budgetTooltip:
+        "What this session has spent generating content, against its budget ceiling. Writing the course is the expensive part; chatting is not.",
+      budgetOf: (spent: string, ceiling: string) => `${spent} of ${ceiling}`,
+      budgetUncapped: (spent: string) => `${spent} · no ceiling`,
+      // The work pane's name below `lg`, where it opens as a sheet — what is in it depends on the state.
+      pane: {
+        INTERVIEWING: "Brief",
+        AWAITING_BLUEPRINT: "Blueprint",
+        BUILDING: "Build",
+        BUILD_FAILED: "Build",
+        EDITING: "Course",
+        ARCHIVED: "Course",
+      } as Record<string, string>,
+      emptyFeed: "Nothing has been said in this session yet.",
+      archivedNotice:
+        "This session is archived, so the conversation is read-only. The course itself is untouched.",
+      sessionGone:
+        "This session no longer exists on the server. Go back to your sessions and start a new one.",
+      approveFailed: "Couldn't approve the blueprint.",
+      approveStale:
+        "The blueprint changed since you opened it. Review the latest version and approve again.",
+      saveFailed: "Couldn't save the blueprint.",
+      saveStale: "The blueprint changed while you were editing it. Reloaded the latest version.",
+      retryFailed: "Couldn't retry the build.",
+      cancelFailed: "Couldn't stop the build.",
+      raiseFailed: "Couldn't raise the ceiling.",
+      archiveFailed: "Couldn't archive that session.",
+      // Placeholder says what this state accepts, so the composer teaches the capability
+      // (Stacks: "Communicate Agent Capabilities via Visual Affordances").
+      composerPlaceholder: {
+        INTERVIEWING: "Answer, or tell me something I haven't asked about…",
+        AWAITING_BLUEPRINT: "Ask for a change — “drop the game, make section 3 two roleplays”…",
+        BUILDING: "Ask a question while it builds…",
+        BUILD_FAILED: "Ask what went wrong, or retry from the build panel…",
+        EDITING: "What should I change?",
+        ARCHIVED: "This session is archived.",
+      } as Record<string, string>,
+    },
+
+    // State-driven chips under the composer. Decided; each one sends its `message` as the next turn.
+    /** The Publish chip's message — the page hides that chip once the course is live. */
+    publishChipMessage: "Publish the course.",
+    suggestedActions: {
+      INTERVIEWING: [
+        {
+          label: "Just build it with sensible defaults",
+          message:
+            "Just build it — fill anything still open with sensible defaults and show me the blueprint.",
+        },
+      ],
+      AWAITING_BLUEPRINT: [
+        {
+          label: "Make it shorter",
+          message: "Make the course shorter — cut it to about two-thirds of the current length.",
+        },
+        {
+          label: "Explain the sequence",
+          message: "Walk me through why the sections are in this order.",
+        },
+      ],
+      EDITING: [
+        {
+          label: "Review the course",
+          message: "Review the course and tell me what you'd improve first.",
+        },
+        { label: "Publish", message: "Publish the course." }, // keep in sync with publishChipMessage
+        {
+          label: "Preview outline",
+          message: "Give me a one-paragraph summary of the course outline.",
+        },
+      ],
+    } as Record<string, { label: string; message: string }[]>,
+
+    // Chat feed
+    chat: {
+      placeholder: "Answer, or tell me something I haven't asked about…",
+      send: "Send",
+      stop: "Stop",
+      thinking: "Thinking",
+      interrupted: "Stopped.",
+      retry: "Retry",
+      // Generic copy for a stream that died with no server message — a dropped connection.
+      streamFailed: "That turn didn't finish. Try again.",
+      // Decided.
+      turnInProgress: "A reply is still being written for this session. Wait for it to finish.",
+      droppedFrames: (count: number) =>
+        count === 1
+          ? "One update was lost in transit — the chat may be missing a line."
+          : `${count} updates were lost in transit — the chat may be missing some lines.`,
+      reviewHeading: "Review notes",
+      findingFix: "Fix",
+      findingConsider: "Consider",
+      applyFinding: "Apply",
+      // The item id lets the copilot act on the right item without guessing.
+      applyFindingMessage: (note: string, itemId?: string) =>
+        `Apply this review finding${itemId ? ` (item ${itemId})` : ""}: ${note}`,
+      suggestedActionsLabel: "Suggested next steps",
+    },
+
+    // Question cards
+    question: {
+      recommended: "Recommended",
+      noneOfThese: "None of these",
+      addCustom: "Something else",
+      addCustomPlaceholder: "Your own answer…",
+      add: "Add",
+      freeTextPlaceholder: "Your answer…",
+      submitAnswer: "Answer",
+      selectPlaceholder: "Choose…",
+      confirmSelection: "Confirm",
+      selectedCountLabel: (count: number) => (count === 1 ? "1 selected" : `${count} selected`),
+      minSelectionsHint: (min: number) => `pick at least ${min}`,
+      answeredLabel: "Answered",
+    },
+  },
   evaluate: {
     title: "Ally Evaluation",
     loginHeading: "Evaluator Sign In",
@@ -4998,6 +5191,401 @@ export const en = {
       editWarning:
         "Saving a change to this skill's text restarts the experiment from your new text.",
       open: "Open experiment",
+    },
+  },
+  // Course Copilot work pane — the right-hand side of /course-copilot/:id (Brief, Blueprint,
+  // Build, Course). The shell, session list and chat copy live under `courseCopilot` above.
+  //
+  // Copy marked "decided" is fixed in the product contract and repeated verbatim: change
+  // `plans/course-copilot-build/contract.md` first. Everything else follows Builder's voice.
+  courseCopilotPane: {
+    paneLabel: "Course workspace",
+    tabs: {
+      brief: "Brief",
+      blueprint: "Blueprint",
+      build: "Build",
+      course: "Course",
+      unavailable: "Nothing to show here yet.",
+      updated: "Updated",
+    },
+
+    // Completion-rule phrases, shared by the blueprint rows and the course cards.
+    completion: {
+      minScore: (score: number) => `Min score ${score}`,
+      passScore: (score: number) => `Pass mark ${score}`,
+      watchPct: (pct: number) => `Watch ${pct}%`,
+      minRead: (duration: string) => `Read for ${duration}`,
+      minDuration: (duration: string) => `At least ${duration}`,
+    },
+
+    // Brief — read-only, fills in as the interview goes.
+    brief: {
+      heading: "Course brief",
+      // Decided.
+      empty: "The brief fills in as you answer.",
+      ready: "Ready for a blueprint",
+      stillNeeded: "Still needed:",
+      sections: {
+        seed: "Where this started",
+        audience: "Audience",
+        outcomes: "Outcomes",
+        competencies: "Competencies",
+        behaviours: "Behaviours",
+        assessment: "Assessment",
+        shape: "Shape",
+        practice: "Practice ladder",
+        look: "Look",
+        videos: "Videos",
+        notes: "Notes",
+      },
+      audience: {
+        who: "Who",
+        priorExperience: "Prior experience",
+        applicationContext: "Where they'll use it",
+        groupNote: "Group",
+      },
+      outcomes: {
+        terminal: "By the end, learners can",
+        enabling: "Building blocks",
+      },
+      behaviours: {
+        helpful: "Helpful",
+        unhelpful: "Unhelpful",
+      },
+      assessment: {
+        how: "Evidence",
+        threshold: "Threshold",
+        note: "Note",
+        passMark: (score: number) => `${score} to pass`,
+        kind: {
+          roleplay: "Capstone roleplay",
+          quiz: "Graded quiz",
+          annotated_artifact: "Annotated transcript",
+          journal: "Reflective journal",
+        } as Record<string, string>,
+      },
+      shape: {
+        duration: "Duration",
+        sections: "Sections",
+        weight: "Balance",
+        componentsLabel: "Components",
+        tone: "Tone",
+        readingLevel: "Reading level",
+        languages: "Languages",
+        languageCount: (count: number) => (count === 1 ? "1 language" : `${count} languages`),
+        weights: {
+          "practice-heavy": "Practice-heavy",
+          balanced: "Balanced",
+          "reading-heavy": "Reading-heavy",
+        } as Record<string, string>,
+        components: {
+          article: "Articles",
+          video: "Videos",
+          journal: "Journals",
+          annotated_artifact: "Annotated transcripts",
+          game: "Game breaks",
+          quiz: "Quizzes",
+        } as Record<string, string>,
+      },
+      practice: {
+        slot: (number: number) => `Practice ${number}`,
+        library: "From library",
+        new: "New roleplay",
+        minScore: (score: number) => `Min score ${score}`,
+        savesCharacter: "The client is saved to the Character Library",
+      },
+      look: {
+        coverLabel: "Cover",
+        articleImagesLabel: "Article images",
+        cover: {
+          generate: "Generate one",
+          library: "Pick from the cover library",
+          "upload-later": "Upload later",
+        } as Record<string, string>,
+        articleImages: {
+          none: "None",
+          "cover-only": "Cover only",
+          "one-per-article": "One per article",
+        } as Record<string, string>,
+      },
+      videos: {
+        sources: {
+          youtube: "YouTube",
+          vimeo: "Vimeo",
+          loom: "Loom",
+          s3: "Uploaded",
+        } as Record<string, string>,
+      },
+    },
+
+    // Blueprint — the editable tree.
+    blueprint: {
+      untitledCourse: "Untitled course",
+      courseTitleLabel: "Course title",
+      untitledSection: (number: number) => `Section ${number}`,
+      sectionNumber: (number: number) => `Section ${number}`,
+      sectionTitleLabel: "Section title",
+      sectionSummary: (count: number, duration: string) =>
+        `${count === 1 ? "1 item" : `${count} items`} · ${duration}`,
+      untitledItem: "Untitled item",
+      itemTitleLabel: "Item title",
+      minutes: (minutes: number) => `${minutes} min`,
+      newItemTitle: (typeLabel: string) => `New ${typeLabel.toLowerCase()}`,
+      newSectionTitle: "New section",
+      // Decided: "Needs a video link" is the label for a source of kind needs-input.
+      source: {
+        new: "New",
+        library: "From library",
+        needsInput: "Needs a video link",
+      },
+      dragItem: "Drag to reorder this item",
+      dragSection: "Drag to reorder this section",
+      moveUp: "Move up",
+      moveDown: "Move down",
+      moveToPreviousSection: "Move to the end of the previous section",
+      moveToNextSection: "Move to the start of the next section",
+      removeItem: "Remove this item",
+      removeItemNamed: (name: string) => `Remove ${name}`,
+      removeSection: "Remove this section",
+      removeSectionNamed: (name: string) => `Remove section ${name}`,
+      changeType: (name: string) => `Change type of ${name}`,
+      changeTypeHint:
+        "Changing the type clears what the copilot planned for this item, and it is written fresh from the title and purpose.",
+      typeLocked:
+        "Roleplays and cases come from the library or a persona brief. Ask the copilot in chat to change one.",
+      videoLinkLabel: "Video link",
+      videoLinkPlaceholder: "Paste a YouTube, Vimeo or Loom link",
+      videoLinkInvalid: "Use a YouTube, Vimeo or Loom link, or a link to an uploaded video.",
+      sectionEmptyHint: "No items yet. Add one below.",
+      sectionEmptyReadOnly: "No items in this section.",
+      addItem: "Add item",
+      addItemPickerLabel: "Choose a type for the new item",
+      addItemPickerHint:
+        "Roleplays and cases are added by asking the copilot. A video needs a link, which you paste after adding it.",
+      itemLimitReached: (limit: number) => `A course can have at most ${limit} items.`,
+      addSection: "Add section",
+      sectionLimitReached: (limit: number) => `A course can have at most ${limit} sections.`,
+      noSectionsHint: "No sections yet. Add one to start the course.",
+      editHint:
+        "Edit here or ask the copilot in chat. Drag a handle (or focus it and press space, then the arrow keys) to reorder; the up and down arrows also move an item into the next or previous section.",
+      busyNotice:
+        "The copilot is working on this blueprint, so editing is paused until it finishes.",
+      draftNotice:
+        "The copilot is still preparing this blueprint. You can edit it once it is ready for your review.",
+      approvedNotice:
+        "This is the blueprint you approved. To change the course now, ask the copilot or use the editor.",
+      replacedNotice:
+        "The copilot updated the blueprint, so the change you were making was replaced. Make it again if you still want it.",
+      saving: "Saving…",
+      saved: "Saved",
+      saveFailed: "Couldn't save your changes.",
+      retrySave: "Try again",
+      removeSectionConfirmTitle: "Remove this section?",
+      removeSectionConfirmBody: (name: string, count: number) =>
+        `"${name}" and its ${count === 1 ? "1 item" : `${count} items`} will be removed from the blueprint.`,
+      removeSectionConfirm: "Remove section",
+      removeSectionKeep: "Keep it",
+      problems: {
+        noSections: "Add at least one section.",
+        untitledSection: (number: number) => `Section ${number}`,
+        sectionNeedsTitle: (number: number) => `Give section ${number} a title.`,
+        sectionEmpty: (name: string) => `"${name}" has no items.`,
+        itemNeedsTitle: (sectionName: string) => `An item in "${sectionName}" needs a title.`,
+        videoNeedsLink: (name: string) => `"${name}" needs a video link.`,
+      },
+      footer: {
+        duration: "Duration",
+        target: (duration: string) => `of ${duration} asked for`,
+        items: "Items",
+        newRoleplays: "New roleplays",
+        images: "Images",
+        estimatedCost: "Estimated cost",
+        estimateUpdating: "updating…",
+        estimateHint:
+          "A rough estimate of what the AI will cost to write everything in this blueprint. The real figure can differ, and the build pauses if it reaches the budget ceiling.",
+        remainingBudget: "Budget left",
+        noCap: "No ceiling",
+        overBudget: (estimate: string, remaining: string) =>
+          `The estimate (${estimate}) is more than the budget left (${remaining}). Raise the budget, or trim the course.`,
+        overBudgetShort: "Raise the budget or trim the course first.",
+        raiseBudget: "Raise budget",
+        problemsHeading: "Fix these before building",
+        fixProblems: "Fix the problems above first.",
+        // Decided.
+        approve: "Approve & build",
+        approveHint:
+          "Starts writing the course: the copilot creates a draft course and writes every item in this blueprint. Nothing is published.",
+        busy: "The copilot is still replying.",
+        saving: "Saving your changes…",
+        saveFailed: "Your last change didn't save.",
+      },
+    },
+
+    // Raise-the-ceiling dialog — before approval (over budget) and mid-build (held).
+    budget: {
+      dialog: {
+        title: "Raise budget",
+        intro: "Raise this session's spend ceiling.",
+        heldIntro:
+          "The build is holding at the ceiling. Raise it and the waiting items carry on from where they stopped. Nothing already written is re-run.",
+        spentLabel: "Spent so far",
+        currentLabel: "Current ceiling",
+        currentNone: "No ceiling",
+        estimateLabel: "Estimate",
+        newLabel: "New ceiling (USD)",
+        newHint:
+          "Has to be above what has already been spent, or the build would stop again at once. Set 0 to remove the ceiling.",
+        invalid: (spent: string) =>
+          `Enter more than the ${spent} already spent, or 0 for no ceiling.`,
+        cancel: "Cancel",
+        submit: "Raise budget",
+        submitHeld: "Raise and continue",
+      },
+    },
+
+    // Build — jobs, progress, cost.
+    build: {
+      // Decided.
+      heading: "Building your course",
+      headingFinished: "Build summary",
+      progress: (done: number, total: number) => `${done} of ${total} done`,
+      progressLabel: "Build progress",
+      notStarted: "Not started yet",
+      elapsed: (duration: string) => `${duration} elapsed`,
+      failedCount: (count: number) => `${count} failed`,
+      skippedCount: (count: number) => `${count} skipped`,
+      pausedCount: (count: number) => `${count} paused`,
+      spendLabel: "Spent",
+      spentOfCeiling: (spent: string, ceiling: string) => `${spent} of ${ceiling}`,
+      spentNoCeiling: (spent: string) => `${spent} · no ceiling`,
+      noJobs: "No build jobs yet.",
+      groupCourse: "Course",
+      attempts: (count: number) => `attempt ${count}`,
+      retry: "Retry",
+      retryAll: "Retry all failed",
+      retrySkipped: "Retry skipped",
+      cancel: "Cancel build",
+      openRoleplay: "Open roleplay",
+      outlineHeading: "Course so far",
+      // Decided job-status wording.
+      status: {
+        queued: "Waiting",
+        running: "Writing…",
+        done: "Done",
+        failed: "Failed",
+        skipped: "Skipped",
+        held: "Paused",
+      } as Record<string, string>,
+      kinds: {
+        course_meta: "Course details",
+        article: "Article",
+        quiz: "Quiz",
+        journal: "Journal",
+        annotated_artifact: "Annotation",
+        game: "Game",
+        video: "Video",
+        roleplay_new: "New roleplay",
+        roleplay_ref: "Library roleplay",
+        case_new: "New case",
+        case_ref: "Library case",
+        cover_image: "Cover image",
+        article_image: "Article image",
+        course_review: "Course review",
+      } as Record<string, string>,
+      // Decided.
+      failedBanner: {
+        body: "The build stopped responding. Retry picks up where it left off — nothing already written is lost.",
+        retry: "Retry",
+      },
+      // Decided.
+      heldBanner: {
+        body: (spent: string, ceiling: string) =>
+          `Paused at the budget ceiling — ${spent} of ${ceiling} spent. Raise the ceiling to continue, or stop here and keep what's built.`,
+        raise: "Raise budget",
+      },
+      // Decided.
+      cancelConfirm: {
+        title: "Stop the build?",
+        body: "Items already written stay in the course; waiting items are skipped.",
+        confirm: "Stop the build",
+        keep: "Keep building",
+      },
+    },
+
+    // Course — the built outline, publish checklist and change log.
+    course: {
+      empty: "The course outline will appear here once it has been written.",
+      emptyCompact: "The outline fills in as items are written.",
+      noCover: "No cover yet",
+      untitledCourse: "Untitled course",
+      untitledSection: (number: number) => `Section ${number}`,
+      duration: (duration: string) => `About ${duration}`,
+      noSections: "This course has no sections yet.",
+      sectionEmpty: "No items in this section.",
+      status: {
+        DRAFT: "Draft",
+        ACTIVE: "Published",
+        ARCHIVED: "Archived",
+      } as Record<string, string>,
+      // Decided.
+      structureLocked: "Structure locked — learners are enrolled",
+      structureLockedHint:
+        "Learners are enrolled, so sections and items can't be added, removed or reordered. Editing what's inside an item still works.",
+      openEditor: "Open in editor",
+      // Decided.
+      openEditorBuildingHint:
+        "Wait for the build to finish — the copilot overwrites edits made during the build.",
+      readiness: {
+        heading: "Publish readiness",
+        // Decided.
+        ready: "Ready to publish",
+        needs: (labels: string[]) => `Needs: ${labels.join(", ")}`,
+        askCopilot: "Ask the copilot",
+        askCopilotMessage: (label: string, detail: string) =>
+          `Please fix this before we publish: ${label}${detail}`,
+      },
+      changeLog: {
+        heading: "What the copilot changed",
+        showMore: (count: number) => `Show ${count} more`,
+        showLess: "Show fewer",
+      },
+      preview: {
+        generated: "Generated",
+        moreImages: (count: number) => (count === 1 ? "+1 more image" : `+${count} more images`),
+        words: (count: number) => `${count} words`,
+        checks: (count: number) => (count === 1 ? "1 check" : `${count} checks`),
+        resources: (count: number) => (count === 1 ? "1 resource" : `${count} resources`),
+        questions: (count: number) => (count === 1 ? "1 question" : `${count} questions`),
+        passMark: (score: number) => `Pass mark ${score}`,
+        questionTypes: {
+          mcq_single: "Multiple choice",
+          mcq_multi: "Select all",
+          true_false: "True or false",
+          open_ended: "Open-ended",
+          likert: "Rating scale",
+        } as Record<string, string>,
+        morePrompts: (count: number) => (count === 1 ? "+1 more prompt" : `+${count} more prompts`),
+        lines: (count: number) => (count === 1 ? "1 line" : `${count} lines`),
+        targets: (count: number) => (count === 1 ? "1 target" : `${count} targets`),
+        roleplayNotLinked: "No roleplay linked yet",
+        openRoleplay: "Open roleplay",
+        caseNotLinked: "No case linked yet",
+        roleplays: (count: number) => (count === 1 ? "1 roleplay" : `${count} roleplays`),
+        gameNames: {
+          TREX_RUNNER: "T-Rex Runner",
+          TIC_TAC_TOE: "Tic-Tac-Toe",
+          MEMORY_MATCH: "Memory Match",
+          CUB_N_PUP: "Cub n Pup",
+          SNAKE: "Snake",
+          SPROUT: "Sprout",
+        } as Record<string, string>,
+        videoSources: {
+          youtube: "YouTube",
+          vimeo: "Vimeo",
+          loom: "Loom",
+          s3: "Uploaded",
+        } as Record<string, string>,
+      },
     },
   },
 };

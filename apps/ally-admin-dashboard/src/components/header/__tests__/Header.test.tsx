@@ -87,6 +87,37 @@ describe("Header", () => {
     expect(onBack).toHaveBeenCalled();
   });
 
+  // CreateTrack puts "Ask Copilot" here; every other caller passes nothing and sees no change.
+  it("renders extraActions before Save, and nothing extra when there are none", () => {
+    const { rerender } = render(
+      <Header
+        isValid={true}
+        onBack={onBack}
+        onSaveDraft={onSaveDraft}
+        onPublish={onPublish}
+        title="Edit Course"
+        extraActions={<button>Ask Copilot</button>}
+      />,
+    );
+
+    const extra = screen.getByText("Ask Copilot");
+    const save = screen.getByText("Save");
+    expect(
+      extra.compareDocumentPosition(save) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    rerender(
+      <Header
+        isValid={true}
+        onBack={onBack}
+        onSaveDraft={onSaveDraft}
+        onPublish={onPublish}
+        title="Edit Course"
+      />,
+    );
+    expect(screen.queryByText("Ask Copilot")).not.toBeInTheDocument();
+  });
+
   it("renders edit breadcrumb when id present", async () => {
     const { useParams } = await import("react-router-dom");
     (useParams as any).mockReturnValue({ id: "123" });

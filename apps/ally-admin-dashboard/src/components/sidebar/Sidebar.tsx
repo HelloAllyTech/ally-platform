@@ -53,6 +53,7 @@ import {
   FrameSource,
   Guardrails,
   Badge,
+  WandStars,
 } from "@assets";
 import { UserModal } from "@components";
 // Direct path, not the @components barrel: this file is the barrel's own
@@ -245,6 +246,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
         return <Chemistry size={20} />;
       case SIDEBAR_ITEMS.BUILDER:
         return <Tools size={20} />;
+      // Sparkles, the same glyph the autofill buttons use for "the AI writes this for you" — and
+      // not Builder's Tools, since the two agents sit side by side in the nav.
+      case SIDEBAR_ITEMS.COURSE_COPILOT:
+        return <WandStars className="w-5 h-5" />;
       case SIDEBAR_ITEMS.PRODUCT_ROADMAP:
         return <Roadmap size={20} />;
       case SIDEBAR_ITEMS.SETTINGS:
@@ -338,6 +343,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
       // while you are inside a build rather than only on the list.
       case ROUTES.BUILDER:
         return location.pathname.includes(ROUTES.BUILDER);
+      // Matches the session and /new routes too, so the tab stays lit inside a session.
+      case ROUTES.COURSE_COPILOT:
+        return location.pathname.includes(ROUTES.COURSE_COPILOT);
       case ROUTES.PRODUCT_ROADMAP:
         return location.pathname.includes(ROUTES.PRODUCT_ROADMAP);
       case ROUTES.SETTINGS:
