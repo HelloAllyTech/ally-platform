@@ -2862,7 +2862,7 @@
     },
     "composer": {
       "label": "Ask Ally anything, or type your email to sign in",
-      "placeholder": "Ask anything, or type your email to sign in",
+      "placeholder": "Ask anything, or your email",
       "placeholderSignedIn": "Ask me anything about Ally",
       "send": "Send",
       "google": "Sign in with Google",

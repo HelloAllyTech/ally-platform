@@ -9,7 +9,9 @@ import { LANGUAGE_CHANGE_SOURCE } from "@constants/analyticsEvents";
 
 import LanguageSelector from "../../../components/language-selector/LanguageSelector";
 
-const navLink = "text-md text-gray-800 hover:text-primary-500";
+// Hidden on phones, where the footer index carries the same links and the
+// conversation needs the room above the fold.
+const navLink = "hidden text-md text-gray-800 hover:text-primary-500 sm:inline";
 
 export const HomeV2Header: FunctionComponent<{ onSupport: () => void }> = ({ onSupport }) => {
   const { t } = useTranslation();
@@ -31,7 +33,10 @@ export const HomeV2Header: FunctionComponent<{ onSupport: () => void }> = ({ onS
         <a href={ALLY_URL} target="_blank" rel="noopener noreferrer" className={navLink}>
           {t("homeV2.nav.about")}
         </a>
-        <LanguageSelector source={LANGUAGE_CHANGE_SOURCE.HOME_V2} />
+        {/* The selector is `w-full`; bound it so it doesn't push the rest of the nav onto a new line. */}
+        <div className="w-40">
+          <LanguageSelector source={LANGUAGE_CHANGE_SOURCE.HOME_V2} />
+        </div>
         <button
           type="button"
           onClick={onSupport}

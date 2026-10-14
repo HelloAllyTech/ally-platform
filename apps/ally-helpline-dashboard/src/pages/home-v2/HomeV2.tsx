@@ -283,8 +283,11 @@ export const HomeV2: FunctionComponent = () => {
         }
       />
 
-      <main className="mx-auto flex w-full max-w-[760px] flex-1 flex-col gap-4 px-5 pb-16 pt-8 sm:px-6 sm:pt-12">
-        <p aria-hidden="true" className="m-0 ml-12 flex flex-wrap gap-x-3 text-md text-gray-500">
+      <main className="mx-auto flex w-full max-w-[760px] flex-1 flex-col gap-4 px-5 pb-16 pt-4 sm:px-6 sm:pt-12">
+        <p
+          aria-hidden="true"
+          className="m-0 ml-12 hidden flex-wrap gap-x-3 text-md text-gray-500 sm:flex"
+        >
           {HELLOS.map((hello, index) => (
             <span key={hello} className="flex gap-3">
               {index > 0 && <span>·</span>}
@@ -384,7 +387,9 @@ export const HomeV2: FunctionComponent = () => {
           <div
             role="group"
             aria-label={t("homeV2.suggestions.label")}
-            className="ml-12 flex flex-wrap gap-2"
+            // One scrollable row on phones, so the composer stays above the fold in every
+            // language; wrapped from `sm` up, where there is room.
+            className="-mr-5 ml-12 flex gap-2 overflow-x-auto pb-1 pr-5 sm:mr-0 sm:flex-wrap sm:overflow-visible sm:pb-0 sm:pr-0"
           >
             {suggestions.map(topic => (
               <button
@@ -392,7 +397,7 @@ export const HomeV2: FunctionComponent = () => {
                 type="button"
                 onClick={() => handleSuggestion(topic)}
                 className={cn(
-                  "min-h-11 rounded-full border px-4 text-md",
+                  "min-h-11 flex-none whitespace-nowrap rounded-full border px-4 text-md",
                   topic === "support"
                     ? "border-status-sageDot/40 bg-status-sageBg text-status-sageFg hover:border-status-sageDot"
                     : "border-gray-300 bg-white text-gray-900 hover:border-gray-500",
