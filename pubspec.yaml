@@ -58,6 +58,8 @@ dependencies:
   image_picker: ^1.2.4
   webview_flutter: ^4.13.0
   video_player: ^2.14.1
+  flutter_svg: ^2.2.1
+  lottie: ^3.3.2
 
 dev_dependencies:
   flutter_test:
@@ -135,6 +137,13 @@ flutter:
     - assets/games/cub_n_pup.html
     - assets/games/snake.html
     - assets/games/sprout.html
+    # Real design-system assets ported verbatim from ally-mobile (React
+    # Native)'s src/assets/{icons,images,animations}/ for exact-match UI
+    # parity — 143 SVGs, 11 PNGs, 4 Lottie JSONs. Flat directories, so a
+    # trailing-slash declaration picks up every file without listing each.
+    - assets/icons/
+    - assets/images/
+    - assets/animations/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
@@ -161,3 +170,32 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+  # Real fonts ported verbatim from ally-mobile (React Native)'s
+  # src/theme/fonts.ts — family names match that file's fontFamily strings
+  # exactly so lib/core/theme/app_fonts.dart can mirror its token structure.
+  # Roboto-ExtraLight has no font file in the RN repo either (a pre-existing
+  # gap there, not fabricated here) — ROBOTO.EXTRA_LIGHT falls back to
+  # Roboto-Regular, same as the real app effectively does.
+  fonts:
+    - family: ReplayPro-Headline
+      fonts:
+        - asset: assets/fonts/ReplayPro-Headline.otf
+    - family: ReplayPro-Bold
+      fonts:
+        - asset: assets/fonts/ReplayPro-Bold.otf
+    - family: ReplayPro-BoldItalic
+      fonts:
+        - asset: assets/fonts/ReplayPro-BoldItalic.otf
+    - family: Roboto-Regular
+      fonts:
+        - asset: assets/fonts/Roboto-Regular.ttf
+    - family: IBMPlexSerif-Regular
+      fonts:
+        - asset: assets/fonts/IBMPlexSerif-Regular.ttf
+    - family: IBMPlexSerif-Medium
+      fonts:
+        - asset: assets/fonts/IBMPlexSerif-Medium.ttf
+    - family: YesevaOne-Regular
+      fonts:
+        - asset: assets/fonts/YesevaOne-Regular.ttf

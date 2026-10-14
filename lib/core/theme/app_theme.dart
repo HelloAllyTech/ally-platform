@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'app_colors.dart';
+import 'app_fonts.dart';
 
 /// Direct port of ally-mobile (React Native)'s `src/theme/designSystem/
 /// colors.ts` + `src/theme/typography.ts` — the real token set, not a
@@ -16,6 +17,18 @@ import 'app_colors.dart';
 /// device-size scaling) isn't replicated — these are the base px values,
 /// consistent with Flutter's own responsive-text conventions rather than
 /// RN's specific scaling algorithm.
+///
+/// Font families: RN sets `fontFamily` per-component (no global default —
+/// there are 210+ call sites each choosing their own token from
+/// `fonts.ts`, no shared `<Text>` wrapper to hang a single default off
+/// of), so there's no single "correct" global mapping to port verbatim.
+/// These defaults follow the dominant pattern by usage count across the
+/// RN codebase (`IBM_PLEX_SERIF.REGULAR` is the most common body/title
+/// font at 136 call sites, `REPLAY_PRO.HEADLINE` is the headline font at
+/// 29, `ROBOTO.REGULAR` is next most common at 53, generally for
+/// labels/buttons) — a close global approximation, not a per-widget exact
+/// match. Screens get their font family corrected to the real per-widget
+/// value as each one is rebuilt for structural parity.
 class AppTheme {
   AppTheme._();
 
@@ -57,26 +70,37 @@ class AppTheme {
   }
 
   static const _textTheme = TextTheme(
-    // display
-    displayLarge: TextStyle(fontSize: 56, height: 64 / 56, letterSpacing: -0.25),
-    displayMedium: TextStyle(fontSize: 32, height: 36 / 32, letterSpacing: -0.6),
-    displaySmall: TextStyle(fontSize: 18, height: 24 / 18, letterSpacing: 0.18),
-    // headline
-    headlineLarge: TextStyle(fontSize: 32, height: 40 / 32),
-    headlineMedium: TextStyle(fontSize: 28, height: 36 / 28),
-    headlineSmall: TextStyle(fontSize: 24, height: 32 / 24),
-    // title (RN has no separate "title" tier - headline.tiny/micro fill this
-    // gap in the original; Flutter's titleLarge/Medium/Small map onto those)
-    titleLarge: TextStyle(fontSize: 18, height: 24 / 18, letterSpacing: 0.2),
-    titleMedium: TextStyle(fontSize: 14, height: 22 / 14, letterSpacing: 0.2),
-    titleSmall: TextStyle(fontSize: 12, height: 16 / 12, letterSpacing: 0.2),
-    // body
-    bodyLarge: TextStyle(fontSize: 16, height: 24 / 16, letterSpacing: 0.5),
-    bodyMedium: TextStyle(fontSize: 14, height: 22 / 14, letterSpacing: 0.2),
-    bodySmall: TextStyle(fontSize: 12, height: 16 / 12, letterSpacing: 0.2),
-    // label
-    labelLarge: TextStyle(fontSize: 14, height: 22 / 14, letterSpacing: 0.2),
-    labelMedium: TextStyle(fontSize: 12, height: 20 / 12, letterSpacing: 0.2),
-    labelSmall: TextStyle(fontSize: 11, height: 16 / 11, letterSpacing: 0.5),
+    // display + headline: REPLAY_PRO.HEADLINE, matching RN's headline.* tiers
+    displayLarge: TextStyle(
+        fontSize: 56, height: 64 / 56, letterSpacing: -0.25, fontFamily: AppFonts.replayProHeadline),
+    displayMedium: TextStyle(
+        fontSize: 32, height: 36 / 32, letterSpacing: -0.6, fontFamily: AppFonts.replayProHeadline),
+    displaySmall: TextStyle(
+        fontSize: 18, height: 24 / 18, letterSpacing: 0.18, fontFamily: AppFonts.replayProHeadline),
+    headlineLarge: TextStyle(fontSize: 32, height: 40 / 32, fontFamily: AppFonts.replayProHeadline),
+    headlineMedium: TextStyle(fontSize: 28, height: 36 / 28, fontFamily: AppFonts.replayProHeadline),
+    headlineSmall: TextStyle(fontSize: 24, height: 32 / 24, fontFamily: AppFonts.replayProHeadline),
+    // title + body: IBM_PLEX_SERIF.REGULAR, the most common body/title font
+    // (RN has no separate "title" tier - headline.tiny/micro fill this gap
+    // in the original; Flutter's titleLarge/Medium/Small map onto those)
+    titleLarge: TextStyle(
+        fontSize: 18, height: 24 / 18, letterSpacing: 0.2, fontFamily: AppFonts.ibmPlexSerifRegular),
+    titleMedium: TextStyle(
+        fontSize: 14, height: 22 / 14, letterSpacing: 0.2, fontFamily: AppFonts.ibmPlexSerifRegular),
+    titleSmall: TextStyle(
+        fontSize: 12, height: 16 / 12, letterSpacing: 0.2, fontFamily: AppFonts.ibmPlexSerifRegular),
+    bodyLarge: TextStyle(
+        fontSize: 16, height: 24 / 16, letterSpacing: 0.5, fontFamily: AppFonts.ibmPlexSerifRegular),
+    bodyMedium: TextStyle(
+        fontSize: 14, height: 22 / 14, letterSpacing: 0.2, fontFamily: AppFonts.ibmPlexSerifRegular),
+    bodySmall: TextStyle(
+        fontSize: 12, height: 16 / 12, letterSpacing: 0.2, fontFamily: AppFonts.ibmPlexSerifRegular),
+    // label: ROBOTO.REGULAR, the next most common font (buttons/tags/labels)
+    labelLarge: TextStyle(
+        fontSize: 14, height: 22 / 14, letterSpacing: 0.2, fontFamily: AppFonts.robotoRegular),
+    labelMedium: TextStyle(
+        fontSize: 12, height: 20 / 12, letterSpacing: 0.2, fontFamily: AppFonts.robotoRegular),
+    labelSmall: TextStyle(
+        fontSize: 11, height: 16 / 11, letterSpacing: 0.5, fontFamily: AppFonts.robotoRegular),
   );
 }
