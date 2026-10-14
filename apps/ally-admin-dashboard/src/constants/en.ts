@@ -3581,6 +3581,12 @@ export const en = {
       superseded: "Never read",
       tooLong: "That is a change to the PRD, not a correction to a run.",
       failed: "Could not send that note. Try again.",
+      // Issue builds: opencode reads pull request comments, not notes here.
+      issueTitle: "Redirect opencode",
+      issueHint: "To steer opencode, comment /oc followed by your instruction on the pull request.",
+      issueHintNoPr:
+        "To steer opencode, comment /oc followed by your instruction on its pull request once it opens one.",
+      issueOpenPr: (repo: string, prNumber: number) => `Open ${repo} #${prNumber}`,
     },
     chat: {
       heading: "Scoping",
@@ -3791,6 +3797,20 @@ export const en = {
       REPORTING: "Writing up",
       DONE: "Done",
     } as Record<string, string>,
+    // The same stages, as an issue build lives through them — opencode does
+    // the work and the repo's own CI does the checking.
+    issueStages: {
+      SETUP: "Raising the issue",
+      PLANNING: "opencode working",
+      CODING: "opencode working",
+      TESTING: "CI running",
+      GATE: "CI running",
+      VERIFYING: "CI running",
+      REMEDIATING: "Asked opencode to fix",
+      FINALISING: "CI passed",
+      OPENING_PRS: "Pull request opened",
+      DONE: "Done",
+    } as Record<string, string>,
 
     // The build screen
     build: {
@@ -3835,6 +3855,11 @@ export const en = {
       e2eSkipped: (reason: string) => `Skipped the end-to-end check — ${reason}`,
       jumpToLive: "Jump to live",
       feedStarting: "The runner is starting. The first update usually arrives within a minute.",
+      feedIssue:
+        "Builder checks the issue and pull request every 5 minutes — follow opencode live in the Actions log.",
+      feedIssueNoLog:
+        "Builder checks the issue and pull request every 5 minutes. The Actions log link appears once opencode starts.",
+      feedIssueLogLink: "Open the Actions log",
       feedLoading: "Loading this run's activity…",
       feedWorking: (count: number) =>
         `Working — ${count} ${count === 1 ? "step" : "steps"} so far, none with anything to show yet.`,
@@ -3849,6 +3874,11 @@ export const en = {
               : mode === "design"
                 ? `Run ${sequence} (design)`
                 : `Run ${sequence}`,
+      issueRunLabel: (sequence: number, repo: string | null, issueNumber: number) =>
+        repo
+          ? `Run ${sequence} · ${repo} · issue #${issueNumber}`
+          : `Run ${sequence} · issue #${issueNumber}`,
+      costNotTracked: "Cost not tracked",
       // Run history rail — reading an older run's transcript without losing
       // the live one is the whole point, so the rail says which run is which
       // rather than leaving that to a bare sequence number.
@@ -3877,6 +3907,40 @@ export const en = {
         WAITING_FOR_INPUT: "Waiting on you",
       } as Record<string, string>,
       watchOnGithub: "Watch on GitHub",
+      // Issue builds link out to three places, each named for what it is.
+      issueLink: (repo: string | null, issueNumber: number) =>
+        repo ? `Issue ${repo}#${issueNumber}` : `Issue #${issueNumber}`,
+      actionsLogLink: "Actions log",
+      prLink: (prNumber: number) => `PR #${prNumber}`,
+      // Where an issue build has got to.
+      issueRail: {
+        label: "Issue build progress",
+        issue: "Issue raised",
+        working: "opencode working",
+        pr: "Pull request opened",
+        ciWaiting: "Waiting for CI",
+        ciPending: "CI running",
+        ciFailed: "CI failed",
+        ciFixing: "Asked opencode to fix",
+        ciNeutral: "CI",
+        passed: "CI passed",
+        fixRequests: (count: number, limit: number) => `fix requested ${count} of ${limit}`,
+      },
+      // The repo's own CI, on an issue build's pull request.
+      ciResultVerified: "Checked by the repo's CI",
+      ciResultFailedChecks: (count: number) =>
+        count === 1 ? "1 check failed" : `${count} checks failed`,
+      ciStatus: {
+        success: "CI passed",
+        failure: "CI failed",
+        pending: "CI running",
+        none: "No CI yet",
+      } as Record<string, string>,
+      prIssueWorking: "opencode is still working on CI",
+      prIssueReady: "Ready for review — approve it on GitHub, then merge",
+      prIssueOpenOnGithub: "Open on GitHub",
+      prChainNote:
+        "Each repo was built against the approved design, one after another. An earlier repo's pull request may still be unmerged — review and merge them in order.",
       pullRequestsHeading: "Pull requests",
       // Named for what it wants from you, not for what it is. A heading that
       // says "Pull requests" describes a data type; one that says a review is
@@ -3916,7 +3980,25 @@ export const en = {
     cancelSessionConfirm: "Stop it?",
     cancelSessionConfirmBody:
       "The current run stops immediately. Nothing already written is lost, but this pass won't finish — you'll need to start again.",
+    cancelSessionConfirmBodyIssue: (repo: string | null) =>
+      `Builder stops following this build, cancels opencode's run in ${repo ?? "the repo"} and closes the issue. Any pull request already opened stays open for you to close.`,
     cancelFailed: "Couldn't stop the build.",
+    // A finished link in a repo chain, with more repos still to build.
+    continueChain: (repo: string) => `Continue (next: ${repo})`,
+    continueChainFailed: "Couldn't continue the build.",
+    // The repo chain on the session page.
+    repoChain: {
+      heading: "Repos, built in order",
+      building: (repo: string) => `Building ${repo} now`,
+      status: {
+        PENDING: "Waiting",
+        BUILDING: "Building",
+        WAITING_FOR_INPUT: "Waiting on you",
+        COMPLETED: "Done",
+        FAILED: "Failed",
+        SKIPPED: "Skipped",
+      } as Record<string, string>,
+    },
     costLabel: "Spend",
     repoLabel: "Repos",
     noReposYet: "Not decided yet",
@@ -3947,6 +4029,15 @@ export const en = {
       reposLabel: "Repos to change",
       reposHint:
         "Builder only touches the repos you choose here — pick every repo this PRD's technical plan calls out.",
+      reposHintIssue:
+        "Each repo the approved design changes is built one after another, in the order ally-be → ally-ai → ally-ai-learn → ally-web → ally-mobile, with one pull request per repo. The next repo starts once the previous one's CI passes.",
+      dispatchLabel: "How to build",
+      dispatchIssue: "GitHub issue + opencode (recommended)",
+      dispatchIssueHint:
+        "Builder raises an issue in the repo, opencode opens a pull request, and the repo's own CI checks it. You approve and merge on GitHub.",
+      dispatchWorkflow: "Builder runner (legacy)",
+      issueModelNote:
+        "The model is set per repo on GitHub with the BUILDER_MODEL variable (default Gemini 3 Flash). Cost isn't tracked for opencode builds.",
       reposPlaceholder: "Choose repos…",
       reposRequired: "Choose at least one repo before starting.",
       budgetLabel: "Budget (USD)",
@@ -4134,13 +4225,16 @@ export const en = {
         columnStatus: "Status",
         columnMode: "Mode",
         columnRuns: "Runs",
-        columnMedianMinutes: "Median runner minutes",
+        // opencode builds run in the target repo's Actions and report no
+        // runner minutes, so this median only covers Builder's own runner.
+        columnMedianMinutes: "Median runner minutes (Builder runner only)",
       },
     },
 
     scoreboard: {
       title: "Builder scoreboard",
-      subtitle: "Cost, review friction, and how often a build actually ships — over time.",
+      subtitle:
+        "Cost, review friction, and how often a build actually ships — over time. Cost isn't tracked for opencode builds.",
       backToBuilder: "Back to Builder",
       loadFailed: "Couldn't load the scoreboard.",
       retry: "Retry",

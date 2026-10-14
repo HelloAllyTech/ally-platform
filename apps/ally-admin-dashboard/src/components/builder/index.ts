@@ -9,6 +9,7 @@ export * from "./ConfirmCancelDialog";
 export * from "./designGate";
 export * from "./DiffBlock";
 export * from "./diffLines";
+export * from "./issueBuild";
 export * from "./PhaseRail";
 export * from "./prdExport";
 export * from "./runFormat";
