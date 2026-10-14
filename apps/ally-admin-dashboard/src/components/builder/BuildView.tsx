@@ -316,11 +316,16 @@ export const BuildView: React.FC<BuildViewProps> = ({
     prevNewestIdRef.current = newestRun.id;
 
     setSelectedRunId(previous => {
-      if (previous === null) return newestRun.id;
+      // First look: the newest run if it is still working, otherwise the
+      // latest build. A finished review or design draft is newer than the
+      // build it was about, and opening the session on its transcript buried
+      // the build itself.
+      if (previous === null)
+        return isRunActive(newestRun) ? newestRun.id : (latestBuild ?? newestRun).id;
       if (isNewRun && followLive) return newestRun.id;
       return previous;
     });
-  }, [newestRun, followLive]);
+  }, [newestRun, latestBuild, followLive]);
 
   const handleSelectRun = useCallback((runId: string) => {
     setSelectedRunId(runId);

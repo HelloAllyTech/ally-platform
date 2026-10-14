@@ -104,6 +104,30 @@ describe("BuildView issue builds", () => {
     );
   });
 
+  it("opens on the issue build, not the finished review run after it", () => {
+    // Ankita's session: a runner review of the PR was the newest run, and the
+    // page opened on its transcript and the runner's phase rail.
+    runs = [
+      { ...issueRun("SUCCEEDED", ["issue", "pr:33", "ci-pass:a"]), mode: "build" },
+      {
+        id: "run-2",
+        sequence: 2,
+        mode: "review",
+        status: "SUCCEEDED",
+        issueNumber: null,
+        cost: null,
+        costUsd: "0.40",
+        error: null,
+        dispatchedAt: new Date().toISOString(),
+      },
+    ];
+    pullRequests = [pr("success")];
+    renderView("COMPLETED");
+
+    expect(screen.getByText("IssueRail")).toBeInTheDocument();
+    expect(screen.queryByText("PhaseRail")).toBeNull();
+  });
+
   it("disables Merge while opencode is still working on CI", () => {
     runs = [issueRun("RUNNING", ["issue", "working:5", "pr:33", "ci-fail:a", "fix:a"])];
     pullRequests = [pr("failure")];
