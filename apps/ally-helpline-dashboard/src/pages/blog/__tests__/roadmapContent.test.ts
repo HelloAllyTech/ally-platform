@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { RoadmapCard } from "@api";
 
-import { formatRoadmapMonth, groupIntoGrid, stageLevel } from "../roadmapContent";
+import { groupIntoGrid, stageLevel } from "../roadmapContent";
 
 const card = (overrides: Partial<RoadmapCard>): RoadmapCard => ({
   id: "c1",
@@ -40,11 +40,5 @@ describe("stageLevel", () => {
     expect(stageLevel("idea")).toBe(1);
     expect(stageLevel("released")).toBe(4);
     expect(stageLevel("stable")).toBe(5);
-  });
-});
-
-describe("formatRoadmapMonth", () => {
-  it("shows the month and year the roadmap last changed", () => {
-    expect(formatRoadmapMonth("2026-10-09T12:00:00Z")).toBe("October 2026");
   });
 });

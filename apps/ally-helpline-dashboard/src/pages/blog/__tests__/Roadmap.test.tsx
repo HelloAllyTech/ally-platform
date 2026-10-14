@@ -80,19 +80,19 @@ describe("Roadmap page", () => {
     ).toBeInTheDocument();
   });
 
-  it("dates the page by the month the roadmap last changed", () => {
+  it("carries no date or update cadence", () => {
     loaded([card({})], "2026-10-09T00:00:00Z");
     renderPage();
 
-    expect(screen.getByText("October 2026")).toHaveAttribute("datetime", "2026-10-09T00:00:00Z");
+    expect(screen.queryByText("October 2026")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Updated quarterly/)).not.toBeInTheDocument();
   });
 
-  it("shows an empty state, and no date, when there are no cards", () => {
+  it("shows an empty state when there are no cards", () => {
     loaded([], null);
     renderPage();
 
     expect(screen.getByText("Nothing on the roadmap yet. Check back soon!")).toBeInTheDocument();
-    expect(screen.queryByText("Updated quarterly")).not.toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Prepare" })).not.toBeInTheDocument();
   });
 
