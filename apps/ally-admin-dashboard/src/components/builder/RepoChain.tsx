@@ -57,9 +57,11 @@ const nextStep = (row: ChainRow, previousRepo: string | null): string | null => 
   const strings = en.builder.repoChain;
   // The server's reason sits under the row and says it better.
   if (row.needsHuman) return null;
+  // Builder is still reviewing or fixing it: say that, not "ready".
+  if (row.workState) return strings.workState[row.workState];
   switch (row.mergeRole) {
     case "primary":
-      return strings.nextReview;
+      return row.reviewedClean ? strings.nextReviewedClean : strings.nextReview;
     case "after":
       return row.mergeAfter ? strings.nextMergeAfter(row.mergeAfter) : null;
     case "notReady":
@@ -117,7 +119,7 @@ export const RepoChain: React.FC<RepoChainProps> = ({
 }) => {
   const strings = en.builder.repoChain;
   const buildStrings = en.builder.build;
-  const rows = chainRows(milestones, runs, pullRequests);
+  const rows = chainRows(milestones, runs, pullRequests, feedback);
   if (rows.length === 0) return null;
 
   return (
@@ -223,7 +225,7 @@ export const RepoChain: React.FC<RepoChainProps> = ({
                         kind={row.mergeRole === "primary" && !row.reviewFirst ? "primary" : "ghost"}
                         // Nothing approves on anyone's behalf: GitHub's branch
                         // protection wants a review first, given on the PR.
-                        title={strings.mergeApprovalHint}
+                        title={row.workState ? strings.mergeBusyHint : strings.mergeApprovalHint}
                         disabled={isMerging || !row.mergeable}
                         onClick={() => onMerge(prRow.id)}
                       >

@@ -153,7 +153,7 @@ describe("RepoChain", () => {
     );
   });
 
-  it("does not promote a green pull request past a red one ahead of it", () => {
+  it("moves the primary past a pull request that is not ready to the next one that is", () => {
     render(
       <RepoChain
         {...threeBuilt}
@@ -170,11 +170,124 @@ describe("RepoChain", () => {
       />,
     );
 
-    expect(screen.queryAllByRole("button").filter(b => b.dataset.kind === "primary")).toHaveLength(
-      0,
+    const primaries = screen.getAllByRole("button").filter(b => b.dataset.kind === "primary");
+    expect(primaries).toHaveLength(1);
+    expect(within(rowFor("ally-web")).getByRole("button", { name: "Merge first" })).toBe(
+      primaries[0],
     );
     expect(within(rowFor("ally-be")).getByRole("button", { name: "Merge" })).toBeDisabled();
     expect(within(rowFor("ally-be")).getByText("Fix CI on the pull request")).toBeInTheDocument();
+    expect(within(rowFor("ally-mobile")).getByText("Merge after ally-web")).toBeInTheDocument();
+  });
+
+  describe("while Builder is still working a pull request", () => {
+    const reviewRun = (status: string) =>
+      ({
+        id: "run-review",
+        mode: "review",
+        status,
+        pullRequestId: "pr-be",
+        issueNumber: null,
+        cost: null,
+      }) as unknown as BuilderBuildRun;
+    const feedbackItem = (status: string) => ({
+      id: `f-${status}`,
+      pullRequestId: "pr-be",
+      sessionId: "s",
+      kind: "agent_review" as const,
+      status: status as any,
+      body: "Missing null check",
+      path: null,
+      line: null,
+    });
+
+    it("says Builder is reviewing it, and moves the primary to the next ready row", () => {
+      render(
+        <RepoChain
+          {...threeBuilt}
+          runs={[...threeBuilt.runs, reviewRun("RUNNING")]}
+          onMerge={vi.fn()}
+        />,
+      );
+
+      const be = rowFor("ally-be");
+      expect(within(be).getByText("Builder is reviewing this")).toBeInTheDocument();
+      expect(within(be).queryByText("Waiting for your review")).toBeNull();
+      const quiet = within(be).getByRole("button", { name: "Merge" });
+      expect(quiet).toHaveAttribute("data-kind", "ghost");
+      expect(quiet).toBeDisabled();
+      expect(quiet).toHaveAttribute("title", "Builder is still working on this pull request");
+
+      const primaries = screen.getAllByRole("button").filter(b => b.dataset.kind === "primary");
+      expect(primaries).toHaveLength(1);
+      expect(within(rowFor("ally-web")).getByRole("button", { name: "Merge first" })).toBe(
+        primaries[0],
+      );
+    });
+
+    it("leaves the row ready once the review run has finished", () => {
+      render(
+        <RepoChain
+          {...threeBuilt}
+          runs={[...threeBuilt.runs, reviewRun("SUCCEEDED")]}
+          onMerge={vi.fn()}
+        />,
+      );
+      expect(
+        within(rowFor("ally-be")).getByRole("button", { name: "Merge first" }),
+      ).toHaveAttribute("data-kind", "primary");
+    });
+
+    it("says opencode is fixing what the review found while a finding is in fix", () => {
+      render(<RepoChain {...threeBuilt} feedback={[feedbackItem("in_fix")]} onMerge={vi.fn()} />);
+      const be = rowFor("ally-be");
+      expect(within(be).getByText("opencode is fixing what the review found")).toBeInTheDocument();
+      expect(within(be).getByRole("button", { name: "Merge" })).toBeDisabled();
+    });
+
+    it("says the findings are on their way while one is pending", () => {
+      render(<RepoChain {...threeBuilt} feedback={[feedbackItem("pending")]} onMerge={vi.fn()} />);
+      expect(
+        within(rowFor("ally-be")).getByText("Sending the review's findings to opencode"),
+      ).toBeInTheDocument();
+    });
+
+    it("ignores findings that are already dealt with", () => {
+      render(
+        <RepoChain {...threeBuilt} feedback={[feedbackItem("addressed")]} onMerge={vi.fn()} />,
+      );
+      expect(within(rowFor("ally-be")).getByText("Waiting for your review")).toBeInTheDocument();
+    });
+
+    it("says a pull request reviewed clean on its current commit is ready to merge", () => {
+      render(
+        <RepoChain
+          {...threeBuilt}
+          pullRequests={[
+            { ...threeBuilt.pullRequests[0], headSha: "abc", reviewPassedSha: "abc" } as any,
+            ...threeBuilt.pullRequests.slice(1),
+          ]}
+          onMerge={vi.fn()}
+        />,
+      );
+      expect(
+        within(rowFor("ally-be")).getByText("Reviewed clean — ready to merge"),
+      ).toBeInTheDocument();
+    });
+
+    it("does not call a review clean once a new commit landed after it", () => {
+      render(
+        <RepoChain
+          {...threeBuilt}
+          pullRequests={[
+            { ...threeBuilt.pullRequests[0], headSha: "def", reviewPassedSha: "abc" } as any,
+            ...threeBuilt.pullRequests.slice(1),
+          ]}
+          onMerge={vi.fn()}
+        />,
+      );
+      expect(within(rowFor("ally-be")).getByText("Waiting for your review")).toBeInTheDocument();
+    });
   });
 
   it("puts the progress line under the building row only, and links the issue until a PR exists", () => {

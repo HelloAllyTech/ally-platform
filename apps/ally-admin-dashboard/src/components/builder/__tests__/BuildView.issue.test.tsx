@@ -115,6 +115,7 @@ const renderView = (status: "BUILDING" | "COMPLETED") =>
 
 describe("BuildView issue builds", () => {
   beforeEach(() => {
+    prFeedback = [];
     runs = [];
     pullRequests = [];
     milestones = [];
@@ -218,6 +219,7 @@ describe("BuildView issue builds", () => {
 
 describe("BuildView pull request handed to a person", () => {
   beforeEach(() => {
+    prFeedback = [];
     runs = [];
     milestones = [];
     resumeAutomation.mockClear();
@@ -272,6 +274,7 @@ describe("BuildView pull request handed to a person", () => {
 
 describe("BuildView automation budget and release health", () => {
   beforeEach(() => {
+    prFeedback = [];
     milestones = [];
   });
 
@@ -304,6 +307,49 @@ describe("BuildView automation budget and release health", () => {
   });
 });
 
+describe("BuildView pull request panel while Builder is working it", () => {
+  beforeEach(() => {
+    prFeedback = [];
+    milestones = [];
+    prFeedback = [];
+  });
+
+  it("holds Merge and says Builder is reviewing it", () => {
+    runs = [
+      issueRun("SUCCEEDED", ["issue", "pr:33", "ci-pass:a"]),
+      {
+        id: "run-2",
+        sequence: 2,
+        mode: "review",
+        status: "RUNNING",
+        pullRequestId: "pr-1",
+        issueNumber: null,
+        cost: null,
+        error: null,
+        dispatchedAt: new Date().toISOString(),
+      },
+    ];
+    pullRequests = [pr("success")];
+    renderView("COMPLETED");
+
+    expect(screen.getByText("Builder is reviewing this")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Merge" })).toBeDisabled();
+    expect(screen.queryByText(/Ready for review/)).toBeNull();
+  });
+
+  it("says opencode is fixing what the review found", () => {
+    runs = [issueRun("SUCCEEDED", ["issue", "pr:33", "ci-pass:a"])];
+    pullRequests = [pr("success")];
+    prFeedback = [
+      { id: "f", pullRequestId: "pr-1", kind: "agent_review", status: "in_fix", body: "x" },
+    ];
+    renderView("COMPLETED");
+
+    expect(screen.getByText("opencode is fixing what the review found")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Merge" })).toBeDisabled();
+  });
+});
+
 describe("BuildView chained issue builds", () => {
   const chainRun = (id: string, repo: string, milestoneId: string, status = "SUCCEEDED") => ({
     id,
@@ -331,6 +377,7 @@ describe("BuildView chained issue builds", () => {
   });
 
   beforeEach(() => {
+    prFeedback = [];
     milestones = [
       { id: "m-be", position: 0, repos: ["ally-be"], status: "COMPLETED" },
       { id: "m-web", position: 1, repos: ["ally-web"], status: "COMPLETED" },

@@ -32,6 +32,8 @@ import { BuildActivityFeed, countFeedUpdates } from "./BuildActivityFeed";
 import { CollapsibleSection } from "./CollapsibleSection";
 import {
   isChainedIssueSession,
+  isReviewedClean,
+  prWorkState,
   isIssueRun,
   isRunActive,
   issueRunPullRequest,
@@ -135,10 +137,18 @@ export const BuildView: React.FC<BuildViewProps> = ({
   // from `runs` — reading it here is a temporal dead zone, and untangling the
   // hook order in this component is a bigger change than five requests a
   // minute justifies.
+  // A review run on an opencode pull request can be going while the session
+  // itself is finished — it must still be followed, or the page offers to
+  // merge a pull request Builder is in the middle of reviewing. Read off the
+  // previous poll's runs (a hook option cannot depend on its own result).
+  const [anyRunActive, setAnyRunActive] = useState(false);
   const { data: runs } = useGetBuilderRunsQuery(sessionId, {
-    pollingInterval: isLive || isWaiting ? POLL_WITHOUT_SOCKET_MS : 0,
+    pollingInterval: isLive || isWaiting || anyRunActive ? POLL_WITHOUT_SOCKET_MS : 0,
     skipPollingIfUnfocused: true,
   });
+  useEffect(() => {
+    setAnyRunActive((runs ?? []).some(isRunActive));
+  }, [runs]);
   // Polled with the runs: the chain moves on when a run's CI goes green, and
   // the session row alone does not say which repo is next.
   const { data: milestones } = useGetBuilderMilestonesQuery(sessionId, {
@@ -179,19 +189,22 @@ export const BuildView: React.FC<BuildViewProps> = ({
   );
 
   const { data: pullRequests } = useGetBuilderPullRequestsQuery(sessionId, {
-    pollingInterval: isLive ? POLL_WITH_SOCKET_MS : 0,
+    pollingInterval: isLive || anyRunActive ? POLL_WITH_SOCKET_MS : 0,
     skipPollingIfUnfocused: true,
   });
   const [fetchEvents] = useLazyGetBuilderRunEventsQuery();
   const [answerQuestion] = useAnswerBuilderQuestionMutation();
 
-  // Findings are only read for a pull request handed to a person — they are
-  // what that person needs to look at, and nothing else on the page uses them.
-  const anyNeedsHuman = (pullRequests ?? []).some(
-    pr => Boolean(pr.needsHumanAt) && !pr.merged && pr.state !== "closed",
+  // Findings are read while any opencode pull request is still open: an open
+  // one means Builder is still working it (and must not be offered for
+  // merge), and a pull request handed to a person lists them.
+  const anyOpenOpencodePr = (pullRequests ?? []).some(
+    pr => !pr.merged && pr.state !== "closed" && Boolean(issueRunFor(pr, runs)),
   );
   const { data: prFeedback } = useGetBuilderPrFeedbackQuery(sessionId, {
-    skip: !anyNeedsHuman,
+    skip: !anyOpenOpencodePr,
+    pollingInterval: isLive || anyRunActive ? POLL_WITH_SOCKET_MS : 0,
+    skipPollingIfUnfocused: true,
   });
   const [resumeAutomation] = useResumeBuilderPullRequestAutomationMutation();
   // The per-PR review-and-fix ceiling and time box, for the budget line.
@@ -751,7 +764,10 @@ export const BuildView: React.FC<BuildViewProps> = ({
               const issueRun = issueRunFor(pullRequest, runs);
               const ciGreen = pullRequest.ciStatus === "success";
               const issueWorking = Boolean(issueRun) && isRunActive(issueRun);
-              const mergeBlocked = Boolean(issueRun) && (issueWorking || !ciGreen);
+              // Builder reviewing it, or opencode fixing what the review found.
+              const workState = issueRun ? prWorkState(pullRequest, runs, prFeedback) : null;
+              const mergeBlocked =
+                Boolean(issueRun) && (issueWorking || !ciGreen || Boolean(workState));
 
               return (
                 <li key={pullRequest.id} className="flex flex-col gap-1">
@@ -781,6 +797,7 @@ export const BuildView: React.FC<BuildViewProps> = ({
                     )}
                     <Button
                       size="sm"
+                      title={workState ? en.builder.repoChain.mergeBusyHint : undefined}
                       disabled={isMerging || mergeBlocked}
                       onClick={() => handleMerge(pullRequest.id)}
                     >
@@ -806,9 +823,16 @@ export const BuildView: React.FC<BuildViewProps> = ({
                   {issueRun && issueWorking && (
                     <p className="text-xs text-typography-600">{strings.prIssueWorking}</p>
                   )}
-                  {issueRun && !issueWorking && ciGreen && (
+                  {issueRun && !issueWorking && workState && (
                     <p className="text-xs text-typography-600">
-                      {strings.prIssueReady}{" "}
+                      {en.builder.repoChain.workState[workState]}
+                    </p>
+                  )}
+                  {issueRun && !issueWorking && !workState && ciGreen && (
+                    <p className="text-xs text-typography-600">
+                      {isReviewedClean(pullRequest)
+                        ? en.builder.repoChain.nextReviewedClean
+                        : strings.prIssueReady}{" "}
                       <a
                         href={pullRequest.prUrl}
                         target="_blank"

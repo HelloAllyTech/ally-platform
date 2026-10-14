@@ -10,6 +10,7 @@ import type {
   BuilderBuildEvent,
   BuilderBuildRun,
   BuilderMilestone,
+  BuilderPrFeedback,
   BuilderPullRequest,
 } from "@types";
 
@@ -191,6 +192,12 @@ export interface ChainRow {
    * action is then reading it on GitHub, not merging it.
    */
   reviewFirst: boolean;
+  /** What Builder is doing to the pull request right now, if anything. */
+  workState: PrWorkState | null;
+  /** Builder's review passed on the commit it is at now. */
+  reviewedClean: boolean;
+  /** Could be the page's primary merge: mergeable and not waiting on a person. */
+  ready: boolean;
 }
 
 /**
@@ -206,6 +213,8 @@ export const chainRows = (
   milestones: BuilderMilestone[] | undefined,
   runs: BuilderBuildRun[] | undefined,
   pullRequests: BuilderPullRequest[] | undefined,
+  /** PR findings: an open one means Builder is still working the pull request. */
+  feedback?: BuilderPrFeedback[],
 ): ChainRow[] => {
   const base = repoMilestones(milestones).map(milestone => {
     const repo = milestone.repos?.[0] ?? "";
@@ -218,6 +227,13 @@ export const chainRows = (
       null;
     const pr = fromRun ?? (row ? { number: row.prNumber, url: row.prUrl, row } : null);
     const building = isRunActive(run);
+    const open = Boolean(row) && !row?.merged && row?.state !== "closed";
+    const workState = row ? prWorkState(row, runs, feedback) : null;
+    // Mergeable = the button may be pressed: CI green and nobody — opencode or
+    // Builder's reviewer — still changing or judging it. A person may still
+    // merge one that was handed to them, so needs-you does not block this.
+    const mergeable = row?.ciStatus === "success" && !building && !workState;
+    const needsHuman = Boolean(open && row?.needsHumanAt);
     return {
       milestone,
       repo,
@@ -225,33 +241,43 @@ export const chainRows = (
       pr,
       ciStatus: row?.ciStatus ?? null,
       building,
-      mergeable: row?.ciStatus === "success" && !building,
-      open: Boolean(row) && !row?.merged && row?.state !== "closed",
+      mergeable,
+      open,
+      needsHuman,
+      workState,
+      reviewedClean: isReviewedClean(row),
+      // Ready to be THE action on the page: mergeable and not waiting on a person.
+      ready: mergeable && !needsHuman,
     };
   });
 
   const openIndexes = base.flatMap((row, index) => (row.open ? [index] : []));
   const firstOpen = openIndexes[0] ?? -1;
+  // When the first unmerged pull request needs a person, reading it is the one
+  // prominent action and nothing is offered as a primary merge. Otherwise the
+  // primary goes to the first unmerged pull request that is actually ready —
+  // never to one Builder is still reviewing or opencode is still fixing.
+  const reviewFirstIndex = firstOpen >= 0 && base[firstOpen].needsHuman ? firstOpen : -1;
+  const primaryIndex =
+    reviewFirstIndex >= 0 ? -1 : (openIndexes.find(index => base[index].ready) ?? -1);
 
   return base.map(({ open, ...row }, index) => {
     const prRow = row.pr?.row ?? null;
     let mergeRole: ChainMergeRole = "none";
     if (prRow?.merged) mergeRole = "merged";
     else if (prRow?.state === "closed") mergeRole = "closed";
-    else if (open && index === firstOpen) mergeRole = row.mergeable ? "primary" : "notReady";
+    else if (open && index === primaryIndex) mergeRole = "primary";
+    else if (open && (index === firstOpen || (primaryIndex >= 0 && index < primaryIndex)))
+      mergeRole = "notReady";
     else if (open) mergeRole = "after";
 
     const previousOpen = [...openIndexes].reverse().find(candidate => candidate < index);
-    const needsHuman = Boolean(open && prRow?.needsHumanAt);
-    const reviewFirst = needsHuman && index === firstOpen;
     return {
       ...row,
       mergeRole,
-      needsHuman,
-      reviewFirst,
-      // "Merge first" is the page's one prominent action — unless this pull
-      // request needs a person, in which case reading it is.
-      mergeFirst: mergeRole === "primary" && openIndexes.length > 1 && !reviewFirst,
+      reviewFirst: index === reviewFirstIndex,
+      // "Merge first" only while later pull requests wait on this one.
+      mergeFirst: mergeRole === "primary" && openIndexes.some(other => other > index),
       mergeAfter:
         mergeRole === "after" && previousOpen !== undefined ? base[previousOpen].repo : null,
     };
@@ -371,3 +397,38 @@ export const automationBudget = (
     timeboxMs && Number.isFinite(startedAt) ? Math.max(0, startedAt + timeboxMs - now) : null;
   return { round, maxRounds, msLeft };
 };
+
+/**
+ * What Builder is doing to a pull request right now, if anything:
+ * - `reviewing` — a review run on it is queued or running;
+ * - `fixing` — opencode is working on a finding (`in_fix`);
+ * - `sending` — findings are waiting to go to opencode (`pending`).
+ *
+ * Any of these means the pull request is about to change under whoever reads
+ * it, so the page must not invite a merge — the live failure was "Merge first"
+ * on a pull request Builder was still reviewing.
+ */
+export type PrWorkState = "reviewing" | "fixing" | "sending";
+
+export const prWorkState = (
+  pullRequest: BuilderPullRequest,
+  runs: BuilderBuildRun[] | undefined,
+  feedback: BuilderPrFeedback[] | undefined,
+): PrWorkState | null => {
+  if (pullRequest.merged || pullRequest.state === "closed") return null;
+  if (
+    (runs ?? []).some(
+      run => run.mode === "review" && run.pullRequestId === pullRequest.id && isRunActive(run),
+    )
+  ) {
+    return "reviewing";
+  }
+  const open = (feedback ?? []).filter(item => item.pullRequestId === pullRequest.id);
+  if (open.some(item => item.status === "in_fix")) return "fixing";
+  if (open.some(item => item.status === "pending")) return "sending";
+  return null;
+};
+
+/** Builder's review passed on the commit the pull request is at now. */
+export const isReviewedClean = (pullRequest: BuilderPullRequest | null | undefined): boolean =>
+  Boolean(pullRequest?.reviewPassedSha) && pullRequest?.reviewPassedSha === pullRequest?.headSha;

@@ -4018,6 +4018,14 @@ export const en = {
       ciFailedLabel: "CI failed",
       // What the row wants next, in a few words.
       nextReview: "Waiting for your review",
+      nextReviewedClean: "Reviewed clean — ready to merge",
+      // Builder is still working the pull request, so it is not ready to merge.
+      workState: {
+        reviewing: "Builder is reviewing this",
+        fixing: "opencode is fixing what the review found",
+        sending: "Sending the review's findings to opencode",
+      } as Record<string, string>,
+      mergeBusyHint: "Builder is still working on this pull request",
       nextMergeAfter: (repo: string) => `Merge after ${repo}`,
       nextCiFailed: "Fix CI on the pull request",
       nextCiRunning: "Waiting for CI",

@@ -344,6 +344,8 @@ export interface BuilderBuildRun {
   repos?: string[] | null;
   /** The repo milestone this run builds, when the design was split per repo. */
   milestoneId?: string | null;
+  /** Set on a review (or fix) run: the pull request it is working on. */
+  pullRequestId?: string | null;
   /**
    * Legacy runs keep spend bookkeeping here. Issue runs reuse the column for
    * where the issue has got to — see `issueProgress`.
@@ -496,6 +498,10 @@ export interface BuilderPullRequest {
   needsHumanReason?: string | null;
   /** Fix requests Builder has made on this pull request so far. */
   fixRunCount?: number;
+  /** The pull request's current head commit. */
+  headSha?: string | null;
+  /** The commit Builder's review last passed clean; equal to headSha = still clean. */
+  reviewPassedSha?: string | null;
   /**
    * One entry per review Builder ran on it; the first entry's `at` starts the
    * pull request's automation time box.
