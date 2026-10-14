@@ -6,7 +6,12 @@
  * hint all agree on what "where has it got to" means, and so it is testable
  * without a DOM.
  */
-import type { BuilderBuildRun, BuilderMilestone, BuilderPullRequest } from "@types";
+import type {
+  BuilderBuildEvent,
+  BuilderBuildRun,
+  BuilderMilestone,
+  BuilderPullRequest,
+} from "@types";
 
 /** Ceiling the server puts on "please fix CI" comments per build. */
 export const ISSUE_FIX_REQUEST_LIMIT = 2;
@@ -139,3 +144,167 @@ export const nextChainRepo = (
   );
   return next?.repos?.[0] ?? null;
 };
+
+/**
+ * Whether the session page should use the consolidated repo-table layout:
+ * the latest BUILD is an issue build and the design was split into repos.
+ * Runner sessions, and issue builds without repo milestones, keep the
+ * original layout.
+ */
+export const isChainedIssueSession = (
+  runs: BuilderBuildRun[] | null | undefined,
+  milestones: BuilderMilestone[] | undefined,
+): boolean => isIssueRun(latestBuildRun(runs)) && repoMilestones(milestones).length > 0;
+
+/** What a row of the repo table offers for its pull request. */
+export type ChainMergeRole =
+  /** The one prominent action on the page: the first unmerged, ready PR. */
+  | "primary"
+  /** A later PR — mergeable on its own terms, but after the one before it. */
+  | "after"
+  /** First in line but not ready yet (CI not green, or opencode still on it). */
+  | "notReady"
+  | "merged"
+  | "closed"
+  | "none";
+
+export interface ChainRow {
+  milestone: BuilderMilestone;
+  repo: string;
+  /** The newest run for this milestone — the one that speaks for the repo. */
+  run: BuilderBuildRun | null;
+  pr: { number: number; url: string | null; row: BuilderPullRequest | null } | null;
+  ciStatus: string | null;
+  /** True while this repo's issue run is still going. */
+  building: boolean;
+  mergeRole: ChainMergeRole;
+  /** Merge is possible: CI green and opencode no longer working on it. */
+  mergeable: boolean;
+  /** "Merge first" — later repos are waiting on this one. */
+  mergeFirst: boolean;
+  /** The repo whose pull request should be merged before this one. */
+  mergeAfter: string | null;
+}
+
+/**
+ * One row per repo, in build order, with the merge order worked out.
+ *
+ * Merge order follows build order: each repo was built against the design on
+ * the assumption the ones before it land first. So the primary action is only
+ * ever the FIRST unmerged pull request, and only once it is ready — a green PR
+ * further down is offered as a secondary "Merge after <repo>", never promoted
+ * past a red one ahead of it.
+ */
+export const chainRows = (
+  milestones: BuilderMilestone[] | undefined,
+  runs: BuilderBuildRun[] | undefined,
+  pullRequests: BuilderPullRequest[] | undefined,
+): ChainRow[] => {
+  const base = repoMilestones(milestones).map(milestone => {
+    const repo = milestone.repos?.[0] ?? "";
+    const run =
+      [...(runs ?? [])].reverse().find(candidate => candidate.milestoneId === milestone.id) ?? null;
+    const fromRun = run ? issueRunPullRequest(run, pullRequests) : null;
+    const row =
+      fromRun?.row ??
+      (pullRequests ?? []).find(candidate => sameRepo(candidate.repo, repo)) ??
+      null;
+    const pr = fromRun ?? (row ? { number: row.prNumber, url: row.prUrl, row } : null);
+    const building = isRunActive(run);
+    return {
+      milestone,
+      repo,
+      run,
+      pr,
+      ciStatus: row?.ciStatus ?? null,
+      building,
+      mergeable: row?.ciStatus === "success" && !building,
+      open: Boolean(row) && !row?.merged && row?.state !== "closed",
+    };
+  });
+
+  const openIndexes = base.flatMap((row, index) => (row.open ? [index] : []));
+  const firstOpen = openIndexes[0] ?? -1;
+
+  return base.map(({ open, ...row }, index) => {
+    const prRow = row.pr?.row ?? null;
+    let mergeRole: ChainMergeRole = "none";
+    if (prRow?.merged) mergeRole = "merged";
+    else if (prRow?.state === "closed") mergeRole = "closed";
+    else if (open && index === firstOpen) mergeRole = row.mergeable ? "primary" : "notReady";
+    else if (open) mergeRole = "after";
+
+    const previousOpen = [...openIndexes].reverse().find(candidate => candidate < index);
+    return {
+      ...row,
+      mergeRole,
+      mergeFirst: mergeRole === "primary" && openIndexes.length > 1,
+      mergeAfter:
+        mergeRole === "after" && previousOpen !== undefined ? base[previousOpen].repo : null,
+    };
+  });
+};
+
+/** The header's one-line account of a chain. */
+export type ChainSummary =
+  | { kind: "building"; repo: string; position: number; total: number }
+  | { kind: "stopped"; repo: string }
+  | { kind: "built"; built: number; total: number };
+
+export const chainSummary = (
+  milestones: BuilderMilestone[] | undefined,
+  sessionFailed: boolean,
+): ChainSummary | null => {
+  const steps = repoMilestones(milestones);
+  if (!steps.length) return null;
+  const buildingIndex = steps.findIndex(step => step.status === "BUILDING");
+  if (buildingIndex >= 0) {
+    return {
+      kind: "building",
+      repo: steps[buildingIndex].repos?.[0] ?? "",
+      position: buildingIndex + 1,
+      total: steps.length,
+    };
+  }
+  const failed = steps.find(step => step.status === "FAILED");
+  if (failed || sessionFailed) {
+    const at =
+      failed ?? steps.find(step => step.status !== "COMPLETED" && step.status !== "SKIPPED");
+    if (at?.repos?.[0]) return { kind: "stopped", repo: at.repos[0] };
+  }
+  return {
+    kind: "built",
+    built: steps.filter(step => step.status === "COMPLETED").length,
+    total: steps.length,
+  };
+};
+
+/**
+ * Server status lines that only restate what the repo table already shows.
+ *
+ * Matched on the exact phrasing ally-be writes in
+ * `BuilderPullRequestService` (`recordIssueMilestone` text for `pr:`,
+ * `ci-pending:` and `ci-pass:`), so a rewording there makes these lines
+ * reappear rather than hiding anything else. Failures, fix requests and every
+ * other line are kept.
+ */
+const RESTATED_STATUS_PREFIXES = ["opencode opened ", "CI is running on ", "CI passed on "];
+
+/**
+ * An issue run's feed without what the table already says: the PR-opened and
+ * CI-running / CI-passed lines, and the CI cards that carry no failed checks.
+ * A CI card that names failing checks is the one place those names appear, so
+ * it stays.
+ */
+export const withoutRestatedStatus = (events: BuilderBuildEvent[]): BuilderBuildEvent[] =>
+  events.filter(event => {
+    if (event.type === "text") {
+      const text = String(event.payload?.text ?? "");
+      return !RESTATED_STATUS_PREFIXES.some(prefix => text.startsWith(prefix));
+    }
+    if (event.type === "ci_result") {
+      const failed = event.payload?.failed;
+      return Array.isArray(failed) && failed.length > 0;
+    }
+    return true;
+  });

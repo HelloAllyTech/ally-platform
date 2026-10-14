@@ -3584,6 +3584,7 @@ export const en = {
       // Issue builds: opencode reads pull request comments, not notes here.
       issueTitle: "Redirect opencode",
       issueHint: "To steer opencode, comment /oc followed by your instruction on the pull request.",
+      issueHintChain: "To steer opencode, comment /oc on a pull request.",
       issueHintNoPr:
         "To steer opencode, comment /oc followed by your instruction on its pull request once it opens one.",
       issueOpenPr: (repo: string, prNumber: number) => `Open ${repo} #${prNumber}`,
@@ -3940,8 +3941,6 @@ export const en = {
       prIssueWorking: "opencode is still working on CI",
       prIssueReady: "Ready for review — approve it on GitHub, then merge",
       prIssueOpenOnGithub: "Open on GitHub",
-      prChainNote:
-        "Each repo was built against the approved design, one after another. An earlier repo's pull request may still be unmerged — review and merge them in order.",
       pullRequestsHeading: "Pull requests",
       // Named for what it wants from you, not for what it is. A heading that
       // says "Pull requests" describes a data type; one that says a review is
@@ -3990,17 +3989,42 @@ export const en = {
     // The repo chain on the session page.
     repoChain: {
       heading: "Repos, built in order",
-      building: (repo: string) => `Building ${repo} now`,
       showActivity: (repo: string) => `Show ${repo}'s activity`,
       showingActivity: "Showing",
+      activityLink: "Activity",
       status: {
         PENDING: "Waiting",
         BUILDING: "Building",
         WAITING_FOR_INPUT: "Waiting on you",
-        COMPLETED: "Done",
+        COMPLETED: "Built",
         FAILED: "Failed",
         SKIPPED: "Skipped",
       } as Record<string, string>,
+      // The header's summary of the whole chain.
+      summaryBuilt: (built: number, total: number) =>
+        total === 1 ? `${built} of 1 repo built` : `${built} of ${total} repos built`,
+      summaryBuilding: (repo: string, position: number, total: number) =>
+        `Building ${repo} (${position} of ${total})`,
+      summaryStopped: (repo: string) => `Stopped at ${repo}`,
+      prNumber: (prNumber: number) => `#${prNumber}`,
+      ciPassed: "CI ✓",
+      ciFailed: "CI ✗",
+      ciRunning: "CI running",
+      ciPassedLabel: "CI passed",
+      ciFailedLabel: "CI failed",
+      // What the row wants next, in a few words.
+      nextReview: "Waiting for your review",
+      nextMergeAfter: (repo: string) => `Merge after ${repo}`,
+      nextCiFailed: "Fix CI on the pull request",
+      nextCiRunning: "Waiting for CI",
+      nextStartsAfter: (repo: string) => `Starts after ${repo}`,
+      nextWaiting: "Waiting to start",
+      mergeFirst: "Merge first",
+      mergeApprovalHint:
+        "GitHub needs an approving review on the pull request before it can merge.",
+      actionsLog: "Actions log",
+      activityHeading: (repo: string) => `Activity: ${repo}`,
+      activityMeta: (count: number) => (count === 1 ? "1 update" : `${count} updates`),
     },
     costLabel: "Spend",
     repoLabel: "Repos",

@@ -65,7 +65,3 @@ export const groupIntoGrid = (cards: RoadmapCard[]): RoadmapGrid => {
   }
   return grid;
 };
-
-/** "October 2026" — the month the roadmap last changed. */
-export const formatRoadmapMonth = (iso: string): string =>
-  new Date(iso).toLocaleDateString("en-GB", { month: "long", year: "numeric" });

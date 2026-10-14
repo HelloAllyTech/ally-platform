@@ -27,6 +27,8 @@ import {
   SteerComposer,
   TechnicalDesignPanel,
   designBuildBlock,
+  chainSummary,
+  isChainedIssueSession,
   isIssueRun,
   latestBuildRun,
   isRunActive,
@@ -385,6 +387,18 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
   const latestRun = latestBuildRun(runs);
   const latestIsIssue = isIssueRun(latestRun);
   const latestPr = latestRun && latestIsIssue ? issueRunPullRequest(latestRun, pullRequests) : null;
+  // A chained issue build: the header says where the chain is instead of
+  // listing repos the table below already lists.
+  const chained = isChainedIssueSession(runs, milestones);
+  const summary = chained ? chainSummary(milestones, effectiveStatus === "FAILED") : null;
+  const chainText =
+    summary?.kind === "building"
+      ? strings.repoChain.summaryBuilding(summary.repo, summary.position, summary.total)
+      : summary?.kind === "stopped"
+        ? strings.repoChain.summaryStopped(summary.repo)
+        : summary?.kind === "built"
+          ? strings.repoChain.summaryBuilt(summary.built, summary.total)
+          : null;
 
   // Read off the polled session row, not the local PRD copy: the design is
   // written by a separate run, which no interview SSE frame reports. The row is
@@ -441,7 +455,7 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
               {asAgentText(prd.title).trim() || session.title}
             </h1>
             <p className="truncate text-xs text-typography-500">
-              {session.repos?.length ? session.repos.join(", ") : strings.noReposYet}
+              {chainText ?? (session.repos?.length ? session.repos.join(", ") : strings.noReposYet)}
             </p>
           </div>
         </div>
@@ -507,6 +521,7 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
                     history from earlier runner builds) is not offered. */}
                 {latestIsIssue ? (
                   <IssueSteerHint
+                    chained={chained}
                     pullRequest={
                       latestPr && latestRun
                         ? {

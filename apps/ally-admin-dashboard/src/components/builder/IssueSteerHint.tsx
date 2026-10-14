@@ -5,6 +5,11 @@ import { en } from "@constants";
 interface IssueSteerHintProps {
   /** The build's pull request, once opencode has opened one. */
   pullRequest: { repo: string | null; number: number; url: string | null } | null;
+  /**
+   * A repo chain: one line and no link — the table above already links every
+   * pull request, and naming one here would be a seventh copy of its number.
+   */
+  chained?: boolean;
 }
 
 /**
@@ -16,8 +21,15 @@ interface IssueSteerHintProps {
  * so it is replaced outright, along with its history of notes read by runs
  * this session no longer has.
  */
-export const IssueSteerHint: React.FC<IssueSteerHintProps> = ({ pullRequest }) => {
+export const IssueSteerHint: React.FC<IssueSteerHintProps> = ({ pullRequest, chained = false }) => {
   const strings = en.builder.steer;
+  if (chained) {
+    return (
+      <p className="border-t border-border-light px-4 py-3 text-xs text-typography-600">
+        {strings.issueHintChain}
+      </p>
+    );
+  }
   return (
     <div className="flex flex-col gap-1 border-t border-border-light p-4">
       <h3 className="text-sm font-medium">{strings.issueTitle}</h3>

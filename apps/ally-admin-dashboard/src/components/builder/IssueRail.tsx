@@ -8,6 +8,8 @@ import { prefersReducedMotion } from "../../pages/Builder/builderMotion";
 
 interface IssueRailProps {
   run: BuilderBuildRun;
+  /** One tight line under a repo-table row, rather than a page-width rail. */
+  compact?: boolean;
 }
 
 /**
@@ -19,7 +21,7 @@ interface IssueRailProps {
  * `currentStage`, so it does not go grey while the session sits in SETUP
  * between two repos of a chain — each run carries its own progress.
  */
-export const IssueRail: React.FC<IssueRailProps> = ({ run }) => {
+export const IssueRail: React.FC<IssueRailProps> = ({ run, compact = false }) => {
   const strings = en.builder.build.issueRail;
   const progress = issueProgress(run);
   const active = isRunActive(run);
@@ -50,7 +52,12 @@ export const IssueRail: React.FC<IssueRailProps> = ({ run }) => {
   ];
 
   return (
-    <ol className="flex items-center gap-1 overflow-x-auto px-4 py-2" aria-label={strings.label}>
+    <ol
+      className={["flex items-center gap-1 overflow-x-auto", compact ? "py-0.5" : "px-4 py-2"].join(
+        " ",
+      )}
+      aria-label={strings.label}
+    >
       {steps.map((label, index) => {
         const isDone = progress.currentStep > index;
         const isCurrent = progress.currentStep === index;
