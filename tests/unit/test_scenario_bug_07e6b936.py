@@ -1,4 +1,4 @@
-from app.core.scenario.base import Scenario, PromptData
+from app.core.scenario.base import PromptData, Scenario
 
 
 def test_scenario_creation_handles_invalid_prompt_data():

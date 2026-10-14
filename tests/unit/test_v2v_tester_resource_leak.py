@@ -1,6 +1,6 @@
+from unittest.mock import patch
 
 import pytest
-from unittest.mock import patch
 
 from app.v2v_tester.tester_bot import V2VTesterBot
 
@@ -24,7 +24,7 @@ async def test_http_session_closed_on_setup_error():
 
     # Mock rtc.Room constructor to raise an exception to simulate a setup failure
     # after the aiohttp.ClientSession has been created.
-    with patch('livekit.rtc.Room', side_effect=RuntimeError("Failed to create room")):
+    with patch("livekit.rtc.Room", side_effect=RuntimeError("Failed to create room")):
         with pytest.raises(RuntimeError, match="Failed to create room"):
             await bot.run()
 
