@@ -45,6 +45,44 @@ describe("mapServerMessagesToFeed", () => {
 
     expect(feed).toHaveLength(0);
   });
+
+  // The server stores an answered card's turn for the model — prefix, labels, then the selected
+  // ids. A resumed feed showed that suffix on both the locked card and the bubble, where the live
+  // feed had shown only the admin's words.
+  it("shows a resumed structured answer as the admin's words alone", () => {
+    const feed = mapServerMessagesToFeed([
+      {
+        id: "a1",
+        seq: 1,
+        role: "assistant",
+        content: "",
+        metadata: {
+          questions: [
+            {
+              id: "q1",
+              prompt: "What is her home life like?",
+              kind: "singleSelect",
+              options: [{ id: "husband_distant", label: "Lives with her husband, but distant" }],
+            },
+          ],
+        },
+      },
+      {
+        id: "u1",
+        seq: 2,
+        role: "user",
+        content:
+          "[answers question q1] Lives with her husband, but distant [selected ids: husband_distant]",
+        metadata: { questionId: "q1", answer: { selectedOptionIds: ["husband_distant"] } },
+      },
+    ] as never);
+
+    const card = feed.find(entry => entry.question);
+    expect(card?.answeredWith).toBe("Lives with her husband, but distant");
+    expect(card?.answeredAnswer).toEqual({ selectedOptionIds: ["husband_distant"] });
+    const bubble = feed.find(entry => entry.role === "user");
+    expect(bubble?.content).toBe("Lives with her husband, but distant");
+  });
 });
 
 /** A response whose body streams `frames` as SSE, the way the server does. */

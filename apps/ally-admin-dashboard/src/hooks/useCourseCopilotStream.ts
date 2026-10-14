@@ -18,6 +18,8 @@ import {
 } from "@types";
 import { logger } from "@utils";
 
+import { userTurnText } from "../utils/userTurnText";
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 /**
@@ -117,18 +119,6 @@ export const parseSseBuffer = (
   return { events, rest, droppedCount };
 };
 
-/** Strips the deterministic answer prefix the server adds to a user turn. */
-const ANSWER_PREFIX_RE = /^\[answers question [^\]]+\]\s*/i;
-
-/**
- * …and the structured-answer suffix (" [selected ids: a | custom: \"…\"]"),
- * which is for the model, not the trainer: the card shows the labels.
- */
-const ANSWER_SUFFIX_RE = /\s*\[(?:none of these|selected ids:|custom:)[^\]]*\]\s*$/i;
-
-const answerText = (content: string | null | undefined): string =>
-  (content ?? "").replace(ANSWER_PREFIX_RE, "").replace(ANSWER_SUFFIX_RE, "");
-
 /**
  * The newest question card in the feed for `questionId` — the one an answer to it is for. Marking
  * and rolling back both look the card up this way, so they always agree on which card it is.
@@ -175,7 +165,7 @@ export const mapServerMessagesToFeed = (
     const questionId = row.metadata?.questionId;
     if (row.role === "user" && questionId) {
       answersByQuestionId.set(String(questionId), {
-        text: answerText(row.content),
+        text: userTurnText(row.content),
         answer: row.metadata?.answer,
       });
     }
@@ -189,7 +179,7 @@ export const mapServerMessagesToFeed = (
   safeRows.forEach((row, index) => {
     const baseId = `srv_${row.id ?? row.seq ?? index}`;
     const metadata = row.metadata ?? {};
-    const content = answerText(row.content);
+    const content = userTurnText(row.content);
 
     if (row.role === "user") {
       // The hidden kickoff turn was never shown as a bubble when it was sent; showing it on resume

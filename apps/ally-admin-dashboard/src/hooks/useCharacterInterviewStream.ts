@@ -15,6 +15,8 @@ import {
 } from "@types";
 import { logger } from "@utils";
 
+import { userTurnText } from "../utils/userTurnText";
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 let messageIdCounter = 0;
@@ -57,8 +59,6 @@ export const parseSseBuffer = (
   return { events, rest };
 };
 
-const ANSWER_PREFIX_RE = /^\[answers question [^\]]+\]\s*/i;
-
 /**
  * Rebuilds the chat feed from persisted character_interview_messages rows —
  * the resume path. Question cards are reconstructed from the assistant row's
@@ -74,7 +74,7 @@ export const mapServerMessagesToFeed = (
     if (row.role !== "user") continue;
     const questionId = row.metadata?.questionId;
     if (questionId) {
-      answeredQuestions.set(String(questionId), (row.content ?? "").replace(ANSWER_PREFIX_RE, ""));
+      answeredQuestions.set(String(questionId), userTurnText(row.content));
       if (row.metadata?.answer) {
         answeredAnswers.set(String(questionId), row.metadata.answer);
       }
@@ -91,7 +91,7 @@ export const mapServerMessagesToFeed = (
       feed.push({
         id: baseId,
         role: "user",
-        content: content.replace(ANSWER_PREFIX_RE, ""),
+        content: userTurnText(content),
       });
       return;
     }

@@ -16,6 +16,8 @@ import {
 } from "@types";
 import { logger } from "@utils";
 
+import { userTurnText } from "../utils/userTurnText";
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 let messageIdCounter = 0;
@@ -63,9 +65,6 @@ export const parseSseBuffer = (
   return { events, rest, droppedCount };
 };
 
-/** Strips the deterministic answer prefix the server adds to a user turn. */
-const ANSWER_PREFIX_RE = /^\[answers question [^\]]+\]\s*/i;
-
 /**
  * Rebuilds the chat feed from persisted rows, re-emitting the question cards
  * an assistant turn asked and marking them answered from the *later* user row
@@ -84,7 +83,7 @@ export const mapServerMessagesToFeed = (
     const questionId = message.metadata?.questionId;
     if (message.role === "user" && questionId) {
       answersByQuestionId.set(questionId, {
-        text: (message.content ?? "").replace(ANSWER_PREFIX_RE, ""),
+        text: userTurnText(message.content),
         answer: message.metadata?.answer,
       });
     }
@@ -94,7 +93,7 @@ export const mapServerMessagesToFeed = (
   }
 
   for (const message of serverMessages) {
-    const content = (message.content ?? "").replace(ANSWER_PREFIX_RE, "");
+    const content = userTurnText(message.content);
 
     if (message.role === "user") {
       // An answer is drawn once, on the card it answers.
