@@ -80,8 +80,23 @@ describe("mapServerMessagesToFeed", () => {
     const card = feed.find(entry => entry.question);
     expect(card?.answeredWith).toBe("Lives with her husband, but distant");
     expect(card?.answeredAnswer).toEqual({ selectedOptionIds: ["husband_distant"] });
-    const bubble = feed.find(entry => entry.role === "user");
-    expect(bubble?.content).toBe("Lives with her husband, but distant");
+    // Drawn once, on the card — not again as a bubble under it, which reads like a double click.
+    expect(feed.filter(entry => entry.role === "user")).toHaveLength(0);
+  });
+
+  it("keeps an answer whose question is not in the feed", () => {
+    // "The card could not be drawn" must never read as "the admin said nothing".
+    const feed = mapServerMessagesToFeed([
+      {
+        id: "u1",
+        seq: 1,
+        role: "user",
+        content: "[answers question q9] Make her older",
+        metadata: { questionId: "q9" },
+      },
+    ] as never);
+
+    expect(feed).toEqual([{ id: "u1", role: "user", content: "Make her older" }]);
   });
 });
 
@@ -158,5 +173,67 @@ describe("useCharacterInterviewStream — a refused turn", () => {
 
     expect(delivered).toBe(true);
     await waitFor(() => expect(result.current.messages).toHaveLength(2));
+  });
+});
+
+describe("useCharacterInterviewStream — answering a question card", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  /** A feed holding one unanswered question card, as a resume leaves it. */
+  const withOpenCard = (sendMessageFrames: string[]) => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(sseResponse(sendMessageFrames)));
+    const hook = renderHook(() => useCharacterInterviewStream({ sessionId: "sess-1" }));
+    act(() => {
+      hook.result.current.hydrateMessages([
+        {
+          id: "a1",
+          seq: 1,
+          role: "assistant",
+          content: "",
+          metadata: {
+            questions: [{ id: "q1", prompt: "Which voice fits her?", kind: "singleSelect" }],
+          },
+        },
+      ] as never);
+    });
+    return hook;
+  };
+
+  const answer = { selectedOptionIds: ["voice-a"] };
+
+  it("marks the card it answers instead of adding a bubble under it", async () => {
+    const { result } = withOpenCard([
+      'event: token\ndata: {"delta":"Anushka it is."}\n\n',
+      'event: done\ndata: {"messageSeq":3}\n\n',
+    ]);
+
+    await act(async () => {
+      await result.current.sendMessage("Anushka", { questionId: "q1", answer });
+    });
+
+    const card = result.current.messages.find(message => message.question);
+    expect(card?.answeredWith).toBe("Anushka");
+    // What the voice shortlist strip reads to show the chosen voice without a reload.
+    expect(card?.answeredAnswer).toEqual(answer);
+    expect(result.current.messages.filter(message => message.role === "user")).toHaveLength(0);
+  });
+
+  it("unmarks the card when the turn was refused, so it can be answered again", async () => {
+    const { result } = withOpenCard([
+      'event: error\ndata: {"code":"turn_in_progress","message":"Another interview turn is already streaming for this session"}\n\n',
+    ]);
+
+    let delivered: boolean | undefined;
+    await act(async () => {
+      delivered = await result.current.sendMessage("Anushka", { questionId: "q1", answer });
+    });
+
+    expect(delivered).toBe(false);
+    await waitFor(() => expect(result.current.messages).toHaveLength(1));
+    const card = result.current.messages[0];
+    expect(card.answeredWith).toBeUndefined();
+    expect(card.answeredAnswer).toBeUndefined();
   });
 });

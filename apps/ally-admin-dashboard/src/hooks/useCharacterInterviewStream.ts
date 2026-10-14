@@ -59,6 +59,17 @@ export const parseSseBuffer = (
   return { events, rest };
 };
 
+/** The newest question card in the feed for `questionId` — the one an answer to it is for. */
+const latestCardFor = (
+  messages: CharacterInterviewChatMessage[],
+  questionId: string,
+): CharacterInterviewChatMessage | undefined => {
+  for (let index = messages.length - 1; index >= 0; index--) {
+    if (messages[index].question?.id === questionId) return messages[index];
+  }
+  return undefined;
+};
+
 /**
  * Rebuilds the chat feed from persisted character_interview_messages rows —
  * the resume path. Question cards are reconstructed from the assistant row's
@@ -70,7 +81,13 @@ export const mapServerMessagesToFeed = (
 ): CharacterInterviewChatMessage[] => {
   const answeredQuestions = new Map<string, string>();
   const answeredAnswers = new Map<string, CharacterInterviewStructuredAnswer>();
+  /** Questions that will be drawn as their own card in this feed. */
+  const renderedQuestionIds = new Set<string>();
   for (const row of rows) {
+    const questions = row.metadata?.questions;
+    if (Array.isArray(questions)) {
+      for (const question of questions) renderedQuestionIds.add(question.id);
+    }
     if (row.role !== "user") continue;
     const questionId = row.metadata?.questionId;
     if (questionId) {
@@ -88,6 +105,12 @@ export const mapServerMessagesToFeed = (
     const content = row.content ?? "";
 
     if (row.role === "user") {
+      // An answer is drawn once, on the card it answers — as the live feed
+      // draws it. Only when that card is actually in this feed: an answer whose
+      // question isn't here has nothing else to show it, and dropping it would
+      // lose what the admin said.
+      const questionId = metadata.questionId;
+      if (questionId && renderedQuestionIds.has(String(questionId))) return;
       feed.push({
         id: baseId,
         role: "user",
@@ -111,7 +134,7 @@ export const mapServerMessagesToFeed = (
         ...(errorText ? { error: errorText } : {}),
       });
     }
-    for (const question of metadata.questions ?? []) {
+    for (const question of Array.isArray(metadata.questions) ? metadata.questions : []) {
       feed.push({
         id: `${baseId}_q_${question.id}`,
         role: "assistant",
@@ -343,9 +366,10 @@ export const useCharacterInterviewStream = ({
   );
 
   /**
-   * Streams one turn against `activeSessionId`, appending a user + assistant
-   * bubble. A `session_not_found` error frame is NOT surfaced here — it's
-   * reported back via the return so the caller can recover.
+   * Streams one turn against `activeSessionId`, appending an assistant bubble
+   * and either the admin's bubble or — for an answer — the answer on its card.
+   * A `session_not_found` error frame is NOT surfaced here — it's reported back
+   * via the return so the caller can recover.
    */
   const runStream = useCallback(
     async (
@@ -357,6 +381,8 @@ export const useCharacterInterviewStream = ({
     ): Promise<{
       userMsgId: string | null;
       assistantId: string;
+      /** The question this turn answered, if it answered one. */
+      questionId: string | null;
       sessionLost: boolean;
       /** The server refused the turn outright — nothing of it was recorded. */
       refused: boolean;
@@ -365,11 +391,34 @@ export const useCharacterInterviewStream = ({
       const userMsgId = hideUserBubble ? null : nextMessageId();
       const assistantId = nextMessageId();
       currentAssistantIdRef.current = assistantId;
-      setMessages(prev => [
-        ...prev,
-        ...(userMsgId ? [{ id: userMsgId, role: "user" as const, content: text }] : []),
-        { id: assistantId, role: "assistant" as const, content: "", isStreaming: true },
-      ]);
+      // An answer belongs on the card it answers, and the card is already in
+      // the feed — so mark it rather than appending a bubble that says the same
+      // thing underneath it, which reads like a click that fired twice (Builder
+      // and Course Copilot draw an answer once for the same reason). Marking the
+      // card is also what lets the voice shortlist strip show the chosen voice
+      // without a reload. Ids are minted outside the updater, which React may
+      // run twice.
+      setMessages(prev => {
+        const assistant: CharacterInterviewChatMessage = {
+          id: assistantId,
+          role: "assistant",
+          content: "",
+          isStreaming: true,
+        };
+        const card = opts?.questionId ? latestCardFor(prev, opts.questionId) : undefined;
+        if (card) {
+          return [
+            ...prev.map(message =>
+              message.id === card.id
+                ? { ...message, answeredWith: text, answeredAnswer: opts?.answer }
+                : message,
+            ),
+            assistant,
+          ];
+        }
+        if (!userMsgId) return [...prev, assistant];
+        return [...prev, { id: userMsgId, role: "user" as const, content: text }, assistant];
+      });
 
       const controller = new AbortController();
       abortRef.current = controller;
@@ -444,12 +493,38 @@ export const useCharacterInterviewStream = ({
       return {
         userMsgId,
         assistantId,
+        questionId: opts?.questionId ?? null,
         sessionLost,
         refused,
         aborted: controller.signal.aborted,
       };
     },
     [fetchStreamWithReauth, flushTokens, handleEvent, patchAssistantMessage],
+  );
+
+  /**
+   * Takes a turn's bubbles back out, and unmarks the card it answered.
+   *
+   * The card is found again here, by question, rather than remembered from
+   * `runStream`: the update that marked it runs when React renders, which can
+   * be after a refusal has already come back — a card id captured inside it
+   * would still be empty, and the card would stay locked on an answer nobody
+   * received. Updates run in order, so this one always sees the card marked.
+   */
+  const rollBackTurn = useCallback(
+    (turn: { userMsgId: string | null; assistantId: string; questionId: string | null }) => {
+      setMessages(prev => {
+        const card = turn.questionId ? latestCardFor(prev, turn.questionId) : undefined;
+        return prev
+          .filter(message => message.id !== turn.userMsgId && message.id !== turn.assistantId)
+          .map(message =>
+            message === card
+              ? { ...message, answeredWith: undefined, answeredAnswer: undefined }
+              : message,
+          );
+      });
+    },
+    [],
   );
 
   /**
@@ -469,11 +544,9 @@ export const useCharacterInterviewStream = ({
       const first = await runStream(trimmed, sessionId, opts, hideUserBubble);
       if (first.refused) {
         // Nothing of this turn exists server-side, so leaving the bubbles up
-        // would show an answer the interview never received. Take them back
-        // out and say what to do.
-        setMessages(prev =>
-          prev.filter(m => m.id !== first.userMsgId && m.id !== first.assistantId),
-        );
+        // (or the card marked) would show an answer the interview never
+        // received. Take them back out and say what to do.
+        rollBackTurn(first);
         toast.error(en.characterInterview.turnInProgress);
         return false;
       }
@@ -485,7 +558,7 @@ export const useCharacterInterviewStream = ({
       // The server session is gone (e.g. a local DB reset dropped it).
       // Re-create one and replay the turn once so the admin never sees the
       // raw error. One recovery attempt is the ceiling.
-      setMessages(prev => prev.filter(m => m.id !== first.userMsgId && m.id !== first.assistantId));
+      rollBackTurn(first);
       const freshId = onSessionInvalid ? await onSessionInvalid() : null;
       if (!freshId) {
         toast.error(en.characterInterview.streamFailed);
@@ -493,9 +566,7 @@ export const useCharacterInterviewStream = ({
       }
       const retry = await runStream(trimmed, freshId, opts, hideUserBubble);
       if (retry.refused) {
-        setMessages(prev =>
-          prev.filter(m => m.id !== retry.userMsgId && m.id !== retry.assistantId),
-        );
+        rollBackTurn(retry);
         toast.error(en.characterInterview.turnInProgress);
         return false;
       }
@@ -509,7 +580,7 @@ export const useCharacterInterviewStream = ({
       }
       return true;
     },
-    [onSessionInvalid, patchAssistantMessage, runStream, sessionId],
+    [onSessionInvalid, patchAssistantMessage, rollBackTurn, runStream, sessionId],
   );
 
   const stop = useCallback(() => {
