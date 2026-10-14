@@ -8,6 +8,9 @@ summary: A chronological log tracking all wiki updates and modifications.
 
 This is an append-only log of modifications, updates, and indexing runs performed on the wiki. All logs use the parseable prefix format: `## [YYYY-MM-DD] action | description`.
 
+## [2026-10-14] update | ally-be: public product roadmap module (`public-roadmap/`).
+- `repos/ally-be.md` gains `public-roadmap/`: hand-written cards on a fixed category × maturity-stage grid behind the public `/blog/roadmap` page, edited from admin Settings → Roadmap, live on save with a per-card visibility flag. Distinguished from `product-roadmap/`.
+
 ## [2026-10-11] update | ally-be: auto-improve (skill experiments) for System Skills.
 - `repos/ally-be.md` gains the `skill-experiment/` module: rubric-judged A/B testing of LLM-drafted prompt variants, with the runtime-placeholder lock, blind judging and fall-back-to-own-text guardrails stated as invariants. Mechanics and the connect-a-skill recipe stay in ally-be's `docs/skill-experiments.md`.
 

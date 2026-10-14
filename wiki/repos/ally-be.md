@@ -93,6 +93,7 @@ Feature modules live under `src/<domain>/` (controllers, services, DTOs, and `en
 **Platform & infrastructure**
 - `auth/`, `authorization/` — authentication plus RBAC guards and permission decorators.
 - `tenant/`, `user/`, `settings/` — multi-tenant management, users, config.
+- `public-roadmap/` — the cards on the learner app's public `/blog/roadmap` page: a fixed grid of two categories (prepare, perform) by five maturity stages (idea → stable). Only the cards are data (`public_roadmap_items`); the grid's headings and copy live in the frontend. `GET /v1/public-roadmap` is unauthenticated and serves visible cards; `/v1/public-roadmap/items` is the admin editor (Settings → Roadmap), gated like Terms and Privacy. Edits are live on save, with no draft state — a per-card visibility flag is how a card is kept off the page. Unrelated to `product-roadmap/`, the internal voted backlog.
 - `livekit/` — room lifecycle, participant tracking, agent dispatch, webhook handling.
 - `aws/`, `queue/`, `message-broker/`, `redis/` — AWS wrappers, SQS setup, Redis pub/sub, Redis client.
 - `audit/` — HIPAA-compliant CloudWatch audit logging.
