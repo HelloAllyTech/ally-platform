@@ -12,6 +12,7 @@ import {
   useLazyGetNextTrackItemQuery,
   useLazyGetTrackAccessQuery,
 } from "@api";
+import { Ally } from "@assets";
 import { LoginDialog } from "@components";
 import {
   LOCAL_STORAGE_KEYS,
@@ -148,11 +149,13 @@ export const CourseLanding: FC = () => {
 
   // Signed-in learners get the app's navbar from the layout; a visitor gets a
   // slim bar with the wordmark and, where the page can act on it, Log in.
+  // The wordmark is the brand SVG the login page uses, not "ally" typed in a
+  // font — a share link is often someone's first sight of Ally.
   const renderHeader = (withLogin: boolean) =>
     !user && (
       <header className="sticky top-0 z-20 border-b border-border-light bg-white/95 backdrop-blur">
         <div className="mx-auto flex w-full max-w-3xl items-center justify-between px-4 py-3 sm:px-6">
-          <span className="font-secondary text-2xl font-bold italic text-typography-900">ally</span>
+          <Ally role="img" aria-label="Ally" className="h-7 w-auto text-typography-900" />
           {withLogin && !isSignedIn() && (
             <button
               type="button"

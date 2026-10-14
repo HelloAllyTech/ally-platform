@@ -172,6 +172,13 @@ describe("CourseLanding", () => {
     expect(mockCheckAccess).not.toHaveBeenCalled();
   });
 
+  it("brands the visitor header with the Ally logo, not the name typed out", () => {
+    renderLanding();
+
+    expect(screen.getByTestId("asset-Ally")).toBeTruthy();
+    expect(screen.queryByText("ally")).toBeNull();
+  });
+
   it("opens the login popup, with the terms step, when a logged-out visitor presses Start", () => {
     renderLanding();
 
