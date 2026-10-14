@@ -76,6 +76,7 @@ const fetchEvents = vi.fn().mockReturnValue({ unwrap: () => Promise.resolve({ ev
 
 vi.mock("@api", () => ({
   useGetBuilderRunsQuery: () => ({ data: [] }),
+  useGetBuilderMilestonesQuery: () => ({ data: [] }),
   useGetBuilderPendingQuestionsQuery: () => ({ data: [] }),
   useGetBuilderPullRequestsQuery: () => ({ data: [] }),
   useMergeBuilderPullRequestMutation: () => [vi.fn(), { isLoading: false }],

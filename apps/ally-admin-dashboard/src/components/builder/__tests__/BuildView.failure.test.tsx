@@ -41,6 +41,7 @@ vi.mock("@api", () => ({
       { id: "run-1", status: "FAILED", error: RUNNER_ERROR, createdAt: new Date().toISOString() },
     ],
   }),
+  useGetBuilderMilestonesQuery: () => ({ data: [] }),
   useGetBuilderPendingQuestionsQuery: () => ({ data: [] }),
   useGetBuilderPullRequestsQuery: () => ({ data: [] }),
   useMergeBuilderPullRequestMutation: () => [vi.fn(), { isLoading: false }],

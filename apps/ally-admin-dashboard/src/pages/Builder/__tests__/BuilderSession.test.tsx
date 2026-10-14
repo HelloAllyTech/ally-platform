@@ -22,6 +22,9 @@ vi.mock("@components/builder", async () => ({
   // The real rule, not a stub: it is what decides whether Start is blocked.
   designBuildBlock: (await vi.importActual<any>("../../../components/builder/designGate"))
     .designBuildBlock,
+  // The real issue-build rules, for the same reason.
+  ...(await vi.importActual<any>("../../../components/builder/issueBuild")),
+  IssueSteerHint: () => <div>IssueSteerHint</div>,
   TechnicalDesignPanel: () => <div>TechnicalDesignPanel</div>,
   BuildView: () => <div>BuildView</div>,
   ChatComposer: () => <div>ChatComposer</div>,
@@ -77,12 +80,18 @@ vi.mock("@hooks", () => ({
 
 let sessionResult: any;
 let pullRequests: any[] = [];
+let runs: any[] = [];
+let milestones: any[] = [];
+const startBuild = vi.fn().mockReturnValue({ unwrap: () => Promise.resolve({}) });
 vi.mock("@api", () => ({
   useGetBuilderSessionQuery: () => sessionResult,
   useGetBuilderSettingsQuery: () => ({ data: undefined }),
   usePatchBuilderPrdMutation: () => [vi.fn()],
   useCancelBuilderSessionMutation: () => [vi.fn(), { isLoading: false }],
   useGetBuilderPullRequestsQuery: () => ({ data: pullRequests }),
+  useGetBuilderRunsQuery: () => ({ data: runs }),
+  useGetBuilderMilestonesQuery: () => ({ data: milestones }),
+  useStartBuilderBuildMutation: () => [startBuild, { isLoading: false }],
 }));
 
 // eslint-disable-next-line import/first
@@ -108,6 +117,9 @@ describe("BuilderSession", () => {
     onSessionInvalid = undefined;
     sessionResult = { data: baseSession, isLoading: false, isError: false };
     pullRequests = [];
+    runs = [];
+    milestones = [];
+    startBuild.mockClear();
   });
 
   it("closes the embedded drawer instead of navigating away when the session is lost and 'New session' is clicked", async () => {
@@ -265,5 +277,68 @@ describe("BuilderSession", () => {
 
     expect(screen.getByText("Done")).toBeTruthy();
     expect(screen.queryByText("Building")).toBeNull();
+  });
+
+  describe("issue builds", () => {
+    const issueRun = (overrides: any = {}) => ({
+      id: "run-1",
+      status: "RUNNING",
+      issueNumber: 7,
+      issueUrl: "https://github.com/org/ally-be/issues/7",
+      repos: ["ally-be"],
+      milestoneId: "m-1",
+      cost: { issueTimeline: ["issue"] },
+      ...overrides,
+    });
+
+    it("replaces the steering composer with the /oc hint when the latest run is an issue build", () => {
+      runs = [issueRun()];
+      sessionResult = {
+        data: { ...baseSession, status: "BUILDING", currentStage: "CODING" },
+        isLoading: false,
+        isError: false,
+      };
+      render(<BuilderSession />);
+      expect(screen.getByText("IssueSteerHint")).toBeTruthy();
+      expect(screen.queryByText("SteerComposer")).toBeNull();
+    });
+
+    it("keeps the steering composer for a legacy run", () => {
+      runs = [{ id: "run-1", status: "RUNNING", issueNumber: null }];
+      sessionResult = {
+        data: { ...baseSession, status: "BUILDING", currentStage: "CODING" },
+        isLoading: false,
+        isError: false,
+      };
+      render(<BuilderSession />);
+      expect(screen.getByText("SteerComposer")).toBeTruthy();
+      expect(screen.queryByText("IssueSteerHint")).toBeNull();
+    });
+
+    it("offers to continue the chain with an issue build when a repo is still to build", async () => {
+      pullRequests = [{ id: "pr-1" }];
+      runs = [issueRun({ status: "SUCCEEDED" })];
+      milestones = [
+        { id: "m-1", position: 0, repos: ["ally-be"], status: "COMPLETED" },
+        { id: "m-2", position: 1, repos: ["ally-web"], status: "PENDING" },
+      ];
+      terminal("COMPLETED");
+
+      fireEvent.click(screen.getByText("Continue (next: ally-web)"));
+      await vi.waitFor(() =>
+        expect(startBuild).toHaveBeenCalledWith({ id: "session-1", dispatch: "issue" }),
+      );
+    });
+
+    it("does not offer to continue once every repo is done or skipped", () => {
+      pullRequests = [{ id: "pr-1" }];
+      runs = [issueRun({ status: "SUCCEEDED" })];
+      milestones = [
+        { id: "m-1", position: 0, repos: ["ally-be"], status: "COMPLETED" },
+        { id: "m-2", position: 1, repos: ["ally-web"], status: "SKIPPED" },
+      ];
+      terminal("COMPLETED");
+      expect(screen.queryByText(/Continue \(next/)).toBeNull();
+    });
   });
 });

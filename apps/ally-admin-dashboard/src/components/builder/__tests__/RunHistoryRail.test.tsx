@@ -72,3 +72,33 @@ describe("RunHistoryRail status", () => {
     expect(screen.getByText("Queued")).toBeInTheDocument();
   });
 });
+
+describe("RunHistoryRail issue builds", () => {
+  const issueRun = run({
+    sequence: 1,
+    status: "RUNNING",
+    issueNumber: 42,
+    issueUrl: "https://github.com/org/ally-be/issues/42",
+    repos: ["ally-be"],
+  });
+
+  it("names the repo and issue, and says cost is not tracked rather than showing $0", () => {
+    render(
+      <RunHistoryRail
+        runs={[issueRun]}
+        selectedRunId={null}
+        onSelect={() => undefined}
+        alwaysShow
+      />,
+    );
+    expect(screen.getByText("Run 1 · ally-be · issue #42")).toBeInTheDocument();
+    expect(screen.getByText("Cost not tracked")).toBeInTheDocument();
+  });
+
+  it("still hides a lone run unless the session has a repo chain", () => {
+    const { container } = render(
+      <RunHistoryRail runs={[issueRun]} selectedRunId={null} onSelect={() => undefined} />,
+    );
+    expect(container).toBeEmptyDOMElement();
+  });
+});

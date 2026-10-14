@@ -6,10 +6,13 @@ import { toast } from "sonner";
 import { Button, InlineNotification, SidePanel, SkeletonText, Tag } from "@ally-ui-mono/ui-shared";
 import {
   useCancelBuilderSessionMutation,
+  useGetBuilderMilestonesQuery,
   useGetBuilderPullRequestsQuery,
+  useGetBuilderRunsQuery,
   useGetBuilderSessionQuery,
   useGetBuilderSettingsQuery,
   usePatchBuilderPrdMutation,
+  useStartBuilderBuildMutation,
 } from "@api";
 import {
   BuildView,
@@ -17,12 +20,18 @@ import {
   ChatMessage,
   ConfirmCancelDialog,
   CollapsibleAside,
+  IssueSteerHint,
   PrdDocPanel,
   ReadinessRing,
   StartBuildDialog,
   SteerComposer,
   TechnicalDesignPanel,
   designBuildBlock,
+  isIssueRun,
+  isRunActive,
+  issueRunPullRequest,
+  issueRunRepo,
+  nextChainRepo,
 } from "@components/builder";
 import type { BuilderAnswerPayload } from "@components/builder";
 import { ErrorBoundary } from "@components/error-boundary";
@@ -49,6 +58,8 @@ const PRD_FROZEN: BuilderSessionStatus[] = ["BUILDING", "WAITING_FOR_INPUT"];
  *
  * COMPLETED is deliberately NOT here. Its pull requests are open or merged, and
  * a second build of finished work opens a competing set against the same PRD.
+ * The one exception is a repo chain with repos still to build — that is not a
+ * rebuild but the next link, offered as "Continue" (see `continueRepo`).
  */
 const RESTARTABLE: BuilderSessionStatus[] = ["FAILED", "CANCELLED"];
 
@@ -142,6 +153,29 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
   const { data: pullRequests } = useGetBuilderPullRequestsQuery(sessionId, {
     skip: !sessionId,
   });
+  // The runs say whether the latest build is an issue build (which changes
+  // steering and stopping); the milestones say which repo a chain builds next.
+  // Both are the same cached queries BuildView polls.
+  const { data: runs, refetch: refetchRuns } = useGetBuilderRunsQuery(sessionId, {
+    skip: !sessionId,
+  });
+  const { data: milestones, refetch: refetchMilestones } = useGetBuilderMilestonesQuery(sessionId, {
+    skip: !sessionId,
+  });
+  // BuildView stops polling both the moment the session settles, which can be
+  // a poll before the last milestone flips to COMPLETED — and a stale BUILDING
+  // there would make "Continue" name the repo that just finished. One fresh
+  // read per status change closes that gap.
+  useEffect(() => {
+    if (!sessionStatus || !sessionId) return;
+    try {
+      void refetchRuns?.();
+      void refetchMilestones?.();
+    } catch {
+      // Not started yet (skipped); the first fetch is fresh anyway.
+    }
+  }, [sessionStatus, sessionId, refetchRuns, refetchMilestones]);
+  const [startBuild, { isLoading: isContinuing }] = useStartBuilderBuildMutation();
   const [patchPrd] = usePatchBuilderPrdMutation();
   const [cancelSession, { isLoading: isCancelling }] = useCancelBuilderSessionMutation();
 
@@ -262,6 +296,17 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
     }
   }, [cancelSession, sessionId, strings.cancelFailed]);
 
+  const handleContinue = useCallback(async () => {
+    try {
+      await startBuild({ id: sessionId, dispatch: "issue" }).unwrap();
+      setStatus("BUILDING");
+    } catch (error) {
+      const message =
+        (error as { data?: { message?: string } })?.data?.message ?? strings.continueChainFailed;
+      toast.error(message);
+    }
+  }, [startBuild, sessionId, strings.continueChainFailed]);
+
   if (isLoading || !prd || !readiness) {
     return (
       <div className="p-4 md:p-6">
@@ -330,6 +375,13 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
   const shippedNothing = (pullRequests?.length ?? 0) === 0;
   const canRestart =
     RESTARTABLE.includes(effectiveStatus) || (effectiveStatus === "COMPLETED" && shippedNothing);
+  // A finished link of a repo chain with repos left: the server picks the next
+  // one up from the same start-build call.
+  const continueRepo = effectiveStatus === "COMPLETED" ? nextChainRepo(milestones, runs) : null;
+
+  const latestRun = runs?.[runs.length - 1] ?? null;
+  const latestIsIssue = isIssueRun(latestRun);
+  const latestPr = latestRun && latestIsIssue ? issueRunPullRequest(latestRun, pullRequests) : null;
 
   // Read off the polled session row, not the local PRD copy: the design is
   // written by a separate run, which no interview SSE frame reports. The row is
@@ -399,7 +451,16 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
           <Tag type={BUILDER_STATUS_TAG_TYPE[effectiveStatus]} size="sm">
             {strings.status[effectiveStatus] ?? effectiveStatus}
           </Tag>
-          {canRestart ? (
+          {continueRepo ? (
+            <Button
+              kind="primary"
+              size="sm"
+              disabled={isContinuing}
+              onClick={() => void handleContinue()}
+            >
+              {strings.continueChain(continueRepo)}
+            </Button>
+          ) : canRestart ? (
             <Button kind="primary" size="sm" onClick={() => setShowStartDialog(true)}>
               {strings.retryBuild}
             </Button>
@@ -438,7 +499,24 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
                     you reach for while watching a build go wrong, and the PRD
                     is frozen at that point anyway. Shown on a finished session
                     too, because a note left now is read by the next run. */}
-                <SteerComposer sessionId={sessionId} live={effectiveStatus === "BUILDING"} />
+                {/* An issue build is steered on its pull request; Builder's
+                    notes never reach opencode, so the composer (and its
+                    history from earlier runner builds) is not offered. */}
+                {latestIsIssue ? (
+                  <IssueSteerHint
+                    pullRequest={
+                      latestPr && latestRun
+                        ? {
+                            repo: issueRunRepo(latestRun),
+                            number: latestPr.number,
+                            url: latestPr.url,
+                          }
+                        : null
+                    }
+                  />
+                ) : (
+                  <SteerComposer sessionId={sessionId} live={effectiveStatus === "BUILDING"} />
+                )}
               </ErrorBoundary>
             </section>
             {/* Folds to a rail. Once a build is running the PRD is frozen
@@ -620,6 +698,13 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
         onClose={() => setShowCancelConfirm(false)}
         onConfirm={() => void handleCancel()}
         isLoading={isCancelling}
+        issueBuild={
+          // Between two repos of a chain no run is active yet, and the repo it
+          // would name is the one that already finished — so it says "the repo".
+          latestRun && latestIsIssue
+            ? { repo: isRunActive(latestRun) ? issueRunRepo(latestRun) : null }
+            : null
+        }
       />
     </div>
   );
