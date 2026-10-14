@@ -12,7 +12,11 @@ vi.mock("@ally-ui-mono/ui-shared", () => ({
 }));
 
 vi.mock("../CollapsibleSection", () => ({
-  CollapsibleSection: ({ children }: any) => <div>{children}</div>,
+  CollapsibleSection: ({ children, heading, defaultOpen = true }: any) => (
+    <div data-heading={heading} data-open={String(defaultOpen)}>
+      {children}
+    </div>
+  ),
 }));
 
 // eslint-disable-next-line import/first
@@ -85,20 +89,33 @@ describe("RunHistoryRail issue builds", () => {
   it("names the repo and issue, and says cost is not tracked rather than showing $0", () => {
     render(
       <RunHistoryRail
-        runs={[issueRun]}
+        runs={[issueRun, { ...issueRun, id: "run-2", sequence: 2 }]}
         selectedRunId={null}
         onSelect={() => undefined}
-        alwaysShow
       />,
     );
     expect(screen.getByText("Run 1 · ally-be · issue #42")).toBeInTheDocument();
-    expect(screen.getByText("Cost not tracked")).toBeInTheDocument();
+    expect(screen.getAllByText("Cost not tracked")).toHaveLength(2);
   });
 
-  it("still hides a lone run unless the session has a repo chain", () => {
+  it("hides a lone run: the repo chain already names it", () => {
     const { container } = render(
       <RunHistoryRail runs={[issueRun]} selectedRunId={null} onSelect={() => undefined} />,
     );
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it("folds every run under 'All runs' in a chained session", () => {
+    const { container } = render(
+      <RunHistoryRail
+        runs={[issueRun, { ...issueRun, id: "run-2", sequence: 2 }]}
+        selectedRunId={null}
+        onSelect={() => undefined}
+        folded
+      />,
+    );
+    const section = container.querySelector("[data-heading]");
+    expect(section?.getAttribute("data-heading")).toBe("All runs");
+    expect(section?.getAttribute("data-open")).toBe("false");
   });
 });

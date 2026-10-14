@@ -10,6 +10,13 @@ interface RepoChainProps {
   milestones: BuilderMilestone[];
   runs: BuilderBuildRun[];
   pullRequests: BuilderPullRequest[];
+  /** The run whose activity the feed below is showing. */
+  selectedRunId?: string | null;
+  /**
+   * Switch the feed to a repo's build. In a chained session this list is how
+   * you move between repos; the strip of every run is folded away beneath it.
+   */
+  onSelectRun?: (runId: string) => void;
 }
 
 const STATUS_TAG: Record<string, "gray" | "blue" | "green" | "red" | "magenta" | "cool-gray"> = {
@@ -40,7 +47,13 @@ const CI_TAG: Record<string, "green" | "red" | "blue" | "gray"> = {
  * Renders nothing for a session without repo milestones: a single-repo or
  * legacy build has no chain to show.
  */
-export const RepoChain: React.FC<RepoChainProps> = ({ milestones, runs, pullRequests }) => {
+export const RepoChain: React.FC<RepoChainProps> = ({
+  milestones,
+  runs,
+  pullRequests,
+  selectedRunId = null,
+  onSelectRun,
+}) => {
   const strings = en.builder.repoChain;
   const buildStrings = en.builder.build;
   const steps = repoMilestones(milestones);
@@ -115,6 +128,19 @@ export const RepoChain: React.FC<RepoChainProps> = ({ milestones, runs, pullRequ
                   {buildStrings.ciStatus[ciStatus] ?? ciStatus}
                 </Tag>
               )}
+              {run &&
+                onSelectRun &&
+                (run.id === selectedRunId ? (
+                  <span className="ml-auto text-typography-500">{strings.showingActivity}</span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => onSelectRun(run.id)}
+                    className="ml-auto text-primary-700 hover:underline"
+                  >
+                    {strings.showActivity(repo)}
+                  </button>
+                ))}
               {step.status === "FAILED" && step.error && (
                 <p className="basis-full pl-6 text-support-error">{step.error}</p>
               )}

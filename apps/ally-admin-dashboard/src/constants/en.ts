@@ -3883,6 +3883,7 @@ export const en = {
       // the live one is the whole point, so the rail says which run is which
       // rather than leaving that to a bare sequence number.
       runHistoryHeading: "Runs",
+      runHistoryAllHeading: "All runs",
       runHistoryEmpty: "No runs yet.",
       runDurationLive: "Running…",
       runDurationUnknown: "—",
@@ -3990,6 +3991,8 @@ export const en = {
     repoChain: {
       heading: "Repos, built in order",
       building: (repo: string) => `Building ${repo} now`,
+      showActivity: (repo: string) => `Show ${repo}'s activity`,
+      showingActivity: "Showing",
       status: {
         PENDING: "Waiting",
         BUILDING: "Building",

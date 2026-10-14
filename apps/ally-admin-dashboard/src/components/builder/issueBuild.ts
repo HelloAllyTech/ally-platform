@@ -14,6 +14,21 @@ export const ISSUE_FIX_REQUEST_LIMIT = 2;
 export const isIssueRun = (run: BuilderBuildRun | null | undefined): boolean =>
   run?.issueNumber !== null && run?.issueNumber !== undefined;
 
+/**
+ * The session's latest run that BUILDS — not a review or a design draft.
+ *
+ * Reviews and design drafts still run on Builder's own runner, after and
+ * before a build. Deciding "is this an issue build" from the newest run of any
+ * kind read a session whose builds were all issues as a runner session the
+ * moment a review ran on its pull request.
+ */
+export const latestBuildRun = (
+  runs: BuilderBuildRun[] | null | undefined,
+): BuilderBuildRun | null =>
+  [...(runs ?? [])]
+    .reverse()
+    .find(run => run.mode === "build" || run.mode === "resume" || run.mode === "fix") ?? null;
+
 export const isRunActive = (run: BuilderBuildRun | null | undefined): boolean =>
   run?.status === "RUNNING" || run?.status === "QUEUED";
 

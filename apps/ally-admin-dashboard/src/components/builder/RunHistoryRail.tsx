@@ -14,10 +14,10 @@ interface RunHistoryRailProps {
   selectedRunId: string | null;
   onSelect: (runId: string) => void;
   /**
-   * Show the strip even for a single run. A repo chain is one run per repo,
-   * and the first run is already worth labelling with its repo and issue.
+   * Start folded. A repo chain shows each repo's build and switches the feed
+   * itself, so every run — reviews and retries included — is detail there.
    */
-  alwaysShow?: boolean;
+  folded?: boolean;
 }
 
 /**
@@ -44,11 +44,11 @@ export const RunHistoryRail: React.FC<RunHistoryRailProps> = ({
   runs,
   selectedRunId,
   onSelect,
-  alwaysShow = false,
+  folded = false,
 }) => {
   const strings = en.builder.build;
 
-  if (runs.length === 0 || (runs.length === 1 && !alwaysShow)) return null;
+  if (runs.length <= 1) return null;
 
   // The number worth seeing while the strip is folded is what it all cost, not
   // how many attempts there were. Seven runs said nothing about eleven dollars.
@@ -57,7 +57,11 @@ export const RunHistoryRail: React.FC<RunHistoryRailProps> = ({
   const meta = spent > 0 ? `${runs.length} · ${formatCostUsd(String(spent))}` : String(runs.length);
 
   return (
-    <CollapsibleSection heading={strings.runHistoryHeading} meta={meta}>
+    <CollapsibleSection
+      heading={folded ? strings.runHistoryAllHeading : strings.runHistoryHeading}
+      meta={meta}
+      defaultOpen={!folded}
+    >
       <div className="flex gap-2 overflow-x-auto pb-1">
         {runs.map(run => {
           const isSelected = run.id === selectedRunId;

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { BuilderBuildRun, BuilderMilestone, BuilderPullRequest } from "@types";
@@ -84,6 +84,26 @@ describe("RepoChain", () => {
     );
     expect(screen.getByRole("link", { name: "PR #9" })).toBeInTheDocument();
     expect(screen.getByText("CI passed")).toBeInTheDocument();
+  });
+
+  it("switches the feed to a repo's build, and marks the one on screen", () => {
+    const onSelectRun = vi.fn();
+    render(
+      <RepoChain
+        milestones={[
+          milestone("m-be", 1, "ally-be", "COMPLETED"),
+          milestone("m-web", 2, "ally-web", "BUILDING"),
+        ]}
+        runs={runs}
+        pullRequests={pullRequests}
+        selectedRunId="run-2"
+        onSelectRun={onSelectRun}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Show ally-be's activity" }));
+    expect(onSelectRun).toHaveBeenCalledWith("run-1");
+    expect(screen.getByText("Showing")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Show ally-web's activity" })).toBeNull();
   });
 
   it("renders nothing without repo milestones", () => {

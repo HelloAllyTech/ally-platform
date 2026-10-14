@@ -28,6 +28,7 @@ import {
   TechnicalDesignPanel,
   designBuildBlock,
   isIssueRun,
+  latestBuildRun,
   isRunActive,
   issueRunPullRequest,
   issueRunRepo,
@@ -379,7 +380,9 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
   // one up from the same start-build call.
   const continueRepo = effectiveStatus === "COMPLETED" ? nextChainRepo(milestones, runs) : null;
 
-  const latestRun = runs?.[runs.length - 1] ?? null;
+  // The latest BUILD, not the latest run: a review on the pull request is a
+  // runner run too, and must not bring the runner's steering box back.
+  const latestRun = latestBuildRun(runs);
   const latestIsIssue = isIssueRun(latestRun);
   const latestPr = latestRun && latestIsIssue ? issueRunPullRequest(latestRun, pullRequests) : null;
 

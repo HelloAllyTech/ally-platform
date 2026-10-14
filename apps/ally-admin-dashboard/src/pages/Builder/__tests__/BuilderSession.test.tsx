@@ -282,6 +282,7 @@ describe("BuilderSession", () => {
   describe("issue builds", () => {
     const issueRun = (overrides: any = {}) => ({
       id: "run-1",
+      mode: "build",
       status: "RUNNING",
       issueNumber: 7,
       issueUrl: "https://github.com/org/ally-be/issues/7",
@@ -303,8 +304,25 @@ describe("BuilderSession", () => {
       expect(screen.queryByText("SteerComposer")).toBeNull();
     });
 
+    it("keeps the /oc hint when a review ran on the runner after the issue build", () => {
+      // Ankita's session: the old "Read at ralph / gate" notes came back because
+      // a review run, not a build, was the newest run.
+      runs = [
+        issueRun({ status: "SUCCEEDED" }),
+        { id: "run-2", mode: "review", status: "SUCCEEDED", issueNumber: null },
+      ];
+      sessionResult = {
+        data: { ...baseSession, status: "COMPLETED", currentStage: "DONE" },
+        isLoading: false,
+        isError: false,
+      };
+      render(<BuilderSession />);
+      expect(screen.getByText("IssueSteerHint")).toBeTruthy();
+      expect(screen.queryByText("SteerComposer")).toBeNull();
+    });
+
     it("keeps the steering composer for a legacy run", () => {
-      runs = [{ id: "run-1", status: "RUNNING", issueNumber: null }];
+      runs = [{ id: "run-1", mode: "build", status: "RUNNING", issueNumber: null }];
       sessionResult = {
         data: { ...baseSession, status: "BUILDING", currentStage: "CODING" },
         isLoading: false,

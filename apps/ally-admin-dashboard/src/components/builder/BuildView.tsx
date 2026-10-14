@@ -32,6 +32,7 @@ import {
   isRunActive,
   issueRunPullRequest,
   issueRunRepo,
+  latestBuildRun,
   repoMilestones,
   sameRepo,
 } from "./issueBuild";
@@ -210,9 +211,12 @@ export const BuildView: React.FC<BuildViewProps> = ({
     [runs, selectedRunId],
   );
   const isViewingLive = selectedRunId !== null && selectedRunId === newestRun?.id;
-  // The run the rail and links describe: the one on screen, or the newest
-  // before anything is selected.
-  const displayRun = selectedRun ?? newestRun;
+  // The latest build — reviews and design drafts run on Builder's runner
+  // after and before it, and must not decide what kind of build this is.
+  const latestBuild = useMemo(() => latestBuildRun(runs), [runs]);
+  // The run the rail and links describe: the one on screen, or the latest
+  // build before anything is selected.
+  const displayRun = selectedRun ?? latestBuild ?? newestRun;
   const displayIsIssue = isIssueRun(displayRun);
   const chain = useMemo(() => repoMilestones(milestones), [milestones]);
 
@@ -395,7 +399,7 @@ export const BuildView: React.FC<BuildViewProps> = ({
   // so it goes stale the moment the run ends, and a terminal session can still
   // be holding a cached one from before it stopped.
   // An issue build reports no spend, so a ceiling cannot hold or stop it.
-  const newestIsIssue = isIssueRun(newestRun);
+  const newestIsIssue = isIssueRun(latestBuild);
   const budgetHeld = Boolean(budget?.hold) && (isLive || isWaiting) && !newestIsIssue;
 
   /**
@@ -486,6 +490,8 @@ export const BuildView: React.FC<BuildViewProps> = ({
         milestones={milestones ?? []}
         runs={runs ?? []}
         pullRequests={pullRequests ?? []}
+        selectedRunId={displayRun?.id ?? null}
+        onSelectRun={handleSelectRun}
       />
 
       <div className="flex flex-wrap items-center gap-2">
@@ -553,7 +559,10 @@ export const BuildView: React.FC<BuildViewProps> = ({
         runs={runs ?? []}
         selectedRunId={selectedRunId}
         onSelect={handleSelectRun}
-        alwaysShow={chain.length > 0}
+        // A repo chain lists each repo's build above, and picking a repo there
+        // switches the feed: every run, reviews and retries included, is then
+        // detail, kept one click away rather than a row of cards on top.
+        folded={chain.length > 0}
       />
 
       {isWaiting && pendingQuestions?.length ? (
