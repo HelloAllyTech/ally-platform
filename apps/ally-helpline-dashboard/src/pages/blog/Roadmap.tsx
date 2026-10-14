@@ -12,7 +12,6 @@ import {
   ROADMAP_INTRO,
   ROADMAP_STAGES,
   RoadmapGrid,
-  formatRoadmapMonth,
   groupIntoGrid,
   stageLevel,
 } from "./roadmapContent";
@@ -162,20 +161,9 @@ export const Roadmap: FC = () => {
       <BlogHeader containerClassName={CONTAINER} />
       <main className={`mx-auto w-full ${CONTAINER} flex-1 px-4 py-6 sm:px-6 sm:py-8`}>
         <h1 className="text-3xl leading-tight sm:text-4xl">{ROADMAP_HEADLINE}</h1>
-        <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
-          <p className="max-w-2xl text-sm leading-relaxed text-gray-700 sm:text-base">
-            {ROADMAP_INTRO}
-          </p>
-          {data?.updatedAt && cards.length > 0 && (
-            <p className="shrink-0 text-sm sm:text-right">
-              <time dateTime={data.updatedAt}>{formatRoadmapMonth(data.updatedAt)}</time>
-              <span aria-hidden="true" className="text-gray-400">
-                {" · "}
-              </span>
-              <span className="italic text-gray-600">Updated quarterly</span>
-            </p>
-          )}
-        </div>
+        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-gray-700 sm:text-base">
+          {ROADMAP_INTRO}
+        </p>
 
         {isLoading ? (
           <p className="mt-8 text-gray-700">Loading…</p>
