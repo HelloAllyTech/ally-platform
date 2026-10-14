@@ -1,4 +1,4 @@
-import { FC } from "react";
+import { FC, ReactNode } from "react";
 
 import { toast } from "sonner";
 
@@ -18,6 +18,12 @@ interface HeaderProps {
   title: string;
   showPreview?: boolean;
   type?: "Simulation" | "Track" | "Case";
+  /**
+   * Extra controls, rendered before Save. Optional and additive: a page that has an action of its
+   * own (CreateTrack's "Ask Copilot") puts it here instead of absolutely positioning it over the
+   * header, which collided with the row's own wrapping at narrow widths.
+   */
+  extraActions?: ReactNode;
 }
 
 export const Header: FC<HeaderProps> = ({
@@ -30,6 +36,7 @@ export const Header: FC<HeaderProps> = ({
   title,
   showPreview = true,
   type,
+  extraActions,
 }) => {
   const handleSaveDraft = async () => {
     const response = await onSaveDraft();
@@ -77,6 +84,7 @@ export const Header: FC<HeaderProps> = ({
       <div className="flex flex-wrap md:flex-nowrap gap-y-2 items-center justify-between w-full px-0 md:px-2 pb-2 md:h-[80px] relative">
         <h1 className="text-xl md:text-2xl text-typography-900 md:whitespace-nowrap">{title}</h1>
         <div className="flex items-center gap-3">
+          {extraActions}
           <Button
             variant={ButtonVariant.TEXT}
             onClick={handleSaveDraft}

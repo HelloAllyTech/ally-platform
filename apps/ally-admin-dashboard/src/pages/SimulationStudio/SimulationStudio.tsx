@@ -1,10 +1,19 @@
 import React, { useEffect, useRef, useState } from "react";
 
 import { useSelector } from "react-redux";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { Tabs } from "@ally-ui-mono/ui-shared";
-import { Add, Close, Filter, Search, Simulation as SimulationIcon, Pathway, Case } from "@assets";
+import {
+  Add,
+  Close,
+  Filter,
+  Search,
+  Simulation as SimulationIcon,
+  Pathway,
+  Case,
+  WandStars,
+} from "@assets";
 import {
   ActionConfirmationPopup,
   DeletePopup,
@@ -24,8 +33,10 @@ import {
   SimulationStatus,
   FeatureToggleKey,
   isSuperDuperAdminRole,
+  ROUTES,
 } from "@constants";
 import {
+  useCanUseCourseCopilot,
   useSimulations,
   useSimulationPathways,
   useSimulationCases,
@@ -65,6 +76,9 @@ export const SimulationStudio: React.FC = () => {
 
   const createButtonRef = useRef<HTMLButtonElement>(null);
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  // Toggle AND edit grant — see the hook. Gates the "Course with Copilot" create option.
+  const canUseCourseCopilot = useCanUseCourseCopilot();
   const { user } = useUser();
   const features = useSelector((state: RootState) => state.user.features);
   /**
@@ -264,8 +278,17 @@ export const SimulationStudio: React.FC = () => {
         icon: <Pathway className="w-5 h-5" />,
         onClick: handleNewTrack,
       },
+
+      // The chat-first way to make a course: the copilot interviews, proposes a blueprint, then
+      // builds it. Sits right after "New Course" because it produces the same thing.
+      {
+        id: "Course with Copilot",
+        label: en.courseCopilot.createOption,
+        icon: <WandStars className="w-5 h-5" />,
+        onClick: () => navigate(ROUTES.COURSE_COPILOT_NEW),
+      },
     ],
-    [handleNewSimulation, handleNewPathway, handleNewCase, handleNewTrack],
+    [handleNewSimulation, handleNewPathway, handleNewCase, handleNewTrack, navigate],
   );
 
   const filteredCreateOptions = React.useMemo(() => {
@@ -278,9 +301,12 @@ export const SimulationStudio: React.FC = () => {
       if (option.id === "New Case" || option.id === "New Course") {
         return hasContentAccess;
       }
+      if (option.id === "Course with Copilot") {
+        return canUseCourseCopilot;
+      }
       return true;
     });
-  }, [createOptions, hasContentAccess]);
+  }, [createOptions, hasContentAccess, canUseCourseCopilot]);
 
   const renderFooter = () => {
     const isCasesTab = activeTab === TAB_KEYS.CASES;

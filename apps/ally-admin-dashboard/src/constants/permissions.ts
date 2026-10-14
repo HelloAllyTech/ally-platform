@@ -44,6 +44,10 @@ export enum Permissions {
   // No delete — a session is cancelled, never removed, because its PRs outlive it.
   VIEW_BUILDER = "view:admin:builder",
   EDIT_BUILDER = "edit:admin:builder",
+  // Course Copilot. Gated on toggle AND EDIT everywhere (one gate — a view-only session list has
+  // nothing to show without the chat), but both grants exist so the backend can tier them later.
+  VIEW_COURSE_COPILOT = "view:admin:course-copilot",
+  EDIT_COURSE_COPILOT = "edit:admin:course-copilot",
   // Per-user preferences (e.g. the saved admin sidebar order). Held by every
   // platform-tier group — PLATFORM_ADMIN inherited both from SUPER_DUPER_ADMIN
   // in the role-collapse migration — but NOT by a plain tenant ADMIN or a
@@ -105,6 +109,7 @@ export const SIDEBAR_ITEMS = {
   WHATSAPP_BOT: "whatsapp-bot",
   BUG_HUNTER: "bug-hunter",
   BUILDER: "builder",
+  COURSE_COPILOT: "course-copilot",
   COMPONENT_LIBRARY: "component-library",
 };
 

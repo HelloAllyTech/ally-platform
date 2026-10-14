@@ -43,6 +43,9 @@ import {
   BuilderScoreboard,
   BuilderSession,
   BuilderSettings,
+  CourseCopilotNew,
+  CourseCopilotSession,
+  CourseCopilotSessions,
   AgentTestCases,
   Competencies,
   RoleplaySessionLogs,
@@ -491,6 +494,42 @@ export const RouteLayout: React.FC = () => {
           element={
             <PrivateLayout requiredFeature={FeatureToggleKey.BUILDER}>
               <BuilderKnowledge />
+            </PrivateLayout>
+          }
+        />
+        {/* Gated on the toggle AND the edit grant (one gate — a view-only session list is
+            pointless without the chat). `new` is registered before `:sessionId`: React Router
+            ranks static segments above params, but the order keeps that obvious to a reader. */}
+        <Route
+          path={ROUTES.COURSE_COPILOT}
+          element={
+            <PrivateLayout
+              requiredFeature={FeatureToggleKey.COURSE_COPILOT}
+              requiredPermissions={[Permissions.EDIT_COURSE_COPILOT]}
+            >
+              <CourseCopilotSessions />
+            </PrivateLayout>
+          }
+        />
+        <Route
+          path={ROUTES.COURSE_COPILOT_NEW}
+          element={
+            <PrivateLayout
+              requiredFeature={FeatureToggleKey.COURSE_COPILOT}
+              requiredPermissions={[Permissions.EDIT_COURSE_COPILOT]}
+            >
+              <CourseCopilotNew />
+            </PrivateLayout>
+          }
+        />
+        <Route
+          path={ROUTES.COURSE_COPILOT_SESSION(":sessionId")}
+          element={
+            <PrivateLayout
+              requiredFeature={FeatureToggleKey.COURSE_COPILOT}
+              requiredPermissions={[Permissions.EDIT_COURSE_COPILOT]}
+            >
+              <CourseCopilotSession />
             </PrivateLayout>
           }
         />

@@ -38,6 +38,7 @@ export const FeatureToggleKey = {
   MULTI_TENANT_ALLOWLIST_MANAGEMENT: "multi_tenant_allowlist_management",
   BUG_HUNTER: "bug_hunter",
   BUILDER: "builder",
+  COURSE_COPILOT: "course_copilot",
   OPERATIONAL_ADMIN_ACTIONS: "operational_admin_actions",
   VIDEO_ACTOR: "video_actor",
   // Component Library — global Track/Course item templates. No org-level
@@ -159,6 +160,7 @@ export const FEATURE_TOGGLE_KEY_TO_SECTION: Record<string, FeatureToggleSection>
   [FeatureToggleKey.OPERATIONAL_ADMIN_ACTIONS]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,
   [FeatureToggleKey.BUG_HUNTER]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,
   [FeatureToggleKey.BUILDER]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,
+  [FeatureToggleKey.COURSE_COPILOT]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,
   [FeatureToggleKey.UX_SIGNALS]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,
 
   [FeatureToggleKey.USER_BADGES]: FEATURE_TOGGLE_SECTIONS.USER_AND_ORG_MANAGEMENT,

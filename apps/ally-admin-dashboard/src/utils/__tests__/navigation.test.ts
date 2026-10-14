@@ -290,6 +290,45 @@ describe("deriveNavigationItems", () => {
     expect(item?.path).toBe(ROUTES.WHATSAPP_BOT);
   });
 
+  // Both halves are required, like Simulation Studio: Course Copilot is deliberately not in
+  // buildSidebarItemFeatureKeyMap (which would make it feature-ONLY and drop the grant), so a
+  // missing toggle and a missing permission each hide it on their own.
+  describe("Course Copilot (toggle AND edit grant)", () => {
+    it("shows Course Copilot right after Builder to a holder of both", () => {
+      const result = deriveNavigationItems({
+        permissions: [Permissions.EDIT_COURSE_COPILOT],
+        features: [FeatureToggleKey.BUILDER, FeatureToggleKey.COURSE_COPILOT],
+        savedOrder: undefined,
+      });
+      const ids = result.map(i => i.id);
+      expect(ids).toContain(SIDEBAR_ITEMS.COURSE_COPILOT);
+      expect(ids.indexOf(SIDEBAR_ITEMS.COURSE_COPILOT)).toBe(
+        ids.indexOf(SIDEBAR_ITEMS.BUILDER) + 1,
+      );
+      expect(result.find(i => i.id === SIDEBAR_ITEMS.COURSE_COPILOT)?.path).toBe(
+        ROUTES.COURSE_COPILOT,
+      );
+    });
+
+    it("hides it when the toggle is on but the edit grant is missing", () => {
+      const result = deriveNavigationItems({
+        permissions: [Permissions.VIEW_COURSE_COPILOT],
+        features: [FeatureToggleKey.COURSE_COPILOT],
+        savedOrder: undefined,
+      });
+      expect(result.map(i => i.id)).not.toContain(SIDEBAR_ITEMS.COURSE_COPILOT);
+    });
+
+    it("hides it when the edit grant is held but the toggle is off", () => {
+      const result = deriveNavigationItems({
+        permissions: [Permissions.EDIT_COURSE_COPILOT],
+        features: [],
+        savedOrder: undefined,
+      });
+      expect(result.map(i => i.id)).not.toContain(SIDEBAR_ITEMS.COURSE_COPILOT);
+    });
+  });
+
   it("hides WhatsApp Bot from a user holding every permission but not the toggle", () => {
     // The corpus is what the bot tells mental healthcare workers, and the conversation log
     // holds their clinical questions beside their phone numbers — so a permission grant must

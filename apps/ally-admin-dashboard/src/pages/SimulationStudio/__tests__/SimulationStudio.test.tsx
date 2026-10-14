@@ -13,6 +13,7 @@ const {
   mockUseTracks,
   mockUseUser,
   mockFeatures,
+  mockCanUseCourseCopilot,
 } = vi.hoisted(() => ({
   mockUseSimulations: vi.fn(),
   mockUseSimulationPathways: vi.fn(),
@@ -20,6 +21,7 @@ const {
   mockUseTracks: vi.fn(),
   mockUseUser: vi.fn(),
   mockFeatures: vi.fn<[], string[]>(),
+  mockCanUseCourseCopilot: vi.fn<() => boolean>(),
 }));
 
 // Mock the custom hooks
@@ -29,6 +31,7 @@ vi.mock("@hooks", () => ({
   useSimulationCases: mockUseSimulationCases,
   useTracks: mockUseTracks,
   useUser: mockUseUser,
+  useCanUseCourseCopilot: mockCanUseCourseCopilot,
 }));
 
 // The content gate reads `state.user.features` off the store. Mocking
@@ -516,6 +519,7 @@ describe("SimulationStudio", () => {
     mockUseTracks.mockReturnValue(defaultTracksHookReturn);
     mockUseUser.mockReturnValue(defaultUserHookReturn);
     mockFeatures.mockReturnValue(["content_management"]);
+    mockCanUseCourseCopilot.mockReturnValue(false);
   });
 
   const renderComponent = (initialEntries = ["/"]) => {
@@ -853,6 +857,29 @@ describe("SimulationStudio", () => {
       expect(screen.getByText("New simulation")).toBeInTheDocument();
       expect(screen.queryByText("New track")).not.toBeInTheDocument();
       expect(screen.queryByTestId("option-New track")).not.toBeInTheDocument();
+    });
+
+    // Gated on the Course Copilot toggle AND its edit grant (useCanUseCourseCopilot), not on the
+    // content-management toggle the neighbouring options use.
+    it("offers Course with Copilot only to someone who can use it", () => {
+      renderComponent();
+      fireEvent.click(screen.getByText("Create"));
+
+      expect(screen.queryByTestId("option-Course with Copilot")).not.toBeInTheDocument();
+    });
+
+    it("offers Course with Copilot, after New Course, when the copilot is available", () => {
+      mockCanUseCourseCopilot.mockReturnValue(true);
+      renderComponent();
+      fireEvent.click(screen.getByText("Create"));
+
+      const labels = screen
+        .getByTestId("options-popup")
+        .querySelectorAll("button[data-testid^='option-']");
+      const order = Array.from(labels).map(node => node.getAttribute("data-testid"));
+      expect(order.indexOf("option-Course with Copilot")).toBe(
+        order.indexOf("option-New Course") + 1,
+      );
     });
 
     it("calls handleNewSimulation when New Simulation option is clicked", () => {

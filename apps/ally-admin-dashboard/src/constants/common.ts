@@ -644,6 +644,21 @@ export const ApiEndpoints = {
     LESSONS_CONSOLIDATE: "/v1/builder/lessons/consolidate",
     EXEMPLARS: "/v1/builder/exemplars",
   },
+  COURSE_COPILOT: {
+    SESSIONS: "/v1/course-copilot/sessions",
+    SESSION_BY_ID: (id: string) => `/v1/course-copilot/sessions/${id}`,
+    // SSE — driven by useCourseCopilotStream (fetch + getReader), not RTK Query.
+    SESSION_MESSAGES_STREAM: (id: string) => `/v1/course-copilot/sessions/${id}/messages/stream`,
+    SESSION_BLUEPRINT: (id: string) => `/v1/course-copilot/sessions/${id}/blueprint`,
+    SESSION_BLUEPRINT_APPROVE: (id: string) =>
+      `/v1/course-copilot/sessions/${id}/blueprint/approve`,
+    SESSION_BUILD_RETRY: (id: string) => `/v1/course-copilot/sessions/${id}/build/retry`,
+    SESSION_BUILD_CANCEL: (id: string) => `/v1/course-copilot/sessions/${id}/build/cancel`,
+    // Raising the ceiling is a POST on the same path as the read, like Builder's:
+    // it authorises spend, so it is not folded into a session PATCH.
+    SESSION_BUDGET: (id: string) => `/v1/course-copilot/sessions/${id}/budget`,
+    SESSION_ARCHIVE: (id: string) => `/v1/course-copilot/sessions/${id}/archive`,
+  },
   WHATSAPP_BOT: {
     // Corpus (ally-be src/knowledge-base)
     DOCUMENTS: "/v1/knowledge-base/documents",
@@ -791,6 +806,11 @@ export const ROUTES = {
   BUILDER_SCOREBOARD: "/builder/scoreboard",
   BUILDER_PIPELINE: "/builder/pipeline",
   BUILDER_KNOWLEDGE: "/builder/knowledge",
+  COURSE_COPILOT: "/course-copilot",
+  // Registered before the session route in RouteLayout: "new" would otherwise match `:sessionId`.
+  // Optional `?trackId=` binds the session to an existing course (EDIT mode).
+  COURSE_COPILOT_NEW: "/course-copilot/new",
+  COURSE_COPILOT_SESSION: (id: string) => `/course-copilot/${id}`,
   // Evaluator micro-app (public routes; evaluator email+password auth)
   EVALUATE: "/evaluate",
   EVALUATE_RECORDS: "/evaluate/records",
@@ -814,6 +834,8 @@ export const LOCAL_STORAGE_KEYS = {
   // The character-interview-agent session id, so a page refresh mid-interview
   // resumes the same conversation instead of silently starting a new one.
   CHARACTER_INTERVIEW_SESSION_ID: "characterInterviewSessionId",
+  // The Course Copilot session being worked on, so a reload resumes it. Cleared on archive.
+  COURSE_COPILOT_SESSION_ID: "courseCopilotSessionId",
 };
 
 export enum KeyboardKeys {
@@ -976,6 +998,9 @@ export const TAG_TYPES = {
   BUILDER_NOTIFICATIONS: "builderNotifications",
   BUILDER_LESSONS: "builderLessons",
   BUILDER_EXEMPLARS: "builderExemplars",
+  // Course Copilot. Also registered in baseApi.ts's `tagTypes`.
+  COURSE_COPILOT_SESSIONS: "courseCopilotSessions",
+  COURSE_COPILOT_SESSION: "courseCopilotSession",
   AI_LAB_SKILLS: "aiLabSkills",
   AI_LAB_VARIABLES: "aiLabVariables",
   AI_LAB_VALUES: "aiLabValues",

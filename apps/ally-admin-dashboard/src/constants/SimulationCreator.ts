@@ -35,6 +35,8 @@ export const SIMULATION_CATEGORY_OPTIONS = [
   { value: "DEMO", label: "Demo" },
   { value: "PARTNER_SIM", label: "Partner Sim" },
   { value: "OTHER", label: "Other" },
+  // Roleplays Course Copilot generated for a course.
+  { value: "COURSE_COPILOT", label: "Course Copilot" },
 ];
 
 export const SIMULATION_CATEGORY_FILTER_OPTIONS = SIMULATION_CATEGORY_OPTIONS.map(
