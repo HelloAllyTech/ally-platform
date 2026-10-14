@@ -11,6 +11,7 @@ import { ApiEndpoints, HttpMethod, TAG_TYPES } from "@constants";
 import {
   AnnotationAttemptResult,
   AnnotationMarkInput,
+  ArticleResourceEmbeddabilityResponse,
   EnrollTrackResponse,
   GetLearnTracksResponse,
   GetNextTrackItemResponse,
@@ -202,6 +203,17 @@ const tracksAPI = baseAPI.injectEndpoints({
       invalidatesTags: ALL_TRACK_TAGS,
     }),
 
+    /** Which of an article's resources must skip the embed and open in a new tab. */
+    getArticleResourceEmbeddability: builder.query<
+      ArticleResourceEmbeddabilityResponse,
+      { itemId: string }
+    >({
+      query: ({ itemId }) => ({
+        url: ApiEndpoints.TRACKS.RESOURCE_EMBEDDABILITY(itemId),
+        method: HttpMethod.GET,
+      }),
+    }),
+
     /** Mark an article read (completes the item when criteria are met). */
     markArticleRead: builder.mutation<TrackItemCompletionResult, { itemId: string }>({
       query: ({ itemId }) => ({
@@ -384,6 +396,7 @@ export const {
   useEnrollTrackMutation,
   useStartTrackItemMutation,
   useMarkArticleReadMutation,
+  useGetArticleResourceEmbeddabilityQuery,
   useReportVideoProgressMutation,
   useSubmitQuizAttemptMutation,
   useSubmitArticleQuestionAnswerMutation,

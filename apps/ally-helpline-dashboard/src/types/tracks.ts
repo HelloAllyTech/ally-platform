@@ -605,6 +605,15 @@ export interface ArticleResource {
   url: string;
 }
 
+/**
+ * Response to `GET .../resources/embeddability`. The server requests each
+ * resource URL itself — a 403/bot-check, a framing block or any failure
+ * reads `openExternally: true`, which the embedded frame cannot report.
+ */
+export interface ArticleResourceEmbeddabilityResponse {
+  resources: { id: string; openExternally: boolean }[];
+}
+
 export interface StartArticleItemPayload extends StartTrackItemBase {
   type: TrackItemType.ARTICLE;
   html: string;

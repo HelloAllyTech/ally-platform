@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
 import { RichTextRenderer } from "@ally-ui-mono/ui-shared";
-import { useMarkArticleReadMutation } from "@api";
+import { useGetArticleResourceEmbeddabilityQuery, useMarkArticleReadMutation } from "@api";
 import { ArrowRight, TickGreenBackground } from "@assets";
 import {
   ArticleResource,
@@ -15,7 +15,7 @@ import {
 
 import { ArticleQuestionCard } from "./ArticleQuestionCard";
 import { splitArticleHtml } from "./articleSegments";
-import { ExternalResourceModal } from "./ExternalResourceModal";
+import { ExternalResourceModal, openInNewTab } from "./ExternalResourceModal";
 
 interface ArticleItemPlayerProps {
   payload: StartArticleItemPayload;
@@ -72,6 +72,27 @@ export const ArticleItemPlayer: FC<ArticleItemPlayerProps> = ({
   const [markArticleRead, { isLoading }] = useMarkArticleReadMutation();
   const [fontScaleIndex, setFontScaleIndex] = useState(readStoredFontScaleIndex);
   const [activeResource, setActiveResource] = useState<ArticleResource | null>(null);
+  const hasResources = (payload.resources?.length ?? 0) > 0;
+  const { data: embeddability } = useGetArticleResourceEmbeddabilityQuery(
+    { itemId },
+    { skip: !hasResources },
+  );
+
+  /**
+   * A resource the server found returning an error (a bot-check 403, a 404),
+   * refusing to be framed, or unreachable goes straight to a new tab — the
+   * embedded frame would show that error page and still report a normal
+   * load. Opened inside the click handler so the popup blocker allows it.
+   * Before the check answers, the embed's own stall fallback still applies.
+   */
+  const openResource = (resource: ArticleResource) => {
+    const verdict = embeddability?.resources.find(r => r.id === resource.id);
+    if (verdict?.openExternally) {
+      openInNewTab(resource.url);
+      return;
+    }
+    setActiveResource(resource);
+  };
 
   const segments = useMemo(
     () => splitArticleHtml(payload.html, payload.questions ?? []),
@@ -221,7 +242,7 @@ export const ArticleItemPlayer: FC<ArticleItemPlayerProps> = ({
           <div ref={sentinelRef} aria-hidden className="h-px w-full" />
         </article>
 
-        {payload.resources && payload.resources.length > 0 && (
+        {hasResources && payload.resources && (
           <div className="mx-auto mt-8 max-w-[68ch] border-t border-border-light pt-6">
             <h2 className="mb-3 text-sm font-semibold text-typography-900">
               {t("tracks2.article.resourcesHeading")}
@@ -231,7 +252,7 @@ export const ArticleItemPlayer: FC<ArticleItemPlayerProps> = ({
                 <button
                   key={resource.id}
                   type="button"
-                  onClick={() => setActiveResource(resource)}
+                  onClick={() => openResource(resource)}
                   className="flex items-center justify-between gap-2 rounded-lg border border-border-light px-3 py-2 text-left text-sm font-medium text-primary-500 transition-colors hover:bg-background-secondary"
                 >
                   <span className="truncate">{resource.title}</span>

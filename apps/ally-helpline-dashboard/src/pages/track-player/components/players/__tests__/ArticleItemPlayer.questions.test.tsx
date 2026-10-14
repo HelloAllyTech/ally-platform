@@ -13,6 +13,7 @@ const submitArticleQuestionAnswer = vi.fn();
 
 vi.mock("@api", () => ({
   useMarkArticleReadMutation: () => [markArticleRead, { isLoading: false }],
+  useGetArticleResourceEmbeddabilityQuery: () => ({ data: undefined }),
   useSubmitArticleQuestionAnswerMutation: () => [
     submitArticleQuestionAnswer,
     { isLoading: false },
