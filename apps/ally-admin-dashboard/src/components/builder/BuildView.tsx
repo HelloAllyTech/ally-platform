@@ -520,10 +520,21 @@ export const BuildView: React.FC<BuildViewProps> = ({
 
           It threw here only once the banner became reachable on a stopped
           session: the same markup had been rendering for live sessions, where
-          a budget hold is rare enough that nobody had hit it. */}
+          a budget hold is rare enough that nobody had hit it.
+
+          `role="status"`, not Carbon's default `alertdialog`. As an
+          alertdialog it moves focus to its action button after EVERY render,
+          and this view re-renders on its own while a hold counts down — so
+          focus kept being pulled to "Raise budget" out of whatever the admin
+          was doing. A status is announced without taking focus; the banner is
+          still red and still carries the action. Escape is off because there
+          is no close button: the banner goes when the hold does, and Escape
+          used to hide the only way to raise the budget. */}
       {(budgetHeld || budgetOver) && budget && (
         <ActionableNotification
           inline
+          role="status"
+          closeOnEscape={false}
           kind={budgetHeld ? "error" : "warning"}
           lowContrast
           hideCloseButton
