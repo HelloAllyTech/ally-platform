@@ -10,6 +10,7 @@ import {
   useStartTrackItemMutation,
   useSubmitQuizAttemptMutation,
 } from "@api";
+import { RichTextRenderer } from "@ally-ui-mono/ui-shared";
 import { ArrowLeft, ArrowRight } from "@assets";
 import {
   QuizAttemptResult,
@@ -306,7 +307,13 @@ export const QuizItemPlayer: FC<QuizItemPlayerProps> = ({
                   {t("tracks2.quiz.question.notScored")}
                 </span>
               )}
-              <h2 className="mb-4 text-lg font-semibold text-typography-900">{question.prompt}</h2>
+              <h2 className="mb-4 text-lg font-semibold text-typography-900">
+                {question.promptHtml ? (
+                  <RichTextRenderer html={question.promptHtml} />
+                ) : (
+                  question.prompt
+                )}
+              </h2>
               <QuestionMedia media={question.media} />
               {renderWidget()}
             </motion.div>
