@@ -68,6 +68,14 @@ Providers optionally define two class constants:
 **Deepgram** -- Default TTS provider. Low latency, no voice parameters. Uses `model` for voice selection. Falls back to gender-based default voices.
 
 **ElevenLabs** -- High-quality voices with expressive parameters. Supports voice ID-based selection, speed control, and SSML-like text enhancement for emphasis and pauses.
+  Model families split by transport: `flash`, `turbo` and `multilingual_v2` stream over
+  the plugin's text-to-speech multi-stream-input WebSocket; the generative **v3 and v4**
+  families (`eleven_v3`, `eleven_v3_conversational`, `eleven_v4`, `eleven_v4_turbo`) are
+  rejected on that socket (verified live 2026-10-14), so the client wraps them in
+  `StreamAdapter` over HTTP `/stream` with fixed stability (0.95) and enables inline audio
+  tags. Detection is `ElevenLabsTTSClient.GENERATIVE_MODEL_MARKERS` (`"v3"`, `"v4"`), and
+  the worker's generative-voice interim/gap timing keys off the same families. The
+  Voices admin lists the live model ids from ElevenLabs' `/models` endpoint.
 
 **Sarvam** -- Specialized for Indian languages. Uses `speaker` for voice selection.
 
@@ -186,7 +194,7 @@ configs known to keep one speaker across generations.
 |---|---|---|
 | Deepgram | on | all (Aura) |
 | ElevenLabs | on | `flash`, `turbo`, `multilingual_v2` models |
-| ElevenLabs | on | `v3` models (`eleven_v3`, `eleven_v3_conversational`) — see below |
+| ElevenLabs | on | `v3`/`v4` models (`eleven_v3`, `eleven_v3_conversational`, `eleven_v4`, `eleven_v4_turbo`) — see below |
 | Sarvam | on | `bulbul:v2` |
 | Sarvam | **off** | `bulbul:v3` and any other model (unclassified; v3 samples at temperature 0.6) |
 | Google | on | Chirp 3 HD voices (`xx-XX-Chirp3-HD-<Name>`) |
@@ -204,7 +212,7 @@ three layers off for such a voice; it may still play the bundled breath/sigh
 opener recordings, which are not a generation of the voice. The comfort tone
 still plays.
 
-**Why ElevenLabs v3 is on.** v3 is generative, but the live reply on v3 is
+**Why ElevenLabs v3/v4 is on.** v3 and v4 are generative, but the live reply on them is
 already one independent generation per sentence (`StreamAdapter` over the HTTP
 path), held to one speaker by the fixed voice settings in `tts_instance`
 (stability 0.95, similarity 0.75). A clip from `create_clip_tts()` has the same
