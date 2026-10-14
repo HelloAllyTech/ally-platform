@@ -64,7 +64,7 @@ const CardRow: React.FC<{
         )}
       </div>
       <p className="mt-0.5 text-sm text-typography-600">{item.description}</p>
-      {item.note && <p className="mt-1 text-xs italic text-[#B34F2C]">{item.note}</p>}
+      {item.note && <p className="mt-1 text-xs italic text-terracotta-text">{item.note}</p>}
     </div>
 
     <div className="flex shrink-0 items-center gap-1">

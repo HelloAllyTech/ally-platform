@@ -34,7 +34,7 @@ const ROW = "lg:grid lg:grid-cols-5 lg:gap-4 xl:grid-cols-[11rem_repeat(5,minmax
 /** Spans the five stage columns at `lg`; a single column once labels sit beside the cells. */
 const LABEL_CELL = "lg:col-span-5 xl:col-span-1";
 
-const ACCENT_TEXT = "text-[#B34F2C]";
+const ACCENT_TEXT = "text-terracotta-text";
 
 const MaturityDots: FC<{ level: number }> = ({ level }) => (
   <span aria-hidden="true" className="flex gap-1">
@@ -42,7 +42,7 @@ const MaturityDots: FC<{ level: number }> = ({ level }) => (
       <span
         key={stage.id}
         className={`h-2 w-2 rounded-full ${
-          index < level ? "bg-[#D76F4C]" : "border border-gray-400"
+          index < level ? "bg-terracotta" : "border border-gray-400"
         }`}
       />
     ))}
@@ -153,7 +153,7 @@ export const Roadmap: FC = () => {
   const grid = groupIntoGrid(cards);
 
   return (
-    <div className="blog-serif flex min-h-dvh flex-col bg-[#FAF9F5] text-[#29261f]">
+    <div className="blog-serif flex min-h-dvh flex-col bg-gray-50 text-gray-900">
       <BlogHeader containerClassName={CONTAINER} />
       <main className={`mx-auto w-full ${CONTAINER} flex-1 px-4 py-10 sm:px-6 sm:py-14`}>
         <h1 className="text-4xl leading-tight sm:text-5xl lg:text-6xl">{ROADMAP_HEADLINE}</h1>

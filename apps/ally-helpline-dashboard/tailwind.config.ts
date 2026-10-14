@@ -149,6 +149,16 @@ export default {
           4: "#8F2D02",
         },
         /*
+         * The public blog's terracotta accent as a colour, not a data step: the
+         * roadmap's maturity dots (DEFAULT, decorative) and its italic card notes
+         * (`text`, 5:1 on white and on gray-50). Same hues as activity-2/3, named
+         * apart so retuning the heatmap's ramp cannot move the roadmap.
+         */
+        terracotta: {
+          DEFAULT: "#D76F4C",
+          text: "#B34F2C",
+        },
+        /*
          * Status — a categorical palette in the warm family.
          *
          * Chips across this app encode three different things: a semantic state

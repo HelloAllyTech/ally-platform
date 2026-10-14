@@ -37,7 +37,7 @@ export const BlogFooter: FC<{ containerClassName?: string; className?: string }>
         </Link>
         <Link
           to={ROUTES.ROADMAP}
-          className="inline-flex min-h-[44px] items-center transition-colors hover:text-[#29261f] md:min-h-0"
+          className="inline-flex min-h-[44px] items-center transition-colors hover:text-gray-900 md:min-h-0"
         >
           Roadmap
         </Link>
