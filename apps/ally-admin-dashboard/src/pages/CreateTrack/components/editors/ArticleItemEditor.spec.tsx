@@ -63,6 +63,7 @@ vi.mock("@ally-ui-mono/ui-shared", () => ({
   TextInput: (props: any) => <input {...props} />,
   Tooltip: ({ children }: any) => <div>{children}</div>,
   htmlToPlainText: (html: string) => html.replace(/<[^>]*>/g, ""),
+  escapeHtml: (text: string) => text,
 }));
 
 // We don't mock RichTextEditor anymore to test against the real component (R1)

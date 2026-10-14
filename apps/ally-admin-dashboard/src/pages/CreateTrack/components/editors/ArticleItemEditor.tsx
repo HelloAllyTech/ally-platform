@@ -3,7 +3,7 @@ import { FC, useMemo } from "react";
 import { Controller, useFieldArray, useFormContext, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 
-import { TextArea, Tooltip, htmlToPlainText } from "@ally-ui-mono/ui-shared";
+import { TextArea, Tooltip, htmlToPlainText, escapeHtml } from "@ally-ui-mono/ui-shared";
 import { TooltipIcon, Trash } from "@assets";
 import { RichTextEditor } from "@components/rich-text-editor";
 import { MAX_ARTICLE_QUESTIONS, MAX_ARTICLE_RESOURCES } from "@constants";
@@ -226,7 +226,7 @@ export const ArticleItemEditor: FC<ArticleItemEditorProps> = ({
                             ? promptField.value
                             : (questions[index]?.prompt ?? "")
                                 .split("\n")
-                                .map(line => `<p>${line}</p>`)
+                                .map(line => `<p>${escapeHtml(line)}</p>`)
                                 .join("")
                         }
                         onChange={html => {

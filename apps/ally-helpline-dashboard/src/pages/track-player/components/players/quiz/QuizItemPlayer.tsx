@@ -307,13 +307,16 @@ export const QuizItemPlayer: FC<QuizItemPlayerProps> = ({
                   {t("tracks2.quiz.question.notScored")}
                 </span>
               )}
-              <h2 className="mb-4 text-lg font-semibold text-typography-900">
+              <div className="mb-4 text-lg font-semibold text-typography-900">
                 {question.promptHtml && htmlToPlainText(question.promptHtml).trim().length > 0 ? (
-                  <RichTextRenderer content={question.promptHtml} />
+                  <RichTextRenderer
+                    content={question.promptHtml}
+                    className="!text-lg !font-semibold !text-typography-900"
+                  />
                 ) : (
                   question.prompt
                 )}
-              </h2>
+              </div>
               <QuestionMedia media={question.media} />
               {renderWidget()}
             </motion.div>

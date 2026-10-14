@@ -2,7 +2,7 @@ import { FC, useState } from "react";
 
 import { Controller, useFieldArray, useFormContext, useWatch } from "react-hook-form";
 
-import { TextArea, Tooltip, htmlToPlainText } from "@ally-ui-mono/ui-shared";
+import { TextArea, Tooltip, htmlToPlainText, escapeHtml } from "@ally-ui-mono/ui-shared";
 import { Plus, TooltipIcon, Trash } from "@assets";
 import { ToggleSwitch } from "@components";
 import { RichTextEditor } from "@components/rich-text-editor";
@@ -194,7 +194,7 @@ export const QuizItemEditor: FC<QuizItemEditorProps> = ({ sectionIndex, itemInde
                               ? field.value
                               : (activeQuestion.prompt ?? "")
                                   .split("\n")
-                                  .map(line => `<p>${line}</p>`)
+                                  .map(line => `<p>${escapeHtml(line)}</p>`)
                                   .join("")
                           }
                           onChange={html => {

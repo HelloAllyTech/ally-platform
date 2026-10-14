@@ -1,8 +1,8 @@
 import { FC } from "react";
 
-import { Controller, useFieldArray, useFormContext } from "react-hook-form";
+import { Controller, useFieldArray, useFormContext, useWatch } from "react-hook-form";
 
-import { htmlToPlainText } from "@ally-ui-mono/ui-shared";
+import { htmlToPlainText, escapeHtml } from "@ally-ui-mono/ui-shared";
 import { Plus, Trash } from "@assets";
 import { ToggleSwitch } from "@components";
 import { RichTextEditor } from "@components/rich-text-editor";
@@ -32,6 +32,8 @@ export const JournalItemEditor: FC<JournalItemEditorProps> = ({
     name: `${base}.journal.prompts`,
     keyName: "fieldId",
   });
+
+  const prompts = useWatch({ control, name: `${base}.journal.prompts` }) || [];
 
   const canAdd = fields.length < MAX_JOURNAL_PROMPTS;
   const canRemove = fields.length > MIN_JOURNAL_PROMPTS;
@@ -97,9 +99,9 @@ export const JournalItemEditor: FC<JournalItemEditorProps> = ({
                     value={
                       promptField.value && promptField.value.length > 0
                         ? promptField.value
-                        : (field.prompt ?? "")
+                        : (prompts[promptIndex]?.prompt ?? "")
                             .split("\n")
-                            .map(line => `<p>${line}</p>`)
+                            .map(line => `<p>${escapeHtml(line)}</p>`)
                             .join("")
                     }
                     onChange={html => {

@@ -3,7 +3,7 @@ import { FC, useRef, useState } from "react";
 import { Controller, useFieldArray, useFormContext, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 
-import { TextArea, Tooltip, htmlToPlainText } from "@ally-ui-mono/ui-shared";
+import { TextArea, Tooltip, htmlToPlainText, escapeHtml } from "@ally-ui-mono/ui-shared";
 import { Plus, TooltipIcon, Trash } from "@assets";
 import { SegmentedToggle, Button } from "@components";
 import { RichTextEditor } from "@components/rich-text-editor";
@@ -325,7 +325,7 @@ export const VideoItemEditor: FC<VideoItemEditorProps> = ({
                                     ? promptField.value
                                     : (question.prompt ?? "")
                                         .split("\n")
-                                        .map(line => `<p>${line}</p>`)
+                                        .map(line => `<p>${escapeHtml(line)}</p>`)
                                         .join("")
                                 }
                                 onChange={html => {
