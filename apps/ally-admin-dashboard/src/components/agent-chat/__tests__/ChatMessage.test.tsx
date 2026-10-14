@@ -12,9 +12,11 @@ vi.mock("remark-gfm", () => ({ default: () => undefined }));
 // eslint-disable-next-line import/first
 import { ChatMessage } from "../ChatMessage";
 
-const strings = en.courseCopilot.chat;
+const strings = en.agentChat.chat;
 
-const assistant = (overrides: Partial<CourseCopilotFeedMessage> = {}): CourseCopilotFeedMessage => ({
+const assistant = (
+  overrides: Partial<CourseCopilotFeedMessage> = {},
+): CourseCopilotFeedMessage => ({
   id: "m1",
   role: "assistant",
   content: "",
@@ -61,6 +63,25 @@ describe("agent-chat ChatMessage", () => {
   it("renders tool notes above the bubble", () => {
     renderMessage(assistant({ content: "Found some.", toolNotes: ["Found 4 matching roleplays"] }));
     expect(screen.getByText("Found 4 matching roleplays")).toBeInTheDocument();
+  });
+
+  // Builder's feed records raw tool names; the row shows them as the feature words them.
+  it("formats tool notes through formatToolNote when given", () => {
+    renderMessage(assistant({ content: "Looked.", toolNotes: ["github_read_file"] }), {
+      formatToolNote: note => (note === "github_read_file" ? "Reading a file" : note),
+    });
+    expect(screen.getByText("Reading a file")).toBeInTheDocument();
+    expect(screen.queryByText("github_read_file")).not.toBeInTheDocument();
+  });
+
+  it("uses a feature's own wording where given", () => {
+    renderMessage(assistant({ isStreaming: true }), { strings: { thinking: "Thinking…" } });
+    expect(screen.getByText("Thinking…")).toBeInTheDocument();
+
+    renderMessage(assistant({ id: "m2", interrupted: true }), {
+      strings: { interrupted: "(interrupted)" },
+    });
+    expect(screen.getByText("(interrupted)")).toBeInTheDocument();
   });
 
   it("renders nothing for a turn whose only output was a hidden tool", () => {
@@ -156,7 +177,11 @@ describe("agent-chat ChatMessage", () => {
       renderMessage(
         assistant({
           content: "Done.",
-          suggestedActions: [{ label: "Fine", message: "ok" }, { label: 3 } as never, null as never],
+          suggestedActions: [
+            { label: "Fine", message: "ok" },
+            { label: 3 } as never,
+            null as never,
+          ],
         }),
       );
       expect(screen.getByText("Fine")).toBeInTheDocument();
@@ -171,6 +196,8 @@ describe("agent-chat ChatMessage", () => {
       }),
     );
     expect(screen.getByText("Who is this for?")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(en.courseCopilot.question.freeTextPlaceholder)).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText(en.agentChat.question.freeTextPlaceholder),
+    ).toBeInTheDocument();
   });
 });

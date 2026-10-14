@@ -285,7 +285,7 @@ export const useCharacterInterviewStream = ({
         case "error": {
           flushTokens();
           const id = currentAssistantIdRef.current;
-          if (id) patchAssistantMessage(id, { error: event.data.message, streaming: false });
+          if (id) patchAssistantMessage(id, { error: event.data.message, isStreaming: false });
           toast.error(event.data.message || strings.streamFailed);
           break;
         }
@@ -368,7 +368,7 @@ export const useCharacterInterviewStream = ({
       setMessages(prev => [
         ...prev,
         ...(userMsgId ? [{ id: userMsgId, role: "user" as const, content: text }] : []),
-        { id: assistantId, role: "assistant" as const, content: "", streaming: true },
+        { id: assistantId, role: "assistant" as const, content: "", isStreaming: true },
       ]);
 
       const controller = new AbortController();
@@ -421,16 +421,16 @@ export const useCharacterInterviewStream = ({
           }
         }
         flushTokens();
-        patchAssistantMessage(assistantId, { streaming: false });
+        patchAssistantMessage(assistantId, { isStreaming: false });
       } catch (error) {
         flushTokens();
         if (controller.signal.aborted) {
           // Keep the partial text, marked interrupted.
-          patchAssistantMessage(assistantId, { streaming: false, interrupted: true });
+          patchAssistantMessage(assistantId, { isStreaming: false, interrupted: true });
         } else if (!sessionLost && !refused) {
           logger.error(`[Character Interview] ${error}`);
           patchAssistantMessage(assistantId, {
-            streaming: false,
+            isStreaming: false,
             error: en.characterInterview.streamFailed,
           });
           toast.error(en.characterInterview.streamFailed);
@@ -501,7 +501,7 @@ export const useCharacterInterviewStream = ({
       }
       if (retry.sessionLost && !retry.aborted) {
         patchAssistantMessage(retry.assistantId, {
-          streaming: false,
+          isStreaming: false,
           error: en.characterInterview.streamFailed,
         });
         toast.error(en.characterInterview.streamFailed);

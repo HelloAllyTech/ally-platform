@@ -98,7 +98,7 @@ export interface CharacterInterviewChatMessage {
   /** True when a stream was aborted mid-message. */
   interrupted?: boolean;
   /** True while tokens are still streaming into this message. */
-  streaming?: boolean;
+  isStreaming?: boolean;
   error?: string;
 }
 
