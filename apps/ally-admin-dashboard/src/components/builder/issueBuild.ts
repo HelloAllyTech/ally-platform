@@ -253,13 +253,13 @@ export const chainRows = (
 
   const openIndexes = base.flatMap((row, index) => (row.open ? [index] : []));
   const firstOpen = openIndexes[0] ?? -1;
-  // When the first unmerged pull request needs a person, reading it is the one
-  // prominent action and nothing is offered as a primary merge. Otherwise the
-  // primary goes to the first unmerged pull request that is actually ready —
-  // never to one Builder is still reviewing or opencode is still fixing.
+  // A chain merges in build order — a later repo is built against the earlier
+  // ones' changes — so the primary is only ever the FIRST unmerged pull
+  // request, and only once it is ready. If it is not (red CI, still being
+  // reviewed or fixed), there is no primary merge anywhere; if it needs a
+  // person, reading it on GitHub is the one prominent action instead.
   const reviewFirstIndex = firstOpen >= 0 && base[firstOpen].needsHuman ? firstOpen : -1;
-  const primaryIndex =
-    reviewFirstIndex >= 0 ? -1 : (openIndexes.find(index => base[index].ready) ?? -1);
+  const primaryIndex = firstOpen >= 0 && base[firstOpen].ready ? firstOpen : -1;
 
   return base.map(({ open, ...row }, index) => {
     const prRow = row.pr?.row ?? null;
@@ -267,13 +267,15 @@ export const chainRows = (
     if (prRow?.merged) mergeRole = "merged";
     else if (prRow?.state === "closed") mergeRole = "closed";
     else if (open && index === primaryIndex) mergeRole = "primary";
-    else if (open && (index === firstOpen || (primaryIndex >= 0 && index < primaryIndex)))
-      mergeRole = "notReady";
+    else if (open && index === firstOpen) mergeRole = "notReady";
     else if (open) mergeRole = "after";
 
     const previousOpen = [...openIndexes].reverse().find(candidate => candidate < index);
     return {
       ...row,
+      // A later pull request waits for the one before it to merge: its Merge
+      // stays quiet and disabled until then.
+      mergeable: row.mergeable && mergeRole !== "after",
       mergeRole,
       reviewFirst: index === reviewFirstIndex,
       // "Merge first" only while later pull requests wait on this one.

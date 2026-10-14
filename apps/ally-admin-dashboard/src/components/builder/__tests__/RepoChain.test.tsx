@@ -153,7 +153,9 @@ describe("RepoChain", () => {
     );
   });
 
-  it("moves the primary past a pull request that is not ready to the next one that is", () => {
+  it("offers no primary anywhere while the first unmerged pull request is not ready", () => {
+    // Build order is merge order: ally-web was built on ally-be's changes, so
+    // a green ally-web must not be offered ahead of a red ally-be.
     render(
       <RepoChain
         {...threeBuilt}
@@ -170,14 +172,15 @@ describe("RepoChain", () => {
       />,
     );
 
-    const primaries = screen.getAllByRole("button").filter(b => b.dataset.kind === "primary");
-    expect(primaries).toHaveLength(1);
-    expect(within(rowFor("ally-web")).getByRole("button", { name: "Merge first" })).toBe(
-      primaries[0],
+    expect(screen.queryAllByRole("button").filter(b => b.dataset.kind === "primary")).toHaveLength(
+      0,
     );
     expect(within(rowFor("ally-be")).getByRole("button", { name: "Merge" })).toBeDisabled();
     expect(within(rowFor("ally-be")).getByText("Fix CI on the pull request")).toBeInTheDocument();
+    expect(within(rowFor("ally-web")).getByText("Merge after ally-be")).toBeInTheDocument();
+    expect(within(rowFor("ally-web")).getByRole("button", { name: "Merge" })).toBeDisabled();
     expect(within(rowFor("ally-mobile")).getByText("Merge after ally-web")).toBeInTheDocument();
+    expect(within(rowFor("ally-mobile")).getByRole("button", { name: "Merge" })).toBeDisabled();
   });
 
   describe("while Builder is still working a pull request", () => {
@@ -201,7 +204,7 @@ describe("RepoChain", () => {
       line: null,
     });
 
-    it("says Builder is reviewing it, and moves the primary to the next ready row", () => {
+    it("says Builder is reviewing it, and offers no primary anywhere", () => {
       render(
         <RepoChain
           {...threeBuilt}
@@ -218,11 +221,11 @@ describe("RepoChain", () => {
       expect(quiet).toBeDisabled();
       expect(quiet).toHaveAttribute("title", "Builder is still working on this pull request");
 
-      const primaries = screen.getAllByRole("button").filter(b => b.dataset.kind === "primary");
-      expect(primaries).toHaveLength(1);
-      expect(within(rowFor("ally-web")).getByRole("button", { name: "Merge first" })).toBe(
-        primaries[0],
-      );
+      expect(
+        screen.queryAllByRole("button").filter(b => b.dataset.kind === "primary"),
+      ).toHaveLength(0);
+      expect(within(rowFor("ally-web")).getByText("Merge after ally-be")).toBeInTheDocument();
+      expect(within(rowFor("ally-web")).getByRole("button", { name: "Merge" })).toBeDisabled();
     });
 
     it("leaves the row ready once the review run has finished", () => {
