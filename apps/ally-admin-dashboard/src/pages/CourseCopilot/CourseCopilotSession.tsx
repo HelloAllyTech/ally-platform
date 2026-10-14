@@ -526,7 +526,12 @@ export const CourseCopilotSession: React.FC = () => {
   const isArchived = effectiveStatus === "ARCHIVED";
   const isBuilding = effectiveStatus === "BUILDING";
   const composerDisabled = isArchived || sessionGone;
-  const chips = strings.suggestedActions[effectiveStatus] ?? [];
+  // "Publish" is dropped once the course is live — offering to do what is already done reads
+  // as the copilot not knowing the state it is in.
+  const courseIsLive = (liveOutline ?? detail.outline)?.status === "ACTIVE";
+  const chips = (strings.suggestedActions[effectiveStatus] ?? []).filter(
+    chip => !(courseIsLive && chip.message === strings.publishChipMessage),
+  );
 
   // Disabled-with-a-reason, not hidden: the trainer should know the editor exists and why it is
   // out of reach right now. The copilot rewrites the course during a build, so an edit made in

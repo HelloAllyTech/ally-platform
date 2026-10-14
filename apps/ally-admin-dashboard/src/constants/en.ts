@@ -4377,6 +4377,8 @@ export const en = {
     },
 
     // State-driven chips under the composer. Decided; each one sends its `message` as the next turn.
+    /** The Publish chip's message — the page hides that chip once the course is live. */
+    publishChipMessage: "Publish the course.",
     suggestedActions: {
       INTERVIEWING: [
         {
@@ -4400,7 +4402,7 @@ export const en = {
           label: "Review the course",
           message: "Review the course and tell me what you'd improve first.",
         },
-        { label: "Publish", message: "Publish the course." },
+        { label: "Publish", message: "Publish the course." }, // keep in sync with publishChipMessage
         {
           label: "Preview outline",
           message: "Give me a one-paragraph summary of the course outline.",
