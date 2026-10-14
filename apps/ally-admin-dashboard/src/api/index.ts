@@ -38,3 +38,4 @@ export * from "./characterInterview";
 export * from "./cohorts";
 export * from "./helplineAdmin";
 export * from "./skillExperiments";
+export * from "./publicRoadmap";

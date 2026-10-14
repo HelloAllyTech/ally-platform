@@ -34,6 +34,7 @@ export * from "./legal/Privacy";
 export * from "./blog/Blog";
 export * from "./blog/BlogPost";
 export * from "./blog/Changelog";
+export * from "./blog/Roadmap";
 export * from "./sjt/Sjt1";
 export * from "./sjt/SjtEdit";
 export * from "./sjt-report/SjtReport1";

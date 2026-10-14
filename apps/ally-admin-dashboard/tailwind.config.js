@@ -60,6 +60,15 @@ module.exports = {
           3: "#B34F2C",
           4: "#8F2D02",
         },
+        /*
+         * Mirrors the consumer app's tailwind.config.ts: the public blog's
+         * terracotta accent. Settings → Roadmap shows card notes in `text`, the
+         * way the public roadmap page does.
+         */
+        terracotta: {
+          DEFAULT: "#D76F4C",
+          text: "#B34F2C",
+        },
         // Badge — the shared ui-shared/lib/badge component's three variants.
         // These are the exact literals Badge.tsx hardcoded before W4, lifted
         // into tokens unchanged so this console renders identically; the

@@ -299,6 +299,10 @@ export const ApiEndpoints = {
     // Public (ungated) feature-level product updates for the /blog/changelog page.
     GET_PUBLIC: "/v1/product-updates/public",
   },
+  PUBLIC_ROADMAP: {
+    // Public (ungated) roadmap cards for the /blog/roadmap page.
+    GET_PUBLIC: "/v1/public-roadmap",
+  },
   // Text helpline — ally-be docs/text-helpline.md §5.
   HELPLINE: {
     // Public (no auth) and guest (talker guest token) — served by helplineGuestAPI,

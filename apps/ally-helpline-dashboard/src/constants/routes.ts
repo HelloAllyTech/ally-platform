@@ -30,6 +30,7 @@ export const ROUTES = {
   BLOG: "/blog",
   BLOG_POST: "/blog/:slug",
   CHANGELOG: "/blog/changelog",
+  ROADMAP: "/blog/roadmap",
   // Standalone public self-check. Capitalised because that is the URL the
   // link is shared as; React Router matches it case-insensitively, so
   // /sjt1 lands on the same page.

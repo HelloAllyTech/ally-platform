@@ -722,6 +722,13 @@ export const ApiEndpoints = {
     PRIVACY: "/v1/settings/privacy",
     TURN_ENDPOINTING: "/v1/settings/turn-endpointing",
   },
+  // Cards on the public product roadmap (app.helloally.ai/blog/roadmap), edited
+  // from Settings → Roadmap. Same gate as Terms/Privacy: Settings toggle + system access.
+  PUBLIC_ROADMAP: {
+    ITEMS: "/v1/public-roadmap/items",
+    ITEM: (id: string) => `/v1/public-roadmap/items/${id}`,
+    ORDER: "/v1/public-roadmap/items/order",
+  },
   // Text helpline org settings (platform admin only; EDIT_GLOBAL_SETTINGS).
   HELPLINE_ADMIN: {
     SETTINGS: "/v1/helpline/admin/settings",
@@ -992,6 +999,9 @@ export const TAG_TYPES = {
   // Skill experiments (auto-improve on System Skills). Also registered in
   // baseApi.ts's `tagTypes` — an unregistered tag is silently ignored.
   SKILL_EXPERIMENTS: "skillExperiments",
+  // Public roadmap cards (Settings → Roadmap). Also registered in baseApi.ts's
+  // `tagTypes` — an unregistered tag is silently ignored.
+  PUBLIC_ROADMAP: "publicRoadmap",
 };
 
 /**
