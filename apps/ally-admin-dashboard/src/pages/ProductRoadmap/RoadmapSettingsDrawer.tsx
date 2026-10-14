@@ -8,6 +8,7 @@ import { RoadmapTaxonomyItem } from "@types";
 import { MergeOpportunitiesPanel } from "./MergeOpportunitiesPanel";
 import { ProductGoalsManager } from "./ProductGoalsManager";
 import { SplitOpportunitiesPanel } from "./SplitOpportunitiesPanel";
+import { StrategyContextManager } from "./StrategyContextManager";
 import { StrategyRankingManager } from "./StrategyRankingManager";
 
 /**
@@ -18,6 +19,7 @@ import { StrategyRankingManager } from "./StrategyRankingManager";
  * a shared board link could reopen someone else's admin panel on arrival.
  */
 enum SettingsTab {
+  VISION = "vision",
   GOALS = "goals",
   STRATEGY = "strategy",
   MERGE = "merge",
@@ -51,8 +53,9 @@ interface RoadmapSettingsDrawerProps {
  *
  * Stacks, "Consolidate Similar Nodes Without Over-Generalizing": cluster genuinely equivalent
  * items, but do not generalise so far that important distinctions vanish. These four are NOT
- * equivalent — product goals are the filing category, strategy goals are the outcomes the board
- * is ranked against, and merge and split are data operations on opportunities. One scrolling form
+ * equivalent — the Vision & strategy page is the prose the opportunity copilot reads, product
+ * goals are the filing category, strategy goals are the outcomes the board is ranked against,
+ * and merge and split are data operations on opportunities. One scrolling form
  * holding them all is exactly how the first two get confused, which the previous separation was
  * deliberately guarding against. Tabs keep each one its own labelled surface; only the way in is
  * shared. Merge and split sit last and adjacent because they are the pair that rewrites rows.
@@ -70,7 +73,9 @@ export const RoadmapSettingsDrawer: React.FC<RoadmapSettingsDrawerProps> = ({
   onMerged,
   onSplit,
 }) => {
-  const [activeTab, setActiveTab] = useState<SettingsTab>(SettingsTab.GOALS);
+  // Opens on the strategy page: it is what everything else in here — the goals, the ranking, the
+  // copilot that files opportunities — is meant to serve, so it is the first thing to keep current.
+  const [activeTab, setActiveTab] = useState<SettingsTab>(SettingsTab.VISION);
 
   return (
     <div
@@ -103,6 +108,7 @@ export const RoadmapSettingsDrawer: React.FC<RoadmapSettingsDrawerProps> = ({
             panels rather than collections of anything countable. */}
         <Tabs
           items={[
+            { id: SettingsTab.VISION, label: "Vision & strategy" },
             { id: SettingsTab.GOALS, label: "Product goals" },
             { id: SettingsTab.STRATEGY, label: "Strategy & ranking" },
             { id: SettingsTab.MERGE, label: "Merge" },
@@ -117,6 +123,7 @@ export const RoadmapSettingsDrawer: React.FC<RoadmapSettingsDrawerProps> = ({
         {/* The BODY scrolls, not the whole panel — the strip has to stay reachable while reading
             a long list of strategy goals, otherwise switching panels means scrolling back up. */}
         <div className="flex-1 overflow-y-auto p-4">
+          {activeTab === SettingsTab.VISION && <StrategyContextManager />}
           {activeTab === SettingsTab.GOALS && (
             <ProductGoalsManager goals={goals} isLoading={areGoalsLoading} />
           )}

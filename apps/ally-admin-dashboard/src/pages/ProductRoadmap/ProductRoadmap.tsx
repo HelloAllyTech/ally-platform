@@ -910,7 +910,7 @@ export const ProductRoadmap: React.FC = () => {
             <Tooltip label="Roadmap settings" align="bottom">
               <button
                 type="button"
-                aria-label="Roadmap settings: product goals, strategy and ranking, merge, split"
+                aria-label="Roadmap settings: vision and strategy, product goals, strategy and ranking, merge, split"
                 onClick={() => setIsSettingsOpen(true)}
                 className="text-typography-secondary hover:text-primary-500 inline-flex h-10 w-10 cursor-pointer items-center justify-center md:h-auto md:w-auto"
               >

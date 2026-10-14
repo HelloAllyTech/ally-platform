@@ -21,7 +21,7 @@ interface ExternalResourceModalProps {
  */
 const EMBED_TIMEOUT_MS = 8000;
 
-const openInNewTab = (url: string) => window.open(url, "_blank", "noopener,noreferrer");
+export const openInNewTab = (url: string) => window.open(url, "_blank", "noopener,noreferrer");
 
 /**
  * In-place view of a trainer-curated external resource, opened from an

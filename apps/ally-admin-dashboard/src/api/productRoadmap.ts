@@ -7,8 +7,6 @@ import {
   RoadmapBugReportResponse,
   RoadmapVoteBudget,
   RoadmapVoter,
-  RoadmapInterviewMessage,
-  RoadmapInterviewTurn,
   RoadmapComment,
   RoadmapDuplicateMatch,
   RoadmapFacets,
@@ -34,6 +32,8 @@ import {
   RoadmapRankWeights,
   RoadmapGoalImpactVerdict,
   RoadmapBulkAssessResult,
+  RoadmapOpportunityBrief,
+  RoadmapStrategyContext,
 } from "@types";
 
 import { baseAPI } from "./baseApi";
@@ -242,6 +242,11 @@ export const productRoadmapAPI = baseAPI.injectEndpoints({
          * 400.
          */
         readinessToken?: string;
+        /**
+         * The copilot's brief from the same turn as `readinessToken`, verbatim. The token is
+         * minted over it, so it cannot be edited on the way in; omit it to file the draft alone.
+         */
+        brief?: RoadmapOpportunityBrief;
       }
     >({
       query: body => ({
@@ -583,6 +588,38 @@ export const productRoadmapAPI = baseAPI.injectEndpoints({
       ],
     }),
 
+    /**
+     * The copilot's brief for one opportunity, as filed. No tags: a brief is written once, at
+     * filing, and never edited, so there is nothing that could make a cached one stale.
+     */
+    getRoadmapOpportunityBrief: builder.query<{ brief: RoadmapOpportunityBrief | null }, string>({
+      query: id => ({
+        url: ApiEndpoints.PRODUCT_ROADMAP.OPPORTUNITY_BRIEF(id),
+        method: HttpMethod.GET,
+      }),
+    }),
+
+    getRoadmapStrategyContext: builder.query<RoadmapStrategyContext, void>({
+      query: () => ({
+        url: ApiEndpoints.PRODUCT_ROADMAP.STRATEGY_CONTEXT,
+        method: HttpMethod.GET,
+      }),
+      providesTags: [TAG_TYPES.PRODUCT_ROADMAP_STRATEGY_CONTEXT],
+    }),
+
+    /** A field left out keeps its saved text, so one section can be saved on its own. */
+    updateRoadmapStrategyContext: builder.mutation<
+      RoadmapStrategyContext,
+      Partial<Omit<RoadmapStrategyContext, "updatedAt" | "updatedByName">>
+    >({
+      query: body => ({
+        url: ApiEndpoints.PRODUCT_ROADMAP.STRATEGY_CONTEXT,
+        method: HttpMethod.PUT,
+        body,
+      }),
+      invalidatesTags: [TAG_TYPES.PRODUCT_ROADMAP_STRATEGY_CONTEXT],
+    }),
+
     getRoadmapRankWeights: builder.query<RoadmapRankWeights, void>({
       query: () => ({
         url: ApiEndpoints.PRODUCT_ROADMAP.RANK_WEIGHTS,
@@ -825,27 +862,6 @@ export const productRoadmapAPI = baseAPI.injectEndpoints({
     }),
 
     /**
-     * One turn of the guided interview.
-     *
-     * A MUTATION rather than a query even though it reads nothing: every call is a new turn, so
-     * caching it by argument — which is what a query would do — would replay a stale answer the
-     * moment two turns happened to carry the same transcript prefix.
-     *
-     * Invalidates nothing: the interview writes no server state. The opportunity it eventually
-     * produces is filed through createRoadmapOpportunity, which owns that invalidation.
-     */
-    roadmapOpportunityInterviewTurn: builder.mutation<
-      RoadmapInterviewTurn,
-      { messages: RoadmapInterviewMessage[] }
-    >({
-      query: body => ({
-        url: ApiEndpoints.PRODUCT_ROADMAP.AI_OPPORTUNITY_INTERVIEW,
-        method: HttpMethod.POST,
-        body,
-      }),
-    }),
-
-    /**
      * Open (or resume) the Builder session for an opportunity.
      *
      * REPLACES roadmapAiGenerateClaudePrompt, which produced a block of text a human then
@@ -903,6 +919,9 @@ export const {
   useDeleteRoadmapStrategyGoalMutation,
   useGetRoadmapRankWeightsQuery,
   useUpdateRoadmapRankWeightsMutation,
+  useGetRoadmapOpportunityBriefQuery,
+  useGetRoadmapStrategyContextQuery,
+  useUpdateRoadmapStrategyContextMutation,
   useGetRoadmapGoalImpactQuery,
   useReassessRoadmapGoalImpactMutation,
   useAssessMissingRoadmapGoalImpactMutation,
@@ -924,6 +943,5 @@ export const {
   useRoadmapAiDuplicatesMutation,
   useRoadmapAiClassifyMutation,
   useRoadmapAiSummariseMutation,
-  useRoadmapOpportunityInterviewTurnMutation,
   useOpenRoadmapBuilderSessionMutation,
 } = productRoadmapAPI;

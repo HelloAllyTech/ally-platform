@@ -123,6 +123,9 @@ export const ApiEndpoints = {
     GET_NEXT_ITEM: (trackId: string) => `/v1/learn/tracks/${trackId}/next-item`,
     START_ITEM: (itemId: string) => `/v1/learn/tracks/items/${itemId}/start`,
     ARTICLE_READ: (itemId: string) => `/v1/learn/tracks/items/${itemId}/article-read`,
+    /** Per article resource: must it open in a new tab instead of embedded. */
+    RESOURCE_EMBEDDABILITY: (itemId: string) =>
+      `/v1/learn/tracks/items/${itemId}/resources/embeddability`,
     ARTICLE_QUESTION_ANSWER: (itemId: string, questionId: string) =>
       `/v1/learn/tracks/items/${itemId}/article-questions/${questionId}/answer`,
     VIDEO_PROGRESS: (itemId: string) => `/v1/learn/tracks/items/${itemId}/video-progress`,
