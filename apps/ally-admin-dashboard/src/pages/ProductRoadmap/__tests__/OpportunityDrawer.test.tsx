@@ -11,6 +11,8 @@ import {
 const state = vi.hoisted(() => ({
   opportunity: undefined as unknown,
   setVotesTarget: undefined as unknown,
+  brief: undefined as unknown,
+  briefSkipped: undefined as boolean | undefined,
 }));
 const setVotes = vi.hoisted(() => vi.fn());
 
@@ -63,6 +65,10 @@ vi.mock("@api", () => ({
   useGetRoadmapVotersQuery: () => ({ data: [] }),
   useGetBugFindingByReportedBugQuery: () => ({ data: undefined, isFetching: false }),
   useGetRoadmapGoalImpactQuery: () => ({ data: undefined, isLoading: false }),
+  useGetRoadmapOpportunityBriefQuery: (_id: string, options: { skip?: boolean }) => {
+    state.briefSkipped = options?.skip;
+    return { data: options?.skip ? undefined : { brief: state.brief }, isLoading: false };
+  },
   useUpdateRoadmapOpportunityMutation: mutation,
   useCreateRoadmapCommentMutation: mutation,
   useDeleteRoadmapOpportunityMutation: mutation,
@@ -182,5 +188,43 @@ describe("OpportunityDrawer voting", () => {
     state.opportunity = makeOpportunity({ type: RoadmapOpportunityType.BUG });
     renderDrawer();
     expect(screen.queryByTestId("vote-button")).not.toBeInTheDocument();
+  });
+});
+
+describe("OpportunityDrawer — the copilot's brief", () => {
+  beforeEach(() => {
+    state.opportunity = makeOpportunity();
+    state.brief = undefined;
+    state.briefSkipped = undefined;
+  });
+
+  it("does not fetch or show a brief for an opportunity filed without one", () => {
+    renderDrawer();
+    expect(state.briefSkipped).toBe(true);
+    expect(screen.queryByText("The case for it")).not.toBeInTheDocument();
+  });
+
+  it("shows the brief as filed, with what the copilot left open", () => {
+    state.opportunity = makeOpportunity({ hasBrief: true });
+    state.brief = {
+      strategicFit: [{ goal: "Retention", why: "Keeps counsellors practising." }],
+      reach: { howMany: null, howOften: null },
+      evidence: [],
+      successMetric: null,
+      assumptions: [],
+      alternativesDropped: [],
+      assessment: {
+        rating: "needs_work",
+        summary: "Collides with a stated non-goal.",
+        openRecommendations: ["Say why this is a worthwhile exception."],
+      },
+    };
+    renderDrawer();
+
+    expect(screen.getByText("The case for it")).toBeInTheDocument();
+    expect(screen.getByText("Needs work")).toBeInTheDocument();
+    // Addressed to the voter now, not the filer.
+    expect(screen.getByText("Left open at filing")).toBeInTheDocument();
+    expect(screen.getByText("Say why this is a worthwhile exception.")).toBeInTheDocument();
   });
 });
