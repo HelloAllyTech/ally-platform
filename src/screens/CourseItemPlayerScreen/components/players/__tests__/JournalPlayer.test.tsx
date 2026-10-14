@@ -1,7 +1,7 @@
 import React from 'react';
 import {act, fireEvent, render, waitFor} from '@testing-library/react-native';
 
-import {TrackItemType} from '@/types';
+import {StartJournalItemPayload, TrackItemType} from '@/types';
 
 import {JournalPlayer} from '../JournalPlayer';
 
@@ -19,6 +19,7 @@ jest.mock('@/hooks', () => {
 jest.mock('@/components', () => {
   const RN = require('react-native');
   return {
+    RichText: ({html}: any) => <RN.Text testID="rich-text">{html}</RN.Text>,
     Button: ({label, onPress, isDisabled, testID}: any) => (
       <RN.TouchableOpacity testID={testID} onPress={onPress} disabled={isDisabled}>
         <RN.Text>{label}</RN.Text>
@@ -44,7 +45,7 @@ jest.mock('@/services', () => ({
   useSubmitJournalMutation: jest.fn(() => [mockSubmitJournal, {isLoading: false}]),
 }));
 
-const buildPayload = () => ({
+const buildPayload = (): StartJournalItemPayload => ({
   type: TrackItemType.JOURNAL as const,
   trackItemProgressId: 'progress-1',
   prompts: [
@@ -131,5 +132,21 @@ describe('JournalPlayer', () => {
     expect(queryByTestId('journal-submit')).toBeNull();
     // Shown in both the autosave-status row and the footer chip.
     expect(getAllByText('courses.journal.submitted').length).toBeGreaterThan(0);
+  });
+
+  it('renders promptHtml when present', () => {
+    const payloadWithHtml = buildPayload();
+    payloadWithHtml.prompts[0].promptHtml = '<p>Rich prompt</p>';
+
+    const {getByText} = render(
+      <JournalPlayer
+        payload={payloadWithHtml}
+        itemId="item-1"
+        alreadyCompleted={false}
+        onCompleted={jest.fn()}
+      />,
+    );
+
+    expect(getByText('<p>Rich prompt</p>')).toBeTruthy();
   });
 });
