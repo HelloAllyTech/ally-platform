@@ -120,6 +120,15 @@ export const parseSseBuffer = (
 /** Strips the deterministic answer prefix the server adds to a user turn. */
 const ANSWER_PREFIX_RE = /^\[answers question [^\]]+\]\s*/i;
 
+/**
+ * …and the structured-answer suffix (" [selected ids: a | custom: \"…\"]"),
+ * which is for the model, not the trainer: the card shows the labels.
+ */
+const ANSWER_SUFFIX_RE = /\s*\[(?:none of these|selected ids:|custom:)[^\]]*\]\s*$/i;
+
+const answerText = (content: string | null | undefined): string =>
+  (content ?? "").replace(ANSWER_PREFIX_RE, "").replace(ANSWER_SUFFIX_RE, "");
+
 /** A persisted tool result's `summary`, when it has one — the resume path's version of a tool note. */
 const summaryOf = (result: unknown): string | null => {
   if (!result || typeof result !== "object") return null;
@@ -152,7 +161,7 @@ export const mapServerMessagesToFeed = (
     const questionId = row.metadata?.questionId;
     if (row.role === "user" && questionId) {
       answersByQuestionId.set(String(questionId), {
-        text: (row.content ?? "").replace(ANSWER_PREFIX_RE, ""),
+        text: answerText(row.content),
         answer: row.metadata?.answer,
       });
     }
@@ -166,7 +175,7 @@ export const mapServerMessagesToFeed = (
   safeRows.forEach((row, index) => {
     const baseId = `srv_${row.id ?? row.seq ?? index}`;
     const metadata = row.metadata ?? {};
-    const content = (row.content ?? "").replace(ANSWER_PREFIX_RE, "");
+    const content = answerText(row.content);
 
     if (row.role === "user") {
       // The hidden kickoff turn was never shown as a bubble when it was sent; showing it on resume

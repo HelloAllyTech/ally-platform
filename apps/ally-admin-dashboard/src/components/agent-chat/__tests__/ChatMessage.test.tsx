@@ -118,7 +118,7 @@ describe("agent-chat ChatMessage", () => {
 
       fireEvent.click(screen.getByText(strings.applyFinding));
       expect(onSendSuggestion).toHaveBeenCalledWith(
-        strings.applyFindingMessage("Quiz 2.3 has a single answer key."),
+        strings.applyFindingMessage("Quiz 2.3 has a single answer key.", "i1"),
       );
     });
 

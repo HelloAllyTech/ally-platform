@@ -157,7 +157,9 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
                     kind="tertiary"
                     size="sm"
                     disabled={disabled}
-                    onClick={() => onSendSuggestion(strings.applyFindingMessage(finding.note))}
+                    onClick={() =>
+                      onSendSuggestion(strings.applyFindingMessage(finding.note, finding.itemId))
+                    }
                   >
                     {strings.applyFinding}
                   </Button>

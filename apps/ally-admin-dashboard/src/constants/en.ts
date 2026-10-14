@@ -4428,7 +4428,9 @@ export const en = {
       findingFix: "Fix",
       findingConsider: "Consider",
       applyFinding: "Apply",
-      applyFindingMessage: (note: string) => `Apply this change: ${note}`,
+      // The item id lets the copilot act on the right item without guessing.
+      applyFindingMessage: (note: string, itemId?: string) =>
+        `Apply this review finding${itemId ? ` (item ${itemId})` : ""}: ${note}`,
       suggestedActionsLabel: "Suggested next steps",
     },
 
