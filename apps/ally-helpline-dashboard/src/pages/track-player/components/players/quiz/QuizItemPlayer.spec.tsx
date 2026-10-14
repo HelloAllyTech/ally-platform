@@ -1,7 +1,9 @@
 import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { QuizItemPlayer } from "./QuizItemPlayer";
+
 import { TrackItemType } from "@types";
+
+import { QuizItemPlayer } from "./QuizItemPlayer";
 
 vi.mock("@api", () => ({
   useSubmitQuizAttemptMutation: () => [vi.fn(), { isLoading: false }],
@@ -16,7 +18,10 @@ vi.mock("react-i18next", () => ({
 }));
 
 vi.mock("@ally-ui-mono/ui-shared", () => ({
-  RichTextRenderer: ({ content }: { content: string }) => <div data-testid="rich-text">{content}</div>,
+  RichTextRenderer: ({ content }: { content: string }) => (
+    <div data-testid="rich-text">{content}</div>
+  ),
+  htmlToPlainText: (html: string) => html.replace(/<[^>]*>/g, ""),
 }));
 
 vi.mock("../QuestionMedia", () => ({
@@ -66,7 +71,7 @@ describe("QuizItemPlayer", () => {
         itemId="item-1"
         onCompleted={vi.fn()}
         onRequestNext={vi.fn()}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByText("Start Quiz"));
@@ -97,7 +102,7 @@ describe("QuizItemPlayer", () => {
         itemId="item-2"
         onCompleted={vi.fn()}
         onRequestNext={vi.fn()}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByText("Start Quiz"));

@@ -1,8 +1,10 @@
 import { render, screen } from "@testing-library/react";
 import { FormProvider, useForm } from "react-hook-form";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { VideoItemEditor } from "./VideoItemEditor";
+
 import { TrackItemType } from "@types";
+
+import { VideoItemEditor } from "./VideoItemEditor";
 
 vi.mock("@hooks", () => ({
   useCanViewComponentLibrary: vi.fn(() => true),
@@ -12,8 +14,16 @@ vi.mock("@hooks", () => ({
 vi.mock("@api", () => ({
   useCreateComponentTemplateMutation: vi.fn(() => [vi.fn(), { isLoading: false }]),
   useGetTrackMediaUploadUrlMutation: vi.fn(() => [vi.fn(), { isLoading: false }]),
-  baseAPI: { reducerPath: "baseAPI", reducer: (state: any = null) => state, middleware: () => (next: any) => (action: any) => next(action) },
-  evaluatorAPI: { reducerPath: "evaluatorAPI", reducer: (state: any = null) => state, middleware: () => (next: any) => (action: any) => next(action) },
+  baseAPI: {
+    reducerPath: "baseAPI",
+    reducer: (state: any = null) => state,
+    middleware: () => (next: any) => (action: any) => next(action),
+  },
+  evaluatorAPI: {
+    reducerPath: "evaluatorAPI",
+    reducer: (state: any = null) => state,
+    middleware: () => (next: any) => (action: any) => next(action),
+  },
 }));
 
 vi.mock("@constants", () => ({
@@ -46,6 +56,7 @@ vi.mock("@assets", () => ({
   Trash: () => null,
   Save: () => null,
   ArrowSolid: () => null,
+  BinaryClassification: () => null,
 }));
 
 vi.mock("@ally-ui-mono/ui-shared", () => ({
@@ -61,17 +72,9 @@ vi.mock("@components", () => ({
   ToggleSwitch: () => null,
   ActionConfirmationPopup: () => null,
   SegmentedToggle: () => <div data-testid="segmented-toggle" />,
-  RichTextEditor: ({ value, onChange, placeholder }: any) => (
-    <div data-testid="rich-text-editor">
-      <textarea
-        data-testid="mock-tiptap"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-      />
-    </div>
-  ),
 }));
+
+// We don't mock RichTextEditor anymore to test against the real component (R1)
 
 const TestHarness = ({ defaultValues }: { defaultValues: any }) => {
   const methods = useForm({ defaultValues });
@@ -101,7 +104,12 @@ describe("VideoItemEditor", () => {
                   {
                     id: "int1",
                     timestampSeconds: 10,
-                    question: { id: "q1", type: "mcq_single", prompt: "Interjection question", options: [] },
+                    question: {
+                      id: "q1",
+                      type: "mcq_single",
+                      prompt: "Interjection question",
+                      options: [],
+                    },
                   },
                 ],
               },
@@ -114,6 +122,6 @@ describe("VideoItemEditor", () => {
     render(<TestHarness defaultValues={defaultValues} />);
 
     expect(screen.getByTestId("rich-text-editor")).toBeInTheDocument();
-    expect(screen.getByTestId("mock-tiptap")).toHaveValue("Interjection question");
+    expect(screen.getByTestId("rich-text-editor")).toHaveTextContent("Interjection question");
   });
 });

@@ -662,9 +662,7 @@ const FieldGroup: FC<FieldGroupProps> = ({
                     <RichTextRenderer content={field.english} />
                   </div>
                 ) : (
-                  <p className="whitespace-pre-wrap text-xs text-typography-600">
-                    {field.english}
-                  </p>
+                  <p className="whitespace-pre-wrap text-xs text-typography-600">{field.english}</p>
                 )}
               </div>
               <textarea

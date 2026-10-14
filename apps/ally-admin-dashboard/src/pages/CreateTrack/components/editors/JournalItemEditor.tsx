@@ -1,9 +1,11 @@
 import { FC } from "react";
 
 import { Controller, useFieldArray, useFormContext } from "react-hook-form";
+
 import { htmlToPlainText } from "@ally-ui-mono/ui-shared";
 import { Plus, Trash } from "@assets";
-import { RichTextEditor, ToggleSwitch } from "@components";
+import { ToggleSwitch } from "@components";
+import { RichTextEditor } from "@components/rich-text-editor";
 import { MAX_JOURNAL_PROMPTS, MIN_JOURNAL_PROMPTS } from "@constants";
 import { TrackFormValues, TrackItemType } from "@types";
 
@@ -92,7 +94,14 @@ export const JournalItemEditor: FC<JournalItemEditorProps> = ({
                 name={`${promptBase}.promptHtml`}
                 render={({ field: promptField }) => (
                   <RichTextEditor
-                    value={promptField.value ?? field.prompt ?? ""}
+                    value={
+                      promptField.value && promptField.value.length > 0
+                        ? promptField.value
+                        : (field.prompt ?? "")
+                            .split("\n")
+                            .map(line => `<p>${line}</p>`)
+                            .join("")
+                    }
                     onChange={html => {
                       promptField.onChange(html);
                       setValue(`${promptBase}.prompt`, htmlToPlainText(html), {

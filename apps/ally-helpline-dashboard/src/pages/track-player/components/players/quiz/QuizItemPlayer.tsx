@@ -5,12 +5,12 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
+import { RichTextRenderer, htmlToPlainText } from "@ally-ui-mono/ui-shared";
 import {
   useRegradeQuizAttemptMutation,
   useStartTrackItemMutation,
   useSubmitQuizAttemptMutation,
 } from "@api";
-import { RichTextRenderer } from "@ally-ui-mono/ui-shared";
 import { ArrowLeft, ArrowRight } from "@assets";
 import {
   QuizAttemptResult,
@@ -308,7 +308,7 @@ export const QuizItemPlayer: FC<QuizItemPlayerProps> = ({
                 </span>
               )}
               <h2 className="mb-4 text-lg font-semibold text-typography-900">
-                {question.promptHtml ? (
+                {question.promptHtml && htmlToPlainText(question.promptHtml).trim().length > 0 ? (
                   <RichTextRenderer content={question.promptHtml} />
                 ) : (
                   question.prompt

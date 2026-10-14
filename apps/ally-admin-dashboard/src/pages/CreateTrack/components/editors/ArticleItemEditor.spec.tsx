@@ -1,8 +1,10 @@
 import { render, screen } from "@testing-library/react";
 import { FormProvider, useForm } from "react-hook-form";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ArticleItemEditor } from "./ArticleItemEditor";
+
 import { TrackItemType } from "@types";
+
+import { ArticleItemEditor } from "./ArticleItemEditor";
 
 vi.mock("@hooks", () => ({
   useCanViewComponentLibrary: vi.fn(() => true),
@@ -12,8 +14,16 @@ vi.mock("@hooks", () => ({
 vi.mock("@api", () => ({
   useCreateComponentTemplateMutation: vi.fn(() => [vi.fn(), { isLoading: false }]),
   useGetTrackMediaUploadUrlMutation: vi.fn(() => [vi.fn(), { isLoading: false }]),
-  baseAPI: { reducerPath: "baseAPI", reducer: (state: any = null) => state, middleware: () => (next: any) => (action: any) => next(action) },
-  evaluatorAPI: { reducerPath: "evaluatorAPI", reducer: (state: any = null) => state, middleware: () => (next: any) => (action: any) => next(action) },
+  baseAPI: {
+    reducerPath: "baseAPI",
+    reducer: (state: any = null) => state,
+    middleware: () => (next: any) => (action: any) => next(action),
+  },
+  evaluatorAPI: {
+    reducerPath: "evaluatorAPI",
+    reducer: (state: any = null) => state,
+    middleware: () => (next: any) => (action: any) => next(action),
+  },
 }));
 
 vi.mock("@constants", () => ({
@@ -45,6 +55,7 @@ vi.mock("@assets", () => ({
   Trash: () => null,
   Save: () => null,
   ArrowSolid: () => null,
+  BinaryClassification: () => null,
 }));
 
 vi.mock("@ally-ui-mono/ui-shared", () => ({
@@ -54,18 +65,7 @@ vi.mock("@ally-ui-mono/ui-shared", () => ({
   htmlToPlainText: (html: string) => html.replace(/<[^>]*>/g, ""),
 }));
 
-vi.mock("@components/rich-text-editor", () => ({
-  RichTextEditor: ({ value, onChange, placeholder }: any) => (
-    <div data-testid="rich-text-editor">
-      <textarea
-        data-testid="mock-tiptap"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-      />
-    </div>
-  ),
-}));
+// We don't mock RichTextEditor anymore to test against the real component (R1)
 
 // Mock components to avoid side effects from @components barrel
 vi.mock("@components", () => ({
@@ -115,6 +115,6 @@ describe("ArticleItemEditor", () => {
     const editors = screen.getAllByTestId("rich-text-editor");
     // One for body, one for question
     expect(editors).toHaveLength(2);
-    expect(screen.getAllByTestId("mock-tiptap")[1]).toHaveValue("Initial question");
+    expect(editors[1]).toHaveTextContent("Initial question");
   });
 });

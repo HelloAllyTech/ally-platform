@@ -5,8 +5,8 @@ import { toast } from "sonner";
 
 import { TextArea, Tooltip, htmlToPlainText } from "@ally-ui-mono/ui-shared";
 import { Plus, TooltipIcon, Trash } from "@assets";
-import { SegmentedToggle, RichTextEditor } from "@components";
-import { Button } from "@components";
+import { SegmentedToggle, Button } from "@components";
+import { RichTextEditor } from "@components/rich-text-editor";
 import { ButtonVariant } from "@components/types";
 import { QUIZ_QUESTION_TYPE_LABELS } from "@constants";
 import {
@@ -320,7 +320,14 @@ export const VideoItemEditor: FC<VideoItemEditorProps> = ({
                             name={`${questionPath}.promptHtml`}
                             render={({ field: promptField }) => (
                               <RichTextEditor
-                                value={promptField.value ?? question.prompt ?? ""}
+                                value={
+                                  promptField.value && promptField.value.length > 0
+                                    ? promptField.value
+                                    : (question.prompt ?? "")
+                                        .split("\n")
+                                        .map(line => `<p>${line}</p>`)
+                                        .join("")
+                                }
                                 onChange={html => {
                                   promptField.onChange(html);
                                   setValue(`${questionPath}.prompt`, htmlToPlainText(html), {

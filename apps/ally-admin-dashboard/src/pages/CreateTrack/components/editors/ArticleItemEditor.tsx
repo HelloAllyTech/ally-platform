@@ -221,7 +221,14 @@ export const ArticleItemEditor: FC<ArticleItemEditorProps> = ({
                     name={`${questionPath}.promptHtml`}
                     render={({ field: promptField }) => (
                       <RichTextEditor
-                        value={promptField.value ?? questions[index]?.prompt ?? ""}
+                        value={
+                          promptField.value && promptField.value.length > 0
+                            ? promptField.value
+                            : (questions[index]?.prompt ?? "")
+                                .split("\n")
+                                .map(line => `<p>${line}</p>`)
+                                .join("")
+                        }
                         onChange={html => {
                           promptField.onChange(html);
                           setValue(`${questionPath}.prompt`, htmlToPlainText(html), {

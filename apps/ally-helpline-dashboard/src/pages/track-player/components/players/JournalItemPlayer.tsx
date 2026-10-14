@@ -3,7 +3,7 @@ import { FC, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
-import { TextArea, RichTextRenderer } from "@ally-ui-mono/ui-shared";
+import { TextArea, RichTextRenderer, htmlToPlainText } from "@ally-ui-mono/ui-shared";
 import { useSaveJournalDraftMutation, useSubmitJournalMutation } from "@api";
 import { Cloud, RoundCheckmark, CrossRedBackground, TickGreenBackground } from "@assets";
 import { useDebounce } from "@hooks";
@@ -155,7 +155,7 @@ export const JournalItemPlayer: FC<JournalItemPlayerProps> = ({
                 </span>
                 <div className="flex flex-col gap-1 pt-1">
                   <div className="text-base font-medium leading-relaxed text-typography-900">
-                    {prompt.promptHtml ? (
+                    {prompt.promptHtml && htmlToPlainText(prompt.promptHtml).trim().length > 0 ? (
                       <RichTextRenderer content={prompt.promptHtml} />
                     ) : (
                       prompt.prompt

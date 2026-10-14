@@ -4,7 +4,8 @@ import { Controller, useFieldArray, useFormContext, useWatch } from "react-hook-
 
 import { TextArea, Tooltip, htmlToPlainText } from "@ally-ui-mono/ui-shared";
 import { Plus, TooltipIcon, Trash } from "@assets";
-import { RichTextEditor, ToggleSwitch } from "@components";
+import { ToggleSwitch } from "@components";
+import { RichTextEditor } from "@components/rich-text-editor";
 import { QUIZ_QUESTION_TYPE_LABELS } from "@constants";
 import { QuizQuestion, QuizQuestionType, TrackFormValues, TrackItemType } from "@types";
 
@@ -188,7 +189,14 @@ export const QuizItemEditor: FC<QuizItemEditorProps> = ({ sectionIndex, itemInde
                       name={`${questionPath}.promptHtml`}
                       render={({ field }) => (
                         <RichTextEditor
-                          value={field.value ?? activeQuestion.prompt ?? ""}
+                          value={
+                            field.value && field.value.length > 0
+                              ? field.value
+                              : (activeQuestion.prompt ?? "")
+                                  .split("\n")
+                                  .map(line => `<p>${line}</p>`)
+                                  .join("")
+                          }
                           onChange={html => {
                             field.onChange(html);
                             setValue(`${questionPath}.prompt`, htmlToPlainText(html), {
