@@ -1,4 +1,6 @@
-import { act, renderHook } from "@testing-library/react";
+import { StrictMode, useEffect, useRef } from "react";
+
+import { act, render, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { parseCopilotSse, useRoadmapCopilotStream } from "@hooks/useRoadmapCopilotStream";
@@ -102,6 +104,59 @@ describe("useRoadmapCopilotStream", () => {
         /did not go through/,
       );
     });
+  });
+
+  it("shows its own copy, not a fetch-level message, when the connection fails", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new DOMException("signal is aborted without reason", "AbortError")),
+    );
+    const { result } = renderHook(() => useRoadmapCopilotStream());
+
+    await act(async () => {
+      await expect(result.current.runTurn({ messages: [], brief: null })).rejects.toThrow(
+        "That answer did not go through.",
+      );
+    });
+  });
+
+  /**
+   * The drawer fires its opening turn from a mount effect, guarded so it fires once. Under
+   * React's development double-mount the hook's cleanup used to abort that request, and the
+   * guard then (rightly) never fired it again — the drawer opened on "did not go through".
+   */
+  it("survives React's development double-mount without aborting a turn fired on mount", async () => {
+    let signal: AbortSignal | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_url: string, init: RequestInit) => {
+        signal = init.signal ?? undefined;
+        return Promise.resolve(sseResponse([`event: turn\ndata: ${JSON.stringify(TURN)}\n\n`]));
+      }),
+    );
+    const outcomes: string[] = [];
+    const Opener = () => {
+      const { runTurn } = useRoadmapCopilotStream();
+      const opened = useRef(false);
+      useEffect(() => {
+        if (opened.current) return;
+        opened.current = true;
+        runTurn({ messages: [], brief: null }).then(
+          ({ turn }) => outcomes.push(turn.reply),
+          (error: Error) => outcomes.push(`failed: ${error.message}`),
+        );
+      }, [runTurn]);
+      return null;
+    };
+
+    render(
+      <StrictMode>
+        <Opener />
+      </StrictMode>,
+    );
+
+    await waitFor(() => expect(outcomes).toEqual(["Who is this for?"]));
+    expect(signal?.aborted).toBe(false);
   });
 
   it("omits a null brief from the request body", async () => {

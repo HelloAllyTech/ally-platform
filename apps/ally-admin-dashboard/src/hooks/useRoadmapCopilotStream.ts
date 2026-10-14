@@ -66,8 +66,24 @@ export const useRoadmapCopilotStream = () => {
   const [activity, setActivity] = useState<RoadmapCopilotActivity[]>([]);
   const [isThinking, setIsThinking] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const mountedRef = useRef(false);
 
-  useEffect(() => () => abortRef.current?.abort(), []);
+  /**
+   * Abort an in-flight turn when the drawer really unmounts — deferred one tick, because React's
+   * development double-mount runs this cleanup and then re-mounts immediately. Aborting
+   * synchronously killed the opening turn every time in development (the drawer fires it once,
+   * on mount, and its run-once guard rightly does not fire it again).
+   */
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      const inFlight = abortRef.current;
+      setTimeout(() => {
+        if (!mountedRef.current) inFlight?.abort();
+      }, 0);
+    };
+  }, []);
 
   const fetchWithReauth = useCallback(
     async (url: string, body: unknown, signal: AbortSignal): Promise<Response> => {
@@ -161,6 +177,13 @@ export const useRoadmapCopilotStream = () => {
           }
         }
         // The stream closed without a turn — a dropped connection, not an answer.
+        throw new Error(FAILED);
+      } catch (error) {
+        // A server `error` frame carries copy written for the admin; anything else (an abort, a
+        // dropped connection, a non-2xx) is a fetch-level message nobody should read.
+        if (error instanceof Error && error.name !== "AbortError" && error.name !== "TypeError") {
+          throw error;
+        }
         throw new Error(FAILED);
       } finally {
         if (abortRef.current === controller) {
