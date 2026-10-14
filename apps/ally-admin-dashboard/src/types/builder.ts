@@ -486,6 +486,35 @@ export interface BuilderPullRequest {
   state?: string | null;
   merged: boolean;
   mergedAt: string | null;
+  /**
+   * Set when Builder's review-and-fix loop gave up on this pull request and
+   * handed it to a person: no more fix requests, reviews or approvals from
+   * Builder until someone resumes it. Optional for rows predating the column.
+   */
+  needsHumanAt?: string | null;
+  /** Why, as one plain sentence written by the server. Rendered as given. */
+  needsHumanReason?: string | null;
+}
+
+export type BuilderPrFeedbackStatus =
+  | "pending"
+  | "in_fix"
+  | "addressed"
+  | "dismissed"
+  | "stale"
+  | "observed";
+
+/** A CI failure or review finding on one of the session's pull requests. */
+export interface BuilderPrFeedback {
+  id: string;
+  pullRequestId: string;
+  sessionId: string;
+  kind: "agent_review" | "ci_failure" | "review_comment" | "review";
+  status: BuilderPrFeedbackStatus;
+  author?: string | null;
+  body: string | null;
+  path: string | null;
+  line: number | null;
 }
 
 export interface BuilderReport {
@@ -528,7 +557,13 @@ export interface BuilderSettings {
 export interface BuilderNotification {
   id: string;
   sessionId: string;
-  kind: "question_pending" | "build_completed" | "build_failed" | "prs_opened" | "budget_reached";
+  kind:
+    | "question_pending"
+    | "build_completed"
+    | "build_failed"
+    | "prs_opened"
+    | "budget_reached"
+    | "pr_needs_human";
   message: string;
   readAt: string | null;
   createdAt: string;

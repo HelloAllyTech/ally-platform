@@ -12,6 +12,7 @@ import {
   BuilderNotification,
   BuilderPendingQuestion,
   BuilderPrdVersion,
+  BuilderPrFeedback,
   BuilderPullRequest,
   BuilderReport,
   BuilderRepoCommand,
@@ -375,6 +376,36 @@ export const builderAPI = baseAPI.injectEndpoints({
       ],
     }),
 
+    /**
+     * CI failures and review findings on the session's pull requests. Read
+     * for the open ones behind a pull request that needs a person.
+     */
+    getBuilderPrFeedback: builder.query<BuilderPrFeedback[], string>({
+      query: id => ({
+        url: ApiEndpoints.BUILDER.SESSION_PR_FEEDBACK(id),
+        method: HttpMethod.GET,
+      }),
+      providesTags: (result, error, id) => [{ type: TAG_TYPES.BUILDER_SESSION, id }],
+    }),
+
+    /**
+     * Give a pull request back to Builder's review-and-fix loop, with a fresh
+     * budget of rounds. Invalidates the session tag, which carries both the
+     * pull requests and their feedback.
+     */
+    resumeBuilderPullRequestAutomation: builder.mutation<
+      BuilderPullRequest,
+      { sessionId: string; pullRequestId: string }
+    >({
+      query: ({ sessionId, pullRequestId }) => ({
+        url: ApiEndpoints.BUILDER.SESSION_PULL_REQUEST_RESUME(sessionId, pullRequestId),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: (result, error, { sessionId }) => [
+        { type: TAG_TYPES.BUILDER_SESSION, id: sessionId },
+      ],
+    }),
+
     getBuilderReports: builder.query<BuilderReport[], string>({
       query: id => ({
         url: ApiEndpoints.BUILDER.SESSION_REPORTS(id),
@@ -534,6 +565,8 @@ export const {
   useAnswerBuilderQuestionMutation,
   useGetBuilderPullRequestsQuery,
   useMergeBuilderPullRequestMutation,
+  useGetBuilderPrFeedbackQuery,
+  useResumeBuilderPullRequestAutomationMutation,
   useGetBuilderReportsQuery,
   useGetBuilderSettingsQuery,
   useUpdateBuilderSettingsMutation,

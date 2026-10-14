@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // See BuildView.budget.test.tsx for why the barrel and the design system are
@@ -50,6 +50,8 @@ vi.mock("../CollapsibleSection", () => ({
   ),
 }));
 
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+
 vi.mock("@hooks", () => ({
   useBuilderSocket: () => ({ connected: true, markSeen: () => undefined }),
 }));
@@ -57,6 +59,8 @@ vi.mock("@hooks", () => ({
 let runs: any[] = [];
 let pullRequests: any[] = [];
 let milestones: any[] = [];
+let prFeedback: any[] = [];
+const resumeAutomation = vi.fn().mockReturnValue({ unwrap: () => Promise.resolve({}) });
 let events: any[] = [];
 
 vi.mock("@api", () => ({
@@ -65,6 +69,8 @@ vi.mock("@api", () => ({
   useGetBuilderPendingQuestionsQuery: () => ({ data: [] }),
   useGetBuilderPullRequestsQuery: () => ({ data: pullRequests }),
   useMergeBuilderPullRequestMutation: () => [vi.fn(), { isLoading: false }],
+  useGetBuilderPrFeedbackQuery: () => ({ data: prFeedback }),
+  useResumeBuilderPullRequestAutomationMutation: () => [resumeAutomation, { isLoading: false }],
   useGetBuilderSessionBudgetQuery: () => ({ data: undefined, refetch: vi.fn() }),
   useLazyGetBuilderRunEventsQuery: () => [
     vi.fn().mockImplementation(() => ({ unwrap: () => Promise.resolve({ events }) })),
@@ -204,6 +210,60 @@ describe("BuildView issue builds", () => {
     renderView("COMPLETED");
 
     expect(screen.getByText("A pull request is waiting for you")).toBeInTheDocument();
+  });
+});
+
+describe("BuildView pull request handed to a person", () => {
+  beforeEach(() => {
+    runs = [];
+    milestones = [];
+    resumeAutomation.mockClear();
+  });
+
+  it("shows Needs you, the reason, the open findings and Resume on the PR panel", async () => {
+    runs = [issueRun("SUCCEEDED", ["issue", "pr:33", "ci-pass:a"])];
+    pullRequests = [
+      {
+        ...pr("success"),
+        needsHumanAt: new Date().toISOString(),
+        needsHumanReason: "3 fix rounds and 2 problems remain.",
+      },
+    ];
+    prFeedback = [
+      {
+        id: "f-1",
+        pullRequestId: "pr-1",
+        kind: "agent_review",
+        status: "pending",
+        body: "Null check missing\nmore",
+        path: "src/a.ts",
+        line: 4,
+      },
+      {
+        id: "f-2",
+        pullRequestId: "pr-1",
+        kind: "agent_review",
+        status: "addressed",
+        body: "Already fixed",
+        path: null,
+        line: null,
+      },
+    ];
+    renderView("COMPLETED");
+
+    expect(screen.getByText("Needs you")).toBeInTheDocument();
+    expect(screen.getByText("3 fix rounds and 2 problems remain.")).toBeInTheDocument();
+    expect(screen.getByText("Null check missing")).toBeInTheDocument();
+    expect(screen.getByText("src/a.ts:4")).toBeInTheDocument();
+    expect(screen.queryByText("Already fixed")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Resume automation" }));
+    await vi.waitFor(() =>
+      expect(resumeAutomation).toHaveBeenCalledWith({
+        sessionId: "session-1",
+        pullRequestId: "pr-1",
+      }),
+    );
   });
 });
 

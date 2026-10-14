@@ -184,6 +184,13 @@ export interface ChainRow {
   mergeFirst: boolean;
   /** The repo whose pull request should be merged before this one. */
   mergeAfter: string | null;
+  /** Builder's review-and-fix loop handed this pull request to a person. */
+  needsHuman: boolean;
+  /**
+   * The first unmerged pull request needs a person: the page's one prominent
+   * action is then reading it on GitHub, not merging it.
+   */
+  reviewFirst: boolean;
 }
 
 /**
@@ -235,10 +242,16 @@ export const chainRows = (
     else if (open) mergeRole = "after";
 
     const previousOpen = [...openIndexes].reverse().find(candidate => candidate < index);
+    const needsHuman = Boolean(open && prRow?.needsHumanAt);
+    const reviewFirst = needsHuman && index === firstOpen;
     return {
       ...row,
       mergeRole,
-      mergeFirst: mergeRole === "primary" && openIndexes.length > 1,
+      needsHuman,
+      reviewFirst,
+      // "Merge first" is the page's one prominent action — unless this pull
+      // request needs a person, in which case reading it is.
+      mergeFirst: mergeRole === "primary" && openIndexes.length > 1 && !reviewFirst,
       mergeAfter:
         mergeRole === "after" && previousOpen !== undefined ? base[previousOpen].repo : null,
     };
@@ -247,6 +260,7 @@ export const chainRows = (
 
 /** The header's one-line account of a chain. */
 export type ChainSummary =
+  | { kind: "needsYou"; repo: string }
   | { kind: "building"; repo: string; position: number; total: number }
   | { kind: "stopped"; repo: string }
   | { kind: "built"; built: number; total: number };
@@ -254,9 +268,13 @@ export type ChainSummary =
 export const chainSummary = (
   milestones: BuilderMilestone[] | undefined,
   sessionFailed: boolean,
+  /** The first repo, in chain order, whose pull request needs a person. */
+  needsYouRepo: string | null = null,
 ): ChainSummary | null => {
   const steps = repoMilestones(milestones);
   if (!steps.length) return null;
+  // Ahead of everything else: it is the one state that waits on the reader.
+  if (needsYouRepo) return { kind: "needsYou", repo: needsYouRepo };
   const buildingIndex = steps.findIndex(step => step.status === "BUILDING");
   if (buildingIndex >= 0) {
     return {

@@ -10,6 +10,8 @@ import {
   useGetBuilderPendingQuestionsQuery,
   useGetBuilderPullRequestsQuery,
   useMergeBuilderPullRequestMutation,
+  useGetBuilderPrFeedbackQuery,
+  useResumeBuilderPullRequestAutomationMutation,
   useGetBuilderRunsQuery,
   useGetBuilderSessionBudgetQuery,
   useLazyGetBuilderRunEventsQuery,
@@ -39,6 +41,7 @@ import {
   withoutRestatedStatus,
 } from "./issueBuild";
 import { IssueRail } from "./IssueRail";
+import { NeedsHumanBlock, openFindingsFor } from "./NeedsHumanBlock";
 import { PhaseRail } from "./PhaseRail";
 import { BuilderAnswerPayload, QuestionCard } from "./QuestionCard";
 import { RaiseBudgetDialog } from "./RaiseBudgetDialog";
@@ -174,6 +177,34 @@ export const BuildView: React.FC<BuildViewProps> = ({
   });
   const [fetchEvents] = useLazyGetBuilderRunEventsQuery();
   const [answerQuestion] = useAnswerBuilderQuestionMutation();
+
+  // Findings are only read for a pull request handed to a person — they are
+  // what that person needs to look at, and nothing else on the page uses them.
+  const anyNeedsHuman = (pullRequests ?? []).some(
+    pr => Boolean(pr.needsHumanAt) && !pr.merged && pr.state !== "closed",
+  );
+  const { data: prFeedback } = useGetBuilderPrFeedbackQuery(sessionId, {
+    skip: !anyNeedsHuman,
+  });
+  const [resumeAutomation] = useResumeBuilderPullRequestAutomationMutation();
+  const [resumingId, setResumingId] = useState<string | null>(null);
+  const handleResume = useCallback(
+    async (pullRequestId: string) => {
+      setResumingId(pullRequestId);
+      try {
+        await resumeAutomation({ sessionId, pullRequestId }).unwrap();
+        toast.success(strings.needsYou.resumed);
+      } catch (error) {
+        const message =
+          (error as { data?: { message?: string } })?.data?.message ??
+          strings.needsYou.resumeFailed;
+        toast.error(message);
+      } finally {
+        setResumingId(null);
+      }
+    },
+    [resumeAutomation, sessionId, strings],
+  );
 
   /**
    * Live spend against the ceiling. Polled rather than read off the session:
@@ -524,7 +555,16 @@ export const BuildView: React.FC<BuildViewProps> = ({
         pullRequests={pullRequests ?? []}
         selectedRunId={displayRun?.id ?? null}
         onSelectRun={handleSelectRun}
-        {...(chained ? { onMerge: handleMerge, mergingId, isMerging } : {})}
+        {...(chained
+          ? {
+              onMerge: handleMerge,
+              mergingId,
+              isMerging,
+              feedback: prFeedback,
+              onResume: (id: string) => void handleResume(id),
+              resumingId,
+            }
+          : {})}
       />
 
       {!chained && (
@@ -705,6 +745,11 @@ export const BuildView: React.FC<BuildViewProps> = ({
                         {pullRequest.repo} #{pullRequest.prNumber}
                       </span>
                     </a>
+                    {pullRequest.needsHumanAt && (
+                      <Tag type="magenta" size="sm">
+                        {strings.needsYou.tag}
+                      </Tag>
+                    )}
                     {pullRequest.ciStatus && (
                       <Tag type={CI_TAG_TYPE[pullRequest.ciStatus] ?? "gray"} size="sm">
                         {strings.ciStatus[pullRequest.ciStatus] ?? pullRequest.ciStatus}
@@ -718,6 +763,14 @@ export const BuildView: React.FC<BuildViewProps> = ({
                       {mergingId === pullRequest.id ? strings.prMerging : strings.prMerge}
                     </Button>
                   </div>
+                  {pullRequest.needsHumanAt && (
+                    <NeedsHumanBlock
+                      pullRequest={pullRequest}
+                      findings={openFindingsFor(pullRequest.id, prFeedback)}
+                      onResume={id => void handleResume(id)}
+                      resuming={resumingId === pullRequest.id}
+                    />
+                  )}
                   {issueRun && issueWorking && (
                     <p className="text-xs text-typography-600">{strings.prIssueWorking}</p>
                   )}

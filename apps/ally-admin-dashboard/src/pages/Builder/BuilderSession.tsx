@@ -27,6 +27,7 @@ import {
   SteerComposer,
   TechnicalDesignPanel,
   designBuildBlock,
+  chainRows,
   chainSummary,
   isChainedIssueSession,
   isIssueRun,
@@ -390,15 +391,22 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
   // A chained issue build: the header says where the chain is instead of
   // listing repos the table below already lists.
   const chained = isChainedIssueSession(runs, milestones);
-  const summary = chained ? chainSummary(milestones, effectiveStatus === "FAILED") : null;
+  const needsYouRepo = chained
+    ? (chainRows(milestones, runs, pullRequests).find(row => row.needsHuman)?.repo ?? null)
+    : null;
+  const summary = chained
+    ? chainSummary(milestones, effectiveStatus === "FAILED", needsYouRepo)
+    : null;
   const chainText =
-    summary?.kind === "building"
-      ? strings.repoChain.summaryBuilding(summary.repo, summary.position, summary.total)
-      : summary?.kind === "stopped"
-        ? strings.repoChain.summaryStopped(summary.repo)
-        : summary?.kind === "built"
-          ? strings.repoChain.summaryBuilt(summary.built, summary.total)
-          : null;
+    summary?.kind === "needsYou"
+      ? strings.repoChain.summaryNeedsYou(summary.repo)
+      : summary?.kind === "building"
+        ? strings.repoChain.summaryBuilding(summary.repo, summary.position, summary.total)
+        : summary?.kind === "stopped"
+          ? strings.repoChain.summaryStopped(summary.repo)
+          : summary?.kind === "built"
+            ? strings.repoChain.summaryBuilt(summary.built, summary.total)
+            : null;
 
   // Read off the polled session row, not the local PRD copy: the design is
   // written by a separate run, which no interview SSE frame reports. The row is

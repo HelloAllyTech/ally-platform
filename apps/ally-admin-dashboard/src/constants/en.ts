@@ -3954,6 +3954,19 @@ export const en = {
       prMerge: "Merge",
       prMerging: "Merging…",
       prMergeFailed: "Could not merge",
+      // A pull request Builder's review-and-fix loop handed to a person.
+      needsYou: {
+        tag: "Needs you",
+        openFindingsHeading: "Still open",
+        showMore: (count: number) => `Show ${count} more`,
+        showFewer: "Show fewer",
+        resume: "Resume automation",
+        resuming: "Resuming…",
+        resumeHint:
+          "Builder goes back to reviewing this pull request and asking opencode for fixes, with a fresh set of rounds.",
+        resumed: "Builder is working on this pull request again.",
+        resumeFailed: "Couldn't resume automation on this pull request.",
+      },
       prMerged_toast: "Merged.",
       // Failure copy lives in the feed, not in a banner. See FailureRow in
       // BuildActivityFeed for why.
@@ -4006,6 +4019,7 @@ export const en = {
       summaryBuilding: (repo: string, position: number, total: number) =>
         `Building ${repo} (${position} of ${total})`,
       summaryStopped: (repo: string) => `Stopped at ${repo}`,
+      summaryNeedsYou: (repo: string) => `Needs you: ${repo}`,
       prNumber: (prNumber: number) => `#${prNumber}`,
       ciPassed: "CI ✓",
       ciFailed: "CI ✗",
@@ -4020,6 +4034,7 @@ export const en = {
       nextStartsAfter: (repo: string) => `Starts after ${repo}`,
       nextWaiting: "Waiting to start",
       mergeFirst: "Merge first",
+      reviewOnGithub: "Review on GitHub",
       mergeApprovalHint:
         "GitHub needs an approving review on the pull request before it can merge.",
       actionsLog: "Actions log",
@@ -4150,6 +4165,7 @@ export const en = {
         build_failed: "Build failed",
         prs_opened: "PRs opened",
         budget_reached: "Budget reached",
+        pr_needs_human: "Needs you",
       } as Record<string, string>,
     },
 

@@ -420,6 +420,35 @@ describe("BuilderSession", () => {
         expect(screen.getByText("Stopped at ally-web")).toBeTruthy();
       });
 
+      it("says which repo needs a person, ahead of the built count", () => {
+        runs = chainRuns().map(run => ({ ...run, mode: "build" }));
+        milestones = [
+          { id: "m-be", position: 0, repos: ["ally-be"], status: "COMPLETED" },
+          { id: "m-web", position: 1, repos: ["ally-web"], status: "COMPLETED" },
+        ];
+        pullRequests = [
+          { id: "pr-be", repo: "ally-be", prNumber: 1, prUrl: "u", merged: true, state: "closed" },
+          {
+            id: "pr-web",
+            repo: "ally-web",
+            prNumber: 2,
+            prUrl: "u",
+            merged: false,
+            state: "open",
+            needsHumanAt: "2026-10-14T10:00:00Z",
+            needsHumanReason: "Two reviews in a row ended without a verdict.",
+          },
+        ];
+        sessionResult = {
+          data: { ...baseSession, status: "COMPLETED", currentStage: "DONE" },
+          isLoading: false,
+          isError: false,
+        };
+        render(<BuilderSession />);
+        expect(screen.getByText("Needs you: ally-web")).toBeTruthy();
+        expect(screen.queryByText("2 of 2 repos built")).toBeNull();
+      });
+
       it("keeps the repo list for a session without a chain", () => {
         runs = [{ ...issueRun(), mode: "build" }];
         milestones = [];

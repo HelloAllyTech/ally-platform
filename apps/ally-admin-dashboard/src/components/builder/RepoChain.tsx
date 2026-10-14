@@ -2,10 +2,11 @@ import React from "react";
 
 import { Button, Tag } from "@ally-ui-mono/ui-shared";
 import { en } from "@constants";
-import { BuilderBuildRun, BuilderMilestone, BuilderPullRequest } from "@types";
+import { BuilderBuildRun, BuilderMilestone, BuilderPrFeedback, BuilderPullRequest } from "@types";
 
 import { ChainRow, chainRows } from "./issueBuild";
 import { IssueRail } from "./IssueRail";
+import { NeedsHumanBlock, openFindingsFor } from "./NeedsHumanBlock";
 
 interface RepoChainProps {
   milestones: BuilderMilestone[];
@@ -23,6 +24,12 @@ interface RepoChainProps {
   /** The pull request a merge is in flight for. */
   mergingId?: string | null;
   isMerging?: boolean;
+  /** The session's PR findings — the open ones show under a row that needs you. */
+  feedback?: BuilderPrFeedback[];
+  /** Give a pull request back to Builder. Without it no Resume control shows. */
+  onResume?: (pullRequestId: string) => void;
+  /** The pull request a resume is in flight for. */
+  resumingId?: string | null;
 }
 
 const STATUS_TAG: Record<string, "gray" | "blue" | "green" | "red" | "magenta" | "cool-gray"> = {
@@ -39,6 +46,8 @@ const LINK = "text-primary-700 hover:underline";
 /** What the row wants next, in a few words — or nothing when its tags say it. */
 const nextStep = (row: ChainRow, previousRepo: string | null): string | null => {
   const strings = en.builder.repoChain;
+  // The server's reason sits under the row and says it better.
+  if (row.needsHuman) return null;
   switch (row.mergeRole) {
     case "primary":
       return strings.nextReview;
@@ -91,6 +100,9 @@ export const RepoChain: React.FC<RepoChainProps> = ({
   onMerge,
   mergingId = null,
   isMerging = false,
+  feedback,
+  onResume,
+  resumingId = null,
 }) => {
   const strings = en.builder.repoChain;
   const buildStrings = en.builder.build;
@@ -115,9 +127,17 @@ export const RepoChain: React.FC<RepoChainProps> = ({
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                 <span className="w-4 shrink-0 tabular-nums text-typography-400">{index + 1}</span>
                 <span className="min-w-[6rem] font-medium text-typography-900">{repo}</span>
-                <Tag type={STATUS_TAG[milestone.status] ?? "gray"} size="sm">
-                  {strings.status[milestone.status] ?? milestone.status}
-                </Tag>
+                {/* Magenta, like "Waiting on you": Carbon has no yellow tag, and
+                    this is the same news — the next move is a person's. */}
+                {row.needsHuman ? (
+                  <Tag type="magenta" size="sm">
+                    {buildStrings.needsYou.tag}
+                  </Tag>
+                ) : (
+                  <Tag type={STATUS_TAG[milestone.status] ?? "gray"} size="sm">
+                    {strings.status[milestone.status] ?? milestone.status}
+                  </Tag>
+                )}
 
                 {/* The pull request number is the way to GitHub — where the
                     review and its approval happen. The issue is only worth a
@@ -172,6 +192,13 @@ export const RepoChain: React.FC<RepoChainProps> = ({
                       {buildStrings.prClosed}
                     </Tag>
                   )}
+                  {/* When the first unmerged pull request needs a person, the
+                      page's one prominent action is reading it, not merging. */}
+                  {row.reviewFirst && pr?.url && (
+                    <Button size="sm" kind="primary" href={pr.url} target="_blank" rel="noreferrer">
+                      {strings.reviewOnGithub}
+                    </Button>
+                  )}
                   {onMerge &&
                     prRow &&
                     (row.mergeRole === "primary" ||
@@ -179,7 +206,7 @@ export const RepoChain: React.FC<RepoChainProps> = ({
                       row.mergeRole === "notReady") && (
                       <Button
                         size="sm"
-                        kind={row.mergeRole === "primary" ? "primary" : "ghost"}
+                        kind={row.mergeRole === "primary" && !row.reviewFirst ? "primary" : "ghost"}
                         // Nothing approves on anyone's behalf: GitHub's branch
                         // protection wants a review first, given on the PR.
                         title={strings.mergeApprovalHint}
@@ -208,6 +235,16 @@ export const RepoChain: React.FC<RepoChainProps> = ({
                     </a>
                   )}
                 </div>
+              )}
+
+              {row.needsHuman && prRow && onResume && (
+                <NeedsHumanBlock
+                  className="mt-1 pl-7"
+                  pullRequest={prRow}
+                  findings={openFindingsFor(prRow.id, feedback)}
+                  onResume={onResume}
+                  resuming={resumingId === prRow.id}
+                />
               )}
 
               {milestone.status === "FAILED" && milestone.error && (

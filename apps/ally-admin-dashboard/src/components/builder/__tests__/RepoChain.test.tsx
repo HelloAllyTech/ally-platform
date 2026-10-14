@@ -228,6 +228,114 @@ describe("RepoChain", () => {
     expect(screen.queryByRole("button", { name: "Show ally-web's activity" })).toBeNull();
   });
 
+  describe("a pull request handed to a person", () => {
+    const needsYou = (base: BuilderPullRequest) =>
+      ({
+        ...base,
+        needsHumanAt: "2026-10-14T10:00:00Z",
+        needsHumanReason: "3 fix rounds and 2 problems remain.",
+      }) as BuilderPullRequest;
+    const finding = (id: string, status: string, body: string, path: string | null = null) => ({
+      id,
+      pullRequestId: "pr-be",
+      sessionId: "s",
+      kind: "agent_review" as const,
+      status: status as any,
+      body,
+      path,
+      line: path ? 12 : null,
+    });
+
+    it("says Needs you, gives the reason and open findings, and offers Resume", () => {
+      const onResume = vi.fn();
+      render(
+        <RepoChain
+          {...threeBuilt}
+          pullRequests={[needsYou(threeBuilt.pullRequests[0]), ...threeBuilt.pullRequests.slice(1)]}
+          feedback={[
+            finding("f1", "pending", "## Missing null check\nDetails…", "src/a.ts"),
+            finding("f2", "in_fix", "Unbounded retry"),
+            finding("f3", "addressed", "Old problem"),
+          ]}
+          onMerge={vi.fn()}
+          onResume={onResume}
+        />,
+      );
+
+      const row = rowFor("ally-be");
+      expect(within(row).getByText("Needs you")).toBeInTheDocument();
+      expect(within(row).queryByText("Built")).toBeNull();
+      expect(within(row).getByText("3 fix rounds and 2 problems remain.")).toBeInTheDocument();
+      expect(within(row).getByText("Missing null check")).toBeInTheDocument();
+      expect(within(row).getByText("src/a.ts:12")).toBeInTheDocument();
+      expect(within(row).getByText("Unbounded retry")).toBeInTheDocument();
+      expect(within(row).queryByText("Old problem")).toBeNull();
+      // PR link and CI stay.
+      expect(within(row).getByRole("link", { name: "#630" })).toBeInTheDocument();
+      expect(within(row).getByLabelText("CI passed")).toBeInTheDocument();
+
+      fireEvent.click(within(row).getByRole("button", { name: "Resume automation" }));
+      expect(onResume).toHaveBeenCalledWith("pr-be");
+    });
+
+    it("makes Review on GitHub the one primary action when the first unmerged PR needs you", () => {
+      render(
+        <RepoChain
+          {...threeBuilt}
+          pullRequests={[needsYou(threeBuilt.pullRequests[0]), ...threeBuilt.pullRequests.slice(1)]}
+          onMerge={vi.fn()}
+          onResume={vi.fn()}
+        />,
+      );
+
+      const primaries = screen.getAllByRole("button").filter(b => b.dataset.kind === "primary");
+      expect(primaries).toHaveLength(1);
+      expect(primaries[0]).toHaveTextContent("Review on GitHub");
+      expect(within(rowFor("ally-be")).getByRole("button", { name: "Merge" })).toHaveAttribute(
+        "data-kind",
+        "ghost",
+      );
+      expect(screen.queryByRole("button", { name: "Merge first" })).toBeNull();
+    });
+
+    it("keeps Merge first when only a later PR needs you", () => {
+      render(
+        <RepoChain
+          {...threeBuilt}
+          pullRequests={[
+            threeBuilt.pullRequests[0],
+            needsYou(threeBuilt.pullRequests[1]),
+            threeBuilt.pullRequests[2],
+          ]}
+          onMerge={vi.fn()}
+          onResume={vi.fn()}
+        />,
+      );
+      expect(screen.getByRole("button", { name: "Merge first" })).toHaveAttribute(
+        "data-kind",
+        "primary",
+      );
+      expect(screen.queryByRole("button", { name: "Review on GitHub" })).toBeNull();
+      expect(within(rowFor("ally-web")).getByText("Needs you")).toBeInTheDocument();
+    });
+
+    it("folds all but three open findings", () => {
+      render(
+        <RepoChain
+          {...threeBuilt}
+          pullRequests={[needsYou(threeBuilt.pullRequests[0]), ...threeBuilt.pullRequests.slice(1)]}
+          feedback={["a", "b", "c", "d", "e"].map(x => finding(x, "pending", `Finding ${x}`))}
+          onMerge={vi.fn()}
+          onResume={vi.fn()}
+        />,
+      );
+      expect(screen.queryByText("Finding d")).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "Show 2 more" }));
+      expect(screen.getByText("Finding e")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Show fewer" })).toBeInTheDocument();
+    });
+  });
+
   it("renders nothing without repo milestones", () => {
     const { container } = render(
       <RepoChain

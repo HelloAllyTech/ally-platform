@@ -638,6 +638,10 @@ export const ApiEndpoints = {
     SESSION_PULL_REQUESTS: (id: string) => `/v1/builder/sessions/${id}/pull-requests`,
     SESSION_PULL_REQUEST_MERGE: (id: string, prId: string) =>
       `/v1/builder/sessions/${id}/pull-requests/${prId}/merge`,
+    // Hand a pull request Builder gave up on back to its review-and-fix loop.
+    SESSION_PULL_REQUEST_RESUME: (id: string, prId: string) =>
+      `/v1/builder/sessions/${id}/pull-requests/${prId}/resume-automation`,
+    SESSION_PR_FEEDBACK: (id: string) => `/v1/builder/sessions/${id}/pr-feedback`,
     SESSION_REPORTS: (id: string) => `/v1/builder/sessions/${id}/reports`,
     SETTINGS: "/v1/builder/settings",
     NOTIFICATIONS: "/v1/builder/notifications",
