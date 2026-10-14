@@ -952,6 +952,7 @@ export const extractTrackMetadata = (values: TrackFormValues): TrackMetadataInpu
   description: values.description,
   coverImageUrl: values.coverImageUrl || undefined,
   isGlobal: values.isGlobal,
+  isPublicView: values.isPublicView ?? false,
   estimatedDurationMinutes: values.estimatedDurationMinutes ?? undefined,
   // Always sent, so clearing the picker clears the tag (`[]` is stored as
   // null). Ids the picker could not list ride along untouched — the backend
@@ -965,6 +966,7 @@ export const deserializeTrack = (detail: TrackDetail): TrackFormValues => ({
   description: detail.description ?? "",
   coverImageUrl: detail.coverImageUrl ?? "",
   isGlobal: detail.isGlobal ?? false,
+  isPublicView: detail.isPublicView ?? false,
   estimatedDurationMinutes: detail.estimatedDurationMinutes ?? null,
   competencyIds: detail.competencyIds ?? [],
   sections: [...(detail.sections ?? [])]

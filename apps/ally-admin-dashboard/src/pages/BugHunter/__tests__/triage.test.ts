@@ -11,6 +11,7 @@ import {
   canStartFixSession,
   eligibleFor,
   formatAge,
+  nextStep,
   showsStaleness,
   stalenessTier,
   STALENESS_DAYS,
@@ -46,7 +47,9 @@ describe("what ally-be will actually accept", () => {
    */
   it("rejects from new as well as pending approval", () => {
     const rejectable = Object.values(BugFindingStatus).filter(canReject);
-    expect(rejectable.sort()).toEqual([BugFindingStatus.NEW, BugFindingStatus.PENDING_APPROVAL].sort());
+    expect(rejectable.sort()).toEqual(
+      [BugFindingStatus.NEW, BugFindingStatus.PENDING_APPROVAL].sort(),
+    );
   });
 
   it("offers a fix session from exactly the statuses @types mirrors", () => {
@@ -126,11 +129,16 @@ describe("age", () => {
    * tinting it would teach a reader to ignore the tint, which is the one thing
    * a staleness signal cannot survive.
    */
-  it("only colours bugs that are still waiting on somebody", () => {
-    expect(showsStaleness(finding({ id: "a", status: BugFindingStatus.PENDING_APPROVAL }))).toBe(true);
-    expect(showsStaleness(finding({ id: "a", status: BugFindingStatus.FAILED }))).toBe(true);
-    expect(showsStaleness(finding({ id: "a", status: BugFindingStatus.NEW }))).toBe(true);
+  it("only colours bugs that are waiting on you", () => {
+    expect(showsStaleness(finding({ id: "a", status: BugFindingStatus.PENDING_APPROVAL }))).toBe(
+      true,
+    );
+    expect(showsStaleness(finding({ id: "a", status: BugFindingStatus.NEEDS_INPUT }))).toBe(true);
 
+    // A backlog bug nobody has started is old, not late — nobody owes it a
+    // decision. Tinting fifty-two of them was teaching people to ignore it.
+    expect(showsStaleness(finding({ id: "a", status: BugFindingStatus.NEW }))).toBe(false);
+    expect(showsStaleness(finding({ id: "a", status: BugFindingStatus.FAILED }))).toBe(false);
     expect(showsStaleness(finding({ id: "a", status: BugFindingStatus.RELEASED }))).toBe(false);
     expect(showsStaleness(finding({ id: "a", status: BugFindingStatus.MERGED }))).toBe(false);
     expect(showsStaleness(finding({ id: "a", status: BugFindingStatus.FIXING }))).toBe(false);
@@ -144,5 +152,45 @@ describe("age", () => {
     expect(formatAge(3)).toBe("3d");
     expect(formatAge(20)).toBe("2w");
     expect(formatAge(95)).toBe("3mo");
+  });
+});
+
+describe("nextStep", () => {
+  it("offers the one human move each waiting status has", () => {
+    expect(nextStep(finding({ id: "a", status: BugFindingStatus.PENDING_APPROVAL }))).toBe(
+      "approve",
+    );
+    expect(nextStep(finding({ id: "a", status: BugFindingStatus.NEEDS_INPUT }))).toBe("answer");
+    expect(nextStep(finding({ id: "a", status: BugFindingStatus.FAILED }))).toBe("retry");
+    expect(nextStep(finding({ id: "a", status: BugFindingStatus.RELEASE_FAILED }))).toBe("release");
+    expect(
+      nextStep(
+        finding({ id: "a", status: BugFindingStatus.PR_OPENED, prUrl: "https://example.com/pr/1" }),
+      ),
+    ).toBe("merge");
+  });
+
+  it("offers nothing on a PR_OPENED row with no PR to merge", () => {
+    expect(
+      nextStep(finding({ id: "a", status: BugFindingStatus.PR_OPENED, prUrl: null })),
+    ).toBeNull();
+  });
+
+  // A button on every row made every row look like it needed you.
+  it("offers nothing on rows that don't need a human", () => {
+    [
+      BugFindingStatus.NEW,
+      BugFindingStatus.APPROVED,
+      BugFindingStatus.QUEUED,
+      BugFindingStatus.FIXING,
+      BugFindingStatus.COORDINATING,
+      BugFindingStatus.BLOCKED,
+      BugFindingStatus.RELEASING,
+      BugFindingStatus.MERGED,
+      BugFindingStatus.RELEASED,
+      BugFindingStatus.DISMISSED,
+      BugFindingStatus.REJECTED,
+      BugFindingStatus.CANCELLED,
+    ].forEach(status => expect(nextStep(finding({ id: "a", status }))).toBeNull());
   });
 });

@@ -2,13 +2,11 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@api", () => ({
-  useGetBugFindingDecisionsQuery: vi.fn(),
   useGetBugHuntRunDecisionsQuery: vi.fn(),
 }));
 vi.mock("@components", () => ({ cellTypes: {} }));
 vi.mock("@utils", () => ({ formatTimestamp: (d: string) => `at ${d}` }));
 
-import { useGetBugFindingDecisionsQuery } from "@api";
 import { BugHuntDecision } from "@types";
 
 import {
@@ -17,7 +15,7 @@ import {
   formatDecisionPick,
   sortDecisions,
 } from "../bugDecisionLabels";
-import { DecisionLogList, FindingDecisions } from "../DecisionLog";
+import { DecisionLogList } from "../DecisionLog";
 
 const decision = (over: Partial<BugHuntDecision>): BugHuntDecision => ({
   id: "d",
@@ -104,8 +102,9 @@ describe("DecisionLogList", () => {
       />,
     );
     const d7 = screen.getByTestId("decision-D7");
-    expect(d7).toHaveTextContent("D7");
-    expect(d7).toHaveTextContent("retry, escalate or ask");
+    // The plain question, not the pipeline's D-number for it.
+    expect(d7).toHaveTextContent("Retry, escalate or ask");
+    expect(d7).not.toHaveTextContent("D7");
     expect(d7).toHaveTextContent("retry_fix");
     expect(d7).toHaveTextContent("by the rule");
     expect(d7).toHaveTextContent("the model would have: escalate_model");
@@ -127,24 +126,5 @@ describe("DecisionLogList", () => {
     expect(screen.getByTestId("decision-D5")).toHaveTextContent("both agreed");
     const { container } = render(<DecisionLogList decisions={[]} />);
     expect(container).toHaveTextContent("No decisions recorded yet.");
-  });
-});
-
-describe("FindingDecisions", () => {
-  it("renders nothing until there is a decision, then a titled log", () => {
-    vi.mocked(useGetBugFindingDecisionsQuery).mockReturnValue({
-      data: [],
-      isError: false,
-    } as never);
-    const { container, rerender } = render(<FindingDecisions findingId="f-1" />);
-    expect(container).toBeEmptyDOMElement();
-
-    vi.mocked(useGetBugFindingDecisionsQuery).mockReturnValue({
-      data: [decision({})],
-      isError: false,
-    } as never);
-    rerender(<FindingDecisions findingId="f-1" />);
-    expect(screen.getByTestId("finding-decisions")).toHaveTextContent("How I decided");
-    expect(screen.getByTestId("decision-log")).toBeInTheDocument();
   });
 });

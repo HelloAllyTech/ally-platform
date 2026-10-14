@@ -79,6 +79,7 @@ import {
 } from "@types";
 
 import { BugFindingsTable } from "../BugFindingsTable";
+import { bucketOf } from "../lifecycleBucket";
 
 const DAY = 24 * 60 * 60 * 1000;
 const ago = (days: number) => new Date(Date.now() - days * DAY).toISOString();
@@ -108,9 +109,16 @@ const finding = (overrides: Partial<BugFinding> & { id: string }): BugFinding =>
     ...overrides,
   }) as unknown as BugFinding;
 
+/**
+ * Opens on the tab the first fixture lives in unless told otherwise — most are
+ * NEW, which is Backlog, and the page itself opens on Needs you or In progress.
+ */
 const mount = (
   items: BugFinding[],
-  { url = "/", queryState = {} }: { url?: string; queryState?: Record<string, unknown> } = {},
+  {
+    url = items.length ? `/?bucket=${bucketOf(items[0])}` : "/",
+    queryState = {},
+  }: { url?: string; queryState?: Record<string, unknown> } = {},
 ) => {
   getBugFindings.mockReturnValue({
     data: { items, count: items.length },
@@ -128,9 +136,7 @@ const mount = (
 
 /** Row titles in the order they are rendered — what every sort assertion reads. */
 const titles = () =>
-  screen
-    .getAllByRole("button", { name: /^Open bug: / })
-    .map(button => button.textContent ?? "");
+  screen.getAllByRole("button", { name: /^Open bug: / }).map(button => button.textContent ?? "");
 
 const openFilters = () => {
   fireEvent.click(screen.getByRole("button", { name: /Filters/ }));
@@ -142,54 +148,33 @@ const openFilters = () => {
  * you meant" rebuild: every column sortable, every facet multi-select, both
  * carried in the URL, plus the age/duplicate filters and the paging controls.
  *
- * The pre-existing suites still own what they always did — `…triage` the row
- * actions and the bucket chips, `…keyboard` the cursor, `…runScope` the sweep
- * scope. This file is only the new surface.
+ * The other suites own what they always did — `…triage` the row action and
+ * the tabs, `…keyboard` the cursor, `…runScope` the sweep scope.
  */
 describe("BugFindingsTable — sorting", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("sorts by status in lifecycle order rather than alphabetically", () => {
     mount([
-      finding({ id: "shipped", status: BugFindingStatus.RELEASED }),
-      finding({ id: "blocked", status: BugFindingStatus.NEEDS_INPUT }),
-      finding({ id: "queued", status: BugFindingStatus.APPROVED }),
+      finding({ id: "rejected", status: BugFindingStatus.REJECTED }),
+      finding({ id: "live", status: BugFindingStatus.RELEASED }),
+      finding({ id: "merged", status: BugFindingStatus.MERGED }),
     ]);
 
     fireEvent.click(screen.getByRole("button", { name: /^Status/ }));
 
-    // "Needs input" before "Approved" before "Released" — the chip row's order,
-    // not the alphabet's, which would have put Approved first.
-    expect(titles()).toEqual(["Bug blocked", "Bug queued", "Bug shipped"]);
+    // Merged, then Live, then Rejected — the lifecycle's order within Done, not
+    // the alphabet's, which would have put Live first.
+    expect(titles()).toEqual(["Bug merged", "Bug live", "Bug rejected"]);
   });
 
-  it("sorts by repo, and keeps repo-less bugs at the bottom in both directions", () => {
-    mount([
-      finding({ id: "none", repo: null }),
-      finding({ id: "web", repo: "ally-web" }),
-      finding({ id: "be", repo: "ally-be" }),
-    ]);
-
-    const repoHeader = () => screen.getByRole("button", { name: /^Repo/ });
-
-    fireEvent.click(repoHeader());
-    expect(titles()).toEqual(["Bug be", "Bug web", "Bug none"]);
-
-    // Flipped, "no repo" is still last — it is absent data, not a value that
-    // sorts before "ally-be".
-    fireEvent.click(repoHeader());
-    expect(titles()).toEqual(["Bug web", "Bug be", "Bug none"]);
-  });
-
-  it("sorts by roadmap stage along the ladder", () => {
-    mount([
-      finding({ id: "released", stage: BugFindingStage.RELEASED }),
-      finding({ id: "new", stage: BugFindingStage.NEW }),
-      finding({ id: "dev", stage: BugFindingStage.UNDER_DEVELOPMENT }),
-    ]);
-
-    fireEvent.click(screen.getByRole("button", { name: /^Stage/ }));
-    expect(titles()).toEqual(["Bug new", "Bug dev", "Bug released"]);
+  // Repo, severity and stage lost their columns on 2026-10-13; a sort the
+  // reader can't see would read as a broken table.
+  it("offers sorting only on the columns it shows", () => {
+    mount([finding({ id: "a" })]);
+    expect(screen.queryByRole("button", { name: /^Repo/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Stage/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Severity/ })).not.toBeInTheDocument();
   });
 
   it("reports the sort to a screen reader, not just with a caret", () => {
@@ -212,13 +197,9 @@ describe("BugFindingsTable — sorting", () => {
    * handed the recipient the same rows in a different order, silently.
    */
   it("reads the sort out of the address bar, so a sorted view is linkable", () => {
-    mount(
-      [
-        finding({ id: "b", title: "Bravo" }),
-        finding({ id: "a", title: "Alpha" }),
-      ],
-      { url: "/?sort=title&dir=asc" },
-    );
+    mount([finding({ id: "b", title: "Bravo" }), finding({ id: "a", title: "Alpha" })], {
+      url: "/?bucket=backlog&sort=title&dir=asc",
+    });
     expect(titles()).toEqual(["Alpha", "Bravo"]);
   });
 });
@@ -226,18 +207,22 @@ describe("BugFindingsTable — sorting", () => {
 describe("BugFindingsTable — the filter panel", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("filters by status, which the bucket chips are too coarse to do", () => {
-    // The real-world case: everything lands in one bucket, so the chips
-    // separate nothing and the status facet is the only way in.
+  // The tabs are status now, and stage is derived from it — both facets were
+  // a second way to ask a question the tabs already answer.
+  it("offers no status or stage facet", () => {
     mount([
-      finding({ id: "new", status: BugFindingStatus.NEW }),
-      finding({ id: "approved", status: BugFindingStatus.APPROVED }),
+      finding({ id: "new", status: BugFindingStatus.NEW, stage: BugFindingStage.NEW }),
+      finding({
+        id: "approved",
+        status: BugFindingStatus.APPROVED,
+        stage: BugFindingStage.PRIORITISED,
+      }),
     ]);
 
-    fireEvent.click(within(openFilters()).getByLabelText(/^Approved/));
-
-    expect(screen.getByText("Bug approved")).toBeInTheDocument();
-    expect(screen.queryByText("Bug new")).not.toBeInTheDocument();
+    const panel = openFilters();
+    expect(within(panel).queryByText("Status")).not.toBeInTheDocument();
+    expect(within(panel).queryByText("Roadmap stage")).not.toBeInTheDocument();
+    expect(within(panel).queryByLabelText(/^Approved/)).not.toBeInTheDocument();
   });
 
   it("filters by age using the same boundary the Age column tints at", () => {
@@ -284,17 +269,23 @@ describe("BugFindingsTable — the filter panel", () => {
   });
 
   /**
-   * The panel can be shut while a filter is on, so the reset must not live
-   * inside it — and it has to appear for the two controls that are outside the
-   * panel too, or a lone search term narrows the table with nothing to press.
+   * The panel can be shut while a facet is on, so the reset lives outside it,
+   * beside the pills. It appears for facets only: a search clears itself with
+   * the box's own ×, and a pill row holding nothing but "Clear filters" under
+   * one typed letter was the bug.
    */
-  it("offers one reset whenever anything is narrowing the table", () => {
-    mount([finding({ id: "a" }), finding({ id: "b" })]);
+  it("offers one reset beside the pills whenever a facet is on", () => {
+    mount([
+      finding({ id: "a", severity: BugFindingSeverity.HIGH }),
+      finding({ id: "b", severity: BugFindingSeverity.LOW }),
+    ]);
     expect(screen.queryByRole("button", { name: "Clear filters" })).not.toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText("Search bugs"), { target: { value: "Bug a" } });
-    expect(screen.getByRole("button", { name: "Clear filters" })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Search bugs"), { target: { value: "Bug" } });
+    expect(screen.queryByRole("button", { name: "Clear filters" })).not.toBeInTheDocument();
 
+    fireEvent.click(within(openFilters()).getByLabelText(/^High/));
+    expect(screen.queryByText("Bug b")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
     expect(screen.getByText("Bug b")).toBeInTheDocument();
   });
@@ -314,30 +305,6 @@ describe("BugFindingsTable — the filter panel", () => {
   });
 });
 
-describe("BugFindingsTable — collapsing columns", () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  /**
-   * Stage used to render as a chip stacked under the status badge, which on a
-   * window of new bugs printed "New" directly above "New".
-   */
-  it("hides the stage column when every bug in the window is at one stage", () => {
-    mount([
-      finding({ id: "a", stage: BugFindingStage.NEW }),
-      finding({ id: "b", stage: BugFindingStage.NEW }),
-    ]);
-    expect(screen.queryByRole("columnheader", { name: /^Stage/ })).not.toBeInTheDocument();
-  });
-
-  it("shows the stage column once the window holds more than one", () => {
-    mount([
-      finding({ id: "a", stage: BugFindingStage.NEW }),
-      finding({ id: "b", stage: BugFindingStage.RELEASED }),
-    ]);
-    expect(screen.getByRole("columnheader", { name: /^Stage/ })).toBeInTheDocument();
-  });
-});
-
 describe("BugFindingsTable — paging and selection", () => {
   beforeEach(() => vi.clearAllMocks());
 
@@ -353,12 +320,12 @@ describe("BugFindingsTable — paging and selection", () => {
 
   it("honours a bigger page size from the address bar", () => {
     cleanup();
-    mount(many(45), { url: "/?size=50" });
+    mount(many(45), { url: "/?bucket=backlog&size=50" });
     expect(titles()).toHaveLength(45);
   });
 
   it("changing the page size re-pages without losing the filters", () => {
-    mount(many(45), { url: "/?q=Bug" });
+    mount(many(45), { url: "/?bucket=backlog&q=Bug" });
     expect(titles()).toHaveLength(20);
 
     fireEvent.change(screen.getByRole("combobox", { name: "Rows" }), { target: { value: "50" } });

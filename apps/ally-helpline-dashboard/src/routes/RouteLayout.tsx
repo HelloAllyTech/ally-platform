@@ -11,6 +11,7 @@ import {
   TrackOverview,
   TrackPlayer,
   TrackProgress,
+  CourseLanding,
   SuspendedUser,
   ImpersonateHandler,
   Terms,
@@ -69,6 +70,8 @@ const RouteLayout = () => {
           <Route path={ROUTES.TRACK} element={<TrackOverview />} />
           <Route path={ROUTES.TRACK_ITEM} element={<TrackPlayer />} />
           <Route path={ROUTES.TRACK_PROGRESS} element={<TrackProgress />} />
+          {/* A course's public share link — outline for anyone, login on Start */}
+          <Route path={ROUTES.COURSE_LANDING} element={<CourseLanding />} />
         </Route>
 
         {/* Private Routes */}

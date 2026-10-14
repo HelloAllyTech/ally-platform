@@ -4,7 +4,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 
-import { BugFindingSeverity, BugFindingSource, BugFindingStatus } from "@types";
+import { BugFindingSeverity, BugFindingSource } from "@types";
 
 import { hasFilterParams, useBugHunterUrlState } from "../bugHunterUrlState";
 
@@ -30,8 +30,6 @@ const Probe: FC = () => {
           repos: state.repos,
           severities: state.severities,
           sources: state.sources,
-          statuses: state.statuses,
-          stages: state.stages,
           age: state.age,
           duplicatesOnly: state.duplicatesOnly,
           sort: state.sort,
@@ -42,10 +40,11 @@ const Probe: FC = () => {
       <p data-testid="has-filters">{String(hasFilterParams(state))}</p>
 
       <button onClick={() => state.setBug("bug-1")}>open bug</button>
+      <button onClick={() => state.setBug(null)}>close bug</button>
       <button onClick={() => state.setSearch("terms")}>search terms</button>
       <button onClick={() => state.setSearch("all")}>search all</button>
       <button onClick={() => state.setBucket("needs_you")}>bucket needs_you</button>
-      <button onClick={() => state.setBucket("all")}>bucket all</button>
+      <button onClick={() => state.setBucket("done")}>bucket done</button>
       <button onClick={() => state.setRun("run-a")}>scope run-a</button>
       <button onClick={() => state.setRun(null)}>scope none</button>
       <button onClick={() => state.setSeverities([BugFindingSeverity.HIGH])}>severity high</button>
@@ -55,11 +54,10 @@ const Probe: FC = () => {
         severity high+medium
       </button>
       <button onClick={() => state.setRepos(["ally-be", "ally-web"])}>two repos</button>
-      <button onClick={() => state.setStatuses([BugFindingStatus.NEW])}>status new</button>
       <button onClick={() => state.setAge("stale")}>age stale</button>
       <button onClick={() => state.setDuplicatesOnly(true)}>duplicates on</button>
       <button onClick={() => state.setDuplicatesOnly(false)}>duplicates off</button>
-      <button onClick={() => state.toggleSort("severity")}>sort severity</button>
+      <button onClick={() => state.toggleSort("status")}>sort status</button>
       <button onClick={() => state.toggleSort("discovered")}>sort discovered</button>
       <button onClick={() => state.setPageSize(100)}>page size 100</button>
       <button onClick={() => state.setPageSize(20)}>page size 20</button>
@@ -84,14 +82,13 @@ describe("reading the query string", () => {
     mount();
     expect(parsed()).toEqual({
       bug: null,
-      bucket: "all",
+      // No tab named: the table picks one from the counts (`defaultBucket`).
+      bucket: null,
       run: null,
       search: "",
       repos: [],
       severities: [],
       sources: [],
-      statuses: [],
-      stages: [],
       age: "all",
       duplicatesOnly: false,
       sort: "discovered",
@@ -103,21 +100,19 @@ describe("reading the query string", () => {
 
   it("reads a whole view out of a link", () => {
     mount(
-      `/?bug=abc&bucket=problem&q=terms&run=run-a&repo=ally-be,ally-web&sev=${BugFindingSeverity.HIGH}&src=${BugFindingSource.CODE_REVIEW}&status=${BugFindingStatus.NEW}&age=stale&dup=1&sort=severity&dir=asc&size=50`,
+      `/?bug=abc&bucket=failed&q=terms&run=run-a&repo=ally-be,ally-web&sev=${BugFindingSeverity.HIGH}&src=${BugFindingSource.CODE_REVIEW}&age=stale&dup=1&sort=status&dir=asc&size=50`,
     );
     expect(parsed()).toEqual({
       bug: "abc",
-      bucket: "problem",
+      bucket: "failed",
       search: "terms",
       run: "run-a",
       repos: ["ally-be", "ally-web"],
       severities: [BugFindingSeverity.HIGH],
       sources: [BugFindingSource.CODE_REVIEW],
-      statuses: [BugFindingStatus.NEW],
-      stages: [],
       age: "stale",
       duplicatesOnly: true,
-      sort: "severity",
+      sort: "status",
       direction: "asc",
       pageSize: 50,
     });
@@ -129,10 +124,20 @@ describe("reading the query string", () => {
    * "all" rather than reaching a filter that then matches nothing and looks
    * broken — and the page is not the place to complain about a mistyped link.
    */
+  it("opens the bug a fix-PR link names with the old `?finding=` param", () => {
+    mount("/?finding=abc");
+    expect(parsed().bug).toBe("abc");
+  });
+
+  it("prefers `bug` when a link carries both", () => {
+    mount("/?bug=abc&finding=old");
+    expect(parsed().bug).toBe("abc");
+  });
+
   it("falls back to the default for a value that isn't in the enum", () => {
     mount("/?bucket=urgent&sev=critical&src=telepathy&age=eternal&size=7&sort=vibes");
     const state = parsed();
-    expect(state.bucket).toBe("all");
+    expect(state.bucket).toBeNull();
     expect(state.severities).toEqual([]);
     expect(state.sources).toEqual([]);
     expect(state.age).toBe("all");
@@ -145,6 +150,24 @@ describe("reading the query string", () => {
    * send, so validation is per value and not per param — throwing the whole
    * facet away because one segment is junk loses the part that parsed.
    */
+  // Links from before the tabs (2026-10-13) open on the tab their chip became.
+  it("maps an old chip value onto its tab", () => {
+    mount("/?bucket=problem");
+    expect(parsed().bucket).toBe("failed");
+  });
+
+  // Severity, cost, stage and updated lost their columns; ordering by a column
+  // the reader can't see would read as a broken table.
+  it("ignores a sort key whose column is gone", () => {
+    mount("/?sort=severity&dir=asc");
+    expect(parsed().sort).toBe("discovered");
+  });
+
+  it("does not count the tab as a filter", () => {
+    mount("/?bucket=done");
+    expect(screen.getByTestId("has-filters").textContent).toBe("false");
+  });
+
   it("keeps the values it recognises in a partly-bad facet", () => {
     mount(`/?sev=${BugFindingSeverity.HIGH},critical,${BugFindingSeverity.LOW}`);
     expect(parsed().severities).toEqual([BugFindingSeverity.HIGH, BugFindingSeverity.LOW]);
@@ -193,22 +216,32 @@ describe("writing the query string", () => {
    */
   it("drops a key rather than writing its default", () => {
     mount();
-    fireEvent.click(screen.getByText("bucket needs_you"));
-    expect(search()).toBe("?bucket=needs_you");
-
-    fireEvent.click(screen.getByText("bucket all"));
+    fireEvent.click(screen.getByText("duplicates on"));
+    fireEvent.click(screen.getByText("duplicates off"));
     expect(search()).toBe("");
   });
 
+  // The default tab moves with the data, so a tab someone clicked is written
+  // even when it is the one the page would have picked — and stays put when
+  // Needs you empties under them.
+  it("writes the tab a reader picks, default or not", () => {
+    mount();
+    fireEvent.click(screen.getByText("bucket needs_you"));
+    expect(search()).toBe("?bucket=needs_you");
+
+    fireEvent.click(screen.getByText("bucket done"));
+    expect(search()).toBe("?bucket=done");
+  });
+
   it("pushes history when a bug is opened, so Back closes the drawer", () => {
-    mount("/?bucket=problem");
+    mount("/?bucket=failed");
     fireEvent.click(screen.getByText("open bug"));
     expect(parsed().bug).toBe("bug-1");
 
     fireEvent.click(screen.getByText("back"));
     expect(parsed().bug).toBeNull();
-    // And the filters that found it survive the trip back.
-    expect(parsed().bucket).toBe("problem");
+    // And the tab that found it survives the trip back.
+    expect(parsed().bucket).toBe("failed");
   });
 
   /**
@@ -216,6 +249,19 @@ describe("writing the query string", () => {
    * cost four presses of Back to undo. Replacing means there is nothing behind
    * the first entry to go back to.
    */
+  it("closes a drawer opened from `?finding=`, rather than leaving the alias to reopen it", () => {
+    mount("/?finding=abc&repo=ally-be");
+    fireEvent.click(screen.getByText("close bug"));
+    expect(parsed().bug).toBeNull();
+    expect(search()).toBe("?repo=ally-be");
+  });
+
+  it("opens another bug from a `?finding=` link under `bug`, dropping the alias", () => {
+    mount("/?finding=abc");
+    fireEvent.click(screen.getByText("open bug"));
+    expect(search()).toBe("?bug=bug-1");
+  });
+
   it("replaces history when the search changes", () => {
     mount();
     fireEvent.click(screen.getByText("search terms"));
@@ -260,13 +306,13 @@ describe("writing the query string", () => {
    */
   it("carries the sort, and drops it again at the default", () => {
     mount();
-    fireEvent.click(screen.getByText("sort severity"));
-    expect(search()).toBe("?sort=severity&dir=desc");
-    expect(parsed()).toMatchObject({ sort: "severity", direction: "desc" });
+    fireEvent.click(screen.getByText("sort status"));
+    expect(search()).toBe("?sort=status&dir=asc");
+    expect(parsed()).toMatchObject({ sort: "status", direction: "asc" });
 
     // Same column again flips the direction rather than picking a new one.
-    fireEvent.click(screen.getByText("sort severity"));
-    expect(parsed().direction).toBe("asc");
+    fireEvent.click(screen.getByText("sort status"));
+    expect(parsed().direction).toBe("desc");
 
     // Back to newest-first, which is the default, so both keys go.
     fireEvent.click(screen.getByText("sort discovered"));
@@ -284,12 +330,13 @@ describe("writing the query string", () => {
 
   it("clears the filters and nothing else", () => {
     mount(
-      `/?bug=abc&bucket=problem&q=terms&repo=ally-be&sev=${BugFindingSeverity.HIGH}&age=stale&dup=1&sort=title&dir=asc`,
+      `/?bug=abc&bucket=failed&q=terms&repo=ally-be&sev=${BugFindingSeverity.HIGH}&age=stale&dup=1&sort=title&dir=asc`,
     );
     fireEvent.click(screen.getByText("clear filters"));
 
     const state = parsed();
-    expect(state.bucket).toBe("all");
+    // The tab is where the reader is, not a filter.
+    expect(state.bucket).toBe("failed");
     expect(state.search).toBe("");
     expect(state.repos).toEqual([]);
     expect(state.severities).toEqual([]);
@@ -309,20 +356,20 @@ describe("writing the query string", () => {
    */
   it("scoping to a run clears every other filter in one write", () => {
     mount(
-      `/?bucket=closed&q=terms&repo=ally-be&sev=${BugFindingSeverity.HIGH}&src=${BugFindingSource.LINT_ERROR}&status=${BugFindingStatus.NEW}&age=stale&dup=1`,
+      `/?bucket=done&q=terms&repo=ally-be&sev=${BugFindingSeverity.HIGH}&src=${BugFindingSource.LINT_ERROR}&age=stale&dup=1`,
     );
     fireEvent.click(screen.getByText("scope run-a"));
 
     const state = parsed();
     expect(state.run).toBe("run-a");
     // "The 10 that sweep found" intersected with a leftover severity filter is
-    // an answer to a question nobody asked, next to a log still saying 10.
-    expect(state.bucket).toBe("all");
+    // an answer to a question nobody asked, next to a log still saying 10. The
+    // tab goes too, so the scope opens on its first non-empty one.
+    expect(state.bucket).toBeNull();
     expect(state.search).toBe("");
     expect(state.repos).toEqual([]);
     expect(state.severities).toEqual([]);
     expect(state.sources).toEqual([]);
-    expect(state.statuses).toEqual([]);
     expect(state.age).toBe("all");
     expect(state.duplicatesOnly).toBe(false);
     expect(search()).toBe("?run=run-a");
@@ -353,18 +400,17 @@ describe("writing the query string", () => {
    */
   it("leaves the other filters alone when dropping the scope", () => {
     mount(
-      `/?run=run-a&bucket=closed&q=terms&repo=ally-be&sev=${BugFindingSeverity.HIGH}&src=${BugFindingSource.LINT_ERROR}&status=${BugFindingStatus.NEW}&age=stale&dup=1`,
+      `/?run=run-a&bucket=done&q=terms&repo=ally-be&sev=${BugFindingSeverity.HIGH}&src=${BugFindingSource.LINT_ERROR}&age=stale&dup=1`,
     );
     fireEvent.click(screen.getByText("scope none"));
 
     const state = parsed();
     expect(state.run).toBeNull();
-    expect(state.bucket).toBe("closed");
+    expect(state.bucket).toBe("done");
     expect(state.search).toBe("terms");
     expect(state.repos).toEqual(["ally-be"]);
     expect(state.severities).toEqual([BugFindingSeverity.HIGH]);
     expect(state.sources).toEqual([BugFindingSource.LINT_ERROR]);
-    expect(state.statuses).toEqual([BugFindingStatus.NEW]);
     expect(state.age).toBe("stale");
     expect(state.duplicatesOnly).toBe(true);
   });

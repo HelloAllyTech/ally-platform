@@ -16,8 +16,13 @@ export interface PipelineRailProps {
    * rail — a bug can be stuck at the same stage for two different reasons (an
    * outright failure vs. an open question it's waiting on), and the rail
    * should say which without implying it moved backward or forward.
+   *
+   * `done` and `stopped` are the two settled ends: a released bug has finished
+   * the last stage rather than sitting on it, and a declined or stopped one is
+   * not moving anywhere. Neither breathes — the pulse means "it is here and
+   * live", which a bug with nothing left to happen is not.
    */
-  variant?: "error" | "waiting";
+  variant?: "error" | "waiting" | "done" | "stopped";
   /**
    * Strips the rail down to its nodes for use inside a row: no bordered box,
    * no header, no per-node text labels, smaller circles. `LiveWorkBoard` shows
@@ -66,6 +71,7 @@ const NODE_STYLES = {
   current: "border-2 border-amber-400 bg-amber-50 text-amber-700",
   currentError: "border-2 border-destructive-500 bg-destructive-50 text-destructive-600",
   currentWaiting: "border-2 border-orange-400 bg-orange-50 text-orange-600",
+  currentStopped: "border-2 border-neutral-400 bg-neutral-100 text-typography-500",
 } as const;
 
 /**
@@ -121,6 +127,8 @@ const PULSE_RING_COLOR: Record<"working" | "error" | "waiting", string> = {
  *
  * Completed stages fill green with a tick, the current stage pulses amber (or
  * red/orange under `variant`), and everything ahead stays a neutral outline.
+ * A settled bug does not pulse: `done` fills the last node green, `stopped`
+ * greys the node it stopped at.
  * The connecting line's fill animates its width when the stage advances —
  * the one motion in this feature that most says "this moved forward since
  * you last looked" (see the module doc in `pipelineStage.ts` for the mapping
@@ -196,6 +204,7 @@ export const PipelineRail: FC<PipelineRailProps> = ({
   const currentIndex = PIPELINE_STAGES.indexOf(stage);
   const progress = currentIndex / SEGMENTS;
   const pulseKind = variant === "error" ? "error" : variant === "waiting" ? "waiting" : "working";
+  const settled = variant === "done" || variant === "stopped";
   const geometry = dense ? GEOMETRY.dense : GEOMETRY.regular;
   const advance = useStageAdvance(currentIndex);
 
@@ -270,10 +279,12 @@ export const PipelineRail: FC<PipelineRailProps> = ({
         <div className="relative flex justify-between">
           {PIPELINE_STAGES.map((nodeStage, index) => {
             const Icon = STAGE_ICONS[nodeStage];
-            const isCompleted = index < currentIndex;
             const isCurrent = index === currentIndex;
+            // A released bug has finished its last stage, not stopped on it.
+            const isCompleted = index < currentIndex || (isCurrent && variant === "done");
             const isCurrentError = isCurrent && variant === "error";
             const isCurrentWaiting = isCurrent && variant === "waiting";
+            const isCurrentStopped = isCurrent && variant === "stopped";
 
             const nodeClassName = isCompleted
               ? NODE_STYLES.completed
@@ -281,9 +292,11 @@ export const PipelineRail: FC<PipelineRailProps> = ({
                 ? NODE_STYLES.currentError
                 : isCurrentWaiting
                   ? NODE_STYLES.currentWaiting
-                  : isCurrent
-                    ? NODE_STYLES.current
-                    : NODE_STYLES.future;
+                  : isCurrentStopped
+                    ? NODE_STYLES.currentStopped
+                    : isCurrent
+                      ? NODE_STYLES.current
+                      : NODE_STYLES.future;
 
             // Re-keying is what replays the pop: a changed key remounts the
             // circle, so its `initial` runs again.
@@ -302,8 +315,9 @@ export const PipelineRail: FC<PipelineRailProps> = ({
                   // tooltip repeating it is noise.
                   title={dense ? STAGE_LABELS[nodeStage] : undefined}
                 >
-                  {isCurrent && !shouldReduceMotion && (
+                  {isCurrent && !settled && !shouldReduceMotion && (
                     <motion.span
+                      data-testid="pipeline-rail-pulse"
                       className={`absolute inline-flex h-full w-full rounded-full ${PULSE_RING_COLOR[pulseKind]}`}
                       initial={{ opacity: 0.5, scale: 1 }}
                       animate={{ opacity: 0, scale: 1.8 }}

@@ -2471,30 +2471,30 @@ export const en = {
     agentStatusOnShiftDetail: "Nothing on my desk. My next sweep runs tonight.",
     agentStatusOnShiftDetailManual:
       "Nothing on my desk. My next sweep runs tonight — I'll check with you before I fix anything.",
-    // ── Lifecycle buckets (the chip row above the bugs table) ────────────────
-    // Seventeen statuses collapsed into the seven groups an admin scans for,
-    // named by whose move it is next. These replace both the four-tile workload
-    // strip on the card and the flat seventeen-item status <Select>; see
-    // lifecycleBucket.ts for why the groups are cut this way.
-    //
-    // "In progress" and "In review" keep the workload tiles' exact wording on
-    // purpose — the numbers moved, the vocabulary shouldn't.
-    bucketGroupLabel: "Filter bugs by what needs to happen next",
-    bucketAll: "Everything",
-    bucketNeedsYou: "Needs your call",
-    // Not "Failed": the bucket holds a failed fix and a failed release, and the
-    // shared fact is that a job went red, which is also how the status line
-    // says it ("{count} of my jobs went red").
-    bucketProblem: "Went red",
-    // NEW, APPROVED and BLOCKED — recorded, accepted, nobody blocked, not
-    // started. "Queued" would collide with the QUEUED status pill ("Starting…").
-    bucketQueued: "On the list",
-    bucketInFlight: "In progress",
-    bucketInReview: "In review",
-    // Matches the RELEASED status pill's own label rather than inventing a
-    // second word for production.
-    bucketShipped: "Live",
-    bucketClosed: "Closed",
+    // ── Tabs over the bugs table (2026-10-13) ───────────────────────────────
+    // Five tabs replaced seven chips and "Everything": one question each, in
+    // the order a reader asks them. Plain words, named by what is in them —
+    // see lifecycleBucket.ts for which statuses each holds.
+    tabsLabel: "Bugs by what happens next",
+    tabNeedsYou: "Needs you",
+    tabFailed: "Failed",
+    tabInProgress: "In progress",
+    tabBacklog: "Backlog",
+    tabDone: "Done",
+    // An empty tab says what lands in it, so it reads as "nothing yet" rather
+    // than as something broken. App voice: this is the page describing itself.
+    tabEmptyNeedsYouTitle: "Nothing needs you right now",
+    tabEmptyNeedsYouSubtitle: "Bugs waiting for your approval or an answer land here.",
+    tabEmptyFailedTitle: "Nothing has failed",
+    tabEmptyFailedSubtitle:
+      "Fix sessions and releases that go red land here, for you to try again or close.",
+    tabEmptyInProgressTitle: "Nothing in progress",
+    tabEmptyInProgressSubtitle:
+      "Bugs being fixed or released, and fixes with a pull request open for review, land here.",
+    tabEmptyBacklogTitle: "The backlog is empty",
+    tabEmptyBacklogSubtitle: "New bugs that nobody has started yet land here.",
+    tabEmptyDoneTitle: "Nothing done yet",
+    tabEmptyDoneSubtitle: "Merged, live and closed bugs land here.",
 
     // ── What I need from you (the decision queue) ────────────────────────────
     // First person, and it ends with what happens next — the voice rules in
@@ -2525,11 +2525,12 @@ export const en = {
 
     // ── Working style: how much rope, not on/off ─────────────────────────────
     modeLabel: "Working style",
-    modeOff: "Off duty",
-    modeManual: "Checks with you",
-    modeAi: "Works solo",
-    modeTooltip:
-      "Off duty blocks every trigger, nightly and on-demand alike — there is no separate pause. Checks with you (Manual mode) and Works solo (AI mode) both keep it finding bugs on schedule; only Checks with you holds the fix stage for your approval on each bug, in the table below. Changing this mid-run lets the current run finish under the old setting.",
+    // Plain control labels (2026-10-13). The API and the logs say off, manual
+    // and ai; About names both vocabularies so they join up. The confirm
+    // dialogs below still speak in Bug Hunter's own voice.
+    modeOff: "Off",
+    modeManual: "Manual",
+    modeAi: "Autonomous",
     modeOffConfirmTitle: "Send Bug Hunter off duty?",
     modeManualConfirmTitle: "Ask Bug Hunter to check with you first?",
     modeAiConfirmTitle: "Let Bug Hunter work solo?",
@@ -2545,6 +2546,20 @@ export const en = {
     // Links to the shared Model Settings hub (see `en.modelSettings`) rather
     // than a Bug-Hunter-only page — Builder's model tiers live there too.
     settingsLink: "Model settings",
+    // ── The one-line header (2026-10-13) ─────────────────────────────────────
+    // State, then what it is doing, then when it last swept — each fragment in
+    // sentence case so any of them can drop out. App voice: the header reports
+    // on Bug Hunter rather than speaking as it.
+    headerFixingNow: "Fixing {count} now",
+    headerSweepingNow: "Sweeping {repo} now",
+    headerLastSweep: "Last sweep {when}",
+    headerNoSweepYet: "No sweep yet",
+    headerAgo: "{span} ago",
+    headerJustNow: "just now",
+    headerMenuLabel: "More actions",
+    menuScanUxSignals: "Scan UX signals now",
+    menuMapFeatures: "Map features now",
+    helpButtonLabel: "About Bug Hunter",
     // ── About me (was the FAQ) ───────────────────────────────────────────────
     // Questions in the second person, answers in the first: this reads as
     // asking a colleague how they work, not as product documentation. Both
@@ -2556,7 +2571,7 @@ export const en = {
       "Every night — and whenever you ask — I go through the Ally repos looking for bugs: failing or flaky tests, an LLM code-review pass over recent changes, production error signals, and the bugs your team has already reported on the product roadmap. Everything I find, and everything your team reports, lands in my bugs table below with its current status.",
     faqModesTitle: "What's the difference between the two working styles?",
     faqModesBody:
-      'I discover and verify bugs the same way in both, on the same schedule. On Works solo (AI mode) a bug I\'ve verified goes straight to the fix stage. On Checks with you (Manual mode) it waits at "Pending approval" in my table until you approve it — I fix nothing without a click from you first.',
+      'I discover and verify bugs the same way in both, on the same schedule. On Autonomous (AI mode) a bug I\'ve verified goes straight to the fix stage. On Manual it waits at "Pending approval" under Needs you until you approve it — I fix nothing without a click from you first.',
     faqTrivialTitle: "What do you fix on your own, and what do you just propose?",
     faqTrivialBody:
       "I merge my own fix only in a narrow, pre-approved set of cases: a lint or type-only change, or a single-file fix backed by a new regression test that fails before it and passes after. I never touch migrations, auth and permission code, payment paths or other security-sensitive services on my own, however small the diff looks — those always come to you as a PR.",
@@ -2574,35 +2589,25 @@ export const en = {
       "In my bugs table below — click any row to open it, approve or reject it, or answer a question I've asked. There's no separate review screen.",
     faqEscalationTitle: "Where do you tell me you're stuck?",
     faqEscalationBody:
-      "In my messages at the top of this page — that's the only place I speak. I post there when I need an answer from you, when something has gone wrong, and when a fix reaches production. The count beside them is what's unread; it turns orange when I'm actually blocked waiting on you. A bug at \"Needs input\" has an open question — open it to read and answer. A quiet, successful night gets no message at all, on purpose.",
+      'Under Needs you, the first tab of my bugs table. A bug that needs your approval waits there, and so does one where I\'ve asked you a question — it reads "Needs input", and its Answer button opens it so you can reply. Anything of mine that went red is under Failed. The count beside Bug Hunter in the sidebar is my unread notifications. A quiet, successful night gets no message at all, on purpose.',
     faqReposTitle: "Which repos do you touch?",
     faqReposBody: "ally-be, ally-web, ally-ai, ally-ai-learn and ally-mobile.",
     faqCostTitle: "What does a night of your work cost?",
     faqCostBody:
-      "Every sweep's estimated token cost is in my shift log below, from the same LLM usage data the platform's cost analytics use.",
+      "Every sweep's estimated token cost is in my shift log on Analytics → Bug Agent, from the same LLM usage data the platform's cost analytics use. What my fix sessions on one bug have cost is on that bug.",
     faqOffTitle: "How do I stop you?",
     faqOffBody:
-      "Set my working style to Off duty above. That blocks every trigger immediately — nightly and on-demand alike.",
+      "Set my working style to Off at the top of the page. That blocks every trigger immediately — nightly and on-demand alike.",
     // ── Findings table (the comprehensive bug table) ──────────────────────────
-    findingsTitle: "Bugs I'm tracking",
-    // No longer "newest first": the table sorts by three columns now, so stating
-    // one order as a property of the list would be wrong the moment anyone
-    // clicks a header. Newest-first is still the default.
-    findingsSubtitle:
-      "Everything I know about, from any source. Search it, or filter by what needs doing.",
     findingColumnTitle: "Bug",
-    findingColumnRepo: "Repo",
-    findingColumnSeverity: "Severity",
     findingColumnStatus: "Status",
     // Sorting by status walks the lifecycle rather than the alphabet, which is
     // worth saying: "sort by status" reads as an arbitrary ordering until you
     // know that clicking it brings your own unfinished work to the top.
     findingColumnStatusTooltip:
-      "Where a bug is in my pipeline. Sorting by it groups the list the way the chips above do — whatever is waiting on you first, then my own work in the order I do it, then what's finished.",
-    // `findingColumnStage` itself already lives with the stage labels below.
-    findingColumnStageTooltip:
-      "The coarse roadmap ladder — New, Prioritised, In development, Released — so a bug reads the same way as an idea on the roadmap board. I derive it from the status on its left unless somebody pinned it by hand.",
-    findingColumnPr: "PR",
+      "Where a bug is in my pipeline. Sorting by it walks the lifecycle rather than the alphabet — within Done, say, the merged fixes, then the live ones, then the closed.",
+    // The severity dot before a title: its accessible name and hover title.
+    severityDotLabel: "{severity} severity",
     findingSourceTestFailure: "Failing test",
     findingSourceLintError: "Lint error",
     findingSourceCodeReview: "Code review",
@@ -2614,7 +2619,6 @@ export const en = {
     findingSeverityLow: "Low",
     findingSeverityMedium: "Medium",
     findingSeverityHigh: "High",
-    findingSeverityNone: "—",
     findingStatusNew: "New",
     findingStatusPendingApproval: "Pending approval",
     findingStatusApproved: "Approved",
@@ -2640,17 +2644,13 @@ export const en = {
     findingStageUnderDevelopment: "In development",
     findingStageReleased: "Released",
     findingStageArchived: "Archived",
-    findingColumnStage: "Stage",
     findingStagePinnedTooltip:
       "Stage set by hand by {name} on {date}. It no longer follows the fix pipeline.",
-    findingStageAutoTooltip:
-      "Stage follows the fix pipeline automatically — it's {stage} because this bug is {status}.",
-    findingStagePinned: "pinned",
     stageSectionTitle: "Stage",
     stageAutoLabel: "Following the pipeline",
     stageEditLabel: "Set stage by hand",
     stageEditHint:
-      "Use this when the bug was fixed outside Bug Hunter — a hand-written PR, a config change, a fix that came along with other work. Once set by hand, the stage stops following the pipeline.",
+      "For a bug fixed outside Bug Hunter; a stage set by hand stops following the pipeline.",
     stageSelectLabel: "Stage",
     stageSave: "Set stage",
     stageBackToAuto: "Back to automatic",
@@ -2680,7 +2680,6 @@ export const en = {
     reporterContextOs: "OS",
     reporterContextAppVersion: "App version",
     reporterContextClientTimestamp: "Reported at (their clock)",
-    reporterTenant: "Tenant",
     findingsEmptyTitle: "No bugs yet",
     findingsEmptySubtitle:
       "Once I'm on duty, anything I find — or your team reports — shows up here.",
@@ -2701,15 +2700,12 @@ export const en = {
     // the triager's daily surface; the monthly governance numbers moved to
     // Analytics → Bug Agent (OPP-0749) — see BugHunter.tsx.
     sectionWork: "Work",
-    sectionAbout: "About",
     sectionNotebook: "Notebook",
     filtersButton: "Filters",
     filtersPanelLabel: "Filter bugs",
-    filterSectionStatus: "Status",
     filterSectionRepo: "Repo",
     filterSectionSeverity: "Severity",
     filterSectionSource: "Source",
-    filterSectionStage: "Roadmap stage",
     filterSectionAge: "Age",
     filterSectionClear: "Clear",
     filterAgeAll: "Any age",
@@ -2726,7 +2722,7 @@ export const en = {
     // I find shows up here" is the wrong thing to tell someone who has just
     // typed a typo into the search box.
     noMatchTitle: "Nothing here matches those filters",
-    noMatchSubtitle: "Clear them, or pick a different group above.",
+    noMatchSubtitle: "Clear them, or try another tab.",
     // "Showing 1 of 1 bugs" is both ungrammatical and redundant, so a single
     // match gets its own line rather than a template with a plural stuck on it.
     resultSummaryOne: "Showing 1 bug",
@@ -2767,9 +2763,8 @@ export const en = {
     // Written from Bug Hunter's side of the exchange, like the rest of this
     // tab: what the admin is changing is what I will be told to fix, and
     // saying so is the whole justification for the control existing.
-    drawerDescriptionEdit: "Rewrite this for me",
-    drawerDescriptionEditTooltip:
-      "This description is the entire brief I work from — I'm told the bug in these words and nothing else, and I use them to work out which codebase it's even in. If it's vague, say what breaks, when, and what should happen instead. Rewriting doesn't approve anything or start anything; it just means I'll be better briefed when you do.",
+    drawerDescriptionEdit: "Rewrite the description",
+    drawerDescriptionEditHelp: "I work from these words and nothing else.",
     drawerDescriptionEditLabel: "The bug, as you want me to understand it",
     drawerDescriptionEditPlaceholder:
       "What breaks, when it breaks, and what should happen instead…",
@@ -2778,16 +2773,47 @@ export const en = {
     drawerDescriptionEditFailed: "Couldn't save that description. Try again.",
     drawerDescriptionEditTooLong:
       "That's longer than I can take as a brief ({length} of {max} characters). Paste raw output into a comment on the PR instead — this field is what I read before I start.",
-    drawerDescriptionEditedBy: "Rewritten by user #{userId}",
+    drawerDescriptionEditedBy: "Rewritten by {name}",
     drawerDescriptionShowOriginal: "See what I originally found",
     drawerDescriptionHideOriginal: "Hide what I originally found",
     drawerDescriptionOriginalTitle: "Originally",
     drawerDescriptionSettleFirst:
-      "Save or cancel your rewrite first — right now I'd still be working from the description above it.",
+      "Save or cancel your rewrite first — right now I'd still be working from the old description.",
     drawerEvidenceTitle: "Evidence",
     drawerTimelineTitle: "My work log",
     drawerTimelineEmpty: "I haven't touched this one yet.",
     drawerLoadFailed: "Couldn't load this bug's details.",
+    drawerLoading: "Loading this bug…",
+    // ── The header: one meta line, and a menu for everything that isn't the decision ──
+    drawerMoreActions: "More actions",
+    drawerFoundAgo: "found {age} ago",
+    drawerFoundJustNow: "found just now",
+    drawerLastRunOn: "Last run on {model}",
+    // ── The decision block's one status sentence, per lifecycle state ─────────
+    // One sentence that says where the bug is and what happens next, in place
+    // of the badge, banner and spinner that used to each say part of it.
+    drawerStatusNew: "I haven't looked at this one yet.",
+    drawerStatusPendingApproval: "Waiting for your call before I fix it.",
+    drawerStatusApproved: "Approved. I'll fix it on my next sweep, or put me on it now.",
+    drawerStatusFixing: "I'm working on the fix now.",
+    drawerStatusCoordinating: "I'm working through a fix that spans several repos, one at a time.",
+    drawerStatusBlocked: "Waiting for an earlier step of this fix to land first.",
+    drawerStatusAnswerReceived: "Thanks. I'll carry on with your answer.",
+    drawerStatusPrOpened: "My fix is in a pull request, waiting for your merge.",
+    drawerStatusMerged: "The fix is merged. Users get it once it's released.",
+    drawerStatusCancelled: "You stopped my fix session. Nothing from it was merged.",
+    drawerStatusDismissed: "I dropped this one.",
+    drawerStatusRejected: "You turned this down.",
+    // ── Collapsed sections ───────────────────────────────────────────────────
+    drawerSectionConfidence: "How sure I am",
+    drawerSectionPlan: "How I planned the fix",
+    // ── Who did what, merged into the work log ───────────────────────────────
+    drawerAuditApproved: "approved it",
+    drawerAuditDeclined: "turned it down",
+    drawerAuditReleased: "released it to production",
+    drawerAuditStopped: "stopped the fix session",
+    drawerAuditAnswered: "answered: {answer}",
+    drawerAuditSomeone: "An admin",
     drawerReportedBugNotice: "Your team reported this. I haven't triaged it yet.",
     drawerGuardedPathNotice:
       "This touches a guarded path — migrations, auth or payments — so I'll never merge it myself, however small the fix turns out to be.",
@@ -2796,6 +2822,8 @@ export const en = {
     drawerApproveConfirmTitle: "Approve this bug for me to fix?",
     drawerApproveConfirmBody:
       'I\'ll pick it up in the fix stage of my next sweep for this repo. If you want it done now, use "Put me on it" instead.',
+    drawerApproveConfirmBodyNoRush:
+      "I'll pick it up in the fix stage of my next sweep for this repo. Once it's approved you can also put me on it straight away.",
     drawerRejectConfirmTitle: "Reject this bug?",
     drawerRejectConfirmBody: "I'll never pick it up. This can't be undone.",
     // ── declining a bug: the reason, and what it is for ────────────────────
@@ -2916,17 +2944,22 @@ export const en = {
       replayEmpty: "No decisions in the window yet.",
     },
 
-    // ── the Work tab's "Today, by repo" board ──────────────────────────────
+    // ── "Today, by repo" — Analytics → Bug Agent, beside the shift log ──────
     today: {
       title: "Today, by repo",
-      subtitle: "{date}, since midnight India time",
+      // Every column counts since midnight except open PRs, which is the live
+      // number; the subtitle says so rather than letting the one exception
+      // pass for a day's count.
+      subtitle: "{date}, since midnight India time. Open PRs is the live count.",
       colRepo: "Repo",
       colSweeps: "Sweeps",
       colFound: "Found",
       colVerified: "Verifier on findings",
       colSessions: "Fix sessions",
       colFixVerdicts: "Verifier on fixes",
-      colPrsOpen: "PRs open",
+      colPrsOpen: "Open PRs now",
+      colPrsOpenTooltip:
+        "Fix pull requests open right now, whatever day they were opened. Every other column counts since midnight.",
       colMerged: "Merged",
       colReleased: "Released",
       colSpend: "Spend",
@@ -2963,20 +2996,18 @@ export const en = {
       "Only if you already know the fault is in this repo's code. A fix that starts from the symptom alone is how the wrong layer gets fixed.",
     drawerLocateFirstStart: "Locate the fault",
     drawerIndependentTooltip:
-      "After a sweep closes, a separate run on a different model reproduces each unproven finding and tries to refute it. I fix nothing in AI mode until it has confirmed the bug.",
+      "A separate run on a different model tries to reproduce this and refute it.",
 
     // ── the Verifier's verdict on a fix (OPP-0779) ────────────────────────
     drawerVerdictPass: "My Verifier passed this fix",
     drawerVerdictFail: "My Verifier refused this fix",
-    drawerVerdictTooltip:
-      "After I open a fix PR, a separate run on a different model reads it with fresh eyes: does the regression test fail before and pass after, is the suite green, does the diff do only what the bug needs, do data files keep their counts. I merge only on a pass, and only where this repo lets me.",
+    drawerVerdictTooltip: "A separate run on a different model checks my PR before it's merged.",
     drawerVerdictBy: "Read on {engine}",
     drawerVerdictCheckSkipped: "skipped: {reason}",
 
     // ── the case file's budget (OPP-0775) ─────────────────────────────────
     drawerBudgetLabel: "What I've spent on this bug",
-    drawerBudgetTooltip:
-      "Every bug has a budget: fix sessions, attempts, times I asked for help, dollars and minutes. I stop starting new sessions once any of them is spent, so trying again is a decision you make, not a reflex I have.",
+    drawerBudgetTooltip: "I stop starting sessions on my own once any cap is spent.",
     drawerBudgetSummary:
       "{sessions} of {sessionsCap} sessions · {attempts} of {attemptsCap} attempts · ${usd} of ${usdCap}",
     drawerBudgetExhausted: "Budget spent ({kind}). I won't start another session on my own.",
@@ -2990,8 +3021,7 @@ export const en = {
     // reader is whoever decides what Bug Hunter should learn to look at next,
     // so the sense is named as a thing to build or fix, not as an enum.
     drawerMissTitle: "Why I didn't find this first",
-    drawerMissTooltip:
-      "Every bug a person reports is one I should have caught. I write down which kind of miss it was and which sense would have seen it, so the next thing I learn to look at is the thing people keep finding for me.",
+    drawerMissTooltip: "Which sense would have caught it, so I learn to look there next.",
     drawerMissWouldNeed: "What would have caught it: {sense}",
     drawerMissSeeMatched: "See what I had already found",
     missNoSense: "I have no sense that could have seen this",
@@ -3019,8 +3049,9 @@ export const en = {
     // try again", and (through the dossier) the session that retries. The
     // labels name what each line is FOR, not the field it came from.
     drawerPostmortemTitle: "Why my last fix session failed",
-    drawerPostmortemTooltip:
-      "I write this when I give up on a fix: what kept failing, what I think is really wrong, and what a retry should do differently. The next session reads it before it starts, so a retry doesn't repeat this one.",
+    drawerPostmortemTooltip: "The next session reads this before it starts.",
+    drawerPostmortemShowAll: "Show the full post-mortem",
+    drawerPostmortemHideAll: "Hide the full post-mortem",
     drawerPostmortemRecorded: "From my session of {date}",
     drawerPostmortemAttempts: "{count} attempt(s) · {check}",
     drawerPostmortemLastFailure: "Last failure",
@@ -3034,8 +3065,7 @@ export const en = {
     // diff: where I said the value lives decides whether the fix is the
     // right shape at all.
     drawerStudyTitle: "How I understood it before fixing",
-    drawerStudyTooltip:
-      "Before I change any code I read the feature end to end — where the value lives, what carries it to the screen, what the client sends — and write it down. A second model reviews it, the Verifier compares my diff with it, and a retry reads it to see where I went wrong.",
+    drawerStudyTooltip: "What I read and planned before changing any code.",
     drawerStudyRecorded: "From my session of {date}",
     drawerStudyFeature: "The feature",
     drawerStudyHowItWorks: "How it works today",
@@ -3059,14 +3089,14 @@ export const en = {
     drawerStudyPreviousWrong: "What my earlier study got wrong",
     drawerStudyReviewNone: "Reviewed by {model}: no concerns.",
     drawerStudyReviewConcerns: "Reviewed by {model} — concerns I had to answer:",
+    drawerStudyReviewUnknownModel: "a second model",
 
     // ── confidence and regressions ─────────────────────────────────────────
     drawerConfidenceLabel: "How sure my checkers were",
-    drawerConfidenceTooltip:
-      "Two verifiers read the code separately, without seeing my reasoning. This is the LOWER of their two scores — if one of them was unsure, the finding is unsure.",
+    drawerConfidenceTooltip: "The lower of two independent verifiers' scores.",
     drawerConfidenceUnscored: "Not scored",
     drawerConfidenceUnscoredTooltip:
-      "Either this was proven outright (a failing test or a real production error, so there was nothing to argue about), or I found it before I started scoring.",
+      "Proven outright by a failing test or a real error, or found before I scored findings.",
     findingLowConfidenceChip: "Low confidence",
     findingLowConfidenceTooltip:
       "Both checkers accepted it but at least one wasn't sure. I hold these for you rather than fixing them myself.",
@@ -3079,8 +3109,6 @@ export const en = {
 
     // ── merging a green PR from here ───────────────────────────────────────
     drawerMerge: "Merge it",
-    drawerMergeTooltip:
-      "I can't merge in this repo — master needs a review and I only have push access — so my PR is sitting green and waiting. This merges it as you, without leaving the tab. I check the PR's own CI first and refuse if anything is red.",
     drawerMergeConfirmTitle: "Merge this fix to master?",
     drawerMergeConfirmBody:
       "I'll merge the PR as you. This does NOT deploy it — releasing to production is still a separate press.",
@@ -3091,8 +3119,7 @@ export const en = {
     drawerMergeForceHelp:
       "Recorded with the merge. This is how #792 landed with the wrong layer fixed; please read first.",
     drawerChainTitle: "The chain",
-    drawerChainTooltip:
-      "A fix is a chain of evidence from the symptom to the change: observed, reproduced, located, changed in that mechanism, resolved for the reporter, held after release. I merge only when the first five hold; the sixth is checked after release. A missing or broken link is what to look at before any diff.",
+    drawerChainTooltip: "I merge only when the first five links hold.",
     drawerChainLinks: {
       observed: "Observed",
       reproduced: "Reproduced",
@@ -3115,8 +3142,6 @@ export const en = {
     drawerAnswerPlaceholder: "Answer my question…",
     drawerAnswerSubmit: "Send answer",
     drawerAnswerFailed: "Couldn't send that answer. Try again.",
-    drawerAnsweredBy: "Answered by user #{userId}",
-    drawerDecidedBy: "Decided by user #{userId}",
     // ── The notebook ─────────────────────────────────────────────────────────
     notebookTitle: "My notebook",
     notebookIntro:
@@ -3174,8 +3199,6 @@ export const en = {
     // ── Fix session (on-demand) ──────────────────────────────────────────────
     drawerStartFixSession: "Put me on it",
     drawerRetryFixSession: "Ask me to try again",
-    drawerFixSessionTooltip:
-      "Puts me on this one bug now, instead of waiting for tonight's sweep. I write a failing test that reproduces it, fix it, check the whole suite is still green, and open a PR — merging it myself only if nothing guarded is involved. I don't deploy: releasing is a separate button once the fix is merged.",
     drawerFixSessionConfirmTitle: "Put Bug Hunter on this bug?",
     drawerFixSessionConfirmBody:
       "I'll work on this in {repo} on my own: a regression test first, then the smallest fix that makes it pass, then the full suite. If everything is green I open a PR and merge it — unless the fix touches migrations, auth or payments, which always stay a PR for you to review. I won't deploy anything in this step.",
@@ -3195,8 +3218,6 @@ export const en = {
     drawerWatchSession: "Watch me work",
     // ── Stop fix session (manual kill switch) ────────────────────────────────
     drawerStopFixSession: "Stop fix session",
-    drawerStopFixSessionTooltip:
-      "Cancels the running GitHub Actions job right away instead of waiting out its 60-minute cap — real compute and token savings, not just a status change. Use this when a session is clearly stuck or looping. You can put me on this bug again afterward, the same as after a failed attempt.",
     drawerStopFixSessionConfirmTitle: "Stop this fix session?",
     drawerStopFixSessionConfirmBody:
       "I'll cancel the GitHub Actions run in progress right away. Whatever I've done so far is lost — nothing partial gets merged. You can put me back on this bug afterward, the same as after a failed attempt.",
@@ -3205,12 +3226,9 @@ export const en = {
     // ambiguous which one you're confirming.
     drawerStopFixSessionConfirm: "Stop it",
     drawerStopFixSessionFailed: "Couldn't stop the fix session.",
-    drawerCancelledBy: "Stopped by user #{userId}",
     // ── Release to production ────────────────────────────────────────────────
     drawerRelease: "Release to production",
     drawerReleaseRetry: "Retry release",
-    drawerReleaseTooltip:
-      "Cuts the next patch version and runs that service's production release pipeline — for the backend that includes a database migration and an ECS rollout. This is the step where the fix actually reaches users.",
     drawerReleaseConfirmTitle: "Release this fix to production?",
     drawerReleaseConfirmBody:
       "This deploys {target} to production at the next patch version, running its full release pipeline — tests, build, database migration where applicable, and rollout. It affects live users. The fix is already merged to master either way; releasing is what puts it in front of people.",
@@ -3223,12 +3241,12 @@ export const en = {
     // and the run does not say which version it shipped — so the banner says
     // how it went live rather than printing "as —".
     drawerReleasedOutOfBandNotice:
-      "This is live in production. It went out in a release somebody ran from GitHub after the fix merged — I didn't start that release. The run is linked below.",
+      "This is live in production. It went out in a release somebody ran from GitHub after the fix merged — I didn't start that release.",
     drawerReleaseFailedNotice:
       "Release {tag} went red. The fix is still merged to master — it just isn't deployed. Check the run, then ask me to retry.",
     drawerFixSessionFailedNotice: "The fix session failed. Start a new session to retry.",
     drawerReleaseBlocked: "Why I can't release this from here",
-    drawerReleasedBy: "Released by user #{userId}",
+    drawerReleaseTargetFallback: "this service",
     drawerViewReleaseRun: "View release run",
     // ── Shift log (was run history) ──────────────────────────────────────────
     historyTitle: "My shift log",
@@ -3335,85 +3353,15 @@ export const en = {
     // The dense rail has no visible stage names, so its group name carries
     // them — see the `dense` prop in PipelineRail.tsx.
     pipelineRailDenseLabel: "Pipeline stage: {stage}, step {step} of {total}",
-    // ── Live clock (freshness readout next to the status pill) ──────────────
-    updatedJustNow: "Updated just now",
-    updatedSecondsAgo: "Updated {count}s ago",
-    updatedMinutesAgo: "Updated {count}m ago",
-    updatedHoursAgo: "Updated {count}h ago",
-    // The same clock in `elapsed` mode: a bare duration, because the caller's
-    // own words say what it is a duration of. No "just now" case — a counter
-    // climbing from 0s is the signal.
-    elapsedSeconds: "{count}s",
-    elapsedMinutes: "{count}m",
-    elapsedHours: "{count}h",
-    // Both modes hover to the exact moment, to the second. The relative form
-    // answers "is this still moving?"; only a real timestamp answers "which
-    // sweep was this?", and an incident review needs the second one.
-    clockUpdatedExactTitle: "Last updated {timestamp}",
-    clockElapsedExactTitle: "Started {timestamp}",
-    // ── Live work board ("on it right now") ─────────────────────────────────
-    // The tab's only present-tense section, and the only one that reports the
-    // agent's own work in progress rather than a record of it. Voice rules
-    // apply as everywhere else — first person, plain, and every line ends with
-    // what happens next — with one extra constraint specific to this section:
-    // nothing here may be written to sound busier than the data is. The board
-    // is absent entirely when nothing is in flight, so no string below ever has
-    // to cover an idle agent.
-    liveWorkTitle: "On it right now",
-    liveWorkSubtitle:
-      "These are moving on their own — nothing here needs you. Open one to follow along.",
-    liveWorkSweeping: "I'm sweeping {repo}.",
-    liveWorkSweepElapsedLabel: "Sweeping for {duration}",
-    liveWorkStageElapsedLabel: "{duration} on this step",
-    liveWorkNoRepo: "No codebase matched to this one yet",
-    // What each in-flight status means, as the thing it is doing.
-    liveWorkQueued: "I've queued a fix session — it starts as soon as a runner frees up.",
-    liveWorkFixing:
-      "I'm writing the fix now: a failing test that reproduces it first, then the change, then the whole suite.",
-    liveWorkCoordinating:
-      "This one spans repos, so I'm working through them in order — one has to land before the next starts.",
-    liveWorkReleasing: "The release is running. I'll report how it went here in a few minutes.",
-    liveWorkGeneric: "I'm working on this one now.",
-    // Where a bug just got to. Shown for a few seconds after it stops being in
-    // flight, which is the only moment on the tab where finishing is visible as
-    // it happens rather than as a row that quietly changed colour.
-    liveWorkLandedPrOpened: "Fix written and pushed — the PR is open for review.",
-    liveWorkLandedMerged: "Merged to master. Putting it in front of users is your call.",
-    liveWorkLandedReleased: "Released to production. Users have this fix now.",
-    liveWorkLandedReleaseFailed:
-      "It's merged, but the release went red. The details are on the bug.",
-    liveWorkLandedNeedsInput:
-      "I've stopped on this one — my question for you is in the queue above.",
-    liveWorkLandedPendingApproval: "Waiting on your call before I start fixing it.",
-    liveWorkLandedFailed: "That attempt went red. Whether I try again is your call.",
-    liveWorkLandedCancelled: "You stopped this session. The bug is still open.",
-    liveWorkLandedClosed: "Off the board — I won't pick this one up.",
-    liveWorkLandedRequeued: "Back in the queue. I'll pick it up on my next pass.",
-    liveWorkShowAll: "Show {count} more",
-    liveWorkShowFewer: "Show fewer",
     // ── Age / staleness column ─────────────────────────────────────
     findingColumnAge: "Age",
     findingColumnAgeTooltip:
       "How long a bug has been on my list. I only colour it for bugs still waiting on a decision — something that shipped last month isn't stale, it's finished.",
     findingAgeStaleTooltip: "Waiting on a decision for over a week.",
     findingAgeAncientTooltip: "Waiting on a decision for over a month.",
-    // ── "Updated" column, and the run scope it exists to explain ────
-    // Not "Last triaged". `updatedAt` moves for anything at all — my own sweep
-    // re-reading the bug, a status change, an admin rewriting the description —
-    // and a column promising it was me who last looked would be wrong roughly
-    // whenever a human touched the row.
-    findingColumnUpdated: "Updated",
-    // Only shows once something in view has actually moved since it was found,
-    // so this tooltip is never explaining a column of repeated Age values.
-    findingColumnUpdatedTooltip:
-      "When anything last happened to a bug — I re-read it on a sweep, its status moved, or someone rewrote it. Age is how long it's been on my list; this is whether it's been touched lately. On a bug your team reported weeks ago and I only looked at last night, those two are very far apart.",
-    // Only shows once some bug in view has cost anything, so a table of
-    // untouched reports is not a column of dashes.
     drawerPrReview: "Found reviewing pull request #{number}",
     drawerPrReviewCommented: "· my comment is on the PR",
-    findingColumnCost: "Est. cost",
-    findingColumnCostTooltip:
-      "What my fix sessions on this bug have cost so far: the engine's own figure where it reported one, else my token estimate. Sweep cost is not counted — a sweep reads the whole repo and no one bug owns it. Sort by it to see which bugs have burned the most. The drawer has the per-session breakdown.",
+    // ── The run scope ───────────────────────────────────────────────
     runScopeBanner: "Showing only the bugs my {repo} sweep at {timestamp} touched.",
     runScopeBannerLoading: "Showing only the bugs one sweep touched.",
     // The point of the sentence. "Found 10" meant ten rows touched, and most of
@@ -3421,21 +3369,27 @@ export const en = {
     // ten were never going to be at the top of a table sorted by age, and the
     // only reading left was that they had gone missing.
     runScopeBannerHint:
-      "Counts and filters below describe this sweep only. Some of these bugs are older than the sweep — I re-read what your team reported, so a bug filed weeks ago still counts as found on the night I looked at it.",
+      "Counts, tabs and filters below describe this sweep only. Some of these bugs are older than the sweep — I re-read what your team reported, so a bug filed weeks ago still counts as found on the night I looked at it.",
     runScopeClear: "Show all bugs",
     runScopeCellLabel: "Show the {count} bugs this {repo} sweep touched",
-    // ── Row selection and quick actions ─────────────────────────────
+    // ── Row selection and the row's one next step ───────────────────
     rowSelectLabel: "Select bug: {title}",
     selectAllLabel: "Select every bug on this page",
     selectAllTooltip:
       "Selects the bugs on this page only — not the whole filtered list, and not the bugs I'm not currently holding.",
-    quickActionsColumn: "Decide",
-    quickApprove: "Approve",
-    quickReject: "Reject",
-    quickFix: "Put me on it",
+    // Screen-reader only: most rows have no button, so a visible heading would
+    // promise a column of buttons that isn't there.
+    quickActionsColumn: "Next step",
+    // At most one per row, and only on rows that need a human (triage.ts
+    // `nextStep`). Reject and "Put me on it" are in the drawer and the bulk bar.
+    nextStepApprove: "Approve",
+    nextStepAnswer: "Answer",
+    nextStepRetry: "Try again",
+    nextStepMerge: "Merge",
+    nextStepRelease: "Release",
     quickActionFailed: "Couldn't record that. Try again.",
-    // Deliberately not "Approve"/"Reject" again. The row button that opened the
-    // dialog says those, and two identical labels on screen at once make it
+    // Deliberately not "Approve"/"Reject" again. The button or key that opened
+    // the dialog says those, and two identical labels on screen at once make it
     // ambiguous which one you are confirming — the same rule the fix-session
     // dialog follows with "Start now".
     quickApproveConfirm: "Approve it",
@@ -3447,13 +3401,17 @@ export const en = {
     bulkSelected: "{count} bugs selected",
     bulkApprove: "Approve {count}",
     bulkReject: "Reject {count}",
+    bulkFix: "Put me on {count}",
     bulkClear: "Clear",
     // Approve and reject have different doors — approve needs "pending your
     // approval", reject also takes "new" — so each states its own scope rather
     // than sharing one sentence with the verb swapped in.
     bulkApproveScope: "{eligible} of {selected} can be approved from where they are.",
     bulkRejectScope: "{eligible} of {selected} can be rejected from where they are.",
+    bulkFixScope: "{eligible} of {selected} can get a fix session from where they are.",
     bulkApproveNone: "Approving only applies to bugs pending your approval. None of these are.",
+    bulkFixNone:
+      "A fix session needs a bug that is still open and matched to a codebase. None of these are — open one to pick its repo.",
     bulkRejectNone:
       "Rejecting only applies to bugs that are new or pending your approval. None of these are.",
     bulkApproveConfirmTitle: "Approve {count} bugs for me to fix?",
@@ -3464,11 +3422,17 @@ export const en = {
     bulkRejectConfirmBody:
       "I'll never pick them up, and this can't be undone. Anything that has moved on since you selected it is skipped, and I'll tell you which.",
     bulkRejectConfirm: "Reject them",
+    bulkFixConfirmTitle: "Put me on {count} bugs?",
+    bulkFixConfirmBody:
+      "I'll start a fix session on each of them now rather than waiting for tonight's sweep — each one a full session with its own cost. Anything that has moved on since you selected it is skipped, and I'll tell you which.",
+    bulkFixConfirm: "Start them",
     bulkProgress: "Working through {done} of {total}…",
     bulkApproveDoneOne: "Approved 1 bug.",
     bulkApproveDone: "Approved {count} bugs.",
     bulkRejectDoneOne: "Rejected 1 bug.",
     bulkRejectDone: "Rejected {count} bugs.",
+    bulkFixDoneOne: "Started 1 fix session.",
+    bulkFixDone: "Started {count} fix sessions.",
     // Partial failure is the ordinary case, not the exception: a selection made
     // fifteen seconds ago can hold a bug whose status has since moved. Both
     // halves get said, and the failures get named rather than counted.
@@ -3495,8 +3459,6 @@ export const en = {
     shortcutHelp: "Show this list",
     // ── Deep link ────────────────────────────────────────────
     drawerCopyLink: "Copy link",
-    drawerCopyLinkTooltip:
-      "Copies a link that opens this exact bug for whoever you send it to — the address bar carries the open bug and your filters, so a bookmark of this page is a bookmark of this view.",
     drawerCopyLinkDone: "Link copied.",
     drawerCopyLinkFailed: "Couldn't copy the link.",
   },

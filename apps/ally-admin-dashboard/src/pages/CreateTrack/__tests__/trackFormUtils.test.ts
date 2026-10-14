@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import { TrackItemType } from "@types";
 
-import { createItemOfType, serializeItem, validateTrackForPublish } from "../trackFormUtils";
+import {
+  createItemOfType,
+  deserializeTrack,
+  extractTrackMetadata,
+  serializeItem,
+  validateTrackForPublish,
+} from "../trackFormUtils";
 
 describe("serializeItem — ARTICLE resources", () => {
   it("includes resources in the saved content payload", () => {
@@ -10,17 +16,13 @@ describe("serializeItem — ARTICLE resources", () => {
     item.article = {
       html: "<p>Read this.</p>",
       questions: [],
-      resources: [
-        { id: "r1", title: "A curated reading", url: "https://example.com/reading" },
-      ],
+      resources: [{ id: "r1", title: "A curated reading", url: "https://example.com/reading" }],
     };
 
     const payload = serializeItem(item, 1);
 
     expect(payload.content).toMatchObject({
-      resources: [
-        { id: "r1", title: "A curated reading", url: "https://example.com/reading" },
-      ],
+      resources: [{ id: "r1", title: "A curated reading", url: "https://example.com/reading" }],
     });
   });
 
@@ -102,5 +104,38 @@ describe("validateTrackForPublish — ARTICLE resources", () => {
       baseValues({ html: "<p>hi</p>", questions: [], resources }) as any,
     );
     expect(errors.some(e => e.message.includes("at most 10 resources"))).toBe(true);
+  });
+});
+
+describe("public view (isPublicView)", () => {
+  const form = {
+    title: "Course",
+    description: "",
+    coverImageUrl: "",
+    isGlobal: false,
+    isPublicView: true,
+    competencyIds: [],
+    sections: [],
+  };
+
+  it("is sent on every metadata save, so switching it off reaches the server", () => {
+    expect(extractTrackMetadata(form).isPublicView).toBe(true);
+    expect(extractTrackMetadata({ ...form, isPublicView: false }).isPublicView).toBe(false);
+  });
+
+  it("loads from the course, and reads as off when an older backend omits it", () => {
+    const detail = {
+      id: "t1",
+      title: "Course",
+      description: "",
+      coverImageUrl: "",
+      status: "ACTIVE",
+      isGlobal: false,
+      totalItems: 0,
+      sections: [],
+    } as any;
+
+    expect(deserializeTrack({ ...detail, isPublicView: true }).isPublicView).toBe(true);
+    expect(deserializeTrack(detail).isPublicView).toBe(false);
   });
 });

@@ -1,3 +1,5 @@
+import { FC } from "react";
+
 import { render, screen, waitFor } from "@testing-library/react";
 import { fireEvent } from "@testing-library/dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -6,6 +8,7 @@ import { UxSignalScanStatus, UxSignalScanTrigger } from "@types";
 
 const invalidateTags = vi.fn();
 const startScan = vi.fn();
+const toast = { success: vi.fn(), warning: vi.fn(), error: vi.fn(), info: vi.fn() };
 
 vi.mock("@api", () => ({
   useScanUxSignalsMutation: vi.fn(() => [startScan, { isLoading: false }]),
@@ -22,42 +25,46 @@ vi.mock("@utils", () => ({
   hasFeature: (features: string[], key: string) => features.includes(key),
 }));
 
-vi.mock("@ally-ui-mono/ui-shared", () => ({
-  Tile: ({ children }: any) => <div>{children}</div>,
-  InlineNotification: ({ kind, title, subtitle }: any) => (
-    <div data-testid="notification" data-kind={kind}>
-      {title}
-      {subtitle}
-    </div>
-  ),
-}));
+vi.mock("@components", () => ({ cellTypes: {} }));
 
-vi.mock("@components", () => ({
-  Button: ({ children, onClick, disabled }: any) => (
-    <button onClick={onClick} disabled={disabled}>
-      {children}
-    </button>
-  ),
-  cellTypes: {},
+vi.mock("sonner", () => ({
+  toast: {
+    success: (...args: unknown[]) => toast.success(...args),
+    warning: (...args: unknown[]) => toast.warning(...args),
+    error: (...args: unknown[]) => toast.error(...args),
+    info: (...args: unknown[]) => toast.info(...args),
+  },
 }));
-
-vi.mock("@components/types", () => ({ ButtonVariant: { SECONDARY: "secondary" } }));
 
 import * as api from "@api";
 
-import { UxSignalsPanel } from "../UxSignalsPanel";
+import { useUxSignalScan } from "../useUxSignalScan";
+
+/** The hook's surface, as the header's menu item would render it. */
+const Probe: FC = () => {
+  const scan = useUxSignalScan();
+  if (!scan.canScan) return <p>no scan</p>;
+  return (
+    <div>
+      <button onClick={() => void scan.runScan()} disabled={scan.isBusy}>
+        scan
+      </button>
+      <p data-testid="last-scan">{scan.lastScanLine}</p>
+    </div>
+  );
+};
 
 /**
- * The panel's job is to say only what it knows.
+ * The scan's job is to say only what it knows.
  *
  * Its predecessor held one HTTP request open for the whole two-minute scan and
  * reported whatever that request did as the scan's outcome. In production the
  * gateway hung up at 60s and an admin was told the scan "could not be completed.
- * Nothing was filed" — while the scan ran on and filed seven findings. Every test
- * here is about the gap between what the panel is entitled to claim and what it
- * actually knows at that moment.
+ * Nothing was filed" — while the scan ran on and filed seven findings. These
+ * tests moved here from UxSignalsPanel on 2026-10-13, when the bar became a
+ * menu item and its inline result became a toast.
  */
-describe("UxSignalsPanel", () => {
+describe("useUxSignalScan", () => {
   const scan = (over: Partial<Record<string, unknown>> = {}) => ({
     id: "scan-1",
     trigger: UxSignalScanTrigger.MANUAL,
@@ -85,54 +92,71 @@ describe("UxSignalsPanel", () => {
     withScans();
   });
 
-  it("claims nothing about the outcome while the scan is still running", async () => {
-    // The whole bug, in one assertion: starting a scan tells you it started, and
-    // nothing about what it found — because at this moment nothing has been found.
+  it("says a scan started, and claims nothing about its outcome yet", async () => {
     startScan.mockReturnValue({ unwrap: async () => ({ scanId: "scan-1" }) });
-    const { rerender } = render(<UxSignalsPanel />);
+    const { rerender } = render(<Probe />);
 
     fireEvent.click(screen.getByRole("button"));
     await waitFor(() => expect(startScan).toHaveBeenCalled());
 
-    // The scan exists; nothing has been found yet.
-    expect(screen.queryByTestId("notification")).not.toBeInTheDocument();
+    expect(toast.info).toHaveBeenCalledWith(
+      "Scanning telemetry…",
+      expect.objectContaining({ description: expect.stringContaining("about two minutes") }),
+    );
+    expect(toast.success).not.toHaveBeenCalled();
     // Disabled from the click itself, not from the next poll — a second press in
     // that gap could only earn a 409.
     expect(screen.getByRole("button")).toBeDisabled();
 
     withScans(scan({ status: UxSignalScanStatus.RUNNING, finishedAt: null }));
-    rerender(<UxSignalsPanel />);
+    rerender(<Probe />);
 
-    expect(screen.getByText(/A scan is running now/)).toBeInTheDocument();
-    expect(screen.queryByTestId("notification")).not.toBeInTheDocument();
+    expect(screen.getByTestId("last-scan")).toHaveTextContent(/A scan is running now/);
+    expect(toast.success).not.toHaveBeenCalled();
   });
 
-  it("reports the counts once the scan log says it finished, and refreshes both queues", async () => {
+  it("toasts the counts once the scan log says it finished, and refreshes both queues", async () => {
     startScan.mockReturnValue({ unwrap: async () => ({ scanId: "scan-1" }) });
-    const { rerender } = render(<UxSignalsPanel />);
+    const { rerender } = render(<Probe />);
 
     withScans(scan({ status: UxSignalScanStatus.RUNNING, finishedAt: null }));
     fireEvent.click(screen.getByRole("button"));
     await waitFor(() => expect(startScan).toHaveBeenCalled());
 
-    // The poll lands and the run is done.
     withScans(scan());
-    rerender(<UxSignalsPanel />);
+    rerender(<Probe />);
 
     await waitFor(() =>
-      expect(screen.getByTestId("notification")).toHaveTextContent(
-        "7 bugs and 2 suggestions filed",
+      expect(toast.success).toHaveBeenCalledWith(
+        "Scan complete: 7 bugs and 2 suggestions filed.",
+        expect.objectContaining({
+          description: "9 signals crossed a threshold; 1 were already known.",
+        }),
       ),
     );
-    expect(screen.getByTestId("notification")).toHaveAttribute("data-kind", "success");
     // The findings only exist now, so this is the first moment either table has
     // anything new to fetch.
     expect(invalidateTags).toHaveBeenCalled();
   });
 
+  it("warns rather than celebrates when a detector could not run", async () => {
+    startScan.mockReturnValue({ unwrap: async () => ({ scanId: "scan-1" }) });
+    const { rerender } = render(<Probe />);
+
+    withScans(scan({ status: UxSignalScanStatus.RUNNING, finishedAt: null }));
+    fireEvent.click(screen.getByRole("button"));
+    await waitFor(() => expect(startScan).toHaveBeenCalled());
+
+    withScans(scan({ failedDetectors: ["rage_clicks"] }));
+    rerender(<Probe />);
+
+    await waitFor(() => expect(toast.warning).toHaveBeenCalled());
+    expect(toast.warning.mock.calls[0][1].description).toContain("rage_clicks");
+  });
+
   it("names the reason a scan failed rather than sending the reader to find a log", async () => {
     startScan.mockReturnValue({ unwrap: async () => ({ scanId: "scan-1" }) });
-    const { rerender } = render(<UxSignalsPanel />);
+    const { rerender } = render(<Probe />);
 
     withScans(scan({ status: UxSignalScanStatus.RUNNING, finishedAt: null }));
     fireEvent.click(screen.getByRole("button"));
@@ -146,22 +170,26 @@ describe("UxSignalsPanel", () => {
         suggestionsCreated: 0,
       }),
     );
-    rerender(<UxSignalsPanel />);
+    rerender(<Probe />);
 
     await waitFor(() =>
-      expect(screen.getByTestId("notification")).toHaveTextContent(
-        "PostHog rejected the query (403)",
-      ),
+      expect(toast.error).toHaveBeenCalledWith("The scan failed: PostHog rejected the query (403)"),
     );
-    expect(screen.getByTestId("notification")).toHaveAttribute("data-kind", "error");
     // A failed scan must never be invalidated into the queues as though it wrote.
     expect(invalidateTags).not.toHaveBeenCalled();
   });
 
+  // A nightly scan that finished before the page opened is the last-scan
+  // line's to report, not a pop-up's.
+  it("does not toast a scan it never saw running", () => {
+    withScans(scan());
+    render(<Probe />);
+
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(screen.getByTestId("last-scan")).toHaveTextContent(/7 bugs, 2 suggestions filed/);
+  });
+
   it("stops waiting on a scan that died mid-run instead of spinning forever", () => {
-    // A RUNNING row past the backend's staleness cutoff: the process that was
-    // running it is gone. Without this the panel polls a dead row indefinitely
-    // and the button stays disabled for a scan that will never report.
     withScans(
       scan({
         status: UxSignalScanStatus.RUNNING,
@@ -170,20 +198,15 @@ describe("UxSignalsPanel", () => {
       }),
     );
 
-    render(<UxSignalsPanel />);
+    render(<Probe />);
 
-    expect(screen.getByText(/never reported back/)).toBeInTheDocument();
+    expect(screen.getByTestId("last-scan")).toHaveTextContent(/never reported back/);
     expect(screen.getByRole("button")).not.toBeDisabled();
   });
 
-  it("re-enables the button when the scan it was watching goes stale mid-wait", async () => {
-    // Unlike the mount-time case above, this scan starts out fresh and running —
-    // the button is disabled from the click itself — and only crosses the
-    // staleness cutoff while the panel is still watching it. Without clearing
-    // watchedScanId on that transition, the button stays disabled forever even
-    // though the panel now says a new scan can be started.
+  it("re-enables the item when the scan it was watching goes stale mid-wait", async () => {
     startScan.mockReturnValue({ unwrap: async () => ({ scanId: "scan-1" }) });
-    const { rerender } = render(<UxSignalsPanel />);
+    const { rerender } = render(<Probe />);
 
     withScans(
       scan({
@@ -195,10 +218,9 @@ describe("UxSignalsPanel", () => {
     fireEvent.click(screen.getByRole("button"));
     await waitFor(() => expect(startScan).toHaveBeenCalled());
 
-    rerender(<UxSignalsPanel />);
+    rerender(<Probe />);
     expect(screen.getByRole("button")).toBeDisabled();
 
-    // The same scan, now past the staleness cutoff.
     withScans(
       scan({
         status: UxSignalScanStatus.RUNNING,
@@ -206,44 +228,41 @@ describe("UxSignalsPanel", () => {
         startedAt: new Date(Date.now() - 20 * 60_000).toISOString(),
       }),
     );
-    rerender(<UxSignalsPanel />);
+    rerender(<Probe />);
 
-    expect(screen.getByText(/never reported back/)).toBeInTheDocument();
+    expect(screen.getByTestId("last-scan")).toHaveTextContent(/never reported back/);
     expect(screen.getByRole("button")).not.toBeDisabled();
   });
 
   it("does not claim nothing was filed when it could not confirm the start", async () => {
-    // The catch-all branch — a gateway error page, a dropped connection. The app
-    // does not know whether the scan was claimed, so it must not say.
     startScan.mockReturnValue({
       unwrap: async () => {
         throw { status: 504, data: "<html>Gateway Timeout</html>" };
       },
     });
 
-    render(<UxSignalsPanel />);
+    render(<Probe />);
     fireEvent.click(screen.getByRole("button"));
 
-    const notification = await screen.findByTestId("notification");
-    expect(notification).toHaveTextContent(/Couldn’t confirm the scan started/);
-    expect(notification).not.toHaveTextContent(/Nothing was filed/);
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    expect(toast.error.mock.calls[0][0]).toMatch(/Couldn’t confirm the scan started/);
+    expect(toast.error.mock.calls[0][0]).not.toMatch(/Nothing was filed/);
   });
 
-  it("answers a 409 in its own words, since the server's add nothing a reader needs", async () => {
-    // The one status where our copy beats the server's: "you double-clicked" and
-    // "you lost a race" are the same event to the reader, and the next step is
-    // the same too.
+  it("answers a 409 in its own words", async () => {
     startScan.mockReturnValue({
       unwrap: async () => {
         throw { status: 409, data: { message: "A UX Signals scan is already running." } };
       },
     });
 
-    render(<UxSignalsPanel />);
+    render(<Probe />);
     fireEvent.click(screen.getByRole("button"));
 
-    expect(await screen.findByTestId("notification")).toHaveTextContent(
-      /A scan is already running/,
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        "A scan is already running. Wait for it to finish before starting another.",
+      ),
     );
   });
 });

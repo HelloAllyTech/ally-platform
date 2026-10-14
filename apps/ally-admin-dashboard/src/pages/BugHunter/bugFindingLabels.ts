@@ -108,11 +108,10 @@ export const BUG_FINDING_STAGE_LABELS: Record<BugFindingStage, string> = {
  * The seventeen pipeline statuses, in words.
  *
  * Lives here beside the other label maps rather than inside the badge that
- * renders them, because three surfaces need the words and only one of them
- * renders a badge: the status facet lists them as checkbox labels and the stage
- * chip names the status its tooltip is explaining. Both of those used to hold
+ * renders them, because more than one surface needs the words and not all of
+ * them render a badge. The status facet and the stage chip each used to hold
  * their own copy of this map — seventeen entries, written out twice, with
- * nothing making them agree.
+ * nothing making them agree. (Both left the table on 2026-10-13.)
  */
 export const BUG_FINDING_STATUS_LABELS: Record<BugFindingStatus, string> = {
   [BugFindingStatus.NEW]: en.bugHunter.findingStatusNew,

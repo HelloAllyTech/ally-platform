@@ -15,12 +15,14 @@ import {
   GetLearnTracksResponse,
   GetNextTrackItemResponse,
   GetTrackLanguagesResponse,
+  PublicTrackOutline,
   QuizAnswerInput,
   QuizAttemptResult,
   SetTrackLanguageResponse,
   StartTrackItemResponse,
   SubmitArticleQuestionAnswerResponse,
   SubmitInterjectionAnswerResponse,
+  TrackAccessResponse,
   TrackDetail,
   TrackItemCompletionResult,
   TrackItemStatus,
@@ -93,6 +95,35 @@ const tracksAPI = baseAPI.injectEndpoints({
         params: languageCode ? { languageCode } : undefined,
       }),
       providesTags: [TAG_TYPES.LEARN_TRACK_DETAIL],
+    }),
+
+    /**
+     * The outline behind a course's public share link. Needs no login (the
+     * endpoint is @Public), so it is safe to call for a logged-out visitor;
+     * 404 whenever public view is off or the course is not published.
+     */
+    getPublicTrackOutline: builder.query<
+      PublicTrackOutline,
+      { trackId: string; languageCode?: string }
+    >({
+      query: ({ trackId, languageCode }) => ({
+        url: ApiEndpoints.TRACKS.PUBLIC_OUTLINE(trackId),
+        method: HttpMethod.GET,
+        params: languageCode ? { languageCode } : undefined,
+      }),
+    }),
+
+    /**
+     * Whether the signed-in learner can take this course. Not cached: it is
+     * asked right after login, when the answer belongs to a different account
+     * than any earlier one.
+     */
+    getTrackAccess: builder.query<TrackAccessResponse, { trackId: string }>({
+      query: ({ trackId }) => ({
+        url: ApiEndpoints.TRACKS.ACCESS(trackId),
+        method: HttpMethod.GET,
+      }),
+      keepUnusedDataFor: 0,
     }),
 
     /** Languages this course is published in, plus the learner's saved choice. */
@@ -343,6 +374,8 @@ const tracksAPI = baseAPI.injectEndpoints({
 export const {
   useGetLearnTracksQuery,
   useGetLearnTrackDetailQuery,
+  useGetPublicTrackOutlineQuery,
+  useLazyGetTrackAccessQuery,
   useGetTrackLanguagesQuery,
   useSetTrackLanguageMutation,
   useGetLearnTrackProgressQuery,

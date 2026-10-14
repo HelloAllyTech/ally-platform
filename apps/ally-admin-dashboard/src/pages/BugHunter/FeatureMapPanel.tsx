@@ -18,6 +18,60 @@ import { BUG_HUNTER_REPOS } from "./repos";
 
 const ALL_REPOS = "__all__";
 
+/**
+ * Shared by every caller of the refresh mutation, so the Notebook's button and
+ * the header menu's shortcut see one request in flight rather than two.
+ */
+const REFRESH_CACHE_KEY = "bug-hunter-feature-map-refresh";
+
+export interface FeatureMapRefreshDialogProps {
+  /** One repo, or every repo when absent. */
+  repo?: string;
+  onClose: () => void;
+}
+
+/**
+ * "Map features now", behind its confirmation.
+ *
+ * Its own component since 2026-10-13 so the page header's ⋯ menu can offer the
+ * same action as a shortcut without a second copy of the dialog. A map run is a
+ * read-only agent session per repo, and it costs what one costs, so the
+ * shortcut keeps the confirm rather than firing on a menu click.
+ */
+export const FeatureMapRefreshDialog: FC<FeatureMapRefreshDialogProps> = ({ repo, onClose }) => {
+  const [refresh] = useRefreshBugHunterFeatureMapsMutation({ fixedCacheKey: REFRESH_CACHE_KEY });
+
+  const handleRefresh = async () => {
+    onClose();
+    try {
+      const { runIds } = await refresh(repo ? { repo } : {}).unwrap();
+      if (runIds.length) {
+        toast.success(
+          en.bugHunter.featureMapRefreshStarted.replace("{count}", String(runIds.length)),
+        );
+      } else {
+        toast.info(en.bugHunter.featureMapRefreshNone);
+      }
+    } catch {
+      toast.error(en.bugHunter.featureMapRefreshFailed);
+    }
+  };
+
+  return (
+    <ActionConfirmationPopup
+      isOpen
+      onClose={onClose}
+      title={en.bugHunter.featureMapRefreshConfirmTitle}
+      description={en.bugHunter.featureMapRefreshConfirmBody.replace(
+        "{scope}",
+        repo ?? "every repo",
+      )}
+      primaryButton={{ label: en.bugHunter.featureMapRefreshConfirm, onClick: handleRefresh }}
+      secondaryButton={{ label: en.bugHunter.cancel, onClick: onClose }}
+    />
+  );
+};
+
 export interface FeatureMapPanelProps {
   /** Whether this reader may start a map run, or only read the cards. */
   canTriage: boolean;
@@ -38,7 +92,9 @@ export const FeatureMapPanel: FC<FeatureMapPanelProps> = ({ canTriage }) => {
   const { data, isLoading, isError } = useGetBugHunterFeatureMapsQuery(
     repo === ALL_REPOS ? undefined : { repo },
   );
-  const [refresh, { isLoading: isRefreshing }] = useRefreshBugHunterFeatureMapsMutation();
+  const [, { isLoading: isRefreshing }] = useRefreshBugHunterFeatureMapsMutation({
+    fixedCacheKey: REFRESH_CACHE_KEY,
+  });
   const [confirming, setConfirming] = useState(false);
   const cards = useMemo(() => data?.cards ?? [], [data]);
   const [removeCard, { isLoading: isRemoving }] = useRemoveBugHunterFeatureMapMutation();
@@ -54,22 +110,6 @@ export const FeatureMapPanel: FC<FeatureMapPanelProps> = ({ canTriage }) => {
       setReason("");
     } catch {
       toast.error(en.bugHunter.featureMapWrongFailed);
-    }
-  };
-
-  const handleRefresh = async () => {
-    setConfirming(false);
-    try {
-      const { runIds } = await refresh(repo === ALL_REPOS ? {} : { repo }).unwrap();
-      if (runIds.length) {
-        toast.success(
-          en.bugHunter.featureMapRefreshStarted.replace("{count}", String(runIds.length)),
-        );
-      } else {
-        toast.info(en.bugHunter.featureMapRefreshNone);
-      }
-    } catch {
-      toast.error(en.bugHunter.featureMapRefreshFailed);
     }
   };
 
@@ -168,16 +208,9 @@ export const FeatureMapPanel: FC<FeatureMapPanelProps> = ({ canTriage }) => {
       )}
 
       {confirming && (
-        <ActionConfirmationPopup
-          isOpen
+        <FeatureMapRefreshDialog
+          repo={repo === ALL_REPOS ? undefined : repo}
           onClose={() => setConfirming(false)}
-          title={en.bugHunter.featureMapRefreshConfirmTitle}
-          description={en.bugHunter.featureMapRefreshConfirmBody.replace(
-            "{scope}",
-            repo === ALL_REPOS ? "every repo" : repo,
-          )}
-          primaryButton={{ label: en.bugHunter.featureMapRefreshConfirm, onClick: handleRefresh }}
-          secondaryButton={{ label: en.bugHunter.cancel, onClick: () => setConfirming(false) }}
         />
       )}
     </section>

@@ -105,7 +105,9 @@ const many = (count: number) =>
     finding({ id: String(index).padStart(3, "0"), createdAt: ago(index + 1) }),
   );
 
-const mount = (items: BugFinding[], count: number, url = "/") => {
+// Backlog, where these NEW fixtures live — the page itself opens on Needs you
+// or In progress.
+const mount = (items: BugFinding[], count: number, url = "/?bucket=backlog") => {
   getBugFindings.mockReturnValue({
     data: { items, count },
     isLoading: false,

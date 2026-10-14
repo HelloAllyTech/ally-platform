@@ -1585,6 +1585,37 @@
     "hold": "Hold breathe",
     "exhale": "Exhale"
   },
+  "courseLanding": {
+    "documentTitle": "Course",
+    "eyebrow": "Course",
+    "summary_one": "{{count}} activity",
+    "summary_other": "{{count}} activities",
+    "summaryWithDuration_one": "{{count}} activity · about {{minutes}} min",
+    "summaryWithDuration_other": "{{count}} activities · about {{minutes}} min",
+    "sectionItems_one": "{{count}} activity",
+    "sectionItems_other": "{{count}} activities",
+    "outlineTitle": "What's in this course",
+    "start": "Start course",
+    "loginHint": "You'll log in to start.",
+    "logIn": "Log in",
+    "goToCourses": "Go to my courses",
+    "login": {
+      "noAccount": "Don't have an account? Ask your organisation's admin to add you.",
+      "moreOptions": "More ways to log in"
+    },
+    "unavailable": {
+      "title": "This course isn't available",
+      "body": "The link may have been switched off, or the course is no longer published. Check with whoever shared it with you."
+    },
+    "denied": {
+      "toast": "This course isn't available for your account",
+      "title": "This course isn't available for your account",
+      "body": "It hasn't been made available to your organisation or group. If you think you should have it, ask your organisation's admin.",
+      "bodyWithEmail": "You're logged in as {{email}}. This course hasn't been made available to your organisation or group — if you think you should have it, ask your organisation's admin.",
+      "closedTitle": "This course is closed",
+      "closedBody": "It's no longer open to new learners."
+    }
+  },
   "tracks2": {
     "breadcrumb": "Learn",
     "language": {
@@ -1689,6 +1720,7 @@
       "answerQuestionsToContinue": "Answer the questions to continue",
       "resourcesHeading": "Resources",
       "openInNewTab": "Open in new tab",
+      "embedTimedOut": "This page couldn't load here — opened in a new tab instead.",
       "question": {
         "title": "Quick check",
         "submit": "Check answer",

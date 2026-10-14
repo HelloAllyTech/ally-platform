@@ -22,6 +22,12 @@ import {
 /** User-facing name for Track 2.0 entities in the admin ("Courses" studio tab). */
 export const TRACK_ENTITY_LABEL = "Course";
 
+/**
+ * Path of a course's share link on the learner app. Must match `ROUTES.COURSE_LANDING` in
+ * ally-helpline-dashboard and the `/course` entries in its `.well-known` files (mobile app links).
+ */
+export const getCourseSharePath = (trackId: string): string => `/course/${trackId}`;
+
 export const DEFAULT_VIDEO_WATCH_PCT = 90;
 export const MIN_VIDEO_WATCH_PCT = 50;
 export const MAX_VIDEO_WATCH_PCT = 100;
@@ -309,6 +315,7 @@ export const DEFAULT_TRACK_FORM_VALUES: TrackFormValues = {
   description: "",
   coverImageUrl: "",
   isGlobal: false,
+  isPublicView: false,
   estimatedDurationMinutes: null,
   competencyIds: [],
   sections: [],

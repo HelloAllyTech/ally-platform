@@ -1,6 +1,5 @@
 import { FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { Launch } from "@icons";
 import { toast } from "sonner";
 
 import {
@@ -39,41 +38,34 @@ import { formatDateTime, formatTimestamp } from "@utils";
 
 import { BrailleSpinner } from "./BrailleSpinner";
 import { BugFindingDrawer } from "./BugFindingDrawer";
-import {
-  BUG_FINDING_SEVERITY_LABELS,
-  BUG_FINDING_SOURCE_LABELS,
-  engineModelLabel,
-} from "./bugFindingLabels";
-import { BugFindingStageChip } from "./BugFindingStageChip";
+import { BUG_FINDING_SEVERITY_LABELS, BUG_FINDING_SOURCE_LABELS } from "./bugFindingLabels";
 import { BugFindingStatusBadge } from "./BugFindingStatusBadge";
 import { PAGE_SIZES, PageSize, useBugHunterUrlState } from "./bugHunterUrlState";
 import { BulkTriageBar } from "./BulkTriageBar";
 import { canSubmitDecline, DeclineReasonPicker } from "./DeclineReasonPicker";
 import { FindingsFilterBar } from "./FindingsFilterBar";
 import { BUG_FINDINGS_TABLE_ANCHOR_ID } from "./findingsTableAnchor";
+import { FindingsTabs } from "./FindingsTabs";
 import {
   buildFacetCounts,
   buildFindingsView,
+  countTabs,
   FindingsFilters,
+  hasActiveFilters,
   isMidFlight,
   reposInWindow,
   severitiesInWindow,
   SortDirection,
   SortKey,
-  costOf,
-  formatCost,
   sourcesInWindow,
-  stagesInWindow,
-  statusesInWindow,
-  updatedAt,
-  wasTouchedSinceDiscovery,
 } from "./findingsView";
-import { countByBucket } from "./lifecycleBucket";
-import { LifecycleBucketChips } from "./LifecycleBucketChips";
+import { countByBucket, defaultBucket, LifecycleBucket } from "./lifecycleBucket";
 import {
   ageInDays,
   canAct,
   formatAge,
+  NextStep,
+  nextStep,
   showsStaleness,
   stalenessTier,
   TriageAction,
@@ -92,11 +84,17 @@ import {
 const CONSUMER_BADGE_STYLE =
   "inline-flex items-center rounded bg-purple-50 px-1 text-[10px] font-semibold text-purple-700";
 
-/** Severity dot colours, so severity is scannable down the column without reading three words. */
+/**
+ * The severity dot before a title — what is left of the Severity column.
+ *
+ * Red for high, two greys below it. No amber: amber no longer means anything on
+ * this page, and a medium-severity bug is not a warning. The word is in the
+ * dot's accessible name and hover title, and the facet is how you filter by it.
+ */
 const SEVERITY_DOTS: Record<BugFindingSeverity, string> = {
   [BugFindingSeverity.HIGH]: "bg-destructive-500",
-  [BugFindingSeverity.MEDIUM]: "bg-amber-500",
-  [BugFindingSeverity.LOW]: "bg-neutral-400",
+  [BugFindingSeverity.MEDIUM]: "bg-neutral-500",
+  [BugFindingSeverity.LOW]: "bg-neutral-300",
 };
 
 /**
@@ -110,37 +108,15 @@ const SEVERITY_DOTS: Record<BugFindingSeverity, string> = {
 const STICKY_HEADER = "sticky top-0 z-20 bg-neutral-50";
 
 /**
- * The two columns that step aside on a narrow viewport.
- *
- * `max-w-0` on the title column makes it yield every spare pixel to the others,
- * which measured at 1024px left it 112px — eight characters of a bug title
- * beside 223px of buttons. Its `min-w` floor stops that, and this is the other
- * half: with a floor and no responsive columns the table just outgrows its
- * container. The sticky header rules out the usual `overflow-x-auto` wrapper,
- * because that wrapper would become the scrollport and the header would stop
- * sticking to the page.
- *
- * Stage and Updated are the two worth dropping. Age answers "how long has this
- * sat?" most of the time, so Updated adds little; Stage is derived from the
- * Status column right beside it. Both are in the drawer regardless.
- *
- * One breakpoint rather than a staircase, and `xl` rather than `2xl`, because
- * the number that matters is the *container* width and it is nothing like the
- * viewport's — the console's nav rail takes about 300px, so a 1512px viewport
- * is a 1204px table. Staggering these produced a table that hid Updated at
- * 1512 with 600px of slack in it.
- *
- * Applied to the header and the body cell identically. A column hidden on one
- * and not the other shifts every cell to its right by one.
+ * Age tint. Only ever applied to bugs waiting on you — see `showsStaleness` —
+ * and in the needs-you orange rather than amber and red: a decision you have
+ * owed for a month is late, not failed.
  */
-const SECONDARY_COLUMN = "hidden xl:table-cell";
-
-/** Age tint. Only ever applied to bugs still awaiting a decision — see `showsStaleness`. */
 const STALENESS_STYLES = {
   fresh: "text-typography-700",
   recent: "text-typography-700",
-  stale: "text-amber-700 font-medium",
-  ancient: "text-destructive-600 font-semibold",
+  stale: "text-orange-700 font-medium",
+  ancient: "text-orange-700 font-semibold",
 } as const;
 
 /**
@@ -148,10 +124,9 @@ const STALENESS_STYLES = {
  * "Load more" click asks the server for.
  *
  * `GET /findings` does real server-side `limit`/`offset` paging with an
- * honest `count`, but three surfaces — this table, the profile card and the
- * queue — ask for the identical `{status: "all", limit: 100}` so they share
- * one RTK Query cache entry rather than each opening its own request (see
- * `findingsView.ts`'s module doc). Growing this table's own `limit` on demand
+ * honest `count`, but this table and the page header ask for the identical
+ * `{status: "all", limit: 100}` so they share one RTK Query cache entry rather
+ * than each opening its own request (see `findingsView.ts`'s module doc). Growing this table's own `limit` on demand
  * is the same trade its `run` scope already makes: one shared request in the
  * ordinary case, and a second cache entry only once a reader does something —
  * scoping to a run, or now clicking "Load more" — that specifically calls for
@@ -259,33 +234,55 @@ const SortableHeader: FC<{
 };
 
 /**
- * The row's quick actions, as one compact control rather than three Carbon
- * ghost buttons. Carbon's `sm` ghost button is 32px tall with 16px side
- * padding, so the three of them cost ~300px of the Decide column on every
- * row — measured on the live page that was the column pushing the table past
- * its container, and the reason "Put me on it" read as "Pu". These are 28px,
- * bordered so they read as buttons at a glance, and tinted by what they do.
+ * The row's one button: the next thing a person does on this bug.
+ *
+ * One look for all five verbs — bordered, 28px, primary-tinted — so the column
+ * reads as "these rows want you" rather than as a legend of colours to learn.
+ * Reject and "Put me on it" left the row on 2026-10-13: both are in the drawer
+ * and the bulk bar, and keyboard `r` and `f` still reach them from the row.
  */
-const QUICK_ACTION_STYLES = {
-  approve: "border-success-200 text-success-600 hover:bg-success-50 focus-visible:ring-success-400",
-  reject:
-    "border-destructive-200 text-destructive-600 hover:bg-destructive-50 focus-visible:ring-destructive-400",
-  fix: "border-primary-200 text-primary-700 hover:bg-primary-50 focus-visible:ring-primary-400",
-} as const;
-
-const QuickAction: FC<{
-  tone: keyof typeof QUICK_ACTION_STYLES;
-  onClick: () => void;
-  children: string;
-}> = ({ tone, onClick, children }) => (
+const NextStepButton: FC<{ onClick: () => void; children: string }> = ({ onClick, children }) => (
   <button
     type="button"
     onClick={onClick}
-    className={`inline-flex h-9 items-center whitespace-nowrap rounded-md border bg-white px-2.5 text-xs font-medium md:h-7 cursor-pointer transition-colors focus:outline-none focus-visible:ring-2 ${QUICK_ACTION_STYLES[tone]}`}
+    className="inline-flex h-9 items-center whitespace-nowrap rounded-md border border-primary-200 bg-white px-2.5 text-xs font-medium text-primary-700 md:h-7 cursor-pointer transition-colors hover:bg-primary-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-400"
   >
     {children}
   </button>
 );
+
+/** Read inside a function — see `bucketLabels` in FindingsTabs on why not at module scope. */
+const nextStepLabels = (): Record<NextStep, string> => ({
+  approve: en.bugHunter.nextStepApprove,
+  answer: en.bugHunter.nextStepAnswer,
+  retry: en.bugHunter.nextStepRetry,
+  merge: en.bugHunter.nextStepMerge,
+  release: en.bugHunter.nextStepRelease,
+});
+
+/** What an empty tab says — where things in it come from, so an empty tab reads as "nothing yet", not "broken". */
+const tabEmptyCopy = (): Record<LifecycleBucket, { title: string; subtitle: string }> => ({
+  needs_you: {
+    title: en.bugHunter.tabEmptyNeedsYouTitle,
+    subtitle: en.bugHunter.tabEmptyNeedsYouSubtitle,
+  },
+  failed: {
+    title: en.bugHunter.tabEmptyFailedTitle,
+    subtitle: en.bugHunter.tabEmptyFailedSubtitle,
+  },
+  in_progress: {
+    title: en.bugHunter.tabEmptyInProgressTitle,
+    subtitle: en.bugHunter.tabEmptyInProgressSubtitle,
+  },
+  backlog: {
+    title: en.bugHunter.tabEmptyBacklogTitle,
+    subtitle: en.bugHunter.tabEmptyBacklogSubtitle,
+  },
+  done: { title: en.bugHunter.tabEmptyDoneTitle, subtitle: en.bugHunter.tabEmptyDoneSubtitle },
+});
+
+/** The id of the region the tabs control. */
+const FINDINGS_PANEL_ID = "bug-findings-panel";
 
 /** How many page buttons the pager shows before it starts eliding the middle. */
 const PAGER_MAX_VISIBLE = 7;
@@ -407,54 +404,42 @@ export interface BugFindingsTableProps {
  * Every bug Bug Hunter knows about, from any source — pipeline findings and
  * human reports alike — as a surface built for triage rather than for reading.
  *
- * ## What the previous rebuilds gave it
+ * ## The 2026-10-13 simplification
  *
- * Buckets instead of seventeen statuses, search and facets, sortable columns
- * with real `aria-sort`, keyboard-reachable rows, a count, pagination, a
- * skeleton, duplicate flagging, per-row quick actions, a bulk bar and a
- * keyboard cursor. All of that stands; the module docs on `lifecycleBucket.ts`,
- * `findingsView.ts` and `BulkTriageBar` still explain why.
+ * The product head found the page cluttered, and most of the clutter was one
+ * fact shown several ways. This table took four cuts:
  *
- * ## What this rebuild adds
+ * - **Five tabs instead of eight chips** (`FindingsTabs`), opening on Needs you
+ *   when it has anything in it and on In progress otherwise — never on
+ *   "Everything", which on prod was 456 closed rows around 44 open ones.
+ * - **Five columns instead of eleven**: the checkbox, the bug (a severity dot,
+ *   the title, and one meta line of repo · source), Status, Age, and one
+ *   action. Stage repeated Status in different words and disagreed with it for
+ *   Merged, Releasing and Failed; Updated repeated Age; Repo and Source moved
+ *   into the meta line; Est. cost and PR live in the drawer.
+ * - **One button per row, only on rows that need a human** (`nextStep`). Three
+ *   tinted buttons on every row made every row look like it needed you.
+ * - **Four status colours** (`BugFindingStatusBadge`): orange needs you, red
+ *   failed, green live, grey everything else. Agent-working is the spinner.
  *
- * The table was good at reading and good at deciding, and bad at the step in
- * between: **narrowing fifty-four bugs down to the eight you meant.** On a real
- * install the whole window lands in one bucket — 52 of 54 at "On the list" — so
- * the chips, which are the primary filter, separated nothing at all. Under them
- * sat three single-select facets and four sortable columns.
+ * The rest of what earlier rebuilds gave it stands: search and multi-select
+ * facets behind one button, sortable columns with real `aria-sort`, the URL as
+ * the source of truth, paging, a skeleton, duplicate flagging, the bulk bar,
+ * and the keyboard cursor with its shortcuts.
  *
- * - **Every facet is multi-select, and there are eight of them** — status,
- *   repo, severity, source, roadmap stage, age band, duplicates-only, plus the
- *   buckets. They live behind one button rather than eight controls, with the
- *   active ones shown as removable pills. `FindingsFilterBar` argues that.
- * - **Every column sorts**, including the three that did not: status (in
- *   lifecycle order, not alphabetically), repo, and stage.
- * - **Sort and page size ride in the URL** with the filters, so a link carries
- *   the view someone meant to send rather than its default ordering.
- * - **Rows per page is a control**, and its top value is the window size — so
- *   "select the lot and reject it" is one gesture instead of five rounds of
- *   select-page. `Select all N` does the same job across pages.
- * - **Stage got its own collapsible column** and left the status cell. Stacked
- *   under the status badge it produced rows reading "New" directly above
- *   "New" — two badges saying one thing, which is the exact failure the
- *   dead-column rule below exists to prevent everywhere else.
+ * ## Which tab is open
  *
- * ## Dead columns collapse, and that now includes Stage
+ * The link's `?bucket=` when it names one. Otherwise `defaultBucket` decides,
+ * **once**, from the first counts that arrive, and the choice holds: if you
+ * approve the last bug on Needs you, the tab stays put and says so, rather
+ * than jumping to In progress under your cursor because the default moved.
  *
- * Repo, severity, PR, updated and stage render only when the loaded window
- * holds a value worth a column. On an install whose findings are mostly human
- * reports that is three of eight columns which would otherwise be an em-dash
- * from top to bottom. Decided over the whole window rather than the current
- * page, so a column cannot appear at page 2 and vanish at page 3. The selection
- * and quick-action columns follow the same rule against `canTriage`.
- *
- * ## A failed poll no longer empties the table
+ * ## A failed poll does not empty the table
  *
  * `isError` used to win over `data`, and this list polls every fifteen seconds
- * — so one timed-out poll swapped fifty-four rows for a single line of error
- * text, and the next poll brought them back. Found by watching the live page.
- * Stale rows under a warning strip are strictly better than no rows: the reader
- * keeps working, and the strip says the data may have moved on.
+ * — so one timed-out poll swapped the rows for a single line of error text,
+ * and the next poll brought them back. Stale rows under a warning strip are
+ * strictly better than no rows.
  */
 export const BugFindingsTable: FC<BugFindingsTableProps> = ({
   onShowShortcuts,
@@ -463,14 +448,12 @@ export const BugFindingsTable: FC<BugFindingsTableProps> = ({
 }) => {
   const {
     bug: selectedId,
-    bucket,
+    bucket: linkedBucket,
     search,
     run,
     repos,
     severities,
     sources,
-    statuses,
-    stages,
     age,
     duplicatesOnly,
     sort: sortKey,
@@ -483,8 +466,6 @@ export const BugFindingsTable: FC<BugFindingsTableProps> = ({
     setRepos,
     setSeverities,
     setSources,
-    setStatuses,
-    setStages,
     setAge,
     setDuplicatesOnly,
     toggleSort,
@@ -533,10 +514,9 @@ export const BugFindingsTable: FC<BugFindingsTableProps> = ({
   const [startFixSession] = useStartBugFixSessionMutation();
 
   /**
-   * Unscoped, these are the same args as the profile card's and the queue's, so
-   * all three read one RTK Query cache entry rather than opening a request
-   * each, and every filter below is applied to that shared window client-side
-   * (see findingsView.ts).
+   * Unscoped, these are the same args as the page header's, so both read one
+   * RTK Query cache entry rather than opening a request each, and every filter
+   * below is applied to that shared window client-side (see findingsView.ts).
    *
    * A run scope is the one exception, and has to be: `runId` goes to the server
    * and *replaces* the window rather than filtering it. A sweep stamps its id
@@ -552,9 +532,12 @@ export const BugFindingsTable: FC<BugFindingsTableProps> = ({
     [run, limit],
   );
 
-  const { data, isLoading, isFetching, isError, refetch } = useGetBugFindingsQuery(queryArgs, {
-    pollingInterval: 15_000,
-  });
+  const { data, currentData, isLoading, isFetching, isError, refetch } = useGetBugFindingsQuery(
+    queryArgs,
+    {
+      pollingInterval: 15_000,
+    },
+  );
 
   // A new scope starts its own window fresh, rather than carrying over
   // however far a previous "Load more" run had grown it.
@@ -598,6 +581,29 @@ export const BugFindingsTable: FC<BugFindingsTableProps> = ({
   const hasNothingToShow = findings.length === 0;
   const isStale = isError && !hasNothingToShow;
 
+  /**
+   * The tab chosen for a link that names none: decided once, from the first
+   * counts that arrive for this scope, and then held — see the component doc.
+   * Read off `currentData` rather than `data`, which RTK Query keeps from the
+   * previous scope while a new one loads and would decide the new scope's tab
+   * from the old scope's rows.
+   */
+  const [pickedBucket, setPickedBucket] = useState<LifecycleBucket | null>(null);
+  // `data` only when nothing is in flight: mid-fetch it may still be the
+  // previous scope's.
+  const settledData = currentData ?? (isFetching ? undefined : data);
+  useEffect(() => {
+    setPickedBucket(null);
+  }, [run]);
+  useEffect(() => {
+    if (linkedBucket || pickedBucket || !settledData) return;
+    setPickedBucket(defaultBucket(countByBucket(settledData.items), { scoped: !!run }));
+  }, [linkedBucket, pickedBucket, settledData, run]);
+
+  // Needs you while the first page is in flight — the tab most loads land on,
+  // so the strip doesn't open on one tab and jump to another as data arrives.
+  const bucket: LifecycleBucket = linkedBucket ?? pickedBucket ?? "needs_you";
+
   const filters = useMemo<FindingsFilters>(
     () => ({
       bucket,
@@ -605,12 +611,10 @@ export const BugFindingsTable: FC<BugFindingsTableProps> = ({
       repos,
       severities,
       sources,
-      statuses,
-      stages,
       age,
       duplicatesOnly,
     }),
-    [bucket, search, repos, severities, sources, statuses, stages, age, duplicatesOnly],
+    [bucket, search, repos, severities, sources, age, duplicatesOnly],
   );
 
   // A filter change can shrink the list below the current offset, which would
@@ -634,50 +638,16 @@ export const BugFindingsTable: FC<BugFindingsTableProps> = ({
     [findings, data?.count, filters, sortKey, sortDirection, page, pageSize],
   );
 
-  const counts = useMemo(() => countByBucket(findings), [findings]);
+  const tabCounts = useMemo(() => countTabs(findings, filters), [findings, filters]);
   const facetCounts = useMemo(() => buildFacetCounts(findings), [findings]);
   const available = useMemo(
     () => ({
       repos: reposInWindow(findings),
       severities: severitiesInWindow(findings),
       sources: sourcesInWindow(findings),
-      statuses: statusesInWindow(findings),
-      stages: stagesInWindow(findings),
     }),
     [findings],
   );
-
-  /**
-   * Which optional columns are worth a column.
-   *
-   * Decided over the whole loaded window rather than the current page, so a
-   * column cannot appear at page 2 and vanish at page 3 — a table whose shape
-   * changes as you page through it is harder to read than one dead column.
-   */
-  const showRepo = available.repos.length > 0;
-  const showSeverity = available.severities.length > 0;
-  const showPr = useMemo(() => findings.some(finding => !!finding.prUrl), [findings]);
-  /**
-   * Stage earns a column only once the window holds more than one of them.
-   *
-   * Stricter than the others — *more than one* value, not *any* value — because
-   * stage is derived from status. A window where every bug is at stage "New"
-   * gives a column repeating one word down the page, which is the dead-column
-   * failure with extra steps. This is also where the old status-cell chip went:
-   * stacked under the badge it rendered "New" above "New" on most rows.
-   */
-  const showStage = available.stages.length > 1;
-  /**
-   * "Updated" earns its column only once something in the window has actually
-   * moved since it was found.
-   *
-   * Without this it is the widest kind of dead column — not an em-dash repeated
-   * down the page but a *second copy of Age*, which is worse: a reader has to
-   * compare the two before concluding they say the same thing.
-   */
-  const showUpdated = useMemo(() => findings.some(wasTouchedSinceDiscovery), [findings]);
-  // Est. cost (OPP-0748): shown once any bug in view has been spent on.
-  const showCost = useMemo(() => findings.some(finding => costOf(finding) > 0), [findings]);
 
   const rows = view.rows;
 
@@ -798,6 +768,18 @@ export const BugFindingsTable: FC<BugFindingsTableProps> = ({
     }
   };
 
+  /**
+   * The row's one button. Approve and Try again confirm in place, through the
+   * same dialog `a` and `f` raise; Answer, Merge and Release open the drawer,
+   * which is where the answer box, the merge dialog's case chain and the
+   * release target live.
+   */
+  const onNextStep = (step: NextStep, finding: BugFinding) => {
+    if (step === "approve") setPending({ action: "approve", finding });
+    else if (step === "retry") setPending({ action: "fix", finding });
+    else setBug(finding.id);
+  };
+
   // ── Keyboard ────────────────────────────────────────────────────
   const rowButtonRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const searchRef = useRef<HTMLDivElement>(null);
@@ -862,8 +844,11 @@ export const BugFindingsTable: FC<BugFindingsTableProps> = ({
         return;
       }
       // The drawer is a modal surface with its own controls; while it is open
-      // the list underneath is not what the keyboard is addressing.
+      // the list underneath is not what the keyboard is addressing. Nor while
+      // any other modal is — the help panel, a confirmation — where `a` would
+      // otherwise approve the row under a cursor the reader can't see.
       if (selectedId) return;
+      if (target?.closest?.('[aria-modal="true"]')) return;
 
       switch (event.key) {
         case "j":
@@ -949,20 +934,14 @@ export const BugFindingsTable: FC<BugFindingsTableProps> = ({
   // switched to, and `?` still opens the shortcut sheet.
   const rowPadding = "py-2";
 
+  const labels = nextStepLabels();
+  const emptyCopy = tabEmptyCopy()[bucket];
+
   return (
     <div id={BUG_FINDINGS_TABLE_ANCHOR_ID} className="scroll-mt-4">
-      <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-semibold text-typography-900">
-            {en.bugHunter.findingsTitle}
-          </h2>
-          <p className="text-xs text-typography-600">{en.bugHunter.findingsSubtitle}</p>
-        </div>
-      </div>
-
-      {/* Above the chips on purpose: the scope changes what every number below
+      {/* Above the tabs on purpose: the scope changes what every count below
           it counts, so a reader who has not seen this line will read
-          "Everything 7" as "seven bugs exist". Stacks' *Making Agent
+          "Backlog 7" as "seven bugs are waiting". Stacks' *Making Agent
           Trustworthiness Visible Through Transparency* is the argument for
           spelling out the audit trail rather than quietly narrowing the view. */}
       {run && (
@@ -983,682 +962,491 @@ export const BugFindingsTable: FC<BugFindingsTableProps> = ({
         </div>
       )}
 
-      <div className="mb-3">
-        <LifecycleBucketChips
-          counts={counts}
-          total={findings.length}
-          value={bucket}
-          onChange={setBucket}
-          disabled={isLoading}
-        />
-      </div>
+      <FindingsTabs
+        counts={tabCounts}
+        value={bucket}
+        onChange={setBucket}
+        panelId={FINDINGS_PANEL_ID}
+        disabled={isLoading}
+      />
 
-      <div className="mb-3">
-        <FindingsFilterBar
-          filters={filters}
-          available={available}
-          counts={facetCounts}
-          onSearch={setSearch}
-          onRepos={setRepos}
-          onSeverities={setSeverities}
-          onSources={setSources}
-          onStatuses={setStatuses}
-          onStages={setStages}
-          onAge={setAge}
-          onDuplicatesOnly={setDuplicatesOnly}
-          onClearAll={clearFilters}
-          searchRef={searchRef}
-        />
-      </div>
-
-      {/* A poll that failed while rows are already on screen. Deliberately a
-          strip above the table rather than a replacement for it. */}
-      {isStale && (
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded border border-amber-200 bg-amber-50 px-3 py-2">
-          <p className="text-xs text-amber-800">{en.bugHunter.findingsStaleNotice}</p>
-          <Button size="sm" kind="ghost" onClick={() => refetch()}>
-            {en.bugHunter.retry}
-          </Button>
+      <div
+        id={FINDINGS_PANEL_ID}
+        role="tabpanel"
+        aria-labelledby={`bug-findings-tab-${bucket}`}
+        className="pt-3"
+      >
+        <div className="mb-3">
+          <FindingsFilterBar
+            filters={filters}
+            available={available}
+            counts={facetCounts}
+            onSearch={setSearch}
+            onRepos={setRepos}
+            onSeverities={setSeverities}
+            onSources={setSources}
+            onAge={setAge}
+            onDuplicatesOnly={setDuplicatesOnly}
+            onClearAll={clearFilters}
+            searchRef={searchRef}
+          />
         </div>
-      )}
 
-      {isLoading ? (
-        <TableSkeleton />
-      ) : isError && hasNothingToShow ? (
-        <div className="flex flex-wrap items-center gap-3">
-          <p className="text-destructive-600 text-sm">{en.bugHunter.findingsLoadFailed}</p>
-          <button
-            type="button"
-            onClick={() => refetch()}
-            className="text-sm text-primary-600 underline"
-          >
-            {en.bugHunter.retry}
-          </button>
-        </div>
-      ) : hasNothingToShow ? (
-        <EmptyState
-          title={en.bugHunter.findingsEmptyTitle}
-          subtitle={en.bugHunter.findingsEmptySubtitle}
-          hideActionButton
-        />
-      ) : view.matched === 0 ? (
-        // A filtered-to-nothing table is a different situation from an empty
-        // one, and telling someone "Once I'm on duty, anything I find shows up
-        // here" when they have simply typed a typo into the search box is the
-        // page blaming its own state for the reader's.
-        <div className="border border-border-light rounded-lg py-10 text-center">
-          <p className="text-sm font-medium text-typography-900">{en.bugHunter.noMatchTitle}</p>
-          <p className="text-xs text-typography-600 mt-1">{en.bugHunter.noMatchSubtitle}</p>
-          <div className="mt-3">
-            <Button size="sm" kind="tertiary" onClick={clearFilters}>
-              {en.bugHunter.clearFilters}
+        {/* A poll that failed while rows are already on screen. Deliberately a
+            strip above the table rather than a replacement for it. */}
+        {isStale && (
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded border border-border-light bg-neutral-50 px-3 py-2">
+            <p className="text-xs text-typography-800">{en.bugHunter.findingsStaleNotice}</p>
+            <Button size="sm" kind="ghost" onClick={() => refetch()}>
+              {en.bugHunter.retry}
             </Button>
           </div>
-        </div>
-      ) : (
-        <>
-          {/* Offered only when the selection could reach past this page. On a
-              single-page result the header checkbox already selects everything,
-              and a second control saying so would be two ways to do one job. */}
-          {canTriage && somePageSelected && view.pageCount > 1 && !matchedAllSelected && (
-            <div className="mb-2 rounded border border-primary-200 bg-primary-50 px-3 py-1.5 text-xs text-typography-800">
-              {en.bugHunter.selectAllMatchingPrompt.replace(
-                "{count}",
-                String(view.matchedIds.length),
-              )}{" "}
-              <button
-                type="button"
-                onClick={selectAllMatching}
-                className="font-semibold text-primary-700 underline cursor-pointer"
-              >
-                {en.bugHunter.selectAllMatchingAction.replace(
+        )}
+
+        {isLoading ? (
+          <TableSkeleton />
+        ) : isError && hasNothingToShow ? (
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="text-destructive-600 text-sm">{en.bugHunter.findingsLoadFailed}</p>
+            <button
+              type="button"
+              onClick={() => refetch()}
+              className="text-sm text-primary-600 underline"
+            >
+              {en.bugHunter.retry}
+            </button>
+          </div>
+        ) : hasNothingToShow ? (
+          <EmptyState
+            title={en.bugHunter.findingsEmptyTitle}
+            subtitle={en.bugHunter.findingsEmptySubtitle}
+            hideActionButton
+          />
+        ) : view.matched === 0 && hasActiveFilters(filters) ? (
+          // Filtered to nothing is a different situation from an empty tab:
+          // telling someone "nothing needs you" when they have typed a typo
+          // into the search box blames the page's state for the reader's.
+          <div className="border border-border-light rounded-lg py-10 text-center">
+            <p className="text-sm font-medium text-typography-900">{en.bugHunter.noMatchTitle}</p>
+            <p className="text-xs text-typography-600 mt-1">{en.bugHunter.noMatchSubtitle}</p>
+            <div className="mt-3">
+              <Button size="sm" kind="tertiary" onClick={clearFilters}>
+                {en.bugHunter.clearFilters}
+              </Button>
+            </div>
+          </div>
+        ) : view.matched === 0 ? (
+          // An empty tab says what lands in it, so "nothing here" reads as
+          // nothing yet rather than as something broken — and the counts on
+          // the tabs above are the way on (Stacks: *The Four-Second Rule:
+          // Confusion Triggers Disengagement*).
+          <div
+            className="border border-border-light rounded-lg py-10 text-center"
+            data-testid="bug-findings-tab-empty"
+          >
+            <p className="text-sm font-medium text-typography-900">{emptyCopy.title}</p>
+            <p className="text-xs text-typography-600 mt-1">{emptyCopy.subtitle}</p>
+          </div>
+        ) : (
+          <>
+            {/* Offered only when the selection could reach past this page. On a
+                single-page result the header checkbox already selects everything,
+                and a second control saying so would be two ways to do one job. */}
+            {canTriage && somePageSelected && view.pageCount > 1 && !matchedAllSelected && (
+              <div className="mb-2 rounded border border-primary-200 bg-primary-50 px-3 py-1.5 text-xs text-typography-800">
+                {en.bugHunter.selectAllMatchingPrompt.replace(
                   "{count}",
                   String(view.matchedIds.length),
-                )}
-              </button>
-            </div>
-          )}
-
-          {/* One card around the rows and the pager. A wrapper rather than a
-              border on the table itself, because `border-collapse` cannot
-              round a corner — and deliberately without `overflow-hidden`,
-              which would make this box the scrollport and stop the sticky
-              header sticking to the page. */}
-          <div className="rounded-lg border border-border-light bg-white">
-            <Table className="w-full text-left border-collapse">
-              <TableHead>
-                <TableRow className="border-b border-border-medium text-xs font-semibold text-typography-700">
-                  {/* No selection column at all for a reader who cannot act —
-                    bulk triage is a decision, same as the row quick actions and
-                    the drawer's buttons, all gated the same way. The whole
-                    <TableHeader> goes, not just the checkbox inside it: an
-                    empty 32px gutter down the left of every row is the "dead
-                    column" this table collapses everywhere else. */}
-                  {canTriage && (
-                    <TableHeader className={`py-2.5 pl-3 pr-3 w-8 ${STICKY_HEADER}`}>
-                      <Tooltip label={en.bugHunter.selectAllTooltip} align="right">
-                        <span className="inline-flex">
-                          <TriStateCheckbox
-                            id="bug-findings-select-all"
-                            checked={allPageSelected}
-                            indeterminate={somePageSelected}
-                            onChange={togglePage}
-                            label={en.bugHunter.selectAllLabel}
-                          />
-                        </span>
-                      </Tooltip>
-                    </TableHeader>
+                )}{" "}
+                <button
+                  type="button"
+                  onClick={selectAllMatching}
+                  className="font-semibold text-primary-700 underline cursor-pointer"
+                >
+                  {en.bugHunter.selectAllMatchingAction.replace(
+                    "{count}",
+                    String(view.matchedIds.length),
                   )}
-                  {/* The one column that holds prose, and the one that absorbs
-                    whatever width the others do not use. A table in `auto`
-                    layout hands surplus to whichever cell wants it, which used
-                    to be the actions column — so a 1500px viewport spent 325px
-                    on two ghost buttons while bug titles truncated at 420px.
+                </button>
+              </div>
+            )}
 
-                    `w-full` here is only half of it, and on its own it is worse
-                    than the bug it fixes: measured on the live page it made the
-                    column 100% of the container *plus* the other six columns'
-                    content, so the table came out 1897px wide inside a 1204px
-                    region and everything from Status rightwards was off-screen.
-                    The other half is `max-w-0` on the body cell, which is what
-                    lets this column shrink past its content — see there. */}
-                  <SortableHeader
-                    sortKey="title"
-                    label={en.bugHunter.findingColumnTitle}
-                    activeKey={sortKey}
-                    direction={sortDirection}
-                    onSort={toggleSort}
-                    className={`w-full ${canTriage ? "" : "pl-3"}`}
-                  />
-                  {showRepo && (
+            {/* One card around the rows and the pager. A wrapper rather than a
+                border on the table itself, because `border-collapse` cannot
+                round a corner — and deliberately without `overflow-hidden`,
+                which would make this box the scrollport and stop the sticky
+                header sticking to the page. */}
+            <div className="rounded-lg border border-border-light bg-white">
+              <Table className="w-full text-left border-collapse">
+                <TableHead>
+                  <TableRow className="border-b border-border-medium text-xs font-semibold text-typography-700">
+                    {/* No selection column at all for a reader who cannot act —
+                      bulk triage is a decision, gated like the row button and
+                      the drawer's. The whole <TableHeader> goes, not just the
+                      checkbox, or an empty gutter runs down every row. */}
+                    {canTriage && (
+                      <TableHeader className={`py-2.5 pl-3 pr-3 w-8 ${STICKY_HEADER}`}>
+                        <Tooltip label={en.bugHunter.selectAllTooltip} align="right">
+                          <span className="inline-flex">
+                            <TriStateCheckbox
+                              id="bug-findings-select-all"
+                              checked={allPageSelected}
+                              indeterminate={somePageSelected}
+                              onChange={togglePage}
+                              label={en.bugHunter.selectAllLabel}
+                            />
+                          </span>
+                        </Tooltip>
+                      </TableHeader>
+                    )}
+                    {/* The one column that holds prose, and the one that absorbs
+                      whatever width the others leave. `w-full` here and
+                      `max-w-0` on the body cell are a pair: without the second
+                      the column grows to its content and the table leaves its
+                      container — see the body cell. */}
                     <SortableHeader
-                      sortKey="repo"
-                      label={en.bugHunter.findingColumnRepo}
+                      sortKey="title"
+                      label={en.bugHunter.findingColumnTitle}
+                      activeKey={sortKey}
+                      direction={sortDirection}
+                      onSort={toggleSort}
+                      className={`w-full ${canTriage ? "" : "pl-3"}`}
+                    />
+                    <SortableHeader
+                      sortKey="status"
+                      label={en.bugHunter.findingColumnStatus}
+                      tooltip={en.bugHunter.findingColumnStatusTooltip}
                       activeKey={sortKey}
                       direction={sortDirection}
                       onSort={toggleSort}
                       className="whitespace-nowrap"
                     />
-                  )}
-                  {showSeverity && (
+                    {/* The magnitude is what a triager reads ("this has been
+                      sitting three weeks"); the exact timestamp is a hover away. */}
                     <SortableHeader
-                      sortKey="severity"
-                      label={en.bugHunter.findingColumnSeverity}
+                      sortKey="discovered"
+                      label={en.bugHunter.findingColumnAge}
+                      tooltip={en.bugHunter.findingColumnAgeTooltip}
                       activeKey={sortKey}
                       direction={sortDirection}
                       onSort={toggleSort}
                       className="whitespace-nowrap"
                     />
-                  )}
-                  <SortableHeader
-                    sortKey="status"
-                    label={en.bugHunter.findingColumnStatus}
-                    tooltip={en.bugHunter.findingColumnStatusTooltip}
-                    activeKey={sortKey}
-                    direction={sortDirection}
-                    onSort={toggleSort}
-                    className="whitespace-nowrap"
-                  />
-                  {showStage && (
-                    <SortableHeader
-                      sortKey="stage"
-                      label={en.bugHunter.findingColumnStage}
-                      tooltip={en.bugHunter.findingColumnStageTooltip}
-                      activeKey={sortKey}
-                      direction={sortDirection}
-                      onSort={toggleSort}
-                      className={`whitespace-nowrap ${SECONDARY_COLUMN}`}
-                    />
-                  )}
-                  {/* Replaces the old absolute "Discovered" date column. The
-                    magnitude is what a triager reads ("this has been sitting
-                    three weeks"); the exact timestamp is a hover away. */}
-                  <SortableHeader
-                    sortKey="discovered"
-                    label={en.bugHunter.findingColumnAge}
-                    tooltip={en.bugHunter.findingColumnAgeTooltip}
-                    activeKey={sortKey}
-                    direction={sortDirection}
-                    onSort={toggleSort}
-                    className="whitespace-nowrap"
-                  />
-                  {/* Age answers "how long has this been sitting"; this answers
-                    "did anything happen to it recently" — and they come apart
-                    hard on a re-triaged human report, where Age is the day
-                    somebody filed it and this is last night. */}
-                  {showUpdated && (
-                    <SortableHeader
-                      sortKey="updated"
-                      label={en.bugHunter.findingColumnUpdated}
-                      tooltip={en.bugHunter.findingColumnUpdatedTooltip}
-                      activeKey={sortKey}
-                      direction={sortDirection}
-                      onSort={toggleSort}
-                      className={`whitespace-nowrap ${SECONDARY_COLUMN}`}
-                    />
-                  )}
-                  {showCost && (
-                    <SortableHeader
-                      sortKey="cost"
-                      label={en.bugHunter.findingColumnCost}
-                      tooltip={en.bugHunter.findingColumnCostTooltip}
-                      activeKey={sortKey}
-                      direction={sortDirection}
-                      onSort={toggleSort}
-                      className={`whitespace-nowrap text-right ${SECONDARY_COLUMN}`}
-                    />
-                  )}
-                  {showPr && (
-                    <TableHeader
-                      className={`py-2.5 pr-3 font-medium whitespace-nowrap ${STICKY_HEADER}`}
-                    >
-                      {en.bugHunter.findingColumnPr}
-                    </TableHeader>
-                  )}
-                  {/* Same rule as the selection column: for a read-only reader
-                    every cell under this heading is empty, so the heading is a
-                    column-width promise of buttons that are never coming. */}
-                  {canTriage && (
-                    <TableHeader
-                      // A width hint, not a cap: the cell's actions wrap onto a
-                      // second line when all three are offered, instead of the
-                      // column growing until the table leaves its container.
-                      className={`py-2.5 pr-3 min-w-[11rem] font-medium text-right whitespace-nowrap ${STICKY_HEADER}`}
-                    >
-                      {en.bugHunter.quickActionsColumn}
-                    </TableHeader>
-                  )}
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {rows.map(({ finding, duplicateCount }, index) => {
-                  const days = ageInDays(finding);
-                  const tier = days == null ? "fresh" : stalenessTier(days);
-                  const tinted = showsStaleness(finding) ? tier : "fresh";
-                  const isCursor = index === cursor;
-                  const isSelected = selectedIds.has(finding.id);
-
-                  return (
-                    <TableRow
-                      key={finding.id}
-                      className={`border-b border-border-light text-sm text-typography-900 cursor-pointer ${
-                        isSelected ? "bg-primary-50" : "hover:bg-neutral-50"
-                      } ${
-                        // The keyboard cursor's own mark. Focus lands on the
-                        // row's button and is visible on its own, but the ring is
-                        // on one cell inside a full-width row — so the row gets a
-                        // left rule too, which is what makes "where am I"
-                        // answerable at a glance while paging with j/k.
-                        isCursor ? "shadow-[inset_3px_0_0_0_var(--cds-interactive,#0f62fe)]" : ""
-                      } ${freshIds.has(finding.id) ? "animate-fadeIn motion-reduce:animate-none" : ""}`}
-                      // Mouse convenience only. The row deliberately carries no
-                      // role or tabIndex — see the button in the title cell.
-                      onClick={() => setBug(finding.id)}
-                    >
-                      {/* Gated with its header above, never independently — a
-                        body cell that outlives its column shifts every other
-                        cell on the row one place left. */}
-                      {canTriage && (
-                        <TableCell className={`${rowPadding} pl-3 pr-3`}>
-                          <TriStateCheckbox
-                            id={`bug-finding-select-${finding.id}`}
-                            checked={isSelected}
-                            onChange={() => toggleId(finding.id)}
-                            label={en.bugHunter.rowSelectLabel.replace("{title}", finding.title)}
-                          />
-                        </TableCell>
-                      )}
-
-                      {/* `max-w-0` is load-bearing, not a typo. A table cell's
-                        column can never be narrower than its content's
-                        min-content width, and `truncate` does not lower that —
-                        so a long title would widen the column and push the
-                        table past its container however the header is sized.
-                        `max-width: 0` opts this column out of that floor: the
-                        header's `w-full` then gets it the leftover space, and
-                        the `truncate`s below do the rest. */}
-                      <TableCell
-                        className={`${rowPadding} ${canTriage ? "" : "pl-3"} pr-4 min-w-[14rem] max-w-0`}
+                    {/* Named for screen readers only: most rows have no button,
+                      and a visible heading over an empty column promises
+                      buttons that are not there. Same gate as the selection
+                      column — a read-only reader gets no column at all. */}
+                    {canTriage && (
+                      <TableHeader
+                        className={`py-2.5 pr-3 font-medium whitespace-nowrap ${STICKY_HEADER}`}
                       >
-                        <div className="flex items-center gap-2">
-                          {/* The row's real control, and the reason it is here
-                            rather than on the <tr>.
+                        <span className="sr-only">{en.bugHunter.quickActionsColumn}</span>
+                      </TableHeader>
+                    )}
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {rows.map(({ finding, duplicateCount }, index) => {
+                    const days = ageInDays(finding);
+                    const tier = days == null ? "fresh" : stalenessTier(days);
+                    const tinted = showsStaleness(finding) ? tier : "fresh";
+                    const isCursor = index === cursor;
+                    const isSelected = selectedIds.has(finding.id);
+                    const step = canTriage ? nextStep(finding) : null;
 
-                            Rows used to be `<tr onClick>` with no tabIndex, no
-                            role and no key handler, so a keyboard user could not
-                            open a single bug — the one outright accessibility
-                            defect in the feature. The first fix put
-                            role="button", tabIndex and aria-label on the TableRow,
-                            and live testing showed Carbon destructures
-                            `aria-label` out of TableRow's props (it only forwards
-                            it for expandable rows), leaving twenty *unnamed*
-                            buttons — worse than before. `role="button"` on a <tr>
-                            also destroys the table semantics for a screen reader.
+                    return (
+                      <TableRow
+                        key={finding.id}
+                        className={`border-b border-border-light text-sm text-typography-900 cursor-pointer ${
+                          isSelected ? "bg-primary-50" : "hover:bg-neutral-50"
+                        } ${
+                          // The keyboard cursor's own mark: a left rule on the
+                          // row, so "where am I" is answerable at a glance while
+                          // paging with j/k.
+                          isCursor ? "shadow-[inset_3px_0_0_0_var(--cds-interactive,#0f62fe)]" : ""
+                        } ${freshIds.has(finding.id) ? "animate-fadeIn motion-reduce:animate-none" : ""}`}
+                        // Mouse convenience only. The row deliberately carries no
+                        // role or tabIndex — see the button in the title cell.
+                        onClick={() => setBug(finding.id)}
+                      >
+                        {/* Gated with its header above, never independently — a
+                          body cell that outlives its column shifts every other
+                          cell on the row one place left. */}
+                        {canTriage && (
+                          <TableCell className={`${rowPadding} pl-3 pr-3`}>
+                            <TriStateCheckbox
+                              id={`bug-finding-select-${finding.id}`}
+                              checked={isSelected}
+                              onChange={() => toggleId(finding.id)}
+                              label={en.bugHunter.rowSelectLabel.replace("{title}", finding.title)}
+                            />
+                          </TableCell>
+                        )}
 
-                            So the row stays a row, and one cell holds a named
-                            control. The aria-label states the affordance and
-                            contains the visible text, satisfying WCAG 2.5.3.
-                            It doubles as the keyboard cursor's focus target. */}
-                          <button
-                            ref={element => {
-                              rowButtonRefs.current[index] = element;
-                            }}
-                            type="button"
-                            aria-label={en.bugHunter.rowOpenLabel.replace("{title}", finding.title)}
-                            title={finding.title}
-                            onFocus={() => setCursorId(finding.id)}
-                            onClick={event => {
-                              event.stopPropagation();
-                              setBug(finding.id);
-                            }}
-                            className="min-w-0 truncate text-left rounded cursor-pointer hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-                          >
-                            {finding.title}
-                          </button>
-                          {duplicateCount != null && (
-                            <Tooltip
-                              label={en.bugHunter.duplicateTooltip.replace(
-                                "{count}",
-                                String(duplicateCount),
+                        {/* `max-w-0` is load-bearing, not a typo. A table cell's
+                          column can never be narrower than its content's
+                          min-content width, and `truncate` does not lower that —
+                          so a long title would widen the column and push the
+                          table past its container. `max-width: 0` opts this
+                          column out of that floor: the header's `w-full` then
+                          gets it the leftover space, and `truncate` does the
+                          rest. */}
+                        <TableCell
+                          className={`${rowPadding} ${canTriage ? "" : "pl-3"} pr-4 min-w-[14rem] max-w-0`}
+                        >
+                          <div className="flex items-center gap-2">
+                            {finding.severity && (
+                              <span
+                                role="img"
+                                aria-label={en.bugHunter.severityDotLabel.replace(
+                                  "{severity}",
+                                  BUG_FINDING_SEVERITY_LABELS[finding.severity],
+                                )}
+                                title={en.bugHunter.severityDotLabel.replace(
+                                  "{severity}",
+                                  BUG_FINDING_SEVERITY_LABELS[finding.severity],
+                                )}
+                                className={`h-2 w-2 shrink-0 rounded-full ${SEVERITY_DOTS[finding.severity]}`}
+                              />
+                            )}
+                            {/* The row's real control, and the reason it is here
+                              rather than on the <tr>. Carbon drops `aria-label`
+                              off a TableRow and `role="button"` on a <tr> breaks
+                              the table for a screen reader, so the row stays a
+                              row and one cell holds a named control. It doubles
+                              as the keyboard cursor's focus target. */}
+                            <button
+                              ref={element => {
+                                rowButtonRefs.current[index] = element;
+                              }}
+                              type="button"
+                              aria-label={en.bugHunter.rowOpenLabel.replace(
+                                "{title}",
+                                finding.title,
                               )}
-                              align="top"
+                              title={finding.title}
+                              onFocus={() => setCursorId(finding.id)}
+                              onClick={event => {
+                                event.stopPropagation();
+                                setBug(finding.id);
+                              }}
+                              className="min-w-0 truncate text-left rounded cursor-pointer hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                             >
-                              <span className="shrink-0 inline-flex items-center whitespace-nowrap rounded border border-border-light bg-neutral-100 px-1.5 text-[10px] font-semibold text-typography-600 cursor-help">
-                                {en.bugHunter.duplicateTag.replace(
+                              {finding.title}
+                            </button>
+                            {duplicateCount != null && (
+                              <Tooltip
+                                label={en.bugHunter.duplicateTooltip.replace(
                                   "{count}",
                                   String(duplicateCount),
                                 )}
-                              </span>
-                            </Tooltip>
-                          )}
-                          {/* A shipped fix that came back. Amber rather than
-                            neutral because it is the one row state where the
-                            reasonable next move is NOT to fix it again — see
-                            the notification's own reasoning. */}
-                          {(finding.regressed || finding.regressionOf) && (
-                            <Tooltip label={en.bugHunter.findingRegressedTooltip} align="top">
-                              <span className="shrink-0 inline-flex items-center whitespace-nowrap rounded border border-amber-300 bg-amber-50 px-1.5 text-[10px] font-semibold text-amber-800 cursor-help">
-                                {finding.regressionOf
-                                  ? en.bugHunter.findingRegressionOfChip
-                                  : en.bugHunter.findingRegressedChip}
-                              </span>
-                            </Tooltip>
-                          )}
-                          {/* Both verifiers accepted it, one of them hesitantly.
-                            Shown on the row rather than only in the drawer:
-                            it is a reason to open THIS bug before the others,
-                            which is a scanning decision. */}
-                          {finding.confidence != null &&
-                            finding.confidence < BUG_FINDING_LOW_CONFIDENCE_THRESHOLD && (
-                              <Tooltip label={en.bugHunter.findingLowConfidenceTooltip} align="top">
+                                align="top"
+                              >
                                 <span className="shrink-0 inline-flex items-center whitespace-nowrap rounded border border-border-light bg-neutral-100 px-1.5 text-[10px] font-semibold text-typography-600 cursor-help">
-                                  {en.bugHunter.findingLowConfidenceChip}
+                                  {en.bugHunter.duplicateTag.replace(
+                                    "{count}",
+                                    String(duplicateCount),
+                                  )}
                                 </span>
                               </Tooltip>
                             )}
-                        </div>
-                        {/* Source moved out of its own column and under the title.
-                          It reads as provenance rather than as a field, it freed
-                          a column, and the facet above is how you scan by it.
-
-                          The reporter joins it for a human-filed bug: with bugs
-                          off the roadmap board this row is the only place a real
-                          user's report can be told apart from an agent-found
-                          lint error, and "who hit this" is the first thing a
-                          triager wants from that distinction. */}
-                        <div className="text-xs text-typography-600 truncate">
-                          {BUG_FINDING_SOURCE_LABELS[finding.source]}
-                          {finding.report && (
-                            <>
-                              {" · "}
-                              <span className={CONSUMER_BADGE_STYLE}>
-                                {finding.report.reporterSource === "consumer"
-                                  ? en.bugHunter.reporterConsumer
-                                  : en.bugHunter.reporterStaff}
-                              </span>{" "}
-                              {finding.report.reportedByName ?? en.bugHunter.reporterUnknown}
-                            </>
-                          )}
-                          {finding.file ? ` · ${finding.file}` : ""}
-                          {engineModelLabel(finding.engine, finding.model)
-                            ? ` · ${engineModelLabel(finding.engine, finding.model)}`
-                            : ""}
-                        </div>
-                      </TableCell>
-
-                      {showRepo && (
-                        <TableCell className={`${rowPadding} pr-3 whitespace-nowrap`}>
-                          {finding.repo ?? "—"}
-                        </TableCell>
-                      )}
-
-                      {showSeverity && (
-                        <TableCell className={`${rowPadding} pr-3 whitespace-nowrap`}>
-                          {finding.severity ? (
-                            <span className="inline-flex items-center gap-1.5">
-                              <span
-                                aria-hidden="true"
-                                className={`h-2 w-2 rounded-full ${SEVERITY_DOTS[finding.severity]}`}
-                              />
-                              {BUG_FINDING_SEVERITY_LABELS[finding.severity]}
-                            </span>
-                          ) : (
-                            en.bugHunter.findingSeverityNone
-                          )}
-                        </TableCell>
-                      )}
-
-                      <TableCell className={`${rowPadding} pr-3 whitespace-nowrap`}>
-                        <span className="inline-flex items-center gap-1.5">
-                          <BugFindingStatusBadge status={finding.status} />
-                          {isMidFlight(finding.status) && (
-                            <BrailleSpinner className="text-amber-600" />
-                          )}
-                        </span>
-                      </TableCell>
-
-                      {/* The roadmap ladder, in its own column now rather than
-                        stacked under the status badge — see `showStage`. */}
-                      {showStage && (
-                        <TableCell
-                          className={`${rowPadding} pr-3 whitespace-nowrap ${SECONDARY_COLUMN}`}
-                        >
-                          <BugFindingStageChip
-                            stage={finding.stage}
-                            status={finding.status}
-                            isAuto={finding.stageIsAuto}
-                            pinnedByName={finding.stageOverriddenByName}
-                            pinnedAt={finding.stageOverriddenAt}
-                          />
-                        </TableCell>
-                      )}
-
-                      <TableCell className={`${rowPadding} pr-3 whitespace-nowrap`}>
-                        {/* The exact timestamp — to the second, not just the day —
-                          stays reachable as the hover title, so a row can be
-                          placed against the sweep that touched it. The column
-                          itself shows the magnitude, which is the thing a
-                          triager is actually comparing between rows.
-
-                          The staleness wording rides in that same `title`
-                          rather than on a control of its own. It used to be an
-                          ⏳ emoji with its own tooltip, sitting in a numeric
-                          column beside a value that was *already* amber or red
-                          for the same reason — a third encoding of one fact,
-                          and the only emoji in the table. */}
-                        <span
-                          title={
-                            tinted === "stale" || tinted === "ancient"
-                              ? `${formatTimestamp(finding.createdAt)} — ${
-                                  tinted === "ancient"
-                                    ? en.bugHunter.findingAgeAncientTooltip
-                                    : en.bugHunter.findingAgeStaleTooltip
-                                }`
-                              : formatTimestamp(finding.createdAt)
-                          }
-                          className={`tabular-nums ${STALENESS_STYLES[tinted]}`}
-                        >
-                          {days == null ? "—" : formatAge(days)}
-                        </span>
-                      </TableCell>
-
-                      {showUpdated && (
-                        <TableCell
-                          className={`${rowPadding} pr-3 whitespace-nowrap ${SECONDARY_COLUMN}`}
-                        >
-                          {/* Relative, like Age, and from the same helper — a
-                            column of absolute timestamps next to a column of
-                            "9h" is two units to hold at once. */}
-                          <span
-                            title={formatTimestamp(finding.updatedAt)}
-                            className="tabular-nums text-typography-700"
-                          >
-                            {formatAge(
-                              // Fractional days, and clamped: `formatAge` derives
-                              // hours from the fraction, so flooring here would
-                              // print "now" for everything under a day, and clock
-                              // skew would otherwise print a negative age.
-                              Math.max(0, (Date.now() - updatedAt(finding)) / 86_400_000),
+                            {/* A shipped fix that came back — the one row state
+                              where the reasonable next move is NOT to fix it
+                              again. Neutral, like every chip here: the status
+                              badge is the only coloured thing on a row. */}
+                            {(finding.regressed || finding.regressionOf) && (
+                              <Tooltip label={en.bugHunter.findingRegressedTooltip} align="top">
+                                <span className="shrink-0 inline-flex items-center whitespace-nowrap rounded border border-border-light bg-neutral-100 px-1.5 text-[10px] font-semibold text-typography-700 cursor-help">
+                                  {finding.regressionOf
+                                    ? en.bugHunter.findingRegressionOfChip
+                                    : en.bugHunter.findingRegressedChip}
+                                </span>
+                              </Tooltip>
                             )}
-                          </span>
-                        </TableCell>
-                      )}
-
-                      {showCost && (
-                        <TableCell
-                          data-testid="finding-cost"
-                          className={`${rowPadding} pr-3 whitespace-nowrap text-right tabular-nums ${SECONDARY_COLUMN}`}
-                        >
-                          {/* The shift log's dollars, per bug: what every fix session on
-
-                            this row has cost, from the case file's budget. */}
-
-                          <span className="text-typography-700">{formatCost(costOf(finding))}</span>
-                        </TableCell>
-                      )}
-
-                      {showPr && (
-                        <TableCell className={`${rowPadding} pr-3 whitespace-nowrap`}>
-                          {finding.prUrl ? (
-                            <a
-                              href={finding.prUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center text-primary-600 hover:text-primary-800"
-                              aria-label={en.bugHunter.viewPr}
-                              title={en.bugHunter.viewPr}
-                              onClick={e => e.stopPropagation()}
-                            >
-                              <Launch className="h-4 w-4" aria-hidden="true" />
-                            </a>
-                          ) : (
-                            "—"
-                          )}
-                        </TableCell>
-                      )}
-
-                      {/* Quick actions. Rendered only where ally-be would accept
-                        them, so there is no such thing as a disabled one here —
-                        a greyed-out "Approve" on forty rows is noise, and an
-                        enabled one that 403s is worse. */}
-                      {canTriage && (
-                        <TableCell className={`${rowPadding} pr-3 text-right`}>
-                          <div
-                            className="inline-flex max-w-[11rem] flex-wrap items-center justify-end gap-1.5"
-                            // These are the row's actions, not the row: a click on
-                            // one must not also open the drawer behind it.
-                            onClick={event => event.stopPropagation()}
-                          >
-                            {canAct("approve", finding) && (
-                              <QuickAction
-                                tone="approve"
-                                onClick={() => setPending({ action: "approve", finding })}
-                              >
-                                {en.bugHunter.quickApprove}
-                              </QuickAction>
-                            )}
-                            {canAct("reject", finding) && (
-                              <QuickAction
-                                tone="reject"
-                                onClick={() => setPending({ action: "reject", finding })}
-                              >
-                                {en.bugHunter.quickReject}
-                              </QuickAction>
-                            )}
-                            {canAct("fix", finding) && (
-                              <QuickAction
-                                tone="fix"
-                                onClick={() => setPending({ action: "fix", finding })}
-                              >
-                                {en.bugHunter.quickFix}
-                              </QuickAction>
+                            {/* Both verifiers accepted it, one of them hesitantly
+                              — a reason to open THIS bug before the others. */}
+                            {finding.confidence != null &&
+                              finding.confidence < BUG_FINDING_LOW_CONFIDENCE_THRESHOLD && (
+                                <Tooltip
+                                  label={en.bugHunter.findingLowConfidenceTooltip}
+                                  align="top"
+                                >
+                                  <span className="shrink-0 inline-flex items-center whitespace-nowrap rounded border border-border-light bg-neutral-100 px-1.5 text-[10px] font-semibold text-typography-600 cursor-help">
+                                    {en.bugHunter.findingLowConfidenceChip}
+                                  </span>
+                                </Tooltip>
+                              )}
+                          </div>
+                          {/* One meta line: where it lives and where it came
+                            from. Repo and Source were a column and a line of
+                            their own; file and engine/model are in the drawer.
+                            The reporter stays on a human-filed bug, because
+                            "who hit this" is the first thing a triager wants
+                            from a real user's report. */}
+                          <div className="text-xs text-typography-700 truncate">
+                            {[finding.repo, BUG_FINDING_SOURCE_LABELS[finding.source]]
+                              .filter(Boolean)
+                              .join(" · ")}
+                            {finding.report && (
+                              <>
+                                {" · "}
+                                <span className={CONSUMER_BADGE_STYLE}>
+                                  {finding.report.reporterSource === "consumer"
+                                    ? en.bugHunter.reporterConsumer
+                                    : en.bugHunter.reporterStaff}
+                                </span>{" "}
+                                {finding.report.reportedByName ?? en.bugHunter.reporterUnknown}
+                              </>
                             )}
                           </div>
                         </TableCell>
-                      )}
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
 
-            {/* Only while something is ticked — an always-present bar with a zero
-              in it is a permanent strip of chrome at the bottom of the page. */}
-            {selected.length > 0 && (
-              <BulkTriageBar
-                selected={selected}
-                onClear={() => setSelectedIds(new Set())}
-                onSettled={actedIds =>
-                  setSelectedIds(current => {
-                    const next = new Set(current);
-                    actedIds.forEach(id => next.delete(id));
-                    return next;
-                  })
-                }
-              />
-            )}
+                        <TableCell className={`${rowPadding} pr-3 whitespace-nowrap`}>
+                          <span className="inline-flex items-center gap-1.5">
+                            <BugFindingStatusBadge status={finding.status} />
+                            {isMidFlight(finding.status) && (
+                              <BrailleSpinner className="text-typography-500" />
+                            )}
+                          </span>
+                        </TableCell>
 
-            {/* One line, not four. This footer used to stack the result count, the
-              window notice and a shortcuts hint as three paragraphs of
-              micro-copy under every table — permanent chrome that said nothing
-              new after the first read. The count and the window caveat are one
-              sentence now, and the shortcuts hint is gone: `?` opens the
-              shortcut sheet from anywhere on the page. */}
-            {/* Closes the table's card: the border continues from the rows above,
-              and the pager sits inside it rather than floating under the page. */}
-            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-b-lg border-t border-border-light bg-neutral-50 px-3 py-2">
-              <p className="text-xs text-typography-600" aria-live="polite">
-                {view.matched === 1
-                  ? en.bugHunter.resultSummaryOne
-                  : en.bugHunter.resultSummary
-                      .replace("{shown}", String(view.rows.length))
-                      .replace("{matched}", String(view.matched))}
-                {view.windowed && (
-                  <span className="text-typography-500">
-                    {" · "}
-                    {en.bugHunter.windowNotice
-                      .replace("{loaded}", String(view.loaded))
-                      .replace("{total}", String(view.total))}{" "}
-                    <button
-                      type="button"
-                      onClick={handleLoadMore}
-                      disabled={loadingMore}
-                      className="font-medium text-primary-700 underline cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {loadingMore
-                        ? en.bugHunter.loadMorePending
-                        : en.bugHunter.loadMoreAction.replace(
-                            "{count}",
-                            String(Math.min(FINDINGS_LOAD_INCREMENT, view.total - view.loaded)),
-                          )}
-                    </button>
-                  </span>
-                )}
-              </p>
+                        <TableCell className={`${rowPadding} pr-3 whitespace-nowrap`}>
+                          {/* The exact timestamp stays reachable as the hover
+                            title; the staleness wording rides in it too, for
+                            the Needs-you rows whose age is tinted. */}
+                          <span
+                            title={
+                              tinted === "stale" || tinted === "ancient"
+                                ? `${formatTimestamp(finding.createdAt)} — ${
+                                    tinted === "ancient"
+                                      ? en.bugHunter.findingAgeAncientTooltip
+                                      : en.bugHunter.findingAgeStaleTooltip
+                                  }`
+                                : formatTimestamp(finding.createdAt)
+                            }
+                            className={`tabular-nums ${STALENESS_STYLES[tinted]}`}
+                          >
+                            {days == null ? "—" : formatAge(days)}
+                          </span>
+                        </TableCell>
 
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                {/* Beside the pager rather than up with the filters: it changes
-                  how the results are paginated, not which results there are. */}
-                <label
-                  htmlFor="bug-findings-page-size"
-                  className="flex items-center gap-1.5 text-xs text-typography-600"
-                >
-                  {en.bugHunter.pageSizeLabel}
-                  <select
-                    id="bug-findings-page-size"
-                    value={pageSize}
-                    onChange={event => setPageSize(Number(event.target.value) as PageSize)}
-                    className="h-10 rounded-md border border-border-light bg-white pl-2 pr-6 text-xs text-typography-900 md:h-8 cursor-pointer hover:border-border-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-400"
-                  >
-                    {PAGE_SIZES.map(size => (
-                      <option key={size} value={size}>
-                        {size}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                        {/* At most one button, and only where ally-be would
+                          accept the move — there is no such thing as a
+                          disabled one here. */}
+                        {canTriage && (
+                          <TableCell className={`${rowPadding} pr-3 text-right`}>
+                            {step && (
+                              <span
+                                className="inline-flex"
+                                // The row's action, not the row: a click on it
+                                // must not also open the drawer behind it.
+                                onClick={event => event.stopPropagation()}
+                              >
+                                <NextStepButton onClick={() => onNextStep(step, finding)}>
+                                  {labels[step]}
+                                </NextStepButton>
+                              </span>
+                            )}
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
 
-                {view.pageCount > 1 && (
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span className="text-xs text-typography-600 tabular-nums">
-                      {en.bugHunter.pageStatus
-                        .replace("{page}", String(view.page + 1))
-                        .replace("{pages}", String(view.pageCount))}
+              {/* Only while something is ticked — an always-present bar with a
+                zero in it is a permanent strip of chrome. */}
+              {selected.length > 0 && (
+                <BulkTriageBar
+                  selected={selected}
+                  onClear={() => setSelectedIds(new Set())}
+                  onSettled={actedIds =>
+                    setSelectedIds(current => {
+                      const next = new Set(current);
+                      actedIds.forEach(id => next.delete(id));
+                      return next;
+                    })
+                  }
+                />
+              )}
+
+              {/* Closes the table's card: the count and the window caveat in
+                one sentence, then rows-per-page and the pager. */}
+              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-b-lg border-t border-border-light bg-neutral-50 px-3 py-2">
+                <p className="text-xs text-typography-600" aria-live="polite">
+                  {view.matched === 1
+                    ? en.bugHunter.resultSummaryOne
+                    : en.bugHunter.resultSummary
+                        .replace("{shown}", String(view.rows.length))
+                        .replace("{matched}", String(view.matched))}
+                  {view.windowed && (
+                    <span className="text-typography-500">
+                      {" · "}
+                      {en.bugHunter.windowNotice
+                        .replace("{loaded}", String(view.loaded))
+                        .replace("{total}", String(view.total))}{" "}
+                      <button
+                        type="button"
+                        onClick={handleLoadMore}
+                        disabled={loadingMore}
+                        className="font-medium text-primary-700 underline cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {loadingMore
+                          ? en.bugHunter.loadMorePending
+                          : en.bugHunter.loadMoreAction.replace(
+                              "{count}",
+                              String(Math.min(FINDINGS_LOAD_INCREMENT, view.total - view.loaded)),
+                            )}
+                      </button>
                     </span>
-                    <TablePager page={view.page} pageCount={view.pageCount} onChange={setPage} />
-                  </div>
-                )}
+                  )}
+                </p>
+
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                  {/* Beside the pager rather than up with the filters: it changes
+                    how the results are paginated, not which results there are. */}
+                  <label
+                    htmlFor="bug-findings-page-size"
+                    className="flex items-center gap-1.5 text-xs text-typography-600"
+                  >
+                    {en.bugHunter.pageSizeLabel}
+                    <select
+                      id="bug-findings-page-size"
+                      value={pageSize}
+                      onChange={event => setPageSize(Number(event.target.value) as PageSize)}
+                      className="h-10 rounded-md border border-border-light bg-white pl-2 pr-6 text-xs text-typography-900 md:h-8 cursor-pointer hover:border-border-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-400"
+                    >
+                      {PAGE_SIZES.map(size => (
+                        <option key={size} value={size}>
+                          {size}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  {view.pageCount > 1 && (
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className="text-xs text-typography-600 tabular-nums">
+                        {en.bugHunter.pageStatus
+                          .replace("{page}", String(view.page + 1))
+                          .replace("{pages}", String(view.pageCount))}
+                      </span>
+                      <TablePager page={view.page} pageCount={view.pageCount} onChange={setPage} />
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        </>
-      )}
+          </>
+        )}
+      </div>
 
       {/* One dialog for every single-row decision, whichever surface asked for
-          it — the row's button or the keyboard. Both approve and reject are
-          one-way doors in ally-be's transition map, so neither is offered
-          without one; the bulk bar is where that cost is paid once instead of
-          per bug. */}
+          it — the row's button or the keyboard. Approve and reject are one-way
+          doors in ally-be's transition map, and a fix session spends money, so
+          none of them is offered without one; the bulk bar is where that cost
+          is paid once instead of per bug. */}
       {pending && (
         <ActionConfirmationPopup
           isOpen
@@ -1706,8 +1494,7 @@ export const BugFindingsTable: FC<BugFindingsTableProps> = ({
       {/* Scoped barrier, keyed to the open bug. The page-level one in
           PrivateLayout would already stop a bad drawer blanking the console,
           but it would take the bugs table down with it — and the table is how
-          you'd reach a different bug. This keeps the failure inside the drawer,
-          and a different row starts clean rather than inheriting the error. */}
+          you'd reach a different bug. */}
       {selectedId && (
         <ErrorBoundary variant="panel" resetKey={selectedId} onDismiss={() => setBug(null)}>
           <BugFindingDrawer id={selectedId} onClose={() => setBug(null)} canTriage={canTriage} />

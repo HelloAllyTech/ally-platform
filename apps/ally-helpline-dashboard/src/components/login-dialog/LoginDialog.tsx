@@ -1,4 +1,4 @@
-import { FC, useCallback, useEffect, useState } from "react";
+import { FC, useCallback, useEffect, useRef, useState } from "react";
 
 import { FetchBaseQueryError } from "@reduxjs/toolkit/query";
 import { motion } from "framer-motion";
@@ -6,7 +6,11 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
 import { ComposedModal, ModalBody } from "@ally-ui-mono/ui-shared";
-import { useGenerateOTPMutation, useVerifyOTPMutation } from "@api";
+import {
+  useGenerateOTPMutation,
+  usePutTermsAndAgreementMutation,
+  useVerifyOTPMutation,
+} from "@api";
 import { BackCircle, CloseIcon } from "@assets";
 import {
   ALLY_PRIVACY_POLICY_URL,
@@ -20,10 +24,22 @@ import { openLinkInNewTab, validateEmail } from "@utils";
 import { LoginPopupProps } from "./types";
 import { Button } from "../button";
 import OTP from "../otp";
+import TermsAndAgreement from "../terms-and-agreement/TermsAndAgreement";
 import TextField from "../text-field";
 
-const LoginDialog: FC<LoginPopupProps> = ({ isOpen, onClose, onSuccess }) => {
+const LoginDialog: FC<LoginPopupProps> = ({
+  isOpen,
+  onClose,
+  onSuccess,
+  requireTerms = false,
+  emailFooter,
+}) => {
   const { t } = useTranslation();
+  // Held until the terms are accepted when `requireTerms` is on, so nothing is
+  // signed in (tokens stored) before the learner has agreed.
+  const pendingTokensRef = useRef<{ accessToken: string; refreshToken: string } | null>(null);
+  const [isTermsOpen, setIsTermsOpen] = useState<boolean>(false);
+  const [putTermsAndAgreement] = usePutTermsAndAgreementMutation();
   const [loginSection, setLoginSection] = useState<LoginSection>(LoginSection.EMAIL);
   const [email, setEmail] = useState<string>("");
   const [emailError, setEmailError] = useState<string>("");
@@ -95,14 +111,41 @@ const LoginDialog: FC<LoginPopupProps> = ({ isOpen, onClose, onSuccess }) => {
         const errorMessage = errorData?.message ?? t("auth.login.errors.verifyOtp");
         toast.error(errorMessage);
       } else if (isVerifyOTPSuccess && verifyOTPData) {
-        localStorage.setItem(LOCAL_STORAGE_KEYS.ACCESS_TOKEN, verifyOTPData.accessToken);
-        localStorage.setItem(LOCAL_STORAGE_KEYS.REFRESH_TOKEN, verifyOTPData.refreshToken);
-        await checkAuth();
-        // function to be called when OTP is verified successfully
-        onSuccess();
+        if (requireTerms) {
+          pendingTokensRef.current = {
+            accessToken: verifyOTPData.accessToken,
+            refreshToken: verifyOTPData.refreshToken,
+          };
+          setIsTermsOpen(true);
+          return;
+        }
+        await signIn(verifyOTPData.accessToken, verifyOTPData.refreshToken);
       }
     })();
   }, [isVerifyOTPSuccess, verifyOTPError, verifyOTPData]);
+
+  const signIn = async (accessToken: string, refreshToken: string) => {
+    localStorage.setItem(LOCAL_STORAGE_KEYS.ACCESS_TOKEN, accessToken);
+    localStorage.setItem(LOCAL_STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
+    await checkAuth();
+    // function to be called when OTP is verified successfully
+    onSuccess();
+  };
+
+  const handleAgreeToTerms = async () => {
+    const tokens = pendingTokensRef.current;
+    if (!tokens) return;
+    const response = await putTermsAndAgreement({ token: tokens.accessToken });
+    if (!response.data?.success) {
+      toast.error(t("auth.login.errors.agreeTerms"));
+      return;
+    }
+    pendingTokensRef.current = null;
+    // Sign in before leaving the terms step: flipping back first re-showed
+    // the code step for as long as the session check took.
+    await signIn(tokens.accessToken, tokens.refreshToken);
+    setIsTermsOpen(false);
+  };
 
   const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newEmail = e.target.value;
@@ -217,6 +260,7 @@ const LoginDialog: FC<LoginPopupProps> = ({ isOpen, onClose, onSuccess }) => {
             </span>
             .
           </div>
+          {emailFooter}
         </motion.div>
       );
     }
@@ -267,6 +311,10 @@ const LoginDialog: FC<LoginPopupProps> = ({ isOpen, onClose, onSuccess }) => {
       </motion.div>
     );
   };
+  if (isTermsOpen) {
+    return <TermsAndAgreement isOpen={isOpen} handleAgreeButtonClick={handleAgreeToTerms} />;
+  }
+
   return (
     <ComposedModal open={isOpen} onClose={onClose} size="sm" className="font-primary">
       <ModalBody className="p-0">

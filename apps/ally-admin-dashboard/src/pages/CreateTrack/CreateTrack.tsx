@@ -261,7 +261,14 @@ export const CreateTrack: FC = () => {
   const sections = watchedValues.sections ?? [];
 
   const renderCanvas = () => {
-    if (isSettingsSelection(selection)) return <TrackSettingsEditor />;
+    if (isSettingsSelection(selection)) {
+      return (
+        <TrackSettingsEditor
+          trackId={trackId}
+          isPublished={trackDetail?.status === SimulationStatus.ACTIVE}
+        />
+      );
+    }
     if (isTranslationsSelection(selection)) {
       return <TrackTranslationsEditor trackId={trackId} isDirty={isDirty} />;
     }

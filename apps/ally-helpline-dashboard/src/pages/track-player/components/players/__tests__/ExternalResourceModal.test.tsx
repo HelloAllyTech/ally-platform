@@ -1,5 +1,7 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { toast } from "sonner";
 
 import { ExternalResourceModal } from "../ExternalResourceModal";
 
@@ -7,6 +9,10 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (key: string) => key,
   }),
+}));
+
+vi.mock("sonner", () => ({
+  toast: { info: vi.fn() },
 }));
 
 const resource = {
@@ -41,5 +47,36 @@ describe("ExternalResourceModal", () => {
 
     expect(openSpy).toHaveBeenCalledWith(resource.url, "_blank", "noopener,noreferrer");
     openSpy.mockRestore();
+  });
+
+  describe("embed timeout fallback", () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    it("falls back to a new tab if the embed never fires onLoad", () => {
+      const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+      const onClose = vi.fn();
+      render(<ExternalResourceModal resource={resource} onClose={onClose} />);
+
+      vi.advanceTimersByTime(8000);
+
+      expect(openSpy).toHaveBeenCalledWith(resource.url, "_blank", "noopener,noreferrer");
+      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(toast.info).toHaveBeenCalledWith("tracks2.article.embedTimedOut");
+      openSpy.mockRestore();
+    });
+
+    it("does not fall back once the embed actually loads", () => {
+      const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+      const onClose = vi.fn();
+      render(<ExternalResourceModal resource={resource} onClose={onClose} />);
+
+      fireEvent.load(screen.getByTitle(resource.title));
+      vi.advanceTimersByTime(8000);
+
+      expect(openSpy).not.toHaveBeenCalled();
+      expect(onClose).not.toHaveBeenCalled();
+      openSpy.mockRestore();
+    });
   });
 });

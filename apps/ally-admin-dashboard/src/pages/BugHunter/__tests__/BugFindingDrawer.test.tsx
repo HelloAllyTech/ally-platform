@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { en } from "@constants";
 import { BugFindingSource, BugFindingStatus } from "@types";
 
 import { BugFindingDrawer } from "../BugFindingDrawer";
@@ -49,9 +50,21 @@ vi.mock("@utils", () => ({
 vi.mock("@assets", () => ({ TooltipIcon: () => <svg data-testid="tooltip-icon" /> }));
 
 vi.mock("@ally-ui-mono/ui-shared", () => ({
-  Button: ({ children, onClick, disabled }: any) => (
-    <button onClick={onClick} disabled={disabled}>
+  Button: ({ children, onClick, disabled, kind }: any) => (
+    <button onClick={onClick} disabled={disabled} data-kind={kind}>
       {children}
+    </button>
+  ),
+  // Rendered open: the menu's own open/close is Carbon's, and what these tests
+  // care about is which items it offers.
+  OverflowMenu: ({ children, iconDescription }: any) => (
+    <div role="menu" aria-label={iconDescription}>
+      {children}
+    </div>
+  ),
+  OverflowMenuItem: ({ itemText, onClick, disabled }: any) => (
+    <button role="menuitem" onClick={onClick} disabled={disabled}>
+      {itemText}
     </button>
   ),
   TextArea: ({ value, onChange, placeholder, labelText, invalid, invalidText }: any) => (
@@ -187,6 +200,13 @@ const renderDrawer = (data: Record<string, unknown>, canTriage = true) => {
   return render(<BugFindingDrawer id="finding-1" onClose={vi.fn()} canTriage={canTriage} />);
 };
 
+/** Opens one of the drawer's collapsed sections by its header. */
+const openSection = (title: string | RegExp) =>
+  fireEvent.click(screen.getByRole("button", { name: title }));
+
+const menu = () => within(screen.getByRole("menu", { name: "More actions" }));
+const decisionBlock = () => within(screen.getByTestId("decision-block"));
+
 describe("BugFindingDrawer — the decision log (OPP-0776)", () => {
   it("shows every orchestration choice about the bug, with the pick not taken", () => {
     getFindingDecisions.mockReturnValueOnce({
@@ -231,7 +251,13 @@ describe("BugFindingDrawer — the decision log (OPP-0776)", () => {
     renderDrawer(finding());
     const log = screen.getByTestId("finding-decisions");
     expect(log).toHaveTextContent("How I decided");
+    // Closed by default: the log is audit trail, not the decision.
+    expect(screen.queryByTestId("decision-D5")).not.toBeInTheDocument();
+    openSection(/How I decided/);
     const d5 = screen.getByTestId("decision-D5");
+    // Plain words for the point, never the pipeline's D-number.
+    expect(d5).toHaveTextContent("Fix now or hold");
+    expect(d5).not.toHaveTextContent("D5");
     expect(d5).toHaveTextContent("fix");
     expect(d5).toHaveTextContent("by the model");
     expect(d5).toHaveTextContent("both agreed");
@@ -259,6 +285,7 @@ describe("BugFindingDrawer — a finding from a PR review (OPP-0785)", () => {
         },
       }),
     );
+    openSection(/How sure I am/);
     const pr = screen.getByTestId("finding-pr");
     expect(pr).toHaveTextContent("Found reviewing pull request #42");
     expect(pr).toHaveTextContent("my comment is on the PR");
@@ -333,6 +360,7 @@ describe("BugFindingDrawer — fix session", () => {
         },
       }),
     );
+    openSection(/How sure I am/);
 
     expect(screen.getByTestId("budget")).toHaveTextContent(
       "1 of 2 sessions · 2 of 4 attempts · $3.50 of $15.00",
@@ -387,11 +415,14 @@ describe("BugFindingDrawer — fix session", () => {
     expect(screen.getByText(/waiting for a runner/i)).toBeInTheDocument();
   });
 
-  it("links to the running session once the backend has correlated it", () => {
+  it("links to the running session from the menu once the backend has correlated it", () => {
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
     renderDrawer(
       finding({ status: BugFindingStatus.FIXING, sessionRunUrl: "https://github.com/run/1" }),
     );
-    expect(screen.getByText("Watch me work")).toHaveAttribute("href", "https://github.com/run/1");
+    fireEvent.click(menu().getByText("Watch me work"));
+    expect(open).toHaveBeenCalledWith("https://github.com/run/1", "_blank", "noopener,noreferrer");
+    open.mockRestore();
   });
 
   it("surfaces the backend's own refusal message rather than a generic one", async () => {
@@ -481,15 +512,20 @@ describe("BugFindingDrawer — stop fix session", () => {
     expect(screen.queryByText("Stop fix session")).not.toBeInTheDocument();
   });
 
-  it("credits who stopped it, the same way a release or a decision is signed", () => {
+  it("credits who stopped it by name in the work log, never as a user id", () => {
     renderDrawer(
       finding({
         status: BugFindingStatus.CANCELLED,
         cancelledBy: 9,
+        cancelledByName: "Priya",
         cancelledAt: "2026-08-19",
       }),
     );
-    expect(screen.getByText(/Stopped by user #9/)).toBeInTheDocument();
+    openSection(/My work log/);
+    const log = screen.getByTestId("work-log");
+    expect(log).toHaveTextContent("Priya");
+    expect(log).toHaveTextContent("stopped the fix session");
+    expect(screen.queryByText(/user #/)).not.toBeInTheDocument();
   });
 });
 
@@ -580,14 +616,20 @@ describe("BugFindingDrawer — release to production", () => {
         },
       }),
     );
-    expect(screen.getByText("Why my last fix session failed")).toBeInTheDocument();
-    expect(screen.getByText("2 attempt(s) · full suite")).toBeInTheDocument();
+    // The summary sits in the decision block, beside the retry it decides on.
+    const block = decisionBlock();
+    expect(block.getByText("Why my last fix session failed")).toBeInTheDocument();
+    expect(block.getByText("2 attempt(s) · full suite")).toBeInTheDocument();
+    expect(block.getByText("What a retry should do differently")).toBeInTheDocument();
+    expect(block.getByText("register the listener inside the ready callback")).toBeInTheDocument();
+    expect(block.getByText("Ask me to try again")).toBeInTheDocument();
+    // The raw record is one click further down.
+    expect(
+      screen.queryByText("queue.spec.ts: expected 3 jobs, received 2"),
+    ).not.toBeInTheDocument();
+    fireEvent.click(block.getByText("Show the full post-mortem"));
     expect(screen.getByText("queue.spec.ts: expected 3 jobs, received 2")).toBeInTheDocument();
-    expect(screen.getByText("What a retry should do differently")).toBeInTheDocument();
-    expect(screen.getByText("register the listener inside the ready callback")).toBeInTheDocument();
     expect(screen.getByText(/A trap in this repo I hit/)).toBeInTheDocument();
-    // A failed bug still offers the retry, now with the reason beside it.
-    expect(screen.getByText("Ask me to try again")).toBeInTheDocument();
   });
 
   it("shows how the session understood the feature before fixing, leading with where the value lives", () => {
@@ -622,6 +664,8 @@ describe("BugFindingDrawer — release to production", () => {
         },
       }),
     );
+    expect(screen.queryByText("How I understood it before fixing")).not.toBeInTheDocument();
+    openSection(/How I planned the fix/);
     expect(screen.getByText("How I understood it before fixing")).toBeInTheDocument();
     expect(screen.getByText("a database table an admin edits")).toBeInTheDocument();
     expect(screen.getByText("GET /v1/tooltips/active translates by language")).toBeInTheDocument();
@@ -654,6 +698,7 @@ describe("BugFindingDrawer — release to production", () => {
         },
       }),
     );
+    openSection(/How sure I am/);
     expect(screen.getByTestId("fault-location")).toBeInTheDocument();
     expect(screen.getByText("Fault located in data (ally-be)")).toBeInTheDocument();
     expect(screen.getByText(/returns the English titles/)).toBeInTheDocument();
@@ -688,6 +733,7 @@ describe("BugFindingDrawer — release to production", () => {
         },
       }),
     );
+    openSection(/How sure I am/);
     expect(screen.getByTestId("case-chain")).toBeInTheDocument();
     expect(screen.getByTestId("chain-changed")).toHaveAttribute("data-status", "broken");
     expect(
@@ -706,7 +752,24 @@ describe("BugFindingDrawer — release to production", () => {
     expect(screen.queryByText("Why my last fix session failed")).not.toBeInTheDocument();
   });
 
-  it("shows the shipped version once released", () => {
+  it("shows the shipped version once released, and who released it in the work log", () => {
+    renderDrawer(
+      finding({
+        status: BugFindingStatus.RELEASED,
+        releaseTag: "v1.4.2",
+        releasedBy: 7,
+        releasedByName: "Priya",
+        releasedAt: "2026-08-17",
+      }),
+    );
+    expect(decisionBlock().getByText(/live in production as v1\.4\.2/i)).toBeInTheDocument();
+    openSection(/My work log/);
+    const log = within(screen.getByTestId("work-log"));
+    expect(log.getByText("Priya")).toBeInTheDocument();
+    expect(log.getByText("released it to production")).toBeInTheDocument();
+  });
+
+  it("says 'An admin' rather than a user id when the backend sends no name", () => {
     renderDrawer(
       finding({
         status: BugFindingStatus.RELEASED,
@@ -715,8 +778,9 @@ describe("BugFindingDrawer — release to production", () => {
         releasedAt: "2026-08-17",
       }),
     );
-    expect(screen.getByText(/live in production as v1\.4\.2/i)).toBeInTheDocument();
-    expect(screen.getByText(/Released by user #7/)).toBeInTheDocument();
+    openSection(/My work log/);
+    expect(within(screen.getByTestId("work-log")).getByText("An admin")).toBeInTheDocument();
+    expect(screen.queryByText(/#7/)).not.toBeInTheDocument();
   });
 
   it("says how it went live when a release run from GitHub shipped it, rather than printing a dash for the tag", () => {
@@ -731,7 +795,8 @@ describe("BugFindingDrawer — release to production", () => {
     );
     expect(screen.getByText(/somebody ran from GitHub/i)).toBeInTheDocument();
     expect(screen.queryByText(/live in production as/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Released by user/)).not.toBeInTheDocument();
+    openSection(/My work log/);
+    expect(screen.queryByText(/released it to production/)).not.toBeInTheDocument();
   });
 });
 
@@ -835,6 +900,7 @@ describe("BugFindingDrawer — a backend older than this build", () => {
       screen.getByText("The external emergency-services link renders unstyled."),
     ).toBeInTheDocument();
     // The timeline degrades to its empty state rather than taking the page down.
+    openSection(/My work log/);
     expect(screen.getByText(/haven.t touched this one yet/i)).toBeInTheDocument();
     // And no plan block, since an absent step list means the same as an empty one.
     expect(screen.queryByText(/This fix spans/)).not.toBeInTheDocument();
@@ -858,13 +924,13 @@ describe("BugFindingDrawer — rewriting the description", () => {
 
   const openEditor = (data: Record<string, unknown>) => {
     renderDrawer(data);
-    fireEvent.click(screen.getByText("Rewrite this for me"));
+    fireEvent.click(menu().getByText("Rewrite the description"));
     return screen.getByRole("textbox", { name: /as you want me to understand it/i });
   };
 
   it("offers the rewrite on a bug that hasn't been fixed yet", () => {
     renderDrawer(finding());
-    expect(screen.getByText("Rewrite this for me")).toBeInTheDocument();
+    expect(screen.getByText("Rewrite the description")).toBeInTheDocument();
   });
 
   it.each([
@@ -874,7 +940,7 @@ describe("BugFindingDrawer — rewriting the description", () => {
     BugFindingStatus.RELEASED,
   ])("hides the rewrite while the bug is %s", status => {
     renderDrawer(finding({ status }));
-    expect(screen.queryByText("Rewrite this for me")).not.toBeInTheDocument();
+    expect(screen.queryByText("Rewrite the description")).not.toBeInTheDocument();
   });
 
   it("starts the draft from the current description, not an empty box", () => {
@@ -932,11 +998,12 @@ describe("BugFindingDrawer — rewriting the description", () => {
         description: "Tapping the terms link opens an unstyled page on Android only.",
         originalDescription: "terms link looks wrong",
         descriptionEditedBy: 42,
+        descriptionEditedByName: "Gayatri",
         descriptionEditedAt: "2026-08-19",
       }),
     );
 
-    expect(screen.getByText(/Rewritten by user #42/)).toBeInTheDocument();
+    expect(screen.getByText(/Rewritten by Gayatri/)).toBeInTheDocument();
     // Collapsed by default — the current brief is what matters day to day.
     expect(screen.queryByText("terms link looks wrong")).not.toBeInTheDocument();
 
@@ -946,7 +1013,7 @@ describe("BugFindingDrawer — rewriting the description", () => {
 
   it("says nothing about an original on a bug nobody has rewritten", () => {
     renderDrawer(finding());
-    expect(screen.queryByText(/Rewritten by user/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Rewritten by/)).not.toBeInTheDocument();
     expect(screen.queryByText("See what I originally found")).not.toBeInTheDocument();
   });
 
@@ -991,7 +1058,7 @@ describe("BugFindingDrawer — an unsaved rewrite blocks the decisions under it"
     renderDrawer(finding());
     expect(screen.getByText("Put me on it")).not.toBeDisabled();
 
-    fireEvent.click(screen.getByText("Rewrite this for me"));
+    fireEvent.click(screen.getByText("Rewrite the description"));
 
     expect(screen.getByText("Put me on it")).toBeDisabled();
     expect(screen.getByText(/Save or cancel your rewrite first/i)).toBeInTheDocument();
@@ -999,7 +1066,7 @@ describe("BugFindingDrawer — an unsaved rewrite blocks the decisions under it"
 
   it("closes the Manual-mode decision too — the next sweep would read the old words", () => {
     renderDrawer(finding({ status: BugFindingStatus.PENDING_APPROVAL }));
-    fireEvent.click(screen.getByText("Rewrite this for me"));
+    fireEvent.click(screen.getByText("Rewrite the description"));
 
     expect(screen.getByText("Approve — go fix it")).toBeDisabled();
     expect(screen.getByText("Reject")).toBeDisabled();
@@ -1007,7 +1074,7 @@ describe("BugFindingDrawer — an unsaved rewrite blocks the decisions under it"
 
   it("reopens them once the rewrite is settled", async () => {
     renderDrawer(finding());
-    fireEvent.click(screen.getByText("Rewrite this for me"));
+    fireEvent.click(screen.getByText("Rewrite the description"));
     fireEvent.click(screen.getByText("Cancel"));
 
     await waitFor(() => expect(screen.getByText("Put me on it")).not.toBeDisabled());
@@ -1021,18 +1088,33 @@ describe("BugFindingDrawer — stage", () => {
     setStage.mockReturnValue({ unwrap: () => Promise.resolve({}) });
   });
 
-  it("shows the derived stage as following the pipeline, with no edit control for a read-only reader", () => {
+  it("says nothing about a stage that just follows the pipeline — the rail already shows it", () => {
     renderDrawer(finding({ stage: "under_development", stageIsAuto: true }), false);
 
-    expect(screen.getByText("In development")).toBeInTheDocument();
-    expect(screen.getByText(/Following the pipeline/)).toBeInTheDocument();
+    expect(screen.queryByText("In development")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("stage-pinned")).not.toBeInTheDocument();
+    // And a read-only reader is offered no way to pin one.
     expect(screen.queryByText("Set stage by hand")).not.toBeInTheDocument();
   });
 
-  it("offers to pin the stage, and saves the chosen value", async () => {
+  it("says when a stage was set by hand, since the rail and the stage then disagree", () => {
+    renderDrawer(
+      finding({
+        stage: "released",
+        stageIsAuto: false,
+        stageOverriddenBy: 7,
+        stageOverriddenByName: "Priya",
+        stageOverriddenAt: "2026-10-01",
+      }),
+    );
+    expect(screen.getByTestId("stage-pinned")).toHaveTextContent("Released");
+    expect(screen.getByTestId("stage-pinned")).toHaveTextContent("Stage set by hand by Priya");
+  });
+
+  it("offers to pin the stage from the menu, and saves the chosen value", async () => {
     renderDrawer(finding({ stage: "new", stageIsAuto: true }));
 
-    fireEvent.click(screen.getByText("Set stage by hand"));
+    fireEvent.click(menu().getByText("Set stage by hand"));
     fireEvent.change(screen.getByLabelText("Stage"), { target: { value: "released" } });
     fireEvent.click(screen.getByText("Set stage"));
 
@@ -1050,14 +1132,14 @@ describe("BugFindingDrawer — stage", () => {
         stageOverriddenByName: "Priya",
       }),
     );
-    fireEvent.click(screen.getByText("Set stage by hand"));
+    fireEvent.click(menu().getByText("Set stage by hand"));
 
     expect(screen.getByText("Back to automatic")).toBeInTheDocument();
   });
 
   it("clears the pin when 'Back to automatic' is pressed", async () => {
     renderDrawer(finding({ stage: "released", stageIsAuto: false, stageOverriddenBy: 7 }));
-    fireEvent.click(screen.getByText("Set stage by hand"));
+    fireEvent.click(menu().getByText("Set stage by hand"));
 
     fireEvent.click(screen.getByText("Back to automatic"));
 
@@ -1092,6 +1174,8 @@ describe("BugFindingDrawer — reported bug context", () => {
     expect(screen.getByText("Priya")).toBeInTheDocument();
     expect(screen.getByText("/cases")).toBeInTheDocument();
     expect(screen.getByText("Android 14")).toBeInTheDocument();
+    // A raw tenant id means nothing to the reader.
+    expect(screen.queryByText(/acme/)).not.toBeInTheDocument();
   });
 });
 
@@ -1140,7 +1224,6 @@ describe("BugFindingDrawer — state persistence", () => {
     expect(checkboxAfterRerender).not.toBeChecked();
   });
 });
-
 
 /**
  * The merge Bug Hunter cannot perform itself.
@@ -1245,14 +1328,17 @@ describe("BugFindingDrawer — merging a green PR", () => {
  * never regressed says nothing rather than saying it is fine.
  */
 describe("BugFindingDrawer — confidence and regressions", () => {
-  it("shows the verifiers' score as a percentage", () => {
+  it("shows the verifiers' score as a percentage, on the closed section and inside it", () => {
     renderDrawer(finding({ confidence: 0.85 }));
 
-    expect(screen.getByText("85%")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /How sure I am/ })).toHaveTextContent("85%");
+    openSection(/How sure I am/);
+    expect(screen.getAllByText("85%")).toHaveLength(2);
   });
 
   it("says an unproven finding was not scored rather than showing 0%", () => {
     renderDrawer(finding({ confidence: null, proven: false }));
+    openSection(/How sure I am/);
 
     expect(screen.getByText("Not scored")).toBeInTheDocument();
     expect(screen.queryByText("0%")).not.toBeInTheDocument();
@@ -1260,6 +1346,7 @@ describe("BugFindingDrawer — confidence and regressions", () => {
 
   it("stays quiet about scoring on a proven finding, which had nothing to verify", () => {
     renderDrawer(finding({ confidence: null, proven: true }));
+    openSection(/How sure I am/);
 
     expect(screen.queryByText("Not scored")).not.toBeInTheDocument();
   });
@@ -1291,6 +1378,7 @@ describe("BugFindingDrawer — confidence and regressions", () => {
 
   it("links a regression back to the fix that did not hold", () => {
     renderDrawer(finding({ regressionOf: "older-finding" }));
+    openSection(/How sure I am/);
 
     expect(screen.getByText("See the fix that didn't hold")).toBeInTheDocument();
   });
@@ -1308,6 +1396,7 @@ describe("BugFindingDrawer — confidence and regressions", () => {
         },
       }),
     );
+    openSection(/How sure I am/);
 
     const block = screen.getByTestId("miss-record");
     expect(block).toHaveTextContent("Why I didn't find this first");
@@ -1332,6 +1421,7 @@ describe("BugFindingDrawer — confidence and regressions", () => {
         },
       }),
     );
+    openSection(/How sure I am/);
 
     expect(screen.getByText("I had found this, and it was turned down")).toBeInTheDocument();
     expect(screen.getByText("See what I had already found")).toHaveAttribute(
@@ -1342,9 +1432,315 @@ describe("BugFindingDrawer — confidence and regressions", () => {
 
   it("says nothing at all when there is no history to report", () => {
     renderDrawer(finding({ proven: true }));
+    openSection(/How sure I am/);
 
     expect(screen.queryByText("Not scored")).not.toBeInTheDocument();
     expect(screen.queryByText(/Turned down/)).not.toBeInTheDocument();
     expect(screen.queryByText(/found this again/)).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Decision first. The drawer used to open on the status badge, the rail, a
+ * Stage line, notices, the description, evidence and a fourteen-line
+ * confidence box — and only then the buttons. Now the decision block sits
+ * directly under the header, with one status sentence and at most one primary
+ * button, and the audit trail is collapsed below.
+ */
+describe("BugFindingDrawer — decision first", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const primaries = () =>
+    within(screen.getByTestId("decision-block"))
+      .queryAllByRole("button")
+      .filter(button => button.getAttribute("data-kind") === "primary");
+
+  it("puts the decision above the rail, the description and the audit trail", () => {
+    renderDrawer(finding({ status: BugFindingStatus.PENDING_APPROVAL, evidence: "trace" }));
+    const order = [
+      screen.getByTestId("decision-block"),
+      screen.getByRole("group", { name: "Pipeline stage" }),
+      screen.getByText("The external emergency-services link renders unstyled."),
+      screen.getByTestId("section-evidence"),
+    ];
+    order.slice(1).forEach((node, i) => {
+      // DOCUMENT_POSITION_FOLLOWING: each comes after the one before it.
+      expect(order[i].compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+        Node.DOCUMENT_POSITION_FOLLOWING,
+      );
+    });
+  });
+
+  it.each([
+    [BugFindingStatus.PENDING_APPROVAL, {}, "Approve — go fix it"],
+    [BugFindingStatus.NEEDS_INPUT, { escalationQuestion: "Which locale?" }, "Send answer"],
+    [BugFindingStatus.PR_OPENED, { prUrl: "https://x/pull/1" }, "Merge it"],
+    [BugFindingStatus.MERGED, { releasable: true, releaseTarget: "x" }, "Release to production"],
+    [BugFindingStatus.RELEASE_FAILED, { releasable: true, releaseTarget: "x" }, "Retry release"],
+    [BugFindingStatus.FAILED, {}, "Ask me to try again"],
+    [BugFindingStatus.CANCELLED, {}, "Ask me to try again"],
+    [BugFindingStatus.NEW, {}, "Put me on it"],
+  ])("offers exactly one primary button at %s", (status, extra, label) => {
+    renderDrawer(finding({ status, ...extra }));
+    expect(primaries().map(button => button.textContent)).toEqual([label]);
+  });
+
+  it.each([BugFindingStatus.QUEUED, BugFindingStatus.FIXING])(
+    "offers no primary at %s — only the way to stop it",
+    status => {
+      renderDrawer(finding({ status }));
+      expect(primaries()).toHaveLength(0);
+      expect(decisionBlock().getByText("Stop fix session")).toBeInTheDocument();
+    },
+  );
+
+  it.each([
+    BugFindingStatus.RELEASING,
+    BugFindingStatus.RELEASED,
+    BugFindingStatus.REJECTED,
+    BugFindingStatus.DISMISSED,
+  ])("offers nothing to press at %s, just the sentence", status => {
+    renderDrawer(finding({ status, releaseTag: "v1.4.2" }));
+    expect(decisionBlock().queryAllByRole("button")).toHaveLength(0);
+    expect(screen.getByTestId("status-sentence")).toBeInTheDocument();
+  });
+
+  it("drops 'Put me on it' at PENDING_APPROVAL — Approve is the decision there", () => {
+    renderDrawer(finding({ status: BugFindingStatus.PENDING_APPROVAL }));
+    expect(screen.queryByText("Put me on it")).not.toBeInTheDocument();
+    expect(menu().queryByText("Ask me to try again")).not.toBeInTheDocument();
+  });
+
+  it("moves 'try again' to the menu once a PR is open, leaving Merge as the one primary", () => {
+    renderDrawer(finding({ status: BugFindingStatus.PR_OPENED, prUrl: "https://x/pull/1" }));
+    expect(decisionBlock().queryByText("Ask me to try again")).not.toBeInTheDocument();
+    fireEvent.click(menu().getByText("Ask me to try again"));
+    expect(screen.getByText("Put Bug Hunter on this bug?")).toBeInTheDocument();
+  });
+
+  it("asks the open question with the answer box and Send answer together, above the rail", () => {
+    renderDrawer(
+      finding({
+        status: BugFindingStatus.NEEDS_INPUT,
+        escalationQuestion: "Skip the oversized document or fail the batch?",
+      }),
+    );
+    const block = decisionBlock();
+    expect(block.getByText("Skip the oversized document or fail the batch?")).toBeInTheDocument();
+    expect(block.getByRole("textbox", { name: "Your answer" })).toBeInTheDocument();
+    expect(block.getByText("Send answer")).toBeDisabled();
+  });
+
+  it("states where a bug is once, in one sentence, with no banners or spinner beside the rail", () => {
+    renderDrawer(finding({ status: BugFindingStatus.QUEUED }));
+    expect(screen.getByTestId("status-sentence")).toHaveTextContent(/waiting for a runner/i);
+    expect(screen.queryByText("Stage")).not.toBeInTheDocument();
+  });
+
+  it("keeps the meta line to repo, source and age, with the engine moved to the menu", () => {
+    renderDrawer(finding({ engine: "claude-code", model: "claude-sonnet-5" }));
+    const meta = screen.getByTestId("drawer-meta");
+    expect(meta).toHaveTextContent("ally-be");
+    expect(meta).toHaveTextContent(/found .* ago|found just now/);
+    expect(meta).not.toHaveTextContent(/sonnet/);
+    expect(menu().getByText(/Last run on .*claude-sonnet-5/)).toBeDisabled();
+  });
+
+  it("keeps the audit trail closed until asked for", () => {
+    renderDrawer(finding({ evidence: "TypeError at line 4", confidence: 0.9 }));
+    expect(screen.queryByText("TypeError at line 4")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Evidence/ })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+    openSection(/Evidence/);
+    expect(screen.getByText("TypeError at line 4")).toBeInTheDocument();
+  });
+
+  it("shows plain loading text, not a bare ellipsis", () => {
+    getBugFinding.mockReturnValue({ data: undefined, isLoading: true, isError: false });
+    render(<BugFindingDrawer id="finding-1" onClose={vi.fn()} canTriage />);
+    expect(screen.getByText("Loading this bug…")).toBeInTheDocument();
+  });
+});
+
+/**
+ * "Skip locating" and "Start anyway, past the budget" are two separate
+ * overrides. They used to share one state, so ticking the budget box also
+ * skipped locating a report nobody had located — straight to a fix session.
+ */
+describe("BugFindingDrawer — the two fix-session overrides", () => {
+  const spentBudget = {
+    caps: { sessions: 2, attempts: 4, escalations: 1, usd: 15, minutes: 120 },
+    used: { sessions: 2, attempts: 4, escalations: 0, usd: 6, minutes: 70 },
+    exhausted: { kind: "sessions", at: "2026-10-07T05:00:00Z" },
+    overriddenBy: null,
+    overriddenAt: null,
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    startFixSession.mockReturnValue({ unwrap: () => Promise.resolve({}) });
+  });
+
+  it("locates first on a spent budget without asking for the budget override", async () => {
+    renderDrawer(finding({ independentVerification: null, budget: spentBudget }));
+    fireEvent.click(screen.getByText("Put me on it"));
+
+    // Locating runs the Verifier, not a fix session, so the budget is not in play.
+    expect(screen.queryByTestId("budget-override")).not.toBeInTheDocument();
+    expect(screen.getByText("Locate the fault")).not.toBeDisabled();
+    fireEvent.click(screen.getByText("Locate the fault"));
+    await waitFor(() => expect(startFixSession).toHaveBeenCalledWith({ id: "finding-1" }));
+  });
+
+  it("asks for the budget override separately once locating is skipped, then sends force", async () => {
+    renderDrawer(finding({ independentVerification: null, budget: spentBudget }));
+    fireEvent.click(screen.getByText("Put me on it"));
+
+    fireEvent.click(screen.getByLabelText("Skip locating, start the fix session now"));
+    expect(screen.getByLabelText("Start anyway, past the budget")).not.toBeChecked();
+    expect(screen.getByText("Start now")).toBeDisabled();
+
+    fireEvent.click(screen.getByLabelText("Start anyway, past the budget"));
+    expect(screen.getByLabelText("Skip locating, start the fix session now")).toBeChecked();
+    fireEvent.click(screen.getByText("Start now"));
+    await waitFor(() =>
+      expect(startFixSession).toHaveBeenCalledWith({ id: "finding-1", force: true }),
+    );
+  });
+
+  it("skips locating on its own tick, within budget", async () => {
+    renderDrawer(finding({ independentVerification: null }));
+    fireEvent.click(screen.getByText("Put me on it"));
+    fireEvent.click(screen.getByLabelText("Skip locating, start the fix session now"));
+
+    expect(screen.queryByTestId("budget-override")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("Start now"));
+    await waitFor(() =>
+      expect(startFixSession).toHaveBeenCalledWith({ id: "finding-1", force: true }),
+    );
+  });
+});
+
+describe("BugFindingDrawer — the rail settles on terminal states", () => {
+  it.each([
+    [BugFindingStatus.RELEASED, 6],
+    [BugFindingStatus.REJECTED, 1],
+    [BugFindingStatus.DISMISSED, 1],
+  ])("does not pulse at %s", (status, done) => {
+    const { container } = renderDrawer(finding({ status, releaseTag: "v1" }));
+    expect(screen.queryByTestId("pipeline-rail-pulse")).not.toBeInTheDocument();
+    expect(container.querySelectorAll(".bg-green-500.border-green-500")).toHaveLength(done);
+  });
+
+  it("still pulses on a bug being worked", () => {
+    renderDrawer(finding({ status: BugFindingStatus.FIXING }));
+    expect(screen.getByTestId("pipeline-rail-pulse")).toBeInTheDocument();
+  });
+});
+
+describe("BugFindingDrawer — names, not ids", () => {
+  it("merges who decided and who answered into the work log, in time order", () => {
+    renderDrawer(
+      finding({
+        status: BugFindingStatus.FIXING,
+        decidedBy: 1,
+        decidedByName: "Admin User",
+        decidedAt: "2026-10-01T10:00:00Z",
+        escalationQuestion: "Which locale?",
+        escalationAnswer: "Marathi",
+        escalationAnsweredBy: 2,
+        escalationAnsweredByName: "Gayatri",
+        escalationAnsweredAt: "2026-10-03T10:00:00Z",
+        events: [
+          {
+            id: "e1",
+            runId: null,
+            repo: "ally-be",
+            stage: "session_dispatched",
+            summary: "Fix session started.",
+            payload: null,
+            suggestionId: null,
+            findingId: "finding-1",
+            createdAt: "2026-10-02T10:00:00Z",
+          },
+        ],
+      }),
+    );
+    openSection(/My work log/);
+    const rows = within(screen.getByTestId("work-log")).getAllByRole("listitem");
+    expect(rows.map(row => row.textContent)).toEqual([
+      "2026-10-01T10:00:00ZAdmin Userapproved it",
+      "2026-10-02T10:00:00ZFix session startedFix session started.",
+      "2026-10-03T10:00:00ZGayatrianswered: Marathi",
+    ]);
+  });
+});
+
+describe("BugFindingDrawer — no hard-coded English", () => {
+  it("names a release with no target and no repo from the copy file", () => {
+    renderDrawer(
+      finding({
+        status: BugFindingStatus.MERGED,
+        releasable: true,
+        releaseTarget: null,
+        repo: null,
+      }),
+    );
+    fireEvent.click(screen.getByText("Release to production"));
+    expect(screen.getByText(/This deploys this service to production/)).toBeInTheDocument();
+  });
+
+  it("names an unnamed study reviewer from the copy file", () => {
+    renderDrawer(
+      finding({
+        study: {
+          feature: "f",
+          entryPoints: [],
+          howItWorksToday: ["a", "b"],
+          valueLivesIn: "code",
+          workingSibling: null,
+          rootCause: "r",
+          approach: "a",
+          filesToChange: ["x.ts"],
+          leaveAlone: [],
+          otherRepos: [],
+          risks: [],
+          testPlan: "t",
+          previousStudyWasWrongBecause: null,
+          recordedAt: "2026-10-10T08:00:00.000Z",
+          runId: null,
+          review: { concerns: [], model: null, at: "2026-10-10T08:00:10.000Z" },
+        },
+      }),
+    );
+    openSection(/How I planned the fix/);
+    expect(screen.getByText("Reviewed by a second model: no concerns.")).toBeInTheDocument();
+  });
+});
+
+/**
+ * Every help icon left in the drawer holds one short sentence. Sixteen of the
+ * seventeen used to run past 25 words, several restating the confirm dialog
+ * the button opened anyway.
+ */
+describe("BugFindingDrawer — tooltips stay short", () => {
+  const t = en.bugHunter;
+  it.each([
+    ["drawerConfidenceTooltip", t.drawerConfidenceTooltip],
+    ["drawerConfidenceUnscoredTooltip", t.drawerConfidenceUnscoredTooltip],
+    ["drawerIndependentTooltip", t.drawerIndependentTooltip],
+    ["drawerChainTooltip", t.drawerChainTooltip],
+    ["drawerVerdictTooltip", t.drawerVerdictTooltip],
+    ["drawerBudgetTooltip", t.drawerBudgetTooltip],
+    ["drawerMissTooltip", t.drawerMissTooltip],
+    ["drawerStudyTooltip", t.drawerStudyTooltip],
+    ["drawerPostmortemTooltip", t.drawerPostmortemTooltip],
+    ["reporterConsumerTooltip", t.reporterConsumerTooltip],
+    ["reporterStaffTooltip", t.reporterStaffTooltip],
+  ])("%s is one sentence of at most 20 words", (_key, text) => {
+    expect(text.trim().split(/\s+/).length).toBeLessThanOrEqual(20);
+    expect(text.trim().replace(/[.!?]$/, "")).not.toMatch(/[.!?]\s/);
   });
 });

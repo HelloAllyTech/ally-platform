@@ -46,14 +46,26 @@ export const BugFindingStageEditor: React.FC<{
   pinnedAt: string | null;
   /** False for a SUPER_ADMIN, who can read the bug table but not act on it. */
   canEdit: boolean;
-}> = ({ id, stage, isAuto, pinnedByName, pinnedAt, canEdit }) => {
-  const [draft, setDraft] = useState<BugFindingStage | null>(null);
+  /**
+   * Opens straight into the form, and hands control back through `onDone` on
+   * save or cancel. The drawer uses this from its "⋯" menu: the stage is
+   * rarely touched, so it has no standing section there to edit in place.
+   */
+  startEditing?: boolean;
+  onDone?: () => void;
+}> = ({ id, stage, isAuto, pinnedByName, pinnedAt, canEdit, startEditing = false, onDone }) => {
+  const [draft, setDraft] = useState<BugFindingStage | null>(startEditing ? stage : null);
   const [setStage, { isLoading }] = useSetBugFindingStageMutation();
+
+  const close = () => {
+    setDraft(null);
+    onDone?.();
+  };
 
   const save = async (next: BugFindingStage | null) => {
     try {
       await setStage({ id, stage: next }).unwrap();
-      setDraft(null);
+      close();
       toast.success(en.bugHunter.stageSaved);
     } catch {
       toast.error(en.bugHunter.stageSaveFailed);
@@ -122,7 +134,7 @@ export const BugFindingStageEditor: React.FC<{
                 {en.bugHunter.stageBackToAuto}
               </Button>
             )}
-            <Button size="sm" kind="ghost" onClick={() => setDraft(null)}>
+            <Button size="sm" kind="ghost" onClick={close}>
               {en.bugHunter.stageCancel}
             </Button>
           </div>

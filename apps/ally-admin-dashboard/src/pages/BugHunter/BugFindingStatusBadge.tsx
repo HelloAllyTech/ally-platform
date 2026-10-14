@@ -7,29 +7,47 @@ import { BUG_FINDING_STATUS_LABELS } from "./bugFindingLabels";
 /** Matches `fadeInOut`'s configured duration in tailwind.config.js — the class loops infinite, so the flash is capped to one cycle by removing it after this long. */
 const STATUS_FLASH_DURATION_MS = 1500;
 
+/**
+ * Four meanings, and only four (2026-10-13):
+ *
+ * - **orange** — needs you: pending your approval, or waiting on your answer;
+ * - **red** — went red: a failed fix or a failed release;
+ * - **green** — live: users have the fix;
+ * - **grey** — everything else, including every state in which Bug Hunter is
+ *   working. Working is said by the spinner the table puts beside the badge,
+ *   not by a colour.
+ *
+ * Amber used to mean both "waiting on you" (Pending approval) and "agent
+ * working" (Fixing, Starting…, Releasing…), and blue and pale green meant
+ * "somewhere in between". Seven tints for seventeen statuses made colour
+ * something to decode rather than something to scan — the opposite of
+ * Stacks' *Dynamic visibility scaling tied to information urgency*: quiet when
+ * normal, loud only when it needs acting on.
+ */
+const NEEDS_YOU = "bg-orange-50 text-orange-700 border-orange-200";
+const FAILED = "bg-destructive-50 text-destructive-700 border-destructive-200";
+const LIVE = "bg-green-600 text-white border-green-600";
+const NEUTRAL = "bg-neutral-100 text-typography-700 border-border-light";
+
 const STYLES: Record<BugFindingStatus, string> = {
-  [BugFindingStatus.NEW]: "bg-neutral-100 text-typography-700 border-border-light",
-  [BugFindingStatus.PENDING_APPROVAL]: "bg-amber-50 text-amber-700 border-amber-200",
-  [BugFindingStatus.APPROVED]: "bg-blue-50 text-blue-700 border-blue-200",
-  [BugFindingStatus.QUEUED]: "bg-amber-50 text-amber-700 border-amber-200",
-  [BugFindingStatus.BLOCKED]: "bg-neutral-100 text-typography-600 border-border-light",
-  [BugFindingStatus.COORDINATING]: "bg-amber-50 text-amber-700 border-amber-200",
-  [BugFindingStatus.FIXING]: "bg-amber-50 text-amber-700 border-amber-200",
-  [BugFindingStatus.NEEDS_INPUT]: "bg-orange-50 text-orange-700 border-orange-200",
-  [BugFindingStatus.PR_OPENED]: "bg-blue-50 text-blue-700 border-blue-200",
-  [BugFindingStatus.MERGED]: "bg-green-50 text-green-700 border-green-200",
-  [BugFindingStatus.RELEASING]: "bg-amber-50 text-amber-700 border-amber-200",
-  // The only status that means "users have this" — the one place in the table
-  // worth a stronger colour than merged-but-not-shipped.
-  [BugFindingStatus.RELEASED]: "bg-green-600 text-white border-green-600",
-  [BugFindingStatus.RELEASE_FAILED]:
-    "bg-destructive-50 text-destructive-700 border-destructive-200",
-  [BugFindingStatus.DISMISSED]: "bg-neutral-100 text-typography-600 border-border-light",
-  [BugFindingStatus.REJECTED]: "bg-neutral-100 text-typography-600 border-border-light",
-  [BugFindingStatus.FAILED]: "bg-destructive-50 text-destructive-700 border-destructive-200",
-  // Deliberately the same neutral grey as DISMISSED/REJECTED, not the FAILED
-  // red — a human stopped this on purpose, it didn't give up on its own.
-  [BugFindingStatus.CANCELLED]: "bg-neutral-100 text-typography-600 border-border-light",
+  [BugFindingStatus.PENDING_APPROVAL]: NEEDS_YOU,
+  [BugFindingStatus.NEEDS_INPUT]: NEEDS_YOU,
+  [BugFindingStatus.FAILED]: FAILED,
+  [BugFindingStatus.RELEASE_FAILED]: FAILED,
+  [BugFindingStatus.RELEASED]: LIVE,
+  [BugFindingStatus.NEW]: NEUTRAL,
+  [BugFindingStatus.APPROVED]: NEUTRAL,
+  [BugFindingStatus.QUEUED]: NEUTRAL,
+  [BugFindingStatus.BLOCKED]: NEUTRAL,
+  [BugFindingStatus.COORDINATING]: NEUTRAL,
+  [BugFindingStatus.FIXING]: NEUTRAL,
+  [BugFindingStatus.PR_OPENED]: NEUTRAL,
+  [BugFindingStatus.MERGED]: NEUTRAL,
+  [BugFindingStatus.RELEASING]: NEUTRAL,
+  [BugFindingStatus.DISMISSED]: NEUTRAL,
+  [BugFindingStatus.REJECTED]: NEUTRAL,
+  // A human stopped this on purpose; it didn't give up on its own.
+  [BugFindingStatus.CANCELLED]: NEUTRAL,
 };
 
 /**

@@ -3,12 +3,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const approveFinding = vi.fn();
 const rejectFinding = vi.fn();
+const startFixSession = vi.fn();
 const toastSuccess = vi.fn();
 const toastError = vi.fn();
 
 vi.mock("@api", () => ({
   useApproveBugFindingMutation: () => [approveFinding, { isLoading: false }],
   useRejectBugFindingMutation: () => [rejectFinding, { isLoading: false }],
+  useStartBugFixSessionMutation: () => [startFixSession, { isLoading: false }],
   // Stubbed because `@constants` reaches back for it at module-eval time —
   // the barrel cycle this repo's CLAUDE.md warns about, met from the test side.
   baseAPI: { injectEndpoints: () => ({}), reducerPath: "api" },
@@ -111,6 +113,8 @@ describe("BulkTriageBar", () => {
     // Approve's door is PENDING_APPROVAL only; reject also takes NEW.
     expect(screen.getByText("Approve 1")).toBeInTheDocument();
     expect(screen.getByText("Reject 2")).toBeInTheDocument();
+    // A fix session starts from NEW and PENDING_APPROVAL, not from FIXING.
+    expect(screen.getByText("Put me on 2")).toBeInTheDocument();
   });
 
   it("says one bug rather than '1 bugs'", () => {
@@ -213,5 +217,44 @@ describe("BulkTriageBar", () => {
     mount([finding("a", BugFindingStatus.NEW)]);
     fireEvent.click(screen.getByText("Reject 1"));
     expect(rejectFinding).not.toHaveBeenCalled();
+  });
+
+  /**
+   * "Put me on it" left the rows on 2026-10-13 and joined the bar. A fix
+   * session spends money, so it gets the same one-confirmation-per-batch
+   * treatment as approve and reject, and leaves out what it can't start.
+   */
+  describe("put me on it", () => {
+    it("starts a fix session on every eligible bug behind one confirmation", async () => {
+      startFixSession.mockImplementation(ok);
+      const { onSettled } = mount([
+        finding("a", BugFindingStatus.NEW),
+        finding("b", BugFindingStatus.FAILED),
+        // Already being fixed, so not eligible.
+        finding("c", BugFindingStatus.FIXING),
+      ]);
+
+      fireEvent.click(screen.getByText("Put me on 2"));
+      expect(screen.getByText("Put me on 2 bugs?")).toBeInTheDocument();
+      expect(startFixSession).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByText("Start them"));
+
+      await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith("Started 2 fix sessions."));
+      expect(startFixSession).toHaveBeenCalledWith({ id: "a" });
+      expect(startFixSession).toHaveBeenCalledWith({ id: "b" });
+      expect(onSettled).toHaveBeenCalledWith(["a", "b"]);
+    });
+
+    // The drawer asks which codebase a repo-less bug belongs to; a batch can't.
+    it("leaves out a bug with no repo, and says why when that's all of them", () => {
+      mount([{ ...finding("a", BugFindingStatus.NEW), repo: null } as BugFinding]);
+
+      expect(screen.getByText("Put me on 0")).toBeDisabled();
+      expect(
+        screen.getByText(
+          "A fix session needs a bug that is still open and matched to a codebase. None of these are — open one to pick its repo.",
+        ),
+      ).toBeInTheDocument();
+    });
   });
 });
