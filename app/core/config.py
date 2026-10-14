@@ -1275,6 +1275,16 @@ class Settings(BaseSettings):
             "the interim is skipped for the turn."
         ),
     )
+    ELEVENLABS_V4_GAIN_DB: float = Field(
+        default=8.0,
+        description=(
+            "Fixed boost applied to ElevenLabs v4-family output (eleven_v4, "
+            "eleven_v4_turbo). Measured 2026-10-14: v4 renders 6.6-10.4 dB "
+            "quieter than v3 for the same voice (speech RMS -24..-28 dBFS vs "
+            "-14..-19) and the API has no loudness control. A peak limiter "
+            "keeps the boost from clipping. 0 disables."
+        ),
+    )
     INTERIM_REPLY_TTS_TIMEOUT_GENERATIVE_MS: float = Field(
         default=6000.0,
         description=(

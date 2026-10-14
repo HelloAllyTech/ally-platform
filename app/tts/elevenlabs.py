@@ -11,6 +11,7 @@ from livekit.plugins.elevenlabs import VoiceSettings
 from app.core.config import settings
 from app.core.logger import get_logger
 from app.tts.base import BaseTTSClient
+from app.tts.gain import GainTTS
 
 logger = get_logger(__name__)
 
@@ -69,6 +70,10 @@ class ElevenLabsTTSClient(BaseTTSClient):
 
     # Model-id markers for ElevenLabs' generative (v3/v4) families.
     GENERATIVE_MODEL_MARKERS = ("v3", "v4")
+    # The v4 family renders 7-10 dB quieter than v3 for the same voice and
+    # ElevenLabs exposes no loudness control, so v4 output gets a fixed boost
+    # (settings.ELEVENLABS_V4_GAIN_DB) through a peak-limited GainTTS.
+    GAIN_MODEL_MARKERS = ("v4",)
 
     @property
     def _is_v3_model(self) -> bool:
@@ -112,6 +117,9 @@ class ElevenLabsTTSClient(BaseTTSClient):
             marker in model.lower() for marker in self.GENERATIVE_MODEL_MARKERS
         )
         self._supports_audio_tags = self._is_generative_model
+        self._needs_gain = any(
+            marker in model.lower() for marker in self.GAIN_MODEL_MARKERS
+        )
 
     @staticmethod
     def validate_voice(voice_id: str, api_key: Optional[str] = None) -> bool:
@@ -228,10 +236,25 @@ class ElevenLabsTTSClient(BaseTTSClient):
                 # v3/v4 have no WebSocket multi-stream-input support
                 # (livekit/agents#4901). StreamAdapter sentence-streams via
                 # the plugin's HTTP /stream chunked path instead.
-                self._tts_instance = agents_tts.StreamAdapter(tts=base)
+                instance: agents_tts.TTS = agents_tts.StreamAdapter(tts=base)
             else:
-                self._tts_instance = base
+                instance = base
+            gain_db = self._configured_gain_db()
+            if self._needs_gain and gain_db > 0:
+                # v4 is 7-10 dB under v3 for the same voice; lift it so a
+                # character sounds the same loudness on either model.
+                instance = GainTTS(tts=instance, gain_db=gain_db)
+                logger.info(
+                    f"[ElevenLabs] gain +{gain_db:g} dB applied for model={self._model}"
+                )
+            self._tts_instance = instance
         return self._tts_instance
+
+    @staticmethod
+    def _configured_gain_db() -> float:
+        """ELEVENLABS_V4_GAIN_DB as a float, or 0 when unset or not numeric."""
+        value = getattr(settings, "ELEVENLABS_V4_GAIN_DB", 0.0)
+        return float(value) if isinstance(value, (int, float)) else 0.0
 
     def allows_clip_synthesis(self) -> bool:
         """Clips for flash, turbo, multilingual_v2 and the v3/v4 models.

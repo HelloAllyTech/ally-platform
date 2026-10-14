@@ -76,6 +76,13 @@ Providers optionally define two class constants:
   tags. Detection is `ElevenLabsTTSClient.GENERATIVE_MODEL_MARKERS` (`"v3"`, `"v4"`), and
   the worker's generative-voice interim/gap timing keys off the same families. The
   Voices admin lists the live model ids from ElevenLabs' `/models` endpoint.
+  **v4 loudness:** v4 renders 6.6-10.4 dB quieter than v3 for the same voice (speech RMS
+  -24..-28 dBFS vs -14..-19, measured 2026-10-14 on five voices) and the API has no loudness
+  control, so v4-family instances are wrapped in `app/tts/gain.py::GainTTS` with
+  `settings.ELEVENLABS_V4_GAIN_DB` (default +8 dB). Its limiter caps the boost at
+  `min(gain, 32000 / running_peak)`, so nothing clips and the gain only steps down within a
+  synthesis; clips built by `create_clip_tts` inherit the same wrapper. Set the setting to 0
+  to disable.
 
 **Sarvam** -- Specialized for Indian languages. Uses `speaker` for voice selection.
 

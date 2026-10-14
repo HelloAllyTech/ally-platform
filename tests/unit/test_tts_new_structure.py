@@ -218,10 +218,11 @@ class TestElevenLabsProvider:
         """eleven_v4 / eleven_v4_turbo must take the same HTTP StreamAdapter
         path as v3: the multi-stream-input socket rejects them (verified live)."""
         mock_settings.ELEVEN_API_KEY = "test-api-key"
+        mock_settings.ELEVENLABS_V4_GAIN_DB = 8.0
         mock_validate.return_value = True
         base_tts = Mock()
         mock_tts_class.return_value = base_tts
-        wrapped = Mock()
+        wrapped = Mock(sample_rate=22050, num_channels=1)
         mock_stream_adapter.return_value = wrapped
         client = ElevenLabsTTSClient(
             model=model,
@@ -230,7 +231,12 @@ class TestElevenLabsProvider:
             api_key="test-api-key",
         )
         assert client._is_generative_model is True
-        assert client.tts_instance is wrapped
+        # v4 also gets the loudness boost: GainTTS over the StreamAdapter.
+        from app.tts.gain import GainTTS
+
+        instance = client.tts_instance
+        assert isinstance(instance, GainTTS)
+        assert instance.wrapped_tts is wrapped
         mock_stream_adapter.assert_called_once_with(tts=base_tts)
         _, kwargs = base_tts.update_options.call_args
         assert kwargs["voice_settings"].stability == 0.95
