@@ -161,10 +161,15 @@ export const VideoInterjectionModal: React.FC<VideoInterjectionModalProps> = ({
               <ScrollView
                 style={styles.scroll}
                 contentContainerStyle={styles.scrollContent}>
-                <RichText
-                  html={question.promptHtml ?? question.prompt}
-                  style={styles.prompt}
-                />
+                {question.promptHtml ? (
+                  <RichText
+                    html={question.promptHtml}
+                    style={styles.prompt}
+                    textStyle={styles.prompt}
+                  />
+                ) : (
+                  <Text style={styles.prompt}>{question.prompt}</Text>
+                )}
                 <QuestionMedia media={question.media} />
                 {renderWidget()}
               </ScrollView>
