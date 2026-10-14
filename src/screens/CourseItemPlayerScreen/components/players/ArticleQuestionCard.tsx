@@ -92,7 +92,11 @@ export const ArticleQuestionCard: React.FC<ArticleQuestionCardProps> = ({
   return (
     <View testID={`article-question-${question.id}`} style={styles.card}>
       <Text style={styles.title}>{t('courses.article.question.title')}</Text>
-      <RichText html={question.promptHtml ?? question.prompt} />
+      {question.promptHtml ? (
+        <RichText html={question.promptHtml} textStyle={styles.prompt} />
+      ) : (
+        <Text style={styles.prompt}>{question.prompt}</Text>
+      )}
       <QuestionMedia media={question.media} />
 
       <View style={styles.list}>
@@ -185,6 +189,12 @@ const styles = ScaledSheet.create({
     fontWeight: fontWeights.medium,
     color: colors.ds.typography.lowEmphasis,
     textTransform: 'uppercase',
+  },
+  prompt: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...typography.body.medium,
+    fontWeight: fontWeights.regular,
+    color: colors.ds.typography.highEmphasis,
   },
   list: {
     gap: '8@ms',

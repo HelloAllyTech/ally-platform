@@ -133,10 +133,27 @@ export const JournalPlayer: React.FC<JournalPlayerProps> = ({
                 <Text style={styles.badgeText}>{index + 1}</Text>
               </View>
               <View style={styles.promptContainer}>
-                <RichText html={prompt.promptHtml ?? prompt.prompt} />
-                {prompt.required && (
-                  <Text style={styles.requiredTag}>
-                    ({t('courses.journal.required')})
+                {prompt.promptHtml ? (
+                  <>
+                    <RichText
+                      html={prompt.promptHtml}
+                      textStyle={styles.prompt}
+                    />
+                    {prompt.required && (
+                      <Text style={styles.requiredTag}>
+                        ({t('courses.journal.required')})
+                      </Text>
+                    )}
+                  </>
+                ) : (
+                  <Text style={styles.prompt}>
+                    {prompt.prompt}
+                    {prompt.required && (
+                      <Text style={styles.requiredTag}>
+                        {' '}
+                        ({t('courses.journal.required')})
+                      </Text>
+                    )}
                   </Text>
                 )}
               </View>
@@ -236,6 +253,12 @@ const styles = ScaledSheet.create({
   },
   promptContainer: {
     flex: 1,
+  },
+  prompt: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...typography.body.medium,
+    fontWeight: fontWeights.regular,
+    color: colors.ds.typography.highEmphasis,
   },
   requiredTag: {
     ...typography.body.tiny,
