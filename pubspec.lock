@@ -910,7 +910,7 @@ packages:
     source: hosted
     version: "0.1.4+1"
   permission_handler_platform_interface:
-    dependency: transitive
+    dependency: "direct dev"
     description:
       name: permission_handler_platform_interface
       sha256: ed86a61c190258fdd65de395ea0632822e3415c1faec38eae0c31b479c28a531
@@ -942,7 +942,7 @@ packages:
     source: hosted
     version: "3.2.0"
   plugin_platform_interface:
-    dependency: transitive
+    dependency: "direct dev"
     description:
       name: plugin_platform_interface
       sha256: "4820fbfdb9478b1ebae27888254d445073732dae3d6ea81f0b7e06d5dedc3f02"
@@ -1014,7 +1014,7 @@ packages:
     source: hosted
     version: "2.1.1"
   record_platform_interface:
-    dependency: transitive
+    dependency: "direct dev"
     description:
       name: record_platform_interface
       sha256: d94b37cadb8fe203e64b0e9893271c0b71b34f2550ee7fb0c6105d650e00c1f5

@@ -45,9 +45,23 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
   bool _isEnding = false;
   String? _error;
 
+  // Resolved once up front (not via `ref.read(...)` inside `dispose()`
+  // itself) per Riverpod's own guidance: reading a provider in `dispose()`
+  // is unsafe once the widget is mid-unmount, since `BuildContext`/`ref`
+  // may already be invalid — reliably reproducible by unmounting this
+  // screen in a widget test (see roleplay_voice_screen_dispose_test.dart),
+  // which is exactly how this was found.
+  late final LiveKitRoomService _liveKitService;
+
+  @override
+  void initState() {
+    super.initState();
+    _liveKitService = ref.read(liveKitRoomServiceProvider);
+  }
+
   @override
   void dispose() {
-    ref.read(liveKitRoomServiceProvider).disconnect();
+    _liveKitService.disconnect();
     super.dispose();
   }
 
@@ -61,12 +75,11 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
     }
 
     try {
-      final service = ref.read(liveKitRoomServiceProvider);
-      await service.connect(
+      await _liveKitService.connect(
         liveKitServerUrl: widget.liveKitServerUrl,
         accessToken: widget.accessToken,
       );
-      await service.setMicrophoneEnabled(true);
+      await _liveKitService.setMicrophoneEnabled(true);
       setState(() {
         _isConnected = true;
         _isMicEnabled = true;
@@ -77,7 +90,7 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
   }
 
   Future<void> _disconnect() async {
-    await ref.read(liveKitRoomServiceProvider).disconnect();
+    await _liveKitService.disconnect();
     setState(() {
       _isConnected = false;
       _isMicEnabled = false;
@@ -86,7 +99,7 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
 
   Future<void> _toggleMic() async {
     final next = !_isMicEnabled;
-    await ref.read(liveKitRoomServiceProvider).setMicrophoneEnabled(next);
+    await _liveKitService.setMicrophoneEnabled(next);
     setState(() => _isMicEnabled = next);
   }
 

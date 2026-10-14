@@ -80,6 +80,22 @@ dev_dependencies:
   # only so community_screen_test.dart can fake UrlLauncherPlatform.instance
   # (CommunityScreen's own real, unmockable-any-other-way dependency).
   url_launcher_platform_interface: ^2.3.2
+  # Already resolved transitively via permission_handler — declared directly
+  # because test/support/fake_permission_platform.dart imports it to fake
+  # PermissionHandlerPlatform.instance (permission_handler itself has no
+  # mock-friendly seam like shared_preferences' setMockInitialValues, but
+  # does expose this real platform-interface swap point).
+  permission_handler_platform_interface: ^4.4.1
+  # Already resolved transitively via `record` — declared directly because
+  # test/support/mock_record_platform.dart mocks RecordPlatform.instance so
+  # ScribeRecordingScreen's eagerly-constructed AudioRecorder doesn't hit a
+  # real (absent) platform channel in widget tests.
+  record_platform_interface: ^2.1.0
+  # Already resolved transitively via several platform-interface packages —
+  # declared directly because mock_record_platform.dart uses its
+  # MockPlatformInterfaceMixin, the sanctioned way to satisfy a
+  # PlatformInterface's token check from a mocktail Mock in tests.
+  plugin_platform_interface: ^2.1.8
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
