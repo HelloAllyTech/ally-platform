@@ -1184,6 +1184,7 @@ export const ProductRoadmap: React.FC = () => {
         <OpportunityDrawer
           opportunityId={openOpportunityId}
           goals={goals ?? []}
+          budget={budget}
           canVote={canVote}
           canManage={canManage}
           hasBuilderAccess={canOpenBuilder}
