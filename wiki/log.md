@@ -8,6 +8,9 @@ summary: A chronological log tracking all wiki updates and modifications.
 
 This is an append-only log of modifications, updates, and indexing runs performed on the wiki. All logs use the parseable prefix format: `## [YYYY-MM-DD] action | description`.
 
+## [2026-10-14] update | ally-be: Course Copilot (`course-copilot/`) and its `/course-copilot` gateway.
+- `repos/ally-be.md` gains `course-copilot/` under "Agents that build": interview → blueprint approval → durable job build → edit loop, with the three invariants (writes through `upsertStructure` with mapped ids, a resumable job table, confirmations enforced in code), and the `/course-copilot` socket namespace beside `/builder`.
+
 ## [2026-10-14] update | ally-be: public product roadmap module (`public-roadmap/`).
 - `repos/ally-be.md` gains `public-roadmap/`: hand-written cards on a fixed category × maturity-stage grid behind the public `/blog/roadmap` page, edited from admin Settings → Roadmap, live on save with a per-card visibility flag. Distinguished from `product-roadmap/`.
 
