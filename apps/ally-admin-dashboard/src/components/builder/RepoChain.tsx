@@ -39,6 +39,8 @@ interface RepoChainProps {
   /** The per-PR review-and-fix budget, for the "Round n of m · time left" line. */
   maxFixRuns?: number;
   timeboxMs?: number;
+  /** The per-PR spend ceiling for review and fixes, USD; null/0 = no limit. */
+  maxSpendUsd?: string | null;
 }
 
 const STATUS_TAG: Record<string, "gray" | "blue" | "green" | "red" | "magenta" | "cool-gray"> = {
@@ -116,6 +118,7 @@ export const RepoChain: React.FC<RepoChainProps> = ({
   resumingId = null,
   maxFixRuns,
   timeboxMs,
+  maxSpendUsd,
 }) => {
   const strings = en.builder.repoChain;
   const buildStrings = en.builder.build;
@@ -259,6 +262,7 @@ export const RepoChain: React.FC<RepoChainProps> = ({
                   pullRequest={prRow}
                   maxRounds={maxFixRuns}
                   timeboxMs={timeboxMs}
+                  maxSpendUsd={maxSpendUsd}
                 />
               )}
               {isUnhealthyRelease(prRow) && <UnhealthyReleaseNote className="mt-1 pl-7" />}

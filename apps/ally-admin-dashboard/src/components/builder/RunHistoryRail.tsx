@@ -52,8 +52,8 @@ export const RunHistoryRail: React.FC<RunHistoryRailProps> = ({
 
   // The number worth seeing while the strip is folded is what it all cost, not
   // how many attempts there were. Seven runs said nothing about eleven dollars.
-  // Issue runs carry no cost, so they are left out rather than counted as $0.
-  const spent = totalCostUsd(runs.filter(run => !isIssueRun(run)));
+  // Issue runs report their cost too now; one without a figure adds nothing.
+  const spent = totalCostUsd(runs);
   const meta = spent > 0 ? `${runs.length} · ${formatCostUsd(String(spent))}` : String(runs.length);
 
   return (
@@ -69,9 +69,9 @@ export const RunHistoryRail: React.FC<RunHistoryRailProps> = ({
             ? (formatRunDuration(run.dispatchedAt, run.completedAt) ?? strings.runDurationUnknown)
             : strings.runDurationLive;
           const issue = isIssueRun(run);
-          // No cost is reported for issue builds. Saying so beats a blank,
-          // which reads as free.
-          const cost = issue ? strings.costNotTracked : formatCostUsd(run.costUsd);
+          // Issue builds report their cost now. One with none recorded says so
+          // rather than going blank, which would read as free.
+          const cost = formatCostUsd(run.costUsd) ?? (issue ? strings.costNotTracked : null);
           // See runDidNothing: a run that ended in seconds having spent nothing
           // is a footnote, and should not compete with one that spent an hour.
           const quiet = runDidNothing(run) && !isSelected;

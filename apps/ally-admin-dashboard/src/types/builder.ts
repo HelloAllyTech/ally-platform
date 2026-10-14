@@ -502,6 +502,8 @@ export interface BuilderPullRequest {
   headSha?: string | null;
   /** The commit Builder's review last passed clean; equal to headSha = still clean. */
   reviewPassedSha?: string | null;
+  /** What Builder's review and `/oc` fixes on this pull request cost so far, USD. */
+  automationCostUsd?: string | null;
   /**
    * One entry per review Builder ran on it; the first entry's `at` starts the
    * pull request's automation time box.
@@ -578,6 +580,8 @@ export interface BuilderSettings {
   suggestedLevel?: "auto_merge" | "auto" | null;
   /** How long Builder keeps reviewing and fixing one pull request, from its first review. */
   automationTimeboxMs?: number;
+  /** Most Builder may spend on one pull request's review and fixes, USD; null/0 = no limit. */
+  maxPrAutomationUsd?: string | null;
 }
 
 export type BuilderAutonomyLevel = "off" | "assist" | "auto_merge" | "auto" | "custom";

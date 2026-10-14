@@ -3936,9 +3936,13 @@ export const en = {
       prMerging: "Merging…",
       prMergeFailed: "Could not merge",
       // How much of a pull request's automation budget is left, while it runs.
-      automationBudget: (round: number, max: number, left: string) =>
-        `Round ${round} of ${max} · ${left} left`,
-      automationBudgetRoundOnly: (round: number, max: number) => `Round ${round} of ${max}`,
+      // Joined with " · ": "Round 2 of 2 · 1h 10m left · $3.41 of $10.00".
+      automationRound: (round: number, max: number) => `Round ${round} of ${max}`,
+      automationTimeLeft: (left: string) => `${left} left`,
+      automationSpend: (spent: string, limit: string | null) =>
+        limit ? `${spent} of ${limit}` : `${spent} spent`,
+      // Once Builder has stopped working it (merged, or handed to a person).
+      automationSpentTotal: (spent: string) => `Spent ${spent} on review and fixes`,
       timeLeftUnderMinute: "under a minute",
       timeLeftNone: "no time",
       // Deployed, but the check after the release failed.
@@ -4225,6 +4229,9 @@ export const en = {
         ) =>
           `Last ${window} reviewed pull ${window === 1 ? "request" : "requests"}: ${clean} approved clean, ${merged} merged as reviewed, ${escalated} needed a person, ${unhealthy} unhealthy ${unhealthy === 1 ? "release" : "releases"}.`,
         trackRecordEmpty: "No reviewed pull requests yet.",
+        maxPrSpendLabel: "Most Builder may spend per pull request on review and fixes ($)",
+        maxPrSpendHint: "When a pull request reaches it, Builder stops and hands it to you.",
+        maxPrSpendPlaceholder: "No limit",
         suggestion: (name: string) => `Builder's recent record is good enough to try ${name}.`,
         switchTo: (name: string) => `Switch to ${name}`,
         switched: (name: string) => `Builder is now on ${name}.`,

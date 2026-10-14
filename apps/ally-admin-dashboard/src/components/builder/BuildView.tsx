@@ -211,6 +211,7 @@ export const BuildView: React.FC<BuildViewProps> = ({
   const { data: builderSettings } = useGetBuilderSettingsQuery();
   const maxFixRuns = builderSettings?.maxFixRunsPerPr;
   const timeboxMs = builderSettings?.automationTimeboxMs;
+  const maxSpendUsd = builderSettings?.maxPrAutomationUsd;
   const [resumingId, setResumingId] = useState<string | null>(null);
   const handleResume = useCallback(
     async (pullRequestId: string) => {
@@ -600,6 +601,7 @@ export const BuildView: React.FC<BuildViewProps> = ({
               resumingId,
               maxFixRuns,
               timeboxMs,
+              maxSpendUsd,
             }
           : {})}
       />
@@ -810,6 +812,7 @@ export const BuildView: React.FC<BuildViewProps> = ({
                       pullRequest={pullRequest}
                       maxRounds={maxFixRuns}
                       timeboxMs={timeboxMs}
+                      maxSpendUsd={maxSpendUsd}
                     />
                   )}
                   {pullRequest.needsHumanAt && (
@@ -875,6 +878,8 @@ export const BuildView: React.FC<BuildViewProps> = ({
                   </a>
                 </div>
                 {isUnhealthyRelease(pullRequest) && <UnhealthyReleaseNote />}
+                {/* What review and fixes cost it, once that is settled. */}
+                <AutomationBudgetLine pullRequest={pullRequest} />
               </li>
             ))}
           </ul>

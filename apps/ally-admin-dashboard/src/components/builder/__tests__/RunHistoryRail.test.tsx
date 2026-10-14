@@ -118,4 +118,26 @@ describe("RunHistoryRail issue builds", () => {
     expect(section?.getAttribute("data-heading")).toBe("All runs");
     expect(section?.getAttribute("data-open")).toBe("false");
   });
+
+  it("shows an issue run's cost once it reports one", () => {
+    render(
+      <RunHistoryRail
+        runs={[
+          issueRun,
+          run({
+            sequence: 2,
+            status: "SUCCEEDED",
+            issueNumber: 43,
+            repos: ["ally-web"],
+            costUsd: "2.5000",
+          }),
+        ]}
+        selectedRunId={null}
+        onSelect={() => undefined}
+      />,
+    );
+    expect(screen.getByText("$2.50")).toBeInTheDocument();
+    // The run with no figure still says so rather than going blank.
+    expect(screen.getByText("Cost not tracked")).toBeInTheDocument();
+  });
 });

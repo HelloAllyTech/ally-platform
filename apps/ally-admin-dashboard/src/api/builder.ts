@@ -435,6 +435,8 @@ export const builderAPI = baseAPI.injectEndpoints({
         autoReleaseEnabled?: boolean;
         autoFixEnabled?: boolean;
         maxFixRunsPerPr?: number;
+        /** USD per pull request for review and fixes; 0 = no limit. */
+        maxPrAutomationUsd?: number;
         maxConcurrentBuilds?: number;
         defaultBudgetUsd?: number;
         // Empty string, not undefined, is how a tier is cleared back to the

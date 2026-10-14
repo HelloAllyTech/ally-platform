@@ -441,4 +441,54 @@ describe("BuilderSettings", () => {
       );
     });
   });
+
+  describe("the per-pull-request spend limit", () => {
+    const label = "Most Builder may spend per pull request on review and fixes ($)";
+
+    it("saves the limit with the rest", async () => {
+      settingsResult = {
+        data: { ...baseSettings, maxPrAutomationUsd: "10.00" },
+        isLoading: false,
+        isError: false,
+      };
+      render(<BuilderSettings />);
+
+      const field = screen.getByLabelText(label);
+      expect(field).toHaveValue("10");
+      fireEvent.change(field, { target: { value: "15" } });
+      fireEvent.click(screen.getByText("Save"));
+
+      await vi.waitFor(() =>
+        expect(updateSettings).toHaveBeenCalledWith(
+          expect.objectContaining({ maxPrAutomationUsd: 15, enabled: true }),
+        ),
+      );
+    });
+
+    it("sends 0 for no limit when the field is cleared", async () => {
+      settingsResult = {
+        data: { ...baseSettings, maxPrAutomationUsd: "10.00" },
+        isLoading: false,
+        isError: false,
+      };
+      render(<BuilderSettings />);
+
+      fireEvent.change(screen.getByLabelText(label), { target: { value: "" } });
+      fireEvent.click(screen.getByText("Save"));
+
+      await vi.waitFor(() =>
+        expect(updateSettings).toHaveBeenCalledWith(
+          expect.objectContaining({ maxPrAutomationUsd: 0 }),
+        ),
+      );
+    });
+
+    it("leaves the limit alone when the server does not report one yet", async () => {
+      render(<BuilderSettings />);
+      fireEvent.click(screen.getByText("Save"));
+
+      await vi.waitFor(() => expect(updateSettings).toHaveBeenCalled());
+      expect(updateSettings.mock.calls[0][0]).not.toHaveProperty("maxPrAutomationUsd");
+    });
+  });
 });

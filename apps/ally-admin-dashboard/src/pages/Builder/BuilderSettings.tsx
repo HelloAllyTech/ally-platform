@@ -37,6 +37,7 @@ type SettingsDraft = Pick<
   | "autoReleaseEnabled"
   | "autoFixEnabled"
   | "maxFixRunsPerPr"
+  | "maxPrAutomationUsd"
   | "maxConcurrentBuilds"
   | "defaultBudgetUsd"
   | "plannerModel"
@@ -175,6 +176,7 @@ export const BuilderSettings: React.FC = () => {
         autoReleaseEnabled: data.autoReleaseEnabled,
         autoFixEnabled: data.autoFixEnabled,
         maxFixRunsPerPr: data.maxFixRunsPerPr,
+        maxPrAutomationUsd: data.maxPrAutomationUsd,
         maxConcurrentBuilds: data.maxConcurrentBuilds,
         defaultBudgetUsd: data.defaultBudgetUsd,
         plannerModel: data.plannerModel,
@@ -229,6 +231,11 @@ export const BuilderSettings: React.FC = () => {
               autoFixEnabled: draft.autoFixEnabled,
             }),
         maxFixRunsPerPr: draft.maxFixRunsPerPr,
+        // Undefined only when the server does not know the field yet — then it
+        // is left alone rather than sent as 0, which would lift the limit.
+        ...(draft.maxPrAutomationUsd !== undefined
+          ? { maxPrAutomationUsd: Number(draft.maxPrAutomationUsd || 0) }
+          : {}),
         maxConcurrentBuilds: draft.maxConcurrentBuilds,
         ...(draft.defaultBudgetUsd !== null
           ? { defaultBudgetUsd: Number(draft.defaultBudgetUsd) }
@@ -340,6 +347,31 @@ export const BuilderSettings: React.FC = () => {
             {level === "custom" && (
               <p className="pt-1 text-xs text-typography-500">{autonomy.customHint}</p>
             )}
+
+            {/* A spend ceiling per pull request belongs with how much Builder
+                does on its own: it is the other half of how far it may go. */}
+            <div className="mt-3 border-t border-border-light pt-3">
+              <Field label={autonomy.maxPrSpendLabel}>
+                <NumberInput
+                  id="builder-settings-max-pr-spend"
+                  label={autonomy.maxPrSpendLabel}
+                  hideLabel
+                  hideSteppers
+                  min={0}
+                  placeholder={autonomy.maxPrSpendPlaceholder}
+                  value={
+                    Number(draft.maxPrAutomationUsd) > 0 ? Number(draft.maxPrAutomationUsd) : ""
+                  }
+                  onChange={(_event: unknown, state: { value: number | string } | undefined) =>
+                    set(
+                      "maxPrAutomationUsd",
+                      state?.value === undefined || state.value === "" ? null : String(state.value),
+                    )
+                  }
+                />
+              </Field>
+              <p className="pt-1 text-xs text-typography-500">{autonomy.maxPrSpendHint}</p>
+            </div>
 
             {data?.trackRecord && (
               <p className="mt-3 border-t border-border-light pt-3 text-xs text-typography-600">
