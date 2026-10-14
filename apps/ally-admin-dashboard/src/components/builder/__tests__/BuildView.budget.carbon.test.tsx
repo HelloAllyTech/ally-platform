@@ -46,6 +46,7 @@ vi.mock("@api", () => ({
   ],
   useAnswerBuilderQuestionMutation: () => [vi.fn(), { isLoading: false }],
   useGetBuilderPrFeedbackQuery: () => ({ data: [] }),
+  useGetBuilderSettingsQuery: () => ({ data: undefined }),
   useResumeBuilderPullRequestAutomationMutation: () => [vi.fn(), { isLoading: false }],
 }));
 
