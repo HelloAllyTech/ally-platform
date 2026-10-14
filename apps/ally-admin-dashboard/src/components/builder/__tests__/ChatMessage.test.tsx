@@ -3,8 +3,6 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { BuilderChatMessage } from "@types";
 
-vi.mock("@constants", () => ({ cellTypes: {} }));
-
 vi.mock("react-markdown", () => ({
   default: ({ children }: { children: string }) => <div>{children}</div>,
 }));

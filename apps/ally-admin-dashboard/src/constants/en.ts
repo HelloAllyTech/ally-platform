@@ -1108,11 +1108,21 @@ export const en = {
   characterInterview: {
     title: "Character interview",
     subtitle: "Answer a few questions and the agent will draft a rich, consistent character.",
-    placeholder: "Type your answer, or add anything else…",
-    send: "Send",
-    stop: "Stop",
-    interrupted: "(interrupted)",
-    thinking: "Thinking…",
+    // The interview's wording where it differs from the shared `agentChat` copy; Send, Stop,
+    // Confirm and "None of these" are the shared words.
+    chat: {
+      placeholder: "Type your answer, or add anything else…",
+      interrupted: "(interrupted)",
+      thinking: "Thinking…",
+    },
+    question: {
+      submitAnswer: "Submit answer",
+      freeTextPlaceholder: "Type your answer…",
+      addCustom: "Add your own",
+      addCustomPlaceholder: "Add your own…",
+      selectPlaceholder: "Select…",
+      minSelectionsHint: (n: number) => `Select at least ${n}`,
+    },
     startFailed: "Couldn't start the interview",
     resumeFailed: "Couldn't resume the interview",
     streamFailed: "The interview stream failed — please try again",
@@ -1124,16 +1134,6 @@ export const en = {
     emptySubtitle: "The agent will ask its first question in a moment.",
     toolLookingUpVoices: "Looking up available voices…",
     toolBuildingProfile: "Putting the character profile together…",
-    submitAnswer: "Submit answer",
-    freeTextPlaceholder: "Type your answer…",
-    confirmSelection: "Confirm",
-    noneOfThese: "None of these",
-    addCustom: "Add your own",
-    addCustomPlaceholder: "Add your own…",
-    add: "Add",
-    selectPlaceholder: "Select…",
-    minSelectionsHint: (n: number) => `Select at least ${n}`,
-    selectedCountLabel: (n: number) => `${n} selected`,
     exitConfirmTitle: "Leave the interview?",
     exitConfirmDescription: "Your progress in this conversation will be lost.",
     exitConfirmLeave: "Leave",
@@ -3589,36 +3589,17 @@ export const en = {
         "To steer opencode, comment /oc followed by your instruction on its pull request once it opens one.",
       issueOpenPr: (repo: string, prNumber: number) => `Open ${repo} #${prNumber}`,
     },
+    // The feed rows, question cards and composer use the shared `agentChat` copy.
     chat: {
       heading: "Scoping",
-      placeholder: "Answer, or tell me something I haven't asked about…",
-      send: "Send",
-      stop: "Stop",
       streamFailed: "That turn didn't finish. Try again.",
       droppedFrames: (count: number) =>
         count === 1
           ? "One update was lost in transit — the chat may be missing a line."
           : `${count} updates were lost in transit — the chat may be missing some lines.`,
-      thinking: "Thinking",
       emptyTitle: "Tell me what you want to build",
       emptyBody:
         "A sentence is enough to start. I'll read the codebase and ask about what I can't work out on my own.",
-    },
-
-    // Question cards — shared by the interview and mid-build pauses
-    question: {
-      recommended: "Recommended",
-      noneOfThese: "None of these",
-      addCustom: "Something else",
-      addCustomPlaceholder: "Your own answer…",
-      add: "Add",
-      freeTextPlaceholder: "Your answer…",
-      submitAnswer: "Answer",
-      selectPlaceholder: "Choose…",
-      confirmSelection: "Confirm",
-      selectedCountLabel: (count: number) => (count === 1 ? "1 selected" : `${count} selected`),
-      minSelectionsHint: (min: number) => `pick at least ${min}`,
-      answeredLabel: "Answered",
     },
 
     // The living PRD
@@ -4396,9 +4377,44 @@ export const en = {
       },
     },
   },
+  // The shared agent chat (`components/agent-chat/`) — feed rows, question cards and the composer
+  // that Builder, Course Copilot and the character interview all render. A feature whose wording
+  // differs passes its own through the components' `strings` prop (see `characterInterview`).
+  agentChat: {
+    chat: {
+      placeholder: "Answer, or tell me something I haven't asked about…",
+      send: "Send",
+      stop: "Stop",
+      thinking: "Thinking",
+      interrupted: "Stopped.",
+      retry: "Retry",
+      reviewHeading: "Review notes",
+      findingFix: "Fix",
+      findingConsider: "Consider",
+      applyFinding: "Apply",
+      // The item id lets the agent act on the right item without guessing.
+      applyFindingMessage: (note: string, itemId?: string) =>
+        `Apply this review finding${itemId ? ` (item ${itemId})` : ""}: ${note}`,
+      suggestedActionsLabel: "Suggested next steps",
+    },
+    question: {
+      recommended: "Recommended",
+      noneOfThese: "None of these",
+      addCustom: "Something else",
+      addCustomPlaceholder: "Your own answer…",
+      add: "Add",
+      freeTextPlaceholder: "Your answer…",
+      submitAnswer: "Answer",
+      selectPlaceholder: "Choose…",
+      confirmSelection: "Confirm",
+      selectedCountLabel: (count: number) => (count === 1 ? "1 selected" : `${count} selected`),
+      minSelectionsHint: (min: number) => `pick at least ${min}`,
+      answeredLabel: "Answered",
+    },
+  },
   // Course Copilot — the chat-first course authoring agent. The right-hand work pane's copy lives
-  // under `courseCopilotPane` (end of this file); everything the shell, the session list and the
-  // shared chat primitives say lives here.
+  // under `courseCopilotPane` (end of this file); everything the shell and the session list say
+  // lives here, and the chat feed's own copy under `agentChat`.
   //
   // Voice follows Builder: the copilot speaks about the course in the first person, the app speaks
   // about itself ("Couldn't load your sessions"). Copy marked "decided" was fixed in the product
@@ -4547,13 +4563,9 @@ export const en = {
       ],
     } as Record<string, { label: string; message: string }[]>,
 
-    // Chat feed
+    // Chat feed — the stream hook's and page's copy. What the feed rows, cards and composer say is
+    // shared with Builder and lives under `agentChat`.
     chat: {
-      placeholder: "Answer, or tell me something I haven't asked about…",
-      send: "Send",
-      stop: "Stop",
-      thinking: "Thinking",
-      interrupted: "Stopped.",
       retry: "Retry",
       // Generic copy for a stream that died with no server message — a dropped connection.
       streamFailed: "That turn didn't finish. Try again.",
@@ -4563,30 +4575,7 @@ export const en = {
         count === 1
           ? "One update was lost in transit — the chat may be missing a line."
           : `${count} updates were lost in transit — the chat may be missing some lines.`,
-      reviewHeading: "Review notes",
-      findingFix: "Fix",
-      findingConsider: "Consider",
-      applyFinding: "Apply",
-      // The item id lets the copilot act on the right item without guessing.
-      applyFindingMessage: (note: string, itemId?: string) =>
-        `Apply this review finding${itemId ? ` (item ${itemId})` : ""}: ${note}`,
       suggestedActionsLabel: "Suggested next steps",
-    },
-
-    // Question cards
-    question: {
-      recommended: "Recommended",
-      noneOfThese: "None of these",
-      addCustom: "Something else",
-      addCustomPlaceholder: "Your own answer…",
-      add: "Add",
-      freeTextPlaceholder: "Your answer…",
-      submitAnswer: "Answer",
-      selectPlaceholder: "Choose…",
-      confirmSelection: "Confirm",
-      selectedCountLabel: (count: number) => (count === 1 ? "1 selected" : `${count} selected`),
-      minSelectionsHint: (min: number) => `pick at least ${min}`,
-      answeredLabel: "Answered",
     },
   },
   evaluate: {

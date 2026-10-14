@@ -5,30 +5,35 @@ import remarkGfm from "remark-gfm";
 
 import { Button, InlineLoading, InlineNotification, Tile } from "@ally-ui-mono/ui-shared";
 import { en } from "@constants";
-import {
-  CourseCopilotFeedMessage,
-  CourseCopilotSuggestedAction,
-  CourseReviewFinding,
-} from "@types";
+import { AgentChatMessage, CourseCopilotSuggestedAction, CourseReviewFinding } from "@types";
 
 import { AgentAnswerPayload, QuestionCard } from "./QuestionCard";
 import { sharedMarkdownComponents } from "../markdown/markdownComponents";
 
-interface ChatMessageProps {
-  message: CourseCopilotFeedMessage;
+export type AgentChatStrings = typeof en.agentChat.chat;
+
+export interface ChatMessageProps {
+  message: AgentChatMessage;
   onAnswerQuestion: (payload: AgentAnswerPayload) => void | Promise<boolean | void>;
-  /** A chip was clicked: send this text as the trainer's next turn. */
+  /** A chip was clicked: send this text as the admin's next turn. */
   onSendSuggestion?: (text: string) => void;
   /** Re-send the last user turn (the error's Retry chip). */
   onRetry?: () => void;
   disabled?: boolean;
+  /** The feature's own wording where it differs from the shared `en.agentChat.chat`. */
+  strings?: Partial<AgentChatStrings>;
+  /**
+   * Turns a tool note into what the admin reads, for a feed that records raw tool names (Builder)
+   * rather than the sentence to show.
+   */
+  formatToolNote?: (note: string) => string;
 }
 
 /**
- * One row of the chat feed.
+ * One row of an agent chat feed — shared by Builder, Course Copilot and the character interview.
  *
  * Tool activity renders as small notes above the bubble rather than as transcript lines: what the
- * agent just did is worth seeing at a glance, but it is not what the trainer is here to read, and
+ * agent just did is worth seeing at a glance, but it is not what the admin is here to read, and
  * interleaving it with the prose buries the question.
  *
  * Everything the agent authored is normalised with `Array.isArray`/`typeof` before it is mapped —
@@ -41,8 +46,10 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   onSendSuggestion,
   onRetry,
   disabled = false,
+  strings: stringOverrides,
+  formatToolNote,
 }) => {
-  const strings = en.courseCopilot.chat;
+  const strings: AgentChatStrings = { ...en.agentChat.chat, ...stringOverrides };
 
   if (message.question) {
     return (
@@ -68,9 +75,9 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
     );
   }
 
-  const toolNotes = (Array.isArray(message.toolNotes) ? message.toolNotes : []).filter(
-    (note): note is string => typeof note === "string" && note.trim().length > 0,
-  );
+  const toolNotes = (Array.isArray(message.toolNotes) ? message.toolNotes : [])
+    .filter((note): note is string => typeof note === "string" && note.trim().length > 0)
+    .map(note => (formatToolNote ? formatToolNote(note) : note));
   const findings = (Array.isArray(message.reviewFindings) ? message.reviewFindings : []).filter(
     (finding): finding is CourseReviewFinding =>
       Boolean(finding) && typeof finding.note === "string" && finding.note.trim().length > 0,

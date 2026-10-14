@@ -26,7 +26,8 @@ const sseResponse = (frames: string[]) =>
     }),
   }) as unknown as Response;
 
-const frame = (event: string, data: unknown) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+const frame = (event: string, data: unknown) =>
+  `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 const DONE = frame("done", { messageSeq: 2, sessionStatus: "INTERVIEWING" });
 
 const mockFetchOnce = (...responses: Response[]) => {
@@ -225,6 +226,50 @@ describe("useCourseCopilotStream — a refused turn", () => {
     );
   });
 
+  // An answer marks its card rather than adding a bubble. A refused answer has to take that mark
+  // back off — including when the refusal arrives before React has rendered the update that made
+  // it, which is how this runs under act(): a card id captured inside that update was still empty
+  // at rollback, and the card stayed marked on an answer the copilot never received.
+  it("unmarks the card a refused answer was for", async () => {
+    mockFetchOnce(
+      sseResponse([
+        frame("error", {
+          code: "turn_in_progress",
+          message: "Another turn is already streaming for this session",
+        }),
+      ]),
+    );
+    const { result } = renderHook(() => useCourseCopilotStream({ sessionId: "sess-1" }));
+    act(() => {
+      result.current.hydrateMessages([
+        {
+          id: "a1",
+          seq: 1,
+          role: "assistant",
+          content: "",
+          metadata: {
+            questions: [{ id: "q1", prompt: "Who is this course for?", kind: "singleSelect" }],
+          },
+          createdAt: "2026-10-14T00:00:00.000Z",
+        },
+      ] as never);
+    });
+
+    let delivered: boolean | undefined;
+    await act(async () => {
+      delivered = await result.current.sendMessage("New volunteers", {
+        questionId: "q1",
+        answer: { selectedOptionIds: ["o2"] },
+      });
+    });
+
+    expect(delivered).toBe(false);
+    const card = result.current.messages.find(message => message.question);
+    expect(card?.answeredWith).toBeUndefined();
+    expect(card?.answeredAnswer).toBeUndefined();
+    expect(result.current.messages).toHaveLength(1);
+  });
+
   it("keeps a turn the server did run", async () => {
     mockFetchOnce(sseResponse([frame("token", { delta: "Working on it" }), DONE]));
     const { result } = renderHook(() => useCourseCopilotStream({ sessionId: "sess-1" }));
@@ -309,7 +354,10 @@ describe("useCourseCopilotStream — frames", () => {
     });
 
     const assistant = result.current.messages.find(m => m.role === "assistant");
-    expect(assistant?.toolNotes).toEqual(["Found 4 matching roleplays", "Added a quiz to section 2"]);
+    expect(assistant?.toolNotes).toEqual([
+      "Found 4 matching roleplays",
+      "Added a quiz to section 2",
+    ]);
     expect(assistant?.content).toBe("Done.");
   });
 
@@ -586,7 +634,9 @@ describe("useCourseCopilotStream — server sync", () => {
     expect(result.current.messages).toHaveLength(3);
 
     // Same snapshot the feed already represents: no change.
-    act(() => result.current.syncServerMessages([userRow(1, "Hello"), assistantRow(2, "Hi")] as never));
+    act(() =>
+      result.current.syncServerMessages([userRow(1, "Hello"), assistantRow(2, "Hi")] as never),
+    );
     expect(result.current.messages).toHaveLength(3);
 
     // The reviewer posts after the build: seq 3 is new.

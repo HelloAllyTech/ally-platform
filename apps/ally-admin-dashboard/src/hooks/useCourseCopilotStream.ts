@@ -18,6 +18,8 @@ import {
 } from "@types";
 import { logger } from "@utils";
 
+import { userTurnText } from "../utils/userTurnText";
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 /**
@@ -117,17 +119,19 @@ export const parseSseBuffer = (
   return { events, rest, droppedCount };
 };
 
-/** Strips the deterministic answer prefix the server adds to a user turn. */
-const ANSWER_PREFIX_RE = /^\[answers question [^\]]+\]\s*/i;
-
 /**
- * …and the structured-answer suffix (" [selected ids: a | custom: \"…\"]"),
- * which is for the model, not the trainer: the card shows the labels.
+ * The newest question card in the feed for `questionId` — the one an answer to it is for. Marking
+ * and rolling back both look the card up this way, so they always agree on which card it is.
  */
-const ANSWER_SUFFIX_RE = /\s*\[(?:none of these|selected ids:|custom:)[^\]]*\]\s*$/i;
-
-const answerText = (content: string | null | undefined): string =>
-  (content ?? "").replace(ANSWER_PREFIX_RE, "").replace(ANSWER_SUFFIX_RE, "");
+const latestCardFor = (
+  messages: CourseCopilotFeedMessage[],
+  questionId: string,
+): CourseCopilotFeedMessage | undefined => {
+  for (let index = messages.length - 1; index >= 0; index--) {
+    if (messages[index].question?.id === questionId) return messages[index];
+  }
+  return undefined;
+};
 
 /** A persisted tool result's `summary`, when it has one — the resume path's version of a tool note. */
 const summaryOf = (result: unknown): string | null => {
@@ -161,7 +165,7 @@ export const mapServerMessagesToFeed = (
     const questionId = row.metadata?.questionId;
     if (row.role === "user" && questionId) {
       answersByQuestionId.set(String(questionId), {
-        text: answerText(row.content),
+        text: userTurnText(row.content),
         answer: row.metadata?.answer,
       });
     }
@@ -175,7 +179,7 @@ export const mapServerMessagesToFeed = (
   safeRows.forEach((row, index) => {
     const baseId = `srv_${row.id ?? row.seq ?? index}`;
     const metadata = row.metadata ?? {};
-    const content = answerText(row.content);
+    const content = userTurnText(row.content);
 
     if (row.role === "user") {
       // The hidden kickoff turn was never shown as a bubble when it was sent; showing it on resume
@@ -529,8 +533,8 @@ export const useCourseCopilotStream = ({
     ): Promise<{
       userMsgId: string | null;
       assistantId: string;
-      /** The question card this turn answered (marked answered instead of adding a bubble). */
-      cardId: string | null;
+      /** The question this turn answered — its card is marked answered instead of adding a bubble. */
+      questionId: string | null;
       sessionLost: boolean;
       /** The server refused the turn outright — nothing of it was recorded. */
       refused: boolean;
@@ -548,11 +552,8 @@ export const useCourseCopilotStream = ({
       // a reload drew the answer in two places.
       // Ids are minted outside the updater, which React may run twice.
       const userMsgId = hideUserBubble ? null : nextMessageId();
-      const marked: { cardId: string | null } = { cardId: null };
       setMessages(prev => {
-        const card = opts?.questionId
-          ? prev.find(message => message.question?.id === opts.questionId)
-          : undefined;
+        const card = opts?.questionId ? latestCardFor(prev, opts.questionId) : undefined;
         const assistant: CourseCopilotFeedMessage = {
           id: assistantId,
           role: "assistant",
@@ -560,7 +561,6 @@ export const useCourseCopilotStream = ({
           isStreaming: true,
         };
         if (card) {
-          marked.cardId = card.id;
           return [
             ...prev.map(message =>
               message.id === card.id
@@ -570,7 +570,6 @@ export const useCourseCopilotStream = ({
             assistant,
           ];
         }
-        marked.cardId = null;
         if (!userMsgId) return [...prev, assistant];
         return [...prev, { id: userMsgId, role: "user" as const, content: text }, assistant];
       });
@@ -658,7 +657,7 @@ export const useCourseCopilotStream = ({
       return {
         userMsgId,
         assistantId,
-        cardId: marked.cardId,
+        questionId: opts?.questionId ?? null,
         sessionLost,
         refused,
         aborted: controller.signal.aborted,
@@ -667,18 +666,26 @@ export const useCourseCopilotStream = ({
     [fetchStreamWithReauth, flushTokens, handleEvent, patchMessage],
   );
 
-  /** Takes a turn's bubbles back out, and unmarks the card it answered. */
+  /**
+   * Takes a turn's bubbles back out, and unmarks the card it answered.
+   *
+   * The card is found again here, by question, rather than remembered from `runStream`: the update
+   * that marked it runs when React renders, which can be after a refusal has already come back — a
+   * card id captured inside that update would still be empty, and the card would stay locked on an
+   * answer the copilot never received. Updates run in order, so this one always sees the mark.
+   */
   const rollBackTurn = useCallback(
-    (turn: { userMsgId: string | null; assistantId: string; cardId: string | null }) => {
-      setMessages(prev =>
-        prev
+    (turn: { userMsgId: string | null; assistantId: string; questionId: string | null }) => {
+      setMessages(prev => {
+        const card = turn.questionId ? latestCardFor(prev, turn.questionId) : undefined;
+        return prev
           .filter(message => message.id !== turn.userMsgId && message.id !== turn.assistantId)
           .map(message =>
-            message.id === turn.cardId
+            message === card
               ? { ...message, answeredWith: undefined, answeredAnswer: undefined }
               : message,
-          ),
-      );
+          );
+      });
     },
     [],
   );

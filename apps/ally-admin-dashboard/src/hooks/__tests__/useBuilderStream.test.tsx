@@ -84,4 +84,26 @@ describe("mapServerMessagesToFeed", () => {
 
     expect(feed).toEqual([{ id: "srv_u1", role: "user", content: "continue" }]);
   });
+
+  it("shows a resumed structured answer as the admin's words, without the ids for the model", () => {
+    const feed = mapServerMessagesToFeed([
+      message({
+        id: "a1",
+        content: "",
+        metadata: { questions: [{ id: "q1", prompt: "Which repos?" } as never] },
+      }),
+      message({
+        id: "u1",
+        role: "user",
+        content: '[answers question q1] ally-be, my own [selected ids: be | custom: "my own"]',
+        metadata: {
+          questionId: "q1",
+          answer: { selectedOptionIds: ["be"], customValues: ["my own"] },
+        },
+      }),
+    ]);
+
+    const card = feed.find(entry => entry.question);
+    expect(card?.answeredWith).toBe("ally-be, my own");
+  });
 });
