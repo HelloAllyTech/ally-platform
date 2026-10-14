@@ -4,7 +4,7 @@ import ConfettiCannon from 'react-native-confetti-cannon';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {ArrowRight, LeftArrowIcon} from '@/assets';
-import {Button} from '@/components';
+import {Button, RichText} from '@/components';
 import {useTranslate} from '@/hooks';
 import {
   useRegradeQuizAttemptMutation,
@@ -285,7 +285,10 @@ export const QuizItemPlayer: React.FC<QuizItemPlayerProps> = ({
       </Text>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.prompt}>{question.prompt}</Text>
+        <RichText
+          html={question.promptHtml ?? question.prompt}
+          style={styles.prompt}
+        />
         <QuestionMedia media={question.media} />
         {renderWidget()}
       </ScrollView>

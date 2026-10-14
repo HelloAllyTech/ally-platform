@@ -2,7 +2,7 @@ import React, {useEffect, useState} from 'react';
 import {Modal, ScrollView, Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {Button} from '@/components';
+import {Button, RichText} from '@/components';
 import {useTranslate} from '@/hooks';
 import {useSubmitInterjectionAnswerMutation} from '@/services';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
@@ -161,7 +161,10 @@ export const VideoInterjectionModal: React.FC<VideoInterjectionModalProps> = ({
               <ScrollView
                 style={styles.scroll}
                 contentContainerStyle={styles.scrollContent}>
-                <Text style={styles.prompt}>{question.prompt}</Text>
+                <RichText
+                  html={question.promptHtml ?? question.prompt}
+                  style={styles.prompt}
+                />
                 <QuestionMedia media={question.media} />
                 {renderWidget()}
               </ScrollView>

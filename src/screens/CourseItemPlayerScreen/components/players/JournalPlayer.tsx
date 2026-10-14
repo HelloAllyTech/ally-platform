@@ -3,7 +3,7 @@ import {ScrollView, Text, TextInput, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
 import {TickRoundIcon} from '@/assets';
-import {Button} from '@/components';
+import {Button, RichText} from '@/components';
 import {useDebounce, useTranslate} from '@/hooks';
 import {
   useSaveJournalDraftMutation,
@@ -132,15 +132,14 @@ export const JournalPlayer: React.FC<JournalPlayerProps> = ({
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>{index + 1}</Text>
               </View>
-              <Text style={styles.promptText}>
-                {prompt.prompt}
+              <View style={styles.promptContainer}>
+                <RichText html={prompt.promptHtml ?? prompt.prompt} />
                 {prompt.required && (
                   <Text style={styles.requiredTag}>
-                    {' '}
                     ({t('courses.journal.required')})
                   </Text>
                 )}
-              </Text>
+              </View>
             </View>
             <TextInput
               testID={`journal-response-${prompt.id}`}
@@ -235,12 +234,8 @@ const styles = ScaledSheet.create({
     fontWeight: fontWeights.medium,
     color: colors.ds.neutral.white,
   },
-  promptText: {
+  promptContainer: {
     flex: 1,
-    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
-    ...typography.body.medium,
-    fontWeight: fontWeights.medium,
-    color: colors.ds.typography.highEmphasis,
   },
   requiredTag: {
     ...typography.body.tiny,

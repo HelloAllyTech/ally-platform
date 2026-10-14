@@ -2,7 +2,7 @@ import React, {useState} from 'react';
 import {Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {Button} from '@/components';
+import {Button, RichText} from '@/components';
 import {useTranslate} from '@/hooks';
 import {useSubmitArticleQuestionAnswerMutation} from '@/services';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
@@ -92,7 +92,7 @@ export const ArticleQuestionCard: React.FC<ArticleQuestionCardProps> = ({
   return (
     <View testID={`article-question-${question.id}`} style={styles.card}>
       <Text style={styles.title}>{t('courses.article.question.title')}</Text>
-      <Text style={styles.prompt}>{question.prompt}</Text>
+      <RichText html={question.promptHtml ?? question.prompt} />
       <QuestionMedia media={question.media} />
 
       <View style={styles.list}>
@@ -185,12 +185,6 @@ const styles = ScaledSheet.create({
     fontWeight: fontWeights.medium,
     color: colors.ds.typography.lowEmphasis,
     textTransform: 'uppercase',
-  },
-  prompt: {
-    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
-    ...typography.body.medium,
-    fontWeight: fontWeights.medium,
-    color: colors.ds.typography.highEmphasis,
   },
   list: {
     gap: '8@ms',
