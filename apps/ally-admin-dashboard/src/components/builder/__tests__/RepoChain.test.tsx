@@ -336,6 +336,76 @@ describe("RepoChain", () => {
     });
   });
 
+  describe("automation budget and release health", () => {
+    const HOUR = 60 * 60 * 1000;
+    const reviewed = (base: BuilderPullRequest, extra: Partial<BuilderPullRequest> = {}) =>
+      ({
+        ...base,
+        fixRunCount: 2,
+        reviewHistory: [
+          { sha: "a", count: 3, keys: [], at: new Date(Date.now() - 2.5 * HOUR).toISOString() },
+        ],
+        ...extra,
+      }) as BuilderPullRequest;
+
+    it("puts the round and time left under a row Builder is still working", () => {
+      render(
+        <RepoChain
+          {...threeBuilt}
+          pullRequests={[reviewed(threeBuilt.pullRequests[0]), ...threeBuilt.pullRequests.slice(1)]}
+          maxFixRuns={3}
+          timeboxMs={3 * HOUR}
+        />,
+      );
+      expect(within(rowFor("ally-be")).getByText(/^Round 3 of 3 · (29|30)m left$/)).toBeTruthy();
+      // No review yet on the others: no clock, so no line.
+      expect(within(rowFor("ally-web")).queryByText(/^Round/)).toBeNull();
+    });
+
+    it("hides the budget once the pull request needs a person or has merged", () => {
+      render(
+        <RepoChain
+          {...threeBuilt}
+          pullRequests={[
+            reviewed(threeBuilt.pullRequests[0], { merged: true, state: "closed" }),
+            reviewed(threeBuilt.pullRequests[1], {
+              needsHumanAt: "2026-10-14T10:00:00Z",
+              needsHumanReason: "3 fix rounds and 2 problems remain.",
+            }),
+            threeBuilt.pullRequests[2],
+          ]}
+          maxFixRuns={3}
+          timeboxMs={3 * HOUR}
+        />,
+      );
+      expect(screen.queryByText(/^Round/)).toBeNull();
+    });
+
+    it("tags a release whose health check is failing, in place of Merged", () => {
+      render(
+        <RepoChain
+          {...threeBuilt}
+          pullRequests={[
+            {
+              ...threeBuilt.pullRequests[0],
+              merged: true,
+              state: "closed",
+              releaseState: "unhealthy",
+            } as BuilderPullRequest,
+            ...threeBuilt.pullRequests.slice(1),
+          ]}
+          onMerge={vi.fn()}
+        />,
+      );
+      const row = rowFor("ally-be");
+      expect(within(row).getByText("Released — health check failing")).toBeInTheDocument();
+      expect(within(row).queryByText("Merged")).toBeNull();
+      expect(
+        within(row).getByText("Builder stopped automatic merges and releases. Check the service."),
+      ).toBeInTheDocument();
+    });
+  });
+
   it("renders nothing without repo milestones", () => {
     const { container } = render(
       <RepoChain

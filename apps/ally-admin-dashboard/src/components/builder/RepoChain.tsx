@@ -7,6 +7,12 @@ import { BuilderBuildRun, BuilderMilestone, BuilderPrFeedback, BuilderPullReques
 import { ChainRow, chainRows } from "./issueBuild";
 import { IssueRail } from "./IssueRail";
 import { NeedsHumanBlock, openFindingsFor } from "./NeedsHumanBlock";
+import {
+  AutomationBudgetLine,
+  UnhealthyReleaseNote,
+  UnhealthyReleaseTag,
+  isUnhealthyRelease,
+} from "./PrAutomationStatus";
 
 interface RepoChainProps {
   milestones: BuilderMilestone[];
@@ -30,6 +36,9 @@ interface RepoChainProps {
   onResume?: (pullRequestId: string) => void;
   /** The pull request a resume is in flight for. */
   resumingId?: string | null;
+  /** The per-PR review-and-fix budget, for the "Round n of m · time left" line. */
+  maxFixRuns?: number;
+  timeboxMs?: number;
 }
 
 const STATUS_TAG: Record<string, "gray" | "blue" | "green" | "red" | "magenta" | "cool-gray"> = {
@@ -103,6 +112,8 @@ export const RepoChain: React.FC<RepoChainProps> = ({
   feedback,
   onResume,
   resumingId = null,
+  maxFixRuns,
+  timeboxMs,
 }) => {
   const strings = en.builder.repoChain;
   const buildStrings = en.builder.build;
@@ -182,11 +193,14 @@ export const RepoChain: React.FC<RepoChainProps> = ({
                       </button>
                     ))}
 
-                  {row.mergeRole === "merged" && (
-                    <Tag type="green" size="sm">
-                      {buildStrings.prMerged}
-                    </Tag>
-                  )}
+                  {row.mergeRole === "merged" &&
+                    (isUnhealthyRelease(prRow) ? (
+                      <UnhealthyReleaseTag />
+                    ) : (
+                      <Tag type="green" size="sm">
+                        {buildStrings.prMerged}
+                      </Tag>
+                    ))}
                   {row.mergeRole === "closed" && (
                     <Tag type="gray" size="sm">
                       {buildStrings.prClosed}
@@ -236,6 +250,16 @@ export const RepoChain: React.FC<RepoChainProps> = ({
                   )}
                 </div>
               )}
+
+              {prRow && (
+                <AutomationBudgetLine
+                  className="mt-1 pl-7"
+                  pullRequest={prRow}
+                  maxRounds={maxFixRuns}
+                  timeboxMs={timeboxMs}
+                />
+              )}
+              {isUnhealthyRelease(prRow) && <UnhealthyReleaseNote className="mt-1 pl-7" />}
 
               {row.needsHuman && prRow && onResume && (
                 <NeedsHumanBlock

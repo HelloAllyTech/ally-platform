@@ -1,3 +1,5 @@
+import React from "react";
+
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -59,6 +61,34 @@ vi.mock("@ally-ui-mono/ui-shared", () => ({
     <input aria-label={labelText || id} value={value} onChange={onChange} />
   ),
   Tooltip: ({ children }: any) => <>{children}</>,
+  // The group hands its onChange down so each radio can report its value.
+  RadioButtonGroup: ({ children, onChange, valueSelected }: any) => (
+    <div role="radiogroup">
+      {React.Children.map(children, (child: any) =>
+        React.cloneElement(child, {
+          checked: child.props.value === valueSelected,
+          onSelect: () => onChange(child.props.value),
+        }),
+      )}
+    </div>
+  ),
+  RadioButton: ({ labelText, value, checked, onSelect, disabled }: any) => (
+    <label>
+      <input type="radio" value={value} checked={checked} disabled={disabled} onChange={onSelect} />
+      {labelText}
+    </label>
+  ),
+}));
+
+vi.mock("@components/action-confirmation-popup", () => ({
+  ActionConfirmationPopup: ({ isOpen, title, primaryButton, secondaryButton }: any) =>
+    isOpen ? (
+      <div role="dialog">
+        <p>{title}</p>
+        <button onClick={primaryButton.onClick}>{primaryButton.label}</button>
+        <button onClick={secondaryButton.onClick}>{secondaryButton.label}</button>
+      </div>
+    ) : null,
 }));
 
 const updateSettings = vi.fn().mockReturnValue({ unwrap: () => Promise.resolve({}) });
@@ -287,6 +317,128 @@ describe("BuilderSettings", () => {
 
       const planner = screen.getByLabelText("Planner model") as HTMLSelectElement;
       expect(planner.value).toBe("retired-model-v1");
+    });
+  });
+
+  describe("the autonomy level", () => {
+    const radio = (name: RegExp) => screen.getByRole("radio", { name });
+
+    it("sends the picked level on save, not the switches it stands for", async () => {
+      render(<BuilderSettings />);
+
+      fireEvent.click(radio(/^Assist/));
+      fireEvent.click(screen.getByText("Save"));
+
+      await vi.waitFor(() => expect(updateSettings).toHaveBeenCalled());
+      const body = updateSettings.mock.calls[0][0];
+      expect(body).toMatchObject({ autonomyLevel: "assist", enabled: true });
+      expect(body).not.toHaveProperty("autoReviewEnabled");
+      expect(body).not.toHaveProperty("autoMergeEnabled");
+    });
+
+    it("names what each step up risks", () => {
+      render(<BuilderSettings />);
+      expect(screen.getByText(/lands on master without a person reading it/)).toBeInTheDocument();
+      expect(screen.getByText(/reach real users with no person in between/)).toBeInTheDocument();
+    });
+
+    it("asks before switching to Auto, and does nothing if cancelled", async () => {
+      render(<BuilderSettings />);
+
+      fireEvent.click(radio(/^Auto ?Also releases/));
+      expect(screen.getByRole("dialog")).toHaveTextContent("Let Builder release on its own?");
+      fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+      expect(radio(/^Auto ?Also releases/)).not.toBeChecked();
+
+      fireEvent.click(radio(/^Auto ?Also releases/));
+      fireEvent.click(screen.getByRole("button", { name: "Switch to Auto" }));
+      expect(radio(/^Auto ?Also releases/)).toBeChecked();
+
+      fireEvent.click(screen.getByText("Save"));
+      await vi.waitFor(() =>
+        expect(updateSettings).toHaveBeenCalledWith(
+          expect.objectContaining({ autonomyLevel: "auto" }),
+        ),
+      );
+    });
+
+    it("shows a mix of switches as Custom, with Advanced open", () => {
+      settingsResult = {
+        data: { ...baseSettings, autoReviewEnabled: true, autonomyLevel: "custom" },
+        isLoading: false,
+        isError: false,
+      };
+      render(<BuilderSettings />);
+
+      expect(radio(/Custom \(set below\)/)).toBeChecked();
+      expect(screen.getByText("Advanced").closest("details")).toHaveAttribute("open");
+    });
+
+    it("keeps Advanced folded for a named level", () => {
+      settingsResult = {
+        data: { ...baseSettings, autonomyLevel: "off" },
+        isLoading: false,
+        isError: false,
+      };
+      render(<BuilderSettings />);
+      expect(screen.getByText("Advanced").closest("details")).not.toHaveAttribute("open");
+      expect(screen.queryByRole("radio", { name: /Custom/ })).toBeNull();
+    });
+
+    it("shows the track record and applies a suggested level straight away", async () => {
+      settingsResult = {
+        data: {
+          ...baseSettings,
+          autoReviewEnabled: true,
+          autoFixEnabled: true,
+          autoApproveEnabled: true,
+          autoMergeEnabled: false,
+          autonomyLevel: "assist",
+          trackRecord: {
+            window: 10,
+            cleanReviewed: 7,
+            mergedAsReviewed: 7,
+            escalated: 2,
+            unhealthyReleases: 0,
+          },
+          suggestedLevel: "auto_merge",
+        },
+        isLoading: false,
+        isError: false,
+      };
+      render(<BuilderSettings />);
+
+      expect(
+        screen.getByText(
+          "Last 10 reviewed pull requests: 7 approved clean, 7 merged as reviewed, 2 needed a person, 0 unhealthy releases.",
+        ),
+      ).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: "Switch to Auto-merge" }));
+      await vi.waitFor(() =>
+        expect(updateSettings).toHaveBeenCalledWith({ autonomyLevel: "auto_merge" }),
+      );
+    });
+
+    it("confirms a suggested switch to Auto before applying it", async () => {
+      settingsResult = {
+        data: { ...baseSettings, autonomyLevel: "auto_merge", suggestedLevel: "auto" },
+        isLoading: false,
+        isError: false,
+      };
+      render(<BuilderSettings />);
+
+      fireEvent.click(screen.getAllByRole("button", { name: "Switch to Auto" })[0]);
+      expect(updateSettings).not.toHaveBeenCalled();
+      const dialog = screen.getByRole("dialog");
+      fireEvent.click(
+        Array.from(dialog.querySelectorAll("button")).find(
+          b => b.textContent === "Switch to Auto",
+        )!,
+      );
+      await vi.waitFor(() =>
+        expect(updateSettings).toHaveBeenCalledWith({ autonomyLevel: "auto" }),
+      );
     });
   });
 });

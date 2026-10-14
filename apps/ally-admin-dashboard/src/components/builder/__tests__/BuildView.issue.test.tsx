@@ -70,6 +70,9 @@ vi.mock("@api", () => ({
   useGetBuilderPullRequestsQuery: () => ({ data: pullRequests }),
   useMergeBuilderPullRequestMutation: () => [vi.fn(), { isLoading: false }],
   useGetBuilderPrFeedbackQuery: () => ({ data: prFeedback }),
+  useGetBuilderSettingsQuery: () => ({
+    data: { maxFixRunsPerPr: 3, automationTimeboxMs: 3 * 60 * 60 * 1000 },
+  }),
   useResumeBuilderPullRequestAutomationMutation: () => [resumeAutomation, { isLoading: false }],
   useGetBuilderSessionBudgetQuery: () => ({ data: undefined, refetch: vi.fn() }),
   useLazyGetBuilderRunEventsQuery: () => [
@@ -264,6 +267,40 @@ describe("BuildView pull request handed to a person", () => {
         pullRequestId: "pr-1",
       }),
     );
+  });
+});
+
+describe("BuildView automation budget and release health", () => {
+  beforeEach(() => {
+    milestones = [];
+  });
+
+  it("shows the round and time left on an opencode pull request still being worked", () => {
+    runs = [issueRun("SUCCEEDED", ["issue", "pr:33", "ci-pass:a"])];
+    pullRequests = [
+      {
+        ...pr("success"),
+        fixRunCount: 1,
+        reviewHistory: [
+          { sha: "a", count: 2, keys: [], at: new Date(Date.now() - 50 * 60_000).toISOString() },
+        ],
+      },
+    ];
+    renderView("COMPLETED");
+
+    expect(screen.getByText(/^Round 2 of 3 · 2h (9|10)m left$/)).toBeInTheDocument();
+  });
+
+  it("marks a merged pull request whose release health check is failing", () => {
+    runs = [issueRun("SUCCEEDED", ["issue", "pr:33", "ci-pass:a"])];
+    pullRequests = [{ ...pr("success"), merged: true, state: "closed", releaseState: "unhealthy" }];
+    renderView("COMPLETED");
+
+    expect(screen.getByText("Released — health check failing")).toBeInTheDocument();
+    expect(
+      screen.getByText("Builder stopped automatic merges and releases. Check the service."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Merged")).toBeNull();
   });
 });
 

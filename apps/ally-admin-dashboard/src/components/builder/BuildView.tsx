@@ -11,6 +11,7 @@ import {
   useGetBuilderPullRequestsQuery,
   useMergeBuilderPullRequestMutation,
   useGetBuilderPrFeedbackQuery,
+  useGetBuilderSettingsQuery,
   useResumeBuilderPullRequestAutomationMutation,
   useGetBuilderRunsQuery,
   useGetBuilderSessionBudgetQuery,
@@ -43,6 +44,12 @@ import {
 import { IssueRail } from "./IssueRail";
 import { NeedsHumanBlock, openFindingsFor } from "./NeedsHumanBlock";
 import { PhaseRail } from "./PhaseRail";
+import {
+  AutomationBudgetLine,
+  UnhealthyReleaseNote,
+  UnhealthyReleaseTag,
+  isUnhealthyRelease,
+} from "./PrAutomationStatus";
 import { BuilderAnswerPayload, QuestionCard } from "./QuestionCard";
 import { RaiseBudgetDialog } from "./RaiseBudgetDialog";
 import { RepoChain } from "./RepoChain";
@@ -187,6 +194,10 @@ export const BuildView: React.FC<BuildViewProps> = ({
     skip: !anyNeedsHuman,
   });
   const [resumeAutomation] = useResumeBuilderPullRequestAutomationMutation();
+  // The per-PR review-and-fix ceiling and time box, for the budget line.
+  const { data: builderSettings } = useGetBuilderSettingsQuery();
+  const maxFixRuns = builderSettings?.maxFixRunsPerPr;
+  const timeboxMs = builderSettings?.automationTimeboxMs;
   const [resumingId, setResumingId] = useState<string | null>(null);
   const handleResume = useCallback(
     async (pullRequestId: string) => {
@@ -574,6 +585,8 @@ export const BuildView: React.FC<BuildViewProps> = ({
               feedback: prFeedback,
               onResume: (id: string) => void handleResume(id),
               resumingId,
+              maxFixRuns,
+              timeboxMs,
             }
           : {})}
       />
@@ -774,6 +787,14 @@ export const BuildView: React.FC<BuildViewProps> = ({
                       {mergingId === pullRequest.id ? strings.prMerging : strings.prMerge}
                     </Button>
                   </div>
+                  {/* Only opencode pull requests run the bounded review-and-fix loop. */}
+                  {issueRun && (
+                    <AutomationBudgetLine
+                      pullRequest={pullRequest}
+                      maxRounds={maxFixRuns}
+                      timeboxMs={timeboxMs}
+                    />
+                  )}
                   {pullRequest.needsHumanAt && (
                     <NeedsHumanBlock
                       pullRequest={pullRequest}
@@ -810,19 +831,26 @@ export const BuildView: React.FC<BuildViewProps> = ({
         <CollapsibleSection heading={strings.pullRequestsHeading} meta={String(settledPrs.length)}>
           <ul className="flex flex-col gap-1">
             {settledPrs.map(pullRequest => (
-              <li key={pullRequest.id} className="flex items-center gap-2 text-xs">
-                <Tag type={pullRequest.merged ? "green" : "gray"} size="sm">
-                  {pullRequest.merged ? strings.prMerged : strings.prClosed}
-                </Tag>
-                <a
-                  href={pullRequest.prUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="min-w-0 flex-1 truncate text-typography-600 hover:underline"
-                >
-                  {pullRequest.repo} #{pullRequest.prNumber}
-                  {pullRequest.title ? ` — ${pullRequest.title}` : ""}
-                </a>
+              <li key={pullRequest.id} className="flex flex-col gap-0.5 text-xs">
+                <div className="flex items-center gap-2">
+                  {isUnhealthyRelease(pullRequest) ? (
+                    <UnhealthyReleaseTag />
+                  ) : (
+                    <Tag type={pullRequest.merged ? "green" : "gray"} size="sm">
+                      {pullRequest.merged ? strings.prMerged : strings.prClosed}
+                    </Tag>
+                  )}
+                  <a
+                    href={pullRequest.prUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="min-w-0 flex-1 truncate text-typography-600 hover:underline"
+                  >
+                    {pullRequest.repo} #{pullRequest.prNumber}
+                    {pullRequest.title ? ` — ${pullRequest.title}` : ""}
+                  </a>
+                </div>
+                {isUnhealthyRelease(pullRequest) && <UnhealthyReleaseNote />}
               </li>
             ))}
           </ul>

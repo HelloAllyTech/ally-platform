@@ -326,3 +326,48 @@ export const withoutRestatedStatus = (events: BuilderBuildEvent[]): BuilderBuild
     }
     return true;
   });
+
+/** "1h 10m", "45m", or null when under a minute (the caller says so in words). */
+export const formatTimeLeft = (ms: number): string | null => {
+  const minutes = Math.floor(ms / 60_000);
+  if (minutes < 1) return null;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  if (hours === 0) return `${rest}m`;
+  return rest === 0 ? `${hours}h` : `${hours}h ${rest}m`;
+};
+
+export interface AutomationBudget {
+  round: number;
+  maxRounds: number;
+  /** Null when the first review carries no time — the round still shows. */
+  msLeft: number | null;
+}
+
+/**
+ * How much of a pull request's review-and-fix budget is left, while Builder
+ * is still working it: the fix round it is on, and the time left in its time
+ * box (counted from its first review). Null once nothing is running on it —
+ * merged, closed, handed to a person — or before its first review, when there
+ * is no clock yet.
+ *
+ * The round is clamped to the ceiling: with every round used and the
+ * escalation not yet recorded, "Round 4 of 3" would read as a bug.
+ */
+export const automationBudget = (
+  pullRequest: BuilderPullRequest,
+  maxRounds: number | undefined,
+  timeboxMs: number | undefined,
+  now: number = Date.now(),
+): AutomationBudget | null => {
+  if (pullRequest.merged || pullRequest.state === "closed" || pullRequest.needsHumanAt) {
+    return null;
+  }
+  const history = pullRequest.reviewHistory ?? [];
+  if (!history.length || !maxRounds) return null;
+  const round = Math.min((pullRequest.fixRunCount ?? 0) + 1, maxRounds);
+  const startedAt = history[0].at ? new Date(history[0].at).getTime() : NaN;
+  const msLeft =
+    timeboxMs && Number.isFinite(startedAt) ? Math.max(0, startedAt + timeboxMs - now) : null;
+  return { round, maxRounds, msLeft };
+};

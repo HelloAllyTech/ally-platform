@@ -7,6 +7,7 @@ import {
   BuilderExemplar,
   BuilderLesson,
   BuilderLessonStatus,
+  BuilderAutonomyLevel,
   BuilderDispatch,
   BuilderMilestone,
   BuilderNotification,
@@ -426,6 +427,8 @@ export const builderAPI = baseAPI.injectEndpoints({
       BuilderSettings,
       {
         enabled?: boolean;
+        /** One level that sets the switches below together; the server maps it. */
+        autonomyLevel?: Exclude<BuilderAutonomyLevel, "custom">;
         autoReviewEnabled?: boolean;
         autoApproveEnabled?: boolean;
         autoMergeEnabled?: boolean;

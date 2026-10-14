@@ -8,6 +8,8 @@ import {
   CarbonToggle,
   InlineNotification,
   NumberInput,
+  RadioButton,
+  RadioButtonGroup,
   Select,
   SelectItem,
   SkeletonText,
@@ -20,8 +22,9 @@ import {
   useUpdateBuilderSettingsMutation,
 } from "@api";
 import { TooltipIcon } from "@assets";
+import { ActionConfirmationPopup } from "@components/action-confirmation-popup";
 import { en, ROUTES } from "@constants";
-import { BuilderSettings as BuilderSettingsType } from "@types";
+import { BuilderAutonomyLevel, BuilderSettings as BuilderSettingsType } from "@types";
 import { formatDate, formatRelativeTime } from "@utils";
 
 /** Local editable copy of the fields this page actually exposes. */
@@ -40,6 +43,63 @@ type SettingsDraft = Pick<
   | "coderModel"
   | "verifierModel"
 >;
+
+/** The switches a level sets together. */
+type AutonomySwitches = Pick<
+  SettingsDraft,
+  | "autoReviewEnabled"
+  | "autoFixEnabled"
+  | "autoApproveEnabled"
+  | "autoMergeEnabled"
+  | "autoReleaseEnabled"
+>;
+type SelectableLevel = Exclude<BuilderAutonomyLevel, "custom">;
+
+const LEVELS: SelectableLevel[] = ["off", "assist", "auto_merge", "auto"];
+
+/**
+ * What each level means in switches — the server's own mapping, mirrored so
+ * the Advanced switches show the effect of a level the moment it is picked.
+ * The server is still the one that applies it (Save sends the level, not
+ * these).
+ */
+const LEVEL_SWITCHES: Record<SelectableLevel, AutonomySwitches> = {
+  off: {
+    autoReviewEnabled: false,
+    autoFixEnabled: false,
+    autoApproveEnabled: false,
+    autoMergeEnabled: false,
+    autoReleaseEnabled: false,
+  },
+  assist: {
+    autoReviewEnabled: true,
+    autoFixEnabled: true,
+    autoApproveEnabled: true,
+    autoMergeEnabled: false,
+    autoReleaseEnabled: false,
+  },
+  auto_merge: {
+    autoReviewEnabled: true,
+    autoFixEnabled: true,
+    autoApproveEnabled: true,
+    autoMergeEnabled: true,
+    autoReleaseEnabled: false,
+  },
+  auto: {
+    autoReviewEnabled: true,
+    autoFixEnabled: true,
+    autoApproveEnabled: true,
+    autoMergeEnabled: true,
+    autoReleaseEnabled: true,
+  },
+};
+
+const SWITCH_KEYS = Object.keys(LEVEL_SWITCHES.off) as (keyof AutonomySwitches)[];
+
+/** The level a mix of switches amounts to; anything else is `custom`. */
+const levelOf = (draft: AutonomySwitches): BuilderAutonomyLevel =>
+  LEVELS.find(level => SWITCH_KEYS.every(key => LEVEL_SWITCHES[level][key] === draft[key])) ??
+  "custom";
 
 const Field: React.FC<{ label: string; hint?: string; children: React.ReactNode }> = ({
   label,
@@ -77,6 +137,7 @@ const Field: React.FC<{ label: string; hint?: string; children: React.ReactNode 
  */
 export const BuilderSettings: React.FC = () => {
   const strings = en.builder.settings;
+  const autonomy = strings.autonomy;
   const navigate = useNavigate();
 
   const { data, isLoading, isError } = useGetBuilderSettingsQuery();
@@ -85,9 +146,27 @@ export const BuilderSettings: React.FC = () => {
   const { data: models = [] } = useGetLlmModelsQuery();
 
   const [draft, setDraft] = useState<SettingsDraft | null>(null);
+  const [level, setLevel] = useState<BuilderAutonomyLevel>("custom");
+  // True once a level was picked here and the switches not touched since: Save
+  // then sends the level, and the server sets the switches from it.
+  const [levelPicked, setLevelPicked] = useState(false);
+  // Auto is the one level that ships to users unasked, so choosing it — from
+  // the selector or the suggestion — goes through a confirmation first.
+  const [confirmAuto, setConfirmAuto] = useState<null | "pick" | "apply">(null);
 
   useEffect(() => {
     if (data) {
+      setLevel(
+        data.autonomyLevel ??
+          levelOf({
+            autoReviewEnabled: data.autoReviewEnabled,
+            autoFixEnabled: data.autoFixEnabled,
+            autoApproveEnabled: data.autoApproveEnabled,
+            autoMergeEnabled: data.autoMergeEnabled,
+            autoReleaseEnabled: data.autoReleaseEnabled,
+          }),
+      );
+      setLevelPicked(false);
       setDraft({
         enabled: data.enabled,
         autoReviewEnabled: data.autoReviewEnabled,
@@ -108,16 +187,47 @@ export const BuilderSettings: React.FC = () => {
   const set = <K extends keyof SettingsDraft>(key: K, value: SettingsDraft[K]) =>
     setDraft(current => (current ? { ...current, [key]: value } : current));
 
+  /** A hand-set switch takes over from a picked level: Save sends switches again. */
+  const setSwitch = (key: keyof AutonomySwitches, value: boolean) => {
+    if (!draft) return;
+    const next = { ...draft, [key]: value };
+    setDraft(next);
+    setLevel(levelOf(next));
+    setLevelPicked(false);
+  };
+
+  const pickLevel = (next: SelectableLevel) => {
+    setLevel(next);
+    setLevelPicked(true);
+    setDraft(current => (current ? { ...current, ...LEVEL_SWITCHES[next] } : current));
+  };
+
+  /** The suggestion's button: applied straight away, not via Save. */
+  const applyLevel = async (next: SelectableLevel) => {
+    try {
+      await updateSettings({ autonomyLevel: next }).unwrap();
+      toast.success(autonomy.switched(autonomy.levels[next].name));
+    } catch {
+      toast.error(strings.saveFailed);
+    }
+  };
+
   const handleSave = async () => {
     if (!draft) return;
     try {
       await updateSettings({
         enabled: draft.enabled,
-        autoReviewEnabled: draft.autoReviewEnabled,
-        autoApproveEnabled: draft.autoApproveEnabled,
-        autoMergeEnabled: draft.autoMergeEnabled,
-        autoReleaseEnabled: draft.autoReleaseEnabled,
-        autoFixEnabled: draft.autoFixEnabled,
+        // A picked level is sent as the level, and the server sets the
+        // switches from it; otherwise the switches go as they stand.
+        ...(levelPicked && level !== "custom"
+          ? { autonomyLevel: level }
+          : {
+              autoReviewEnabled: draft.autoReviewEnabled,
+              autoApproveEnabled: draft.autoApproveEnabled,
+              autoMergeEnabled: draft.autoMergeEnabled,
+              autoReleaseEnabled: draft.autoReleaseEnabled,
+              autoFixEnabled: draft.autoFixEnabled,
+            }),
         maxFixRunsPerPr: draft.maxFixRunsPerPr,
         maxConcurrentBuilds: draft.maxConcurrentBuilds,
         ...(draft.defaultBudgetUsd !== null
@@ -168,102 +278,217 @@ export const BuilderSettings: React.FC = () => {
             <p className="pt-1 text-xs text-typography-500">{strings.enabledHelp}</p>
           </section>
 
-          {/* Ordered by how much they let go of, not by when they were built:
-              review only reads, approve vouches for the result, fix writes to
-              a branch someone may be reading. Each is independent, so the
-              middle setting — findings land, nothing pushes — is reachable. */}
+          {/* One control for how much Builder does on its own, ordered by how
+              much it lets go of. Stacks, "Design autonomy sliders to build user
+              trust" and "Progressive Delegation": a level a person can read in
+              one line beats five interacting switches, and each step up names
+              what it risks ("communicate risks and benefits"). The switches
+              stay, under Advanced, for a mix no level describes. */}
           <section className="rounded-md border border-border-light p-4">
-            <CarbonToggle
-              id="builder-settings-auto-review"
-              labelText={strings.autoReviewLabel}
-              size="sm"
-              toggled={draft.autoReviewEnabled}
-              onToggle={(checked: boolean) => set("autoReviewEnabled", checked)}
-            />
-            <p className="pt-1 text-xs text-typography-500">{strings.autoReviewHelp}</p>
-            {draft.autoReviewEnabled && (
-              <div className="mt-3 border-t border-border-light pt-3">
-                <CarbonToggle
-                  id="builder-settings-auto-approve"
-                  labelText={strings.autoApproveLabel}
+            <h2 className="text-sm font-medium text-typography-900">{autonomy.heading}</h2>
+            <RadioButtonGroup
+              name="builder-autonomy-level"
+              legendText=""
+              orientation="vertical"
+              className="mt-2"
+              valueSelected={level}
+              onChange={(value: unknown) => {
+                const next = value as SelectableLevel;
+                if (next === "auto") setConfirmAuto("pick");
+                else pickLevel(next);
+              }}
+            >
+              {[
+                ...LEVELS.map(option => (
+                  <RadioButton
+                    key={option}
+                    id={`builder-autonomy-${option}`}
+                    value={option}
+                    labelText={
+                      <span className="flex flex-col">
+                        <span className="font-medium">
+                          {autonomy.levels[option].name}
+                          {option === "assist" ? ` · ${autonomy.recommended}` : ""}
+                        </span>
+                        <span className="text-xs text-typography-600">
+                          {autonomy.levels[option].description}
+                        </span>
+                        {autonomy.levels[option].risk && (
+                          <span className="text-xs text-typography-500">
+                            {autonomy.levels[option].risk}
+                          </span>
+                        )}
+                      </span>
+                    }
+                  />
+                )),
+                // Only offered when it is the truth: custom is what the
+                // switches add up to, not something to pick.
+                ...(level === "custom"
+                  ? [
+                      <RadioButton
+                        key="custom"
+                        id="builder-autonomy-custom"
+                        value="custom"
+                        disabled
+                        labelText={autonomy.custom}
+                      />,
+                    ]
+                  : []),
+              ]}
+            </RadioButtonGroup>
+            {level === "custom" && (
+              <p className="pt-1 text-xs text-typography-500">{autonomy.customHint}</p>
+            )}
+
+            {data?.trackRecord && (
+              <p className="mt-3 border-t border-border-light pt-3 text-xs text-typography-600">
+                {data.trackRecord.window > 0
+                  ? autonomy.trackRecord(
+                      data.trackRecord.window,
+                      data.trackRecord.cleanReviewed,
+                      data.trackRecord.mergedAsReviewed,
+                      data.trackRecord.escalated,
+                      data.trackRecord.unhealthyReleases,
+                    )
+                  : autonomy.trackRecordEmpty}
+              </p>
+            )}
+            {/* Quiet on purpose: the record earns a suggestion, never a switch. */}
+            {data?.suggestedLevel && data.suggestedLevel !== level && (
+              <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-typography-600">
+                <span>{autonomy.suggestion(autonomy.levels[data.suggestedLevel].name)}</span>
+                <Button
+                  kind="tertiary"
                   size="sm"
-                  toggled={draft.autoApproveEnabled}
-                  onToggle={(checked: boolean) => set("autoApproveEnabled", checked)}
+                  disabled={isSaving}
+                  onClick={() => {
+                    const next = data.suggestedLevel as SelectableLevel;
+                    if (next === "auto") setConfirmAuto("apply");
+                    else void applyLevel(next);
+                  }}
+                >
+                  {autonomy.switchTo(autonomy.levels[data.suggestedLevel].name)}
+                </Button>
+              </div>
+            )}
+          </section>
+
+          {/* Open by default only when the switches are a mix no level names —
+              then they are the setting, and hiding them would hide it. */}
+          <details
+            className="rounded-md border border-border-light"
+            open={data?.autonomyLevel === "custom" || undefined}
+          >
+            <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-typography-900">
+              {autonomy.advanced}
+            </summary>
+            <div className="flex flex-col gap-4 px-4 pb-4">
+              {/* Ordered by how much they let go of, not by when they were built:
+                  review only reads, approve vouches for the result, fix writes to
+                  a branch someone may be reading. Each is independent, so the
+                  middle setting — findings land, nothing pushes — is reachable. */}
+              <section className="rounded-md border border-border-light p-4">
+                <CarbonToggle
+                  id="builder-settings-auto-review"
+                  labelText={strings.autoReviewLabel}
+                  size="sm"
+                  toggled={draft.autoReviewEnabled}
+                  onToggle={(checked: boolean) => setSwitch("autoReviewEnabled", checked)}
                 />
-                <p className="pt-1 text-xs text-typography-500">{strings.autoApproveHelp}</p>
-
-                {/* Nested one level deeper again. Neither of these is a
-                    setting anyone should be able to reach by accident, and the
-                    ladder — read, vouch, take, ship — is the whole shape of how
-                    much each switch lets go of.
-
-                    Siblings rather than a further nesting: merging is Builder
-                    taking the work itself, releasing is what happens to a
-                    merged pull request whoever merged it. Hanging release off
-                    merge would say a hand-merged one does not release, which is
-                    not true. */}
-                {draft.autoApproveEnabled && (
+                <p className="pt-1 text-xs text-typography-500">{strings.autoReviewHelp}</p>
+                {draft.autoReviewEnabled && (
                   <div className="mt-3 border-t border-border-light pt-3">
                     <CarbonToggle
-                      id="builder-settings-auto-merge"
-                      labelText={strings.autoMergeLabel}
+                      id="builder-settings-auto-approve"
+                      labelText={strings.autoApproveLabel}
                       size="sm"
-                      toggled={draft.autoMergeEnabled}
-                      onToggle={(checked: boolean) => set("autoMergeEnabled", checked)}
+                      toggled={draft.autoApproveEnabled}
+                      onToggle={(checked: boolean) => setSwitch("autoApproveEnabled", checked)}
                     />
-                    <p className="pt-1 text-xs text-typography-500">{strings.autoMergeHelp}</p>
+                    <p className="pt-1 text-xs text-typography-500">{strings.autoApproveHelp}</p>
 
-                    <div className="mt-3 border-t border-border-light pt-3">
-                      <CarbonToggle
-                        id="builder-settings-auto-release"
-                        labelText={strings.autoReleaseLabel}
-                        size="sm"
-                        toggled={draft.autoReleaseEnabled}
-                        onToggle={(checked: boolean) => set("autoReleaseEnabled", checked)}
-                      />
-                      <p className="pt-1 text-xs text-typography-500">{strings.autoReleaseHelp}</p>
-                    </div>
+                    {/* Nested one level deeper again. Neither of these is a
+                        setting anyone should be able to reach by accident, and the
+                        ladder — read, vouch, take, ship — is the whole shape of how
+                        much each switch lets go of.
+
+                        Siblings rather than a further nesting: merging is Builder
+                        taking the work itself, releasing is what happens to a
+                        merged pull request whoever merged it. Hanging release off
+                        merge would say a hand-merged one does not release, which is
+                        not true. */}
+                    {draft.autoApproveEnabled && (
+                      <div className="mt-3 border-t border-border-light pt-3">
+                        <CarbonToggle
+                          id="builder-settings-auto-merge"
+                          labelText={strings.autoMergeLabel}
+                          size="sm"
+                          toggled={draft.autoMergeEnabled}
+                          onToggle={(checked: boolean) => setSwitch("autoMergeEnabled", checked)}
+                        />
+                        <p className="pt-1 text-xs text-typography-500">{strings.autoMergeHelp}</p>
+
+                        <div className="mt-3 border-t border-border-light pt-3">
+                          <CarbonToggle
+                            id="builder-settings-auto-release"
+                            labelText={strings.autoReleaseLabel}
+                            size="sm"
+                            toggled={draft.autoReleaseEnabled}
+                            onToggle={(checked: boolean) =>
+                              setSwitch("autoReleaseEnabled", checked)
+                            }
+                          />
+                          <p className="pt-1 text-xs text-typography-500">
+                            {strings.autoReleaseHelp}
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
-              </div>
-            )}
-          </section>
+              </section>
 
-          {/* Next to the kill switch, not under the thresholds. This decides
-              whether an agent may push commits to a pull request a person is
-              in the middle of reviewing — which makes it the second most
-              consequential control here, and it had no control at all until
-              now: the field existed, the API accepted it, and the only way to
-              change it was a hand-written PATCH. */}
-          <section className="rounded-md border border-border-light p-4">
-            <CarbonToggle
-              id="builder-settings-auto-fix"
-              labelText={strings.autoFixLabel}
-              size="sm"
-              toggled={draft.autoFixEnabled}
-              onToggle={(checked: boolean) => set("autoFixEnabled", checked)}
-            />
-            <p className="pt-1 text-xs text-typography-500">{strings.autoFixHelp}</p>
-            {draft.autoFixEnabled && (
-              <div className="pt-3">
-                <Field label={strings.maxFixRunsPerPrLabel} hint={strings.maxFixRunsPerPrHelp}>
-                  <NumberInput
-                    id="builder-settings-max-fix-runs"
-                    label={strings.maxFixRunsPerPrLabel}
-                    hideLabel
-                    hideSteppers
-                    min={0}
-                    max={10}
-                    value={draft.maxFixRunsPerPr}
-                    onChange={(_event: unknown, state: { value: number | string } | undefined) => {
-                      const next = Number(state?.value);
-                      if (!Number.isNaN(next)) set("maxFixRunsPerPr", next);
-                    }}
-                  />
-                </Field>
-              </div>
-            )}
-          </section>
+              {/* Next to the kill switch, not under the thresholds. This decides
+                  whether an agent may push commits to a pull request a person is
+                  in the middle of reviewing — which makes it the second most
+                  consequential control here, and it had no control at all until
+                  now: the field existed, the API accepted it, and the only way to
+                  change it was a hand-written PATCH. */}
+              <section className="rounded-md border border-border-light p-4">
+                <CarbonToggle
+                  id="builder-settings-auto-fix"
+                  labelText={strings.autoFixLabel}
+                  size="sm"
+                  toggled={draft.autoFixEnabled}
+                  onToggle={(checked: boolean) => setSwitch("autoFixEnabled", checked)}
+                />
+                <p className="pt-1 text-xs text-typography-500">{strings.autoFixHelp}</p>
+                {draft.autoFixEnabled && (
+                  <div className="pt-3">
+                    <Field label={strings.maxFixRunsPerPrLabel} hint={strings.maxFixRunsPerPrHelp}>
+                      <NumberInput
+                        id="builder-settings-max-fix-runs"
+                        label={strings.maxFixRunsPerPrLabel}
+                        hideLabel
+                        hideSteppers
+                        min={0}
+                        max={10}
+                        value={draft.maxFixRunsPerPr}
+                        onChange={(
+                          _event: unknown,
+                          state: { value: number | string } | undefined,
+                        ) => {
+                          const next = Number(state?.value);
+                          if (!Number.isNaN(next)) set("maxFixRunsPerPr", next);
+                        }}
+                      />
+                    </Field>
+                  </div>
+                )}
+              </section>
+            </div>
+          </details>
 
           <section className="flex flex-col gap-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -415,6 +640,21 @@ export const BuilderSettings: React.FC = () => {
           </div>
         </>
       )}
+      <ActionConfirmationPopup
+        isOpen={confirmAuto !== null}
+        onClose={() => setConfirmAuto(null)}
+        title={autonomy.confirmAutoTitle}
+        description={autonomy.confirmAutoBody}
+        primaryButton={{
+          label: autonomy.confirmAutoAction,
+          onClick: () => {
+            if (confirmAuto === "apply") void applyLevel("auto");
+            else pickLevel("auto");
+            setConfirmAuto(null);
+          },
+        }}
+        secondaryButton={{ label: autonomy.cancel, onClick: () => setConfirmAuto(null) }}
+      />
     </div>
   );
 };

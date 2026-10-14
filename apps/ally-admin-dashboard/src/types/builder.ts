@@ -494,6 +494,18 @@ export interface BuilderPullRequest {
   needsHumanAt?: string | null;
   /** Why, as one plain sentence written by the server. Rendered as given. */
   needsHumanReason?: string | null;
+  /** Fix requests Builder has made on this pull request so far. */
+  fixRunCount?: number;
+  /**
+   * One entry per review Builder ran on it; the first entry's `at` starts the
+   * pull request's automation time box.
+   */
+  reviewHistory?: { sha: string | null; count: number; keys: string[]; at?: string }[] | null;
+  /**
+   * Where its production release got to. `unhealthy` = deployed, but the
+   * health check after the release failed.
+   */
+  releaseState?: "releasing" | "released" | "failed" | "skipped" | "unhealthy" | null;
 }
 
 export type BuilderPrFeedbackStatus =
@@ -552,6 +564,24 @@ export interface BuilderSettings {
   verifierModel: string | null;
   /** The server's default for new builds; `workflow` is the legacy runner. */
   dispatch?: BuilderDispatch;
+  /** The switches above, read as one level; `custom` is any other mix. */
+  autonomyLevel?: BuilderAutonomyLevel;
+  /** Over Builder's last `window` reviewed opencode pull requests. */
+  trackRecord?: BuilderTrackRecord;
+  /** Set when the track record has earned the next level. */
+  suggestedLevel?: "auto_merge" | "auto" | null;
+  /** How long Builder keeps reviewing and fixing one pull request, from its first review. */
+  automationTimeboxMs?: number;
+}
+
+export type BuilderAutonomyLevel = "off" | "assist" | "auto_merge" | "auto" | "custom";
+
+export interface BuilderTrackRecord {
+  window: number;
+  cleanReviewed: number;
+  mergedAsReviewed: number;
+  escalated: number;
+  unhealthyReleases: number;
 }
 
 export interface BuilderNotification {

@@ -3935,6 +3935,15 @@ export const en = {
       prMerge: "Merge",
       prMerging: "Merging…",
       prMergeFailed: "Could not merge",
+      // How much of a pull request's automation budget is left, while it runs.
+      automationBudget: (round: number, max: number, left: string) =>
+        `Round ${round} of ${max} · ${left} left`,
+      automationBudgetRoundOnly: (round: number, max: number) => `Round ${round} of ${max}`,
+      timeLeftUnderMinute: "under a minute",
+      timeLeftNone: "no time",
+      // Deployed, but the check after the release failed.
+      releaseUnhealthy: "Released — health check failing",
+      releaseUnhealthyBody: "Builder stopped automatic merges and releases. Check the service.",
       // A pull request Builder's review-and-fix loop handed to a person.
       needsYou: {
         tag: "Needs you",
@@ -4162,6 +4171,56 @@ export const en = {
       // The kill switch sits alone, first, for the same reason WhatsApp's does:
       // it's the control someone reaches for in an incident and shouldn't be
       // buried under thresholds.
+      // One control for how much Builder does on its own; the switches it sets
+      // stay under Advanced. Each step up says what it risks in one line.
+      autonomy: {
+        heading: "How much Builder does on its own",
+        levels: {
+          off: {
+            name: "Off",
+            description: "Builder builds; nothing happens on pull requests automatically.",
+            risk: "",
+          },
+          assist: {
+            name: "Assist",
+            description:
+              "Reviews pull requests, asks opencode to fix what it finds, and approves clean ones. You merge and release.",
+            risk: "Its approval counts as the review GitHub asks for, so read the pull request before you merge it.",
+          },
+          auto_merge: {
+            name: "Auto-merge",
+            description: "Also merges clean pull requests, in build order. You release.",
+            risk: "Code lands on master without a person reading it; anything the review missed goes out with your next release.",
+          },
+          auto: {
+            name: "Auto",
+            description:
+              "Also releases, and checks the service is healthy after each release; stops and alerts you if not.",
+            risk: "Changes reach real users with no person in between. A failed health check stops it, but only after that release is out.",
+          },
+        } as Record<string, { name: string; description: string; risk: string }>,
+        recommended: "Recommended now",
+        custom: "Custom (set below)",
+        customHint: "The switches under Advanced don't match one of the levels above.",
+        advanced: "Advanced",
+        confirmAutoTitle: "Let Builder release on its own?",
+        confirmAutoBody:
+          "Builder will merge and release clean pull requests to production without asking, then check the service is healthy. If a check fails it stops merging and releasing and alerts you — after that release is already out.",
+        confirmAutoAction: "Switch to Auto",
+        cancel: "Cancel",
+        trackRecord: (
+          window: number,
+          clean: number,
+          merged: number,
+          escalated: number,
+          unhealthy: number,
+        ) =>
+          `Last ${window} reviewed pull ${window === 1 ? "request" : "requests"}: ${clean} approved clean, ${merged} merged as reviewed, ${escalated} needed a person, ${unhealthy} unhealthy ${unhealthy === 1 ? "release" : "releases"}.`,
+        trackRecordEmpty: "No reviewed pull requests yet.",
+        suggestion: (name: string) => `Builder's recent record is good enough to try ${name}.`,
+        switchTo: (name: string) => `Switch to ${name}`,
+        switched: (name: string) => `Builder is now on ${name}.`,
+      },
       enabledLabel: "Builder enabled",
       enabledHelp:
         "Off means no build will dispatch, whatever a session's own readiness says. The Builder tab stays visible; nothing behind it will run.",
