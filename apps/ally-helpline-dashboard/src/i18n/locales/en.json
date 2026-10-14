@@ -2694,8 +2694,6 @@
       "loadFailed": "Couldn't load your team.",
       "empty": "No one in your organisation yet.",
       "noMatch": "No one matches “{{search}}”.",
-      "adminChip": "Admin",
-      "adminHint": "Admins are supervisors by role, so this can't be changed here.",
       "listenerViaSupervisor": "Supervisors can already take chats. Turn Supervisor off to change this.",
       "listenerFor": "Listener: {{name}}",
       "supervisorFor": "Supervisor: {{name}}",

@@ -26,6 +26,22 @@ describe("useCanUseTextHelpline", () => {
     expect(result.current.hasPermission).toBe(false);
   });
 
+  it("gives an org admin with no helpline role nothing, even with the helpline on", () => {
+    // What a tenant ADMIN holds once ally-be 1976600000000 has run: team
+    // management, which only works from inside the workspace, and no
+    // lobby/monitor permission to get in.
+    permissionsRef.current = ["edit:helpline:team", "view:call:logs-summary"];
+    enabledQuery.mockReturnValue({
+      data: { enabled: true, continuingChatIds: [] },
+      isLoading: false,
+    });
+    const { result } = renderHook(() => useCanUseTextHelpline());
+
+    expect(enabledQuery).toHaveBeenCalledWith(undefined, { skip: true });
+    expect(result.current.canView).toBe(false);
+    expect(result.current.hasPermission).toBe(false);
+  });
+
   it("is false when the organisation's helpline is off, even with the permission", () => {
     permissionsRef.current = ["view:helpline:lobby"];
     enabledQuery.mockReturnValue({

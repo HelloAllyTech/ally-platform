@@ -11,6 +11,10 @@ const NO_CHATS: string[] = [];
  * supervisors) AND the tenant's TEXT_HELPLINE_ENABLED toggle, which only a
  * platform admin can turn on. Same shape as useCanViewCharacterLibrary.
  *
+ * Only the LISTENER and HELPLINE_SUPERVISOR groups hold those two permissions,
+ * so the tab is for people given a helpline role. Being an org ADMIN is not
+ * enough — ally-be 1976600000000 revoked the workspace grants ADMIN once had.
+ *
  * One exception keeps a conversation from being cut off: when the toggle goes
  * off, a listener still in ACTIVE chats keeps the workspace for those chats
  * (`continuingChatIds`, contract §5.4) — `restricted` — until they end.
