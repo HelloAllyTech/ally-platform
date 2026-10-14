@@ -123,6 +123,24 @@ export const ANALYTICS_EVENTS = {
   HELPLINE_TALKER_BLOCKED: "helpline_talker_blocked",
   HELPLINE_SUPERVISOR_ALERTED: "helpline_supervisor_alerted",
   HELPLINE_QA_VIEWED: "helpline_qa_viewed",
+
+  // Conversational homepage at /v2 — public and signed out. Topics are coarse
+  // enums. The ONLY free text is `question_text`, sent for a question Ally had
+  // no answer for, scrubbed of emails, numbers and links first (see
+  // `scrubQuestion`); a message that matched distress is never sent at all.
+  HOME_V2_SUGGESTION_TAPPED: "home_v2_suggestion_tapped",
+  HOME_V2_QUESTION_ASKED: "home_v2_question_asked",
+  HOME_V2_PRACTICE_RESPONSE_CHOSEN: "home_v2_practice_response_chosen",
+  HOME_V2_SUPPORT_SHOWN: "home_v2_support_shown",
+  HOME_V2_SIGN_IN_STARTED: "home_v2_sign_in_started",
+} as const;
+
+/** `source` values for the /v2 homepage's `home_v2_*` events. */
+export const HOME_V2_SOURCE = {
+  HEADER: "header",
+  SUGGESTION: "suggestion",
+  TYPED: "typed",
+  REMEMBERED: "remembered",
 } as const;
 
 /**
@@ -161,6 +179,7 @@ export const REVIEW_ACTOR_TYPE = {
 export const LANGUAGE_CHANGE_SOURCE = {
   SIDEBAR: "sidebar",
   ROLEPLAY_CONFIRMATION_MODAL: "roleplay_confirmation_modal",
+  HOME_V2: "home_v2",
 } as const;
 
 /**
@@ -291,4 +310,12 @@ export const ANALYTICS_PROPS = {
   HELPLINE_HAS_NOTE: "has_note",
   HELPLINE_ALERTED_COUNT: "alerted_count",
   HELPLINE_QA_VIEWER: "viewer",
+
+  // Homepage v2 context
+  HOME_V2_TOPIC: "topic",
+  HOME_V2_MATCHED: "matched",
+  // Scrubbed, unmatched questions only — see the HOME_V2_* events above.
+  HOME_V2_QUESTION_TEXT: "question_text",
+  HOME_V2_PRACTICE_CHOICE: "practice_choice",
+  HOME_V2_AUTH_METHOD: "auth_method",
 } as const;

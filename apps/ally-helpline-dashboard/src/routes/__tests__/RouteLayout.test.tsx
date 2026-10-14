@@ -28,6 +28,7 @@ vi.mock("@pages", () => ({
   SjtEdit: () => <div data-testid="sjt1-edit-page">SJT1 Edit Page</div>,
   SjtReport1: () => <div data-testid="sjt-report1-page">SJT Report 1 Page</div>,
   HelplineTalk: () => <div data-testid="helpline-talk-page">Helpline Talk Page</div>,
+  HomeV2: () => <div data-testid="home-v2-page">Home v2 Page</div>,
 }));
 
 // Mock useAnalytics to avoid context error in PageviewTracker
@@ -91,6 +92,7 @@ vi.mock("@constants", () => ({
     SJT1_EDIT: "/SJT1/edit",
     SJT_REPORT1: "/sjtreport1",
     TALK: "/talk/:tenantCode",
+    HOME_V2: "/v2",
   },
 }));
 
@@ -162,6 +164,14 @@ describe("RouteLayout", () => {
     renderWithRouter(<RouteLayout />);
 
     expect(screen.getByTestId("public-layout")).toBeInTheDocument();
+    expect(screen.queryByTestId("private-layout")).not.toBeInTheDocument();
+  });
+
+  it("serves the conversational homepage publicly at /v2, leaving /login as it is", () => {
+    window.history.pushState({}, "", "/v2");
+    renderWithRouter(<RouteLayout />);
+
+    expect(screen.getByTestId("home-v2-page")).toBeInTheDocument();
     expect(screen.queryByTestId("private-layout")).not.toBeInTheDocument();
   });
 

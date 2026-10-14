@@ -24,6 +24,7 @@ import {
   SjtEdit,
   SjtReport1,
   HelplineTalk,
+  HomeV2,
 } from "@pages";
 
 import { PageviewTracker } from "../analytics";
@@ -60,6 +61,9 @@ const RouteLayout = () => {
           {/* Text helpline talker page — anonymous, no nav, no sign-in. Uses its
               own API slice so a rejected guest token never logs anyone out. */}
           <Route path={ROUTES.TALK} element={<HelplineTalk />} />
+          {/* Conversational homepage, trialled beside /login — no nav, sign-in
+              happens inside the conversation */}
+          <Route path={ROUTES.HOME_V2} element={<HomeV2 />} />
         </Route>
 
         {/* Hybrid routes - routes which are public but have navbar upon login */}

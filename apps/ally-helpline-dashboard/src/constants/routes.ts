@@ -42,6 +42,9 @@ export const ROUTES = {
   // Standalone public report for school leadership: teacher readiness across
   // the five SJT skills, on sample data or a CSV read in the browser.
   SJT_REPORT1: "/sjtreport1",
+  // The conversational homepage, trialled beside /login rather than replacing
+  // it: Ally greets the visitor, and sign-in happens inside the conversation.
+  HOME_V2: "/v2",
 
   // Private Routes
   HOME: "/",

@@ -2707,5 +2707,194 @@
       "chatFallback": "Chat",
       "elsewhere": "This part of the helpline is unavailable while it's switched off. Finish your open chats from the Lobby."
     }
+  },
+  "homeV2": {
+    "nav": {
+      "label": "Main",
+      "home": "Ally home",
+      "blog": "Blog",
+      "changelog": "Changelog",
+      "about": "About",
+      "support": "Need support now?"
+    },
+    "greeting": {
+      "title": "Hi, I'm Ally.",
+      "intro": "I help people who support others — counsellors, volunteers, teachers, peers — practise hard conversations and get support on the job.",
+      "capabilities": "Try a practice moment right here, ask me anything about Ally, or type your email below to sign in.",
+      "welcomeBack": "Welcome back.",
+      "rememberedHint": "Or ask me anything about Ally.",
+      "signedInTitle": "Welcome back, {{name}}.",
+      "signedInBody": "You're already signed in."
+    },
+    "speakers": {
+      "ally": "Ally",
+      "you": "You",
+      "client": "Riya · virtual client"
+    },
+    "suggestions": {
+      "label": "Suggestions",
+      "practice": "Try a practice moment",
+      "again": "Try another response",
+      "what": "What is Ally?",
+      "access": "How do I get access?",
+      "org": "I train or manage helpers",
+      "privacy": "Is it private?",
+      "news": "What's new?",
+      "support": "I need support myself",
+      "signin": "Sign in",
+      "supportNow": "I need support now"
+    },
+    "answers": {
+      "practiceSetup": "Let's try one moment. I'll play Riya, 19, a first-year student whose exams start next week. Read what she says, then choose how you'd respond. There's no score here.",
+      "practiceAgain": "Let's rewind. Riya says it again:",
+      "practiceWrap": "That was one moment, in text. In Ally you'd keep going out loud, in your own language, and get a full debrief at the end.",
+      "whatIntro": "I'm the front door to Ally, a not-for-profit platform for people who help others. Inside there are two main tools:",
+      "whatMore": "Plus courses, cases and learning pathways, with XP and levels as you practise. Practice runs in eleven languages.",
+      "access1": "Ally comes to you through a partner organization: a helpline, NGO, school or employer.",
+      "access2": "If yours uses Ally, your trainer adds your email and you sign in right here. If not, point them our way, or get in touch yourself.",
+      "org": "Trainers write virtual clients from the cases their helpers actually meet, with no code, and review every session. Organizations use Ally to train more helpers in their own language.",
+      "privacy": "Plainly, it depends on what you're doing:",
+      "news": "Here's what's new:",
+      "languages1": "Practice runs in eleven languages: Hindi, English, Bengali, Tamil, Telugu, Marathi, Kannada, Malayalam, Gujarati, Punjabi and Odia.",
+      "languages2": "The app itself is in English, Hindi, Marathi, Tamil and Kannada. Switch any time from the language menu at the top.",
+      "cost": "Ally is built by a not-for-profit, and access comes through partner organizations. Ask yours, or get in touch to talk about your programme.",
+      "supportAck": "Thank you for telling me. I'm glad you said something.",
+      "support": "I'm a practice tool, not a counsellor, so I'm not the right support for this. Tele-MANAS is, any time, for free:",
+      "supportAfter": "If you'd like to keep talking about Ally, I'm still here.",
+      "signin": "Type your email below and I'll send you a 4-digit code.",
+      "fallback": "I don't have a good answer to that yet. I've passed your question to the team so we can add one.",
+      "fallbackMore": "Here's what I can help with right now, or write to the team directly.",
+      "codeSent_one": "If {{email}} has an Ally account, a 4-digit code is on its way. It's valid for {{count}} minute.",
+      "codeSent_other": "If {{email}} has an Ally account, a 4-digit code is on its way. It's valid for {{count}} minutes.",
+      "noCode": "No code? Ally accounts come through partner organizations, so ask your trainer to invite this address.",
+      "codeResent": "A new code is on its way to {{email}}. The old one no longer works.",
+      "codeWrong": "That code didn't match, or it has expired. Check the most recent email from Ally and try again.",
+      "verifyFailed": "I couldn't check that code just now. Please try again in a moment.",
+      "sendFailed": "I couldn't send the email just now. Please try again in a moment.",
+      "differentEmail": "No problem. Type the right email below.",
+      "notYou": "No problem. Type your email below.",
+      "alreadySignedIn": "You're already signed in. Open Ally whenever you're ready.",
+      "googleNoAccount": "There's no Ally account for that Google address yet. Ally accounts come through partner organizations, so ask your trainer to invite you.",
+      "googleFailed": "Google sign-in didn't work. Try again, or type your email instead."
+    },
+    "links": {
+      "partner": "Partner with us",
+      "writeTeam": "Write to the team",
+      "privacyPolicy": "Read the Privacy Policy",
+      "browseScenarios": "Browse practice scenarios"
+    },
+    "practice": {
+      "prompt": "How would you respond?",
+      "opening": "Everyone says it's just one exam. But if I fail, my parents… I can't even sleep.",
+      "choices": {
+        "a": "Don't worry, you'll do fine. Have you tried making a study timetable?",
+        "b": "It sounds like it isn't only the exam — it's what failing would mean at home.",
+        "c": "What exactly do your parents say to you?"
+      },
+      "reactions": {
+        "a": "…Yeah. Maybe I'll try that.",
+        "b": "Yes. Nobody gets that part. Even my friends just say 'chill'.",
+        "c": "They don't say anything. That's the worst part."
+      },
+      "feedback": {
+        "title": "Ally supervisor",
+        "tryNext": "Try next:",
+        "a": {
+          "tag": "Watch for: advice too early",
+          "what": "Reassurance and a tip came before Riya felt heard, so she closed the conversation politely. It's the most common first instinct, and exactly what practice helps you notice.",
+          "next": "Reflect what she's carrying before offering anything."
+        },
+        "b": {
+          "tag": "Skill: reflecting feelings",
+          "what": "You named the fear underneath her words. That's reflecting feelings, a core helping skill, and you just used it. Riya felt understood, so she opened up.",
+          "next": "Ask an open question, like what her nights have been like."
+        },
+        "c": {
+          "tag": "Watch for: facts before feelings",
+          "what": "A fair question, but it moved to facts before feelings. Riya still answered, and something important slipped out.",
+          "next": "Reflect what you just heard: the silence at home sounds heavy."
+        }
+      }
+    },
+    "cards": {
+      "skillsLab": {
+        "title": "Skills Lab",
+        "body": "Roleplay with virtual clients by voice or text, with an AI supervisor and a debrief after every session."
+      },
+      "assist": {
+        "title": "Ally Assist",
+        "body": "A scribe that transcribes real sessions and drafts notes in your organization's format."
+      },
+      "org": {
+        "creator": "Simulation creator: write a persona and a scenario, and Ally plays the client.",
+        "review": "Session review: transcripts, debriefs and roleplay logs for every learner.",
+        "courses": "Courses and pathways: sequence lessons, cases and roleplays."
+      },
+      "privacy": {
+        "assistTitle": "Real sessions, with Ally Assist",
+        "assistAudio": "Audio recordings are not stored.",
+        "assistPii": "Clients' personal details are removed automatically.",
+        "assistTraining": "Client data is never used to train models.",
+        "assistTranscripts": "Your organization decides how long transcripts are kept.",
+        "practiceTitle": "Practice, in Skills Lab",
+        "practiceStored": "Roleplay audio and transcripts are stored to improve the training, and shared with your training organization.",
+        "encrypted": "Data is encrypted."
+      },
+      "news": {
+        "blogLabel": "Building Ally",
+        "blogFallback": "Read the latest from the team",
+        "changelog": "Changelog: everything we've shipped",
+        "roadmap": "Roadmap: from the practice room to the field"
+      },
+      "support": {
+        "title": "Tele-MANAS · free, 24×7",
+        "call": "Call {{number}}",
+        "danger": "If you're in immediate danger, call {{number}}."
+      }
+    },
+    "remembered": {
+      "label": "Last signed in on this device",
+      "send": "Send my code",
+      "notYou": "Not you?"
+    },
+    "signedIn": {
+      "open": "Open Ally"
+    },
+    "composer": {
+      "label": "Ask Ally anything, or type your email to sign in",
+      "placeholder": "Ask anything, or your email",
+      "placeholderSignedIn": "Ask me anything about Ally",
+      "send": "Send",
+      "google": "Sign in with Google",
+      "agree": "Signing in means you agree to the <terms>Terms</terms> and <privacy>Privacy Policy</privacy>.",
+      "codeLabel": "4-digit code sent to {{email}}",
+      "verify": "Verify",
+      "verifying": "Checking…",
+      "resend": "Send a new code",
+      "resendIn": "New code in {{seconds}}s",
+      "differentEmail": "Use a different email"
+    },
+    "index": {
+      "label": "Everything else",
+      "products": "Products",
+      "skillsLab": "Skills Lab: practice with virtual clients",
+      "assist": "Ally Assist: session notes",
+      "courses": "Courses and learning pathways",
+      "sjt": "Everyday conversations: a self-check for teachers",
+      "read": "Read",
+      "blog": "Building Ally, the blog",
+      "changelog": "Changelog",
+      "roadmap": "Roadmap",
+      "ally": "Ally",
+      "about": "About the Foundation",
+      "partner": "Partner with us",
+      "docs": "Developer docs",
+      "support": "Need support?",
+      "teleManas": "Tele-MANAS, free and 24×7: {{number}}",
+      "emergency": "Emergency: {{number}}",
+      "copyright": "© {{year}} Ally For Mental Health Foundation",
+      "privacy": "Privacy",
+      "terms": "Terms"
+    }
   }
 }
