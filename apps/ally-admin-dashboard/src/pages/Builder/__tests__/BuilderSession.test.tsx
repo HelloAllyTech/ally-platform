@@ -17,6 +17,7 @@ vi.mock("@ally-ui-mono/ui-shared", () => ({
 // SteerComposer and CollapsibleAside render only in the build layout, which no
 // test reached until the restart cases below.
 let startDialogProps: any;
+let steerHintProps: any = null;
 let prdPanelProps: any[] = [];
 vi.mock("@components/builder", async () => ({
   // The real rule, not a stub: it is what decides whether Start is blocked.
@@ -24,7 +25,10 @@ vi.mock("@components/builder", async () => ({
     .designBuildBlock,
   // The real issue-build rules, for the same reason.
   ...(await vi.importActual<any>("../../../components/builder/issueBuild")),
-  IssueSteerHint: () => <div>IssueSteerHint</div>,
+  IssueSteerHint: (props: any) => {
+    steerHintProps = props;
+    return <div>IssueSteerHint</div>;
+  },
   TechnicalDesignPanel: () => <div>TechnicalDesignPanel</div>,
   BuildView: () => <div>BuildView</div>,
   ChatComposer: () => <div>ChatComposer</div>,
@@ -357,6 +361,77 @@ describe("BuilderSession", () => {
       ];
       terminal("COMPLETED");
       expect(screen.queryByText(/Continue \(next/)).toBeNull();
+    });
+
+    describe("in a repo chain", () => {
+      const chainRuns = () => [
+        issueRun({ id: "run-1", status: "SUCCEEDED", milestoneId: "m-be", repos: ["ally-be"] }),
+        issueRun({ id: "run-2", status: "SUCCEEDED", milestoneId: "m-web", repos: ["ally-web"] }),
+      ];
+
+      it("sums up the chain in the header instead of listing its repos", () => {
+        runs = chainRuns().map(run => ({ ...run, mode: "build" }));
+        milestones = [
+          { id: "m-be", position: 0, repos: ["ally-be"], status: "COMPLETED" },
+          { id: "m-web", position: 1, repos: ["ally-web"], status: "COMPLETED" },
+          { id: "m-mobile", position: 2, repos: ["ally-mobile"], status: "COMPLETED" },
+        ];
+        pullRequests = [{ id: "pr-1" }];
+        sessionResult = {
+          data: {
+            ...baseSession,
+            status: "COMPLETED",
+            currentStage: "DONE",
+            repos: ["ally-be", "ally-web", "ally-mobile"],
+          },
+          isLoading: false,
+          isError: false,
+        };
+        render(<BuilderSession />);
+
+        expect(screen.getByText("3 of 3 repos built")).toBeTruthy();
+        expect(screen.queryByText("ally-be, ally-web, ally-mobile")).toBeNull();
+        expect(steerHintProps.chained).toBe(true);
+      });
+
+      it("names the repo being built, and where a failed chain stopped", () => {
+        runs = chainRuns().map(run => ({ ...run, mode: "build" }));
+        milestones = [
+          { id: "m-be", position: 0, repos: ["ally-be"], status: "COMPLETED" },
+          { id: "m-web", position: 1, repos: ["ally-web"], status: "BUILDING" },
+          { id: "m-mobile", position: 2, repos: ["ally-mobile"], status: "PENDING" },
+        ];
+        sessionResult = {
+          data: { ...baseSession, status: "BUILDING", currentStage: "SETUP" },
+          isLoading: false,
+          isError: false,
+        };
+        const { unmount } = render(<BuilderSession />);
+        expect(screen.getByText("Building ally-web (2 of 3)")).toBeTruthy();
+        unmount();
+
+        milestones[1].status = "FAILED";
+        sessionResult = {
+          data: { ...baseSession, status: "FAILED", currentStage: "GATE" },
+          isLoading: false,
+          isError: false,
+        };
+        render(<BuilderSession />);
+        expect(screen.getByText("Stopped at ally-web")).toBeTruthy();
+      });
+
+      it("keeps the repo list for a session without a chain", () => {
+        runs = [{ ...issueRun(), mode: "build" }];
+        milestones = [];
+        sessionResult = {
+          data: { ...baseSession, status: "BUILDING", currentStage: "CODING", repos: ["ally-be"] },
+          isLoading: false,
+          isError: false,
+        };
+        render(<BuilderSession />);
+        expect(screen.getByText("ally-be")).toBeTruthy();
+        expect(steerHintProps.chained).toBe(false);
+      });
     });
   });
 });

@@ -15,16 +15,39 @@ vi.mock("@ally-ui-mono/ui-shared", () => ({
   Tile: ({ children }: any) => <div>{children}</div>,
 }));
 
-vi.mock("../BuildActivityFeed", () => ({ BuildActivityFeed: () => <div /> }));
+// The feed is stubbed to record what it was HANDED, so the chain's filtering of
+// status-restating lines can be read off it. Loading the real module pulls in
+// the API layer, so its count is stubbed too: every event is an update here.
+let feedEvents: any[] = [];
+vi.mock("../BuildActivityFeed", () => ({
+  countFeedUpdates: (events: any[]) => events.length,
+  BuildActivityFeed: ({ events }: any) => {
+    feedEvents = events;
+    return <div data-testid="feed" />;
+  },
+}));
 vi.mock("../PhaseRail", () => ({ PhaseRail: () => <div>PhaseRail</div> }));
 vi.mock("../IssueRail", () => ({ IssueRail: () => <div>IssueRail</div> }));
-vi.mock("../RepoChain", () => ({ RepoChain: () => null }));
+let repoChainProps: any = null;
+vi.mock("../RepoChain", () => ({
+  RepoChain: (props: any) => {
+    repoChainProps = props;
+    return <div>RepoChain</div>;
+  },
+}));
 vi.mock("../RunHistoryRail", () => ({ RunHistoryRail: () => <div /> }));
 vi.mock("../TodoPanel", () => ({ TodoPanel: () => <div /> }));
 vi.mock("../QuestionCard", () => ({ QuestionCard: () => <div /> }));
 vi.mock("../RaiseBudgetDialog", () => ({ RaiseBudgetDialog: () => null }));
 vi.mock("../CollapsibleSection", () => ({
-  CollapsibleSection: ({ children }: any) => <div>{children}</div>,
+  CollapsibleSection: ({ heading, meta, defaultOpen = true, children }: any) => (
+    <details open={defaultOpen} data-testid={`section-${heading}`}>
+      <summary>
+        {heading} {meta}
+      </summary>
+      {children}
+    </details>
+  ),
 }));
 
 vi.mock("@hooks", () => ({
@@ -33,16 +56,18 @@ vi.mock("@hooks", () => ({
 
 let runs: any[] = [];
 let pullRequests: any[] = [];
+let milestones: any[] = [];
+let events: any[] = [];
 
 vi.mock("@api", () => ({
   useGetBuilderRunsQuery: () => ({ data: runs }),
-  useGetBuilderMilestonesQuery: () => ({ data: [] }),
+  useGetBuilderMilestonesQuery: () => ({ data: milestones }),
   useGetBuilderPendingQuestionsQuery: () => ({ data: [] }),
   useGetBuilderPullRequestsQuery: () => ({ data: pullRequests }),
   useMergeBuilderPullRequestMutation: () => [vi.fn(), { isLoading: false }],
   useGetBuilderSessionBudgetQuery: () => ({ data: undefined, refetch: vi.fn() }),
   useLazyGetBuilderRunEventsQuery: () => [
-    vi.fn().mockReturnValue({ unwrap: () => Promise.resolve({ events: [] }) }),
+    vi.fn().mockImplementation(() => ({ unwrap: () => Promise.resolve({ events }) })),
   ],
   useAnswerBuilderQuestionMutation: () => [vi.fn(), { isLoading: false }],
 }));
@@ -83,6 +108,10 @@ describe("BuildView issue builds", () => {
   beforeEach(() => {
     runs = [];
     pullRequests = [];
+    milestones = [];
+    events = [];
+    feedEvents = [];
+    repoChainProps = null;
   });
 
   it("uses the issue rail and labeled links instead of the phase rail", () => {
@@ -166,5 +195,96 @@ describe("BuildView issue builds", () => {
 
     expect(screen.getByText("PhaseRail")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Merge" })).not.toBeDisabled();
+  });
+
+  it("keeps the pull request panel for a legacy build", () => {
+    runs = [{ ...issueRun("SUCCEEDED", []), issueNumber: null, issueUrl: null, mode: "build" }];
+    milestones = [{ id: "m-1", position: 0, repos: ["ally-web"], status: "COMPLETED" }];
+    pullRequests = [pr("success")];
+    renderView("COMPLETED");
+
+    expect(screen.getByText("A pull request is waiting for you")).toBeInTheDocument();
+  });
+});
+
+describe("BuildView chained issue builds", () => {
+  const chainRun = (id: string, repo: string, milestoneId: string, status = "SUCCEEDED") => ({
+    id,
+    sequence: Number(id.slice(-1)),
+    mode: "build",
+    status,
+    issueNumber: 40 + Number(id.slice(-1)),
+    issueUrl: `https://github.com/org/${repo}/issues/4${id.slice(-1)}`,
+    repos: [repo],
+    milestoneId,
+    cost: { issueTimeline: ["issue", "pr:9", "ci-pass:a"] },
+    costUsd: null,
+    error: null,
+    dispatchedAt: new Date().toISOString(),
+  });
+
+  const event = (seq: number, type: string, payload: Record<string, unknown>) => ({
+    id: `e-${seq}`,
+    runId: "run-2",
+    seq,
+    stage: null,
+    type,
+    payload,
+    createdAt: new Date().toISOString(),
+  });
+
+  beforeEach(() => {
+    milestones = [
+      { id: "m-be", position: 0, repos: ["ally-be"], status: "COMPLETED" },
+      { id: "m-web", position: 1, repos: ["ally-web"], status: "COMPLETED" },
+    ];
+    runs = [chainRun("run-1", "ally-be", "m-be"), chainRun("run-2", "ally-web", "m-web")];
+    pullRequests = [pr("success")];
+    feedEvents = [];
+    events = [
+      event(1, "text", {
+        text: "opencode opened https://github.com/org/ally-web/pull/33. CI checks it next.",
+      }),
+      event(2, "text", { text: "CI is running on abc1234." }),
+      event(3, "ci_result", { repo: "ally-web", state: "pending", failed: [] }),
+      event(4, "ci_result", { repo: "ally-web", state: "failure", failed: ["Vitest"] }),
+      event(5, "text", { text: "Asked opencode to fix the failing checks on … (request 1 of 2)." }),
+      event(6, "text", { text: "CI passed on def5678. The build is done; … is ready for review." }),
+    ];
+  });
+
+  it("drops the pull request panel and hands merging to the repo table", () => {
+    renderView("COMPLETED");
+
+    expect(screen.queryByText("A pull request is waiting for you")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Merge" })).toBeNull();
+    expect(repoChainProps.onMerge).toEqual(expect.any(Function));
+    // No rail row or link row above the feed: the table carries both.
+    expect(screen.queryByText("IssueRail")).toBeNull();
+    expect(screen.queryByRole("link", { name: "PR #33" })).toBeNull();
+  });
+
+  it("folds the activity when nothing is building, and drops lines that restate the table", async () => {
+    renderView("COMPLETED");
+
+    const section = screen.getByTestId("section-Activity: ally-web");
+    expect(section).not.toHaveAttribute("open");
+
+    // Kept: the CI card that names a failing check, and the fix request.
+    // Dropped: "opencode opened …", "CI is running on …", "CI passed on …",
+    // and the CI card with nothing failing — the table shows all of those.
+    await vi.waitFor(() => expect(feedEvents.map(e => e.seq)).toEqual([4, 5]));
+    expect(section).toHaveTextContent("2 updates");
+  });
+
+  it("opens the activity while a repo is building", () => {
+    runs = [
+      chainRun("run-1", "ally-be", "m-be"),
+      chainRun("run-2", "ally-web", "m-web", "RUNNING"),
+    ];
+    milestones[1].status = "BUILDING";
+    renderView("BUILDING");
+
+    expect(screen.getByTestId("section-Activity: ally-web")).toHaveAttribute("open");
   });
 });

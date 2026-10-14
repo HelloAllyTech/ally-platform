@@ -44,6 +44,13 @@ export const toolLabel = (name: string) => TOOL_LABELS[name.toLowerCase()] ?? na
  */
 const HIDDEN_TYPES = new Set(["cost", "phase_cost", "done", "tool_result", "todo"]);
 
+/**
+ * How many rows the feed would show — the count a folded feed puts beside its
+ * heading. Stage dividers are not updates, so they are not counted.
+ */
+export const countFeedUpdates = (events: BuilderBuildEvent[]): number =>
+  events.filter(event => !HIDDEN_TYPES.has(event.type) && event.type !== "stage_change").length;
+
 interface BuildActivityFeedProps {
   events: BuilderBuildEvent[];
   /** True while the run is live — drives auto-scroll and the live pill. */
