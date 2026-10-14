@@ -76,6 +76,9 @@ dev_dependencies:
   # and video_fallback_card_test.dart) — previously only transitive
   # dependencies of video_player/url_launcher.
   video_player_platform_interface: ^6.9.0
+  # Already resolved transitively via url_launcher — declared directly here
+  # only so community_screen_test.dart can fake UrlLauncherPlatform.instance
+  # (CommunityScreen's own real, unmockable-any-other-way dependency).
   url_launcher_platform_interface: ^2.3.2
 
 # For information on the generic Dart part of this file, see the

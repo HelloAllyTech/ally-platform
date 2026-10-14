@@ -1,0 +1,182 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
+
+import 'package:ally_mobile_flutter/features/search/data/search_repository.dart';
+import 'package:ally_mobile_flutter/features/search/presentation/search_screen.dart';
+
+import '../../../support/pump_app.dart';
+import '../../../support/prewarm_translations.dart';
+
+class MockSearchRepository extends Mock implements SearchRepository {}
+
+ResourceArticle _article(String id, {String category = 'Anxiety'}) => ResourceArticle(
+      id: id,
+      heading: 'Heading $id',
+      content: 'Content for $id',
+      category: category,
+    );
+
+void main() {
+  late MockSearchRepository repository;
+
+  setUp(() {
+    repository = MockSearchRepository();
+  });
+
+  testWidgets('builds category chip tabs from the response counts', (tester) async {
+    when(() => repository.search('anxiety')).thenAnswer(
+      (_) async => SearchResult(
+        documents: [_article('d1'), _article('d2', category: 'Stress')],
+        categoryCounts: {'Anxiety': 4, 'Stress': 2},
+        total: 6,
+      ),
+    );
+
+    await preWarmTranslations(tester);
+    await pumpApp(
+      tester,
+      const SearchScreen(),
+      overrides: [searchRepositoryProvider.overrideWithValue(repository)],
+    );
+
+    await tester.enterText(find.byType(TextField), 'anxiety');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+
+    expect(find.text('All (6)'), findsOneWidget);
+    expect(find.text('Anxiety (4)'), findsOneWidget);
+    expect(find.text('Stress (2)'), findsOneWidget);
+    expect(find.text('Heading d1'), findsOneWidget);
+    expect(find.text('Heading d2'), findsOneWidget);
+  });
+
+  testWidgets('tapping a category chip re-queries with that category filter', (tester) async {
+    when(() => repository.search('anxiety')).thenAnswer(
+      (_) async => SearchResult(
+        documents: [_article('d1'), _article('d2', category: 'Stress')],
+        categoryCounts: {'Anxiety': 4, 'Stress': 2},
+        total: 6,
+      ),
+    );
+    when(() => repository.search('anxiety', category: 'Stress')).thenAnswer(
+      (_) async => SearchResult(
+        documents: [_article('d2', category: 'Stress')],
+        categoryCounts: {'Anxiety': 4, 'Stress': 2},
+        total: 2,
+      ),
+    );
+
+    await preWarmTranslations(tester);
+    await pumpApp(
+      tester,
+      const SearchScreen(),
+      overrides: [searchRepositoryProvider.overrideWithValue(repository)],
+    );
+
+    await tester.enterText(find.byType(TextField), 'anxiety');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Stress (2)'));
+    await tester.pumpAndSettle();
+
+    verify(() => repository.search('anxiety', category: 'Stress')).called(1);
+    expect(find.text('Heading d1'), findsNothing);
+    expect(find.text('Heading d2'), findsOneWidget);
+  });
+
+  testWidgets('scrolling near the bottom loads more with the right excludedIds', (tester) async {
+    // Enough items that the list overflows the test viewport and is
+    // actually scrollable — a handful of short ListTiles wouldn't need to
+    // scroll at all, and the screen's `_onScroll` listener only fires
+    // `_loadMore` once `pixels` gets within 200px of `maxScrollExtent`.
+    final firstPage = [for (var i = 0; i < 20; i++) _article('d$i')];
+    final secondPage = [_article('d20')];
+
+    when(() => repository.search('anxiety')).thenAnswer(
+      (_) async => SearchResult(
+        documents: firstPage,
+        categoryCounts: {'Anxiety': 21},
+        total: 21,
+      ),
+    );
+    when(() => repository.search(
+          'anxiety',
+          category: 'All',
+          excludedIds: [for (final a in firstPage) a.id],
+        )).thenAnswer(
+      (_) async => SearchResult(
+        documents: secondPage,
+        categoryCounts: {'Anxiety': 21},
+        total: 21,
+      ),
+    );
+
+    await preWarmTranslations(tester);
+    await pumpApp(
+      tester,
+      const SearchScreen(),
+      overrides: [searchRepositoryProvider.overrideWithValue(repository)],
+    );
+
+    await tester.enterText(find.byType(TextField), 'anxiety');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+
+    // Drag the results list (the vertical ListView.builder, not the
+    // horizontal category-chip row) all the way to its end to trigger the
+    // scroll listener's "near the bottom" check.
+    await tester.drag(find.byType(ListView).last, const Offset(0, -20000));
+    await tester.pumpAndSettle();
+
+    verify(() => repository.search(
+          'anxiety',
+          category: 'All',
+          excludedIds: [for (final a in firstPage) a.id],
+        )).called(1);
+
+    // The appended item extended `maxScrollExtent` past where the drag
+    // above left the view — scroll to the new end to bring it into the
+    // lazily-built `ListView.builder` range.
+    await tester.drag(find.byType(ListView).last, const Offset(0, -20000));
+    await tester.pumpAndSettle();
+    expect(find.text('Heading d20'), findsOneWidget);
+  });
+
+  testWidgets('shows an error message when the search fails', (tester) async {
+    when(() => repository.search('anxiety')).thenThrow(Exception('network down'));
+
+    await preWarmTranslations(tester);
+    await pumpApp(
+      tester,
+      const SearchScreen(),
+      overrides: [searchRepositoryProvider.overrideWithValue(repository)],
+    );
+
+    await tester.enterText(find.byType(TextField), 'anxiety');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Error fetching search results'), findsOneWidget);
+  });
+
+  testWidgets('shows the no-results message for an empty response', (tester) async {
+    when(() => repository.search('anxiety')).thenAnswer(
+      (_) async => SearchResult(documents: [], categoryCounts: {}, total: 0),
+    );
+
+    await preWarmTranslations(tester);
+    await pumpApp(
+      tester,
+      const SearchScreen(),
+      overrides: [searchRepositoryProvider.overrideWithValue(repository)],
+    );
+
+    await tester.enterText(find.byType(TextField), 'anxiety');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+
+    expect(find.text('No results found for "anxiety"'), findsOneWidget);
+  });
+}
