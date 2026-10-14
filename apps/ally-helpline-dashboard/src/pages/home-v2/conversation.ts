@@ -225,7 +225,8 @@ export const routeTyped = (raw: string): Routed => {
   const text = raw.trim();
   if (EMAIL.test(text)) return { type: "email", email: text.toLowerCase() };
   if (isDistress(text)) return { type: "distress" };
-  const topic = topicFor(text);
+  // Match on the scrubbed text, so an address like `@ngo.org` can't pass for a question about NGOs.
+  const topic = topicFor(scrubQuestion(text));
   return topic
     ? { type: "topic", topic, matched: true }
     : { type: "topic", topic: "fallback", matched: false };

@@ -230,7 +230,7 @@ the logout dialog, not on opening it — the dialog can be cancelled.
 a disabled input and the form only carries `profileImageUrl`. It is sent anyway so the payload
 matches the spec if the field opens up.
 
-`language.changed` sends `source` as `sidebar` or `roleplay_confirmation_modal` (see
+`language.changed` sends `source` as `sidebar`, `roleplay_confirmation_modal` or `home_v2` (see
 `LANGUAGE_CHANGE_SOURCE`). The sidebar selector reports the English language name rather than
 the native display label, so the value stays stable as labels are localised; the roleplay
 confirmation picker reports the label the scenario's language list supplies.
@@ -266,6 +266,24 @@ Talker events have no signed-in user, so `user_role` is `unknown`.
 | `HELPLINE_TALKER_BLOCKED`         | `helpline_talker_blocked`         | A supervisor blocked a talker (Block talker → confirm). Sends `chat_id`, `has_reason` (boolean, never the reason)                                                                               | `pages/helpline/HelplineChatView.tsx`     |
 | `HELPLINE_SUPERVISOR_ALERTED`     | `helpline_supervisor_alerted`     | The listener of record pressed **Alert a supervisor**. Sends `chat_id`, `has_note` (boolean, never the note), `alerted_count` (how many supervisors the server reached; 0 means none is set up) | `pages/helpline/HelplineChatView.tsx`     |
 | `HELPLINE_QA_VIEWED`              | `helpline_qa_viewed`              | Someone opened a chat's helping-skills feedback. Sends `chat_id`, `viewer` (`self` for the listener's own feedback, `supervisor` otherwise) — never scores or behaviours                        | `pages/helpline/HelplineQaDetail.tsx`     |
+
+### Homepage v2 (`/v2`)
+
+The conversational homepage, signed out, so `user_role` is `unknown`. Topics are coarse enums
+(`practice`, `what`, `access`, `org`, `privacy`, `news`, `languages`, `cost`, `support`, `signin`,
+`fallback`). The **only** free text is `question_text`, sent when Ally had no answer, after
+`scrubQuestion` has replaced emails, phone numbers and links and capped it at 200 characters. Names
+and case details cannot be scrubbed reliably, which is why matched questions send their topic alone
+and a message that matched distress sends nothing but `source`. The conversation and the composer
+carry `ph-no-capture`. Sign-in itself is reported by ally-be's `auth.*` funnel.
+
+| Constant                           | Event Name                         | Description                                                                                                                         | Fires at                   |
+| ---------------------------------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
+| `HOME_V2_SUGGESTION_TAPPED`        | `home_v2_suggestion_tapped`        | A suggestion chip was tapped. Sends `topic`                                                                                         | `pages/home-v2/HomeV2.tsx` |
+| `HOME_V2_QUESTION_ASKED`           | `home_v2_question_asked`           | A typed question was answered. Sends `topic`, `matched`; when unmatched also `question_text` (scrubbed) and `query_length`          | `pages/home-v2/HomeV2.tsx` |
+| `HOME_V2_PRACTICE_RESPONSE_CHOSEN` | `home_v2_practice_response_chosen` | A reply was picked in the practice moment. Sends `practice_choice` (`a` advice too early, `b` reflecting feelings, `c` facts first) | `pages/home-v2/HomeV2.tsx` |
+| `HOME_V2_SUPPORT_SHOWN`            | `home_v2_support_shown`            | The Tele-MANAS card was shown. Sends `source` (`header`, `suggestion`, `typed`) — never what was typed                              | `pages/home-v2/HomeV2.tsx` |
+| `HOME_V2_SIGN_IN_STARTED`          | `home_v2_sign_in_started`          | A sign-in began from the page. Sends `auth_method` (`email`, `google`) and, for email, `source` (`typed`, `remembered`)             | `pages/home-v2/HomeV2.tsx` |
 
 ### Errors (automatic — no component code needed)
 

@@ -45,7 +45,6 @@ export const MessageComposer = forwardRef<HTMLInputElement, MessageComposerProps
     return (
       <form
         onSubmit={handleSubmit}
-        aria-label={t("homeV2.composer.label")}
         className={cn(
           "ph-no-capture flex flex-col gap-2 rounded-[22px] border-2 bg-white py-2.5 pl-5 pr-2.5 shadow-md transition-colors",
           highlighted ? "border-primary-500" : "border-gray-200",
