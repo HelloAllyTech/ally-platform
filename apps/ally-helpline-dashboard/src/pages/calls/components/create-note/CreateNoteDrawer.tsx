@@ -607,9 +607,28 @@ const CreateNoteDrawer: FC<CreateNoteDrawerProps> = ({ open, onClose }) => {
     }
   };
 
+  // A dictation that has not been turned into notes yet exists only in the
+  // recorder's memory: the note row is created lazily on the first field edit
+  // or once "Generate notes" succeeds, so nothing is on the server. The shared
+  // SidePanel routes an overlay click, Escape and the X button through this
+  // one handler, and a counsellor mid-sentence can brush the overlay or hit
+  // Escape by accident — so while a recording is live (recording, paused, or
+  // stopped and waiting to be generated) or the generate call is in flight,
+  // the drawer stays put and says why. The explicit Stop/Discard/Generate
+  // controls in the panel are the way out, exactly as before.
+  const hasUnsavedRecording =
+    recorderStatus === "recording" ||
+    recorderStatus === "paused" ||
+    (recorderStatus === "stopped" && recordedBlob !== null) ||
+    isGeneratingNotes;
+
   // Flush pending edits before the drawer closes — the debounce timer is
   // cancelled on unmount, so the last keystroke would otherwise be lost.
   const handleClose = () => {
+    if (hasUnsavedRecording) {
+      toast.warning(t("calls.createNote.voice.closeBlocked"));
+      return;
+    }
     void autosave.flush().catch(() => {});
     resetRecorder();
     setVoiceOpen(false);

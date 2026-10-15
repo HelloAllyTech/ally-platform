@@ -36,10 +36,15 @@ const recorderState: any = {
 
 // Tenant voice-note toggle (default on in tests; flipped per-test).
 let mockVoiceNoteEnabled = true;
+// Whether a generate-notes call is in flight (flipped per-test).
+let mockIsGenerating = false;
 
 vi.mock("@api", () => ({
   useCreateNoteMutation: () => [mockCreateNote],
-  useGenerateNoteFromAudioMutation: () => [mockGenerateNoteFromAudio, { isLoading: false }],
+  useGenerateNoteFromAudioMutation: () => [
+    mockGenerateNoteFromAudio,
+    { isLoading: mockIsGenerating },
+  ],
   useSaveNoteTranscriptMutation: () => [mockSaveNoteTranscript],
   useGetCustomFieldDefinitionsQuery: () => mockUseGetDefinitions(),
   useGetSummaryFieldsQuery: () => mockUseGetSummaryFields(),
@@ -64,23 +69,15 @@ vi.mock("../VoiceNotePanel", () => ({
   ),
 }));
 
-vi.mock("@components", () => ({
+vi.mock("@components", async () => ({
   // Renders the raw state so tests can assert what the counsellor is told.
   SaveStatus: ({ state }: any) =>
     state === "idle" ? null : <span data-testid="save-status">{state}</span>,
-  Drawer: ({ children, title, headerButtons }: any) => (
-    <div>
-      <div>{title}</div>
-      {(headerButtons ?? [])
-        .filter((b: any) => b.show)
-        .map((b: any) => (
-          <button key={b.alt} data-testid={`drawer-header-button-${b.alt}`} onClick={b.onClick}>
-            {b.icon}
-          </button>
-        ))}
-      {children}
-    </div>
-  ),
+  // The real Drawer (and so the real shared SidePanel), imported directly
+  // rather than through the @components barrel so the barrel's heavy modules
+  // stay out of the test worker. The close-guard tests below need the genuine
+  // overlay click and Escape paths, not a stub that calls onClose.
+  Drawer: (await import("@components/drawer/Drawer")).default,
 }));
 
 vi.mock("@constants", () => ({
@@ -252,6 +249,7 @@ describe("CreateNoteDrawer", () => {
     ];
     userResult.user = { role: "COUNSELLOR", email: "counsellor@example.com" };
     mockVoiceNoteEnabled = true;
+    mockIsGenerating = false;
     mockCreateNote.mockReturnValue({
       unwrap: () => Promise.resolve({ chatId: 123, name: "CALL-123" }),
     });
@@ -517,6 +515,97 @@ describe("CreateNoteDrawer", () => {
       expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/try again/i)),
     );
     expect(mockSaveNoteTranscript).not.toHaveBeenCalled();
+  });
+
+  describe("closing the drawer mid-dictation", () => {
+    const CLOSE_BLOCKED = "Finish or discard your recording before closing.";
+    // SidePanel renders its click-to-dismiss overlay as the dialog's previous
+    // sibling (it carries no test id of its own).
+    const overlay = () => screen.getByRole("dialog").previousElementSibling as HTMLElement;
+
+    const renderRecording = (status: "recording" | "paused" | "stopped") => {
+      mockUseGetSummaryFields.mockReturnValue({ data: ["age"], isLoading: false });
+      recorderState.status = status;
+      recorderState.isRecording = status === "recording";
+      recorderState.isPaused = status === "paused";
+      if (status === "stopped") recorderState.blob = new Blob(["x"], { type: "audio/webm" });
+      const onClose = vi.fn();
+      render(<CreateNoteDrawer open onClose={onClose} />);
+      fireEvent.click(screen.getByTestId("drawer-header-button-voice-note"));
+      // Opening the drawer resets the recorder once; the assertions below are
+      // about what a dismissal attempt does after that.
+      mockRecorderReset.mockClear();
+      return onClose;
+    };
+
+    it("ignores an overlay click while recording and keeps the recorder running", () => {
+      const onClose = renderRecording("recording");
+
+      fireEvent.click(overlay());
+
+      expect(onClose).not.toHaveBeenCalled();
+      expect(mockRecorderReset).not.toHaveBeenCalled();
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+      expect(screen.getByTestId("voice-panel")).toBeInTheDocument();
+      expect(toast.warning).toHaveBeenCalledWith(CLOSE_BLOCKED);
+    });
+
+    it("ignores Escape while recording and keeps the recorder running", () => {
+      const onClose = renderRecording("recording");
+
+      fireEvent.keyDown(document, { key: "Escape" });
+
+      expect(onClose).not.toHaveBeenCalled();
+      expect(mockRecorderReset).not.toHaveBeenCalled();
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+      expect(toast.warning).toHaveBeenCalledWith(CLOSE_BLOCKED);
+    });
+
+    it("ignores the close button while paused", () => {
+      const onClose = renderRecording("paused");
+
+      fireEvent.click(screen.getByRole("button", { name: "Close" }));
+
+      expect(onClose).not.toHaveBeenCalled();
+      expect(mockRecorderReset).not.toHaveBeenCalled();
+      expect(toast.warning).toHaveBeenCalledWith(CLOSE_BLOCKED);
+    });
+
+    it("keeps a stopped recording that has not been generated yet", () => {
+      const onClose = renderRecording("stopped");
+
+      fireEvent.click(overlay());
+
+      expect(onClose).not.toHaveBeenCalled();
+      expect(mockRecorderReset).not.toHaveBeenCalled();
+      expect(toast.warning).toHaveBeenCalledWith(CLOSE_BLOCKED);
+    });
+
+    it("ignores an overlay click while notes are being generated", () => {
+      mockIsGenerating = true;
+      const onClose = renderRecording("stopped");
+
+      fireEvent.click(overlay());
+
+      expect(onClose).not.toHaveBeenCalled();
+      expect(mockRecorderReset).not.toHaveBeenCalled();
+      expect(toast.warning).toHaveBeenCalledWith(CLOSE_BLOCKED);
+    });
+
+    it("closes normally from the overlay and Escape when nothing is recording", () => {
+      mockUseGetSummaryFields.mockReturnValue({ data: ["age"], isLoading: false });
+      const onClose = vi.fn();
+      render(<CreateNoteDrawer open onClose={onClose} />);
+
+      fireEvent.click(overlay());
+      expect(onClose).toHaveBeenCalledTimes(1);
+
+      fireEvent.keyDown(document, { key: "Escape" });
+      expect(onClose).toHaveBeenCalledTimes(2);
+
+      expect(mockRecorderReset).toHaveBeenCalled();
+      expect(toast.warning).not.toHaveBeenCalled();
+    });
   });
 
   describe("slow generate calls", () => {
