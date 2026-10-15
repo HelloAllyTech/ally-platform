@@ -626,15 +626,10 @@ export const ApiEndpoints = {
     SESSION_RUNS: (id: string) => `/v1/builder/sessions/${id}/runs`,
     // The per-repo chain an issue build walks, in build order.
     SESSION_MILESTONES: (id: string) => `/v1/builder/sessions/${id}/milestones`,
-    // Raising the ceiling is a POST, not part of the session PATCH: it is
-    // allowed mid-build (which is the case it exists for) and authorises
-    // spend, so it stands on its own.
+    // Raising the ceiling is a POST, not part of the session PATCH: it
+    // authorises spend, so it stands on its own.
     SESSION_BUDGET: (id: string) => `/v1/builder/sessions/${id}/budget`,
-    SESSION_STEER: (id: string) => `/v1/builder/sessions/${id}/steer`,
     RUN_EVENTS: (runId: string) => `/v1/builder/runs/${runId}/events`,
-    SESSION_QUESTIONS: (id: string) => `/v1/builder/sessions/${id}/questions`,
-    ANSWER_QUESTION: (id: string, questionId: string) =>
-      `/v1/builder/sessions/${id}/questions/${questionId}/answer`,
     SESSION_PULL_REQUESTS: (id: string) => `/v1/builder/sessions/${id}/pull-requests`,
     SESSION_PULL_REQUEST_MERGE: (id: string, prId: string) =>
       `/v1/builder/sessions/${id}/pull-requests/${prId}/merge`,
@@ -642,7 +637,6 @@ export const ApiEndpoints = {
     SESSION_PULL_REQUEST_RESUME: (id: string, prId: string) =>
       `/v1/builder/sessions/${id}/pull-requests/${prId}/resume-automation`,
     SESSION_PR_FEEDBACK: (id: string) => `/v1/builder/sessions/${id}/pr-feedback`,
-    SESSION_REPORTS: (id: string) => `/v1/builder/sessions/${id}/reports`,
     SETTINGS: "/v1/builder/settings",
     NOTIFICATIONS: "/v1/builder/notifications",
     NOTIFICATION_READ: (id: string) => `/v1/builder/notifications/${id}/read`,

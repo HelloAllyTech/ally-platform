@@ -23,10 +23,7 @@ vi.mock("../BuildActivityFeed", () => ({
     return <div data-testid="feed" />;
   },
 }));
-vi.mock("../PhaseRail", () => ({ PhaseRail: () => <div /> }));
 vi.mock("../RunHistoryRail", () => ({ RunHistoryRail: () => <div /> }));
-vi.mock("../TodoPanel", () => ({ TodoPanel: () => <div /> }));
-vi.mock("../QuestionCard", () => ({ QuestionCard: () => <div /> }));
 vi.mock("../RaiseBudgetDialog", () => ({ RaiseBudgetDialog: () => null }));
 
 vi.mock("@hooks", () => ({
@@ -42,7 +39,6 @@ vi.mock("@api", () => ({
     ],
   }),
   useGetBuilderMilestonesQuery: () => ({ data: [] }),
-  useGetBuilderPendingQuestionsQuery: () => ({ data: [] }),
   useGetBuilderPullRequestsQuery: () => ({ data: [] }),
   useMergeBuilderPullRequestMutation: () => [vi.fn(), { isLoading: false }],
   useGetBuilderPrFeedbackQuery: () => ({ data: [] }),
@@ -52,7 +48,6 @@ vi.mock("@api", () => ({
   useLazyGetBuilderRunEventsQuery: () => [
     vi.fn().mockReturnValue({ unwrap: () => Promise.resolve({ events: [] }) }),
   ],
-  useAnswerBuilderQuestionMutation: () => [vi.fn(), { isLoading: false }],
 }));
 
 // eslint-disable-next-line import/first
@@ -63,14 +58,7 @@ const SESSION_ERROR =
 
 const renderFailed = (sessionError: string | null = SESSION_ERROR) => {
   received.length = 0;
-  return render(
-    <BuildView
-      sessionId="session-1"
-      status="FAILED"
-      currentStage="GATE"
-      sessionError={sessionError}
-    />,
-  );
+  return render(<BuildView sessionId="session-1" status="FAILED" sessionError={sessionError} />);
 };
 
 describe("BuildView failure", () => {

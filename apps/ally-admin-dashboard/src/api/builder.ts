@@ -8,14 +8,11 @@ import {
   BuilderLesson,
   BuilderLessonStatus,
   BuilderAutonomyLevel,
-  BuilderDispatch,
   BuilderMilestone,
   BuilderNotification,
-  BuilderPendingQuestion,
   BuilderPrdVersion,
   BuilderPrFeedback,
   BuilderPullRequest,
-  BuilderReport,
   BuilderRepoCommand,
   BuilderRepoMapSummary,
   BuilderRunStatus,
@@ -25,7 +22,6 @@ import {
   BuilderSessionDetail,
   BuilderSessionStatus,
   BuilderSettings,
-  BuilderSteer,
   CreateBuilderSessionRequest,
   PatchBuilderLessonRequest,
   PatchBuilderPrdRequest,
@@ -189,23 +185,11 @@ export const builderAPI = baseAPI.injectEndpoints({
 
     /* ── Builds ─────────────────────────────────────────────────────────── */
 
-    startBuilderBuild: builder.mutation<
-      BuilderBuildRun,
-      {
-        id: string;
-        /** The coder tier. Planner and verifier are overridden separately below. */
-        model?: string;
-        plannerModel?: string;
-        verifierModel?: string;
-        budgetUsd?: number;
-        /** `issue` makes the server ignore the model fields and the budget. */
-        dispatch?: BuilderDispatch;
-      }
-    >({
-      query: ({ id, ...body }) => ({
+    startBuilderBuild: builder.mutation<BuilderBuildRun, { id: string }>({
+      query: ({ id }) => ({
         url: ApiEndpoints.BUILDER.SESSION_START_BUILD(id),
         method: HttpMethod.POST,
-        body,
+        body: {},
       }),
       invalidatesTags: (result, error, { id }) => [
         { type: TAG_TYPES.BUILDER_SESSION, id },
@@ -255,7 +239,7 @@ export const builderAPI = baseAPI.injectEndpoints({
      * refetched by the component that made the raise.
      */
     raiseBuilderSessionBudget: builder.mutation<
-      BuilderBudgetState & { released: boolean },
+      BuilderBudgetState,
       { id: string; budgetUsd: number }
     >({
       query: ({ id, ...body }) => ({
@@ -267,32 +251,6 @@ export const builderAPI = baseAPI.injectEndpoints({
         { type: TAG_TYPES.BUILDER_SESSION, id },
         TAG_TYPES.BUILDER_SESSIONS,
       ],
-    }),
-
-    /** Steering notes on a session, newest first. */
-    getBuilderSteers: builder.query<BuilderSteer[], string>({
-      query: id => ({
-        url: ApiEndpoints.BUILDER.SESSION_STEER(id),
-        method: HttpMethod.GET,
-      }),
-      providesTags: (result, error, id) => [{ type: TAG_TYPES.BUILDER_SESSION, id }],
-    }),
-
-    /**
-     * Send a correction to a build in flight. Invalidates the session so the
-     * note appears in the list without a manual refetch — the whole point is
-     * that the sender can see it was queued.
-     */
-    steerBuilderSession: builder.mutation<
-      { id: string; status: string; delivery: string },
-      { id: string; note: string }
-    >({
-      query: ({ id, ...body }) => ({
-        url: ApiEndpoints.BUILDER.SESSION_STEER(id),
-        method: HttpMethod.POST,
-        body,
-      }),
-      invalidatesTags: (result, error, { id }) => [{ type: TAG_TYPES.BUILDER_SESSION, id }],
     }),
 
     getBuilderRuns: builder.query<BuilderBuildRun[], string>({
@@ -331,29 +289,6 @@ export const builderAPI = baseAPI.injectEndpoints({
         method: HttpMethod.GET,
         params: { afterSeq },
       }),
-    }),
-
-    getBuilderPendingQuestions: builder.query<BuilderPendingQuestion[], string>({
-      query: id => ({
-        url: ApiEndpoints.BUILDER.SESSION_QUESTIONS(id),
-        method: HttpMethod.GET,
-      }),
-      providesTags: (result, error, id) => [{ type: TAG_TYPES.BUILDER_SESSION, id }],
-    }),
-
-    answerBuilderQuestion: builder.mutation<
-      { resumed: boolean; runId: string | null },
-      { id: string; questionId: string; message: string; answer?: Record<string, unknown> }
-    >({
-      query: ({ id, questionId, ...body }) => ({
-        url: ApiEndpoints.BUILDER.ANSWER_QUESTION(id, questionId),
-        method: HttpMethod.POST,
-        body,
-      }),
-      invalidatesTags: (result, error, { id }) => [
-        { type: TAG_TYPES.BUILDER_SESSION, id },
-        TAG_TYPES.BUILDER_SESSIONS,
-      ],
     }),
 
     getBuilderPullRequests: builder.query<BuilderPullRequest[], string>({
@@ -405,14 +340,6 @@ export const builderAPI = baseAPI.injectEndpoints({
       invalidatesTags: (result, error, { sessionId }) => [
         { type: TAG_TYPES.BUILDER_SESSION, id: sessionId },
       ],
-    }),
-
-    getBuilderReports: builder.query<BuilderReport[], string>({
-      query: id => ({
-        url: ApiEndpoints.BUILDER.SESSION_REPORTS(id),
-        method: HttpMethod.GET,
-      }),
-      providesTags: (result, error, id) => [{ type: TAG_TYPES.BUILDER_SESSION, id }],
     }),
 
     getBuilderSettings: builder.query<BuilderSettings, void>({
@@ -560,19 +487,14 @@ export const {
   useStartBuilderDesignMutation,
   useApproveBuilderDesignMutation,
   useGetBuilderSessionBudgetQuery,
-  useGetBuilderSteersQuery,
-  useSteerBuilderSessionMutation,
   useRaiseBuilderSessionBudgetMutation,
   useGetBuilderRunsQuery,
   useGetBuilderMilestonesQuery,
   useLazyGetBuilderRunEventsQuery,
-  useGetBuilderPendingQuestionsQuery,
-  useAnswerBuilderQuestionMutation,
   useGetBuilderPullRequestsQuery,
   useMergeBuilderPullRequestMutation,
   useGetBuilderPrFeedbackQuery,
   useResumeBuilderPullRequestAutomationMutation,
-  useGetBuilderReportsQuery,
   useGetBuilderSettingsQuery,
   useUpdateBuilderSettingsMutation,
   useGetBuilderNotificationsQuery,

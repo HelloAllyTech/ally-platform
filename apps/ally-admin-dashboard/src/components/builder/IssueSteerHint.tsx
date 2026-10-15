@@ -13,13 +13,10 @@ interface IssueSteerHintProps {
 }
 
 /**
- * Stands in for {@link SteerComposer} on an issue build.
+ * How to steer an issue build.
  *
- * Builder does not run an issue build, so a note left here would never reach
- * the agent doing the work — opencode reads `/oc` comments on its pull request.
- * Offering the composer anyway would be a control that quietly does nothing,
- * so it is replaced outright, along with its history of notes read by runs
- * this session no longer has.
+ * Builder does not run an issue build, so it has no channel of its own to the
+ * agent doing the work — opencode reads `/oc` comments on its pull request.
  */
 export const IssueSteerHint: React.FC<IssueSteerHintProps> = ({ pullRequest, chained = false }) => {
   const strings = en.builder.steer;

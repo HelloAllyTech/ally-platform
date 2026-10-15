@@ -16,7 +16,7 @@ interface IssueRailProps {
  * Where an issue build has got to: issue raised → opencode working → pull
  * request opened → CI → CI passed.
  *
- * The {@link PhaseRail} counterpart for a build Builder does not run itself.
+ * The progress rail for a build Builder does not run itself.
  * It reads the run's own `cost.issueTimeline` rather than the session's
  * `currentStage`, so it does not go grey while the session sits in SETUP
  * between two repos of a chain — each run carries its own progress.

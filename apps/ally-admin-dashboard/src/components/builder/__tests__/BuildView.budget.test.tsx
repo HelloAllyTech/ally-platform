@@ -59,10 +59,7 @@ vi.mock("@ally-ui-mono/ui-shared", () => ({
 // The feed, rail and panels are exercised by their own tests; what is under
 // test here is the budget banner and what it does.
 vi.mock("../BuildActivityFeed", () => ({ BuildActivityFeed: () => <div /> }));
-vi.mock("../PhaseRail", () => ({ PhaseRail: () => <div /> }));
 vi.mock("../RunHistoryRail", () => ({ RunHistoryRail: () => <div /> }));
-vi.mock("../TodoPanel", () => ({ TodoPanel: () => <div /> }));
-vi.mock("../QuestionCard", () => ({ QuestionCard: () => <div /> }));
 vi.mock("../RaiseBudgetDialog", () => ({
   RaiseBudgetDialog: ({ isOpen }: any) => (isOpen ? <div>raise-budget-dialog</div> : null),
 }));
@@ -77,7 +74,6 @@ const fetchEvents = vi.fn().mockReturnValue({ unwrap: () => Promise.resolve({ ev
 vi.mock("@api", () => ({
   useGetBuilderRunsQuery: () => ({ data: [] }),
   useGetBuilderMilestonesQuery: () => ({ data: [] }),
-  useGetBuilderPendingQuestionsQuery: () => ({ data: [] }),
   useGetBuilderPullRequestsQuery: () => ({ data: [] }),
   useMergeBuilderPullRequestMutation: () => [vi.fn(), { isLoading: false }],
   useGetBuilderPrFeedbackQuery: () => ({ data: [] }),
@@ -85,47 +81,36 @@ vi.mock("@api", () => ({
   useResumeBuilderPullRequestAutomationMutation: () => [vi.fn(), { isLoading: false }],
   useGetBuilderSessionBudgetQuery: () => ({ data: budget, refetch: vi.fn() }),
   useLazyGetBuilderRunEventsQuery: () => [fetchEvents],
-  useAnswerBuilderQuestionMutation: () => [vi.fn(), { isLoading: false }],
 }));
 
 // eslint-disable-next-line import/first
 import { BuildView } from "../BuildView";
 
-const held: BuilderBudgetState = {
+const over: BuilderBudgetState = {
   budgetUsd: 15,
   spentUsd: 16.7668,
   remainingUsd: 0,
   exceeded: true,
-  holdSeconds: 1200,
-  pollSeconds: 15,
-  hold: {
-    runId: "run-3",
-    heldAt: new Date().toISOString(),
-    // Deliberately a live clock: the countdown is computed against `now`, and a
-    // fixed past timestamp would render the expiry copy instead.
-    holdUntil: new Date(Date.now() + 18 * 60_000).toISOString(),
-  },
 };
 
-const renderView = () =>
-  render(<BuildView sessionId="session-1" status="BUILDING" currentStage="CODING" />);
+const renderView = () => render(<BuildView sessionId="session-1" status="BUILDING" />);
 
 describe("BuildView budget banner", () => {
   beforeEach(() => {
     budget = undefined;
   });
 
-  it("offers the raise where the hold is, with the deadline attached", () => {
-    budget = held;
+  it("offers the raise once spend is past the ceiling", () => {
+    budget = over;
     renderView();
 
-    expect(screen.getByText("Paused — this build has spent its budget")).toBeTruthy();
-    expect(screen.getByText(/About 18 minutes left/)).toBeTruthy();
+    expect(screen.getByText("Spend is past the ceiling")).toBeTruthy();
+    expect(screen.getByText(/Raise the ceiling to run anything more/)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Raise budget" })).toBeTruthy();
   });
 
   it("opens the raise dialog from the banner", () => {
-    budget = held;
+    budget = over;
     renderView();
 
     fireEvent.click(screen.getByRole("button", { name: "Raise budget" }));
@@ -133,63 +118,28 @@ describe("BuildView budget banner", () => {
     expect(screen.getByText("raise-budget-dialog")).toBeTruthy();
   });
 
-  it("warns one phase early — past the ceiling but still coding", () => {
-    budget = { ...held, hold: null };
+  it("stays out of the way while the session is inside its budget", () => {
+    budget = { ...over, spentUsd: 4, remainingUsd: 11, exceeded: false };
     renderView();
 
-    expect(screen.getByText("Spend is past the ceiling")).toBeTruthy();
-    expect(screen.getByText(/pause at the end of the current phase/)).toBeTruthy();
-  });
-
-  it("says the work is already gone once the window has closed", () => {
-    budget = {
-      ...held,
-      hold: { ...held.hold!, holdUntil: new Date(Date.now() - 60_000).toISOString() },
-    };
-    renderView();
-
-    expect(screen.getByText(/the work in progress is gone/)).toBeTruthy();
-  });
-
-  it("stays out of the way while the build is inside its budget", () => {
-    budget = { ...held, spentUsd: 4, budgetUsd: 15, remainingUsd: 11, exceeded: false, hold: null };
-    renderView();
-
-    expect(screen.queryByText("Paused — this build has spent its budget")).toBeNull();
     expect(screen.queryByText("Spend is past the ceiling")).toBeNull();
   });
 
-  it("drops a stale held banner once the run has ended on its own", () => {
-    // The budget query stops polling once the session goes terminal, so a
-    // FAILED/CANCELLED/expired-hold session can still be sitting on a cached
-    // response whose `hold` is truthy from before it stopped. A hold is a live
-    // thing — a run counting down on the ceiling — so that one is stale.
-    budget = held;
-    render(<BuildView sessionId="session-1" status="FAILED" currentStage="CODING" />);
-
-    expect(screen.queryByText("Paused — this build has spent its budget")).toBeNull();
-  });
-
   /**
-   * The state this was actually found in.
-   *
-   * A session stopped over its ceiling with a question still unanswered: the
-   * raise is the only way to answer it, restart anything, or even see what was
-   * spent. Hiding the control here hid every route out of the session behind
-   * the thing that was blocking it. `exceeded` is a durable fact, not a live
-   * one, and `raiseBudget` has no status guard on the server for this reason.
+   * `exceeded` is a durable fact, not a live one: the ceiling is why the
+   * session stopped, and the raise is the only way to restart it.
    */
   it("still offers the raise on a session stopped over its ceiling", () => {
-    budget = { ...held, hold: null };
-    render(<BuildView sessionId="session-1" status="FAILED" currentStage="CODING" />);
+    budget = over;
+    render(<BuildView sessionId="session-1" status="FAILED" />);
 
     expect(screen.getByRole("button", { name: "Raise budget" })).toBeInTheDocument();
   });
 
   /** A raise cannot unblock a session that has nothing left to do. */
   it("stops offering it once the session is finished", () => {
-    budget = { ...held, hold: null };
-    render(<BuildView sessionId="session-1" status="COMPLETED" currentStage="CODING" />);
+    budget = over;
+    render(<BuildView sessionId="session-1" status="COMPLETED" />);
 
     expect(screen.queryByRole("button", { name: "Raise budget" })).toBeNull();
   });

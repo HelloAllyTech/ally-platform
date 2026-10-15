@@ -15,7 +15,6 @@ import type { BuilderPrdReadiness } from "@types";
 
 // @constants reads off the @components barrel at module-eval time, so the barrel is stubbed.
 vi.mock("@components", () => ({ cellTypes: {} }));
-vi.mock("@assets", () => ({ TooltipIcon: () => <svg /> }));
 vi.mock("@api", () => ({
   useGetBuilderRepoCommandsQuery: () => ({ data: { repos: [] } }),
   useUpdateBuilderSessionMutation: () => [vi.fn(), { isLoading: false }],

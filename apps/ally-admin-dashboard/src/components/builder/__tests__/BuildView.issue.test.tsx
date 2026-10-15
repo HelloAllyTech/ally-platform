@@ -26,7 +26,6 @@ vi.mock("../BuildActivityFeed", () => ({
     return <div data-testid="feed" />;
   },
 }));
-vi.mock("../PhaseRail", () => ({ PhaseRail: () => <div>PhaseRail</div> }));
 vi.mock("../IssueRail", () => ({ IssueRail: () => <div>IssueRail</div> }));
 let repoChainProps: any = null;
 vi.mock("../RepoChain", () => ({
@@ -36,8 +35,6 @@ vi.mock("../RepoChain", () => ({
   },
 }));
 vi.mock("../RunHistoryRail", () => ({ RunHistoryRail: () => <div /> }));
-vi.mock("../TodoPanel", () => ({ TodoPanel: () => <div /> }));
-vi.mock("../QuestionCard", () => ({ QuestionCard: () => <div /> }));
 vi.mock("../RaiseBudgetDialog", () => ({ RaiseBudgetDialog: () => null }));
 vi.mock("../CollapsibleSection", () => ({
   CollapsibleSection: ({ heading, meta, defaultOpen = true, children }: any) => (
@@ -66,7 +63,6 @@ let events: any[] = [];
 vi.mock("@api", () => ({
   useGetBuilderRunsQuery: () => ({ data: runs }),
   useGetBuilderMilestonesQuery: () => ({ data: milestones }),
-  useGetBuilderPendingQuestionsQuery: () => ({ data: [] }),
   useGetBuilderPullRequestsQuery: () => ({ data: pullRequests }),
   useMergeBuilderPullRequestMutation: () => [vi.fn(), { isLoading: false }],
   useGetBuilderPrFeedbackQuery: () => ({ data: prFeedback }),
@@ -78,7 +74,6 @@ vi.mock("@api", () => ({
   useLazyGetBuilderRunEventsQuery: () => [
     vi.fn().mockImplementation(() => ({ unwrap: () => Promise.resolve({ events }) })),
   ],
-  useAnswerBuilderQuestionMutation: () => [vi.fn(), { isLoading: false }],
 }));
 
 // eslint-disable-next-line import/first
@@ -111,7 +106,7 @@ const pr = (ciStatus: string) => ({
 });
 
 const renderView = (status: "BUILDING" | "COMPLETED") =>
-  render(<BuildView sessionId="session-1" status={status} currentStage="SETUP" />);
+  render(<BuildView sessionId="session-1" status={status} />);
 
 describe("BuildView issue builds", () => {
   beforeEach(() => {
@@ -124,14 +119,13 @@ describe("BuildView issue builds", () => {
     repoChainProps = null;
   });
 
-  it("uses the issue rail and labeled links instead of the phase rail", () => {
+  it("uses the issue rail and labeled links", () => {
     runs = [
       issueRun("RUNNING", ["issue", "working:5", "pr:33"], "https://github.com/x/actions/runs/5"),
     ];
     renderView("BUILDING");
 
     expect(screen.getByText("IssueRail")).toBeInTheDocument();
-    expect(screen.queryByText("PhaseRail")).toBeNull();
     expect(screen.getByRole("link", { name: "Issue ally-web#21" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Actions log" })).toHaveAttribute(
       "href",
@@ -145,7 +139,7 @@ describe("BuildView issue builds", () => {
 
   it("opens on the issue build, not the finished review run after it", () => {
     // Ankita's session: a runner review of the PR was the newest run, and the
-    // page opened on its transcript and the runner's phase rail.
+    // page opened on its transcript instead of the build's.
     runs = [
       { ...issueRun("SUCCEEDED", ["issue", "pr:33", "ci-pass:a"]), mode: "build" },
       {
@@ -164,7 +158,6 @@ describe("BuildView issue builds", () => {
     renderView("COMPLETED");
 
     expect(screen.getByText("IssueRail")).toBeInTheDocument();
-    expect(screen.queryByText("PhaseRail")).toBeNull();
   });
 
   it("disables Merge while opencode is still working on CI", () => {
@@ -198,12 +191,12 @@ describe("BuildView issue builds", () => {
     expect(screen.getByRole("button", { name: "Merge" })).not.toBeDisabled();
   });
 
-  it("leaves a legacy build on the phase rail with Merge enabled", () => {
+  it("shows a legacy build without a rail, with Merge enabled", () => {
     runs = [{ ...issueRun("SUCCEEDED", []), issueNumber: null, issueUrl: null }];
     pullRequests = [pr("pending")];
     renderView("COMPLETED");
 
-    expect(screen.getByText("PhaseRail")).toBeInTheDocument();
+    expect(screen.queryByText("IssueRail")).toBeNull();
     expect(screen.getByRole("button", { name: "Merge" })).not.toBeDisabled();
   });
 

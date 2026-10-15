@@ -5,9 +5,7 @@ import { toast } from "sonner";
 
 import { ActionableNotification, Button, Tag } from "@ally-ui-mono/ui-shared";
 import {
-  useAnswerBuilderQuestionMutation,
   useGetBuilderMilestonesQuery,
-  useGetBuilderPendingQuestionsQuery,
   useGetBuilderPullRequestsQuery,
   useMergeBuilderPullRequestMutation,
   useGetBuilderPrFeedbackQuery,
@@ -24,8 +22,6 @@ import {
   BuilderBuildRun,
   BuilderPullRequest,
   BuilderSessionStatus,
-  BuilderStage,
-  BuilderTodoItem,
 } from "@types";
 
 import { BuildActivityFeed, countFeedUpdates } from "./BuildActivityFeed";
@@ -45,18 +41,15 @@ import {
 } from "./issueBuild";
 import { IssueRail } from "./IssueRail";
 import { NeedsHumanBlock, openFindingsFor } from "./NeedsHumanBlock";
-import { PhaseRail } from "./PhaseRail";
 import {
   AutomationBudgetLine,
   UnhealthyReleaseNote,
   UnhealthyReleaseTag,
   isUnhealthyRelease,
 } from "./PrAutomationStatus";
-import { BuilderAnswerPayload, QuestionCard } from "./QuestionCard";
 import { RaiseBudgetDialog } from "./RaiseBudgetDialog";
 import { RepoChain } from "./RepoChain";
 import { RunHistoryRail } from "./RunHistoryRail";
-import { TodoPanel } from "./TodoPanel";
 
 /** Statuses in which the build is still moving on its own. */
 const LIVE_STATUSES: BuilderSessionStatus[] = ["BUILDING"];
@@ -69,12 +62,6 @@ const LIVE_STATUSES: BuilderSessionStatus[] = ["BUILDING"];
  */
 const POLL_WITH_SOCKET_MS = 20000;
 const POLL_WITHOUT_SOCKET_MS = 4000;
-
-/**
- * How often the held-budget banner re-reads the clock. The countdown it draws
- * is in whole minutes, so anything finer would repaint for nothing.
- */
-const BUDGET_COUNTDOWN_TICK_MS = 20000;
 
 const CI_TAG_TYPE: Record<string, "green" | "red" | "blue" | "gray"> = {
   success: "green",
@@ -97,15 +84,9 @@ interface BuildViewProps {
   status: BuilderSessionStatus;
   /** The session-level error, so the run does not repeat it. */
   sessionError?: string | null;
-  currentStage: BuilderStage | null;
 }
 
-export const BuildView: React.FC<BuildViewProps> = ({
-  sessionId,
-  status,
-  currentStage,
-  sessionError,
-}) => {
+export const BuildView: React.FC<BuildViewProps> = ({ sessionId, status, sessionError }) => {
   const strings = en.builder.build;
 
   // One transcript per run, keyed by run id, so switching back to an older
@@ -155,10 +136,6 @@ export const BuildView: React.FC<BuildViewProps> = ({
     pollingInterval: isLive || isWaiting ? POLL_WITH_SOCKET_MS : 0,
     skipPollingIfUnfocused: true,
   });
-  const { data: pendingQuestions } = useGetBuilderPendingQuestionsQuery(sessionId, {
-    pollingInterval: isWaiting ? POLL_WITHOUT_SOCKET_MS : 0,
-    skipPollingIfUnfocused: true,
-  });
   const [mergePullRequest, { isLoading: isMerging }] = useMergeBuilderPullRequestMutation();
   const [mergingId, setMergingId] = useState<string | null>(null);
 
@@ -193,7 +170,6 @@ export const BuildView: React.FC<BuildViewProps> = ({
     skipPollingIfUnfocused: true,
   });
   const [fetchEvents] = useLazyGetBuilderRunEventsQuery();
-  const [answerQuestion] = useAnswerBuilderQuestionMutation();
 
   // Findings are read while any opencode pull request is still open: an open
   // one means Builder is still working it (and must not be offered for
@@ -242,26 +218,6 @@ export const BuildView: React.FC<BuildViewProps> = ({
     skipPollingIfUnfocused: true,
   });
   const [showRaiseBudget, setShowRaiseBudget] = useState(false);
-  const [countdownNow, setCountdownNow] = useState(() => Date.now());
-
-  // The hold expires on its own, so the banner has to keep counting even
-  // though nothing new arrives from the server while it waits.
-  const holdUntil = budget?.hold?.holdUntil ?? null;
-  useEffect(() => {
-    if (!holdUntil) return undefined;
-    const interval = window.setInterval(
-      () => setCountdownNow(Date.now()),
-      BUDGET_COUNTDOWN_TICK_MS,
-    );
-    return () => window.clearInterval(interval);
-  }, [holdUntil]);
-
-  const holdMinutesLeft = useMemo(() => {
-    if (!holdUntil) return null;
-    const until = new Date(holdUntil).getTime();
-    if (!Number.isFinite(until)) return null;
-    return Math.max(0, Math.ceil((until - countdownNow) / 60000));
-  }, [holdUntil, countdownNow]);
 
   const newestRun = useMemo(() => runs?.[runs.length - 1] ?? null, [runs]);
   const selectedRun = useMemo(
@@ -418,70 +374,13 @@ export const BuildView: React.FC<BuildViewProps> = ({
     return () => window.clearInterval(interval);
   }, [newestRun?.id, connected, isLive, isWaiting, fetchRunEvents]);
 
-  /** The newest todo snapshot from the LIVE run — the agent replaces the list
-   *  wholesale, and the checklist is current-progress, not a transcript, so it
-   *  does not follow the reader to an older run the way the feed does. */
-  const todoItems: BuilderTodoItem[] = useMemo(() => {
-    const liveEvents = newestRun ? (eventsByRun[newestRun.id] ?? []) : [];
-    for (let index = liveEvents.length - 1; index >= 0; index--) {
-      const event = liveEvents[index];
-      if (event.type === "todo" && Array.isArray(event.payload?.items)) {
-        return event.payload.items as BuilderTodoItem[];
-      }
-    }
-    return [];
-  }, [eventsByRun, newestRun]);
-
-  const handleAnswer = async (payload: BuilderAnswerPayload) => {
-    try {
-      const result = await answerQuestion({
-        id: sessionId,
-        questionId: payload.questionId,
-        message: payload.message,
-        answer: payload.answer as Record<string, unknown> | undefined,
-      }).unwrap();
-      if (result.resumed) {
-        toast.success(strings.resumed);
-      }
-    } catch {
-      toast.error(strings.answerFailed);
-    }
-  };
-
   const budgetStrings = en.builder.budget;
   const money = (value: number | null | undefined) =>
     value === null || value === undefined ? "—" : `$${value.toFixed(2)}`;
 
-  /**
-   * Two states, one control. A held run is the urgent one — its work is intact
-   * but only until the window closes — and the "past the ceiling but still
-   * coding" state is the warning that precedes it by one phase. Both are shown
-   * above the phase rail because they are the only thing on this page a person
-   * can act on to change the outcome.
-   */
-  // A hold is a live thing — a run sitting on the ceiling, counting down —
-  // so it goes stale the moment the run ends, and a terminal session can still
-  // be holding a cached one from before it stopped.
-  // An issue build reports no spend, so a ceiling cannot hold or stop it.
+  // An issue build reports no spend, so a ceiling cannot stop it.
   const newestIsIssue = isIssueRun(latestBuild);
-  const budgetHeld = Boolean(budget?.hold) && (isLive || isWaiting) && !newestIsIssue;
 
-  /**
-   * Being over the ceiling is not a live thing, and this is shown on a stopped
-   * session on purpose.
-   *
-   * It used to need the session live or waiting, on the same reasoning as the
-   * hold above. For `exceeded` that is exactly backwards: the ceiling is *why*
-   * the session stopped, so hiding the control on a stopped session hides the
-   * only way to restart it. A session that went over budget with a question
-   * still unanswered showed no spend, no banner, no Raise button and no
-   * explanation — every route out was behind the thing doing the blocking, and
-   * `raiseBudget` on the server has no status guard precisely because it is
-   * meant to be reachable from there.
-   *
-   * Still hidden once a raise could not change anything: a completed or
-   * cancelled session's ceiling is history.
-   */
   /** A pull request still wants a decision until it is merged or closed. */
   const awaitingMerge = useMemo(
     () => (pullRequests ?? []).filter(pr => !pr.merged && pr.state !== "closed"),
@@ -492,6 +391,12 @@ export const BuildView: React.FC<BuildViewProps> = ({
     [pullRequests],
   );
 
+  /**
+   * Being over the ceiling is shown on a stopped session on purpose: the
+   * ceiling is *why* the session stopped, so hiding the control there hides
+   * the only way to restart it. Still hidden once a raise could not change
+   * anything — a completed or cancelled session's ceiling is history.
+   */
   const budgetOver =
     Boolean(budget?.exceeded) && status !== "COMPLETED" && status !== "CANCELLED" && !newestIsIssue;
 
@@ -537,44 +442,21 @@ export const BuildView: React.FC<BuildViewProps> = ({
   return (
     <div className="flex min-h-0 flex-1 flex-col max-md:flex-none">
       {/* ActionableNotification, not InlineNotification with a button inside
-          it. Carbon forbids interactive children in an InlineNotification and
-          throws at render — a notification is announced to a screen reader as
-          one block of text, so a control buried in it is unreachable. This is
-          the component Carbon provides for a notification that has an action,
-          and it takes the button as a prop rather than a child.
-
-          It threw here only once the banner became reachable on a stopped
-          session: the same markup had been rendering for live sessions, where
-          a budget hold is rare enough that nobody had hit it.
-
-          `role="status"`, not Carbon's default `alertdialog`. As an
-          alertdialog it moves focus to its action button after EVERY render,
-          and this view re-renders on its own while a hold counts down — so
-          focus kept being pulled to "Raise budget" out of whatever the admin
-          was doing. A status is announced without taking focus; the banner is
-          still red and still carries the action. Escape is off because there
-          is no close button: the banner goes when the hold does, and Escape
-          used to hide the only way to raise the budget. */}
-      {(budgetHeld || budgetOver) && budget && (
+          it: Carbon forbids interactive children in an InlineNotification and
+          throws at render. `role="status"`, not Carbon's default
+          `alertdialog`, which moves focus to its action button on every
+          render. Escape is off because there is no close button: the banner
+          goes when the spend is back under the ceiling. */}
+      {budgetOver && budget && (
         <ActionableNotification
           inline
           role="status"
           closeOnEscape={false}
-          kind={budgetHeld ? "error" : "warning"}
+          kind="warning"
           lowContrast
           hideCloseButton
-          title={budgetHeld ? budgetStrings.heldTitle : budgetStrings.overTitle}
-          subtitle={
-            budgetHeld
-              ? holdMinutesLeft !== null && holdMinutesLeft <= 0
-                ? budgetStrings.heldBodyExpiring
-                : budgetStrings.heldBody(
-                    money(budget.spentUsd),
-                    money(budget.budgetUsd),
-                    budgetStrings.minutesLeft(holdMinutesLeft ?? 0),
-                  )
-              : budgetStrings.overBody(money(budget.spentUsd), money(budget.budgetUsd))
-          }
+          title={budgetStrings.overTitle}
+          subtitle={budgetStrings.overBody(money(budget.spentUsd), money(budget.budgetUsd))}
           actionButtonLabel={budgetStrings.raise}
           onActionButtonClick={() => setShowRaiseBudget(true)}
           className="m-3"
@@ -610,12 +492,10 @@ export const BuildView: React.FC<BuildViewProps> = ({
         <div className="flex flex-wrap items-center gap-2">
           <div className="min-w-0 flex-1">
             {/* An issue build's progress lives on its run, not on the session's
-              stage, which sits at SETUP between two repos of a chain. */}
-            {displayRun && displayIsIssue ? (
-              <IssueRail run={displayRun} />
-            ) : (
-              <PhaseRail currentStage={currentStage} active={isLive} failed={status === "FAILED"} />
-            )}
+              stage, which sits at SETUP between two repos of a chain. A design
+              or review run has no rail: the design panel carries a design's
+              progress, and the feed carries the rest. */}
+            {displayRun && displayIsIssue && <IssueRail run={displayRun} />}
           </div>
           {displayRun && displayIsIssue ? (
             // Three places to go, each named — a lone GitHub icon cannot say
@@ -680,25 +560,6 @@ export const BuildView: React.FC<BuildViewProps> = ({
           folded={chain.length > 0}
         />
       )}
-
-      {isWaiting && pendingQuestions?.length ? (
-        <section className="border-y border-primary-200 bg-primary-50/40 px-4 py-3">
-          <h2 className="text-sm font-semibold text-typography-900">{strings.waitingHeading}</h2>
-          <p className="mt-0.5 text-xs text-typography-600">{strings.waitingBody}</p>
-          <div className="mt-3 flex flex-col gap-3">
-            {pendingQuestions.map(pending => (
-              <QuestionCard
-                key={pending.id}
-                question={{ ...pending.question, id: pending.id }}
-                onAnswer={handleAnswer}
-                emphasised
-              />
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      <TodoPanel items={todoItems} isLive={isLive} />
 
       {/* The run's fate reads as the last thing that happened, in the feed,
           rather than as a banner over it. There were two of these — the
@@ -893,7 +754,7 @@ export const BuildView: React.FC<BuildViewProps> = ({
           sessionId={sessionId}
           budget={budget}
           // The banner is driven by this query, so it has to re-read rather
-          // than wait for the next 20s tick to stop saying "paused".
+          // than wait for the next 20s tick to stop saying "over budget".
           onRaised={() => void refetchBudget()}
         />
       )}

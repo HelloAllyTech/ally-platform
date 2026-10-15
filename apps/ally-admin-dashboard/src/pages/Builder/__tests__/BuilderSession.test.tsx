@@ -14,7 +14,7 @@ vi.mock("@ally-ui-mono/ui-shared", () => ({
   Tag: ({ children }: any) => <span>{children}</span>,
 }));
 
-// SteerComposer and CollapsibleAside render only in the build layout, which no
+// IssueSteerHint and CollapsibleAside render only in the build layout, which no
 // test reached until the restart cases below.
 let startDialogProps: any;
 let steerHintProps: any = null;
@@ -44,7 +44,6 @@ vi.mock("@components/builder", async () => ({
     startDialogProps = props;
     return null;
   },
-  SteerComposer: () => <div>SteerComposer</div>,
 }));
 
 vi.mock("@components/error-boundary", () => ({
@@ -89,7 +88,6 @@ let milestones: any[] = [];
 const startBuild = vi.fn().mockReturnValue({ unwrap: () => Promise.resolve({}) });
 vi.mock("@api", () => ({
   useGetBuilderSessionQuery: () => sessionResult,
-  useGetBuilderSettingsQuery: () => ({ data: undefined }),
   usePatchBuilderPrdMutation: () => [vi.fn()],
   useCancelBuilderSessionMutation: () => [vi.fn(), { isLoading: false }],
   useGetBuilderPullRequestsQuery: () => ({ data: pullRequests }),
@@ -296,7 +294,7 @@ describe("BuilderSession", () => {
       ...overrides,
     });
 
-    it("replaces the steering composer with the /oc hint when the latest run is an issue build", () => {
+    it("shows the /oc hint when the latest run is an issue build", () => {
       runs = [issueRun()];
       sessionResult = {
         data: { ...baseSession, status: "BUILDING", currentStage: "CODING" },
@@ -305,7 +303,6 @@ describe("BuilderSession", () => {
       };
       render(<BuilderSession />);
       expect(screen.getByText("IssueSteerHint")).toBeTruthy();
-      expect(screen.queryByText("SteerComposer")).toBeNull();
     });
 
     it("keeps the /oc hint when a review ran on the runner after the issue build", () => {
@@ -322,10 +319,9 @@ describe("BuilderSession", () => {
       };
       render(<BuilderSession />);
       expect(screen.getByText("IssueSteerHint")).toBeTruthy();
-      expect(screen.queryByText("SteerComposer")).toBeNull();
     });
 
-    it("keeps the steering composer for a legacy run", () => {
+    it("offers no steering on a legacy run", () => {
       runs = [{ id: "run-1", mode: "build", status: "RUNNING", issueNumber: null }];
       sessionResult = {
         data: { ...baseSession, status: "BUILDING", currentStage: "CODING" },
@@ -333,7 +329,6 @@ describe("BuilderSession", () => {
         isError: false,
       };
       render(<BuilderSession />);
-      expect(screen.getByText("SteerComposer")).toBeTruthy();
       expect(screen.queryByText("IssueSteerHint")).toBeNull();
     });
 
@@ -347,9 +342,7 @@ describe("BuilderSession", () => {
       terminal("COMPLETED");
 
       fireEvent.click(screen.getByText("Continue (next: ally-web)"));
-      await vi.waitFor(() =>
-        expect(startBuild).toHaveBeenCalledWith({ id: "session-1", dispatch: "issue" }),
-      );
+      await vi.waitFor(() => expect(startBuild).toHaveBeenCalledWith({ id: "session-1" }));
     });
 
     it("does not offer to continue once every repo is done or skipped", () => {

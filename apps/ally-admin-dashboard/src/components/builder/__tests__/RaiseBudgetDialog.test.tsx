@@ -38,25 +38,18 @@ vi.mock("@api", () => ({
 // eslint-disable-next-line import/first
 import { RaiseBudgetDialog, suggestNewCeiling } from "../RaiseBudgetDialog";
 
-const heldBudget: BuilderBudgetState = {
+const overBudget: BuilderBudgetState = {
   budgetUsd: 15,
   spentUsd: 16.7668,
   remainingUsd: 0,
   exceeded: true,
-  holdSeconds: 1200,
-  pollSeconds: 15,
-  hold: {
-    runId: "run-3",
-    heldAt: "2026-08-28T10:00:00.000Z",
-    holdUntil: "2026-08-28T10:20:00.000Z",
-  },
 };
 
 const baseProps = {
   isOpen: true,
   onClose: vi.fn(),
   sessionId: "session-1",
-  budget: heldBudget,
+  budget: overBudget,
 };
 
 describe("suggestNewCeiling", () => {
@@ -76,16 +69,9 @@ describe("suggestNewCeiling", () => {
 describe("RaiseBudgetDialog", () => {
   beforeEach(() => {
     raiseBudget.mockReset();
-    raiseBudget.mockReturnValue({ unwrap: () => Promise.resolve({ released: true }) });
+    raiseBudget.mockReturnValue({ unwrap: () => Promise.resolve(overBudget) });
     success.mockClear();
     error.mockClear();
-  });
-
-  it("says the build carries on rather than restarts, since that is the whole point", () => {
-    render(<RaiseBudgetDialog {...baseProps} />);
-
-    expect(screen.getByText(/picks up from there — no retry, nothing re-run/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Raise and continue" })).toBeInTheDocument();
   });
 
   it("shows the spend and the ceiling that stopped it", () => {
@@ -95,33 +81,22 @@ describe("RaiseBudgetDialog", () => {
     expect(screen.getByText("$15.00")).toBeInTheDocument();
   });
 
-  it("submits the new ceiling and reports that a held run was released", async () => {
+  it("submits the new ceiling and says it was raised", async () => {
     render(<RaiseBudgetDialog {...baseProps} />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Raise and continue" }));
-
-    await vi.waitFor(() => {
-      expect(raiseBudget).toHaveBeenCalledWith({ id: "session-1", budgetUsd: 30 });
-      expect(success).toHaveBeenCalledWith(
-        "Budget raised — the build is carrying on from where it stopped.",
-      );
-    });
-  });
-
-  it("does not claim the build carried on when nothing was waiting on the raise", async () => {
-    raiseBudget.mockReturnValue({ unwrap: () => Promise.resolve({ released: false }) });
-    render(<RaiseBudgetDialog {...baseProps} budget={{ ...heldBudget, hold: null }} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Raise budget" }));
 
-    await vi.waitFor(() => expect(success).toHaveBeenCalledWith("Budget raised."));
+    await vi.waitFor(() => {
+      expect(raiseBudget).toHaveBeenCalledWith({ id: "session-1", budgetUsd: 30 });
+      expect(success).toHaveBeenCalledWith("Budget raised.");
+    });
   });
 
   it("does not submit a zero-budget removal when the field is cleared", async () => {
     render(<RaiseBudgetDialog {...baseProps} />);
 
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "" } });
-    fireEvent.click(screen.getByRole("button", { name: "Raise and continue" }));
+    fireEvent.click(screen.getByRole("button", { name: "Raise budget" }));
 
     await new Promise(resolve => setTimeout(resolve, 0));
     expect(raiseBudget).not.toHaveBeenCalled();
@@ -133,7 +108,7 @@ describe("RaiseBudgetDialog", () => {
     });
     render(<RaiseBudgetDialog {...baseProps} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Raise and continue" }));
+    fireEvent.click(screen.getByRole("button", { name: "Raise budget" }));
 
     await vi.waitFor(() =>
       expect(error).toHaveBeenCalledWith("This session has already spent $16.77…"),

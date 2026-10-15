@@ -1,5 +1,3 @@
-import React from "react";
-
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -8,8 +6,6 @@ import type { BuilderPrdReadiness, BuilderRepoCommand } from "@types";
 // @constants reads off the @components barrel at module-eval time (see the
 // BugHunter tests), so the barrel is stubbed rather than loaded for real.
 vi.mock("@components", () => ({ cellTypes: {} }));
-
-vi.mock("@assets", () => ({ TooltipIcon: () => <svg /> }));
 
 vi.mock("@ally-ui-mono/ui-shared", () => ({
   Button: ({ children, onClick, disabled }: any) => (
@@ -25,39 +21,6 @@ vi.mock("@ally-ui-mono/ui-shared", () => ({
       {subtitle && <p>{subtitle}</p>}
       {children}
     </div>
-  ),
-  NumberInput: ({ id, value, onChange }: any) => (
-    <input
-      aria-label={id}
-      value={value}
-      onChange={event => onChange(undefined, { value: event.target.value })}
-    />
-  ),
-  TextInput: ({ id, labelText, value, onChange, placeholder }: any) => (
-    <input
-      aria-label={labelText || id}
-      placeholder={placeholder}
-      value={value}
-      onChange={onChange}
-    />
-  ),
-  Tooltip: ({ children }: any) => <>{children}</>,
-  // The group hands its onChange down so each radio can report its value.
-  RadioButtonGroup: ({ children, onChange, valueSelected }: any) => (
-    <div role="radiogroup">
-      {React.Children.map(children, (child: any) =>
-        React.cloneElement(child, {
-          checked: child.props.value === valueSelected,
-          onSelect: () => onChange(child.props.value),
-        }),
-      )}
-    </div>
-  ),
-  RadioButton: ({ labelText, value, checked, onSelect }: any) => (
-    <label>
-      <input type="radio" value={value} checked={checked} onChange={onSelect} />
-      {labelText}
-    </label>
   ),
   FilterableMultiSelect: ({ items, selectedItems, onChange, invalid, invalidText }: any) => (
     <div>
@@ -181,59 +144,18 @@ describe("StartBuildDialog", () => {
     expect(screen.getByText("Start anyway")).toBeInTheDocument();
   });
 
-  it("defaults to an issue build, sends dispatch 'issue' and no model or budget", async () => {
-    render(<StartBuildDialog {...baseProps} currentRepos={["ally-be"]} initialBudgetUsd="15" />);
+  it("asks for no model or budget and starts with the session id alone", async () => {
+    render(<StartBuildDialog {...baseProps} currentRepos={["ally-be"]} />);
 
-    expect(screen.getByLabelText("GitHub issue + opencode (recommended)")).toBeChecked();
-    expect(screen.queryByLabelText("builder-start-budget")).toBeNull();
-    expect(screen.queryByLabelText("Planner model")).toBeNull();
-    expect(screen.queryByLabelText("Coder model")).toBeNull();
-    expect(screen.queryByLabelText("Verifier model")).toBeNull();
+    expect(screen.queryByRole("radiogroup")).toBeNull();
     expect(screen.getByText(/BUILDER_MODEL variable/)).toBeInTheDocument();
     expect(screen.getByText(/built one after another/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Start build" }));
 
     await vi.waitFor(() => {
-      expect(startBuild).toHaveBeenCalledWith({ id: "session-1", dispatch: "issue" });
+      expect(startBuild).toHaveBeenCalledWith({ id: "session-1" });
     });
-  });
-
-  it("brings the budget and model fields back for the legacy runner", async () => {
-    render(<StartBuildDialog {...baseProps} currentRepos={["ally-be"]} initialBudgetUsd="15" />);
-
-    fireEvent.click(screen.getByLabelText("Builder runner (legacy)"));
-
-    expect(screen.getByLabelText("builder-start-budget")).toHaveValue("15");
-    expect(screen.getByLabelText("Coder model")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Start build" }));
-
-    await vi.waitFor(() => {
-      expect(startBuild).toHaveBeenCalledWith({
-        id: "session-1",
-        dispatch: "workflow",
-        budgetUsd: 15,
-      });
-    });
-  });
-
-  it("seeds a retry above the spend, so the dispatch is not refused by the ceiling that stopped it", () => {
-    // The live failure this came from: $16.77 spent against a $15 ceiling.
-    // Seeding "15" hands back the figure the backend refuses, and "Retry
-    // build" fails on the click.
-    render(
-      <StartBuildDialog
-        {...baseProps}
-        retryError="Budget exhausted mid-run"
-        initialBudgetUsd="15"
-        spentUsd="16.7668"
-      />,
-    );
-    // The budget belongs to the legacy runner; issue builds have none.
-    fireEvent.click(screen.getByLabelText("Builder runner (legacy)"));
-
-    expect(screen.getByLabelText("builder-start-budget")).toHaveValue("30");
   });
 
   it("shows what is being retried past when opened for a retry", () => {

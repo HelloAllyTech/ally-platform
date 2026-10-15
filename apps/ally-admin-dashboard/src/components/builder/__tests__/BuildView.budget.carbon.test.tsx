@@ -8,22 +8,19 @@ import type { BuilderBudgetState } from "@types";
  * `@ally-ui-mono/ui-shared`, so it cannot see how Carbon's notification treats
  * focus — and Carbon's ActionableNotification, as an `alertdialog`, focuses its
  * own action button after every render and wraps focus back inside itself on
- * blur. BuildView re-renders on its own while a hold counts down, so that pulled
- * the admin's focus to "Raise budget" over and over, out of whatever they were
- * doing elsewhere on the page.
+ * blur. BuildView re-renders on its own as it polls, so that pulled the admin's
+ * focus to "Raise budget" over and over, out of whatever they were doing
+ * elsewhere on the page.
  */
 
 // @constants reads off the @components barrel at module-eval time.
 vi.mock("@components", () => ({ cellTypes: {} }));
 
-vi.mock("../BuildActivityFeed", () => ({ BuildActivityFeed: () => <div /> }));
-vi.mock("../PhaseRail", () => ({ PhaseRail: () => <div /> }));
-vi.mock("../RunHistoryRail", () => ({ RunHistoryRail: () => <div /> }));
 // Stands in for anything else on the page the admin might be using.
-vi.mock("../TodoPanel", () => ({
-  TodoPanel: () => <textarea aria-label="Somewhere else" />,
+vi.mock("../BuildActivityFeed", () => ({
+  BuildActivityFeed: () => <textarea aria-label="Somewhere else" />,
 }));
-vi.mock("../QuestionCard", () => ({ QuestionCard: () => <div /> }));
+vi.mock("../RunHistoryRail", () => ({ RunHistoryRail: () => <div /> }));
 vi.mock("../RaiseBudgetDialog", () => ({
   RaiseBudgetDialog: ({ isOpen }: any) => (isOpen ? <div>raise-budget-dialog</div> : null),
 }));
@@ -37,14 +34,12 @@ let budget: BuilderBudgetState | undefined;
 vi.mock("@api", () => ({
   useGetBuilderRunsQuery: () => ({ data: [] }),
   useGetBuilderMilestonesQuery: () => ({ data: [] }),
-  useGetBuilderPendingQuestionsQuery: () => ({ data: [] }),
   useGetBuilderPullRequestsQuery: () => ({ data: [] }),
   useMergeBuilderPullRequestMutation: () => [vi.fn(), { isLoading: false }],
   useGetBuilderSessionBudgetQuery: () => ({ data: budget, refetch: vi.fn() }),
   useLazyGetBuilderRunEventsQuery: () => [
     vi.fn().mockReturnValue({ unwrap: () => Promise.resolve({ events: [] }) }),
   ],
-  useAnswerBuilderQuestionMutation: () => [vi.fn(), { isLoading: false }],
   useGetBuilderPrFeedbackQuery: () => ({ data: [] }),
   useGetBuilderSettingsQuery: () => ({ data: undefined }),
   useResumeBuilderPullRequestAutomationMutation: () => [vi.fn(), { isLoading: false }],
@@ -53,27 +48,19 @@ vi.mock("@api", () => ({
 // eslint-disable-next-line import/first
 import { BuildView } from "../BuildView";
 
-const heldBudget = (): BuilderBudgetState => ({
+const overBudget = (): BuilderBudgetState => ({
   budgetUsd: 15,
   spentUsd: 16.7668,
   remainingUsd: 0,
   exceeded: true,
-  holdSeconds: 1200,
-  pollSeconds: 15,
-  hold: {
-    runId: "run-3",
-    heldAt: new Date().toISOString(),
-    holdUntil: new Date(Date.now() + 18 * 60_000).toISOString(),
-  },
 });
 
-const renderView = () =>
-  render(<BuildView sessionId="session-1" status="BUILDING" currentStage="CODING" />);
+const renderView = () => render(<BuildView sessionId="session-1" status="BUILDING" />);
 
 describe("BuildView budget banner on real Carbon — focus", () => {
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    budget = heldBudget();
+    budget = overBudget();
   });
 
   afterEach(() => {
@@ -86,13 +73,15 @@ describe("BuildView budget banner on real Carbon — focus", () => {
     expect(screen.getByText("raise-budget-dialog")).toBeInTheDocument();
   });
 
-  it("leaves focus where the admin put it while the hold counts down", () => {
-    renderView();
+  it("leaves focus where the admin put it when the view re-renders", () => {
+    const { rerender } = renderView();
     const elsewhere = screen.getByLabelText("Somewhere else");
     act(() => elsewhere.focus());
     expect(document.activeElement).toBe(elsewhere);
 
-    // The countdown re-renders the banner on its own; nothing the admin did.
+    // A poll re-renders the banner on its own; nothing the admin did.
+    budget = { ...overBudget(), spentUsd: 17.1 };
+    rerender(<BuildView sessionId="session-1" status="BUILDING" />);
     act(() => {
       vi.advanceTimersByTime(20_000);
     });
@@ -105,7 +94,7 @@ describe("BuildView budget banner on real Carbon — focus", () => {
     expect(document.activeElement).not.toBe(screen.getByRole("button", { name: "Raise budget" }));
   });
 
-  // The banner has no close button: it says what the server says, and goes when the hold does.
+  // The banner has no close button: it says what the server says, and goes when the spend does.
   // Escape inside it used to dismiss it anyway — and with focus pulled into it on every render,
   // any Escape on the page could hide the only way to raise the budget.
   it("is not dismissed by Escape", () => {

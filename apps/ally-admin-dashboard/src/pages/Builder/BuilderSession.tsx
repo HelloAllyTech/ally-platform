@@ -10,10 +10,10 @@ import {
   useGetBuilderPullRequestsQuery,
   useGetBuilderRunsQuery,
   useGetBuilderSessionQuery,
-  useGetBuilderSettingsQuery,
   usePatchBuilderPrdMutation,
   useStartBuilderBuildMutation,
 } from "@api";
+import type { AgentAnswerPayload } from "@components/agent-chat";
 import {
   BuildView,
   ChatComposer,
@@ -24,7 +24,6 @@ import {
   PrdDocPanel,
   ReadinessRing,
   StartBuildDialog,
-  SteerComposer,
   TechnicalDesignPanel,
   designBuildBlock,
   chainRows,
@@ -37,7 +36,6 @@ import {
   issueRunRepo,
   nextChainRepo,
 } from "@components/builder";
-import type { BuilderAnswerPayload } from "@components/builder";
 import { ErrorBoundary } from "@components/error-boundary";
 import { en, ROUTES } from "@constants";
 import { useBuilderStream } from "@hooks";
@@ -152,7 +150,6 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
     // newer of the two.
     setStatus(null);
   }, [sessionStatus]);
-  const { data: settings } = useGetBuilderSettingsQuery();
   // Read for one question only: did this session ship anything? See canRestart.
   const { data: pullRequests } = useGetBuilderPullRequestsQuery(sessionId, {
     skip: !sessionId,
@@ -261,7 +258,7 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
   }, [isEmbedded, location, navigate, openingMessageProp, sendMessage, session]);
 
   const handleAnswer = useCallback(
-    (payload: BuilderAnswerPayload) => {
+    (payload: AgentAnswerPayload) => {
       void sendMessage(payload.message, {
         questionId: payload.questionId,
         answer: payload.answer,
@@ -302,7 +299,7 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
 
   const handleContinue = useCallback(async () => {
     try {
-      await startBuild({ id: sessionId, dispatch: "issue" }).unwrap();
+      await startBuild({ id: sessionId }).unwrap();
       setStatus("BUILDING");
     } catch (error) {
       const message =
@@ -518,16 +515,10 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
                   sessionError={session.error}
                   sessionId={sessionId}
                   status={effectiveStatus}
-                  currentStage={session.currentStage}
                 />
-                {/* Under the build feed, not beside the PRD: this is a thing
-                    you reach for while watching a build go wrong, and the PRD
-                    is frozen at that point anyway. Shown on a finished session
-                    too, because a note left now is read by the next run. */}
-                {/* An issue build is steered on its pull request; Builder's
-                    notes never reach opencode, so the composer (and its
-                    history from earlier runner builds) is not offered. */}
-                {latestIsIssue ? (
+                {/* An issue build is steered on its pull request with `/oc`
+                    comments; Builder has no steering channel of its own. */}
+                {latestIsIssue && (
                   <IssueSteerHint
                     chained={chained}
                     pullRequest={
@@ -540,8 +531,6 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
                         : null
                     }
                   />
-                ) : (
-                  <SteerComposer sessionId={sessionId} live={effectiveStatus === "BUILDING"} />
                 )}
               </ErrorBoundary>
             </section>
@@ -680,9 +669,6 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
                 .map(plan => plan.repo)
                 .filter((repo): repo is string => Boolean(repo))
         }
-        initialBudgetUsd={session.budgetUsd}
-        defaultBudgetUsd={settings?.defaultBudgetUsd}
-        spentUsd={session.totalCostUsd}
         readiness={readiness}
         retryError={retryError}
         designBlock={designBlock}

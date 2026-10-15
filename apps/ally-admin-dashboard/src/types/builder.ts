@@ -366,9 +366,6 @@ export interface BuilderRunCost {
   [key: string]: unknown;
 }
 
-/** How a build is carried out: Builder's own runner, or an issue opencode works. */
-export type BuilderDispatch = "workflow" | "issue";
-
 export type BuilderMilestoneStatus =
   | "PENDING"
   | "BUILDING"
@@ -412,9 +409,9 @@ export type BuilderEventType =
   | "ci_result"
   | "phase_cost"
   /**
-   * A run parked at a phase boundary because the spend ceiling is gone.
-   * `payload.state`: `held` while it waits, `raised` once a new ceiling let it
-   * carry on, `expired` when nobody answered and the run stopped.
+   * Legacy runner builds only, kept so their history still renders: a run
+   * parked at a phase boundary because the spend ceiling was gone.
+   * `payload.state`: `held`, `raised` or `expired`.
    */
   | "budget_hold"
   | "question"
@@ -430,18 +427,13 @@ export type BuilderEventType =
  * Live spend against the session's ceiling.
  *
  * Polled while a build is running rather than read off the session, whose
- * detail response is fetched once: the spend moves every phase, and `hold` is
- * set only while a run is actually sitting on the ceiling waiting for a raise.
+ * detail response is fetched once: the spend moves every phase.
  */
 export interface BuilderBudgetState {
   budgetUsd: number | null;
   spentUsd: number;
   remainingUsd: number | null;
   exceeded: boolean;
-  /** How long a held run waits before giving up, from the server. */
-  holdSeconds: number;
-  pollSeconds: number;
-  hold: { runId: string; heldAt: string; holdUntil: string } | null;
 }
 
 export interface BuilderBuildEvent {
@@ -452,23 +444,6 @@ export interface BuilderBuildEvent {
   type: BuilderEventType;
   payload: Record<string, any>;
   createdAt: string;
-}
-
-/** One row of the agent's own checklist, replaced wholesale on each change. */
-export interface BuilderTodoItem {
-  id?: string;
-  text: string;
-  status: "pending" | "in_progress" | "done";
-}
-
-export interface BuilderPendingQuestion {
-  id: string;
-  sessionId: string;
-  runId: string;
-  groupId: string;
-  position: number;
-  question: BuilderQuestionEvent;
-  status: "pending" | "answered" | "superseded";
 }
 
 export interface BuilderPullRequest {
@@ -537,15 +512,6 @@ export interface BuilderPrFeedback {
   line: number | null;
 }
 
-export interface BuilderReport {
-  id: string;
-  runId: string | null;
-  type: "run_report" | "session_report" | "retrospective";
-  contentMd: string;
-  metrics: Record<string, any> | null;
-  createdAt: string;
-}
-
 export interface BuilderSettings {
   id: string;
   enabled: boolean;
@@ -563,15 +529,12 @@ export interface BuilderSettings {
   maxConcurrentBuilds: number;
   defaultBudgetUsd: string | null;
   /**
-   * Per-tier model overrides for new runs. Null falls through to the
-   * platform default — same resolution order a per-run override sits above
-   * (see `startBuilderBuild`'s `plannerModel`/`model`/`verifierModel`).
+   * Per-tier models for design runs (the designer, the critic, and the
+   * fallback). Null falls through to the platform default.
    */
   plannerModel: string | null;
   coderModel: string | null;
   verifierModel: string | null;
-  /** The server's default for new builds; `workflow` is the legacy runner. */
-  dispatch?: BuilderDispatch;
   /** The switches above, read as one level; `custom` is any other mix. */
   autonomyLevel?: BuilderAutonomyLevel;
   /** Over Builder's last `window` reviewed opencode pull requests. */
@@ -802,23 +765,5 @@ export interface BuilderExemplar {
   timeToMergeHours: number | null;
   failureTags: string[];
   summaryMd: string;
-  createdAt: string;
-}
-
-/**
- * A correction sent to a build already running.
- *
- * `delivered` means a run read it and put it in a phase prompt — never that
- * the agent complied. Nothing can promise the second, and a status that
- * implied it would be lying to whoever sent the note.
- */
-export interface BuilderSteer {
-  id: string;
-  sessionId: string;
-  runId: string | null;
-  note: string;
-  status: "pending" | "delivered" | "superseded";
-  deliveredAt: string | null;
-  deliveredAtPhase: string | null;
   createdAt: string;
 }

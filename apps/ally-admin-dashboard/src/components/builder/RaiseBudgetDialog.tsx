@@ -11,7 +11,7 @@ interface RaiseBudgetDialogProps {
   isOpen: boolean;
   onClose: () => void;
   sessionId: string;
-  /** Live spend and ceiling — `hold` set means a run is parked waiting on this. */
+  /** Live spend and ceiling. */
   budget: BuilderBudgetState;
   onRaised?: () => void;
 }
@@ -34,16 +34,7 @@ export const suggestNewCeiling = (spentUsd: number, currentUsd: number | null): 
 const money = (value: number | null) => (value === null ? null : `$${value.toFixed(2)}`);
 
 /**
- * Raise a session's spend ceiling — including mid-build, which is what this
- * exists for.
- *
- * A build that hits its ceiling holds at the next phase boundary instead of
- * aborting (see `hold_or_abort_if_over_budget` in run-engine.sh), because
- * nothing it has written is pushed anywhere before the finalise phase: an
- * abort discards the whole working tree and the retry starts again from the
- * PRD. So raising the ceiling here is not "start again with more money", it is
- * "carry on" — and the copy says so, because the two are worth very different
- * amounts to the person deciding.
+ * Raise a session's spend ceiling, so a session stopped by it can run again.
  */
 export const RaiseBudgetDialog: React.FC<RaiseBudgetDialogProps> = ({
   isOpen,
@@ -53,7 +44,6 @@ export const RaiseBudgetDialog: React.FC<RaiseBudgetDialogProps> = ({
   onRaised,
 }) => {
   const strings = en.builder.budget.dialog;
-  const isHeld = Boolean(budget.hold);
 
   const [raiseBudget, { isLoading }] = useRaiseBuilderSessionBudgetMutation();
   const [value, setValue] = useState("");
@@ -71,11 +61,8 @@ export const RaiseBudgetDialog: React.FC<RaiseBudgetDialogProps> = ({
     if (!Number.isFinite(parsed) || parsed < 0) return;
 
     try {
-      const result = await raiseBudget({ id: sessionId, budgetUsd: parsed }).unwrap();
-      // Two different pieces of news: a held run picking its work back up, and
-      // a ceiling raised for later. Saying "carrying on" when nothing was
-      // waiting would be a lie the person can't check.
-      toast.success(result.released ? strings.released : strings.raised);
+      await raiseBudget({ id: sessionId, budgetUsd: parsed }).unwrap();
+      toast.success(strings.raised);
       onRaised?.();
       onClose();
     } catch (error) {
@@ -91,9 +78,7 @@ export const RaiseBudgetDialog: React.FC<RaiseBudgetDialogProps> = ({
       <ModalBody>
         <div className="flex flex-col gap-4">
           <h2 className="text-lg font-semibold text-typography-900">{strings.title}</h2>
-          <p className="text-sm text-typography-600">
-            {isHeld ? strings.heldIntro : strings.intro}
-          </p>
+          <p className="text-sm text-typography-600">{strings.intro}</p>
 
           <dl className="flex gap-6 text-sm">
             <div>
@@ -138,7 +123,7 @@ export const RaiseBudgetDialog: React.FC<RaiseBudgetDialogProps> = ({
               disabled={isLoading}
               onClick={() => void handleSubmit()}
             >
-              {isHeld ? strings.submitHeld : strings.submit}
+              {strings.submit}
             </Button>
           </div>
         </div>

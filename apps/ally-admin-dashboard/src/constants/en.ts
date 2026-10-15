@@ -3567,21 +3567,7 @@ export const en = {
 
     // Interview
     steer: {
-      title: "Redirect this build",
-      // Said plainly on the control, because the alternative to being
-      // precise here is someone believing the build changed course when it
-      // has only been told.
-      hintLive: "Reaches the build at its next phase",
-      hintIdle: "The next build on this session reads it first",
-      placeholder: "Use the existing repository rather than adding a second one…",
-      send: "Send",
-      pending: "Waiting",
-      delivered: "Read by the build",
-      deliveredAtPhase: (phase: string) => `Read at ${phase}`,
-      superseded: "Never read",
-      tooLong: "That is a change to the PRD, not a correction to a run.",
-      failed: "Could not send that note. Try again.",
-      // Issue builds: opencode reads pull request comments, not notes here.
+      // Issue builds: opencode reads pull request comments.
       issueTitle: "Redirect opencode",
       issueHint: "To steer opencode, comment /oc followed by your instruction on the pull request.",
       issueHintChain: "To steer opencode, comment /oc on a pull request.",
@@ -3796,10 +3782,6 @@ export const en = {
 
     // The build screen
     build: {
-      todoHeading: "Checklist",
-      todoProgress: (done: number, total: number) => `${done} of ${total}`,
-      todoStopped: (done: number, total: number) =>
-        `${done} of ${total} — the agent stopped reporting progress`,
       planHeading: "Plan",
       verificationHeading: "Independent review",
       verificationRoundHeading: (round: number) => `Independent review · round ${round}`,
@@ -3967,15 +3949,6 @@ export const en = {
       failureHeading: "The build stopped here",
       failureDetail: "Details",
       reportsHeading: "Reports",
-      noReports: "Nothing written up yet.",
-      // A pause is a normal turn in the conversation, not a fault — the copy
-      // says so, because an alarming label here would make every question
-      // read as something going wrong.
-      waitingHeading: "I need a decision",
-      waitingBody:
-        "The build is holding here until you answer. Nothing is lost — I'll pick up exactly where I stopped.",
-      answerFailed: "Couldn't record that answer.",
-      resumed: "Thanks — picking it back up.",
       startFailed: "Couldn't start the build.",
       tabActivity: "Activity",
       tabPrd: "PRD",
@@ -4071,29 +4044,12 @@ export const en = {
       // retried past before asking for the same decisions again.
       retryIntro: "The last attempt failed:",
       reposLabel: "Repos to change",
-      reposHint:
-        "Builder only touches the repos you choose here — pick every repo this PRD's technical plan calls out.",
       reposHintIssue:
         "Each repo the approved design changes is built one after another, in the order ally-be → ally-ai → ally-ai-learn → ally-web → ally-mobile, with one pull request per repo. The next repo starts once the previous one's CI passes.",
-      dispatchLabel: "How to build",
-      dispatchIssue: "GitHub issue + opencode (recommended)",
-      dispatchIssueHint:
-        "Builder raises an issue in the repo, opencode opens a pull request, and the repo's own CI checks it. You approve and merge on GitHub.",
-      dispatchWorkflow: "Builder runner (legacy)",
       issueModelNote:
         "The model is set per repo on GitHub with the BUILDER_MODEL variable (default Gemini 3 Flash). Cost isn't tracked for opencode builds.",
       reposPlaceholder: "Choose repos…",
       reposRequired: "Choose at least one repo before starting.",
-      budgetLabel: "Budget (USD)",
-      budgetHint:
-        "Builder stops itself once this build's spend reaches this figure. Leave the platform default unless you have a reason to change it.",
-      modelOverridesHeading: "Model overrides",
-      modelOverridesHint:
-        "Leave any of these blank to use the platform default for that tier. Only set one if you specifically need a different model for this build.",
-      plannerModelLabel: "Planner model",
-      coderModelLabel: "Coder model",
-      verifierModelLabel: "Verifier model",
-      modelPlaceholder: "Platform default",
       saveReposFailed: "Couldn't save the chosen repos.",
       submit: "Start build",
       retrySubmit: "Retry build",
@@ -4106,31 +4062,14 @@ export const en = {
         "The PRD changed after the technical design was approved. Redraft and approve it again before building.",
     },
 
-    /**
-     * Mid-build budget. The wording follows the graceful-failure model in
-     * Stacks' "Graceful Failure: Transparent Acknowledgment and Fallbacks" and
-     * "Preserve State During Agent Failure in Multistep Tasks": say what
-     * happened, say what is at stake, and put the action that fixes it in the
-     * same place — the run is holding its work, not throwing it away.
-     */
+    // The session's spend ceiling.
     budget: {
-      heldTitle: "Paused — this build has spent its budget",
-      heldBody: (spent: string, ceiling: string, remaining: string) =>
-        `It has spent ${spent} of its ${ceiling} ceiling and is holding everything it has written so far. ${remaining} to raise the budget and carry on from where it stopped — after that it gives up and this run's work is lost.`,
-      heldBodyExpiring:
-        "The window to raise it has closed, so this run is stopping. Raising the budget now lets you retry, but the work in progress is gone.",
       overTitle: "Spend is past the ceiling",
       overBody: (spent: string, ceiling: string) =>
-        `${spent} of ${ceiling} spent. This build will pause at the end of the current phase and wait for a raise.`,
+        `${spent} of ${ceiling} spent. Raise the ceiling to run anything more on this session.`,
       raise: "Raise budget",
-      // Countdown, deliberately coarse: a to-the-second timer on a twenty
-      // minute window reads as more urgent than it is.
-      minutesLeft: (minutes: number) =>
-        minutes <= 1 ? "Less than a minute left" : `About ${minutes} minutes left`,
       dialog: {
         title: "Raise budget",
-        heldIntro:
-          "The build is holding its work at a phase boundary. Raise the ceiling and it picks up from there — no retry, nothing re-run.",
         intro: "Raise this session's spend ceiling.",
         spentLabel: "Spent so far",
         currentLabel: "Current ceiling",
@@ -4139,12 +4078,10 @@ export const en = {
         newHint:
           "Has to be above what the session has already spent, or the build would stop again immediately. Set 0 to remove the ceiling entirely.",
         submit: "Raise budget",
-        submitHeld: "Raise and continue",
         raised: "Budget raised.",
-        released: "Budget raised — the build is carrying on from where it stopped.",
         failed: "Couldn't raise the budget.",
       },
-      // Feed rows for the budget_hold event.
+      // Feed rows for the budget_hold event — legacy runner builds' history.
       feed: {
         held: (spent: string, ceiling: string) =>
           `Paused: spent ${spent} of the ${ceiling} ceiling, holding this run's work while it waits for a raise.`,
