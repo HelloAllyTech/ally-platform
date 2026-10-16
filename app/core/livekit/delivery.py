@@ -53,6 +53,7 @@ MAX_INTERIM_PIECES = 3
 MAX_PIECE_WORDS = 8
 MAX_PIECE_CHARS = 60
 MAX_OPENER_IDS = 3
+_SENTENCE_ENDS = (".", "!", "।", "॥", "。")
 
 #: Opener kinds the plan may name, plus the explicit choice of saying nothing.
 PLAN_KINDS = ("silence",) + OPENER_KINDS
@@ -139,6 +140,12 @@ def _safe_piece(text: Optional[str]) -> Optional[str]:
     if len(line) > MAX_PIECE_CHARS or len(line.split()) > MAX_PIECE_WORDS:
         return None
     if "?" in line or "？" in line:
+        return None
+    # A finished sentence is a statement — an opinion, a fact, a decision —
+    # and the interim must not be one: in Hindi the updater's later pieces
+    # were often "रोहन के लिए ये अच्छे रहेंगे।" ("these will be good for
+    # Rohan"). A holding piece trails off; an ellipsis is not an ending.
+    if line.endswith(_SENTENCE_ENDS) and not line.endswith(("…", "...")):
         return None
     if any(ch.isdigit() for ch in line):
         return None

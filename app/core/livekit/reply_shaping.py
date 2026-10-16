@@ -83,7 +83,9 @@ _NEXT_WORD_RE = re.compile(r"\s*([^\s,.!?…।\[]+)([\s,.!?…।]*)")
 
 #: Give up holding back after this many characters: a reply that has not
 #: resolved its first word by then is streamed through untouched.
-_MAX_HOLD_CHARS = 48
+#: Covers the longest interim piece (delivery.MAX_PIECE_CHARS), so a reply
+#: that restates one is still recognised before it is released.
+_MAX_HOLD_CHARS = 64
 
 
 def _phrase_words(phrase: str) -> List[str]:

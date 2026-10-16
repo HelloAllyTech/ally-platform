@@ -512,11 +512,15 @@ class GlossarySwapAgent(Agent):
             stages.append(
                 LeadingHesitationTrimmer(
                     is_active=lambda: bool(_opener() and _opener().made_a_sound),
+                    # The filler's words and each interim piece: a reply that
+                    # restates "I just feel…" as "I just feel like…" is heard
+                    # as a restart. It read a field that no longer existed, so
+                    # in prod V2V (2026-10-16) the interim was never trimmed.
                     phrases=lambda: [
                         p
                         for p in (
                             getattr(_opener(), "spoken", None),
-                            getattr(_opener(), "bridge", None),
+                            *(getattr(_opener(), "interim", None) or ()),
                         )
                         if p
                     ],

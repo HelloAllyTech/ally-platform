@@ -262,6 +262,26 @@ class TestValidateDelivery:
         )
         assert plan.interim == ("I keep going back", "and forth")
 
+    def test_a_finished_sentence_is_not_a_holding_piece(self):
+        plan = validate_delivery(
+            ProposedDelivery(
+                interim=[
+                    "सोच रहा हूँ कि...",
+                    "रोहन के लिए ये अच्छे रहेंगे।",
+                    "कैसे बताऊँ…",
+                ]
+            ),
+            None,
+            source="working_memory",
+        )
+        assert plan.interim == ("सोच रहा हूँ कि...", "कैसे बताऊँ…")
+        plan = validate_delivery(
+            ProposedDelivery(interim=["It's settled then.", "hard to say"]),
+            None,
+            source="working_memory",
+        )
+        assert [p.lower() for p in plan.interim] == ["hard to say"]
+
     def test_at_most_three_pieces(self):
         plan = validate_delivery(
             ProposedDelivery(interim=["one two", "three four", "five six", "seven"]),
@@ -324,12 +344,12 @@ class TestValidateDelivery:
         )
         assert plan.interim == ()
         fresh = validate_delivery(
-            ProposedDelivery(interim=["Give me a second with that."]),
+            ProposedDelivery(interim=["Give me a second with that…"]),
             catalog,
             source="working_memory",
             recent_lines=recent,
         )
-        assert fresh.interim == ("Give me a second with that.",)
+        assert fresh.interim == ("Give me a second with that…",)
 
     def test_a_fresh_indic_line_is_not_mistaken_for_a_repeat(self):
         """Hindi v2v: every holding line was dropped as a "repeat" because shared
@@ -641,6 +661,14 @@ class TestLeadingHesitationTrimmer:
 
     def test_inactive_is_a_pass_through(self):
         assert _stream(LeadingHesitationTrimmer(active=False), ["Um, ok"]) == "Um, ok"
+
+    def test_strips_a_restated_interim_piece(self):
+        """Prod V2V: "I just feel…" then the reply "I just feel like I want…"."""
+        trimmer = LeadingHesitationTrimmer(
+            is_active=lambda: True, phrases=lambda: ["Um…", "I just feel…"]
+        )
+        out = _stream(trimmer, ["I just ", "feel like I want ", "him to be happy."])
+        assert out == "Like I want him to be happy."
 
     def test_strips_the_echoed_opener_phrase(self):
         """The first live run: every opener came back at the start of the reply."""

@@ -29,7 +29,12 @@ On the next turn, before the client's reply, the counsellor may hear a short sou
 - opener_kind: one of silence, hum, hesitation, reflective, lexical, breath, sigh. hesitation ("um…") fits a guarded, anxious or reserved client. reflective ("hmm…") fits a client who is considering, taking something in or opening up. breath or sigh fits weariness, sadness, or bracing before something hard. silence fits a moment of weight, withdrawal or shutting down, where a pause says more than a sound. Pick it from this turn's state: the same kind every turn reads as a tic.
 - opener_ids: up to 3 ids from this list, best fit first. Use only these ids, exactly as written:
 {opener_catalog}
-- interim: required. 1 to 3 very short pieces (2 to 6 words each), in {language_label}, in the client's own voice and register, that run on from each other as one trailing, unfinished thought while the client gathers themselves. Each piece must still make sense if the client stops right after it, because the reply may start at any point. Hold the moment; never answer, decide, ask a question or state a fact. Write fresh words for this turn: never reuse the client's recent lines or an opening they have already used.
+- interim: required. What the client mutters while gathering themselves, in the second before they answer the counsellor's NEXT question — which you have not seen. 1 to 3 very short pieces (2 to 5 words each), in spoken, colloquial {language_label}, in the client's own register and mood as you reported them, running on from each other as one trailing, unfinished thought. Rules for every piece:
+  - It must fit in front of ANY answer: no topic, no name, no fact, no opinion, nothing about what was discussed.
+  - It never asks the counsellor anything or raises a concern, even without a question mark. Words the client says to themselves while searching for words are fine.
+  - Never take words or phrases from the conversation turns above, and never reuse an opening the client has already used: write fresh words for this moment.
+  - Each piece trails off — end it open (with "…" or nothing), never as a finished sentence — and still makes sense if the client stops right after it, because the reply may start at any point.
+  It shows HOW the client is feeling (hesitant, weary, defensive, opening up), never WHAT they think.
 - hold_silence: true when a noticeable pause fits better than any sound.
 
 RULES
