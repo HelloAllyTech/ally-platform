@@ -366,11 +366,10 @@ class TimeEventScheduler:
                 logger.exception(
                     "Error while event_notifier after trigger for %s: %s", event_id, e
                 )
+                raise
 
         except asyncio.CancelledError:
             logger.info("Trigger task cancelled for event %s", event_id)
-        except Exception:
-            logger.exception("Exception in trigger task for %s", event_id)
         finally:
             self._time_tasks.pop(event_id, None)
 
@@ -442,11 +441,10 @@ class TimeEventScheduler:
                 logger.exception(
                     "Error while event_notifier during revoke for %s: %s", event_id, e
                 )
+                raise
 
         except asyncio.CancelledError:
             logger.info("Revoke task cancelled for event %s", event_id)
-        except Exception:
-            logger.exception("Exception in revoke task for %s", event_id)
         finally:
             self._time_tasks.pop(event_id, None)
 
