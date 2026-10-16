@@ -243,7 +243,7 @@ const styles = ScaledSheet.create({
     flex: 1,
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     ...typography.body.medium,
-    fontWeight: fontWeights.regular,
+    fontWeight: fontWeights.medium,
     color: colors.ds.typography.highEmphasis,
   },
   feedback: {
@@ -275,13 +275,13 @@ const styles = ScaledSheet.create({
   explanation: {
     ...fontFamily.ROBOTO.REGULAR,
     ...typography.body.small,
-    fontWeight: fontWeights.regular,
+    fontWeight: fontWeights.medium,
     color: colors.ds.typography.mediumEmphasis,
   },
   hint: {
     ...fontFamily.ROBOTO.REGULAR,
     ...typography.body.tiny,
-    fontWeight: fontWeights.regular,
+    fontWeight: fontWeights.medium,
     color: colors.ds.typography.lowEmphasis,
   },
 });
