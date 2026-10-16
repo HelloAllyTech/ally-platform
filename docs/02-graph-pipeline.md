@@ -414,9 +414,10 @@ the interim, and tells the reply to continue straight on from it rather than
 open with a second hesitation.
 
 The updater passes the character's last few lines (`_recent_character_lines`)
-into `validate_delivery`, which drops an interim piece that replays one of them
-— in prod a holding line once repeated a reply from two turns earlier word for
-word.
+and last turn's interim into `validate_delivery`, which skips an interim piece
+that replays one of them and keeps the rest — in prod a holding line once
+repeated a reply from two turns earlier word for word, and the same opening was
+proposed turn after turn.
 
 ---
 
