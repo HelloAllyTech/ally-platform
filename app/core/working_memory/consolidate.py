@@ -637,6 +637,13 @@ def schedule_update(
         # over before recall and the commit rather than after them — it depends
         # on neither, and every millisecond here is a chance the learner has
         # already finished speaking.
+        if on_delivery is not None and update.delivery is None:
+            # Otherwise indistinguishable from a session with no delivery layer:
+            # the next turn silently keeps the previous (or default) plan.
+            logger.info(
+                "[working-memory] turn %d: the update carried no delivery plan",
+                turn_index,
+            )
         if on_delivery is not None and update.delivery is not None:
             try:
                 on_delivery(update.delivery, turn_index)

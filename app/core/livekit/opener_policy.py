@@ -316,10 +316,42 @@ class OpenerPolicy:
             t += durations[entry.id]
             spoken += durations[entry.id]
 
+        gaps = self._fit_pieces(
+            piece_ms, t, spoken, entry is not None, speech_ends_by, speech_cap
+        )
+        if entry is not None and not gaps and piece_ms:
+            # A sound OR a line: the wait holds one but not both. The line says
+            # more, so it goes alone, opening after the pause. Prod V2V
+            # (2026-10-16): on ~2.5 s English waits a filler always played and
+            # the interim never fit behind it, leaving 1.1-1.8 s of silence.
+            alone = self._fit_pieces(
+                piece_ms, hold, 0.0, False, speech_ends_by, speech_cap
+            )
+            if alone:
+                entry, gaps = None, alone
+
+        category = (
+            "none" if entry is None else "body" if entry.kind in BODY_KINDS else "vocal"
+        )
+        if entry is None and not gaps:
+            return OpenerDecision("none", reason="skipped_policy")
+        return OpenerDecision(category, entry, hold, len(gaps), tuple(gaps), "played")
+
+    def _fit_pieces(
+        self,
+        piece_ms: Sequence[float],
+        t: float,
+        spoken: float,
+        after_a_sound: bool,
+        speech_ends_by: float,
+        speech_cap: float,
+    ) -> List[float]:
+        """The gaps before each interim piece that fits, starting at ``t``."""
+        cfg = self.config
         gaps: List[float] = []
         for d in list(piece_ms)[: cfg.max_pieces]:
             # No gap before a piece that opens the turn: the hold is its pause.
-            if entry is None and not gaps:
+            if not after_a_sound and not gaps:
                 gap = 0.0
             else:
                 gap = cfg.piece_gap_ms * cfg.piece_gap_growth ** len(gaps)
@@ -328,10 +360,4 @@ class OpenerPolicy:
             t += gap + d
             spoken += d
             gaps.append(gap)
-
-        category = (
-            "none" if entry is None else "body" if entry.kind in BODY_KINDS else "vocal"
-        )
-        if entry is None and not gaps:
-            return OpenerDecision("none", reason="skipped_policy")
-        return OpenerDecision(category, entry, hold, len(gaps), tuple(gaps), "played")
+        return gaps

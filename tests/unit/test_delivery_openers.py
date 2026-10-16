@@ -470,7 +470,8 @@ class TestOpenerPolicy:
         medium = self._policy(**cfg).decide(
             plan, catalog, _durations(catalog), 1800.0, "I see.", pieces
         )
-        assert medium.entry is not None and medium.pieces == 0
+        # A sound OR a line: both won't fit, so the line goes alone.
+        assert medium.entry is None and medium.pieces == 1
         long_ = self._policy(**cfg).decide(
             plan, catalog, _durations(catalog), 7000.0, "I see.", pieces
         )
@@ -488,6 +489,14 @@ class TestOpenerPolicy:
         assert d.gaps_ms[1] == pytest.approx(d.gaps_ms[0] * 1.4)
         end = d.hold_ms + 600.0 + sum(d.gaps_ms) + 3 * 600.0
         assert end <= 8000.0 - 500.0
+
+    def test_a_filler_plays_when_no_line_fits_even_alone(self):
+        catalog = build_session_catalog("en-IN")
+        plan = self._wm(opener_kind="hum", interim=("a b",))
+        d = self._policy(hold_min_ms=400.0, hold_max_ms=400.0).decide(
+            plan, catalog, _durations(catalog), 1500.0, "I see.", (2000.0,)
+        )
+        assert d.entry is not None and d.pieces == 0
 
     def test_a_piece_that_does_not_fit_is_left_out(self):
         catalog = build_session_catalog("en-IN")

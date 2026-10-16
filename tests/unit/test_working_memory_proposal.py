@@ -255,3 +255,11 @@ def test_normal_length_values_are_untouched():
 # configured states while the ladder moved only on updater-proposed events, so
 # the state machine and the stance ladder disagreed and it read as "the states
 # stopped doing anything".
+
+
+def test_delivery_is_required_in_the_schema_but_an_omission_is_tolerated():
+    """Optional, gpt-4o-mini left it out of Hindi updates in prod V2V
+    (2026-10-16); required, structured output always emits it."""
+    schema = ProposedUpdate.model_json_schema()
+    assert "delivery" in schema.get("required", [])
+    assert ProposedUpdate(affect="calm").delivery is None

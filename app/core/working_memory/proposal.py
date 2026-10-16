@@ -21,7 +21,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, List, Optional, Sequence, Tuple
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.core.livekit.delivery import ProposedDelivery
 from app.core.logger import get_logger
@@ -110,12 +110,29 @@ class ProposedUpdate(BaseModel):
     opened_threads: List[str] = Field(default_factory=list)
     closed_threads: List[str] = Field(default_factory=list)
     retrieve_cues: List[str] = Field(default_factory=list)
-    #: How the client should START its next reply — the first sound the learner
-    #: hears. Proposed here because this call already knows the client's state;
-    #: validated against the session's opener catalog by the caller, which has
-    #: it (see app/core/livekit/delivery.py). Optional: a model that omits it
-    #: leaves the previous plan in force.
-    delivery: Optional[ProposedDelivery] = None
+    #: How the client should START its next reply — the filler and the
+    #: interim the learner hears first. Proposed here because this call already
+    #: knows the client's state; validated against the session's opener catalog
+    #: by the caller, which has it (see app/core/livekit/delivery.py).
+    #:
+    #: Required in the JSON schema (no default), so structured output always
+    #: emits it: optional, gpt-4o-mini left it out of Hindi updates (prod V2V
+    #: 2026-10-16, two sessions with no plan on any turn), the same failure the
+    #: bridge line had before it was made required. The before-validator still
+    #: tolerates an omission, so a model that skips it can't fail the update.
+    delivery: Optional[ProposedDelivery] = Field(
+        description=(
+            "How the client starts the next reply: the filler and the interim. "
+            "Always fill it in."
+        ),
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _tolerate_missing_delivery(cls, data):
+        if isinstance(data, dict) and "delivery" not in data:
+            return {**data, "delivery": None}
+        return data
 
 
 @dataclass
