@@ -227,15 +227,17 @@ class OpenerPlayer:
                     # A real reply started: the next learner turn may open again.
                     self._opened_since_reply = False
                     self._report_wait(created_at)
-                if new_state == "listening":
+                if new_state == "listening" and not self._opened_since_reply:
+                    # Back to listening with something heard is a false
+                    # endpoint: the same reply is still coming, so keep it.
                     self.turn_delivery.end_turn()
         except Exception:  # noqa: BLE001 - must never break a session
             logger.warning("[OPENER] agent-state handler error", exc_info=True)
 
     def _start_turn(self, created_at) -> None:
-        self.turn_delivery.begin_turn()
         self.stats["turns"] += 1
         if self._voice_on_avatar():
+            self.turn_delivery.begin_turn()
             turn_metrics.note_filler_decision(self._room, "skipped_video_actor")
             return
         if self._opened_since_reply:
@@ -245,9 +247,14 @@ class OpenerPlayer:
             # "I mean…" then "Well…". Only an opener that actually played
             # counts (the flag is set at playback): one withdrawn during its
             # hold was never heard and must not silence the rest of the turn.
+            # What was heard stays on record for this reply: clearing it (as
+            # this used to, and the false endpoint's "listening" did) left the
+            # reply neither told about nor trimmed of the interim it follows —
+            # a Kannada prod session (2026-10-16) restated it word for word.
             self.stats["none"] += 1
             turn_metrics.note_filler_decision(self._room, "skipped_same_reply")
             return
+        self.turn_delivery.begin_turn()
         plan = self.turn_delivery.plan
         predicted = float(self._predicted_gap_ms())
         durations = {k: float(c.duration_ms) for k, c in self.clips.items()}

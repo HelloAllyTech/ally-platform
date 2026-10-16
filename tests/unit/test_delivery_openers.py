@@ -860,6 +860,24 @@ class TestOpenerPlayer:
         assert len(bg.played) == 2
 
     @pytest.mark.asyncio
+    async def test_a_false_endpoint_keeps_what_was_heard_on_record(self, monkeypatch):
+        """Kannada prod session: the learner paused, heard the interim, went
+        on — and the reply restated it, because the record had been wiped."""
+        player, td, bg, _ = _player(monkeypatch)
+        await player.render_catalog()
+        player.on_agent_state("thinking")
+        await asyncio.sleep(0.3)
+        assert td.opener is not None and td.opener.made_a_sound
+        player.on_agent_state("listening")  # the learner goes on
+        player.on_agent_state("thinking")  # and pauses again
+        assert td.opener is not None and td.opener.made_a_sound
+        assert td.reply_note() is not None
+        # After the real reply, the next turn starts clean.
+        player.on_agent_state("speaking")
+        player.on_agent_state("listening")
+        assert td.opener is None
+
+    @pytest.mark.asyncio
     async def test_an_opener_withdrawn_in_its_hold_does_not_block_the_turn(
         self, monkeypatch
     ):
