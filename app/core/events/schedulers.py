@@ -234,10 +234,11 @@ class TimeEventScheduler:
                                     {"configurable": {"thread_id": thread_id}},
                                     values=state_updates,
                                 )
-                    except Exception:
+                    except Exception as e:
                         logger.exception(
-                            "Error while sending immediate LT event update for %s",
+                            "Error while sending immediate LT event update for %s: %s",
                             event_id,
+                            e,
                         )
 
                     # Schedule revoke
@@ -361,9 +362,9 @@ class TimeEventScheduler:
                             {"configurable": {"thread_id": thread_id}},
                             values=state_updates,
                         )
-            except Exception:
+            except Exception as e:
                 logger.exception(
-                    "Error while event_notifier after trigger for %s", event_id
+                    "Error while event_notifier after trigger for %s: %s", event_id, e
                 )
 
         except asyncio.CancelledError:
@@ -437,9 +438,9 @@ class TimeEventScheduler:
                         )
 
                 await event_notifier(room, detected_event_ids=None)
-            except Exception:
+            except Exception as e:
                 logger.exception(
-                    "Error while event_notifier during revoke for %s", event_id
+                    "Error while event_notifier during revoke for %s: %s", event_id, e
                 )
 
         except asyncio.CancelledError:
