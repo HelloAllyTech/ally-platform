@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
+import 'package:ally_mobile_flutter/core/widgets/app_button.dart';
 import 'package:ally_mobile_flutter/features/courses/data/courses_repository.dart';
 import 'package:ally_mobile_flutter/features/courses/data/start_item_payload.dart';
 import 'package:ally_mobile_flutter/features/courses/presentation/journal/journal_player.dart';
@@ -78,15 +79,15 @@ void main() {
       ),
     );
 
-    FilledButton submitButton() => tester.widget<FilledButton>(find.byType(FilledButton));
+    AppButton submitButton() => tester.widget<AppButton>(find.byType(AppButton));
 
     // Only the required prompt is missing text — Submit stays disabled.
-    expect(submitButton().onPressed, isNull);
+    expect(submitButton().isDisabled, isTrue);
 
     await tester.enterText(find.byType(TextField).first, 'Learned a lot');
     await tester.pump();
 
-    expect(submitButton().onPressed, isNotNull);
+    expect(submitButton().isDisabled, isFalse);
   });
 
   testWidgets('debounced autosave persists the draft after the delay', (tester) async {
@@ -132,13 +133,13 @@ void main() {
     await tester.enterText(find.byType(TextField).first, 'Learned a lot');
     await tester.pump();
 
-    await tester.tap(find.byType(FilledButton));
+    await tester.tap(find.byType(AppButton));
     await tester.pumpAndSettle();
 
     verify(() => repository.submitJournal('item1')).called(1);
     expect(completedCalled, isTrue);
     // Submitted state: no Submit button, fields disabled.
-    expect(find.byType(FilledButton), findsNothing);
+    expect(find.byType(AppButton), findsNothing);
     final field = tester.widget<TextField>(find.byType(TextField).first);
     expect(field.enabled, isFalse);
   });
@@ -159,7 +160,7 @@ void main() {
       ),
     );
 
-    expect(find.byType(FilledButton), findsNothing);
+    expect(find.byType(AppButton), findsNothing);
     final field = tester.widget<TextField>(find.byType(TextField).first);
     expect(field.enabled, isFalse);
     expect(field.controller?.text, 'Already answered');

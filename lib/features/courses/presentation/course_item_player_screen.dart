@@ -6,9 +6,14 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_button.dart';
+import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/html_rich_text.dart';
+import '../../../core/widgets/tab_screen_header.dart';
 import '../data/course_models.dart';
 import '../data/courses_repository.dart';
 import '../data/start_item_payload.dart';
@@ -69,12 +74,18 @@ class _CourseItemPlayerScreenState extends ConsumerState<CourseItemPlayerScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(widget.item.title)),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-              ? Center(child: Text(_error!, style: const TextStyle(color: Colors.red)))
-              : _buildBody(),
+      body: Column(
+        children: [
+          TabScreenHeader(title: widget.item.title),
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _error != null
+                    ? Center(child: Text(_error!, style: const TextStyle(color: AppColors.red400)))
+                    : _buildBody(),
+          ),
+        ],
+      ),
     );
   }
 
@@ -169,33 +180,36 @@ class _ArticleViewState extends ConsumerState<_ArticleView> {
         HtmlRichText(html: payload.html),
         const SizedBox(height: 24),
         for (final question in payload.articleQuestions ?? [])
-          Card(
-            margin: const EdgeInsets.only(bottom: 12),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(question.prompt, style: Theme.of(context).textTheme.titleSmall),
-                  for (final option in question.options)
-                    RadioListTile<String>(
-                      title: Text(option.text),
-                      value: option.id,
-                      groupValue: _answeredOptionIds[question.id],
-                      onChanged: _answeredOptionIds.containsKey(question.id)
-                          ? null
-                          : (value) => _answer(question, value!),
-                    ),
-                  if (_results[question.id] != null)
-                    Text(
-                      _results[question.id]!.correct
-                          ? ref.t('courses.article.question.correct')
-                          : ref.t('courses.article.question.incorrect'),
-                      style: TextStyle(
-                        color: _results[question.id]!.correct ? Colors.green : Colors.red,
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: AppCard(
+              variant: AppCardVariant.flat,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(question.prompt, style: Theme.of(context).textTheme.titleSmall),
+                    for (final option in question.options)
+                      RadioListTile<String>(
+                        title: Text(option.text),
+                        value: option.id,
+                        groupValue: _answeredOptionIds[question.id],
+                        onChanged: _answeredOptionIds.containsKey(question.id)
+                            ? null
+                            : (value) => _answer(question, value!),
                       ),
-                    ),
-                ],
+                    if (_results[question.id] != null)
+                      Text(
+                        _results[question.id]!.correct
+                            ? ref.t('courses.article.question.correct')
+                            : ref.t('courses.article.question.incorrect'),
+                        style: TextStyle(
+                          color: _results[question.id]!.correct ? Colors.green : AppColors.red400,
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -203,15 +217,15 @@ class _ArticleViewState extends ConsumerState<_ArticleView> {
         if (widget.completed)
           Row(
             children: [
-              const Icon(Icons.check_circle, color: Colors.green),
+              SvgPicture.asset('assets/icons/checkCircle.svg', width: 24, height: 24),
               const SizedBox(width: 8),
               Text(ref.t('courses.article.read')),
             ],
           )
         else
-          FilledButton(
+          AppButton(
+            label: ref.t('courses.article.markRead'),
             onPressed: widget.onMarkComplete,
-            child: Text(ref.t('courses.article.markRead')),
           ),
       ],
     );

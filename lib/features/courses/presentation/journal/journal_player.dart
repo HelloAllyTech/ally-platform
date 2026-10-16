@@ -2,8 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../../core/localization/translate_ref.dart';
+import '../../../../core/widgets/app_button.dart';
+import '../../../../core/widgets/app_card.dart';
+import '../../../../core/widgets/app_text_field.dart';
 import '../../data/courses_repository.dart';
 import '../../data/start_item_payload.dart';
 
@@ -144,47 +148,51 @@ class _JournalPlayerState extends ConsumerState<JournalPlayer> {
               ),
               const SizedBox(height: 8),
               for (var i = 0; i < _prompts.length; i++)
-                Card(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            CircleAvatar(radius: 14, child: Text('${i + 1}')),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: RichText(
-                                text: TextSpan(
-                                  style: DefaultTextStyle.of(context).style,
-                                  children: [
-                                    TextSpan(text: _prompts[i].prompt),
-                                    if (_prompts[i].required)
-                                      TextSpan(
-                                        text: ' (${ref.t('courses.journal.required')})',
-                                        style: const TextStyle(color: Colors.red, fontSize: 12),
-                                      ),
-                                  ],
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: AppCard(
+                    variant: AppCardVariant.flat,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              CircleAvatar(radius: 14, child: Text('${i + 1}')),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: RichText(
+                                  text: TextSpan(
+                                    style: DefaultTextStyle.of(context).style,
+                                    children: [
+                                      TextSpan(text: _prompts[i].prompt),
+                                      if (_prompts[i].required)
+                                        TextSpan(
+                                          text: ' (${ref.t('courses.journal.required')})',
+                                          style: const TextStyle(color: Colors.red, fontSize: 12),
+                                        ),
+                                    ],
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        TextField(
-                          controller: _controllers[_prompts[i].id],
-                          onChanged: _onChanged,
-                          maxLines: 4,
-                          enabled: !_submitted,
-                          decoration: InputDecoration(
-                            border: const OutlineInputBorder(),
-                            hintText: _prompts[i].placeholder ?? ref.t('courses.journal.placeholder'),
+                            ],
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 10),
+                          TextField(
+                            controller: _controllers[_prompts[i].id],
+                            onChanged: _onChanged,
+                            maxLines: 4,
+                            enabled: !_submitted,
+                            style: AppTextField.textStyleFor(context),
+                            decoration: AppTextField.decorationFor(
+                              context,
+                              placeholder: _prompts[i].placeholder ?? ref.t('courses.journal.placeholder'),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -198,23 +206,16 @@ class _JournalPlayerState extends ConsumerState<JournalPlayer> {
                 ? Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.check_circle, color: Colors.green),
+                      SvgPicture.asset('assets/icons/checkCircle.svg', width: 24, height: 24),
                       const SizedBox(width: 8),
                       Text(ref.t('courses.journal.submitted')),
                     ],
                   )
-                : SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      onPressed: _allRequiredAnswered ? _submit : null,
-                      child: _submitting
-                          ? const SizedBox(
-                              height: 16,
-                              width: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Text(ref.t('courses.journal.submit')),
-                    ),
+                : AppButton(
+                    label: ref.t('courses.journal.submit'),
+                    isDisabled: !_allRequiredAnswered,
+                    isLoading: _submitting,
+                    onPressed: _allRequiredAnswered ? _submit : null,
                   ),
           ),
         ),
