@@ -15,6 +15,7 @@ class TabScreenHeader extends StatelessWidget {
     required this.title,
     this.subtitle,
     this.italicSubtitle = false,
+    this.leading,
     this.trailing,
     this.showBorder = true,
   });
@@ -22,6 +23,11 @@ class TabScreenHeader extends StatelessWidget {
   final String title;
   final String? subtitle;
   final bool italicSubtitle;
+
+  /// Matches the real header's hamburger-menu slot — reused here for any
+  /// leading affordance, e.g. CallLogScreen's back button when viewing
+  /// archived logs (`showBackButton` in the RN source).
+  final Widget? leading;
   final Widget? trailing;
   final bool showBorder;
 
@@ -38,6 +44,8 @@ class TabScreenHeader extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
+          ?leading,
+          if (leading != null) const SizedBox(width: 6),
           Expanded(
             child: Text.rich(
               TextSpan(

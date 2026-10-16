@@ -85,4 +85,18 @@ class AppColors {
   static const charcoal2 = Color(0xFF49454F); // Dropdown placeholder
   static const red400 = Color(0xFFF93535); // Button destructive, input error state
   static const disabledContainer = Color(0x1F000000); // rgba(0,0,0,0.12)
+
+  // StatusBadge (src/screens/CallLog/components/StatusBadge + colors.ts)
+  static const creamYellow = Color(0xFFF8E6BA); // Processing/Pending background
+  static const amberOrange = Color(0xFFFFAD0D); // Processing dot
+  static const mintGreen = Color(0xFFDCEBDD); // Generated background
+  static const emeraldGreen = Color(0xFF47B881); // Generated dot
+  static const coralPink = Color(0xFFFBDED9); // Error background
+  static const brickRed = Color(0xFFE5675A); // Error dot
+
+  // ReviewTypeChip (src/components/ReviewTypeChip + designSystem/colors.ts)
+  static const deepPurple50 = Color(0xFFEDE7F6); // Simulation chip background
+  static const deepPurple400 = Color(0xFF7E57C2); // Simulation chip text
+  static const orange50 = Color(0xFFFFF3E0); // Scribe chip background
+  static const orange900 = Color(0xFFE65100); // Scribe chip text
 }

@@ -33,6 +33,36 @@ class CallLogItem {
   final double? score;
 }
 
+/// The "Role play" sub-tab's row shape — mirrors a `/learn/scenario-sessions`
+/// list entry. Row rendering shows `scenario.title • date` here instead of
+/// `date • time`, per the real CallLogScreen's `CallLogItem.tsx`.
+class SimulationLogItem {
+  SimulationLogItem({
+    required this.id,
+    required this.startedAt,
+    required this.status,
+    required this.scenarioTitle,
+    required this.score,
+  });
+
+  factory SimulationLogItem.fromJson(Map<String, dynamic> json) {
+    final scenario = json['scenario'] as Map<String, dynamic>?;
+    return SimulationLogItem(
+      id: (json['id'] as num).toInt(),
+      startedAt: json['startedAt'] as String,
+      status: json['status'] as String? ?? '',
+      scenarioTitle: scenario?['title'] as String? ?? json['scenarioTitle'] as String?,
+      score: (json['score'] as num?)?.toDouble(),
+    );
+  }
+
+  final int id;
+  final String startedAt;
+  final String status;
+  final String? scenarioTitle;
+  final double? score;
+}
+
 /// Mirrors ally-mobile (React Native)'s `src/services/callTranscriptApi.ts`
 /// `ChatMessage`.
 class ChatMessage {
@@ -121,14 +151,32 @@ class CallLogRepository {
   Future<List<CallLogItem>> getCallLogs({
     int limit = 25,
     int offset = 0,
+    bool archive = false,
   }) async {
     final response = await _dio.get<Map<String, dynamic>>(
       '/chats/call-logs',
-      queryParameters: {'limit': limit, 'offset': offset},
+      queryParameters: {'limit': limit, 'offset': offset, 'archive': archive},
     );
     final data = response.data?['data'] as List<dynamic>? ?? [];
     return data
         .map((e) => CallLogItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Mirrors ally-mobile (React Native)'s `useLazyGetSimulationLogsQuery` —
+  /// the "Role play" tab's data source on CallLogScreen, a distinct
+  /// endpoint/list from the real-call logs above.
+  Future<List<SimulationLogItem>> getSimulationLogs({
+    int limit = 25,
+    int offset = 0,
+  }) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/learn/scenario-sessions',
+      queryParameters: {'limit': limit, 'offset': offset},
+    );
+    final data = response.data?['data'] as List<dynamic>? ?? [];
+    return data
+        .map((e) => SimulationLogItem.fromJson(e as Map<String, dynamic>))
         .toList();
   }
 
@@ -174,8 +222,16 @@ final callLogRepositoryProvider = Provider<CallLogRepository>((ref) {
   return CallLogRepository(ref.watch(apiClientProvider));
 });
 
-final callLogsProvider = FutureProvider<List<CallLogItem>>((ref) {
+final realCallLogsProvider = FutureProvider<List<CallLogItem>>((ref) {
   return ref.watch(callLogRepositoryProvider).getCallLogs();
+});
+
+final archivedCallLogsProvider = FutureProvider<List<CallLogItem>>((ref) {
+  return ref.watch(callLogRepositoryProvider).getCallLogs(archive: true);
+});
+
+final simulationLogsProvider = FutureProvider<List<SimulationLogItem>>((ref) {
+  return ref.watch(callLogRepositoryProvider).getSimulationLogs();
 });
 
 final callSummaryProvider = FutureProvider.family<CallSummaryDetails, int>((

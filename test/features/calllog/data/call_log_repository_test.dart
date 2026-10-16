@@ -26,7 +26,7 @@ void main() {
       when(
         () => dio.get<Map<String, dynamic>>(
           '/chats/call-logs',
-          queryParameters: {'limit': 10, 'offset': 20},
+          queryParameters: {'limit': 10, 'offset': 20, 'archive': false},
         ),
       ).thenAnswer(
         (_) async => _response({
@@ -48,7 +48,7 @@ void main() {
       verify(
         () => dio.get<Map<String, dynamic>>(
           '/chats/call-logs',
-          queryParameters: {'limit': 10, 'offset': 20},
+          queryParameters: {'limit': 10, 'offset': 20, 'archive': false},
         ),
       ).called(1);
       expect(logs, hasLength(1));
@@ -57,11 +57,11 @@ void main() {
       expect(logs.first.score, 87.5);
     });
 
-    test('defaults to limit 25 / offset 0', () async {
+    test('defaults to limit 25 / offset 0 / archive false', () async {
       when(
         () => dio.get<Map<String, dynamic>>(
           '/chats/call-logs',
-          queryParameters: {'limit': 25, 'offset': 0},
+          queryParameters: {'limit': 25, 'offset': 0, 'archive': false},
         ),
       ).thenAnswer((_) async => _response({'data': <dynamic>[]}));
 
@@ -70,7 +70,25 @@ void main() {
       verify(
         () => dio.get<Map<String, dynamic>>(
           '/chats/call-logs',
-          queryParameters: {'limit': 25, 'offset': 0},
+          queryParameters: {'limit': 25, 'offset': 0, 'archive': false},
+        ),
+      ).called(1);
+    });
+
+    test('passes archive: true through to the query params', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>(
+          '/chats/call-logs',
+          queryParameters: {'limit': 25, 'offset': 0, 'archive': true},
+        ),
+      ).thenAnswer((_) async => _response({'data': <dynamic>[]}));
+
+      await repository.getCallLogs(archive: true);
+
+      verify(
+        () => dio.get<Map<String, dynamic>>(
+          '/chats/call-logs',
+          queryParameters: {'limit': 25, 'offset': 0, 'archive': true},
         ),
       ).called(1);
     });
@@ -111,6 +129,50 @@ void main() {
       expect(logs.single.sessionName, isNull);
       expect(logs.single.score, isNull);
       expect(logs.single.endedAt, '');
+    });
+  });
+
+  group('getSimulationLogs', () {
+    test('hits /learn/scenario-sessions and maps each entry', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>(
+          '/learn/scenario-sessions',
+          queryParameters: {'limit': 25, 'offset': 0},
+        ),
+      ).thenAnswer(
+        (_) async => _response({
+          'data': [
+            {
+              'id': 3,
+              'startedAt': '2026-01-01T00:00:00Z',
+              'status': 'SUCCESS',
+              'scenario': {'title': 'Difficult client'},
+              'score': 80.0,
+            },
+          ],
+        }),
+      );
+
+      final logs = await repository.getSimulationLogs();
+
+      expect(logs, hasLength(1));
+      expect(logs.first.id, 3);
+      expect(logs.first.scenarioTitle, 'Difficult client');
+      expect(logs.first.status, 'SUCCESS');
+      expect(logs.first.score, 80.0);
+    });
+
+    test('returns an empty list when data is missing', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>(
+          '/learn/scenario-sessions',
+          queryParameters: any(named: 'queryParameters'),
+        ),
+      ).thenAnswer((_) async => _response({}));
+
+      final logs = await repository.getSimulationLogs();
+
+      expect(logs, isEmpty);
     });
   });
 

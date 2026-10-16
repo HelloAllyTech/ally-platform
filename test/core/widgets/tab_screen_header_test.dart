@@ -29,6 +29,19 @@ void main() {
     expect(find.byKey(const Key('trailing')), findsOneWidget);
   });
 
+  testWidgets('renders leading content on the left', (tester) async {
+    await tester.pumpWidget(
+      _wrap(
+        const TabScreenHeader(
+          title: 'Archives',
+          leading: Icon(Icons.arrow_back, key: Key('leading')),
+        ),
+      ),
+    );
+
+    expect(find.byKey(const Key('leading')), findsOneWidget);
+  });
+
   testWidgets('omits the bottom border when showBorder is false', (tester) async {
     await tester.pumpWidget(
       _wrap(const TabScreenHeader(title: 'Ally', showBorder: false)),
