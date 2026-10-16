@@ -68,4 +68,21 @@ class AppColors {
   // misc (src/theme/colors.ts)
   static const lightGray2 = Color(0xFFE5E7EB);
   static const softCoralRed = Color(0xFFFE6F64);
+
+  // Shared-component tokens (src/theme/colors.ts's `legacyColors` +
+  // designSystem/colors.ts's `red`/`grey` scales) — several of the RN
+  // "shared" components (Button, TabView, Dropdown, EmptyState) are
+  // mid-migration and still reference these literal legacy hex values
+  // rather than the `ds.*` semantic tokens above, so porting them
+  // faithfully means keeping the same literal values, not substituting
+  // the nearest `ds.*` token.
+  static const lightGray = Color(0xFFF5F5F5); // CommentInput fill
+  static const lightGray4 = Color(0xFFD5D5D5); // TabView container border
+  static const lightGray7 = Color(0xFFE5E5E5); // Dropdown menu border
+  static const lightGray14 = Color(0xFFDADCE1); // ResourceArticleCard border
+  static const lightGray19 = Color(0xFFF3F3F3); // TabView container background
+  static const darkGray2 = Color(0xFF222222); // EmptyState title/description
+  static const charcoal2 = Color(0xFF49454F); // Dropdown placeholder
+  static const red400 = Color(0xFFF93535); // Button destructive, input error state
+  static const disabledContainer = Color(0x1F000000); // rgba(0,0,0,0.12)
 }

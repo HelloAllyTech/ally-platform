@@ -3,14 +3,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/widgets/app_empty_state.dart';
+import '../../../core/widgets/app_tab_view.dart';
+import '../../../core/widgets/tab_screen_header.dart';
 import '../data/analytics_repository.dart';
 
 /// Port of ally-mobile (React Native)'s `UserAnalyticsScreen` — the
 /// previously-missing "Session Metrics" tab. Embeds each Metabase dashboard
 /// the backend returns in its own WebView; when both call-log and
-/// simulation dashboards exist, a tab switcher filters which set shows
+/// simulation dashboards exist, [AppTabView] filters which set shows
 /// (matching the RN screen's `TabView<AnalyticsType>`, locked to the single
-/// type when only one is present).
+/// type when only one is present), using the same shared
+/// [TabScreenHeader]/[AppEmptyState] primitives most other tab-root
+/// screens use — not a plain Material `AppBar`/`SegmentedButton`.
 class UserAnalyticsScreen extends ConsumerStatefulWidget {
   const UserAnalyticsScreen({super.key});
 
@@ -26,75 +31,72 @@ class _UserAnalyticsScreenState extends ConsumerState<UserAnalyticsScreen> {
     final dashboardsAsync = ref.watch(dashboardsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text(ref.t('analytics.title'))),
-      body: dashboardsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(child: Text(ref.t('analytics.empty.description'))),
-        data: (dashboards) {
-          if (dashboards.isEmpty) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      ref.t('analytics.empty.title'),
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      ref.t('analytics.empty.description'),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }
-
-          final presentTypes = dashboards.map((d) => d.analyticsType).toSet();
-          final effectiveTab =
-              presentTypes.length == 1 ? presentTypes.first : _selectedTab;
-          final filtered =
-              dashboards.where((d) => d.analyticsType == effectiveTab).toList();
-
-          return Column(
-            children: [
-              if (presentTypes.length > 1)
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: SegmentedButton<AnalyticsType>(
-                    segments: [
-                      ButtonSegment(
-                        value: AnalyticsType.callLogAnalytics,
-                        label: Text(ref.t('analytics.types.callLogs')),
+      body: SafeArea(
+        child: Column(
+          children: [
+            TabScreenHeader(title: ref.t('analytics.title'), subtitle: ref.t('analytics.dashboardTitle')),
+            Expanded(
+              child: dashboardsAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (error, _) => Center(child: Text(ref.t('analytics.empty.description'))),
+                data: (dashboards) {
+                  if (dashboards.isEmpty) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: AppEmptyState(
+                          title: ref.t('analytics.empty.title'),
+                          description: ref.t('analytics.empty.description'),
+                        ),
                       ),
-                      ButtonSegment(
-                        value: AnalyticsType.simulationAnalytics,
-                        label: Text(ref.t('analytics.types.simulations')),
+                    );
+                  }
+
+                  final presentTypes = dashboards.map((d) => d.analyticsType).toSet();
+                  final effectiveTab =
+                      presentTypes.length == 1 ? presentTypes.first : _selectedTab;
+                  final filtered =
+                      dashboards.where((d) => d.analyticsType == effectiveTab).toList();
+
+                  return Column(
+                    children: [
+                      if (presentTypes.length > 1)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                          child: AppTabView<AnalyticsType>(
+                            tabs: [
+                              AppTabViewItem(
+                                key: AnalyticsType.callLogAnalytics,
+                                label: ref.t('analytics.types.callLogs'),
+                              ),
+                              AppTabViewItem(
+                                key: AnalyticsType.simulationAnalytics,
+                                label: ref.t('analytics.types.simulations'),
+                              ),
+                            ],
+                            activeTab: effectiveTab,
+                            onTabChange: (tab) => setState(() => _selectedTab = tab),
+                          ),
+                        ),
+                      Expanded(
+                        child: ListView(
+                          padding: const EdgeInsets.all(16),
+                          children: [
+                            for (final dashboard in filtered)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 16),
+                                child: _DashboardWebView(dashboard: dashboard),
+                              ),
+                          ],
+                        ),
                       ),
                     ],
-                    selected: {effectiveTab},
-                    onSelectionChanged: (selection) =>
-                        setState(() => _selectedTab = selection.first),
-                  ),
-                ),
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    for (final dashboard in filtered)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: _DashboardWebView(dashboard: dashboard),
-                      ),
-                  ],
-                ),
+                  );
+                },
               ),
-            ],
-          );
-        },
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -1,0 +1,40 @@
+import 'package:ally_mobile_flutter/core/widgets/tab_screen_header.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+Widget _wrap(Widget child) => MaterialApp(home: Scaffold(body: child));
+
+void main() {
+  testWidgets('renders the title and subtitle together as one text block', (tester) async {
+    await tester.pumpWidget(
+      _wrap(const TabScreenHeader(title: 'Ally', subtitle: 'Learn')),
+    );
+
+    // Subtitle is a nested TextSpan inside the same Text.rich as the title
+    // (matching RN's nested-<Text> pattern), not a separate Text widget.
+    expect(find.textContaining('Ally'), findsOneWidget);
+    expect(find.textContaining('Learn'), findsOneWidget);
+  });
+
+  testWidgets('renders trailing content on the right', (tester) async {
+    await tester.pumpWidget(
+      _wrap(
+        const TabScreenHeader(
+          title: 'Session Metrics',
+          trailing: Icon(Icons.badge, key: Key('trailing')),
+        ),
+      ),
+    );
+
+    expect(find.byKey(const Key('trailing')), findsOneWidget);
+  });
+
+  testWidgets('omits the bottom border when showBorder is false', (tester) async {
+    await tester.pumpWidget(
+      _wrap(const TabScreenHeader(title: 'Ally', showBorder: false)),
+    );
+
+    final container = tester.widget<Container>(find.byType(Container).first);
+    expect(container.decoration, isNull);
+  });
+}

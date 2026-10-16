@@ -7,6 +7,9 @@ import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import '../../../core/auth/auth_state.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_button.dart';
+import '../../../core/widgets/app_text_field.dart';
 import '../data/auth_repository.dart';
 
 /// Real email+OTP, Google, and Apple sign-in, matching ally-mobile (React
@@ -188,29 +191,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(ref.t('common.appName'), style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+              Text(ref.t('common.appName'), style: Theme.of(context).textTheme.displayMedium),
               const SizedBox(height: 24),
               if (_step == _Step.email) ...[
-                TextField(
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(ref.t('auth.login.email.label'), style: Theme.of(context).textTheme.labelLarge),
+                ),
+                const SizedBox(height: 8),
+                AppTextField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
-                  decoration: InputDecoration(
-                    labelText: ref.t('auth.login.email.label'),
-                    border: const OutlineInputBorder(),
-                  ),
                 ),
                 const SizedBox(height: 16),
                 if (_error != null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 12),
-                    child: Text(_error!, style: const TextStyle(color: Colors.red)),
+                    child: Text(_error!, style: const TextStyle(color: AppColors.red400)),
                   ),
-                FilledButton(
-                  onPressed: _isSubmitting ? null : _sendCode,
-                  child: _isSubmitting
-                      ? const SizedBox(
-                          width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                      : Text(ref.t('common.next')),
+                AppButton(
+                  label: ref.t('common.next'),
+                  onPressed: _sendCode,
+                  isLoading: _isSubmitting,
                 ),
                 const SizedBox(height: 24),
                 Row(
@@ -240,23 +242,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ] else ...[
                 Text('${ref.t('auth.login.otp.enterCode')} ${_emailController.text.trim()}'),
                 const SizedBox(height: 16),
-                TextField(
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('Code', style: Theme.of(context).textTheme.labelLarge),
+                ),
+                const SizedBox(height: 8),
+                AppTextField(
                   controller: _otpController,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Code', border: OutlineInputBorder()),
                 ),
                 const SizedBox(height: 16),
                 if (_error != null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 12),
-                    child: Text(_error!, style: const TextStyle(color: Colors.red)),
+                    child: Text(_error!, style: const TextStyle(color: AppColors.red400)),
                   ),
-                FilledButton(
-                  onPressed: _isSubmitting ? null : _verifyCode,
-                  child: _isSubmitting
-                      ? const SizedBox(
-                          width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                      : Text(ref.t('auth.login.otp.verify')),
+                AppButton(
+                  label: ref.t('auth.login.otp.verify'),
+                  onPressed: _verifyCode,
+                  isLoading: _isSubmitting,
                 ),
                 TextButton(
                   onPressed: () => setState(() => _step = _Step.email),
