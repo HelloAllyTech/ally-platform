@@ -458,11 +458,13 @@ beforeEach(() => {
 afterEach(() => {
   console.error = consoleErrorBeforeActGuard;
   if (actWarnings.length === 0) {
+    jest.clearAllMocks();
     return;
   }
   const [first] = actWarnings;
   const count = actWarnings.length;
   actWarnings.length = 0;
+  jest.clearAllMocks();
   throw new Error(
     `${count} React state update${count === 1 ? '' : 's'} in this test ` +
       `happened outside act(...). Wrap whatever triggers them — a ` +
