@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
@@ -162,8 +163,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byIcon(Icons.arrow_forward_ios), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, 'courses.enroll'), findsNothing);
+    expect(find.byType(SvgPicture), findsOneWidget);
+    expect(find.widgetWithText(TextButton, 'courses.enroll'), findsNothing);
 
     await tester.tap(find.byType(ListTile));
     await tester.pumpAndSettle();

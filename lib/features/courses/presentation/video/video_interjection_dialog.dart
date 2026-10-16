@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/localization/translate_ref.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/app_button.dart';
 import '../../data/courses_repository.dart';
 import '../../data/quiz_models.dart';
 import '../../data/start_item_payload.dart';
@@ -104,23 +106,19 @@ class _VideoInterjectionDialogState extends ConsumerState<VideoInterjectionDialo
                 if (_error != null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 12),
-                    child: Text(_error!, style: const TextStyle(color: Colors.red)),
+                    child: Text(_error!, style: const TextStyle(color: AppColors.red400)),
                   ),
                 if (_result == null)
-                  FilledButton(
-                    onPressed: (_answer == null || _isSubmitting) ? null : _submit,
-                    child: _isSubmitting
-                        ? const SizedBox(
-                            height: 16,
-                            width: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Text(ref.t('courses.video.interjection.submit')),
+                  AppButton(
+                    label: ref.t('courses.video.interjection.submit'),
+                    isDisabled: _answer == null,
+                    isLoading: _isSubmitting,
+                    onPressed: _answer == null ? null : _submit,
                   )
                 else
-                  FilledButton(
+                  AppButton(
+                    label: ref.t('courses.video.interjection.continue'),
                     onPressed: () => Navigator.of(context).pop(true),
-                    child: Text(ref.t('courses.video.interjection.continue')),
                   ),
               ],
             ),

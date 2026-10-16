@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/tab_screen_header.dart';
 import '../data/courses_repository.dart';
 
 /// Ported from ally-mobile (React Native)'s `CourseOverviewScreen` — the
@@ -17,61 +20,79 @@ class CourseOverviewScreen extends ConsumerWidget {
     final tracksAsync = ref.watch(learnTracksProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text(ref.t('learn.tabs.courses'))),
-      body: tracksAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) =>
-            Center(child: Text('${ref.t('courses.listLoadFailed')}: $error')),
-        data: (tracks) {
-          if (tracks.isEmpty) {
-            return Center(child: Text(ref.t('simulationPage.noCoursesAvailable')));
-          }
-          return RefreshIndicator(
-            onRefresh: () => ref.refresh(learnTracksProvider.future),
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: tracks.length,
-              itemBuilder: (context, index) {
-                final track = tracks[index];
-                final progress = track.totalItems == 0
-                    ? 0.0
-                    : track.completedItems / track.totalItems;
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: ListTile(
-                    title: Text(track.title),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (track.description != null) Text(track.description!),
-                        const SizedBox(height: 8),
-                        LinearProgressIndicator(value: progress),
-                        Text(ref.t('simulations.progressCompleted', {
-                          'current': track.completedItems,
-                          'total': track.totalItems,
-                        })),
-                      ],
-                    ),
-                    trailing: track.enrolled
-                        ? const Icon(Icons.arrow_forward_ios, size: 16)
-                        : FilledButton(
-                            onPressed: () async {
-                              await ref
-                                  .read(coursesRepositoryProvider)
-                                  .enrollTrack(track.id);
-                              ref.invalidate(learnTracksProvider);
-                            },
-                            child: Text(ref.t('courses.enroll')),
+      body: Column(
+        children: [
+          TabScreenHeader(title: ref.t('learn.tabs.courses')),
+          Expanded(
+            child: tracksAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (error, _) =>
+                  Center(child: Text('${ref.t('courses.listLoadFailed')}: $error')),
+              data: (tracks) {
+                if (tracks.isEmpty) {
+                  return Center(child: Text(ref.t('simulationPage.noCoursesAvailable')));
+                }
+                return RefreshIndicator(
+                  onRefresh: () => ref.refresh(learnTracksProvider.future),
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: tracks.length,
+                    itemBuilder: (context, index) {
+                      final track = tracks[index];
+                      final progress = track.totalItems == 0
+                          ? 0.0
+                          : track.completedItems / track.totalItems;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: AppCard(
+                          child: ListTile(
+                            title: Text(track.title),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (track.description != null) Text(track.description!),
+                                const SizedBox(height: 8),
+                                LinearProgressIndicator(value: progress),
+                                Text(ref.t('simulations.progressCompleted', {
+                                  'current': track.completedItems,
+                                  'total': track.totalItems,
+                                })),
+                              ],
+                            ),
+                            trailing: track.enrolled
+                                ? SvgPicture.asset(
+                                    'assets/icons/arrowRight.svg',
+                                    width: 16,
+                                    height: 16,
+                                  )
+                                // Not AppButton here: it's always full-bleed
+                                // width in its container (matching the real
+                                // RN Button component, which is the same),
+                                // which doesn't fit a ListTile's trailing
+                                // slot — that's a real constraint mismatch,
+                                // not something to force around.
+                                : TextButton(
+                                    onPressed: () async {
+                                      await ref
+                                          .read(coursesRepositoryProvider)
+                                          .enrollTrack(track.id);
+                                      ref.invalidate(learnTracksProvider);
+                                    },
+                                    child: Text(ref.t('courses.enroll')),
+                                  ),
+                            onTap: track.enrolled
+                                ? () => context.push('/courses/${track.id}')
+                                : null,
                           ),
-                    onTap: track.enrolled
-                        ? () => context.push('/courses/${track.id}')
-                        : null,
+                        ),
+                      );
+                    },
                   ),
                 );
               },
             ),
-          );
-        },
+          ),
+        ],
       ),
     );
   }

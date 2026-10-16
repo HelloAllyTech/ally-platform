@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
+import 'package:ally_mobile_flutter/core/widgets/app_button.dart';
 import 'package:ally_mobile_flutter/features/courses/data/courses_repository.dart';
 import 'package:ally_mobile_flutter/features/courses/data/quiz_models.dart';
 import 'package:ally_mobile_flutter/features/courses/data/start_item_payload.dart';
@@ -81,13 +82,13 @@ void main() {
   testWidgets('submit is disabled until an answer is chosen', (tester) async {
     await pump(tester, interjection());
 
-    FilledButton submitButton() => tester.widget<FilledButton>(find.byType(FilledButton));
-    expect(submitButton().onPressed, isNull);
+    AppButton submitButton() => tester.widget<AppButton>(find.byType(AppButton));
+    expect(submitButton().isDisabled, isTrue);
 
     await tester.tap(find.text('courses.quiz.question.true'));
     await tester.pump();
 
-    expect(submitButton().onPressed, isNotNull);
+    expect(submitButton().isDisabled, isFalse);
   });
 
   testWidgets('submitting shows pass/fail feedback and a Continue button', (tester) async {

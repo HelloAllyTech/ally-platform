@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/localization/translate_ref.dart';
+import '../../../../core/widgets/app_button.dart';
 
 /// Port of ally-mobile (React Native)'s `VideoFallbackCard` — fallback for
 /// youtube/vimeo/loom sources: no native SDK integration for these hosts on
@@ -32,14 +33,15 @@ class VideoFallbackCard extends ConsumerWidget {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
-            OutlinedButton(
+            AppButton(
+              label: ref.t('courses.video.openVideo'),
+              variant: AppButtonVariant.secondary,
               onPressed: () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
-              child: Text(ref.t('courses.video.openVideo')),
             ),
             const SizedBox(height: 8),
-            FilledButton(
+            AppButton(
+              label: ref.t('courses.video.markWatched'),
               onPressed: onMarkWatched,
-              child: Text(ref.t('courses.video.markWatched')),
             ),
           ],
         ),

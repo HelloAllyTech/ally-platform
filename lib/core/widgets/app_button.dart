@@ -90,12 +90,15 @@ class AppButton extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (iconLeft != null) ...[iconLeft!, const SizedBox(width: 8)],
-                      Text(
-                        label,
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodyMedium
-                            ?.copyWith(color: textColor, fontFamily: null),
+                      Flexible(
+                        child: Text(
+                          label,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.copyWith(color: textColor, fontFamily: null),
+                        ),
                       ),
                       if (iconRight != null) ...[const SizedBox(width: 8), iconRight!],
                     ],

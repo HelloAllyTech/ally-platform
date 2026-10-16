@@ -56,6 +56,22 @@ void main() {
     expect(decoration?.border, isNotNull);
   });
 
+  testWidgets('ellipsizes rather than overflows when the label is too long to fit', (tester) async {
+    await tester.pumpWidget(
+      _wrap(
+        SizedBox(
+          width: 100,
+          child: AppButton(
+            label: 'A label far too long to fit in a 100px wide button',
+            onPressed: () {},
+          ),
+        ),
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('renders left and right icons alongside the label', (tester) async {
     await tester.pumpWidget(
       _wrap(

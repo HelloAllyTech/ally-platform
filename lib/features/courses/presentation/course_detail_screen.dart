@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/tab_screen_header.dart';
 import '../data/course_models.dart';
 import '../data/courses_repository.dart';
 
@@ -42,72 +45,95 @@ class CourseDetailScreen extends ConsumerWidget {
     final detailAsync = ref.watch(trackDetailProvider(trackId));
 
     return Scaffold(
-      appBar: AppBar(
-        title: detailAsync.maybeWhen(
-          data: (detail) => Text(detail.title),
-          orElse: () => Text(ref.t('learn.choose.course')),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.bar_chart),
-            tooltip: ref.t('courses.viewProgress'),
-            onPressed: () => context.push('/courses/$trackId/progress'),
+      body: Column(
+        children: [
+          TabScreenHeader(
+            title: detailAsync.maybeWhen(
+              data: (detail) => detail.title,
+              orElse: () => ref.t('learn.choose.course'),
+            ),
+            trailing: IconButton(
+              icon: const Icon(Icons.bar_chart),
+              tooltip: ref.t('courses.viewProgress'),
+              onPressed: () => context.push('/courses/$trackId/progress'),
+            ),
+          ),
+          Expanded(
+            child: detailAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (error, _) =>
+                  Center(child: Text('${ref.t('courses.notFound')}: $error')),
+              data: (detail) => ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  for (final section in detail.sections) ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Text(
+                        section.title,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ),
+                    for (final item in section.items)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: AppCard(
+                          variant: AppCardVariant.flat,
+                          child: ListTile(
+                            leading: Icon(_iconForType(item.type)),
+                            title: Text(item.title),
+                            trailing: item.status == TrackItemStatus.completed
+                                ? SvgPicture.asset(
+                                    'assets/icons/checkCircle.svg',
+                                    key: const ValueKey('trailing-completed'),
+                                    width: 24,
+                                    height: 24,
+                                  )
+                                : item.status == TrackItemStatus.locked
+                                    ? SvgPicture.asset(
+                                        'assets/icons/lock.svg',
+                                        key: const ValueKey('trailing-locked'),
+                                        width: 20,
+                                        height: 20,
+                                      )
+                                    : SvgPicture.asset(
+                                        'assets/icons/arrowRight.svg',
+                                        key: const ValueKey('trailing-unlocked'),
+                                        width: 16,
+                                        height: 16,
+                                      ),
+                            enabled: item.status != TrackItemStatus.locked,
+                            onTap: item.status == TrackItemStatus.locked
+                                ? null
+                                : () {
+                                    if (item.type == TrackItemType.article ||
+                                        item.type == TrackItemType.video ||
+                                        item.type == TrackItemType.quiz ||
+                                        item.type == TrackItemType.journal ||
+                                        item.type == TrackItemType.game) {
+                                      context.push(
+                                        '/courses/item/${item.id}',
+                                        extra: item,
+                                      );
+                                    } else {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            ref.tr('courses.player.unsupportedBody'),
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  },
+                          ),
+                        ),
+                      ),
+                  ],
+                ],
+              ),
+            ),
           ),
         ],
-      ),
-      body: detailAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) =>
-            Center(child: Text('${ref.t('courses.notFound')}: $error')),
-        data: (detail) => ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            for (final section in detail.sections) ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text(
-                  section.title,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ),
-              for (final item in section.items)
-                Card(
-                  child: ListTile(
-                    leading: Icon(_iconForType(item.type)),
-                    title: Text(item.title),
-                    trailing: item.status == TrackItemStatus.completed
-                        ? const Icon(Icons.check_circle, color: Colors.green)
-                        : item.status == TrackItemStatus.locked
-                            ? const Icon(Icons.lock_outline)
-                            : const Icon(Icons.arrow_forward_ios, size: 16),
-                    enabled: item.status != TrackItemStatus.locked,
-                    onTap: item.status == TrackItemStatus.locked
-                        ? null
-                        : () {
-                            if (item.type == TrackItemType.article ||
-                                item.type == TrackItemType.video ||
-                                item.type == TrackItemType.quiz ||
-                                item.type == TrackItemType.journal ||
-                                item.type == TrackItemType.game) {
-                              context.push(
-                                '/courses/item/${item.id}',
-                                extra: item,
-                              );
-                            } else {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    ref.tr('courses.player.unsupportedBody'),
-                                  ),
-                                ),
-                              );
-                            }
-                          },
-                  ),
-                ),
-            ],
-          ],
-        ),
       ),
     );
   }

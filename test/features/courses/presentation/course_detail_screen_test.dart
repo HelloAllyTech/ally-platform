@@ -105,9 +105,9 @@ void main() {
     expect(find.text('Locked item'), findsOneWidget);
     expect(find.text('Open item'), findsOneWidget);
 
-    expect(find.byIcon(Icons.check_circle), findsOneWidget);
-    expect(find.byIcon(Icons.lock_outline), findsOneWidget);
-    expect(find.byIcon(Icons.arrow_forward_ios), findsOneWidget);
+    expect(find.byKey(const ValueKey('trailing-completed')), findsOneWidget);
+    expect(find.byKey(const ValueKey('trailing-locked')), findsOneWidget);
+    expect(find.byKey(const ValueKey('trailing-unlocked')), findsOneWidget);
   });
 
   testWidgets('a locked item cannot be tapped', (tester) async {
