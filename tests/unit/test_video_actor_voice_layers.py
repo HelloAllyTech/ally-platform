@@ -117,15 +117,26 @@ class TestFillerSuppression:
 
 class TestInterimSuppression:
     @pytest.mark.unit
-    async def test_no_interim_plays_once_the_character_has_a_face(self):
+    async def test_no_interim_is_made_once_the_character_has_a_face(self, monkeypatch):
+        """The OpenerPlayer plays the interim and refuses an avatar turn
+        (``voice_on_avatar``); the generator also skips the LLM call and the
+        render, so a face costs nothing per turn."""
+        calls = []
+
+        async def _generate(*a, **k):
+            calls.append(1)
+            return "I hear you."
+
+        monkeypatch.setattr(
+            "app.core.livekit.interim_reply.generate_interim_reply", _generate
+        )
         w = _worker()
         w._video_actor = _actor(publishes_audio=True)
-        w._filler_enabled = False
-        w._interim_state = "ready"
-        w._interim_clip = types.SimpleNamespace(phrase="I hear you.")
+        w._interim_state = "generating"
 
-        await w._interim_play_after_filler(None)
+        await w._interim_generate("a long partial transcript from the learner")
 
+        assert calls == []
         w._bg_audio.play.assert_not_called()
         # Back to idle, the same resting state every other bail-out path uses,
         # so the next turn can generate a fresh one.
