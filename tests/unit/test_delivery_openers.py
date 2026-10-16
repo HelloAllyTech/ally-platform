@@ -233,7 +233,7 @@ class TestValidateDelivery:
         )
         assert plan.opener_ids == ("um_hesitant",)
 
-    def test_an_interim_piece_that_answers_ends_the_interim(self):
+    def test_an_interim_piece_that_answers_is_skipped(self):
         catalog = build_session_catalog("en-IN")
         for bad in ("Why do you ask?", "I take 20 mg a day.", "word " * 12):
             plan = validate_delivery(
@@ -241,14 +241,26 @@ class TestValidateDelivery:
                 catalog,
                 source="working_memory",
             )
-            # Later pieces lean on earlier ones: a bad piece ends the interim.
-            assert plan.interim == ("It's just that…",), bad
+            # Skipped, not the end: ending at the first failure threw away
+            # almost every interim in prod V2V.
+            assert plan.interim == ("It's just that…", "I don't know…"), bad
         ok = validate_delivery(
             ProposedDelivery(interim=["It's just that…", "I don't know…", "it's hard"]),
             catalog,
             source="working_memory",
         )
         assert ok.interim == ("It's just that…", "I don't know…", "it's hard")
+
+    def test_a_repeated_opening_is_dropped_and_the_rest_kept(self):
+        plan = validate_delivery(
+            ProposedDelivery(
+                interim=["It's just that…", "I keep going back", "and forth"]
+            ),
+            None,
+            source="working_memory",
+            recent_lines=["It's just that… I don't know."],
+        )
+        assert plan.interim == ("I keep going back", "and forth")
 
     def test_at_most_three_pieces(self):
         plan = validate_delivery(

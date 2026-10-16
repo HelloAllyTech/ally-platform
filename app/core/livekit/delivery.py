@@ -233,11 +233,14 @@ def validate_delivery(
 
 
 def _validate_interim(pieces: Sequence[str], recent_lines: Sequence[str]) -> tuple:
-    """The pieces that survive, in order, up to the first one that fails.
+    """The pieces that survive, in order.
 
-    Later pieces lean on the earlier ones ("It's just that…" → "I don't know…"),
-    so a failed piece ends the interim there rather than leaving a gap the
-    character would audibly skip over.
+    A piece that replays a recent line is skipped and the rest are kept: ending
+    the interim at the first failure threw away every interim whose opening
+    repeated (prod V2V 2026-10-16: the updater wrote "It's just that…" nearly
+    every turn, and Hindi openings were often a line the client had just said),
+    so almost none played. Each piece already has to stand on its own, because
+    the reply can start after any of them.
     """
     from app.core.livekit.reply_shaping import (
         strip_leading_hesitation,
@@ -265,7 +268,6 @@ def _validate_interim(pieces: Sequence[str], recent_lines: Sequence[str]) -> tup
             # Logged because a short interim is otherwise indistinguishable
             # from a planner that wrote a short one.
             logger.info("[DELIVERY] interim piece dropped (%s): %r", dropped, raw)
-        break
     return tuple(kept)
 
 

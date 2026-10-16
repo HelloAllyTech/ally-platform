@@ -2787,13 +2787,16 @@ def _delivery_hooks(turn_delivery, source: str, recent_lines=()) -> dict:
     from app.core.livekit.delivery import validate_delivery
 
     def _on_delivery(proposal, turn_index: int) -> None:
+        # Last turn's interim counts as a recent line too, so the same opening
+        # isn't played turn after turn.
+        previous = tuple(getattr(turn_delivery.plan, "interim", ()) or ())
         turn_delivery.set_plan(
             validate_delivery(
                 proposal,
                 catalog,
                 source=source,
                 made_after_turn=turn_index,
-                recent_lines=recent_lines,
+                recent_lines=[*recent_lines, *previous],
             )
         )
 
