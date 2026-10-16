@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
+import 'package:ally_mobile_flutter/core/widgets/app_button.dart';
 import 'package:ally_mobile_flutter/features/calllog/data/call_log_repository.dart';
 import 'package:ally_mobile_flutter/features/calllog/presentation/call_summary_screen.dart';
 
@@ -49,8 +50,8 @@ void main() {
       expect(find.text('Transcript'), findsOneWidget);
 
       // Save starts disabled — nothing has been edited yet.
-      var saveButton = tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'No changes'));
-      expect(saveButton.onPressed, isNull);
+      var saveButton = tester.widget<AppButton>(find.widgetWithText(AppButton, 'No changes'));
+      expect(saveButton.isDisabled, isTrue);
 
       // Expand "Features & Demographics" — it's the first section, so it's
       // already materialized (the ListView is a Sliver: only materializes
@@ -103,10 +104,10 @@ void main() {
       await tester.enterText(find.byKey(const ValueKey('sessionSummary')), 'Edited summary text');
       await tester.pumpAndSettle();
 
-      saveButton = tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Save changes'));
-      expect(saveButton.onPressed, isNotNull);
+      saveButton = tester.widget<AppButton>(find.widgetWithText(AppButton, 'Save changes'));
+      expect(saveButton.isDisabled, isFalse);
 
-      await tester.tap(find.widgetWithText(FilledButton, 'Save changes'));
+      await tester.tap(find.widgetWithText(AppButton, 'Save changes'));
       await tester.pumpAndSettle();
 
       verify(() => repository.updateCallSummary(1001, {'sessionSummary': 'Edited summary text'})).called(1);
@@ -114,8 +115,8 @@ void main() {
 
       // After a successful save, Save goes back to disabled (no more
       // pending changes) until something else is edited.
-      saveButton = tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'No changes'));
-      expect(saveButton.onPressed, isNull);
+      saveButton = tester.widget<AppButton>(find.widgetWithText(AppButton, 'No changes'));
+      expect(saveButton.isDisabled, isTrue);
 
       // --- Scenario 2: changing a dropdown's value also marks it dirty, ---
       // --- and Save sends only that field, from a fresh mount.          ---
@@ -156,7 +157,7 @@ void main() {
       // just-closed dropdown's menu route can leave a stray overlay/absorber
       // sitting at the same screen position as the Save button for a frame,
       // making a real tap miss it unreliably.
-      final saveButton2 = tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Save changes'));
+      final saveButton2 = tester.widget<AppButton>(find.widgetWithText(AppButton, 'Save changes'));
       saveButton2.onPressed!();
       await tester.pumpAndSettle();
 

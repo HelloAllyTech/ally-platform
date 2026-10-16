@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_button.dart';
+import '../../../core/widgets/app_card.dart';
 import '../data/call_log_repository.dart';
 import '../data/call_summary_fields.dart';
 
@@ -266,27 +269,18 @@ class _SummaryTabState extends ConsumerState<_SummaryTab> {
             if (_error != null)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text(_error!, style: const TextStyle(color: Colors.red)),
+                child: Text(_error!, style: const TextStyle(color: AppColors.red400)),
               ),
             SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: (_dirtyKeys.isEmpty || _isSaving) ? null : _save,
-                    child: _isSaving
-                        ? const SizedBox(
-                            height: 18,
-                            width: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Text(
-                            _dirtyKeys.isEmpty
-                                ? ref.t('callSummary.noChanges')
-                                : ref.t('callSummary.saveChanges'),
-                          ),
-                  ),
+                child: AppButton(
+                  label: _dirtyKeys.isEmpty
+                      ? ref.t('callSummary.noChanges')
+                      : ref.t('callSummary.saveChanges'),
+                  isDisabled: _dirtyKeys.isEmpty,
+                  isLoading: _isSaving,
+                  onPressed: _save,
                 ),
               ),
             ),
@@ -316,26 +310,29 @@ class _SectionCard extends ConsumerWidget {
     // `selectSummaryVisibleFields`) — not ported, so every section in the
     // catalog shows here regardless of whether it has data yet, which
     // matters for a section the counsellor still needs to fill in.
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ExpansionTile(
-        title: Text(ref.t(_sectionLabelKeys[section] ?? section.label)),
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                for (final field in fields)
-                  _FieldEditor(
-                    field: field,
-                    formValues: formValues,
-                    onChanged: onFieldChanged,
-                  ),
-              ],
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: AppCard(
+        variant: AppCardVariant.flat,
+        child: ExpansionTile(
+          title: Text(ref.t(_sectionLabelKeys[section] ?? section.label)),
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final field in fields)
+                    _FieldEditor(
+                      field: field,
+                      formValues: formValues,
+                      onChanged: onFieldChanged,
+                    ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -380,9 +377,15 @@ class _FieldEditor extends ConsumerWidget {
         padding: const EdgeInsets.only(top: 8),
         child: DropdownButtonFormField<String>(
           initialValue: currentValue,
+          // `labelText`, not `decorationFor`'s `placeholder`/hint — unlike a
+          // one-shot input, this field's label must stay visible once a
+          // value is picked, same as every other field in this long form.
           decoration: InputDecoration(
             labelText: label,
-            border: const OutlineInputBorder(),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: AppColors.strokePrimary),
+            ),
           ),
           items: [
             for (final option in options)
@@ -404,7 +407,10 @@ class _FieldEditor extends ConsumerWidget {
         maxLines: field.type == SummaryFieldType.multilineText ? 4 : 1,
         decoration: InputDecoration(
           labelText: label,
-          border: const OutlineInputBorder(),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: AppColors.strokePrimary),
+          ),
         ),
         onChanged: (text) => onChanged(field.key, text),
       ),
