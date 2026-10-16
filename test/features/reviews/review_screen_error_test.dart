@@ -1,10 +1,15 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:ally_mobile_flutter/core/permissions/permissions_repository.dart';
+import 'package:ally_mobile_flutter/core/permissions/user_permissions.dart';
 import 'package:ally_mobile_flutter/features/reviews/data/reviews_repository.dart';
 import 'package:ally_mobile_flutter/features/reviews/presentation/review_screen.dart';
 
-import '../../support/pump_app.dart';
+import '../../support/fake_translations.dart';
 
 class MockReviewsRepository extends Mock implements ReviewsRepository {}
 
@@ -29,11 +34,23 @@ void main() {
     // `pump()`/`pumpAndSettle()` ever flushes to a proper `AsyncError`.
     when(() => repository.getReviews()).thenAnswer((_) async => throw Exception('network down'));
 
-    await pumpApp(
-      tester,
-      const ReviewScreen(),
-      overrides: [reviewsRepositoryProvider.overrideWithValue(repository)],
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          fixedTranslationsOverride(),
+          reviewsRepositoryProvider.overrideWithValue(repository),
+          userPermissionsProvider.overrideWith(
+            (ref) async => [
+              UserPermissions.viewSimulationReviews,
+              UserPermissions.viewSimulationReview,
+            ],
+          ),
+        ],
+        child: const MaterialApp(home: ReviewScreen()),
+      ),
     );
+    await tester.pumpAndSettle();
 
     expect(find.textContaining('Unable to Load Reviews'), findsOneWidget);
   });

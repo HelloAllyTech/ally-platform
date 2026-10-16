@@ -6,6 +6,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:ally_mobile_flutter/core/permissions/permissions_repository.dart';
+import 'package:ally_mobile_flutter/core/permissions/user_permissions.dart';
 import 'package:ally_mobile_flutter/features/reviews/data/review_models.dart';
 import 'package:ally_mobile_flutter/features/reviews/data/reviews_repository.dart';
 import 'package:ally_mobile_flutter/features/reviews/presentation/review_screen.dart';
@@ -32,7 +34,15 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [reviewsRepositoryProvider.overrideWithValue(repository)],
+        overrides: [
+          reviewsRepositoryProvider.overrideWithValue(repository),
+          userPermissionsProvider.overrideWith(
+            (ref) async => [
+              UserPermissions.viewSimulationReviews,
+              UserPermissions.viewSimulationReview,
+            ],
+          ),
+        ],
         child: const MaterialApp(home: ReviewScreen()),
       ),
     );
