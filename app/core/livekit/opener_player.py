@@ -59,6 +59,7 @@ class OpenerPlayer:
         emit_interim_transcript: Callable[[str, Optional[float]], None],
         voice_on_avatar: Callable[[], bool] = lambda: False,
         background_tasks: Optional[Set[asyncio.Task]] = None,
+        observe_wait: Optional[Callable[[float], None]] = None,
     ) -> None:
         self._room = room_name
         self.turn_delivery = turn_delivery
@@ -70,6 +71,11 @@ class OpenerPlayer:
         self._emit_interim = emit_interim_transcript
         self._voice_on_avatar = voice_on_avatar
         self._tasks = background_tasks if background_tasks is not None else set()
+        #: Reports each turn's measured wait (thinking -> reply audio) to the
+        #: gap predictor, which the timing rules fit the cues into.
+        self._observe_wait = observe_wait
+        #: When the agent last started thinking; the cues are timed from here.
+        self._thinking_at: Optional[float] = None
 
         #: catalog id -> FillerClip
         self.clips: Dict[str, Any] = {}
@@ -207,6 +213,10 @@ class OpenerPlayer:
         try:
             if new_state == "thinking":
                 self._thinking = True
+                # The LAST thinking before the reply: a false endpoint restarts
+                # the wait, and the cues are timed from it.
+                if created_at is not None:
+                    self._thinking_at = float(created_at)
                 if self._task_pending() or self._is_playing():
                     return
                 self._start_turn(created_at)
@@ -216,6 +226,7 @@ class OpenerPlayer:
                 if new_state == "speaking":
                     # A real reply started: the next learner turn may open again.
                     self._opened_since_reply = False
+                    self._report_wait(created_at)
                 if new_state == "listening":
                     self.turn_delivery.end_turn()
         except Exception:  # noqa: BLE001 - must never break a session
@@ -485,6 +496,15 @@ class OpenerPlayer:
         return dataclasses.replace(
             clip, frames=frames, duration_ms=duration_ms, alternates=[]
         )
+
+    def _report_wait(self, speaking_at) -> None:
+        started = self._thinking_at
+        self._thinking_at = None
+        if self._observe_wait is None or started is None or speaking_at is None:
+            return
+        wait_ms = (float(speaking_at) - started) * 1000.0
+        if 0 < wait_ms <= 30_000:
+            self._observe_wait(wait_ms)
 
     # ---- helpers ----------------------------------------------------
 

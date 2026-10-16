@@ -54,6 +54,9 @@ class GapPredictor:
         self._samples = 0
         #: This turn's LLM time-to-first-token, waiting for its TTS half.
         self._pending_llm_ms: Optional[float] = None
+        #: Whether a measured end-to-end wait has been seen (``observe_wait``).
+        #: From then on only measured waits count.
+        self._measured = False
 
     @property
     def samples(self) -> int:
@@ -88,6 +91,29 @@ class GapPredictor:
         )
         self._samples += 1
 
+    def observe_wait(self, wait_ms: Optional[float]) -> None:
+        """Fold in one turn's MEASURED wait: "thinking" to the reply's audio.
+
+        The component sum (LLM time-to-first-token + TTS time-to-first-byte)
+        leaves out the rest of the pipeline between the learner finishing and
+        the reply sounding. Prod V2V (2026-10-16) measured it at ~0.8x the real
+        wait (2.1-2.5 s predicted vs 2.7-3.2 s real), so the interim never fit
+        in a gap that left 1.1-1.5 s of silence after the filler. The first
+        measured wait replaces the component estimate; component timings are
+        ignored after that.
+        """
+        try:
+            value = float(wait_ms) if wait_ms is not None else None
+        except (TypeError, ValueError):
+            return
+        if value is None or value <= 0:
+            return
+        if not self._measured:
+            self._measured = True
+            self._value = None
+            self._samples = 0
+        self.observe(value)
+
     def observe_turn(
         self, llm_ttft_ms: Optional[float], tts_ttfb_ms: Optional[float]
     ) -> None:
@@ -96,8 +122,11 @@ class GapPredictor:
         Either component may be missing (a cached reply, a provider that doesn't
         report TTFB); the sum of what IS present is still a usable lower bound,
         which is the safe direction — it under-predicts the gap, so the filler
-        errs toward not playing rather than talking over the reply.
+        errs toward not playing rather than talking over the reply. Ignored once
+        measured waits are arriving (``observe_wait``).
         """
+        if self._measured:
+            return
         total = 0.0
         for part in (llm_ttft_ms, tts_ttfb_ms):
             try:
@@ -142,7 +171,13 @@ class GapPredictor:
         self.observe_turn(pending, tts_ttfb_ms)
 
     def predict_ms(self) -> float:
-        """Best estimate of the coming turn's time to first reply audio."""
-        if self._value is None or not self.is_warm:
+        """Best estimate of the coming turn's time to first reply audio.
+
+        A single measured wait is already a better estimate than the prior: it
+        is the real thing, where the prior is a fleet-wide guess.
+        """
+        if self._value is None:
             return self._prior
-        return self._value
+        if self._measured or self.is_warm:
+            return self._value
+        return self._prior

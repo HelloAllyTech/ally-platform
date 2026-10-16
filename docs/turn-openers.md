@@ -64,6 +64,11 @@ learner finishes → agent "thinking"
   `kind` (state fit) and `family` (repeat detection). Studio `allowedFillers`
   are added as lexical entries. Rendered once per voice and cached worker-wide.
   `breath` plays bundled audio from `app/assets/openers/`.
+- **The predicted wait** (`gap_predictor.py`) is learned from each turn's
+  measured wait, from the agent starting to think to the reply's first audio.
+  The earlier estimate (LLM time-to-first-token + TTS time-to-first-byte) read
+  ~0.8x the real wait in prod V2V, so no interim piece ever fit; it is only the
+  starting point until the first measured turn.
 - **The policy** (`opener_policy.py`) is pure and deterministic:
   - **pause first** — a randomised `OPENER_HOLD_*`, and a real pause
     (`OPENER_LONG_HOLD_*`, 1.2-2 s) when the plan says one fits;

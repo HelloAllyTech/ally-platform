@@ -2748,6 +2748,7 @@ class AgentWorker:
             emit_filler_transcript=self._emit_filler_transcript,
             emit_interim_transcript=self._emit_interim_transcript,
             voice_on_avatar=self._voice_on_avatar,
+            observe_wait=self._observe_measured_wait,
         )
         playable = await player.render_catalog()
         if not playable:
@@ -3007,6 +3008,14 @@ class AgentWorker:
     # ================================================================
     # Thinking-filler playback
     # ================================================================
+
+    def _observe_measured_wait(self, wait_ms: float) -> None:
+        """Teach the gap predictor a turn's real wait (thinking -> reply audio)."""
+        try:
+            if self._gap_predictor is not None:
+                self._gap_predictor.observe_wait(wait_ms)
+        except Exception:  # noqa: BLE001 - prediction must never break a turn
+            pass
 
     def _predicted_gap_ms(self) -> float:
         """How long the learner is about to wait for the real reply, in ms."""

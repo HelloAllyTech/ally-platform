@@ -88,6 +88,32 @@ class TestGapPredictorPairsTheHalves:
 # ---------------------------------------------------------------------------
 
 
+class TestGapPredictorLearnsTheRealWait:
+    """Prod V2V 2026-10-16: the component sum read ~0.8x the real wait, so the
+    interim never fit while 1.1-1.5 s of silence followed the filler."""
+
+    def test_a_measured_wait_replaces_the_component_estimate(self):
+        p = GapPredictor(prior_ms=2500.0, min_samples=2)
+        for _ in range(3):
+            p.observe_llm_ttft(1200.0)
+            p.observe_tts_ttfb(1000.0)
+        assert p.predict_ms() == pytest.approx(2200.0)
+        p.observe_wait(2900.0)
+        assert p.predict_ms() == pytest.approx(2900.0)  # one is enough
+        # Component timings no longer pull it back down.
+        p.observe_llm_ttft(1200.0)
+        p.observe_tts_ttfb(1000.0)
+        assert p.predict_ms() == pytest.approx(2900.0)
+        p.observe_wait(3100.0)
+        assert 2900.0 < p.predict_ms() < 3100.0
+
+    def test_nonsense_waits_are_ignored(self):
+        p = GapPredictor(prior_ms=2500.0)
+        for bad in (None, 0, -5, "x"):
+            p.observe_wait(bad)
+        assert p.predict_ms() == 2500.0
+
+
 class TestSessionCatalog:
     def test_the_catalog_file_ships(self):
         """It must be tracked by git: under a ``data/`` dir it was gitignored and
@@ -889,6 +915,21 @@ class TestOpenerPlayer:
         player.on_agent_state("thinking")
         await asyncio.sleep(1.0)
         assert len(bg.played) == 3
+
+    @pytest.mark.asyncio
+    async def test_the_real_wait_is_reported_from_the_last_thinking(self, monkeypatch):
+        player, td, bg, _ = _player(monkeypatch)
+        seen = []
+        player._observe_wait = seen.append
+        player.on_agent_state("thinking", created_at=100.0)
+        player.on_agent_state("listening", created_at=100.4)  # false endpoint
+        player.on_agent_state("thinking", created_at=101.0)
+        player.on_agent_state("speaking", created_at=103.9)
+        assert seen == [pytest.approx(2900.0)]
+        # The opening statement has no thinking before it: nothing reported.
+        player.on_agent_state("listening", created_at=110.0)
+        player.on_agent_state("speaking", created_at=111.0)
+        assert len(seen) == 1
 
     @pytest.mark.asyncio
     async def test_a_line_ready_during_the_filler_still_plays_if_it_fits(
