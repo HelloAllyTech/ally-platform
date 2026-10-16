@@ -31,5 +31,32 @@ void main() {
       // Sibling key untouched by the overlay.
       expect(merged.t('progress.hero.level', {'level': 1}), 'Level 1');
     });
+
+    group('raw', () {
+      final withStructuredContent = Translations({
+        'terms': {
+          'sections': [
+            {
+              'heading': 'General Terms',
+              'content': ['Bullet one', 'Bullet two'],
+            },
+          ],
+        },
+      });
+
+      test('returns a non-scalar node unconverted', () {
+        final sections = withStructuredContent.raw('terms.sections');
+        expect(sections, isA<List<dynamic>>());
+        expect((sections as List)[0]['heading'], 'General Terms');
+      });
+
+      test('still resolves a scalar leaf, same as t() would', () {
+        expect(translations.raw('progress.title'), 'Your progress');
+      });
+
+      test('returns null (not the key itself) when the path is missing', () {
+        expect(translations.raw('does.not.exist'), isNull);
+      });
+    });
   });
 }

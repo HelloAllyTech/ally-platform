@@ -6,6 +6,7 @@ import 'package:mocktail/mocktail.dart';
 
 import 'package:ally_mobile_flutter/core/auth/auth_state.dart';
 import 'package:ally_mobile_flutter/core/config/app_config.dart';
+import 'package:ally_mobile_flutter/core/widgets/app_button.dart';
 import 'package:ally_mobile_flutter/features/auth/data/auth_repository.dart';
 import 'package:ally_mobile_flutter/features/auth/presentation/login_screen.dart';
 
@@ -147,21 +148,53 @@ void main() {
       verifyNever(() => authRepository.verifyOtp(email: any(named: 'email'), otp: any(named: 'otp')));
     });
 
-    testWidgets('calls verifyOtp and signs in on success', (tester) async {
-      when(() => authRepository.verifyOtp(email: 'learner@example.com', otp: '123456'))
-          .thenAnswer((_) async => ('access-tok', 'refresh-tok'));
+    testWidgets(
+      'calls verifyOtp, shows the terms modal, and only signs in once agreed',
+      (tester) async {
+        when(() => authRepository.verifyOtp(email: 'learner@example.com', otp: '123456'))
+            .thenAnswer((_) async => ('access-tok', 'refresh-tok'));
 
-      await advanceToOtpStep(tester);
-      await tester.enterText(find.byType(TextField).last, '123456');
-      await tester.pump();
-      await tester.tap(find.text('Verify'));
-      await tester.pumpAndSettle();
+        await advanceToOtpStep(tester);
+        await tester.enterText(find.byType(TextField).last, '123456');
+        await tester.pump();
+        await tester.tap(find.text('Verify'));
+        // Not pumpAndSettle: the Verify button's spinner animates
+        // indefinitely while `TermsAndAgreementModal.show` is awaiting the
+        // learner's input, which `pumpAndSettle` would time out on.
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
 
-      verify(() => authRepository.verifyOtp(email: 'learner@example.com', otp: '123456')).called(1);
-      expect(authController.signInCalls, 1);
-      expect(authController.lastAccessToken, 'access-tok');
-      expect(authController.lastRefreshToken, 'refresh-tok');
-    });
+        verify(() => authRepository.verifyOtp(email: 'learner@example.com', otp: '123456')).called(1);
+        expect(authController.signInCalls, 0, reason: 'tokens are held until the terms are agreed to');
+        expect(find.text('Terms and agreement'), findsOneWidget);
+        expect(find.byKey(const Key('scroll-to-bottom-button')), findsOneWidget);
+
+        // Scroll the terms document to the bottom to reveal the
+        // checkbox/Agree button. Not pumpAndSettle here either — same
+        // indefinite-spinner reason as above, still true until Agree is
+        // tapped.
+        await tester.fling(find.byType(SingleChildScrollView), const Offset(0, -5000), 8000);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 350));
+
+        expect(find.byKey(const Key('scroll-to-bottom-button')), findsNothing);
+        final agreeButtonBefore = tester.widget<AppButton>(find.byType(AppButton).last);
+        expect(agreeButtonBefore.isDisabled, isTrue, reason: 'unchecked');
+
+        await tester.tap(find.byKey(const Key('agree-checkbox-container')));
+        await tester.pump();
+
+        final agreeButtonAfter = tester.widget<AppButton>(find.byType(AppButton).last);
+        expect(agreeButtonAfter.isDisabled, isFalse);
+
+        await tester.tap(find.byType(AppButton).last);
+        await tester.pumpAndSettle();
+
+        expect(authController.signInCalls, 1);
+        expect(authController.lastAccessToken, 'access-tok');
+        expect(authController.lastRefreshToken, 'refresh-tok');
+      },
+    );
 
     testWidgets('shows an error when verifyOtp fails', (tester) async {
       when(() => authRepository.verifyOtp(email: any(named: 'email'), otp: any(named: 'otp')))

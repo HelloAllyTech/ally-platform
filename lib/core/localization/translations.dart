@@ -35,6 +35,24 @@ class Translations {
     return result;
   }
 
+  /// Same dot-path lookup as [t], but returns whatever JSON node is there
+  /// unconverted — for the handful of real translation entries that are
+  /// structured content (e.g. `terms.sections`, an array of `{heading,
+  /// content}` objects) rather than a single interpolatable string. Returns
+  /// `null` when the path doesn't resolve, since there's no sensible
+  /// "visible miss" fallback for a non-string shape the way [t] has one.
+  dynamic raw(String key) {
+    dynamic node = _tree;
+    for (final segment in key.split('.')) {
+      if (node is Map<String, dynamic> && node.containsKey(segment)) {
+        node = node[segment];
+      } else {
+        return null;
+      }
+    }
+    return node;
+  }
+
   /// Merges [other] on top of this tree (deep merge, [other] wins on
   /// conflicts) — mirrors i18next's `addResourceBundle(..., deep: true,
   /// overwrite: true)` call in the RN app's dynamic sync.

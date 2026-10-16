@@ -11,6 +11,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_text_field.dart';
 import '../data/auth_repository.dart';
+import 'terms_and_agreement_modal.dart';
 
 /// Real email+OTP, Google, and Apple sign-in, matching ally-mobile (React
 /// Native)'s `generateOtp`/`verifyOtp`/`loginWithGoogle`/`loginWithApple`
@@ -87,6 +88,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       }
       final (accessToken, refreshToken) =
           await ref.read(authRepositoryProvider).loginWithGoogle(idToken);
+      if (!mounted) return;
+      await TermsAndAgreementModal.show(context);
       await ref.read(authControllerProvider.notifier).signIn(
             accessToken: accessToken,
             refreshToken: refreshToken,
@@ -121,6 +124,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             givenName: credential.givenName,
             familyName: credential.familyName,
           );
+      if (!mounted) return;
+      await TermsAndAgreementModal.show(context);
       await ref.read(authControllerProvider.notifier).signIn(
             accessToken: accessToken,
             refreshToken: refreshToken,
@@ -171,6 +176,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             email: _emailController.text.trim(),
             otp: otp,
           );
+      if (!mounted) return;
+      await TermsAndAgreementModal.show(context);
       await ref.read(authControllerProvider.notifier).signIn(
             accessToken: accessToken,
             refreshToken: refreshToken,
