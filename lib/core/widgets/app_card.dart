@@ -22,31 +22,39 @@ class AppCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return switch (variant) {
-      AppCardVariant.elevated => Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(AppRadius.xl3),
-            border: Border.all(color: AppColors.strokePrimary, width: 0.5),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.onBackground.withValues(alpha: 0.2),
-                offset: const Offset(0, 2),
-                blurRadius: 3,
-              ),
-            ],
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: child,
-        ),
-      AppCardVariant.flat => Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(AppRadius.lg),
-            border: Border.all(color: AppColors.lightGray14, width: 0.5),
-          ),
-          child: child,
-        ),
-    };
+    final radius = variant == AppCardVariant.elevated ? AppRadius.xl3 : AppRadius.lg;
+    final borderColor = variant == AppCardVariant.elevated
+        ? AppColors.strokePrimary
+        : AppColors.lightGray14;
+
+    // The surface color lives on an inner `Material`, not this `Container`'s
+    // own decoration — any interactive descendant (a `ListTile`, an
+    // `InkWell`) paints its splashes on the nearest `Material` ancestor,
+    // and a `DecoratedBox`-painted background in between hides them
+    // (Flutter's own Card widget does the same split for this reason).
+    // The border/shadow stay on the outer `Container` since `Material`'s
+    // own `elevation` shadow isn't the same shape as the real app's
+    // `boxShadow` spec.
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(radius),
+        border: Border.all(color: borderColor, width: 0.5),
+        boxShadow: variant == AppCardVariant.elevated
+            ? [
+                BoxShadow(
+                  color: AppColors.onBackground.withValues(alpha: 0.2),
+                  offset: const Offset(0, 2),
+                  blurRadius: 3,
+                ),
+              ]
+            : null,
+      ),
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(radius),
+        clipBehavior: Clip.antiAlias,
+        child: child,
+      ),
+    );
   }
 }

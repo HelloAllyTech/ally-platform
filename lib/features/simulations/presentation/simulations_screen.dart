@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/tab_screen_header.dart';
 import '../data/simulations_repository.dart';
 
 /// Port of ally-mobile (React Native)'s `SimulationsScreen` — scenario list
@@ -16,55 +19,62 @@ class SimulationsScreen extends ConsumerWidget {
     final creditsAsync = ref.watch(simulationCreditsProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(ref.t('learn.tabs.simulations')),
-        actions: [
-          creditsAsync.when(
-            data: (credits) => Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Center(
-                child: Text(
-                  ref.t('simulations.creditsRemaining', {'count': credits.remaining}),
-                ),
+      body: Column(
+        children: [
+          TabScreenHeader(
+            title: ref.t('common.appName'),
+            subtitle: ref.t('nav.tabs.learn'),
+            italicSubtitle: true,
+            trailing: creditsAsync.when(
+              data: (credits) => Text(
+                ref.t('simulations.creditsRemaining', {'count': credits.remaining}),
               ),
+              loading: () => const SizedBox.shrink(),
+              error: (_, _) => const SizedBox.shrink(),
             ),
-            loading: () => const SizedBox.shrink(),
-            error: (_, _) => const SizedBox.shrink(),
+          ),
+          Expanded(
+            child: scenariosAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (error, _) => Center(
+                child: Text('${ref.t('simulations.failedToLoadScenarios')}: $error'),
+              ),
+              data: (scenarios) {
+                if (scenarios.isEmpty) {
+                  return Center(child: Text(ref.t('simulationPage.noSimulationsAvailable')));
+                }
+                return ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: scenarios.length,
+                  itemBuilder: (context, index) {
+                    final scenario = scenarios[index];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: AppCard(
+                        child: ListTile(
+                          title: Text(scenario.title),
+                          subtitle: scenario.description != null
+                              ? Text(
+                                  scenario.description!,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                )
+                              : null,
+                          trailing: SvgPicture.asset(
+                            'assets/icons/arrowRight.svg',
+                            width: 16,
+                            height: 16,
+                          ),
+                          onTap: () => context.push('/simulations/${scenario.id}'),
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
           ),
         ],
-      ),
-      body: scenariosAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(
-          child: Text('${ref.t('simulations.failedToLoadScenarios')}: $error'),
-        ),
-        data: (scenarios) {
-          if (scenarios.isEmpty) {
-            return Center(child: Text(ref.t('simulationPage.noSimulationsAvailable')));
-          }
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: scenarios.length,
-            itemBuilder: (context, index) {
-              final scenario = scenarios[index];
-              return Card(
-                margin: const EdgeInsets.only(bottom: 12),
-                child: ListTile(
-                  title: Text(scenario.title),
-                  subtitle: scenario.description != null
-                      ? Text(
-                          scenario.description!,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        )
-                      : null,
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                  onTap: () => context.push('/simulations/${scenario.id}'),
-                ),
-              );
-            },
-          );
-        },
       ),
     );
   }
