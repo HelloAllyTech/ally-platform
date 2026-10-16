@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/widgets/app_tab_view.dart';
+import '../../../core/widgets/tab_screen_header.dart';
 import '../data/achievements_repository.dart';
 
 enum _AchievementsFilter { all, unlocked }
@@ -26,8 +29,17 @@ class _AchievementsScreenState extends ConsumerState<AchievementsScreen> {
     final badgesAsync = ref.watch(badgesProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text(ref.t('achievements.title'))),
-      body: badgesAsync.when(
+      body: Column(
+        children: [
+          TabScreenHeader(title: ref.t('achievements.title')),
+          Expanded(child: _buildBody(context, badgesAsync)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBody(BuildContext context, AsyncValue<List<BadgeCategoryGroup>> badgesAsync) {
+    return badgesAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) =>
             Center(child: Text('${ref.t('achievements.errors.title')}: $error')),
@@ -49,19 +61,16 @@ class _AchievementsScreenState extends ConsumerState<AchievementsScreen> {
             children: [
               Padding(
                 padding: const EdgeInsets.only(bottom: 16),
-                child: SegmentedButton<_AchievementsFilter>(
-                  segments: [
-                    ButtonSegment(
-                      value: _AchievementsFilter.all,
-                      label: Text(ref.t('achievements.filters.all')),
-                    ),
-                    ButtonSegment(
-                      value: _AchievementsFilter.unlocked,
-                      label: Text(ref.t('achievements.filters.unlocked')),
+                child: AppTabView<_AchievementsFilter>(
+                  tabs: [
+                    AppTabViewItem(key: _AchievementsFilter.all, label: ref.t('achievements.filters.all')),
+                    AppTabViewItem(
+                      key: _AchievementsFilter.unlocked,
+                      label: ref.t('achievements.filters.unlocked'),
                     ),
                   ],
-                  selected: {_filter},
-                  onSelectionChanged: (selection) => setState(() => _filter = selection.first),
+                  activeTab: _filter,
+                  onTabChange: (filter) => setState(() => _filter = filter),
                 ),
               ),
               for (final group in filteredGroups) ...[
@@ -88,10 +97,12 @@ class _AchievementsScreenState extends ConsumerState<AchievementsScreen> {
                                 backgroundImage:
                                     badge.imageUrl.isNotEmpty ? NetworkImage(badge.imageUrl) : null,
                                 child: badge.imageUrl.isEmpty
-                                    ? Icon(
+                                    ? SvgPicture.asset(
                                         badge.lockStatus == BadgeLockStatus.unlocked
-                                            ? Icons.emoji_events
-                                            : Icons.lock_outline,
+                                            ? 'assets/icons/badgeIcon.svg'
+                                            : 'assets/icons/achievementLocked.svg',
+                                        width: 28,
+                                        height: 28,
                                       )
                                     : null,
                               ),
@@ -113,7 +124,6 @@ class _AchievementsScreenState extends ConsumerState<AchievementsScreen> {
             ],
           );
         },
-      ),
-    );
+      );
   }
 }
