@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { FeatureToggleKey, Permissions } from "@constants";
 
-import { canManageRoadmap, canOpenRoadmapBuilder } from "../utils/access";
+import { canManageRoadmap, canOpenRoadmapBuilder, canQuickAddRoadmap } from "../utils/access";
 
 const EDIT = Permissions.EDIT_PRODUCT_ROADMAP;
 const TOGGLE = FeatureToggleKey.PRODUCT_ROADMAP_MANAGE;
@@ -53,5 +53,34 @@ describe("canOpenRoadmapBuilder", () => {
     expect(canOpenRoadmapBuilder([EDIT_BUILDER], [])).toBe(false);
     expect(canOpenRoadmapBuilder([EDIT_BUILDER], undefined)).toBe(false);
     expect(canOpenRoadmapBuilder(undefined, [BUILDER])).toBe(false);
+  });
+});
+
+describe("canQuickAddRoadmap", () => {
+  const VOTE = Permissions.VOTE_PRODUCT_ROADMAP;
+  const QUICK_ADD = FeatureToggleKey.PRODUCT_ROADMAP_QUICK_ADD;
+
+  it("quick-adds with the vote permission and the toggle", () => {
+    expect(canQuickAddRoadmap([VOTE], [QUICK_ADD])).toBe(true);
+  });
+
+  it("does NOT quick-add on the vote permission alone", () => {
+    // Every admin can vote; the toggle is the whole distinction.
+    expect(canQuickAddRoadmap([VOTE], [TOGGLE])).toBe(false);
+  });
+
+  it("does NOT quick-add on the toggle alone", () => {
+    expect(canQuickAddRoadmap([Permissions.VIEW_PRODUCT_ROADMAP], [QUICK_ADD])).toBe(false);
+  });
+
+  it("is independent of roadmap manage", () => {
+    // A curator is not a quick-adder, and a quick-adder is not a curator.
+    expect(canQuickAddRoadmap([EDIT, VOTE], [TOGGLE])).toBe(false);
+    expect(canManageRoadmap([EDIT, VOTE], [QUICK_ADD])).toBe(false);
+  });
+
+  it("fails closed when toggles could not be loaded", () => {
+    expect(canQuickAddRoadmap([VOTE], [])).toBe(false);
+    expect(canQuickAddRoadmap([VOTE], undefined)).toBe(false);
   });
 });

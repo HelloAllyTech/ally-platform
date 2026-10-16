@@ -34,6 +34,9 @@ export const FeatureToggleKey = {
   WHATSAPP_BOT: "whatsapp_bot",
   KNOWLEDGE_BASE: "knowledge_base",
   PRODUCT_ROADMAP_MANAGE: "product_roadmap_manage",
+  // Quick add: file an opportunity straight onto the roadmap, skipping the guided interview's
+  // readiness check. A curator shortcut granted to named admins, independent of MANAGE.
+  PRODUCT_ROADMAP_QUICK_ADD: "product_roadmap_quick_add",
   ADMIN_USER_MANAGEMENT: "admin_user_management",
   MULTI_TENANT_ALLOWLIST_MANAGEMENT: "multi_tenant_allowlist_management",
   BUG_HUNTER: "bug_hunter",
@@ -168,6 +171,7 @@ export const FEATURE_TOGGLE_KEY_TO_SECTION: Record<string, FeatureToggleSection>
   [FeatureToggleKey.MULTI_TENANT_ALLOWLIST_MANAGEMENT]:
     FEATURE_TOGGLE_SECTIONS.USER_AND_ORG_MANAGEMENT,
   [FeatureToggleKey.PRODUCT_ROADMAP_MANAGE]: FEATURE_TOGGLE_SECTIONS.USER_AND_ORG_MANAGEMENT,
+  [FeatureToggleKey.PRODUCT_ROADMAP_QUICK_ADD]: FEATURE_TOGGLE_SECTIONS.USER_AND_ORG_MANAGEMENT,
 
   [FeatureToggleKey.AGENT_TEST_CASES]: FEATURE_TOGGLE_SECTIONS.TESTING,
   [FeatureToggleKey.ROLEPLAY_SESSION_LOGS]: FEATURE_TOGGLE_SECTIONS.TESTING,

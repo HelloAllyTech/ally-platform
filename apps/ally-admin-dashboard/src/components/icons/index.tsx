@@ -421,6 +421,14 @@ export const BuilderAgentIcon = materialSymbol("auto_awesome");
 export const RoadmapSettingsIcon = materialSymbol("settings");
 
 /**
+ * The roadmap header's quick-add glyph: a plain plus, beside the guided-interview bulb. The
+ * bulb says "file an idea, with help"; the plus says "add a row" — which is exactly what quick
+ * add is, so the glyph the bulb's note rejected for the interview is the right one here. Same
+ * `wght 100` family as its neighbours. "add" MUST stay in index.html's `icon_names` subset.
+ */
+export const QuickAddIcon = materialSymbol("add");
+
+/**
  * Standard tooltip affordance across the admin. Unlike the Carbon icons above
  * this renders the Material Symbols "sticky_note" glyph via a ligature — the
  * font is loaded in index.html (`icon_names=sticky_note,...`) and the thin

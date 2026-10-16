@@ -323,6 +323,11 @@ export const ApiEndpoints = {
   PRODUCT_ROADMAP: {
     OPPORTUNITIES: "/v1/product-roadmap/opportunities",
     /**
+     * Quick add: the same filing as OPPORTUNITIES with the readiness gate off. Behind the
+     * `product_roadmap_quick_add` admin toggle server-side; a caller without it gets a 403.
+     */
+    OPPORTUNITIES_QUICK: "/v1/product-roadmap/opportunities/quick",
+    /**
      * The same route helpline and mobile file a bug on. Not `/opportunities` with
      * type=bug: this one captures the reporter's screen/device context for triage and
      * stamps `source` from the reporter's own roles, so a staff report and a consumer

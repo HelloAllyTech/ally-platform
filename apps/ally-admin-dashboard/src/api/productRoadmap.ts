@@ -216,6 +216,35 @@ export const productRoadmapAPI = baseAPI.injectEndpoints({
       providesTags: [TAG_TYPES.PRODUCT_ROADMAP_FACETS],
     }),
 
+    /**
+     * Quick add: file straight onto the board with no readiness token and no brief. Same
+     * response and the same cache invalidation as createRoadmapOpportunity, so the new row shows
+     * up wherever an interviewed one would. Only shown to holders of the quick-add toggle — see
+     * canQuickAddRoadmap.
+     */
+    quickAddRoadmapOpportunity: builder.mutation<
+      RoadmapOpportunity,
+      {
+        description: string;
+        type: string;
+        productGoal: string;
+        effort?: RoadmapOpportunityEffort | null;
+        /** Only sent by a filer who can manage the roadmap — 403 otherwise, as on create. */
+        ownerUserId?: number | null;
+        referenceImages?: RoadmapReferenceImage[];
+      }
+    >({
+      query: body => ({
+        url: ApiEndpoints.PRODUCT_ROADMAP.OPPORTUNITIES_QUICK,
+        method: HttpMethod.POST,
+        body,
+      }),
+      invalidatesTags: [
+        { type: TAG_TYPES.PRODUCT_ROADMAP_OPPORTUNITIES, id: "LIST" },
+        TAG_TYPES.PRODUCT_ROADMAP_FACETS,
+      ],
+    }),
+
     createRoadmapOpportunity: builder.mutation<
       RoadmapOpportunity,
       {
@@ -894,6 +923,7 @@ export const {
   useGetRoadmapVoteBudgetQuery,
   useGetRoadmapFacetsQuery,
   useCreateRoadmapOpportunityMutation,
+  useQuickAddRoadmapOpportunityMutation,
   useCreateRoadmapBugReportMutation,
   useUpdateRoadmapOpportunityMutation,
   useDeleteRoadmapOpportunityMutation,
