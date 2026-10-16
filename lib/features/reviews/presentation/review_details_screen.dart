@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/app_chat_input.dart';
 import '../data/reviews_repository.dart';
 import 'thread_detail_screen.dart';
 
@@ -60,7 +63,7 @@ class _ReviewDetailsScreenState extends ConsumerState<ReviewDetailsScreen> {
           title: Text(ref.t('review.title')),
           actions: [
             IconButton(
-              icon: const Icon(Icons.emoji_emotions_outlined),
+              icon: SvgPicture.asset('assets/icons/smile.svg', width: 24, height: 24),
               tooltip: ref.t('review.reactionsModal.title'),
               onPressed: () => context.push('/reactions/${widget.reviewId}'),
             ),
@@ -142,7 +145,7 @@ class _ReviewDetailsScreenState extends ConsumerState<ReviewDetailsScreen> {
                       final comment = comments[index];
                       return ListTile(
                         dense: true,
-                        leading: const Icon(Icons.comment_outlined),
+                        leading: SvgPicture.asset('assets/icons/chatBubble.svg', width: 20, height: 20),
                         title: Text(comment.authorName),
                         subtitle: Text(comment.content),
                       );
@@ -153,23 +156,11 @@ class _ReviewDetailsScreenState extends ConsumerState<ReviewDetailsScreen> {
         SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _commentController,
-                    decoration: InputDecoration(
-                      hintText: ref.t('review.details.addCommentPlaceholder'),
-                      border: const OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.send),
-                  onPressed: _isSubmitting ? null : _submitComment,
-                ),
-              ],
+            child: AppChatInput(
+              controller: _commentController,
+              placeholder: ref.t('review.details.addCommentPlaceholder'),
+              enabled: !_isSubmitting,
+              onSend: _submitComment,
             ),
           ),
         ),
@@ -200,28 +191,31 @@ class _ThreadsTab extends ConsumerWidget {
               itemBuilder: (context, index) {
                 final thread = threads[index];
                 final rootComment = thread.comments.firstOrNull;
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: ListTile(
-                    title: Text(
-                      thread.message?.content ?? '(transcript moment)',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontStyle: FontStyle.italic),
-                    ),
-                    subtitle: rootComment != null
-                        ? Text(
-                            '${rootComment.authorName}: ${rootComment.content}',
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          )
-                        : null,
-                    trailing: Text('${thread.commentCount}'),
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => ThreadDetailScreen(
-                          reviewId: reviewId,
-                          thread: thread,
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: AppCard(
+                    variant: AppCardVariant.flat,
+                    child: ListTile(
+                      title: Text(
+                        thread.message?.content ?? '(transcript moment)',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontStyle: FontStyle.italic),
+                      ),
+                      subtitle: rootComment != null
+                          ? Text(
+                              '${rootComment.authorName}: ${rootComment.content}',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            )
+                          : null,
+                      trailing: Text('${thread.commentCount}'),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => ThreadDetailScreen(
+                            reviewId: reviewId,
+                            thread: thread,
+                          ),
                         ),
                       ),
                     ),

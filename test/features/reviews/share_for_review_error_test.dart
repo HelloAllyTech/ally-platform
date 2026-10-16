@@ -1,7 +1,7 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
+import 'package:ally_mobile_flutter/core/widgets/app_button.dart';
 import 'package:ally_mobile_flutter/features/reviews/data/reviews_repository.dart';
 import 'package:ally_mobile_flutter/features/reviews/presentation/share_for_review_screen.dart';
 
@@ -30,7 +30,7 @@ void main() {
 
     expect(find.textContaining('Failed to share for review'), findsOneWidget);
     // The button is interactable again (not stuck in its submitting state).
-    final button = tester.widget<FilledButton>(find.byType(FilledButton));
-    expect(button.onPressed, isNotNull);
+    final button = tester.widget<AppButton>(find.byType(AppButton));
+    expect(button.isLoading, isFalse);
   });
 }

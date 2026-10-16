@@ -43,7 +43,7 @@ void main() {
       overrides: threadDetailOverrides(reviewsRepository, reactionsRepository),
     );
 
-    await tester.tap(find.byIcon(Icons.add_reaction_outlined));
+    await tester.tap(find.byType(PopupMenuButton<String>));
     await tester.pumpAndSettle();
     await tester.tap(find.text('👍').last);
     await tester.pumpAndSettle();

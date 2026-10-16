@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/app_chat_input.dart';
+import '../../../core/widgets/tab_screen_header.dart';
 import '../../reactions/data/reactions_repository.dart';
 import '../data/review_models.dart';
 import '../data/reviews_repository.dart';
@@ -109,18 +113,16 @@ class _ThreadDetailScreenState extends ConsumerState<ThreadDetailScreen> {
     final remainingCount = widget.thread.commentCount - _comments.length;
 
     return Scaffold(
-      appBar: AppBar(title: Text(ref.t('commentThreadBottomSheet.title'))),
       body: Column(
         children: [
+          TabScreenHeader(title: ref.t('commentThreadBottomSheet.title')),
           Expanded(
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
                 if (message != null)
-                  Card(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .surfaceContainerHighest,
+                  AppCard(
+                    variant: AppCardVariant.flat,
                     child: Padding(
                       padding: const EdgeInsets.all(12),
                       child: Column(
@@ -170,23 +172,11 @@ class _ThreadDetailScreenState extends ConsumerState<ThreadDetailScreen> {
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _replyController,
-                      decoration: InputDecoration(
-                        hintText: ref.t('review.details.replyPlaceholder'),
-                        border: const OutlineInputBorder(),
-                        isDense: true,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.send),
-                    onPressed: _isSubmitting ? null : _submitReply,
-                  ),
-                ],
+              child: AppChatInput(
+                controller: _replyController,
+                placeholder: ref.t('review.details.replyPlaceholder'),
+                enabled: !_isSubmitting,
+                onSend: _submitReply,
               ),
             ),
           ),
@@ -204,49 +194,52 @@ class _CommentTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              comment.authorName,
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
-            const SizedBox(height: 4),
-            Text(comment.content),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 6,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                for (final entry in comment.reactions.entries)
-                  Chip(
-                    label: Text('${entry.key} ${entry.value}'),
-                    visualDensity: VisualDensity.compact,
-                    backgroundColor: comment.myReaction == entry.key
-                        ? Theme.of(context).colorScheme.primaryContainer
-                        : null,
-                  ),
-                PopupMenuButton<String>(
-                  icon: const Icon(Icons.add_reaction_outlined, size: 18),
-                  onSelected: (emoji) => onReact(comment, emoji),
-                  itemBuilder: (context) => [
-                    for (final emoji in _availableReactions)
-                      PopupMenuItem(
-                        value: emoji,
-                        child: Text(
-                          emoji,
-                          style: const TextStyle(fontSize: 18),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: AppCard(
+        variant: AppCardVariant.flat,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                comment.authorName,
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              const SizedBox(height: 4),
+              Text(comment.content),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  for (final entry in comment.reactions.entries)
+                    Chip(
+                      label: Text('${entry.key} ${entry.value}'),
+                      visualDensity: VisualDensity.compact,
+                      backgroundColor: comment.myReaction == entry.key
+                          ? Theme.of(context).colorScheme.primaryContainer
+                          : null,
+                    ),
+                  PopupMenuButton<String>(
+                    icon: SvgPicture.asset('assets/icons/addReaction.svg', width: 18, height: 18),
+                    onSelected: (emoji) => onReact(comment, emoji),
+                    itemBuilder: (context) => [
+                      for (final emoji in _availableReactions)
+                        PopupMenuItem(
+                          value: emoji,
+                          child: Text(
+                            emoji,
+                            style: const TextStyle(fontSize: 18),
+                          ),
                         ),
-                      ),
-                  ],
-                ),
-              ],
-            ),
-          ],
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
