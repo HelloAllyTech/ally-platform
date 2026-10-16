@@ -56,7 +56,7 @@ void main() {
         (_) async => null,
       );
 
-      await tester.tap(find.byType(DropdownButton<LeaderboardWindow>));
+      await tester.tap(find.byType(DropdownMenu<String>));
       await tester.pumpAndSettle();
       await tester.tap(find.text('All time').last);
       await tester.pumpAndSettle();

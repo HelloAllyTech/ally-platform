@@ -29,6 +29,7 @@ class AppTextField extends StatelessWidget {
     this.maxLines = 1,
     this.keyboardType,
     this.onChanged,
+    this.onSubmitted,
   });
 
   final TextEditingController? controller;
@@ -38,6 +39,7 @@ class AppTextField extends StatelessWidget {
   final int? maxLines;
   final TextInputType? keyboardType;
   final ValueChanged<String>? onChanged;
+  final ValueChanged<String>? onSubmitted;
 
   @override
   Widget build(BuildContext context) {
@@ -82,6 +84,7 @@ class AppTextField extends StatelessWidget {
       maxLines: maxLines,
       keyboardType: keyboardType,
       onChanged: onChanged,
+      onSubmitted: onSubmitted,
       style: textStyle,
       decoration: decoration,
     );

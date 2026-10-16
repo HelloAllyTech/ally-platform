@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/widgets/app_dropdown.dart';
+import '../../../core/widgets/tab_screen_header.dart';
 import '../data/leaderboard_repository.dart';
 
 /// Port of ally-mobile (React Native)'s `LeaderboardScreen` — ranked list,
@@ -17,73 +19,71 @@ class LeaderboardScreen extends ConsumerWidget {
     final selectedWindow = ref.watch(leaderboardWindowProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(ref.t('community.title')),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: Center(
-              child: DropdownButton<LeaderboardWindow>(
-                value: selectedWindow,
-                underline: const SizedBox.shrink(),
-                onChanged: (window) {
-                  if (window != null) {
-                    ref.read(leaderboardWindowProvider.notifier).select(window);
-                  }
+      body: Column(
+        children: [
+          TabScreenHeader(
+            title: ref.t('community.title'),
+            trailing: SizedBox(
+              width: 160,
+              child: AppDropdown(
+                value: selectedWindow.label,
+                options: [for (final window in LeaderboardWindow.values) window.label],
+                onSelect: (label) {
+                  final window = LeaderboardWindow.values.firstWhere((w) => w.label == label);
+                  ref.read(leaderboardWindowProvider.notifier).select(window);
                 },
-                items: [
-                  for (final window in LeaderboardWindow.values)
-                    DropdownMenuItem(value: window, child: Text(window.label)),
+              ),
+            ),
+          ),
+          Expanded(
+            child: leaderboardAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (error, _) => Center(child: Text('${ref.t('community.loadError')}: $error')),
+              data: (entries) => Column(
+                children: [
+                  myRankAsync.maybeWhen(
+                    data: (myRank) => myRank == null
+                        ? const SizedBox.shrink()
+                        : Card(
+                            margin: const EdgeInsets.all(12),
+                            color: Theme.of(context).colorScheme.primaryContainer,
+                            child: ListTile(
+                              leading: CircleAvatar(child: Text('${myRank.rank}')),
+                              title: Text(ref.t('community.yourRank')),
+                              subtitle: Text(
+                                '${myRank.minutesPlayed} ${ref.t('community.duration.minute')} · '
+                                '${myRank.badgeCount} ${ref.t('community.table.badges')}',
+                              ),
+                            ),
+                          ),
+                    orElse: () => const SizedBox.shrink(),
+                  ),
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: entries.length,
+                      itemBuilder: (context, index) {
+                        final entry = entries[index];
+                        return ListTile(
+                          leading: CircleAvatar(
+                            backgroundImage: entry.profileImageUrl.isNotEmpty
+                                ? NetworkImage(entry.profileImageUrl)
+                                : null,
+                            child: entry.profileImageUrl.isEmpty
+                                ? Text('${entry.rank}')
+                                : null,
+                          ),
+                          title: Text(entry.name),
+                          trailing:
+                              Text('${entry.minutesPlayed} ${ref.t('community.duration.minute')}'),
+                        );
+                      },
+                    ),
+                  ),
                 ],
               ),
             ),
           ),
         ],
-      ),
-      body: leaderboardAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(child: Text('${ref.t('community.loadError')}: $error')),
-        data: (entries) => Column(
-          children: [
-            myRankAsync.maybeWhen(
-              data: (myRank) => myRank == null
-                  ? const SizedBox.shrink()
-                  : Card(
-                      margin: const EdgeInsets.all(12),
-                      color: Theme.of(context).colorScheme.primaryContainer,
-                      child: ListTile(
-                        leading: CircleAvatar(child: Text('${myRank.rank}')),
-                        title: Text(ref.t('community.yourRank')),
-                        subtitle: Text(
-                          '${myRank.minutesPlayed} ${ref.t('community.duration.minute')} · '
-                          '${myRank.badgeCount} ${ref.t('community.table.badges')}',
-                        ),
-                      ),
-                    ),
-              orElse: () => const SizedBox.shrink(),
-            ),
-            Expanded(
-              child: ListView.builder(
-                itemCount: entries.length,
-                itemBuilder: (context, index) {
-                  final entry = entries[index];
-                  return ListTile(
-                    leading: CircleAvatar(
-                      backgroundImage: entry.profileImageUrl.isNotEmpty
-                          ? NetworkImage(entry.profileImageUrl)
-                          : null,
-                      child: entry.profileImageUrl.isEmpty
-                          ? Text('${entry.rank}')
-                          : null,
-                    ),
-                    title: Text(entry.name),
-                    trailing: Text('${entry.minutesPlayed} ${ref.t('community.duration.minute')}'),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

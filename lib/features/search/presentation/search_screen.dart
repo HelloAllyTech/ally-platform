@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/widgets/app_text_field.dart';
 import '../data/search_repository.dart';
 
 /// Port of ally-mobile (React Native)'s `SearchScreen` + `useSearch` hook —
@@ -131,12 +133,18 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: TextField(
+        title: AppTextField(
           controller: _controller,
-          decoration: InputDecoration(hintText: ref.t('search.placeholder')),
+          shape: AppTextFieldShape.line,
+          placeholder: ref.t('search.placeholder'),
           onSubmitted: (_) => _search(),
         ),
-        actions: [IconButton(icon: const Icon(Icons.search), onPressed: _search)],
+        actions: [
+          IconButton(
+            icon: SvgPicture.asset('assets/icons/search.svg', width: 24, height: 24),
+            onPressed: _search,
+          ),
+        ],
       ),
       body: Column(
         children: [
