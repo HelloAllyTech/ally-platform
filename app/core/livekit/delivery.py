@@ -54,6 +54,9 @@ MAX_PIECE_WORDS = 8
 MAX_PIECE_CHARS = 60
 MAX_OPENER_IDS = 3
 _SENTENCE_ENDS = (".", "!", "।", "॥", "。")
+_PRONOUN_I = frozenset(
+    {"I", "I'm", "I've", "I'd", "I'll", "I’m", "I’ve", "I’d", "I’ll"}
+)
 
 #: Opener kinds the plan may name, plus the explicit choice of saying nothing.
 PLAN_KINDS = ("silence",) + OPENER_KINDS
@@ -147,6 +150,13 @@ def _safe_piece(text: Optional[str]) -> Optional[str]:
     # Rohan"). A holding piece trails off; an ellipsis is not an ending.
     if line.endswith(_SENTENCE_ENDS) and not line.endswith(("…", "...")):
         return None
+    # A name ties the piece to a topic — "Just thinking about Vivaan…" — which
+    # is what the interim must not have. Detectable only in scripts with case:
+    # a capitalised word after the first one.
+    for word in line.split()[1:]:
+        core = word.strip(".,…!?\"'“”‘’()-")
+        if core and core[0].isupper() and core[0].isascii() and core not in _PRONOUN_I:
+            return None
     if any(ch.isdigit() for ch in line):
         return None
     return line

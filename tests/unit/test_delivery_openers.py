@@ -282,6 +282,16 @@ class TestValidateDelivery:
         )
         assert [p.lower() for p in plan.interim] == ["hard to say"]
 
+    def test_a_piece_with_a_name_is_dropped(self):
+        plan = validate_delivery(
+            ProposedDelivery(
+                interim=["Just thinking about Vivaan…", "I'm not sure…", "hard to say"]
+            ),
+            None,
+            source="working_memory",
+        )
+        assert plan.interim == ("I'm not sure…", "hard to say")
+
     def test_at_most_three_pieces(self):
         plan = validate_delivery(
             ProposedDelivery(interim=["one two", "three four", "five six", "seven"]),
@@ -669,6 +679,14 @@ class TestLeadingHesitationTrimmer:
         )
         out = _stream(trimmer, ["I just ", "feel like I want ", "him to be happy."])
         assert out == "Like I want him to be happy."
+
+    def test_a_quoted_reply_is_still_recognised(self):
+        """Some scenarios wrap every reply in quotes (prod V2V, 2026-10-16)."""
+        trimmer = LeadingHesitationTrimmer(
+            is_active=lambda: True, phrases=lambda: ["Just thinking…"]
+        )
+        out = _stream(trimmer, ['"Just ', "thinking… I think ", "it might help."])
+        assert out == "I think it might help."
 
     def test_strips_the_echoed_opener_phrase(self):
         """The first live run: every opener came back at the start of the reply."""

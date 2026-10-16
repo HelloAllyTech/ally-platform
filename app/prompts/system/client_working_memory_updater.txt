@@ -32,7 +32,7 @@ On the next turn, before the client's reply, the counsellor may hear a short sou
 - interim: required. What the client mutters while gathering themselves, in the second before they answer the counsellor's NEXT question — which you have not seen. 1 to 3 very short pieces (2 to 5 words each), in spoken, colloquial {language_label}, in the client's own register and mood as you reported them, running on from each other as one trailing, unfinished thought. Rules for every piece:
   - It must fit in front of ANY answer: no topic, no name, no fact, no opinion, nothing about what was discussed.
   - It never asks the counsellor anything or raises a concern, even without a question mark. Words the client says to themselves while searching for words are fine.
-  - Never take words or phrases from the conversation turns above, and never reuse an opening the client has already used: write fresh words for this moment.
+  - Never take words or phrases from the conversation turns above, and never reuse an opening the client has already used: write fresh words for this moment, and vary how the pieces begin from turn to turn.
   - Each piece trails off — end it open (with "…" or nothing), never as a finished sentence — and still makes sense if the client stops right after it, because the reply may start at any point.
   It shows HOW the client is feeling (hesitant, weary, defensive, opening up), never WHAT they think.
 - hold_silence: true when a noticeable pause fits better than any sound.

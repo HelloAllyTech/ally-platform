@@ -81,6 +81,12 @@ _WORD_RE = re.compile(r"^\s*([^\s,.!?…।\[]+)([\s,.!?…।]*)")
 #: ``^`` match at ``pos``, so walking several words needs this one.
 _NEXT_WORD_RE = re.compile(r"\s*([^\s,.!?…।\[]+)([\s,.!?…।]*)")
 
+#: Edge characters ignored when comparing words: a dash, and the quote marks
+#: some scenarios wrap every reply in. A reply opening '"Just thinking…' was
+#: not recognised as restating the interim "Just thinking…" (prod V2V
+#: 2026-10-16), so the learner heard it twice.
+_WORD_EDGES = "-\"'“”‘’«»"
+
 #: Give up holding back after this many characters: a reply that has not
 #: resolved its first word by then is streamed through untouched.
 #: Covers the longest interim piece (delivery.MAX_PIECE_CHARS), so a reply
@@ -91,9 +97,9 @@ _MAX_HOLD_CHARS = 64
 def _phrase_words(phrase: str) -> List[str]:
     """Lower-cased words of an opener phrase, punctuation dropped."""
     return [
-        w.strip("-").lower()
+        w.strip(_WORD_EDGES).lower()
         for w in re.findall(r"[^\s,.!?…।\[\]]+", phrase or "")
-        if w.strip("-")
+        if w.strip(_WORD_EDGES)
     ]
 
 
@@ -223,7 +229,7 @@ class LeadingHesitationTrimmer:
             match = _NEXT_WORD_RE.match(buf, pos)
             if match is None:
                 break
-            words.append(match.group(1).strip("-").lower())
+            words.append(match.group(1).strip(_WORD_EDGES).lower())
             pos = match.end()
         return words, pos, pos < len(buf)
 
@@ -276,7 +282,7 @@ class LeadingHesitationTrimmer:
                 if len(stripped) > _MAX_HOLD_CHARS or final:
                     return self._release()
                 return ""
-            word = match.group(1).strip("-").lower()
+            word = match.group(1).strip(_WORD_EDGES).lower()
             if word in _HESITATION_WORDS:
                 self._buffer = buf[match.end() :]
                 continue
