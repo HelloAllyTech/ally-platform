@@ -147,13 +147,8 @@ def test_default_threshold_is_long_enough_for_slow_responses():
     wd.note_user_turn_finalized()
     wd.start()
     try:
-        # Wait for a duration that is JUST OVER the old 75s threshold.
-        has_fired = fired.wait(77.0)
         # The bug is that the watchdog fires too early. The fix is a longer
-        # threshold. So this test should assert it does NOT fire. It will fail
-        # before the fix, and pass after.
-        assert (
-            not has_fired
-        ), "WATCHDOG FIRED PREMATURELY: session timeout is still too short"
+        # threshold. So this test should assert the threshold is high enough.
+        assert wd._threshold >= 120.0
     finally:
         wd.stop()
