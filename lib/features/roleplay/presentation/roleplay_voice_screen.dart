@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/realtime/livekit_room_service.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_button.dart';
+import '../../../core/widgets/tab_screen_header.dart';
 import '../../simulations/data/simulations_repository.dart';
 
 /// Phase 1's other half: live roleplay voice, mirroring ally-mobile (React
@@ -121,62 +125,69 @@ class _RoleplayVoiceScreenState extends ConsumerState<RoleplayVoiceScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(ref.t('roleplayVoice.title'))),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                _isConnected ? Icons.podcasts : Icons.podcasts_outlined,
-                size: 64,
-                color: _isConnected ? Colors.green : null,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                _isConnected
-                    ? ref.t('roleplayVoice.connectedToRoom')
-                    : ref.t('roleplayVoice.notConnected'),
-              ),
-              if (_error != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(_error!, style: const TextStyle(color: Colors.red)),
+      body: Column(
+        children: [
+          TabScreenHeader(title: ref.t('roleplayVoice.title')),
+          Expanded(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SvgPicture.asset(
+                      _isConnected ? 'assets/icons/micOn.svg' : 'assets/icons/micOff.svg',
+                      width: 64,
+                      height: 64,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      _isConnected
+                          ? ref.t('roleplayVoice.connectedToRoom')
+                          : ref.t('roleplayVoice.notConnected'),
+                    ),
+                    if (_error != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(_error!, style: const TextStyle(color: AppColors.red400)),
+                      ),
+                    const SizedBox(height: 24),
+                    if (!_isConnected)
+                      AppButton(label: ref.t('roleplayVoice.connect'), onPressed: _connect)
+                    else ...[
+                      AppButton(
+                        label: _isMicEnabled
+                            ? ref.t('simulationPage.mute')
+                            : ref.t('simulationPage.unmute'),
+                        iconLeft: SvgPicture.asset(
+                          _isMicEnabled ? 'assets/icons/mic.svg' : 'assets/icons/micOff.svg',
+                          width: 20,
+                          height: 20,
+                          colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+                        ),
+                        onPressed: _toggleMic,
+                      ),
+                      const SizedBox(height: 12),
+                      if (widget.scenarioSessionId != null)
+                        AppButton(
+                          label: ref.t('simulationPage.endSession'),
+                          variant: AppButtonVariant.destructive,
+                          isLoading: _isEnding,
+                          onPressed: _endSession,
+                        )
+                      else
+                        AppButton(
+                          label: ref.t('roleplayVoice.disconnect'),
+                          variant: AppButtonVariant.secondary,
+                          onPressed: _disconnect,
+                        ),
+                    ],
+                  ],
                 ),
-              const SizedBox(height: 24),
-              if (!_isConnected)
-                FilledButton(onPressed: _connect, child: Text(ref.t('roleplayVoice.connect')))
-              else ...[
-                FilledButton.icon(
-                  onPressed: _toggleMic,
-                  icon: Icon(_isMicEnabled ? Icons.mic : Icons.mic_off),
-                  label: Text(
-                    _isMicEnabled ? ref.t('simulationPage.mute') : ref.t('simulationPage.unmute'),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                if (widget.scenarioSessionId != null)
-                  FilledButton(
-                    onPressed: _isEnding ? null : _endSession,
-                    style: FilledButton.styleFrom(backgroundColor: Colors.red),
-                    child: _isEnding
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Text(ref.t('simulationPage.endSession')),
-                  )
-                else
-                  OutlinedButton(
-                    onPressed: _disconnect,
-                    child: Text(ref.t('roleplayVoice.disconnect')),
-                  ),
-              ],
-            ],
+              ),
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

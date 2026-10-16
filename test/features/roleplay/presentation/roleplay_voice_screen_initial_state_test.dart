@@ -1,8 +1,8 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
 import 'package:ally_mobile_flutter/core/realtime/livekit_room_service.dart';
+import 'package:ally_mobile_flutter/core/widgets/app_button.dart';
 import 'package:ally_mobile_flutter/features/roleplay/presentation/roleplay_voice_screen.dart';
 
 import '../../../support/pump_app.dart';
@@ -38,7 +38,7 @@ void main() {
     );
 
     expect(find.text('Not connected'), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, 'Connect'), findsOneWidget);
+    expect(find.widgetWithText(AppButton, 'Connect'), findsOneWidget);
     verifyNever(
       () => liveKitService.connect(
         liveKitServerUrl: any(named: 'liveKitServerUrl'),

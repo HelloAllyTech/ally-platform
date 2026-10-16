@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
 
@@ -10,6 +11,9 @@ import '../../../core/localization/translate_ref.dart';
 import '../../../core/realtime/foreground_recording_service.dart';
 import '../../../core/realtime/socket_events.dart';
 import '../../../core/realtime/socket_service.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_button.dart';
+import '../../../core/widgets/tab_screen_header.dart';
 
 /// Phase 1 proof: rebuild Scribe's live recording path first, since the
 /// reliability problems that motivated this whole migration live here
@@ -125,44 +129,55 @@ class _ScribeRecordingScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(ref.t('scribe.title'))),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                _isRecording ? Icons.mic : Icons.mic_none,
-                size: 64,
-                color: _isRecording ? Colors.red : null,
-              ),
-              const SizedBox(height: 16),
-              Text(_isRecording ? ref.t('scribe.recording') : ref.t('scribe.notRecording')),
-              Text(
-                '${ref.t('scribe.socketLabel')}: ${_isSocketConnected ? ref.t('scribe.connected') : ref.t('scribe.disconnected')}',
-              ),
-              if (_isRecording)
-                Text(ref.t('scribe.chunksSent', {'count': _chunksSent})),
-              if (_error != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(_error!, style: const TextStyle(color: Colors.red)),
+      body: Column(
+        children: [
+          TabScreenHeader(title: ref.t('scribe.title')),
+          Expanded(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SvgPicture.asset(
+                      _isRecording ? 'assets/icons/mic.svg' : 'assets/icons/micOff.svg',
+                      width: 64,
+                      height: 64,
+                      colorFilter: _isRecording
+                          ? const ColorFilter.mode(AppColors.red400, BlendMode.srcIn)
+                          : null,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(_isRecording ? ref.t('scribe.recording') : ref.t('scribe.notRecording')),
+                    Text(
+                      '${ref.t('scribe.socketLabel')}: ${_isSocketConnected ? ref.t('scribe.connected') : ref.t('scribe.disconnected')}',
+                    ),
+                    if (_isRecording)
+                      Text(ref.t('scribe.chunksSent', {'count': _chunksSent})),
+                    if (_error != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(_error!, style: const TextStyle(color: AppColors.red400)),
+                      ),
+                    const SizedBox(height: 24),
+                    AppButton(
+                      label: _isRecording ? ref.t('scribe.stop') : ref.t('scribe.startRecording'),
+                      variant:
+                          _isRecording ? AppButtonVariant.destructive : AppButtonVariant.primary,
+                      onPressed: _isRecording ? _stopRecording : _startRecording,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      ref.t('scribe.testingHint'),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ],
                 ),
-              const SizedBox(height: 24),
-              FilledButton(
-                onPressed: _isRecording ? _stopRecording : _startRecording,
-                child: Text(_isRecording ? ref.t('scribe.stop') : ref.t('scribe.startRecording')),
               ),
-              const SizedBox(height: 16),
-              Text(
-                ref.t('scribe.testingHint'),
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 12, color: Colors.grey),
-              ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
