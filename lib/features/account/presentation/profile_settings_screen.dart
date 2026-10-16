@@ -2,12 +2,17 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/auth/auth_state.dart';
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_button.dart';
+import '../../../core/widgets/tab_screen_header.dart';
 import '../data/account_repository.dart';
+import '../data/user_profile.dart';
 
 /// Port of ally-mobile (React Native)'s `ProfileSettingsScreen` — real
 /// profile (GET /users/me), profile image upload (full presigned-S3-URL
@@ -59,8 +64,17 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
     final userAsync = ref.watch(currentUserProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text(ref.t('profile.settings.title'))),
-      body: userAsync.when(
+      body: Column(
+        children: [
+          TabScreenHeader(title: ref.t('profile.settings.title')),
+          Expanded(child: _buildBody(context, userAsync)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBody(BuildContext context, AsyncValue<UserProfile> userAsync) {
+    return userAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) =>
             Center(child: Text('${ref.t('common.somethingWentWrong')} $error')),
@@ -101,7 +115,7 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
               ),
             ),
             if (_error != null)
-              Center(child: Text(_error!, style: const TextStyle(color: Colors.red))),
+              Center(child: Text(_error!, style: const TextStyle(color: AppColors.red400))),
             const SizedBox(height: 16),
             Center(
               child: Text(
@@ -113,19 +127,19 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
             if (user.phone.isNotEmpty) Center(child: Text(user.phone)),
             const SizedBox(height: 24),
             ListTile(
-              leading: const Icon(Icons.tune),
+              leading: SvgPicture.asset('assets/icons/profileSettings.svg', width: 24, height: 24),
               title: Text(ref.t('preferences.title')),
-              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+              trailing: SvgPicture.asset('assets/icons/arrowRight.svg', width: 16, height: 16),
               onTap: () => context.push('/preferences'),
             ),
             const SizedBox(height: 8),
-            OutlinedButton(
+            AppButton(
+              label: ref.t('user.logout'),
+              variant: AppButtonVariant.secondary,
               onPressed: () => ref.read(authControllerProvider.notifier).logout(),
-              child: Text(ref.t('user.logout')),
             ),
           ],
         ),
-      ),
-    );
+      );
   }
 }

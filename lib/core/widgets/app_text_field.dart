@@ -41,15 +41,27 @@ class AppTextField extends StatelessWidget {
   final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onSubmitted;
 
-  @override
-  Widget build(BuildContext context) {
-    final borderColor = isError ? AppColors.red400 : AppColors.strokePrimary;
-    final textStyle = Theme.of(context)
-        .textTheme
-        .bodyMedium
-        ?.copyWith(color: AppColors.highEmphasis, fontFamily: 'IBMPlexSerif-Regular');
+  /// The real text style every input uses (`IBM_PLEX_SERIF.REGULAR`) —
+  /// exposed so a `TextFormField` that needs `Form`/`validator` support
+  /// (which this widget doesn't wrap) can still match the same look.
+  static TextStyle? textStyleFor(BuildContext context) => Theme.of(context)
+      .textTheme
+      .bodyMedium
+      ?.copyWith(color: AppColors.highEmphasis, fontFamily: 'IBMPlexSerif-Regular');
 
-    final decoration = switch (shape) {
+  /// The real `InputDecoration` for a given [shape]/[isError] — see
+  /// [textStyleFor]'s doc comment for why this is exposed separately from
+  /// the widget itself.
+  static InputDecoration decorationFor(
+    BuildContext context, {
+    AppTextFieldShape shape = AppTextFieldShape.boxed,
+    String? placeholder,
+    bool isError = false,
+  }) {
+    final borderColor = isError ? AppColors.red400 : AppColors.strokePrimary;
+    final textStyle = textStyleFor(context);
+
+    return switch (shape) {
       AppTextFieldShape.line => InputDecoration(
           hintText: placeholder,
           hintStyle: textStyle?.copyWith(color: AppColors.mediumEmphasis),
@@ -78,15 +90,18 @@ class AppTextField extends StatelessWidget {
           ),
         ),
     };
+  }
 
+  @override
+  Widget build(BuildContext context) {
     return TextField(
       controller: controller,
       maxLines: maxLines,
       keyboardType: keyboardType,
       onChanged: onChanged,
       onSubmitted: onSubmitted,
-      style: textStyle,
-      decoration: decoration,
+      style: textStyleFor(context),
+      decoration: decorationFor(context, shape: shape, placeholder: placeholder, isError: isError),
     );
   }
 }

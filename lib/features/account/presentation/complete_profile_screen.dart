@@ -3,6 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_button.dart';
+import '../../../core/widgets/app_text_field.dart';
+import '../../../core/widgets/tab_screen_header.dart';
 import '../data/account_repository.dart';
 
 /// Port of ally-mobile (React Native)'s `CompleteProfileScreen` — the
@@ -57,45 +61,54 @@ class _CompleteProfileScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(ref.t('completeProfile.title'))),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TextFormField(
-                controller: _nameController,
-                decoration: InputDecoration(labelText: ref.t('completeProfile.nameLabel')),
-                validator: (value) => (value == null || value.trim().isEmpty)
-                    ? ref.t('completeProfile.required')
-                    : null,
+      body: Column(
+        children: [
+          TabScreenHeader(title: ref.t('completeProfile.title')),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TextFormField(
+                      controller: _nameController,
+                      style: AppTextField.textStyleFor(context),
+                      decoration: AppTextField.decorationFor(
+                        context,
+                        placeholder: ref.t('completeProfile.nameLabel'),
+                      ),
+                      validator: (value) => (value == null || value.trim().isEmpty)
+                          ? ref.t('completeProfile.required')
+                          : null,
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _phoneController,
+                      style: AppTextField.textStyleFor(context),
+                      decoration: AppTextField.decorationFor(
+                        context,
+                        placeholder: ref.t('completeProfile.phoneLabel'),
+                      ),
+                      keyboardType: TextInputType.phone,
+                    ),
+                    if (_error != null) ...[
+                      const SizedBox(height: 16),
+                      Text(_error!, style: const TextStyle(color: AppColors.red400)),
+                    ],
+                    const SizedBox(height: 24),
+                    AppButton(
+                      label: ref.t('completeProfile.submit'),
+                      isLoading: _isSubmitting,
+                      onPressed: _submit,
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _phoneController,
-                decoration: InputDecoration(labelText: ref.t('completeProfile.phoneLabel')),
-                keyboardType: TextInputType.phone,
-              ),
-              if (_error != null) ...[
-                const SizedBox(height: 16),
-                Text(_error!, style: const TextStyle(color: Colors.red)),
-              ],
-              const SizedBox(height: 24),
-              FilledButton(
-                onPressed: _isSubmitting ? null : _submit,
-                child: _isSubmitting
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Text(ref.t('completeProfile.submit')),
-              ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
