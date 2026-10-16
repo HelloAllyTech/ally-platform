@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 
+import 'package:ally_mobile_flutter/core/widgets/app_button.dart';
 import 'package:ally_mobile_flutter/features/simulations/data/simulation_models.dart';
 import 'package:ally_mobile_flutter/features/simulations/data/simulations_repository.dart';
 import 'package:ally_mobile_flutter/features/simulations/presentation/learning_path_detail_view.dart';
@@ -119,7 +120,7 @@ void main() {
       overrides: [simulationsRepositoryProvider.overrideWithValue(repository)],
     );
 
-    await tester.tap(find.widgetWithText(FilledButton, 'Start'));
+    await tester.tap(find.widgetWithText(AppButton, 'Start'));
     await tester.pumpAndSettle();
 
     verify(
@@ -161,7 +162,7 @@ void main() {
       overrides: [simulationsRepositoryProvider.overrideWithValue(repository)],
     );
 
-    await tester.tap(find.widgetWithText(FilledButton, 'Start'));
+    await tester.tap(find.widgetWithText(AppButton, 'Start'));
     await tester.pumpAndSettle();
 
     verify(() => repository.createPathSession('path-1')).called(1);

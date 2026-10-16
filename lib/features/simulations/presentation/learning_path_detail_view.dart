@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_button.dart';
+import '../../../core/widgets/app_card.dart';
 import '../data/simulation_models.dart';
 
 /// Shared body for CaseDetailsScreen and SimulationPathDetailsScreen — ally-
@@ -118,21 +121,15 @@ class _LearningPathDetailViewState extends ConsumerState<LearningPathDetailView>
           ),
         ],
         const SizedBox(height: 12),
-        FilledButton(
-          onPressed: (_isStarting || next == null)
-              ? null
-              : () => _startScenario(next),
-          child: _isStarting
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : Text(_isStarted ? ref.t('common.continue') : ref.t('common.start')),
+        AppButton(
+          label: _isStarted ? ref.t('common.continue') : ref.t('common.start'),
+          isDisabled: next == null,
+          isLoading: _isStarting,
+          onPressed: next == null ? null : () => _startScenario(next),
         ),
         if (_error != null) ...[
           const SizedBox(height: 8),
-          Text(_error!, style: const TextStyle(color: Colors.red)),
+          Text(_error!, style: const TextStyle(color: AppColors.red400)),
         ],
         const SizedBox(height: 16),
         for (final scenario in details.scenarios)
@@ -168,32 +165,36 @@ class _ScenarioRow extends ConsumerWidget {
     final locked = scenario.status == SessionItemStatus.locked;
     final completed = scenario.status == SessionItemStatus.completed;
 
-    return Card(
-      color: isNext ? Theme.of(context).colorScheme.primaryContainer : null,
-      child: ListTile(
-        leading: CircleAvatar(
-          child: locked
-              ? const Icon(Icons.lock_outline, size: 18)
-              : completed
-              ? const Icon(Icons.check, size: 18)
-              : Text('${scenario.order}'),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: AppCard(
+        variant: AppCardVariant.flat,
+        child: ListTile(
+          tileColor: isNext ? Theme.of(context).colorScheme.primaryContainer : null,
+          leading: CircleAvatar(
+            child: locked
+                ? const Icon(Icons.lock_outline, size: 18)
+                : completed
+                ? const Icon(Icons.check, size: 18)
+                : Text('${scenario.order}'),
+          ),
+          title: Text(
+            scenario.title ??
+                ref.t('simulations.scenarioFallbackTitle', {'id': scenario.scenarioId}),
+          ),
+          subtitle: scenario.description != null
+              ? Text(scenario.description!)
+              : null,
+          trailing: completed && scenario.sessionId != null
+              ? IconButton(
+                  icon: const Icon(Icons.description_outlined),
+                  tooltip: ref.t('simulations.viewFeedback'),
+                  onPressed: onViewFeedback,
+                )
+              : null,
+          enabled: !locked && !isStarting,
+          onTap: locked ? null : onTap,
         ),
-        title: Text(
-          scenario.title ??
-              ref.t('simulations.scenarioFallbackTitle', {'id': scenario.scenarioId}),
-        ),
-        subtitle: scenario.description != null
-            ? Text(scenario.description!)
-            : null,
-        trailing: completed && scenario.sessionId != null
-            ? IconButton(
-                icon: const Icon(Icons.description_outlined),
-                tooltip: ref.t('simulations.viewFeedback'),
-                onPressed: onViewFeedback,
-              )
-            : null,
-        enabled: !locked && !isStarting,
-        onTap: locked ? null : onTap,
       ),
     );
   }

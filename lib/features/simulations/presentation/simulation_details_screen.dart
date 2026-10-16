@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_button.dart';
+import '../../../core/widgets/tab_screen_header.dart';
 import '../data/simulations_repository.dart';
 
 /// Port of ally-mobile (React Native)'s `SimulationDetailsScreen` — scenario
@@ -56,43 +59,44 @@ class _SimulationDetailsScreenState
     final scenarioAsync = ref.watch(scenarioByIdProvider(widget.scenarioId));
 
     return Scaffold(
-      appBar: AppBar(title: Text(ref.t('common.startSimulation'))),
-      body: scenarioAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(
-          child: Text('${ref.t('learn.details.loadingDetailsError')}: $error'),
-        ),
-        data: (scenario) => Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                scenario.title,
-                style: Theme.of(context).textTheme.headlineSmall,
+      body: Column(
+        children: [
+          TabScreenHeader(title: ref.t('common.startSimulation')),
+          Expanded(
+            child: scenarioAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (error, _) => Center(
+                child: Text('${ref.t('learn.details.loadingDetailsError')}: $error'),
               ),
-              if (scenario.description != null) ...[
-                const SizedBox(height: 12),
-                Text(scenario.description!),
-              ],
-              if (_error != null) ...[
-                const SizedBox(height: 16),
-                Text(_error!, style: const TextStyle(color: Colors.red)),
-              ],
-              const Spacer(),
-              FilledButton(
-                onPressed: _isStarting ? null : _startSimulation,
-                child: _isStarting
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Text(ref.t('common.startSimulation')),
+              data: (scenario) => Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      scenario.title,
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+                    if (scenario.description != null) ...[
+                      const SizedBox(height: 12),
+                      Text(scenario.description!),
+                    ],
+                    if (_error != null) ...[
+                      const SizedBox(height: 16),
+                      Text(_error!, style: const TextStyle(color: AppColors.red400)),
+                    ],
+                    const Spacer(),
+                    AppButton(
+                      label: ref.t('common.startSimulation'),
+                      isLoading: _isStarting,
+                      onPressed: _startSimulation,
+                    ),
+                  ],
+                ),
               ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

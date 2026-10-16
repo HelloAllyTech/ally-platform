@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:ally_mobile_flutter/core/widgets/app_button.dart';
 import 'package:ally_mobile_flutter/features/simulations/data/simulation_models.dart';
 import 'package:ally_mobile_flutter/features/simulations/presentation/learning_path_detail_view.dart';
 
@@ -63,8 +64,8 @@ void main() {
         ),
       );
 
-      expect(find.widgetWithText(FilledButton, 'Start'), findsOneWidget);
-      expect(find.widgetWithText(FilledButton, 'Continue'), findsNothing);
+      expect(find.widgetWithText(AppButton, 'Start'), findsOneWidget);
+      expect(find.widgetWithText(AppButton, 'Continue'), findsNothing);
     });
 
     testWidgets('flips to Continue once any scenario is completed', (
@@ -94,8 +95,8 @@ void main() {
         ),
       );
 
-      expect(find.widgetWithText(FilledButton, 'Continue'), findsOneWidget);
-      expect(find.widgetWithText(FilledButton, 'Start'), findsNothing);
+      expect(find.widgetWithText(AppButton, 'Continue'), findsOneWidget);
+      expect(find.widgetWithText(AppButton, 'Start'), findsNothing);
     });
 
     testWidgets('is disabled when there is no next scenario', (tester) async {
@@ -123,8 +124,8 @@ void main() {
         ),
       );
 
-      final button = tester.widget<FilledButton>(find.byType(FilledButton));
-      expect(button.onPressed, isNull);
+      final button = tester.widget<AppButton>(find.byType(AppButton));
+      expect(button.isDisabled, isTrue);
     });
 
     testWidgets('tapping it calls onEnsureSession then onStartScenario with the next scenario', (
@@ -152,7 +153,7 @@ void main() {
         ),
       );
 
-      await tester.tap(find.widgetWithText(FilledButton, 'Start'));
+      await tester.tap(find.widgetWithText(AppButton, 'Start'));
       await tester.pumpAndSettle();
 
       expect(calls, ['ensure', 'start:s1']);

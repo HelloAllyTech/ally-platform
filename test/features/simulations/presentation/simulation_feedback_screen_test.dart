@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
+import 'package:ally_mobile_flutter/core/widgets/app_button.dart';
 import 'package:ally_mobile_flutter/features/simulations/data/simulation_models.dart';
 import 'package:ally_mobile_flutter/features/simulations/data/simulation_transcript_repository.dart';
 import 'package:ally_mobile_flutter/features/simulations/data/simulations_repository.dart';
@@ -88,7 +89,7 @@ void main() {
 
     await pumpScreen(tester);
 
-    await tester.tap(find.widgetWithText(FilledButton, 'Submit'));
+    await tester.tap(find.widgetWithText(AppButton, 'Submit'));
     await tester.pumpAndSettle();
 
     expect(find.text('Please select a rating.'), findsOneWidget);
@@ -129,7 +130,7 @@ void main() {
     await tester.enterText(find.byType(TextField), 'Really helpful session');
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(FilledButton, 'Submit'));
+    await tester.tap(find.widgetWithText(AppButton, 'Submit'));
     await tester.pumpAndSettle();
 
     verify(

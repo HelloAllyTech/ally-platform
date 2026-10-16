@@ -3,6 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_button.dart';
+import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/app_text_field.dart';
 import '../data/simulation_models.dart';
 import '../data/simulations_repository.dart';
 import 'simulation_transcript_tab.dart';
@@ -117,16 +121,17 @@ class _SimulationFeedbackScreenState
               const SizedBox(height: 16),
               Text(ref.t('callFeedback.submitted')),
               const SizedBox(height: 24),
-              OutlinedButton(
+              AppButton(
+                variant: AppButtonVariant.secondary,
+                label: ref.t('postSim.common.shareForReview'),
                 onPressed: () => context.push(
                   '/share-for-review/${widget.scenarioSessionId}',
                 ),
-                child: Text(ref.t('postSim.common.shareForReview')),
               ),
               const SizedBox(height: 12),
-              FilledButton(
+              AppButton(
+                label: ref.t('common.backToHome'),
                 onPressed: () => context.go('/home'),
-                child: Text(ref.t('common.backToHome')),
               ),
             ],
           )
@@ -154,28 +159,20 @@ class _SimulationFeedbackScreenState
                 }),
               ),
               const SizedBox(height: 16),
-              TextField(
+              AppTextField(
                 controller: _commentController,
                 maxLines: 4,
-                decoration: InputDecoration(
-                  labelText: ref.t('postSim.feedback.commentLabel'),
-                  border: const OutlineInputBorder(),
-                ),
+                placeholder: ref.t('postSim.feedback.commentLabel'),
               ),
               if (_error != null) ...[
                 const SizedBox(height: 12),
-                Text(_error!, style: const TextStyle(color: Colors.red)),
+                Text(_error!, style: const TextStyle(color: AppColors.red400)),
               ],
               const SizedBox(height: 24),
-              FilledButton(
-                onPressed: _isSubmitting ? null : _submit,
-                child: _isSubmitting
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Text(ref.t('common.submit')),
+              AppButton(
+                label: ref.t('common.submit'),
+                isLoading: _isSubmitting,
+                onPressed: _submit,
               ),
             ],
           ),
@@ -196,7 +193,7 @@ class _SummarySection extends ConsumerWidget {
               .difference(DateTime.parse(summary.startedAt))
         : null;
 
-    return Card(
+    return AppCard(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(

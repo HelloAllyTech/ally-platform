@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 
+import 'package:ally_mobile_flutter/core/widgets/app_button.dart';
 import 'package:ally_mobile_flutter/features/simulations/data/simulation_models.dart';
 import 'package:ally_mobile_flutter/features/simulations/data/simulations_repository.dart';
 import 'package:ally_mobile_flutter/features/simulations/presentation/simulation_details_screen.dart';
@@ -77,7 +78,7 @@ void main() {
       overrides: [simulationsRepositoryProvider.overrideWithValue(repository)],
     );
 
-    await tester.tap(find.widgetWithText(FilledButton, 'Start role play'));
+    await tester.tap(find.widgetWithText(AppButton, 'Start role play'));
     await tester.pumpAndSettle();
 
     verify(() => repository.startScenarioSession(scenarioId: 5)).called(1);
@@ -101,7 +102,7 @@ void main() {
       overrides: [simulationsRepositoryProvider.overrideWithValue(repository)],
     );
 
-    await tester.tap(find.widgetWithText(FilledButton, 'Start role play'));
+    await tester.tap(find.widgetWithText(AppButton, 'Start role play'));
     await tester.pumpAndSettle();
 
     expect(find.textContaining('Failed to start simulation'), findsOneWidget);
