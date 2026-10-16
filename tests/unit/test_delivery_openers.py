@@ -1,9 +1,10 @@
 """The delivery plan: catalog, validation, turn-time rubric, playback, shaping.
 
 Each class drives one layer through its public entry point. The rubric these
-enforce (product, 2026-09-29): vary the first sound across turns, one opener at
-most with a thinking pause after it, never the same sound twice running,
-nothing over the learner, nothing before a goodbye, fit the character's state.
+enforce (product, 2026-10-16): pause first, then at most one filler chosen from
+the plan's own suggestions, then the interim piece by piece while the wait
+lasts, with lengthening gaps and a beat before the reply; never the same sound
+twice running, nothing over the learner, nothing before a goodbye.
 """
 
 from __future__ import annotations
@@ -12,7 +13,6 @@ import asyncio
 import random
 import types
 import wave
-from unittest.mock import Mock
 
 import pytest
 
@@ -207,19 +207,50 @@ class TestValidateDelivery:
         )
         assert plan.opener_ids == ("um_hesitant",)
 
-    def test_a_bridge_line_that_answers_is_refused(self):
+    def test_an_interim_piece_that_answers_ends_the_interim(self):
         catalog = build_session_catalog("en-IN")
-        for bad in ("Why do you ask?", "I take 20 mg a day.", "word " * 25):
+        for bad in ("Why do you ask?", "I take 20 mg a day.", "word " * 12):
             plan = validate_delivery(
-                ProposedDelivery(bridge_line=bad), catalog, source="planner"
+                ProposedDelivery(interim=["It's just that…", bad, "I don't know…"]),
+                catalog,
+                source="working_memory",
             )
-            assert plan.bridge_line is None, bad
+            # Later pieces lean on earlier ones: a bad piece ends the interim.
+            assert plan.interim == ("It's just that…",), bad
         ok = validate_delivery(
-            ProposedDelivery(bridge_line="That's… a lot to think about."),
+            ProposedDelivery(interim=["It's just that…", "I don't know…", "it's hard"]),
             catalog,
-            source="planner",
+            source="working_memory",
         )
-        assert ok.bridge_line == "That's… a lot to think about."
+        assert ok.interim == ("It's just that…", "I don't know…", "it's hard")
+
+    def test_at_most_three_pieces(self):
+        plan = validate_delivery(
+            ProposedDelivery(interim=["one two", "three four", "five six", "seven"]),
+            None,
+            source="working_memory",
+        )
+        assert len(plan.interim) == 3
+
+    def test_the_opening_piece_loses_a_hesitation_and_a_claim(self):
+        """It usually follows a filler, so "Um," would be a second hesitation;
+        and "I see…" before a pushback contradicts the reply (prod)."""
+        plan = validate_delivery(
+            ProposedDelivery(interim=["Um, it's just that…", "I don't know…"]),
+            None,
+            source="working_memory",
+        )
+        assert plan.interim[0].lower().startswith("it's just")
+        plan = validate_delivery(
+            ProposedDelivery(interim=["I see…", "it's just a lot…"]),
+            None,
+            source="working_memory",
+        )
+        assert [p.lower() for p in plan.interim] == ["it's just a lot…"]
+
+    def test_a_missing_or_single_string_interim_is_tolerated(self):
+        assert ProposedDelivery().interim == []
+        assert ProposedDelivery(interim="It's just…").interim == ["It's just…"]
 
     def test_an_unknown_kind_falls_back_to_the_first_id(self):
         catalog = build_session_catalog("en-IN")
@@ -244,26 +275,26 @@ class TestValidateDelivery:
         )
         assert plan.opener_kind == "hesitation"
 
-    def test_a_bridge_that_replays_a_recent_line_is_dropped(self):
+    def test_a_piece_that_replays_a_recent_line_is_dropped(self):
         catalog = build_session_catalog("en-IN")
         recent = ["I'm trying to hold it together. It's a lot right now."]
         plan = validate_delivery(
-            ProposedDelivery(bridge_line="I'm trying to hold it together."),
+            ProposedDelivery(interim=["I'm trying to hold it together."]),
             catalog,
             source="working_memory",
             recent_lines=recent,
         )
-        assert plan.bridge_line is None
+        assert plan.interim == ()
         fresh = validate_delivery(
-            ProposedDelivery(bridge_line="Give me a second with that."),
+            ProposedDelivery(interim=["Give me a second with that."]),
             catalog,
             source="working_memory",
             recent_lines=recent,
         )
-        assert fresh.bridge_line == "Give me a second with that."
+        assert fresh.interim == ("Give me a second with that.",)
 
     def test_a_fresh_indic_line_is_not_mistaken_for_a_repeat(self):
-        """Hindi v2v: every bridge was dropped as a "repeat" because shared
+        """Hindi v2v: every holding line was dropped as a "repeat" because shared
         function words (and a tokenizer that split at vowel signs) made any
         two Hindi lines overlap."""
         recent = [
@@ -305,12 +336,27 @@ class TestReplyNote:
         assert "Um" not in note
         assert "no opening hesitation" in note and "do not repeat" in note
 
-    def test_body_sound_and_bridge(self):
+    def test_the_interim_is_quoted_so_the_reply_carries_on(self):
+        """A reply that never learned the interim's words started a fresh
+        thought after "It's just that…" — the disconnect learners reported."""
         td = TurnDelivery()
-        td.note_opener(OpenerRecord(category="body", kind="sigh", bridge="It's hard."))
+        td.note_opener(
+            OpenerRecord(
+                category="body",
+                kind="breath",
+                interim=("It's just that…", "I don't know…"),
+            )
+        )
         note = td.reply_note()
-        assert "a sigh" in note and "holding line" in note
-        assert "It's hard." not in note
+        assert "a breath" in note
+        assert '"It\'s just that…"' in note and '"I don\'t know…"' in note
+        assert "continues straight on" in note and "do not repeat" in note
+
+    def test_an_interim_alone_is_quoted_without_a_sound(self):
+        td = TurnDelivery()
+        td.note_opener(OpenerRecord(category="none", interim=("It's hard…",)))
+        note = td.reply_note()
+        assert '"It\'s hard…"' in note and "make" not in note
 
     def test_turn_boundaries_clear_the_opener(self):
         td = TurnDelivery()
@@ -323,7 +369,7 @@ class TestReplyNote:
         seen = []
         td.on_plan(lambda plan: (_ for _ in ()).throw(RuntimeError("boom")))
         td.on_plan(seen.append)
-        plan = DeliveryPlan(opener_kind="reflective", source="planner")
+        plan = DeliveryPlan(opener_kind="reflective", source="working_memory")
         td.set_plan(plan)
         assert td.plan is plan and seen == [plan]
 
@@ -368,46 +414,122 @@ class TestOpenerPolicy:
         )
         assert decision.reason == "skipped_fast_turn"
 
-    def _run(self, policy, plan, catalog, turns=200, gap=2500.0, bridge_ms=None):
+    def _run(self, policy, plan, catalog, turns=200, gap=2500.0, piece_ms=()):
         decisions = []
         for _ in range(turns):
             decision = policy.decide(
-                plan, catalog, _durations(catalog), gap, "I see.", bridge_ms
+                plan, catalog, _durations(catalog), gap, "I see.", piece_ms
             )
             policy.record(decision)
             decisions.append(decision)
         return decisions
 
-    def test_a_long_bridge_plays_alone_and_a_short_one_after_the_opener(self):
-        """v2v on v3: a ~2.4 s line never fit behind an opener plus two beats
-        in a ~4.4 s wait, so no bridge ever played."""
+    @staticmethod
+    def _wm(**kw):
+        return DeliveryPlan(source="working_memory", **kw)
+
+    def test_the_cover_grows_with_the_wait(self):
+        """Short wait: nothing. Medium: a filler. Long (v3, 6-8 s): a filler and
+        the interim pieces."""
         catalog = build_session_catalog("en-IN")
-        plan = DeliveryPlan(opener_kind="hum", bridge_line="That's a lot.")
-        cfg = dict(
-            hold_min_ms=900.0,
-            hold_max_ms=925.0,
-            weight_none=0.0,
-            bridge_probability=1.0,
+        plan = self._wm(
+            opener_kind="hum", interim=("It's just that…", "I don't know…", "it's hard")
         )
-        long_line = self._policy(seed=1, **cfg).decide(
-            plan, catalog, _durations(catalog), 4400.0, "I see.", 2400.0
+        pieces = (900.0, 800.0, 700.0)
+        cfg = dict(hold_min_ms=400.0, hold_max_ms=400.0)
+        fast = self._policy(**cfg).decide(
+            plan, catalog, _durations(catalog), 500.0, "I see.", pieces
         )
-        assert long_line.bridge and long_line.entry is None
-        short_line = self._policy(seed=1, **cfg).decide(
-            plan, catalog, _durations(catalog), 4400.0, "I see.", 1500.0
+        assert not fast.plays_anything
+        medium = self._policy(**cfg).decide(
+            plan, catalog, _durations(catalog), 1800.0, "I see.", pieces
         )
-        assert short_line.bridge and short_line.entry is not None
-        # Too long even alone: the opener plays and the line waits.
-        too_long = self._policy(seed=1, **cfg).decide(
-            plan, catalog, _durations(catalog), 4400.0, "I see.", 3200.0
+        assert medium.entry is not None and medium.pieces == 0
+        long_ = self._policy(**cfg).decide(
+            plan, catalog, _durations(catalog), 7000.0, "I see.", pieces
         )
-        assert not too_long.bridge and too_long.entry is not None
+        assert long_.entry is not None and long_.pieces == 3
+
+    def test_the_gaps_lengthen_and_a_beat_is_left_before_the_reply(self):
+        catalog = build_session_catalog("en-IN")
+        plan = self._wm(opener_kind="hum", interim=("a b", "c d", "e f"))
+        cfg = dict(hold_min_ms=400.0, hold_max_ms=400.0, tail_ms=500.0)
+        d = self._policy(**cfg).decide(
+            plan, catalog, _durations(catalog), 8000.0, "I see.", (600.0, 600.0, 600.0)
+        )
+        assert d.pieces == 3
+        assert list(d.gaps_ms) == sorted(d.gaps_ms) and d.gaps_ms[0] < d.gaps_ms[-1]
+        assert d.gaps_ms[1] == pytest.approx(d.gaps_ms[0] * 1.4)
+        end = d.hold_ms + 600.0 + sum(d.gaps_ms) + 3 * 600.0
+        assert end <= 8000.0 - 500.0
+
+    def test_a_piece_that_does_not_fit_is_left_out(self):
+        catalog = build_session_catalog("en-IN")
+        plan = self._wm(opener_kind="hum", interim=("a b", "c d"))
+        cfg = dict(hold_min_ms=400.0, hold_max_ms=400.0)
+        # 400 hold + 600 filler + 350 gap + 900 piece = 2250 > 3000 - 500? No:
+        # fits. The second (gap 490 + 900) does not.
+        d = self._policy(**cfg).decide(
+            plan, catalog, _durations(catalog), 3000.0, "I see.", (900.0, 900.0)
+        )
+        assert d.entry is not None and d.pieces == 1
+
+    def test_speech_never_fills_the_whole_wait(self):
+        catalog = build_session_catalog("en-IN")
+        plan = self._wm(opener_kind="hum", interim=("a b", "c d", "e f"))
+        d = self._policy(max_speech_share=0.5).decide(
+            plan, catalog, _durations(catalog), 6000.0, "I see.", (1200.0,) * 3
+        )
+        assert 600.0 + d.pieces * 1200.0 <= 0.5 * 6000.0
+
+    def test_with_no_filler_the_interim_opens_after_the_pause(self):
+        plan = self._wm(opener_kind="hum", interim=("It's hard…",))
+        d = self._policy().decide(plan, None, {}, 4000.0, "I see.", (900.0,))
+        assert d.entry is None and d.pieces == 1 and d.gaps_ms == (0.0,)
+
+    def test_the_plan_s_own_filler_plays(self):
+        """The old rules replaced working memory's kind on ~60% of prod turns."""
+        catalog = build_session_catalog("en-IN")
+        plan = self._wm(opener_kind="hesitation", opener_ids=("um_hesitant",))
+        firsts = [
+            self._policy(seed=seed).decide(
+                plan, catalog, _durations(catalog), 2500.0, "I see."
+            )
+            for seed in range(50)
+        ]
+        assert all(d.entry is not None and d.entry.id == "um_hesitant" for d in firsts)
+
+    def test_variety_comes_from_the_plan_s_own_list(self):
+        """Its first choice in the no-repeat window: the next suggestion plays,
+        and it stays the planned kind."""
+        catalog = build_session_catalog("en-IN")
+        ids = catalog.ids_of_kind("hesitation")
+        assert len(ids) >= 2
+        plan = self._wm(opener_kind="hesitation", opener_ids=tuple(ids[:3]))
+        decisions = self._run(self._policy(seed=3), plan, catalog, turns=40)
+        played = [d.entry for d in decisions if d.entry is not None]
+        assert played and all(e.kind == "hesitation" for e in played)
+        assert len({e.id for e in played}) >= 2
+
+    def test_a_pause_plan_is_a_real_pause(self):
+        """Prod: a "silence" plan still played a sound 16 of 16 times."""
+        catalog = build_session_catalog("en-IN")
+        plan = self._wm(opener_kind="silence", hold_silence=True)
+        d = self._policy(seed=1).decide(
+            plan, catalog, _durations(catalog), 1800.0, "I see."
+        )
+        assert not d.plays_anything
+        # A wait that outlasts the pause gets a sound after it, never at once.
+        long_ = self._policy(seed=1).decide(
+            plan, catalog, _durations(catalog), 4500.0, "I see."
+        )
+        assert long_.entry is not None and long_.hold_ms >= 1200.0
 
     def test_breath_and_sigh_are_spaced_out(self):
         """Prod: a planner asking "sigh" every turn gave a breath or sigh on 4
         of 9 turns. At most one body sound per body_min_gap_turns."""
         catalog = build_session_catalog("en-IN", gender="female")
-        plan = DeliveryPlan(opener_kind="sigh", source="planner")
+        plan = self._wm(opener_kind="breath", opener_ids=("breath_in",))
         decisions = self._run(
             self._policy(seed=3, body_min_gap_turns=4), plan, catalog, gap=3500.0
         )
@@ -417,77 +539,6 @@ class TestOpenerPolicy:
         # The blocked turns still get a sound, not silence.
         assert sum(d.plays_anything for d in decisions) / len(decisions) > 0.9
 
-    def test_a_blocked_plan_falls_back_to_another_sound_not_silence(self):
-        """A planner asking "sigh" every turn: the one sigh is in the no-repeat
-        window most turns, and those turns must still mostly get a sound."""
-        catalog = build_session_catalog("en-IN", gender="female")
-        assert catalog.ids_of_kind("breath")
-        plan = DeliveryPlan(opener_kind="breath", source="planner")
-        decisions = self._run(self._policy(seed=4), plan, catalog, gap=2500.0)
-        played = sum(d.plays_anything for d in decisions) / len(decisions)
-        assert played >= 0.65
-        kinds = {d.entry.kind for d in decisions if d.entry is not None}
-        assert "breath" in kinds and kinds & {
-            "hum",
-            "hesitation",
-            "lexical",
-            "reflective",
-        }
-
-    def test_not_every_turn_starts_with_a_sound(self):
-        # A short wait (below OPENER_MAX_SILENT_GAP_MS), where a pause may stand
-        # in for an opener.
-        catalog = build_session_catalog("en-IN")
-        decisions = self._run(self._policy(), DEFAULT_PLAN, catalog, gap=1800.0)
-        with_sound = sum(1 for d in decisions if d.plays_anything)
-        assert 0.3 < with_sound / len(decisions) < 0.8
-
-    def test_a_long_wait_is_never_left_silent_when_a_sound_can_play(self):
-        """Prod day one: skipped turns left learners in p50 5.7 s of silence."""
-        catalog = build_session_catalog("en-IN", gender="female")
-        decisions = self._run(self._policy(), DEFAULT_PLAN, catalog, gap=4500.0)
-        silent = [d for d in decisions if not d.plays_anything]
-        assert not silent
-        # ...while a short wait may still be met with a brief silence.
-        short = self._run(self._policy(seed=4), DEFAULT_PLAN, catalog, gap=1800.0)
-        assert any(not d.plays_anything for d in short)
-
-    def test_the_planned_kind_leads(self):
-        """A "sigh" plan was heard as "Hmm" on 5 of 11 prod openers."""
-        # Measured with no history, so the no-repeat rotation cannot be what
-        # decides it. (The breath is now the only body recording.)
-        catalog = build_session_catalog("en-IN", gender="female")
-        plan = DeliveryPlan(opener_kind="breath", opener_ids=("breath_in",))
-        firsts = [
-            self._policy(seed=seed).decide(
-                plan, catalog, _durations(catalog), 2500.0, "I see."
-            )
-            for seed in range(200)
-        ]
-        played = [d for d in firsts if d.entry is not None]
-        on_plan = sum(1 for d in played if d.entry.id == "breath_in")
-        assert on_plan / len(played) > 0.7
-
-    def test_vocal_runs_are_capped(self):
-        catalog = build_session_catalog("en-IN")
-        decisions = self._run(
-            self._policy(max_vocal_run=2), DEFAULT_PLAN, catalog, gap=1800.0
-        )
-        run = longest = 0
-        for d in decisions:
-            run = run + 1 if d.category == "vocal" else 0
-            longest = max(longest, run)
-        assert longest <= 2
-
-    def test_on_a_long_wait_the_vocal_cap_yields_rather_than_go_silent(self):
-        """No body sound available (no gender, or the breath in its no-repeat
-        window): a long wait gets another spoken opener, never dead air."""
-        catalog = build_session_catalog("en-IN")
-        decisions = self._run(
-            self._policy(max_vocal_run=2), DEFAULT_PLAN, catalog, gap=4000.0
-        )
-        assert all(d.plays_anything for d in decisions)
-
     def test_no_family_repeats_inside_the_window(self):
         catalog = build_session_catalog("en-IN")
         decisions = self._run(self._policy(repeat_window=4), DEFAULT_PLAN, catalog)
@@ -495,53 +546,26 @@ class TestOpenerPolicy:
         for i in range(1, len(families)):
             assert families[i] not in families[max(0, i - 4) : i]
 
-    def test_the_plan_decides_what_kind_plays(self):
+    def test_without_working_memory_fillers_rotate_and_pauses_happen(self):
         catalog = build_session_catalog("en-IN")
-        plan = DeliveryPlan(opener_kind="hesitation", opener_ids=("um_hesitant",))
-        decisions = self._run(self._policy(seed=3), plan, catalog, turns=60)
+        decisions = self._run(self._policy(seed=2), DEFAULT_PLAN, catalog, gap=1800.0)
         kinds = [d.entry.kind for d in decisions if d.entry is not None]
-        # The no-repeat window rotates through the kind's few families, so the
-        # plan's kind cannot play every time, but it must lead by a clear margin.
-        counts = {k: kinds.count(k) for k in set(kinds)}
-        assert max(counts, key=counts.get) == "hesitation"
-        assert counts["hesitation"] > len(kinds) / 3
+        assert len(set(kinds)) >= 3
+        assert not any(a == b for a, b in zip(kinds, kinds[1:]))
+        silent = sum(1 for d in decisions if not d.plays_anything)
+        assert 0.15 < silent / len(decisions) < 0.6
+        # A long wait is not left to a pause alone.
+        long_ = self._run(self._policy(seed=2), DEFAULT_PLAN, catalog, gap=4500.0)
+        assert all(d.plays_anything for d in long_)
+        assert all(d.pieces == 0 for d in long_)  # no plan, no interim
 
-    def test_a_pause_plan_holds_longer_and_speaks_less(self):
-        catalog = build_session_catalog("en-IN")
-        quiet = DeliveryPlan(opener_kind="silence", hold_silence=True)
-        loud = DEFAULT_PLAN
-        # Below OPENER_MAX_SILENT_GAP_MS, where silence is still allowed.
-        q = self._run(self._policy(seed=5), quiet, catalog, gap=1800.0)
-        l_ = self._run(self._policy(seed=5), loud, catalog, gap=1800.0)
-        assert sum(d.plays_anything for d in q) < sum(d.plays_anything for d in l_)
-        holds = [d.hold_ms for d in q if d.plays_anything]
-        assert holds and min(holds) >= 600.0
-
-    def test_the_opener_leaves_a_thinking_pause_before_the_reply(self):
+    def test_a_filler_too_long_for_the_wait_is_not_played(self):
         catalog = build_session_catalog("en-IN")
         durations = {k: 2500.0 for k in catalog.entries}  # all too long
-        decision = self._policy(post_opener_pause_ms=550.0).decide(
+        decision = self._policy().decide(
             DEFAULT_PLAN, catalog, durations, 2000.0, "I see."
         )
         assert decision.entry is None
-
-    def test_bridge_never_two_turns_running_and_only_on_long_gaps(self):
-        catalog = build_session_catalog("en-IN")
-        plan = DeliveryPlan(bridge_line="Give me a second.")
-        decisions = self._run(
-            self._policy(seed=2, bridge_probability=1.0),
-            plan,
-            catalog,
-            gap=5000.0,
-            bridge_ms=900.0,
-        )
-        flags = [d.bridge for d in decisions]
-        assert any(flags)
-        assert not any(a and b for a, b in zip(flags, flags[1:]))
-        short = self._policy(seed=2, bridge_probability=1.0).decide(
-            plan, catalog, _durations(catalog), 1500.0, "I see.", 900.0
-        )
-        assert short.bridge is False
 
 
 # ---------------------------------------------------------------------------
@@ -671,11 +695,7 @@ def _player(monkeypatch, *, policy_cfg=None, plan=None):
         return [FillerClip(phrase=p[0], frames=[], duration_ms=300.0) for p in phrases]
 
     cfg = policy_cfg or PolicyConfig(
-        hold_min_ms=1.0,
-        hold_max_ms=2.0,
-        weight_none=0.0,
-        weight_unplanned=0.0,
-        post_opener_pause_ms=1.0,
+        hold_min_ms=1.0, hold_max_ms=2.0, piece_gap_ms=10.0, tail_ms=1.0
     )
     player = OpenerPlayer(
         room_name="room-x",
@@ -685,8 +705,7 @@ def _player(monkeypatch, *, policy_cfg=None, plan=None):
         predicted_gap_ms=lambda: 4000.0,
         synthesize=_synth,
         emit_filler_transcript=lambda text, ts: transcripts.append(("filler", text)),
-        emit_bridge_transcript=lambda text, ts: transcripts.append(("bridge", text)),
-        post_opener_pause_ms=1.0,
+        emit_interim_transcript=lambda text, ts: transcripts.append(("interim", text)),
     )
     monkeypatch.setattr(
         "livekit.agents.AudioConfig", lambda *a, **k: types.SimpleNamespace()
@@ -711,9 +730,13 @@ class TestOpenerPlayer:
     async def test_learner_speech_cancels_and_flushes(self, monkeypatch):
         player, td, bg, _ = _player(monkeypatch)
         await player.render_catalog()
-        recorded = {}
+        recorded = {"metadata": {}}
         monkeypatch.setattr(
-            turn_metrics, "record", lambda room, **kw: recorded.update(kw)
+            turn_metrics,
+            "record",
+            lambda room, metadata=None, **kw: recorded["metadata"].update(
+                metadata or {}
+            ),
         )
         player.on_agent_state("thinking")
         await asyncio.sleep(0.01)
@@ -748,13 +771,7 @@ class TestOpenerPlayer:
         self, monkeypatch
     ):
         """Nothing was heard, so the learner's next pause may still get one."""
-        cfg = PolicyConfig(
-            hold_min_ms=150.0,
-            hold_max_ms=160.0,
-            weight_none=0.0,
-            weight_unplanned=0.0,
-            post_opener_pause_ms=1.0,
-        )
+        cfg = PolicyConfig(hold_min_ms=150.0, hold_max_ms=160.0)
         player, td, bg, _ = _player(monkeypatch, policy_cfg=cfg)
         await player.render_catalog()
         decisions = []
@@ -786,63 +803,126 @@ class TestOpenerPlayer:
         player.on_agent_state("listening")
         assert td.opener is None
 
-    @pytest.mark.asyncio
-    async def test_a_new_plan_prerenders_its_bridge_and_it_plays_once(
-        self, monkeypatch
-    ):
-        cfg = PolicyConfig(
-            hold_min_ms=1.0,
-            hold_max_ms=2.0,
-            weight_none=0.0,
-            weight_unplanned=0.0,
-            post_opener_pause_ms=1.0,
-            bridge_probability=1.0,
-            bridge_min_gap_ms=100.0,
-        )
-        player, td, bg, transcripts = _player(monkeypatch, policy_cfg=cfg)
-        recorded_meta = {}
+    @staticmethod
+    def _capture(monkeypatch):
+        meta = {}
 
         def _merge(room, metadata=None, **kw):
-            recorded_meta.update(metadata or {})
+            meta.update(metadata or {})
 
         def _decision(room, decision, **kw):
-            recorded_meta.update(kw)
+            meta.update(kw)
+
+        def _started(room, ts, kind="filler", interim_source=None):
+            meta.setdefault("firstKind", kind)
+            if interim_source:
+                meta.setdefault("interimSource", interim_source)
 
         monkeypatch.setattr(turn_metrics, "record", _merge)
         monkeypatch.setattr(turn_metrics, "note_filler_decision", _decision)
-        await player.render_catalog()
-        td.on_plan(player.on_plan)
-        td.set_plan(DeliveryPlan(bridge_line="That's a lot.", source="planner"))
-        await asyncio.sleep(0.01)
-        player.on_agent_state("thinking")
-        await asyncio.sleep(0.8)
-        assert ("bridge", "That's a lot.") in transcripts
-        assert len(bg.played) == 2  # opener, then the bridge after a pause
-        assert recorded_meta.get("openerBridge") is True  # set when it PLAYED
-        assert player._bridge is None  # heard once
-        # The legacy interim reads these so it never stacks on a bridge.
-        assert player.bridged_since_reply
-        player.on_agent_state("speaking")
-        assert not player.bridged_since_reply
+        monkeypatch.setattr(turn_metrics, "note_filler_started", _started)
+        return meta
 
     @pytest.mark.asyncio
-    async def test_busy_through_the_hold_and_the_clip(self, monkeypatch):
-        cfg = PolicyConfig(
-            hold_min_ms=50.0,
-            hold_max_ms=60.0,
-            weight_none=0.0,
-            weight_unplanned=0.0,
-            post_opener_pause_ms=1.0,
-        )
-        player, td, bg, _ = _player(monkeypatch, policy_cfg=cfg)
+    async def test_the_interim_plays_piece_by_piece_after_the_filler(self, monkeypatch):
+        player, td, bg, transcripts = _player(monkeypatch)
+        meta = self._capture(monkeypatch)
         await player.render_catalog()
+        td.on_plan(player.on_plan)
+        td.set_plan(
+            DeliveryPlan(
+                opener_kind="hum",
+                interim=("It's just that…", "I don't know…"),
+                source="working_memory",
+            )
+        )
+        await asyncio.sleep(0.01)
         player.on_agent_state("thinking")
-        assert player.busy  # holding
-        await asyncio.sleep(0.6)
-        assert len(bg.played) == 1
-        assert player.opened_since_reply and not player.bridged_since_reply
-        bg.played[0].stop()  # the clip finished
-        assert not player.busy
+        assert td.opener.interim == ("It's just that…", "I don't know…")
+        assert '"I don\'t know…"' in td.reply_note()
+        await asyncio.sleep(1.5)
+        assert len(bg.played) == 3  # filler, then two pieces
+        # One transcript line for the whole interim, not one per piece.
+        assert ("interim", "It's just that… I don't know…") in transcripts
+        assert meta["openerBridge"] is True  # an interim followed the filler
+        assert meta["cuesPlayed"] == 3 and meta["interimPiecesPlayed"] == 2
+        assert meta["interimPiecesScheduled"] == 2
+
+    @pytest.mark.asyncio
+    async def test_the_reply_cuts_the_interim_and_only_what_was_heard_is_kept(
+        self, monkeypatch
+    ):
+        player, td, bg, transcripts = _player(monkeypatch)
+        self._capture(monkeypatch)
+        await player.render_catalog()
+        td.on_plan(player.on_plan)
+        td.set_plan(
+            DeliveryPlan(
+                opener_kind="hum",
+                interim=("It's just that…", "I don't know…", "it's hard"),
+                source="working_memory",
+            )
+        )
+        await asyncio.sleep(0.01)
+        player.on_agent_state("thinking")
+        await asyncio.sleep(0.45)  # filler done, first piece playing
+        player.on_agent_state("speaking")
+        await asyncio.sleep(0.05)
+        assert len(bg.played) == 2 and bg.played[-1].stopped and bg.flushed
+        assert ("interim", "It's just that…") in transcripts
+
+    @pytest.mark.asyncio
+    async def test_without_working_memory_the_generator_s_line_plays(self, monkeypatch):
+        player, td, bg, transcripts = _player(monkeypatch)
+        self._capture(monkeypatch)
+        await player.render_catalog()
+        line = FillerClip(phrase="It's hard to say…", frames=[], duration_ms=300.0)
+        player.set_live_interim(line.phrase, line)
+        player.on_agent_state("thinking")
+        assert td.opener.interim == ("It's hard to say…",)
+        await asyncio.sleep(1.0)
+        assert len(bg.played) == 2
+        assert ("interim", "It's hard to say…") in transcripts
+        # Heard once: the next turn does not replay it.
+        player.on_agent_state("speaking")
+        player.on_agent_state("listening")
+        player.on_agent_state("thinking")
+        await asyncio.sleep(1.0)
+        assert len(bg.played) == 3
+
+    @pytest.mark.asyncio
+    async def test_a_line_ready_during_the_filler_still_plays_if_it_fits(
+        self, monkeypatch
+    ):
+        """Rendering can finish after the learner stops (v3 takes ~3-4 s)."""
+        player, td, bg, transcripts = _player(monkeypatch)
+        meta = self._capture(monkeypatch)
+        await player.render_catalog()
+        player.on_agent_state("thinking", created_at=__import__("time").time())
+        await asyncio.sleep(0.1)  # the filler is playing
+        line = FillerClip(phrase="It's hard to say…", frames=[], duration_ms=300.0)
+        player.set_live_interim(line.phrase, line)
+        await asyncio.sleep(1.0)
+        assert len(bg.played) == 2
+        assert ("interim", "It's hard to say…") in transcripts
+        assert meta.get("interimSource") is None  # the filler was first
+
+    @pytest.mark.asyncio
+    async def test_a_plan_s_pieces_are_never_mixed_with_an_older_render(
+        self, monkeypatch
+    ):
+        player, td, bg, transcripts = _player(monkeypatch)
+        self._capture(monkeypatch)
+        await player.render_catalog()
+        td.on_plan(player.on_plan)
+        td.set_plan(DeliveryPlan(interim=("Old words…",), source="working_memory"))
+        await asyncio.sleep(0.01)
+        # A new plan arrives and its render has not finished.
+        player._synthesize = lambda *a, **k: asyncio.sleep(10, result=[])
+        td.set_plan(DeliveryPlan(interim=("New words…",), source="working_memory"))
+        player.on_agent_state("thinking")
+        await asyncio.sleep(0.8)
+        assert not any(t == ("interim", "Old words…") for t in transcripts)
 
 
 class TestClipLessVoice:
@@ -851,7 +931,7 @@ class TestClipLessVoice:
     are playable."""
 
     @pytest.mark.asyncio
-    async def test_only_body_openers_play_and_no_bridge_renders(self, monkeypatch):
+    async def test_only_body_openers_play_and_no_interim_renders(self, monkeypatch):
         from app.core.livekit.opener_player import OpenerPlayer
 
         catalog = build_session_catalog("en-IN", gender="female")
@@ -869,21 +949,14 @@ class TestClipLessVoice:
             room_name="room-v3",
             turn_delivery=td,
             policy=OpenerPolicy(
-                PolicyConfig(
-                    hold_min_ms=1.0,
-                    hold_max_ms=2.0,
-                    post_opener_pause_ms=1.0,
-                    bridge_probability=1.0,
-                    bridge_min_gap_ms=100.0,
-                ),
+                PolicyConfig(hold_min_ms=1.0, hold_max_ms=2.0),
                 rng=random.Random(0),
             ),
             bg_audio_getter=lambda: bg,
             predicted_gap_ms=lambda: 5000.0,
             synthesize=_synth,
             emit_filler_transcript=lambda text, ts: None,
-            emit_bridge_transcript=lambda text, ts: None,
-            post_opener_pause_ms=1.0,
+            emit_interim_transcript=lambda text, ts: None,
         )
         monkeypatch.setattr(
             "livekit.agents.AudioConfig", lambda *a, **k: types.SimpleNamespace()
@@ -892,14 +965,16 @@ class TestClipLessVoice:
         assert synth_calls == []  # nothing spoken was even attempted
         td.on_plan(player.on_plan)
         td.set_plan(
-            DeliveryPlan(opener_kind="hum", bridge_line="Okay.", source="planner")
+            DeliveryPlan(
+                opener_kind="breath", interim=("Okay…",), source="working_memory"
+            )
         )
         await asyncio.sleep(0.01)
         player.on_agent_state("thinking")
         await asyncio.sleep(1.5)
-        assert len(bg.played) == 1  # the body opener; no bridge clip exists
+        assert len(bg.played) == 1  # the body opener; no interim clip exists
         assert td.opener.category == "body"
-        assert not player.bridged_since_reply
+        assert td.opener.interim == ()
 
 
 # ---------------------------------------------------------------------------
@@ -969,73 +1044,13 @@ class TestPostFillerSilence:
 
 
 class TestGraphSeams:
-    @pytest.mark.asyncio
-    async def test_plan_delivery_node_skips_working_memory_scenarios(self, monkeypatch):
-        from app.core.graph import nodes
+    def test_no_planner_runs_without_working_memory(self):
+        """Those scenarios get fillers and pauses (plus the interim generator's
+        line); a second planner prompt confused the people editing prompts."""
+        from app.core.graph import graph_builder, nodes
 
-        td = TurnDelivery(build_session_catalog("en-IN"))
-        td.active = True
-        client = Mock()
-        monkeypatch.setattr(
-            nodes, "prompt_declares_client_working_memory", lambda pd: True
-        )
-        config = {
-            "configurable": {
-                "turn_delivery": td,
-                "delivery_llm_client": client,
-                "scenario": types.SimpleNamespace(prompt_data=object()),
-            }
-        }
-        state = types.SimpleNamespace(messages=[])
-        assert await nodes.plan_delivery(state, config) == {}
-        assert td.planner_in_flight is False
-
-    @pytest.mark.asyncio
-    async def test_plan_delivery_node_sets_the_plan(self, monkeypatch):
-        from langchain_core.messages import AIMessage, HumanMessage
-
-        from app.core.graph import nodes
-
-        td = TurnDelivery(build_session_catalog("en-IN"))
-        td.active = True
-        monkeypatch.setattr(
-            nodes, "prompt_declares_client_working_memory", lambda pd: False
-        )
-
-        async def _fake_plan(*args, **kwargs):
-            return ProposedDelivery(
-                opener_kind="reflective", opener_ids=["hmm_reflective"]
-            )
-
-        monkeypatch.setattr(
-            "app.core.livekit.delivery_planner.plan_next_delivery", _fake_plan
-        )
-        config = {
-            "configurable": {
-                "turn_delivery": td,
-                "delivery_llm_client": object(),
-                "scenario": types.SimpleNamespace(prompt_data=object()),
-            }
-        }
-        state = types.SimpleNamespace(
-            messages=[HumanMessage(content="hi"), AIMessage(content="hello")]
-        )
-        await nodes.plan_delivery(state, config)
-        await asyncio.sleep(0.05)
-        assert td.plan.source == "planner"
-        assert td.plan.opener_ids == ("hmm_reflective",)
-        assert td.planner_in_flight is False
-
-    @pytest.mark.asyncio
-    async def test_plan_delivery_node_is_inert_until_active(self):
-        from app.core.graph import nodes
-
-        td = TurnDelivery(build_session_catalog("en-IN"))
-        config = {"configurable": {"turn_delivery": td, "delivery_llm_client": 1}}
-        assert (
-            await nodes.plan_delivery(types.SimpleNamespace(messages=[]), config) == {}
-        )
-        assert td.planner_in_flight is False
+        assert not hasattr(nodes, "plan_delivery")
+        assert not hasattr(graph_builder, "build_plan_delivery_subgraph")
 
     def test_working_memory_hooks_validate_against_the_catalog(self):
         from app.core.graph.nodes import _delivery_hooks

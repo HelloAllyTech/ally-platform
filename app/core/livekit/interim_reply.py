@@ -1,17 +1,18 @@
-"""Predictive interim reply — a latency-masking holding utterance.
+"""Interim generator — the holding line for scenarios WITHOUT working memory.
 
 While the learner is still speaking on a long turn, the worker snapshots the
-interim (partial) transcript and asks a FAST, DEDICATED model (separate from the
-scenario's main reply LLM — see ``settings.INTERIM_REPLY_MODEL``) for a short,
-NON-COMMITTAL holding reply the character would plausibly say. The worker
-pre-synthesizes it to audio and, at the VAD endpoint, plays it on the background
-track (after the thinking-filler) to mask the real reply's latency. The interim
-is cut the instant the real reply's TTS begins.
+partial transcript and asks a FAST, DEDICATED model (separate from the
+scenario's main reply LLM — see ``settings.INTERIM_REPLY_MODEL``) for one short,
+NON-COMMITTAL holding line the character would plausibly say. The worker
+pre-renders it and hands it to the ``OpenerPlayer``, which plays it as the
+turn's interim under the same timing rules as any other (after the filler, only
+if it fits the wait) and tells the real reply its words, so the reply carries
+on from it. Working-memory scenarios never call this: the updater writes their
+interim into the delivery plan.
 
-The real reply is generated INDEPENDENTLY by the normal graph and never sees the
-interim (the interim is never inserted into the LangGraph message history — it
-lives only in the transcript sink, like the filler). The interim IS recorded as
-a CLIENT transcript line, so it is treated as a real (if non-committal) turn.
+The interim is never inserted into the LangGraph message history — it lives
+only in the transcript sink, like the filler — and is recorded as a CLIENT
+transcript line, so it is treated as a real (if non-committal) turn.
 
 The prompt is the superadmin-editable ``filler/interim_reply`` template,
 resolved via the normal prompt pipeline (DB override when edited, local ``.txt``

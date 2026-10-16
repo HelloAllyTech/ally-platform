@@ -383,7 +383,6 @@ real builder, and the difference between them is *when* they are added:
 |---|---|---|
 | `retrieve_knowledge` (subgraph) | fans out from `START`, joins at `sync_events_and_behaviors_node` | always |
 | `update_working_memory` (subgraph) | after `publish_done_thinking` | **always** |
-| `plan_delivery` (subgraph) | after `publish_done_thinking` | **always** |
 | `compact_history` (subgraph) | after `publish_done_thinking` | only when `ROLLING_SUMMARY_ENABLED` |
 
 Both post-reply nodes sit strictly after `publish_done_thinking` — the reply
@@ -403,22 +402,21 @@ the node returns immediately unless that prompt declares
 `{client_working_memory}` or a `working_memory_*` section placeholder, so the
 cost for every other simulation is one no-op node visit.
 
-`plan_delivery` plans how the character STARTS its next reply (see
-[Turn Openers](turn-openers.md)). It is the complement of working memory:
-working-memory scenarios get the plan from the updater call they already make
-(`ProposedUpdate.delivery`), so the node returns at once for them and runs a
-small-model planner, detached, only for scenarios without working memory whose
-session has an active delivery layer (`TurnDelivery.active`). Subgraph-wrapped
-for the same LiveKit #2836 reason. Neither planner can delay the current reply.
+The working-memory updater also plans how the character STARTS its next reply
+(`ProposedUpdate.delivery`, see [Turn Openers](turn-openers.md)): the filler and
+the interim pieces. Scenarios without working memory get no plan — fillers and
+pauses, plus the interim generator's line where it is enabled — so there is no
+second planner node.
 
-`generate_response` also appends one trailing system line when an opener
-already played this turn (`TurnDelivery.reply_note`), so the reply does not
+`generate_response` also appends one trailing system line when a filler or an
+interim played this turn (`TurnDelivery.reply_note`): it names the filler, quotes
+the interim, and tells the reply to continue straight on from it rather than
 open with a second hesitation.
 
-Both planners pass the character's last few lines (`_recent_character_lines`)
-into `validate_delivery`, which drops a proposed bridge line that replays one
-of them — in prod a bridge once repeated a reply from two turns earlier word
-for word.
+The updater passes the character's last few lines (`_recent_character_lines`)
+into `validate_delivery`, which drops an interim piece that replays one of them
+— in prod a holding line once repeated a reply from two turns earlier word for
+word.
 
 ---
 

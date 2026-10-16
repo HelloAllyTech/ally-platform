@@ -8,7 +8,6 @@ from app.core.graph.nodes import (
     compact_history,
     detect_behaviors,
     generate_response,
-    plan_delivery,
     process_events,
     process_gating_events,
     publish_done_thinking,
@@ -108,20 +107,6 @@ def build_update_working_memory_subgraph() -> CompiledStateGraph[SimulationState
     subgraph.add_node("update_working_memory", update_working_memory)
     subgraph.add_edge(START, "update_working_memory")
     subgraph.add_edge("update_working_memory", END)
-    return subgraph.compile()
-
-
-def build_plan_delivery_subgraph():
-    """Build a subgraph for the small delivery planner's trigger.
-
-    Subgraph-wrapped like update_working_memory: the planner's structured
-    output must never reach TTS (LiveKit issue #2836), and the detached task it
-    creates inherits the run's streaming context from this node.
-    """
-    subgraph = StateGraph(SimulationState)
-    subgraph.add_node("plan_delivery", plan_delivery)
-    subgraph.add_edge(START, "plan_delivery")
-    subgraph.add_edge("plan_delivery", END)
     return subgraph.compile()
 
 
@@ -260,14 +245,6 @@ def build_simulation_graph() -> StateGraph[SimulationState]:
     graph.add_node("update_working_memory", working_memory_subgraph)
     graph.add_edge("publish_done_thinking", "update_working_memory")
     graph.add_edge("update_working_memory", END)
-
-    # Delivery planner for scenarios WITHOUT working memory: how the character
-    # starts its NEXT reply. Parallel to update_working_memory and gated inside
-    # the node to the scenarios it does not serve, so exactly one of the two
-    # proposes a plan per turn. Schedules detached work only.
-    graph.add_node("plan_delivery", build_plan_delivery_subgraph())
-    graph.add_edge("publish_done_thinking", "plan_delivery")
-    graph.add_edge("plan_delivery", END)
 
     if settings.ROLLING_SUMMARY_ENABLED:
         # Rolling-summary compactor: strictly AFTER publish_done_thinking (the

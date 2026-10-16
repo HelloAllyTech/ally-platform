@@ -601,7 +601,6 @@ def create_agent_with_adapter(
     retrieved_context_store=None,
     client_working_memory_store=None,
     turn_delivery=None,
-    delivery_llm_client=None,
 ) -> Agent:
     """
     Create LLM adapter and agent instance.
@@ -661,12 +660,10 @@ def create_agent_with_adapter(
         configurable["client_working_memory_store"] = client_working_memory_store
 
     # How each reply starts (app/core/livekit/delivery.py): the worker records
-    # the opener it played here and the graph's planners write the next plan.
-    # The small planner client serves scenarios without working memory.
+    # the opener it played here and the working-memory updater writes the next
+    # plan.
     if turn_delivery is not None:
         configurable["turn_delivery"] = turn_delivery
-    if delivery_llm_client is not None:
-        configurable["delivery_llm_client"] = delivery_llm_client
 
     # Lazy import to avoid circular dependency
     from app.core.graph import agent_graph

@@ -1,5 +1,0 @@
-{
-    "name": "Delivery Planner Prompt",
-    "kind": "prompt",
-    "description": "Plans the FIRST SOUND of a character's next reply — a catalog opener (hum, hesitation, reflective sound, discourse marker, breath or sigh), a short bridge line, or a deliberate pause — from the character's current state. Used only by scenarios WITHOUT client working memory; working-memory scenarios get the same plan from the Client Working Memory Updater, which already knows the state. Runs after the character speaks, off the reply path, on a small model. The worker plays the plan under deterministic turn-time rules (variation across turns, one opener at most, no repeats, nothing over the learner). Editable under System Skills. Variables: {scenario_context}, {character_voice}, {language_label}, {opener_catalog}."
-}

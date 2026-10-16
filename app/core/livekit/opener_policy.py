@@ -1,26 +1,31 @@
-"""Turn-time rules for what the learner hears first. Deterministic, no LLM.
+"""Turn-time rules for what the learner hears before the reply. Deterministic.
 
 The delivery plan (``delivery.py``) says what FITS the character; this module
-decides what actually PLAYS on a given turn, applying the product rubric for
-natural-sounding replies:
+decides what actually PLAYS on a given turn, and when:
 
-* **Not every turn starts with a sound.** The first thing heard varies across
-  turns: nothing (just the reply after a pause), a vocal opener, a breath or
-  sigh, a bridging line. The same category is discouraged twice in a row and
-  vocal openers are capped at ``max_vocal_run`` turns in a row. Prod had
-  filler-first turns in 55% of turns per session and runs of up to 11.
-* **One opener at most, then a pause.** Never two fillers back to back (67% of
-  prod filler turns stacked two). A bridge line, when one plays, comes after a
-  thinking pause, not glued to the opener.
-* **The gap varies.** A randomised hold before the opener, longer when the plan
-  says a pause fits, so the agent is not a metronome at ~630 ms.
-* **Never the same sound turn after turn.** A no-repeat window over catalog
-  FAMILIES (hmm / hmmm / hmm… are one family).
+* **Pause first.** A randomised hold before anything, longer when the plan says a
+  pause fits. A reply after a pause is one of the natural first sounds.
+* **One filler at most**, chosen from the plan's own suggestions. Variety comes
+  from moving down the planner's list (and a no-repeat window over sound
+  FAMILIES: hmm / hmmm / hmm… are one family), never from overruling it: the
+  previous rules replaced the planned kind on ~60% of prod turns.
+* **Then the interim, piece by piece, while the wait lasts.** The gaps between
+  pieces lengthen a little each time, the way a person thinking aloud slows
+  down, and a piece plays only if it ends in time to leave a short beat before
+  the reply::
+
+      gap before piece k   gₖ = PIECE_GAP · GROWTHᵏ        (0.35, 0.49, 0.69 s …)
+      piece k plays only if   t + gₖ + dₖ ≤ W − TAIL       (W = predicted wait)
+      and all speech so far   ≤ MAX_SPEECH_SHARE · W
+
+  So a short wait gets nothing, a medium one a pause and a filler, and a long one
+  (ElevenLabs v3, 6-8 s) a filler and two or three pieces.
 * **Nothing over the learner.** Declines when the learner's last words read as
-  unfinished (they are likely to continue), and the runner cancels on any
-  learner speech during the hold. In prod ~30% of fillers started while the
-  learner was still mid-turn.
+  unfinished, and the runner cancels on any learner speech.
 * **Nothing before a goodbye**, and nothing on a turn predicted to be fast.
+
+Scenarios without working memory keep the default plan: a filler or a pause,
+rotating the kind of sound, and never an interim.
 
 The policy is pure — state in, decision out — so every rule is testable without
 a room, a TTS or a clock.
@@ -32,7 +37,7 @@ import random
 import re
 from collections import deque
 from dataclasses import dataclass
-from typing import Deque, Dict, List, Optional, Sequence
+from typing import Deque, Dict, List, Optional, Sequence, Tuple
 
 from app.core.livekit.delivery import DeliveryPlan
 from app.core.livekit.opener_catalog import (
@@ -111,19 +116,21 @@ def learner_is_leaving(text: Optional[str]) -> bool:
 class OpenerDecision:
     """What to play before the reply this turn."""
 
-    #: "none" | "vocal" | "body"
+    #: The filler's category: "none" | "vocal" | "body".
     category: str
     entry: Optional[CatalogEntry] = None
-    #: Silence before the opener starts, in ms.
+    #: Silence before the first sound, in ms.
     hold_ms: float = 0.0
-    #: Whether the pre-rendered bridge line follows the opener (after a pause).
-    bridge: bool = False
+    #: How many of the plan's interim pieces follow, in order.
+    pieces: int = 0
+    #: The silence before each of those pieces, in ms.
+    gaps_ms: Tuple[float, ...] = ()
     #: Why — recorded on the turn metrics.
     reason: str = "played"
 
     @property
     def plays_anything(self) -> bool:
-        return self.entry is not None or self.bridge
+        return self.entry is not None or self.pieces > 0
 
 
 @dataclass
@@ -131,44 +138,36 @@ class PolicyConfig:
     min_gap_ms: float = 700.0
     hold_min_ms: float = 300.0
     hold_max_ms: float = 600.0
-    long_hold_min_ms: float = 600.0
-    long_hold_max_ms: float = 1000.0
-    #: Silence after an opener before a bridge line or the reply — the
-    #: "thinking" beat the rubric asks for.
-    post_opener_pause_ms: float = 550.0
-    #: The beat between an opener and the bridge line after it: shorter than
-    #: the thinking pause before the reply, because "Hmm… that's a lot" is
-    #: one breath group, not two.
-    bridge_gap_ms: float = 250.0
-    bridge_min_gap_ms: float = 2200.0
-    max_vocal_run: int = 2
+    #: The hold when the plan says a pause fits: a real pause, not a beat.
+    long_hold_min_ms: float = 1200.0
+    long_hold_max_ms: float = 2000.0
+    #: The gap before the first interim piece that follows a sound, and how
+    #: much longer each later gap is.
+    piece_gap_ms: float = 350.0
+    piece_gap_growth: float = 1.4
+    #: Silence left between the last sound and the predicted reply, so the
+    #: answer doesn't land glued to the holding words.
+    tail_ms: float = 500.0
+    max_pieces: int = 3
+    #: Speech never fills more than this share of the predicted wait.
+    max_speech_share: float = 0.7
     #: A breath or sigh may play at most once in this many turns. Body sounds
     #: are the most noticeable openers; a prod session whose small planner asked
     #: for "sigh" on all 8 plans heard a breath or sigh on 4 of 9 turns.
     body_min_gap_turns: int = 4
     repeat_window: int = 4
-    #: Base weights for the first-sound categories before plan and history
-    #: adjustments. "none" is weighted in on purpose: a reply after a pause is
-    #: one of the natural first sounds, not a failure to fill. Lowered from
-    #: 0.35 after prod (09-29..10-01) left 68 of 249 opener turns silent for
-    #: ~4.5 s each — the pause stopped reading as a beat and became dead air.
-    weight_none: float = 0.2
-    #: The category the plan asked for, and any other playable category.
-    weight_planned: float = 0.6
-    weight_unplanned: float = 0.12
-    #: Multiplier on the category used last turn: variety without overruling
-    #: the plan outright.
-    repeat_category_factor: float = 0.4
-    #: At or above this predicted gap, choosing silence is not allowed.
-    max_silent_gap_ms: float = 2000.0
-    #: 1.0: the fit check and the no-two-in-a-row rule are the real gates. At
-    #: 0.35, with the planner also leaving the line empty 99% of the time, one
-    #: bridge played in three prod days.
-    bridge_probability: float = 1.0
+    #: Default plan (no working memory) only: on a wait shorter than this, a
+    #: pause alone stands in for the filler this often.
+    pause_only_max_gap_ms: float = 2000.0
+    pause_only_probability: float = 0.35
+
+
+#: What a "silence" plan plays if the wait outlasts the pause.
+_AFTER_A_PAUSE = ("breath", "reflective", "hum")
 
 
 class OpenerPolicy:
-    """Decides each turn's first sound from the plan plus recent history."""
+    """Decides each turn's opening from the plan plus recent history."""
 
     def __init__(
         self,
@@ -179,7 +178,7 @@ class OpenerPolicy:
         self._rng = rng or random.Random()
         self._categories: Deque[str] = deque(maxlen=8)
         self._families: Deque[str] = deque(maxlen=max(1, self.config.repeat_window))
-        self._last_bridge = False
+        self._last_kind: Optional[str] = None
 
     # ---- history ----------------------------------------------------
 
@@ -188,54 +187,80 @@ class OpenerPolicy:
         self._categories.append(decision.category)
         if decision.entry is not None:
             self._families.append(decision.entry.family)
-        self._last_bridge = decision.bridge
+            self._last_kind = decision.entry.kind
 
     def _body_recent(self) -> bool:
         """Whether a body sound played within the last body_min_gap_turns - 1."""
         window = max(0, self.config.body_min_gap_turns - 1)
         return window > 0 and "body" in list(self._categories)[-window:]
 
-    def _vocal_run(self) -> int:
-        run = 0
-        for category in reversed(self._categories):
-            if category != "vocal":
-                break
-            run += 1
-        return run
-
     # ---- choosing ---------------------------------------------------
 
-    def _pick_entry(
+    def _pick_filler(
         self,
-        kinds: Sequence[str],
         plan: DeliveryPlan,
         catalog: SessionCatalog,
         durations: Dict[str, float],
         max_ms: float,
     ) -> Optional[CatalogEntry]:
-        """The best playable entry of ``kinds``: plan order first, then any.
+        """The filler to play: the plan's own choice whenever one can play.
 
-        Playable = rendered (has a duration), short enough to leave the post-
-        opener pause before the reply, and not in a recently heard family.
+        Playable = rendered, short enough to fit, not in a recently heard
+        family, and not a body sound inside its spacing window. Order: the
+        plan's ids, then the plan's kind, then the nearest kind in the same
+        category, then any spoken filler.
         """
 
         def ok(entry: Optional[CatalogEntry]) -> bool:
             return (
                 entry is not None
-                and entry.kind in kinds
                 and entry.id in durations
                 and durations[entry.id] <= max_ms
                 and entry.family not in self._families
+                and not (entry.kind in BODY_KINDS and self._body_recent())
             )
 
+        entries = [e for e in catalog.entries.values() if ok(e)]
+        if not entries:
+            return None
+        if plan.source == "default":
+            # No planner: rotate the kind of sound so it isn't "Hmm" every turn.
+            fresh = [e for e in entries if e.kind != self._last_kind]
+            return self._rng.choice(fresh or entries)
         for entry_id in plan.opener_ids:
             entry = catalog.get(entry_id)
             if ok(entry):
                 return entry
-        preferred = [
-            e for e in catalog.entries.values() if ok(e) and e.kind == plan.opener_kind
-        ]
-        pool = preferred or [e for e in catalog.entries.values() if ok(e)]
+        kinds = _AFTER_A_PAUSE if plan.opener_kind == "silence" else (plan.opener_kind,)
+        for kind in kinds:
+            same = [e for e in entries if e.kind == kind]
+            if same:
+                return self._rng.choice(same)
+        # Every family of the planned kind was heard recently. Stay with the
+        # kind — it is the character's state — and take the one heard longest
+        # ago, never the one just played.
+        recent = list(self._families)
+        for kind in kinds:
+            stale = [
+                e
+                for e in catalog.entries.values()
+                if e.kind == kind
+                and e.id in durations
+                and durations[e.id] <= max_ms
+                and (not recent or e.family != recent[-1])
+                and not (e.kind in BODY_KINDS and self._body_recent())
+            ]
+            if stale:
+                return min(
+                    stale,
+                    key=lambda e: (
+                        recent.index(e.family) if e.family in recent else -1
+                    ),
+                )
+        category = BODY_KINDS if plan.opener_kind in BODY_KINDS else VOCAL_KINDS
+        near = [e for e in entries if e.kind in category]
+        spoken = [e for e in entries if e.kind in VOCAL_KINDS]
+        pool = near or spoken
         return self._rng.choice(pool) if pool else None
 
     def decide(
@@ -245,9 +270,13 @@ class OpenerPolicy:
         durations: Dict[str, float],
         predicted_gap_ms: float,
         learner_text: Optional[str] = None,
-        bridge_ms: Optional[float] = None,
+        piece_ms: Sequence[float] = (),
     ) -> OpenerDecision:
-        """This turn's first sound. Pure; call ``record`` with the result."""
+        """This turn's opening. Pure; call ``record`` with the result.
+
+        ``piece_ms`` is the rendered length of each of the plan's interim
+        pieces, in order; a piece not rendered yet ends the list.
+        """
         cfg = self.config
         if learner_is_leaving(learner_text):
             return OpenerDecision("none", reason="skipped_closing")
@@ -255,111 +284,54 @@ class OpenerPolicy:
             return OpenerDecision("none", reason="skipped_learner_unfinished")
         if predicted_gap_ms < cfg.min_gap_ms:
             return OpenerDecision("none", reason="skipped_fast_turn")
-        if catalog is None or not durations:
+        if (catalog is None or not durations) and not piece_ms:
             return OpenerDecision("none", reason="skipped_no_clips")
 
-        long_hold = plan.hold_silence
+        pause_fits = plan.hold_silence or plan.opener_kind == "silence"
         lo, hi = (
             (cfg.long_hold_min_ms, cfg.long_hold_max_ms)
-            if long_hold
+            if pause_fits
             else (cfg.hold_min_ms, cfg.hold_max_ms)
         )
         hold = self._rng.uniform(lo, hi)
-        # Whatever plays must finish, plus the thinking beat, before the reply.
-        room_ms = predicted_gap_ms - hold - cfg.post_opener_pause_ms
+        # Every sound must end by here, leaving the beat before the reply.
+        speech_ends_by = predicted_gap_ms - cfg.tail_ms
+        speech_cap = cfg.max_speech_share * predicted_gap_ms
+        t = hold
 
-        last = self._categories[-1] if self._categories else None
-        # The plan's own category leads clearly: in the first prod day, the old
-        # 0.45 / 0.25 split played a different kind from the one planned on 5
-        # of 11 openers (a "sigh" plan heard as "Hmm").
-        planned_vocal = plan.opener_kind in VOCAL_KINDS
-        planned_body = plan.opener_kind in BODY_KINDS
-        weights: Dict[str, float] = {
-            # A pause-fits plan mostly LENGTHENS the hold (above); it only
-            # nudges toward saying nothing. At +0.4, planners that set it
-            # freely left 12 of 16 live v2v turns silent.
-            "none": cfg.weight_none + (0.15 if plan.hold_silence else 0.0),
-            "vocal": cfg.weight_planned if planned_vocal else cfg.weight_unplanned,
-            "body": cfg.weight_planned if planned_body else cfg.weight_unplanned,
-        }
-        if self._body_recent():
-            weights["body"] = 0.0
-        if last in weights:
-            weights[last] *= cfg.repeat_category_factor
-        # Silence is a device for a SHORT beat, not for a long wait: in the
-        # first prod day, turns where the policy chose nothing left the learner
-        # in p50 5.7 s of total silence (23 of 34 decided turns). Above this
-        # predicted gap, some sound always plays when one can.
-        if predicted_gap_ms >= cfg.max_silent_gap_ms:
-            weights["none"] = 0.0
-
-        vocal = self._pick_entry(VOCAL_KINDS, plan, catalog, durations, room_ms)
-        body = self._pick_entry(BODY_KINDS, plan, catalog, durations, room_ms)
-        if vocal is None:
-            weights["vocal"] = 0.0
-        if body is None:
-            weights["body"] = 0.0
-        # The vocal-run cap keeps a "Hmm" from fronting every reply. On a short
-        # wait a pause may take its place; on a long one (where silence is not
-        # allowed) it applies only if a body sound can actually play now —
-        # otherwise another spoken opener beats dead air.
-        if self._vocal_run() >= cfg.max_vocal_run and (
-            weights["body"] > 0.0 or predicted_gap_ms < cfg.max_silent_gap_ms
-        ):
-            weights["vocal"] = 0.0
-        # The plan's category can't play this turn (its few entries are in the
-        # no-repeat window, or the vocal-run cap is hit): the plan's weight
-        # moves to the other sound, not to silence. Otherwise a planner that
-        # keeps asking for the same kind silences most turns: prod 09-30..10-02
-        # played on 27% of "hum" plans vs 80% of "hesitation" plans, and a v2v
-        # small planner asking "sigh" 11 of 12 turns left most turns silent.
-        planned = "vocal" if planned_vocal else "body" if planned_body else None
-        if planned is not None and weights[planned] == 0.0:
-            other = "body" if planned == "vocal" else "vocal"
-            if weights[other] > 0.0:
-                weights[other] = max(weights[other], cfg.weight_planned)
-
-        category = self._weighted(weights)
-
-        bridge = False
-        if (
-            plan.bridge_line
-            and bridge_ms is not None
-            and not self._last_bridge
-            and predicted_gap_ms >= cfg.bridge_min_gap_ms
-        ):
-            entry_ms = (
-                durations.get(vocal.id, 0.0)
-                if category == "vocal" and vocal
-                else durations.get(body.id, 0.0) if category == "body" and body else 0.0
+        entry = None
+        if catalog is not None and durations:
+            entry = self._pick_filler(
+                plan, catalog, durations, min(speech_ends_by - t, speech_cap)
             )
-            after_opener = room_ms - entry_ms - cfg.bridge_gap_ms >= bridge_ms
-            # Doesn't fit after the opener but fits on its own: the line alone
-            # is the better first sound for a long wait. In v2v no bridge ever
-            # fit behind an opener plus two 550 ms beats (3.9-4.4 s on v3).
-            alone = not after_opener and entry_ms > 0 and room_ms >= bridge_ms
-            if (after_opener or alone) and self._rng.random() < cfg.bridge_probability:
-                bridge = True
-                if alone:
-                    category = "none"
+        if (
+            entry is not None
+            and plan.source == "default"
+            and predicted_gap_ms < cfg.pause_only_max_gap_ms
+            and self._rng.random() < cfg.pause_only_probability
+        ):
+            entry = None  # a pause alone, the other natural opening
+        spoken = 0.0
+        if entry is not None:
+            t += durations[entry.id]
+            spoken += durations[entry.id]
 
-        if category == "vocal" and vocal is not None:
-            return OpenerDecision("vocal", vocal, hold, bridge, "played")
-        if category == "body" and body is not None:
-            return OpenerDecision("body", body, hold, bridge, "played")
-        if bridge:
-            return OpenerDecision("none", None, hold, True, "played")
-        return OpenerDecision("none", reason="skipped_policy")
+        gaps: List[float] = []
+        for d in list(piece_ms)[: cfg.max_pieces]:
+            # No gap before a piece that opens the turn: the hold is its pause.
+            if entry is None and not gaps:
+                gap = 0.0
+            else:
+                gap = cfg.piece_gap_ms * cfg.piece_gap_growth ** len(gaps)
+            if t + gap + d > speech_ends_by or spoken + d > speech_cap:
+                break
+            t += gap + d
+            spoken += d
+            gaps.append(gap)
 
-    def _weighted(self, weights: Dict[str, float]) -> str:
-        total = sum(max(0.0, w) for w in weights.values())
-        if total <= 0:
-            return "none"
-        point = self._rng.uniform(0, total)
-        running = 0.0
-        order: List[str] = ["none", "vocal", "body"]
-        for name in order:
-            running += max(0.0, weights.get(name, 0.0))
-            if point <= running:
-                return name
-        return "none"
+        category = (
+            "none" if entry is None else "body" if entry.kind in BODY_KINDS else "vocal"
+        )
+        if entry is None and not gaps:
+            return OpenerDecision("none", reason="skipped_policy")
+        return OpenerDecision(category, entry, hold, len(gaps), tuple(gaps), "played")

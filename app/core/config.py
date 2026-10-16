@@ -698,47 +698,18 @@ class Settings(BaseSettings):
     )
 
     # ---- Delivery plan: how the character STARTS each reply ----
-    # Replaces the generated-filler path (seed / exchange / in-turn batches,
-    # the continuation filler and the interim reply) with a plan proposed by
-    # client working memory — or, for scenarios without it, by a small planner
-    # — that PICKS from a fixed opener catalog, played under deterministic
-    # turn-time rules. See app/core/livekit/delivery.py and opener_policy.py.
-    # False restores the previous filler path exactly (rollback lever).
+    # Replaces the generated-filler path (seed / exchange / in-turn batches and
+    # the continuation filler) with a plan proposed by client working memory
+    # that PICKS from a fixed opener catalog and writes the interim, played
+    # under deterministic turn-time rules. Scenarios without working memory
+    # get fillers and pauses, plus the interim generator's line when enabled.
+    # See app/core/livekit/delivery.py and opener_policy.py. False restores the
+    # previous filler path (rollback lever; it plays no interim).
     DELIVERY_PLAN_ENABLED: bool = Field(
         default=True,
         description=(
             "Drive turn openers from the delivery plan + opener catalog instead "
             "of LLM-generated fillers. False restores the legacy filler path."
-        ),
-    )
-    DELIVERY_PLANNER_MODEL_PROVIDER: str = Field(
-        default="openai",
-        description=(
-            "Provider for the small delivery planner used by scenarios WITHOUT "
-            "client working memory (working-memory scenarios get the plan from "
-            "the updater call they already make)."
-        ),
-    )
-    DELIVERY_PLANNER_MODEL: str = Field(
-        default="gpt-4o-mini",
-        description="Model id for the small delivery planner.",
-    )
-    DELIVERY_PLANNER_TIMEOUT_S: float = Field(
-        default=8.0,
-        description=(
-            "Timeout for one planner call. It runs detached after the reply, "
-            "so a miss only means the next turn reuses the previous plan."
-        ),
-    )
-    OPENER_MAX_SILENT_GAP_MS: float = Field(
-        default=2000.0,
-        description=(
-            "Predicted gap at or above which a turn may not open with silence: "
-            "a pause is a device for a short beat, and the first prod day left "
-            "learners in p50 5.7 s of total silence when the policy chose none. "
-            "Lowered from 3000: the predictor reads ~2.5 s where the real wait "
-            "is 3-4.6 s, and prod turns that opened with silence waited 4.6 s "
-            "on average (2026-09-29..10-01)."
         ),
     )
     CLIP_SYNTH_CONCURRENCY: int = Field(
@@ -777,32 +748,54 @@ class Settings(BaseSettings):
         default=600.0, description="Upper bound of the randomised pre-opener hold."
     )
     OPENER_LONG_HOLD_MIN_MS: float = Field(
-        default=600.0,
-        description="Hold lower bound when the plan says a pause fits the moment.",
-    )
-    OPENER_LONG_HOLD_MAX_MS: float = Field(
-        default=1000.0,
-        description="Hold upper bound when the plan says a pause fits the moment.",
-    )
-    OPENER_POST_PAUSE_MS: float = Field(
-        default=550.0,
+        default=1200.0,
         description=(
-            "Thinking pause left between the last opener sound and the "
-            "predicted reply (the opener-to-bridge beat is "
-            "OPENER_BRIDGE_GAP_MS)."
+            "Hold lower bound when the plan says a pause fits the moment: a real "
+            "pause, not a beat. Was 600-1000, and a 'pause' plan still played a "
+            "sound 16 of 16 times in prod."
         ),
     )
-    OPENER_BRIDGE_GAP_MS: float = Field(
-        default=250.0,
-        description="Beat between an opener and the bridge line that follows it.",
+    OPENER_LONG_HOLD_MAX_MS: float = Field(
+        default=2000.0,
+        description=(
+            "Hold upper bound when the plan says a pause fits. Learners talked "
+            "over 41% of replies after 3-4 s of silence, so it stays under 2 s."
+        ),
     )
-    OPENER_BRIDGE_MIN_GAP_MS: float = Field(
-        default=2200.0,
-        description="Predicted gap below which no bridge line is attempted.",
+    OPENER_PIECE_GAP_MS: float = Field(
+        default=350.0,
+        description=(
+            "Silence before the first interim piece that follows a sound. Each "
+            "later gap is OPENER_PIECE_GAP_GROWTH times the one before, the way "
+            "someone thinking aloud slows down."
+        ),
     )
-    OPENER_BRIDGE_PROBABILITY: float = Field(
-        default=1.0,
-        description="Chance of a bridge line on a turn where one fits.",
+    OPENER_PIECE_GAP_GROWTH: float = Field(
+        default=1.4, description="How much longer each gap between interim pieces is."
+    )
+    OPENER_TAIL_MS: float = Field(
+        default=500.0,
+        description=(
+            "Silence left between the last filler or interim piece and the "
+            "predicted reply, so the answer doesn't land glued to them."
+        ),
+    )
+    OPENER_MAX_INTERIM_PIECES: int = Field(
+        default=3, description="Most interim pieces played before one reply."
+    )
+    OPENER_MAX_SPEECH_SHARE: float = Field(
+        default=0.7,
+        description=(
+            "Filler plus interim never fill more than this share of the predicted "
+            "wait, so some silence always remains."
+        ),
+    )
+    OPENER_PAUSE_ONLY_MAX_GAP_MS: float = Field(
+        default=2000.0,
+        description=(
+            "Scenarios without working memory: below this predicted wait a pause "
+            "alone may stand in for the filler."
+        ),
     )
     OPENER_BODY_MIN_GAP_TURNS: int = Field(
         default=4,
@@ -810,10 +803,6 @@ class Settings(BaseSettings):
             "A breath or sigh opener plays at most once in this many turns; a "
             "planner that keeps asking for one falls back to a spoken opener."
         ),
-    )
-    OPENER_MAX_VOCAL_RUN: int = Field(
-        default=2,
-        description="Most consecutive turns that may open with a vocal sound.",
     )
     OPENER_REPEAT_WINDOW: int = Field(
         default=4,
@@ -1222,19 +1211,16 @@ class Settings(BaseSettings):
         ),
     )
 
-    # ---- Predictive interim reply (latency mask) ----
-    # Perceived-latency lever: while the learner is STILL speaking on a long turn,
-    # snapshot the interim transcript and ask a FAST dedicated model for a short,
-    # NON-COMMITTAL holding reply (~3-5s spoken), synthesize it to audio, and keep
-    # it ready. At the VAD endpoint the thinking-filler plays first (if any), then
-    # this interim reply plays on the background track, buying time while the real
-    # reply is generated by the normal pipeline. The interim is cut the instant the
-    # real reply's TTS begins. Unlike the filler, the interim IS recorded as a
-    # CLIENT transcript line (a real, if non-committal, agent turn); the real reply
-    # is generated INDEPENDENTLY (it never sees the interim). This GLOBAL flag
-    # (default OFF — riskiest layer) GATES a per-simulation opt-in
-    # (PromptData.interim_reply_enabled, Studio: interimReplyEnabled, default off):
-    # both must be on for the interim to run. See app/core/livekit/interim_reply.py.
+    # ---- Interim generator (scenarios WITHOUT working memory) ----
+    # While the learner is STILL speaking on a long turn, snapshot the partial
+    # transcript and ask a FAST dedicated model for one short, NON-COMMITTAL
+    # holding line, rendered ahead and handed to the OpenerPlayer, which plays
+    # it as the turn's interim under the same timing rules as a working-memory
+    # interim and tells the reply its words. Working-memory scenarios never run
+    # it: the updater writes their interim. Recorded as a CLIENT transcript
+    # line. This GLOBAL flag GATES a per-simulation opt-in
+    # (PromptData.interim_reply_enabled, Studio: interimReplyEnabled, default
+    # off): both must be on. See app/core/livekit/interim_reply.py.
     INTERIM_REPLY_GLOBALLY_ENABLED: bool = Field(
         default=False,
         description=(
@@ -1292,14 +1278,6 @@ class Settings(BaseSettings):
             "render a whole interim sentence: at 2500 every v3 interim timed "
             "out in v2v. Generation starts while the learner is still talking, "
             "so the longer limit adds no latency; the real reply still cuts it."
-        ),
-    )
-    INTERIM_REPLY_VOLUME: float = Field(
-        default=0.9,
-        description=(
-            "Playback volume (0-1) of the interim reply on the background track. "
-            "Louder than back-channel (0.6) since this is a spoken utterance, not "
-            "a soft listening signal."
         ),
     )
     INTERIM_REPLY_HISTORY_TURNS: int = Field(

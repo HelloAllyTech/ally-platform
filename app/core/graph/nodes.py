@@ -62,7 +62,6 @@ from app.core.scenario.base import (
     SimulationStateInstruction,
 )
 from app.core.scoring.score_keeper import ScoreKeeper
-from app.core.tasks import spawn_background_task
 from app.core.time_utils import TimingContext, time_operation
 from app.llms import create_llm_client
 from app.prompts.resolver import load_template
@@ -2741,7 +2740,7 @@ def _trim_after_opener(turn_delivery, text):
         from app.core.livekit.reply_shaping import LeadingHesitationTrimmer
 
         trimmer = LeadingHesitationTrimmer(
-            phrases=lambda: [p for p in (opener.spoken, opener.bridge) if p],
+            phrases=lambda: [p for p in (opener.spoken, *opener.interim) if p],
             is_active=lambda: True,
         )
         out = trimmer.feed(text) + trimmer.flush()
@@ -2760,80 +2759,8 @@ def _delivery_reply_note(config: Optional[RunnableConfig]) -> Optional[str]:
         return None
 
 
-async def plan_delivery(
-    state: SimulationState, config: Optional[RunnableConfig] = None
-) -> dict:
-    """Schedule the small delivery planner for scenarios WITHOUT working memory.
-
-    Terminal and detached, for the same reasons as update_working_memory: the
-    plan is for the NEXT turn, so its call must never sit between the learner
-    finishing and hearing this one. Working-memory scenarios return at once —
-    their updater already proposes the plan with the state it just derived, and
-    two planners for one turn would race.
-
-    One call per character turn at most, and none while the previous one is
-    still in flight; a miss just leaves the previous plan in force. Never writes
-    graph state — the plan lives on the worker-owned TurnDelivery.
-    """
-    configurable = (config or {}).get("configurable", {})
-    turn_delivery = configurable.get("turn_delivery")
-    if turn_delivery is None or not getattr(turn_delivery, "active", False):
-        return {}
-    catalog = getattr(turn_delivery, "catalog", None)
-    if catalog is None or not catalog.entries:
-        return {}
-    _clock = configurable.get("session_clock")
-    if _clock is not None and getattr(_clock, "is_paused", False):
-        return {}
-    scenario = cast(Scenario, configurable.get("scenario")) if configurable else None
-    prompt_data = getattr(scenario, "prompt_data", None) if scenario else None
-    if prompt_data is not None and prompt_declares_client_working_memory(prompt_data):
-        return {}
-    llm_client = configurable.get("delivery_llm_client")
-    if llm_client is None or turn_delivery.planner_in_flight:
-        return {}
-
-    from app.core.livekit.delivery import validate_delivery
-    from app.core.livekit.delivery_planner import plan_next_delivery
-
-    messages = list(state.messages)
-    room = configurable.get("room")
-    room_id = getattr(room, "name", None)
-    made_after = sum(1 for m in messages if isinstance(m, AIMessage)) - 1
-
-    async def _plan() -> None:
-        try:
-            proposal = await plan_next_delivery(
-                llm_client,
-                scenario,
-                messages,
-                catalog.describe_for_prompt(),
-                timeout_s=float(settings.DELIVERY_PLANNER_TIMEOUT_S),
-                room_id=room_id,
-            )
-            turn_delivery.set_plan(
-                validate_delivery(
-                    proposal,
-                    catalog,
-                    source="planner",
-                    made_after_turn=made_after,
-                    recent_lines=_recent_character_lines(messages),
-                )
-            )
-        finally:
-            turn_delivery.planner_in_flight = False
-
-    turn_delivery.planner_in_flight = True
-    task = spawn_background_task(
-        _plan(), name="delivery-planner", background_tasks=turn_delivery.tasks
-    )
-    if task is None:
-        turn_delivery.planner_in_flight = False
-    return {}
-
-
 def _recent_character_lines(messages, count: int = 6) -> List[str]:
-    """The character's last few lines, which a bridge line must not replay."""
+    """The character's last few lines, which an interim piece must not replay."""
     lines: List[str] = []
     for msg in reversed(list(messages or [])):
         if isinstance(msg, AIMessage):

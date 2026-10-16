@@ -364,74 +364,47 @@ class TestUserStateReset:
         assert w._user_speaking is False
 
 
-class TestCutover:
-    @pytest.mark.unit
-    async def test_agent_speaking_cuts_playing_interim(self, monkeypatch):
-        w = _interim_worker(monkeypatch)
-        handle = MagicMock()
-        handle.done.return_value = False
-        w._interim_handle = handle
-        w._interim_state = "playing"
+class _FakePlayer:
+    """Stands in for the OpenerPlayer, which plays the line."""
 
-        w._on_interim_agent_state(types.SimpleNamespace(new_state="speaking"))
+    def __init__(self):
+        self.live = None
+        self.cleared = 0
 
-        handle.stop.assert_called_once()
-        # stop() alone leaves a buffered tail on the shared bg track that would
-        # bleed over the real reply — the cutover must flush the source queue too.
-        w._bg_audio.flush.assert_called_once()
-        assert w._interim_handle is None
-        assert w._interim_state == "done"
+    def set_live_interim(self, text, clip):
+        self.live = (text, clip)
 
-    @pytest.mark.unit
-    async def test_no_flush_when_interim_already_finished(self, monkeypatch):
-        """A naturally-finished interim leaves nothing to cut — don't churn the
-        shared bg queue (and the comfort tone) for nothing."""
-        w = _interim_worker(monkeypatch)
-        handle = MagicMock()
-        handle.done.return_value = True  # interim already played out
-        w._interim_handle = handle
-        w._interim_state = "playing"
+    def clear_live_interim(self):
+        self.cleared += 1
+        self.live = None
 
-        w._on_interim_agent_state(types.SimpleNamespace(new_state="speaking"))
 
-        handle.stop.assert_not_called()
-        w._bg_audio.flush.assert_not_called()
-        assert w._interim_handle is None
-        assert w._interim_state == "done"
+class TestHandOff:
+    """The worker only makes the line; the OpenerPlayer decides when it plays
+    (after the filler, if it fits), so it is never chained as a second
+    holding sentence — the "hum → pause → sentence → reply" pattern."""
 
     @pytest.mark.unit
-    async def test_thinking_starts_play_task_when_ready(self, monkeypatch):
+    async def test_the_real_reply_drops_this_turn_s_line(self, monkeypatch):
         w = _interim_worker(monkeypatch)
-        started = []
-        w._interim_play_after_filler = lambda ts: (
-            started.append(ts),
-            asyncio.sleep(0),
-        )[1]
+        w._opener_player = _FakePlayer()
+        gen = asyncio.create_task(asyncio.sleep(10))
+        w._interim_gen_task = gen
         w._interim_state = "ready"
-
-        w._on_interim_agent_state(
-            types.SimpleNamespace(new_state="thinking", created_at=12.5)
-        )
-
-        assert started == [12.5]
-        assert w._interim_play_task is not None
-        await asyncio.sleep(0.01)
+        w._on_interim_agent_state(types.SimpleNamespace(new_state="speaking"))
+        await asyncio.sleep(0)
+        assert gen.cancelled()
+        assert w._interim_state == "idle" and w._opener_player.cleared == 1
 
     @pytest.mark.unit
-    async def test_thinking_noop_when_idle(self, monkeypatch):
+    async def test_thinking_plays_nothing_itself(self, monkeypatch):
         w = _interim_worker(monkeypatch)
-        started = []
-        w._interim_play_after_filler = lambda ts: (
-            started.append(ts),
-            asyncio.sleep(0),
-        )[1]
-        w._interim_state = "idle"
-
+        w._interim_state = "ready"
         w._on_interim_agent_state(
             types.SimpleNamespace(new_state="thinking", created_at=1.0)
         )
-
-        assert started == []
+        w._bg_audio.play.assert_not_called()
+        assert w._interim_state == "ready"
 
 
 def _clip(phrase: str, duration_ms: float = 3000.0):
@@ -461,10 +434,12 @@ class TestInterimGenerate:
             "app.core.livekit.filler_clips.synthesize_clips", fake_synth
         )
 
+        w._opener_player = _FakePlayer()
         await w._interim_generate("I have been feeling low about everything lately")
 
         assert w._interim_state == "ready"
-        assert w._interim_clip.phrase == "Mm, I'm with you."
+        # The leading "Mm," goes: a filler usually played just before it.
+        assert w._opener_player.live[0] == "I'm with you."
 
     @pytest.mark.unit
     async def test_empty_reply_returns_to_idle(self, monkeypatch):
@@ -477,10 +452,11 @@ class TestInterimGenerate:
 
         monkeypatch.setattr(interim_reply, "generate_interim_reply", fake_generate)
 
+        w._opener_player = _FakePlayer()
         await w._interim_generate("some partial transcript text here for testing")
 
         assert w._interim_state == "idle"
-        assert w._interim_clip is None
+        assert w._opener_player.live is None
 
     @pytest.mark.unit
     async def test_discards_clip_if_turn_reset_mid_synth(self, monkeypatch):
@@ -502,40 +478,33 @@ class TestInterimGenerate:
             "app.core.livekit.filler_clips.synthesize_clips", fake_synth
         )
 
+        w._opener_player = _FakePlayer()
         await w._interim_generate("some partial transcript text here for testing")
 
-        # The clip is in-memory, so "discarding" it is simply never committing it
-        # — there is no temp file left behind to clean up any more.
-        assert w._interim_clip is None
+        # In memory, so "discarding" it is simply never handing it over.
+        assert w._opener_player.live is None
 
 
 class TestResetTurn:
     @pytest.mark.unit
     async def test_reset_clears_all_state(self, monkeypatch):
         w = _interim_worker(monkeypatch)
-        handle = MagicMock()
-        handle.done.return_value = False
-        w._interim_handle = handle
-        w._interim_state = "playing"
+        w._opener_player = _FakePlayer()
+        w._opener_player.live = ("text", object())
+        w._interim_state = "ready"
         w._interim_armed = True
         w._interim_final_segments = ["a"]
         w._interim_current_interim = "b"
         w._interim_partial_text = "a b"
-        w._interim_clip = ("text", "/tmp/x.wav")
 
         w._interim_reset_turn()
 
-        handle.stop.assert_called_once()
-        # Same as cutover: a live handle must also flush the buffered tail so a
-        # barge-in/new turn doesn't leave the interim playing over what follows.
-        w._bg_audio.flush.assert_called_once()
-        assert w._interim_handle is None
         assert w._interim_state == "idle"
         assert w._interim_armed is False
         assert w._interim_final_segments == []
         assert w._interim_current_interim == ""
         assert w._interim_partial_text == ""
-        assert w._interim_clip is None
+        assert w._opener_player.live is None
 
 
 class TestFillerCutover:
@@ -665,57 +634,6 @@ def FillerClipForTest(phrase):
     return FillerClip(phrase=phrase, frames=[], duration_ms=500.0)
 
 
-class _FakeOpener:
-    def __init__(self, busy=False, opened=False, bridged=False):
-        self.busy = busy
-        self.opened_since_reply = opened
-        self.bridged_since_reply = bridged
-
-
-class TestInterimAlongsideOpeners:
-    """Delivery-plan openers no longer switch the interim off: it plays after
-    the opener, and never on a pause a bridge line already covered."""
-
-    def _ready_worker(self, monkeypatch, opener):
-        w = _interim_worker(monkeypatch)
-        w._opener_player = opener
-        w._interim_clip = _clip("Let me think about that.")
-        w._interim_state = "ready"
-        w._emit_interim_transcript = MagicMock()
-        monkeypatch.setattr(worker.settings, "OPENER_POST_PAUSE_MS", 1.0)
-        monkeypatch.setattr(
-            "livekit.agents.AudioConfig", lambda *a, **k: types.SimpleNamespace()
-        )
-        return w
-
-    @pytest.mark.asyncio
-    async def test_waits_for_the_opener_then_plays(self, monkeypatch):
-        opener = _FakeOpener(busy=True, opened=True)
-        w = self._ready_worker(monkeypatch, opener)
-        task = asyncio.create_task(w._interim_play_after_filler(None))
-        await asyncio.sleep(0.15)
-        w._bg_audio.play.assert_not_called()  # opener still holding/playing
-        opener.busy = False
-        await asyncio.wait_for(task, 1.0)
-        w._bg_audio.play.assert_called_once()
-        assert w._interim_state == "playing"
-
-    @pytest.mark.asyncio
-    async def test_skips_a_pause_the_bridge_covered(self, monkeypatch):
-        w = self._ready_worker(
-            monkeypatch, _FakeOpener(busy=False, opened=True, bridged=True)
-        )
-        await asyncio.wait_for(w._interim_play_after_filler(None), 1.0)
-        w._bg_audio.play.assert_not_called()
-        assert w._interim_state == "idle"
-
-    @pytest.mark.asyncio
-    async def test_plays_straight_away_when_the_policy_chose_silence(self, monkeypatch):
-        w = self._ready_worker(monkeypatch, _FakeOpener())
-        await asyncio.wait_for(w._interim_play_after_filler(None), 1.0)
-        w._bg_audio.play.assert_called_once()
-
-
 class TestFalseEndpoint:
     """A long turn has pauses. In v2v every v3 interim was armed and then
     cancelled at the learner's next pause (armed 6x, played 0x)."""
@@ -739,28 +657,14 @@ class TestFalseEndpoint:
         gen.cancel()
 
     @pytest.mark.unit
-    async def test_a_ready_clip_waits_for_the_real_end_of_turn(self, monkeypatch):
+    async def test_a_ready_line_waits_for_the_real_end_of_turn(self, monkeypatch):
         w = _interim_worker(monkeypatch)
+        w._opener_player = _FakePlayer()
+        w._opener_player.live = ("Hmm, that's a lot.", object())
         w._interim_state = "ready"
-        w._interim_clip = _clip("Hmm, that's a lot.")
         w._on_interim_agent_state(types.SimpleNamespace(new_state="listening"))
         w._on_interim_user_state(types.SimpleNamespace(new_state="speaking"))
-        assert w._interim_state == "ready" and w._interim_clip is not None
-
-    @pytest.mark.unit
-    async def test_a_heard_interim_is_stopped_and_never_replayed(self, monkeypatch):
-        w = _interim_worker(monkeypatch)
-        handle = MagicMock()
-        handle.done.return_value = False
-        w._interim_handle = handle
-        w._interim_state = "playing"
-        w._on_interim_agent_state(types.SimpleNamespace(new_state="listening"))
-        handle.stop.assert_called_once()
-        w._bg_audio.flush.assert_called_once()
-        assert w._interim_state == "done"
-        # The next learner speech starts a fresh turn.
-        w._on_interim_user_state(types.SimpleNamespace(new_state="speaking"))
-        assert w._interim_state == "idle"
+        assert w._interim_state == "ready" and w._opener_player.live is not None
 
     @pytest.mark.unit
     async def test_the_real_reply_still_cuts_everything(self, monkeypatch):
@@ -770,18 +674,19 @@ class TestFalseEndpoint:
         w._interim_state = "generating"
         w._on_interim_agent_state(types.SimpleNamespace(new_state="speaking"))
         await asyncio.sleep(0)
-        assert gen.cancelled() and w._interim_state == "done"
+        assert gen.cancelled() and w._interim_state == "idle"
 
 
 class TestInterimAfterAnOpener:
     """Prod: a sigh opener, then an interim opening "Hhh, you know…" — two
-    breaths in a row. In opener sessions the interim's own hesitation goes."""
+    breaths in a row. The interim's own hesitation goes."""
 
-    async def _generate(self, monkeypatch, with_opener):
+    @pytest.mark.asyncio
+    async def test_the_leading_breath_is_dropped(self, monkeypatch):
         w = _interim_worker(monkeypatch)
         w._interim_state = "generating"
         w._read_conversation_history = lambda: []
-        w._opener_player = object() if with_opener else None
+        w._opener_player = _FakePlayer()
 
         async def fake_generate(*_a, **_k):
             return "Hhh, you know, it's just that..."
@@ -794,18 +699,7 @@ class TestInterimAfterAnOpener:
             "app.core.livekit.filler_clips.synthesize_clips", fake_synth
         )
         await w._interim_generate("I have been feeling low about everything lately")
-        return w._interim_clip.phrase
-
-    @pytest.mark.asyncio
-    async def test_opener_sessions_drop_the_leading_breath(self, monkeypatch):
-        assert await self._generate(monkeypatch, True) == "You know, it's just that..."
-
-    @pytest.mark.asyncio
-    async def test_legacy_sessions_keep_it(self, monkeypatch):
-        assert (
-            await self._generate(monkeypatch, False)
-            == "Hhh, you know, it's just that..."
-        )
+        assert w._opener_player.live[0] == "You know, it's just that..."
 
 
 @pytest.mark.asyncio
