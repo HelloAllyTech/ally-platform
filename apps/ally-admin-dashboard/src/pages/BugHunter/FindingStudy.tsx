@@ -57,6 +57,24 @@ export const StudyDetails: FC<{ study: BugFixStudy }> = ({ study }) => (
         mono
       />
     )}
+    {study.consumers?.search && (
+      <>
+        <DetailLine
+          label={en.bugHunter.drawerStudyConsumers}
+          value={
+            study.consumers.found.length
+              ? study.consumers.found.join("\n")
+              : en.bugHunter.drawerStudyConsumersNone
+          }
+          emphasis={study.consumers.found.length > 0}
+        />
+        <DetailLine
+          label={en.bugHunter.drawerStudyConsumersSearch}
+          value={study.consumers.search}
+          mono
+        />
+      </>
+    )}
     {study.risks.length > 0 && (
       <DetailLine label={en.bugHunter.drawerStudyRisks} value={study.risks.join("\n")} />
     )}

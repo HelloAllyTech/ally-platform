@@ -430,6 +430,8 @@ export interface BugFixStudy {
   filesToChange: string[];
   leaveAlone: string[];
   otherRepos: string[];
+  /** Who else reads the value the fix changes, and the search run to find them (since 2026-10-16; empty search on older studies). */
+  consumers?: { search: string; found: string[] };
   risks: string[];
   testPlan: string;
   previousStudyWasWrongBecause: string | null;
