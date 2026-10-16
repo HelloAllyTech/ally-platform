@@ -26,10 +26,10 @@ class MockEvent(BaseEvent):
 
 
 @pytest.mark.asyncio
-async def test_send_events_to_core_exception_is_logged(monkeypatch, caplog):
+async def test_send_events_to_core_exception_is_logged_and_raised(monkeypatch, caplog):
     """
     Tests that if _send_events_to_core has an error, it is logged and
-    does not propagate.
+    the exception is propagated.
     """
     # 1. Setup
     mock_scenario = MagicMock()
@@ -51,10 +51,43 @@ async def test_send_events_to_core_exception_is_logged(monkeypatch, caplog):
     mock_send = AsyncMock(side_effect=Exception("SQS is down"))
     monkeypatch.setattr(msg_event_queue, "send_message", mock_send)
 
-    # 2. Execute
-    await orchestrator.orchestrate_events(
-        room=mock_room, detected_event_ids={"some_event"}
-    )
+    # 2. Execute and Assert
+    with pytest.raises(Exception, match="SQS is down"):
+        await orchestrator.orchestrate_events(
+            room=mock_room, detected_event_ids={"some_event"}
+        )
 
     # 3. Assert
     assert "Failed to send event to core: SQS is down" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_send_events_to_core_exception_is_raised(monkeypatch):
+    """
+    Tests that if _send_events_to_core has an error, it is raised.
+    """
+    # 1. Setup
+    mock_scenario = MagicMock()
+    mock_scenario.events = [MockEvent()]
+    mock_scenario.trigger_events = ["some_event"]
+    mock_scenario.termination_events = []
+
+    mock_room = MagicMock(spec=Room)
+    mock_room.name = "test_room"
+
+    orchestrator = EventOrchestrator(
+        scenario=mock_scenario,
+        thread_id="test_thread",
+        room=mock_room,
+        score_keeper=MagicMock()
+    )
+
+    # Mock the SQS queue to raise an exception
+    mock_send = AsyncMock(side_effect=Exception("SQS is down"))
+    monkeypatch.setattr(msg_event_queue, "send_message", mock_send)
+
+    # 2. Execute and Assert
+    with pytest.raises(Exception, match="SQS is down"):
+        await orchestrator._send_events_to_core(
+            events_to_send=[MockEvent()], room=mock_room
+        )

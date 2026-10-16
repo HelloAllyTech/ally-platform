@@ -333,6 +333,11 @@ class EventSender:
 
             if send_tasks:
                 results = await asyncio.gather(*send_tasks, return_exceptions=True)
+                first_exception = None
                 for result in results:
                     if isinstance(result, Exception):
                         logger.error(f"Failed to send event to core: {result}")
+                        if first_exception is None:
+                            first_exception = result
+                if first_exception:
+                    raise first_exception
