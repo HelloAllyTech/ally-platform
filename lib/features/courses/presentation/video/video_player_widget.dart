@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../../../core/localization/translate_ref.dart';
@@ -128,8 +129,8 @@ class _PlayPauseOverlay extends StatelessWidget {
           duration: const Duration(milliseconds: 150),
           child: Container(
             color: Colors.black26,
-            child: const Center(
-              child: Icon(Icons.play_arrow, size: 56, color: Colors.white),
+            child: Center(
+              child: SvgPicture.asset('assets/icons/playWhite.svg', width: 56, height: 56),
             ),
           ),
         ),

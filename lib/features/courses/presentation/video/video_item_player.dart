@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../../core/localization/translate_ref.dart';
 import '../../data/courses_repository.dart';
@@ -172,7 +173,7 @@ class _VideoItemPlayerState extends ConsumerState<VideoItemPlayer> {
               ? Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.check_circle, color: Colors.green),
+                    SvgPicture.asset('assets/icons/checkCircle.svg', width: 24, height: 24),
                     const SizedBox(width: 8),
                     Text(ref.t('courses.video.watched')),
                   ],

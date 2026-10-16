@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/localization/translate_ref.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/app_button.dart';
+import '../../../../core/widgets/app_card.dart';
 import '../../data/courses_repository.dart';
 import '../../data/quiz_models.dart';
 import 'quiz_question_widget.dart';
@@ -77,11 +80,12 @@ class _QuizPlayerState extends ConsumerState<QuizPlayer> {
       padding: const EdgeInsets.all(16),
       children: [
         if (_result != null)
-          Card(
-            color: _result!.passed
-                ? Colors.green.shade50
-                : Colors.orange.shade50,
-            child: Padding(
+          AppCard(
+            variant: AppCardVariant.flat,
+            child: Container(
+              color: _result!.passed
+                  ? Colors.green.shade50
+                  : Colors.orange.shade50,
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -119,22 +123,21 @@ class _QuizPlayerState extends ConsumerState<QuizPlayer> {
         if (_error != null)
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
-            child: Text(_error!, style: const TextStyle(color: Colors.red)),
+            child: Text(_error!, style: const TextStyle(color: AppColors.red400)),
           ),
         if (_result == null)
-          FilledButton(
-            onPressed: _isSubmitting ? null : _submit,
-            child: _isSubmitting
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                : Text(ref.t('courses.quiz.question.submit')),
+          AppButton(
+            label: ref.t('courses.quiz.question.submit'),
+            isLoading: _isSubmitting,
+            onPressed: _submit,
           )
         else if (!_result!.passed && !_attemptsExhausted)
-          FilledButton(
+          AppButton(
+            label: ref.t('courses.quiz.results.retry'),
             onPressed: () => setState(() {
               _result = null;
               _answers.clear();
             }),
-            child: Text(ref.t('courses.quiz.results.retry')),
           ),
       ],
     );

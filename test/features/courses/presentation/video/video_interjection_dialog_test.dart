@@ -82,7 +82,11 @@ void main() {
   testWidgets('submit is disabled until an answer is chosen', (tester) async {
     await pump(tester, interjection());
 
-    AppButton submitButton() => tester.widget<AppButton>(find.byType(AppButton));
+    // Not a bare find.byType(AppButton) — QuizQuestionWidget's own
+    // True/False controls are AppButtons too now.
+    AppButton submitButton() => tester.widget<AppButton>(
+          find.widgetWithText(AppButton, 'courses.video.interjection.submit'),
+        );
     expect(submitButton().isDisabled, isTrue);
 
     await tester.tap(find.text('courses.quiz.question.true'));

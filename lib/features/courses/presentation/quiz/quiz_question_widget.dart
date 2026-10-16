@@ -8,6 +8,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/localization/translate_ref.dart';
+import '../../../../core/widgets/app_button.dart';
+import '../../../../core/widgets/app_card.dart';
+import '../../../../core/widgets/app_text_field.dart';
 import '../../data/quiz_models.dart';
 
 /// Renders the right interactive control for each of the 8 quiz question
@@ -108,21 +111,24 @@ class _QuizQuestionWidgetState extends ConsumerState<QuizQuestionWidget> {
   @override
   Widget build(BuildContext context) {
     final q = widget.question;
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(q.prompt, style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 12),
-            _buildControl(q),
-            if (widget.showResult != null) ...[
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: AppCard(
+        variant: AppCardVariant.flat,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(q.prompt, style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 12),
-              _ResultBanner(result: widget.showResult!),
+              _buildControl(q),
+              if (widget.showResult != null) ...[
+                const SizedBox(height: 12),
+                _ResultBanner(result: widget.showResult!),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -177,36 +183,30 @@ class _QuizQuestionWidgetState extends ConsumerState<QuizQuestionWidget> {
         return Row(
           children: [
             Expanded(
-              child: OutlinedButton(
-                style: OutlinedButton.styleFrom(
-                  backgroundColor: _booleanAnswer == true
-                      ? Theme.of(context).colorScheme.primaryContainer
-                      : null,
-                ),
-                onPressed: _locked
-                    ? null
-                    : () {
-                        setState(() => _booleanAnswer = true);
-                        _emit();
-                      },
-                child: Text(ref.t('courses.quiz.question.true')),
+              child: AppButton(
+                label: ref.t('courses.quiz.question.true'),
+                variant: _booleanAnswer == true
+                    ? AppButtonVariant.primary
+                    : AppButtonVariant.secondary,
+                isDisabled: _locked,
+                onPressed: () {
+                  setState(() => _booleanAnswer = true);
+                  _emit();
+                },
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: OutlinedButton(
-                style: OutlinedButton.styleFrom(
-                  backgroundColor: _booleanAnswer == false
-                      ? Theme.of(context).colorScheme.primaryContainer
-                      : null,
-                ),
-                onPressed: _locked
-                    ? null
-                    : () {
-                        setState(() => _booleanAnswer = false);
-                        _emit();
-                      },
-                child: Text(ref.t('courses.quiz.question.false')),
+              child: AppButton(
+                label: ref.t('courses.quiz.question.false'),
+                variant: _booleanAnswer == false
+                    ? AppButtonVariant.primary
+                    : AppButtonVariant.secondary,
+                isDisabled: _locked,
+                onPressed: () {
+                  setState(() => _booleanAnswer = false);
+                  _emit();
+                },
               ),
             ),
           ],
@@ -296,7 +296,8 @@ class _QuizQuestionWidgetState extends ConsumerState<QuizQuestionWidget> {
                       width: 100,
                       child: TextField(
                         enabled: !_locked,
-                        decoration: const InputDecoration(isDense: true, border: OutlineInputBorder()),
+                        decoration: AppTextField.decorationFor(context).copyWith(isDense: true),
+                        style: AppTextField.textStyleFor(context),
                         onChanged: (value) {
                           _blanks[parts[i]] = value;
                           _emit();
@@ -311,8 +312,8 @@ class _QuizQuestionWidgetState extends ConsumerState<QuizQuestionWidget> {
           controller: _textController,
           enabled: !_locked,
           maxLines: 4,
-          decoration: InputDecoration(
-            border: const OutlineInputBorder(),
+          style: AppTextField.textStyleFor(context),
+          decoration: AppTextField.decorationFor(context).copyWith(
             helperText: q.minWords != null
                 ? ref.t('courses.quiz.question.minWordsHint', {'min': q.minWords})
                 : null,
