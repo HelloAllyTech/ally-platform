@@ -2,11 +2,11 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from livekit import rtc
+from pydantic import BaseModel
 
 from app.core.constants import ConditionOperator, DetectionType
 from app.core.events.base import BaseEvent
 from app.core.events.schedulers import TimeEventScheduler
-from pydantic import BaseModel
 
 
 class EventData(BaseModel):

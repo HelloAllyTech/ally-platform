@@ -1,13 +1,11 @@
-
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from livekit.rtc import Room
 
-from app.core.events.event_orchestrator.event_orchestrator import EventOrchestrator
-from app.core.events.base import BaseEvent
 from app.core.constants import DetectionType
-
+from app.core.events.base import BaseEvent
+from app.core.events.event_orchestrator.event_orchestrator import EventOrchestrator
 from app.core.queue import msg_event_queue
 
 
@@ -44,7 +42,7 @@ async def test_send_events_to_core_exception_is_logged_and_raised(monkeypatch, c
         scenario=mock_scenario,
         thread_id="test_thread",
         room=mock_room,
-        score_keeper=MagicMock()
+        score_keeper=MagicMock(),
     )
 
     # Mock the SQS queue to raise an exception
@@ -79,7 +77,7 @@ async def test_send_events_to_core_exception_is_raised(monkeypatch):
         scenario=mock_scenario,
         thread_id="test_thread",
         room=mock_room,
-        score_keeper=MagicMock()
+        score_keeper=MagicMock(),
     )
 
     # Mock the SQS queue to raise an exception
