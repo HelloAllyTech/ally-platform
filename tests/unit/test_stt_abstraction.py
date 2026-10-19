@@ -297,9 +297,12 @@ class TestSTTFactory:
     """Test cases for create_stt_client factory function."""
 
     @pytest.mark.unit
-    @patch("app.stt.deepgram.DeepgramSTTClient")
+    @patch("app.stt.google.GoogleSTTClient")
     def test_create_stt_client_with_defaults(self, mock_stt_client_class):
-        """Test factory function uses defaults when no config provided."""
+        """Test factory function uses defaults when no config provided.
+
+        The default is Google chirp_2 — and it must carry the region, since
+        chirp_2 is not served from "global"."""
         mock_stt_instance = Mock()
         mock_client = Mock()
         mock_client.stt_instance = mock_stt_instance
@@ -307,12 +310,42 @@ class TestSTTFactory:
 
         client = create_stt_client(language_code="en-IN")
 
-        # Verify DeepgramSTTClient was created with defaults using from_config
         mock_stt_client_class.from_config.assert_called_once_with(
-            config={"model": "nova-3"},
+            config={"model": "chirp_2", "location": "asia-southeast1"},
             language_code="en-IN",
         )
         assert client == mock_client
+
+    @pytest.mark.unit
+    @patch("app.stt.google.GoogleSTTClient")
+    def test_google_without_model_gets_default_region_too(self, mock_stt_client_class):
+        """A Google row with no model inherits the default model AND its region."""
+        mock_stt_client_class.from_config.return_value = Mock()
+
+        create_stt_client(
+            stt_config={"provider": "google", "config": {}}, language_code="en-IN"
+        )
+
+        mock_stt_client_class.from_config.assert_called_once_with(
+            config={"model": "chirp_2", "location": "asia-southeast1"},
+            language_code="en-IN",
+        )
+
+    @pytest.mark.unit
+    @patch("app.stt.google.GoogleSTTClient")
+    def test_explicit_google_config_is_passed_through(self, mock_stt_client_class):
+        """An explicit model keeps whatever location the row chose (or none)."""
+        mock_stt_client_class.from_config.return_value = Mock()
+
+        create_stt_client(
+            stt_config={"provider": "google", "config": {"model": "chirp_3"}},
+            language_code="en-IN",
+        )
+
+        mock_stt_client_class.from_config.assert_called_once_with(
+            config={"model": "chirp_3"},
+            language_code="en-IN",
+        )
 
     @pytest.mark.unit
     @patch("app.stt.deepgram.DeepgramSTTClient")
@@ -366,11 +399,9 @@ class TestSTTAbstractionIntegration:
     """Integration tests for STT abstraction."""
 
     @pytest.mark.integration
-    @patch("livekit.plugins.deepgram.STT")
-    @patch("app.stt.deepgram.settings")
-    def test_full_stt_creation_flow(self, mock_settings, mock_stt_class):
-        """Test complete STT creation flow using factory."""
-        mock_settings.DEEPGRAM_API_KEY = "test-key"
+    @patch("livekit.plugins.google.STT")
+    def test_full_stt_creation_flow(self, mock_stt_class):
+        """Test complete STT creation flow using factory (Google default)."""
         mock_stt_instance = Mock()
         mock_stt_class.return_value = mock_stt_instance
 
@@ -378,24 +409,23 @@ class TestSTTAbstractionIntegration:
 
         assert stt_client.stt_instance == mock_stt_instance
         mock_stt_class.assert_called_once_with(
-            model="nova-3",
-            language="en",  # Provider converted "en-IN" to "en"
-            api_key="test-key",
+            languages="en-IN",
+            spoken_punctuation=False,
+            model="chirp_2",
+            location="asia-southeast1",
         )
 
     @pytest.mark.integration
-    @patch("livekit.plugins.deepgram.STT")
-    @patch("app.stt.deepgram.settings")
-    def test_stt_with_different_languages(self, mock_settings, mock_stt_class):
+    @patch("livekit.plugins.google.STT")
+    def test_stt_with_different_languages(self, mock_stt_class):
         """Test STT creation with different language codes."""
-        mock_settings.DEEPGRAM_API_KEY = "test-key"
         mock_stt_instance = Mock()
         mock_stt_class.return_value = mock_stt_instance
 
         # Test en-IN
         create_stt_client(language_code="en-IN")
-        assert mock_stt_class.call_args[1]["model"] == "nova-3"
-        assert mock_stt_class.call_args[1]["language"] == "en"  # Converted
+        assert mock_stt_class.call_args[1]["model"] == "chirp_2"
+        assert mock_stt_class.call_args[1]["languages"] == "en-IN"
 
         # Reset mock
         mock_stt_class.reset_mock()
@@ -403,5 +433,5 @@ class TestSTTAbstractionIntegration:
 
         # Test hi-IN
         create_stt_client(language_code="hi-IN")
-        assert mock_stt_class.call_args[1]["model"] == "nova-3"
-        assert mock_stt_class.call_args[1]["language"] == "hi"  # Converted
+        assert mock_stt_class.call_args[1]["model"] == "chirp_2"
+        assert mock_stt_class.call_args[1]["languages"] == "hi-IN"

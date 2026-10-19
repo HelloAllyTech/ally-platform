@@ -144,7 +144,8 @@ class Settings(BaseSettings):
         ),
     )
 
-    DEEPGRAM_API_KEY: str = Field(...)
+    # Legacy provider (unfunded since 2026-10); only needed to read old rows.
+    DEEPGRAM_API_KEY: Optional[str] = Field(default=None)
 
     # AWS SES settings
     AWS_ACCESS_KEY_ID: str = Field(...)
@@ -1538,9 +1539,13 @@ class Settings(BaseSettings):
         description="Path to Google Cloud credentials JSON file (for Google TTS)",
     )
 
-    DEFAULT_MALE_VOICE_MODEL: Optional[str] = Field(...)
-    DEFAULT_FEMALE_VOICE_MODEL: Optional[str] = Field(...)
-    DEFAULT_NON_BINARY_VOICE_MODEL: Optional[str] = Field(...)
+    # Fallback voice per gender, used only when a session's configured voice
+    # cannot be built. Optional Google voice ids (e.g. ``en-IN-Chirp3-HD-Kore``);
+    # unset, or any non-Google value left over from the Deepgram era, lets
+    # Google pick a voice for the session language.
+    DEFAULT_MALE_VOICE_MODEL: Optional[str] = Field(default=None)
+    DEFAULT_FEMALE_VOICE_MODEL: Optional[str] = Field(default=None)
+    DEFAULT_NON_BINARY_VOICE_MODEL: Optional[str] = Field(default=None)
 
     # Core service
     CORE_SERVICE_BASE_URL: str = Field(

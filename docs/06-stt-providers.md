@@ -59,7 +59,7 @@ def convert_language_code(cls, language_code: str) -> str:
 
 ### Provider Details
 
-**Deepgram** -- Default STT provider. Uses `nova-3` model by default. Supports BCP 47 language codes directly.
+**Deepgram** -- Legacy provider, no longer the default: the account has no credits (every call 402s since 2026-10-18), and the admin registry form no longer offers it. The client is kept only so an old row can be read; do not point anything new at it.
 
 **Google Cloud** -- Uses the Chirp model by default. Requires `GOOGLE_APPLICATION_CREDENTIALS` environment variable. Supports model mapping for backward compatibility (`default` -> `chirp`, `command_and_search` -> `latest_short`, `phone_call` -> `latest_long`).
 
@@ -71,14 +71,14 @@ def convert_language_code(cls, language_code: str) -> str:
 
 `create_stt_client(stt_config, language_code)` creates a client:
 
-1. If `stt_config` is `None`, returns a default Deepgram client with `nova-3`
+1. If `stt_config` is `None`, returns a default Google client with `chirp_2` in `asia-southeast1` (the region matters: chirp_2 is not served from `global`, and a Google row with no model inherits the default region along with the default model)
 2. Reads `provider` from config
-3. Supports both nested (`{"provider": "deepgram", "config": {"model": "nova-3"}}`) and flat (`{"provider": "deepgram", "model": "nova-3"}`) config structures
+3. Supports both nested (`{"provider": "google", "config": {"model": "chirp_2"}}`) and flat (`{"provider": "google", "model": "chirp_2"}`) config structures
 4. Calls `<Provider>STTClient.from_config(config, language_code)` to instantiate
 
 Default configuration:
 ```python
-DEFAULT_STT_CONFIG = {"provider": "deepgram", "model": "nova-3"}
+DEFAULT_STT_CONFIG = {"provider": "google", "model": "chirp_2", "location": "asia-southeast1"}
 ```
 
 ---

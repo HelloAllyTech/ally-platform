@@ -1,5 +1,6 @@
 """TTS provider factory for creating TTS clients based on configuration."""
 
+import re
 from enum import Enum
 from typing import Any, Dict, Optional
 
@@ -34,46 +35,68 @@ class Gender(str, Enum):
     NON_BINARY = "non-binary"
 
 
+# A Google voice id looks like ``en-IN-Chirp3-HD-Kore``: language tag first.
+# Anything else in DEFAULT_*_VOICE_MODEL (a leftover Deepgram ``aura-…`` id) is
+# ignored rather than sent to Google, which would reject it.
+_GOOGLE_VOICE_NAME_RE = re.compile(r"^[a-z]{2,3}-[A-Z]{2}-")
+
+# Google only knows male / female / neutral; a non-binary persona gets neutral.
+_GOOGLE_GENDER = {
+    Gender.MALE: "male",
+    Gender.FEMALE: "female",
+    Gender.NON_BINARY: "neutral",
+}
+
+
+def _default_google_voice_name(gender: Gender) -> Optional[str]:
+    if gender == Gender.MALE:
+        configured = getattr(settings, "DEFAULT_MALE_VOICE_MODEL", None)
+    elif gender == Gender.FEMALE:
+        configured = getattr(settings, "DEFAULT_FEMALE_VOICE_MODEL", None)
+    else:
+        configured = getattr(settings, "DEFAULT_NON_BINARY_VOICE_MODEL", None)
+    if isinstance(configured, str) and _GOOGLE_VOICE_NAME_RE.match(configured.strip()):
+        return configured.strip()
+    if configured:
+        logger.warning(
+            f"DEFAULT_*_VOICE_MODEL '{configured}' is not a Google voice id; "
+            "letting Google pick a voice for the session language instead"
+        )
+    return None
+
+
 def _get_default_tts_client(
     gender: Gender, language_code: str = DEFAULT_LANGUAGE_CODE
 ) -> BaseTTSClient:
     """
-    Get default Deepgram TTS client based on gender.
+    Get the default Google TTS client based on gender.
 
     Internal helper function used by create_tts_client for fallback defaults.
+    This is the voice a session gets when its configured voice cannot be
+    built, so it must never depend on a vendor that can be unfunded: Deepgram
+    Aura was the default until 2026-10-19, when its credits ran out.
+
+    With no voice name Google picks a voice for ``language_code`` and
+    ``gender`` (the LiveKit plugin defaults to Gemini-TTS); an explicit Google
+    voice id in DEFAULT_*_VOICE_MODEL is honoured when present.
 
     Args:
         gender: Gender type for voice selection
         language_code: BCP 47 language code (defaults to DEFAULT_LANGUAGE_CODE)
 
     Returns:
-        Default Deepgram TTS client instance
+        Default Google TTS client instance
     """
     try:
-        if gender == Gender.MALE:
-            model = settings.DEFAULT_MALE_VOICE_MODEL
-        elif gender == Gender.FEMALE:
-            model = settings.DEFAULT_FEMALE_VOICE_MODEL
-        else:
-            model = settings.DEFAULT_NON_BINARY_VOICE_MODEL
+        from app.tts.google import GoogleTTSClient  # noqa: F811
 
-        from app.tts.deepgram import DeepgramTTSClient  # noqa: F811
-
-        return DeepgramTTSClient(
-            model=model,
+        return GoogleTTSClient(
             language_code=language_code,
-            api_key=settings.DEEPGRAM_API_KEY,
-        )
-    except AttributeError as e:
-        logger.error(f"Missing gender-specific default Deepgram setting: {e}")
-        raise ValueError(
-            f"Missing default Deepgram TTS settings for gender "
-            f"'{gender.value}'. Check your config for "
-            f"DEFAULT_MALE_VOICE_MODEL, DEFAULT_FEMALE_VOICE_MODEL, and "
-            f"DEFAULT_NON_BINARY_VOICE_MODEL."
+            gender=_GOOGLE_GENDER.get(gender, "neutral"),
+            voice_name=_default_google_voice_name(gender),
         )
     except Exception as e:
-        logger.error(f"Failed to create default Deepgram TTS: {e}")
+        logger.error(f"Failed to create default Google TTS: {e}")
         raise
 
 
@@ -90,7 +113,7 @@ def get_default_tts_config(gender: Gender, language_code: Optional[str] = None):
         language_code: Optional BCP 47 language code (defaults to DEFAULT_LANGUAGE_CODE)
 
     Returns:
-        Default TTS instance (e.g., deepgram.TTS)
+        Default TTS instance (google.TTS)
 
     Note:
         For new code, prefer using create_tts_client() which returns

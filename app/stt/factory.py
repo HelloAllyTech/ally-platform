@@ -22,6 +22,11 @@ if not settings.LAZY_PROVIDER_IMPORTS_ENABLED:
     from app.stt.sarvam import SarvamSTTClient  # noqa: F401
 
 
+def _default_config_dict() -> Dict[str, Any]:
+    """The platform default STT config minus its provider key."""
+    return {k: v for k, v in DEFAULT_STT_CONFIG.items() if k != "provider"}
+
+
 def create_stt_client(
     stt_config: Optional[Dict[str, Any]] = None,
     language_code: str = DEFAULT_LANGUAGE_CODE,
@@ -31,10 +36,10 @@ def create_stt_client(
 
     Args:
         stt_config: Optional STT config from metadata. If None, uses defaults.
-            Expected structure: {"provider": "deepgram", "config":
-            {"model": "nova-3"}}
+            Expected structure: {"provider": "google", "config":
+            {"model": "chirp_2", "location": "asia-southeast1"}}
             Also supports backward compatibility with flat structure:
-            {"provider": "deepgram", "model": "nova-3"}
+            {"provider": "google", "model": "chirp_2"}
         language_code: BCP 47 language code (e.g., "en-IN", "hi-IN")
 
     Returns:
@@ -47,8 +52,9 @@ def create_stt_client(
     if stt_config is None:
         logger.debug("No STT config provided, using defaults")
         provider = DEFAULT_STT_CONFIG["provider"]
-        # Create default config dict for provider to parse
-        config_dict = {"model": DEFAULT_STT_CONFIG["model"]}
+        # Everything but the provider key is the provider's own config
+        # (model, and for Google the region the model is served from).
+        config_dict = _default_config_dict()
     else:
         provider = stt_config.get("provider", DEFAULT_STT_CONFIG["provider"])
         # Support both nested config structure and backward-compatible flat structure
@@ -63,6 +69,17 @@ def create_stt_client(
             # Ensure model has a default if missing
             if "model" not in config_dict:
                 config_dict["model"] = DEFAULT_STT_CONFIG["model"]
+    # A missing model falls back to the platform default's model, which only
+    # makes sense on the platform default's provider: Google must also get the
+    # region that model is served from, or chirp_2 is requested from "global"
+    # and the session starts transcribing nothing.
+    if (
+        provider.lower() == DEFAULT_STT_CONFIG["provider"]
+        and config_dict.get("model") == DEFAULT_STT_CONFIG["model"]
+        and "location" not in config_dict
+        and "location" in DEFAULT_STT_CONFIG
+    ):
+        config_dict["location"] = DEFAULT_STT_CONFIG["location"]
 
     # Map provider to class and instantiate using from_config
     provider = provider.lower()

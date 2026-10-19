@@ -65,7 +65,7 @@ Providers optionally define two class constants:
 
 ### Provider Details
 
-**Deepgram** -- Default TTS provider. Low latency, no voice parameters. Uses `model` for voice selection. Falls back to gender-based default voices.
+**Deepgram** -- Legacy provider, no longer the default or the fallback: the account has no credits (every call 402s since 2026-10-18). Low latency, no voice parameters. Uses `model` for voice selection.
 
 **ElevenLabs** -- High-quality voices with expressive parameters. Supports voice ID-based selection, speed control, and SSML-like text enhancement for emphasis and pauses.
   Model families split by transport: `flash`, `turbo` and `multilingual_v2` stream over
@@ -111,11 +111,11 @@ Two Sarvam traps, both handled in `app/tts/sarvam.py`:
 
 `create_tts_client(tts_config, language_code, gender)` creates a client:
 
-1. If `tts_config` is `None`, returns a default Deepgram client based on `gender`
+1. If `tts_config` is `None`, returns a default Google client for the session language and `gender`
 2. Reads `provider` from config
 3. Reads `config` dict from config (provider-specific settings)
 4. Calls `<Provider>TTSClient.from_config(config, language_code)` to instantiate
-5. Falls back to default Deepgram on error
+5. Falls back to the default Google voice on error
 
 Config structure from metadata:
 ```json
@@ -149,7 +149,7 @@ Google's and Hume's clients already validated structurally only.
 
 ## Default Voice Selection
 
-When no TTS config is provided, the factory selects a Deepgram voice based on the persona's gender:
+When no TTS config is provided, the factory builds a Google TTS client for the session language and the persona's gender. `DEFAULT_*_VOICE_MODEL` may name a Google voice id (`en-IN-Chirp3-HD-Kore`); any other value (a leftover Deepgram Aura id) is ignored and Google picks the voice:
 
 | Gender | Setting |
 |--------|---------|

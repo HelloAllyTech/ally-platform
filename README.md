@@ -64,7 +64,7 @@ Edit `.env` with your configuration:
 **Required Settings:**
 - `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `LIVEKIT_URL` - LiveKit credentials
 - `OPENAI_API_KEY` - OpenAI API key for LLM (used as default if not specified in metadata)
-- `DEEPGRAM_API_KEY` - Deepgram API key for STT (used as default if not specified in metadata)
+- `DEEPGRAM_API_KEY` - Deepgram API key (legacy provider; the default STT is Google chirp_2 via Google Cloud credentials)
 - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` - AWS credentials
 - `SQS_MESSAGE_EVENT_QUEUE_NAME` - SQS queue name for event publishing
 
@@ -375,7 +375,7 @@ HUME_API_KEY=your_key
 
 STT (Speech-to-Text) providers can be configured per scenario via metadata or fallback to environment defaults.
 
-**Deepgram (Default):**
+**Deepgram (legacy, unfunded):**
 ```env
 DEEPGRAM_API_KEY=your_key
 # Use in scenario metadata:
@@ -389,7 +389,7 @@ DEEPGRAM_API_KEY=your_key
 # }
 ```
 
-If not specified in metadata, the system uses the default Deepgram configuration from environment settings.
+If not specified in metadata, the system uses the default Google configuration (`DEFAULT_STT_CONFIG` in `app/core/constants.py`: chirp_2 in asia-southeast1).
 
 **Google Cloud STT:**
 ```env

@@ -82,7 +82,15 @@ def normalize_language_code_for_providers(code: Optional[str]) -> str:
 DEFAULT_LANGUAGE_CODE: Final[str] = "en-IN"
 
 # Default capability configurations (fallback when not provided in metadata)
-DEFAULT_STT_CONFIG: Final[Dict[str, str]] = {"provider": "deepgram", "model": "nova-3"}
+# Google chirp_2 in asia-southeast1 is what every Indic language runs on and
+# what the V2V tester uses for English, so it is the proven fallback. Deepgram
+# (nova-3) was the default until 2026-10-19, when its credits ran out and every
+# session on it died at join with a 402.
+DEFAULT_STT_CONFIG: Final[Dict[str, str]] = {
+    "provider": "google",
+    "model": "chirp_2",
+    "location": "asia-southeast1",
+}
 
 DEFAULT_LLM_CONFIG: Final[Dict[str, str]] = {
     "provider": "openai",

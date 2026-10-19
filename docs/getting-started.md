@@ -11,7 +11,7 @@
 - **LiveKit** account with API credentials
 - **OpenAI** API key (always required -- see [Architecture](architecture.md) for why)
 - **AWS** credentials or LocalStack for SQS
-- At least one **TTS provider** API key (Deepgram is the default)
+- Google Cloud credentials (the default STT and the fallback TTS are Google) and at least one other **TTS provider** API key
 
 ## Environment Setup
 
@@ -37,7 +37,7 @@ Edit `.env` with your credentials. Required variables:
 | `LIVEKIT_API_SECRET` | LiveKit API secret |
 | `LIVEKIT_URL` | LiveKit WebSocket URL |
 | `OPENAI_API_KEY` | OpenAI API key |
-| `DEEPGRAM_API_KEY` | Deepgram API key (default STT) |
+| `DEEPGRAM_API_KEY` | Deepgram API key (legacy STT/TTS; unfunded, only needed to read old rows) |
 | `AWS_ACCESS_KEY_ID` | AWS access key (or `test` for LocalStack) |
 | `AWS_SECRET_ACCESS_KEY` | AWS secret key (or `test` for LocalStack) |
 | `AWS_REGION` | AWS region (e.g., `us-east-1`) |

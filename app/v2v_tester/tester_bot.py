@@ -9,13 +9,11 @@ Flow per exchange:
       → audio frames published to LiveKit room
 
 Provider selection mirrors the live platform (via the app.stt/app.tts
-factories): Indian languages use Sarvam for BOTH sides (the same stack the
-counselor runs, so the test exercises production providers) with a tester
-speaker distinct from the counselor voices; English stays on Deepgram
-(nova STT + Aura TTS). This is what makes v2v testing usable beyond
-English — previously both STT and TTS were hardcoded to Deepgram, so a
-Malayalam test had an English-accented tester voice the counselor's Sarvam
-STT could not reliably transcribe.
+factories): Google STT + TTS for every language (see the constants below),
+with a tester voice distinct from the counselor voices. Previously both STT
+and TTS were hardcoded to Deepgram, so a Malayalam test had an
+English-accented tester voice the counselor's Sarvam STT could not reliably
+transcribe; Deepgram itself is gone from the platform since 2026-10-19.
 
 The bot disconnects after `max_exchanges` counselor→learner exchanges or a
 configurable idle timeout.
@@ -596,8 +594,9 @@ class V2VTesterBot:
         stt_stream = stt_plugin.stream()
 
         # Debounce multiple FINAL_TRANSCRIPT chunks from one counselor utterance
-        # into a single queue entry.  Deepgram often splits one sentence into
-        # 2-3 finals; without debouncing each chunk triggers a separate exchange.
+        # into a single queue entry.  Streaming STT often splits one sentence
+        # into 2-3 finals; without debouncing each chunk triggers a separate
+        # exchange.
         pending_chunks: list[str] = []
         flush_handle: Optional[asyncio.TimerHandle] = None
         collect_loop = asyncio.get_event_loop()

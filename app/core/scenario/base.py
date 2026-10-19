@@ -460,8 +460,8 @@ class VoiceConfig(BaseModel):
     # ally-be's VOICE_CONFIG_SCHEMA stores and what the preview endpoint reads.
     # This model is a fixed whitelist, so a key that is missing here is dropped
     # on the way to the TTS factory; the provider then fails its required-field
-    # check and create_tts_client() silently falls back to the default English
-    # Deepgram voice, which reads the scenario's Hindi text in English.
+    # check and create_tts_client() silently falls back to the default Google
+    # voice for the session language instead of the configured one.
     voice: Optional[str] = Field(default=None)
     speed: Optional[Any] = Field(default=None)  # Cartesia, Smallest.ai
     emotion: Optional[Any] = Field(default=None)  # Cartesia
