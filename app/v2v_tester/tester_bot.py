@@ -184,10 +184,12 @@ _SILENCE_GATE_S = 1.8
 # tester answered mid-reply and cut off nearly every Hindi reply in prod V2V
 # (2026-10-16..19).
 _AGENT_STATE_ATTRIBUTE = "lk.agent.state"
-# The agent must have been listening this long before the tester speaks: a
-# pause between two sentences of one reply is "speaking" throughout, but the
-# state can flicker at the boundary.
-_AGENT_IDLE_SETTLE_S = 1.0
+# The agent must have been listening this long before the tester speaks.
+# Longer than the gap between two sentences of one reply: on ElevenLabs v3
+# each sentence is a separate render (~2 s to first audio) and the agent shows
+# "listening" in between — at 1.0 s the tester spoke into those gaps and cut
+# off 5 of 6 Hindi replies (prod V2V 2026-10-19).
+_AGENT_IDLE_SETTLE_S = 2.5
 # Longest the tester waits for the agent to finish one reply.
 _AGENT_REPLY_MAX_WAIT_S = 60.0
 # Time for the last sentence's transcript to arrive after the agent stops
