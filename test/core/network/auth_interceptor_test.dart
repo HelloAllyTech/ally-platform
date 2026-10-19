@@ -93,6 +93,22 @@ void main() {
       expect(handler.nextOptions!.path, '/v2${ApiRoutes.learnScenarios}');
     });
 
+    test(
+      'does not v2-match a path that merely starts with a v2Endpoints route '
+      '(RN matches with exact equality, not a prefix check)',
+      () async {
+        when(() => tokenStorage.accessToken).thenAnswer((_) async => null);
+
+        final handler = _RecordingRequestHandler();
+        await interceptor.onRequest(
+          RequestOptions(path: '${ApiRoutes.learnScenarios}/7'),
+          handler,
+        );
+
+        expect(handler.nextOptions!.path, '/v1${ApiRoutes.learnScenarios}/7');
+      },
+    );
+
     test('adds the bearer header when an access token exists', () async {
       when(() => tokenStorage.accessToken).thenAnswer((_) async => 'the-access-token');
 

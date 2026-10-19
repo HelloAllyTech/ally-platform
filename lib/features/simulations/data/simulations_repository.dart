@@ -29,11 +29,16 @@ class SimulationsRepository {
     return SimulationSummary.fromJson(response.data!);
   }
 
+  /// The real endpoint wraps the array in a `{data: [...]}` envelope — RN's
+  /// `simulationsApi.ts` unwraps it via `transformResponse`, which is why
+  /// its declared return type (`Scenario[]`) looks like a bare array. A bare
+  /// `List&lt;dynamic&gt;` request here throws (confirmed live: "type
+  /// `_Map&lt;String, dynamic&gt;` is not a subtype of type
+  /// `List&lt;dynamic&gt;?`").
   Future<List<Scenario>> getScenarios() async {
-    final response = await _dio.get<List<dynamic>>('/learn/scenarios');
-    return (response.data ?? [])
-        .map((e) => Scenario.fromJson(e as Map<String, dynamic>))
-        .toList();
+    final response = await _dio.get<Map<String, dynamic>>('/learn/scenarios');
+    final data = response.data?['data'] as List<dynamic>? ?? [];
+    return data.map((e) => Scenario.fromJson(e as Map<String, dynamic>)).toList();
   }
 
   Future<Scenario> getScenarioById(int id) async {

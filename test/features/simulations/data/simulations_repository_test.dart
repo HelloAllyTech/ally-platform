@@ -48,12 +48,14 @@ void main() {
   });
 
   group('getScenarios', () {
-    test('GETs /learn/scenarios and maps every entry', () async {
-      when(() => dio.get<List<dynamic>>('/learn/scenarios')).thenAnswer(
-        (_) async => _response([
-          {'id': 1, 'title': 'First'},
-          {'id': 2, 'title': 'Second'},
-        ]),
+    test('GETs /learn/scenarios and maps every entry in the data envelope', () async {
+      when(() => dio.get<Map<String, dynamic>>('/learn/scenarios')).thenAnswer(
+        (_) async => _response({
+          'data': [
+            {'id': 1, 'title': 'First'},
+            {'id': 2, 'title': 'Second'},
+          ],
+        }),
       );
 
       final result = await repository.getScenarios();
@@ -63,9 +65,9 @@ void main() {
       expect(result[1].id, 2);
     });
 
-    test('returns an empty list when response data is null', () async {
-      when(() => dio.get<List<dynamic>>('/learn/scenarios')).thenAnswer(
-        (_) async => _response(null),
+    test('returns an empty list when the data field is absent', () async {
+      when(() => dio.get<Map<String, dynamic>>('/learn/scenarios')).thenAnswer(
+        (_) async => _response(<String, dynamic>{}),
       );
 
       final result = await repository.getScenarios();

@@ -26,7 +26,11 @@ class AuthInterceptor extends Interceptor {
   final TokenStorage _tokenStorage;
   final Future<void> Function() _onUnrecoverable;
 
-  bool _isV2(String path) => v2Endpoints.any((route) => path.startsWith(route));
+  // RN's `api.ts` matches with `url === v2Endpoint` (exact equality), not a
+  // prefix check — `startsWith` here would wrongly also match e.g.
+  // `/learn/scenarios/7` (getScenarioById) against the v2-listed
+  // `/learn/scenarios`, sending it to a v2 route the backend never migrated.
+  bool _isV2(String path) => v2Endpoints.contains(path);
 
   @override
   Future<void> onRequest(
