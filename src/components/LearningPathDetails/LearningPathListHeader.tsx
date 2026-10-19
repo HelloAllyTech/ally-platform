@@ -6,6 +6,7 @@ import {ChevronRight} from '@/assets';
 import {Button} from '@/components';
 import {useTranslate} from '@/hooks/useTranslate';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
+import {htmlToMultilineText} from '@/utils';
 
 import {ProgressBar} from './ProgressBar';
 
@@ -55,7 +56,9 @@ export const LearningPathListHeader: React.FC<LearningPathListHeaderProps> = ({
       )}
       <View style={styles.listHeaderContent}>
         <Text style={styles.pathTitle}>{title}</Text>
-        <Text style={styles.pathDescription}>{description ?? ''}</Text>
+        <Text style={styles.pathDescription}>
+          {htmlToMultilineText(description)}
+        </Text>
 
         {showProgressBar &&
           completedScenarios !== undefined &&

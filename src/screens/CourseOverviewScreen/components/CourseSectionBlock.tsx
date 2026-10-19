@@ -6,6 +6,7 @@ import {CircularProgress} from '@/components';
 import {useTranslate} from '@/hooks';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
 import {TrackDetailItem, TrackItemStatus, TrackSection} from '@/types';
+import {htmlToPlainText} from '@/utils';
 
 import {CourseItemRow} from './CourseItemRow';
 
@@ -45,7 +46,7 @@ export const CourseSectionBlock: React.FC<CourseSectionBlockProps> = ({
             {section.title}
           </Text>
           <Text style={styles.sectionSubtitle} numberOfLines={1}>
-            {section.description ||
+            {htmlToPlainText(section.description) ||
               t('courses.progress', {
                 completed: completedCount,
                 total: items.length,
