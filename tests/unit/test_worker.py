@@ -14,6 +14,18 @@ from app.core.livekit.filler_clips import FillerClip
 from app.core.livekit.filler_pool import FillerPool
 
 
+@pytest.fixture(autouse=True)
+def _google_stt_without_adc(monkeypatch):
+    """The platform default STT is Google now, and the LiveKit Google plugin
+    demands Application Default Credentials at construction — which CI has
+    none of. Deepgram only needed an API key from the env, so these tests never
+    had to care. Replace the plugin class, not our factory: the factory path
+    these tests drive stays real."""
+    monkeypatch.setattr(
+        "livekit.plugins.google.STT", lambda **kwargs: Mock(name="google.STT")
+    )
+
+
 def _create_test_scenario(prompt_data, events=None):
     """Helper to create a proper Scenario object for tests."""
     from app.core.scenario.base import Scenario
