@@ -18,7 +18,7 @@ import {
  *
  * Why this matters: when a required field is missing, the runtime's
  * `create_tts_client()` catches the resulting error and falls back to a default
- * Deepgram voice. The scenario still runs, just in the wrong voice — so a bad
+ * Google voice. The scenario still runs, just in the wrong voice — so a bad
  * config is invisible until someone listens to a call.
  */
 

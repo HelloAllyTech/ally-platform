@@ -313,9 +313,12 @@ export const TURN_ENDPOINTING_MAX_CEILING = 10;
  * STT providers ally-ai-learn's `app/stt/factory.py` can construct. Kept in
  * step with SUPPORTED_STT_PROVIDERS in ally-be — a provider outside this list
  * raises at agent start, so the registry form must not offer one.
+ *
+ * Deepgram is deliberately absent: the runtime can still build it, but the
+ * account has no credits (every call 402s since 2026-10-18), so offering it
+ * would only let an admin create a row that kills sessions at join.
  */
 export const STT_PROVIDER_OPTIONS = [
-  { value: "deepgram", label: "Deepgram" },
   { value: "google", label: "Google" },
   { value: "sarvam", label: "Sarvam" },
   { value: "elevenlabs", label: "ElevenLabs" },
@@ -501,6 +504,7 @@ export const AI_TASK_PROVIDER_LABELS: Record<string, string> = {
   openai: "OpenAI",
   anthropic: "Anthropic",
   gemini: "Gemini",
+  google: "Google Cloud",
   deepgram: "Deepgram",
   multiple: "Several",
   resolved: "Set per session",

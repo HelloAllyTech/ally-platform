@@ -10,7 +10,7 @@ import { ProviderConfigSchema } from "./providerConfigSchema";
  *
  * `model` is required on hosted providers because both runtimes fall back to
  * the *platform default* model when it's missing while keeping the chosen
- * provider — an ElevenLabs client asking for Deepgram's "nova-3" starts a
+ * provider — an ElevenLabs client asking for Google's "chirp_2" starts a
  * session and transcribes nothing.
  */
 const MODEL_FIELD = {
