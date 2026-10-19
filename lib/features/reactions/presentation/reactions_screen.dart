@@ -2,22 +2,34 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/widgets/review_type_chip.dart';
 import '../data/reactions_repository.dart';
 
 const _availableReactions = ['👍', '❤️', '😂', '🎉', '👏'];
 
 /// Port of ally-mobile (React Native)'s `ReactionsScreen` — reaction-count
 /// summary + who-reacted list for a review, plus an emoji picker to add
-/// your own reaction.
+/// your own reaction. [reviewType] picks simulation vs. scribe endpoints,
+/// same role it plays in `ReviewDetailsScreen`.
 class ReactionsScreen extends ConsumerWidget {
-  const ReactionsScreen({super.key, required this.reviewId});
+  const ReactionsScreen({
+    super.key,
+    required this.reviewId,
+    this.reviewType = ReviewType.simulation,
+  });
 
   final String reviewId;
+  final ReviewType reviewType;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final reactionsAsync = ref.watch(reactionsListProvider(reviewId));
-    final countsAsync = ref.watch(reactionsCountProvider(reviewId));
+    final isScribe = reviewType == ReviewType.scribe;
+    final reactionsAsync = isScribe
+        ? ref.watch(scribeReactionsListProvider(reviewId))
+        : ref.watch(reactionsListProvider(reviewId));
+    final countsAsync = isScribe
+        ? ref.watch(scribeReactionsCountProvider(reviewId))
+        : ref.watch(reactionsCountProvider(reviewId));
 
     return Scaffold(
       appBar: AppBar(title: Text(ref.t('review.reactionsModal.title'))),
@@ -32,15 +44,27 @@ class ReactionsScreen extends ConsumerWidget {
                   ActionChip(
                     label: Text(emoji, style: const TextStyle(fontSize: 20)),
                     onPressed: () async {
-                      await ref
-                          .read(reactionsRepositoryProvider)
-                          .addReactionToReview(
-                            reviewId: reviewId,
-                            reaction: emoji,
-                            action: ReactionAction.add,
-                          );
-                      ref.invalidate(reactionsListProvider(reviewId));
-                      ref.invalidate(reactionsCountProvider(reviewId));
+                      if (isScribe) {
+                        await ref
+                            .read(scribeReactionsRepositoryProvider)
+                            .addReactionToReview(
+                              reviewId: reviewId,
+                              reaction: emoji,
+                              action: ReactionAction.add,
+                            );
+                        ref.invalidate(scribeReactionsListProvider(reviewId));
+                        ref.invalidate(scribeReactionsCountProvider(reviewId));
+                      } else {
+                        await ref
+                            .read(reactionsRepositoryProvider)
+                            .addReactionToReview(
+                              reviewId: reviewId,
+                              reaction: emoji,
+                              action: ReactionAction.add,
+                            );
+                        ref.invalidate(reactionsListProvider(reviewId));
+                        ref.invalidate(reactionsCountProvider(reviewId));
+                      }
                     },
                   ),
               ],

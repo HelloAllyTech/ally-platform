@@ -162,7 +162,7 @@ void main() {
 
   group('getGeneralComments', () {
     test('fetches and parses the flat comment list', () async {
-      when(() => dio.get<Map<String, dynamic>>('/scenario-session-reviews/rev-1/general-comments'))
+      when(() => dio.get<Map<String, dynamic>>('/scenario-session-reviews/rev-1/comments'))
           .thenAnswer(
         (_) async => _response({
           'data': [
@@ -188,16 +188,16 @@ void main() {
   });
 
   group('addGeneralComment', () {
-    test('posts the content body to the general-comments endpoint', () async {
+    test('posts the content body (no threadId) to the comments endpoint', () async {
       when(() => dio.post<void>(
-            '/scenario-session-reviews/rev-1/general-comments',
+            '/scenario-session-reviews/rev-1/comments',
             data: {'content': 'nice job'},
           )).thenAnswer((_) async => _response<void>(null));
 
       await repository.addGeneralComment(reviewId: 'rev-1', content: 'nice job');
 
       verify(() => dio.post<void>(
-            '/scenario-session-reviews/rev-1/general-comments',
+            '/scenario-session-reviews/rev-1/comments',
             data: {'content': 'nice job'},
           )).called(1);
     });

@@ -37,6 +37,7 @@ import '../../features/simulations/presentation/simulation_path_details_screen.d
 import '../../features/simulations/presentation/simulations_screen.dart';
 import '../auth/auth_state.dart';
 import '../navigation/app_shell_screen.dart';
+import '../widgets/review_type_chip.dart';
 
 /// The redirect gate's actual decision logic, extracted to a pure top-level
 /// function so it's testable without constructing a real [GoRouterState]
@@ -199,8 +200,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/reviews/:reviewId',
-        builder: (context, state) =>
-            ReviewDetailsScreen(reviewId: state.pathParameters['reviewId']!),
+        builder: (context, state) => ReviewDetailsScreen(
+          reviewId: state.pathParameters['reviewId']!,
+          reviewType: (state.extra as ReviewType?) ?? ReviewType.simulation,
+        ),
       ),
       GoRoute(
         path: '/call-log',
@@ -242,8 +245,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/reactions/:reviewId',
-        builder: (context, state) =>
-            ReactionsScreen(reviewId: state.pathParameters['reviewId']!),
+        builder: (context, state) => ReactionsScreen(
+          reviewId: state.pathParameters['reviewId']!,
+          reviewType: (state.extra as ReviewType?) ?? ReviewType.simulation,
+        ),
       ),
     ],
   );

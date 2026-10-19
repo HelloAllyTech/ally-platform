@@ -172,4 +172,71 @@ void main() {
           )).called(1);
     });
   });
+
+  group('ScribeReactionsRepository', () {
+    late ScribeReactionsRepository scribeRepository;
+
+    setUp(() {
+      scribeRepository = ScribeReactionsRepository(dio);
+    });
+
+    test('getReactions hits the scribe reactions path', () async {
+      when(() => dio.get<Map<String, dynamic>>(
+            '/scribe-session-reviews/rev-1/reactions',
+            queryParameters: {'offset': 0, 'limit': 50},
+          )).thenAnswer((_) async => _response({'data': <dynamic>[]}));
+
+      await scribeRepository.getReactions('rev-1');
+
+      verify(() => dio.get<Map<String, dynamic>>(
+            '/scribe-session-reviews/rev-1/reactions',
+            queryParameters: {'offset': 0, 'limit': 50},
+          )).called(1);
+    });
+
+    test('getReactionsCount hits the scribe reactions/count path', () async {
+      when(() => dio.get<Map<String, dynamic>>('/scribe-session-reviews/rev-1/reactions/count'))
+          .thenAnswer((_) async => _response({'reactions': {'👍': 2}}));
+
+      final result = await scribeRepository.getReactionsCount('rev-1');
+
+      expect(result, {'👍': 2});
+    });
+
+    test('addReactionToReview posts to the scribe reactions path', () async {
+      when(() => dio.post<void>(
+            '/scribe-session-reviews/rev-1/reactions',
+            data: {'reaction': '👍', 'action': 'ADD'},
+          )).thenAnswer((_) async => _response<void>(null));
+
+      await scribeRepository.addReactionToReview(
+        reviewId: 'rev-1',
+        reaction: '👍',
+        action: ReactionAction.add,
+      );
+
+      verify(() => dio.post<void>(
+            '/scribe-session-reviews/rev-1/reactions',
+            data: {'reaction': '👍', 'action': 'ADD'},
+          )).called(1);
+    });
+
+    test('addReactionToComment posts to the scribe comment-reactions path', () async {
+      when(() => dio.post<void>(
+            '/scribe-session-reviews/comments/c-1/reactions',
+            data: {'reaction': '🎉', 'action': 'ADD'},
+          )).thenAnswer((_) async => _response<void>(null));
+
+      await scribeRepository.addReactionToComment(
+        commentId: 'c-1',
+        reaction: '🎉',
+        action: ReactionAction.add,
+      );
+
+      verify(() => dio.post<void>(
+            '/scribe-session-reviews/comments/c-1/reactions',
+            data: {'reaction': '🎉', 'action': 'ADD'},
+          )).called(1);
+    });
+  });
 }

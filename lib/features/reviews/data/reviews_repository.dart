@@ -61,11 +61,15 @@ class ReviewsRepository {
     );
   }
 
-  /// Flat, non-transcript-anchored discussion on a review — matches
-  /// `generalCommentsApi.ts`'s scope exactly (no threading/reply params).
+  /// Flat, non-transcript-anchored discussion on a review. The real RN app
+  /// (`reviewsApi.ts`'s `getGeneralReviewComments`/`addReviewComment`) hits
+  /// GET/POST `/scenario-session-reviews/:reviewId/comments` — the same
+  /// path `addThreadReply` posts to, just without a `threadId`. The
+  /// `/general-comments` suffix is a route constant RN defines but never
+  /// actually wires to a request.
   Future<List<ReviewComment>> getGeneralComments(String reviewId) async {
     final response = await _dio.get<Map<String, dynamic>>(
-      '/scenario-session-reviews/$reviewId/general-comments',
+      '/scenario-session-reviews/$reviewId/comments',
     );
     final data = response.data?['data'] as List<dynamic>? ?? [];
     return data
@@ -78,7 +82,7 @@ class ReviewsRepository {
     required String content,
   }) async {
     await _dio.post<void>(
-      '/scenario-session-reviews/$reviewId/general-comments',
+      '/scenario-session-reviews/$reviewId/comments',
       data: {'content': content},
     );
   }

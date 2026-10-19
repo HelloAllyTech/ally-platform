@@ -6,7 +6,9 @@ import 'package:go_router/go_router.dart';
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_chat_input.dart';
+import '../../../core/widgets/review_type_chip.dart';
 import '../data/reviews_repository.dart';
+import '../data/scribe_reviews_repository.dart';
 import 'thread_detail_screen.dart';
 
 /// Scoped port of ally-mobile (React Native)'s `ReviewDetailsScreen` — the
@@ -17,10 +19,25 @@ import 'thread_detail_screen.dart';
 /// *new* thread from a fresh transcript selection, and review-status
 /// updates (approve/request changes), are real further work — see
 /// `reviews_repository.dart`'s doc comments.
+///
+/// RN splits this into `SimulationReviewDetailsScreen`/
+/// `ScribeReviewDetailsScreen`, but both are thin wrappers around one
+/// shared `ReviewDetailsLayout`, switching only the data source
+/// (`ReviewApiProvider`) and a couple of layout props neither of which
+/// this scoped port renders yet (audio player, privacy toggle). [reviewType]
+/// plays that same "which data source" role here, so this one widget
+/// serves both instead of duplicating the UI.
 class ReviewDetailsScreen extends ConsumerStatefulWidget {
-  const ReviewDetailsScreen({super.key, required this.reviewId});
+  const ReviewDetailsScreen({
+    super.key,
+    required this.reviewId,
+    this.reviewType = ReviewType.simulation,
+  });
 
   final String reviewId;
+  final ReviewType reviewType;
+
+  bool get _isScribe => reviewType == ReviewType.scribe;
 
   @override
   ConsumerState<ReviewDetailsScreen> createState() =>
@@ -42,11 +59,18 @@ class _ReviewDetailsScreenState extends ConsumerState<ReviewDetailsScreen> {
     if (content.isEmpty) return;
     setState(() => _isSubmitting = true);
     try {
-      await ref
-          .read(reviewsRepositoryProvider)
-          .addGeneralComment(reviewId: widget.reviewId, content: content);
+      if (widget._isScribe) {
+        await ref
+            .read(scribeReviewsRepositoryProvider)
+            .addGeneralComment(reviewId: widget.reviewId, content: content);
+        ref.invalidate(scribeGeneralCommentsProvider(widget.reviewId));
+      } else {
+        await ref
+            .read(reviewsRepositoryProvider)
+            .addGeneralComment(reviewId: widget.reviewId, content: content);
+        ref.invalidate(generalCommentsProvider(widget.reviewId));
+      }
       _commentController.clear();
-      ref.invalidate(generalCommentsProvider(widget.reviewId));
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -54,7 +78,9 @@ class _ReviewDetailsScreenState extends ConsumerState<ReviewDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final reviewAsync = ref.watch(reviewDetailProvider(widget.reviewId));
+    final reviewAsync = widget._isScribe
+        ? ref.watch(scribeReviewDetailProvider(widget.reviewId))
+        : ref.watch(reviewDetailProvider(widget.reviewId));
 
     return DefaultTabController(
       length: 2,
@@ -65,7 +91,10 @@ class _ReviewDetailsScreenState extends ConsumerState<ReviewDetailsScreen> {
             IconButton(
               icon: SvgPicture.asset('assets/icons/smile.svg', width: 24, height: 24),
               tooltip: ref.t('review.reactionsModal.title'),
-              onPressed: () => context.push('/reactions/${widget.reviewId}'),
+              onPressed: () => context.push(
+                '/reactions/${widget.reviewId}',
+                extra: widget.reviewType,
+              ),
             ),
           ],
           bottom: TabBar(
@@ -112,7 +141,10 @@ class _ReviewDetailsScreenState extends ConsumerState<ReviewDetailsScreen> {
                 child: TabBarView(
                   children: [
                     _buildDiscussionTab(),
-                    _ThreadsTab(reviewId: widget.reviewId),
+                    _ThreadsTab(
+                      reviewId: widget.reviewId,
+                      reviewType: widget.reviewType,
+                    ),
                   ],
                 ),
               ),
@@ -124,7 +156,9 @@ class _ReviewDetailsScreenState extends ConsumerState<ReviewDetailsScreen> {
   }
 
   Widget _buildDiscussionTab() {
-    final commentsAsync = ref.watch(generalCommentsProvider(widget.reviewId));
+    final commentsAsync = widget._isScribe
+        ? ref.watch(scribeGeneralCommentsProvider(widget.reviewId))
+        : ref.watch(generalCommentsProvider(widget.reviewId));
 
     return Column(
       children: [
@@ -170,13 +204,16 @@ class _ReviewDetailsScreenState extends ConsumerState<ReviewDetailsScreen> {
 }
 
 class _ThreadsTab extends ConsumerWidget {
-  const _ThreadsTab({required this.reviewId});
+  const _ThreadsTab({required this.reviewId, required this.reviewType});
 
   final String reviewId;
+  final ReviewType reviewType;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final threadsAsync = ref.watch(reviewThreadsProvider(reviewId));
+    final threadsAsync = reviewType == ReviewType.scribe
+        ? ref.watch(scribeReviewThreadsProvider(reviewId))
+        : ref.watch(reviewThreadsProvider(reviewId));
 
     return threadsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -215,6 +252,7 @@ class _ThreadsTab extends ConsumerWidget {
                           builder: (_) => ThreadDetailScreen(
                             reviewId: reviewId,
                             thread: thread,
+                            reviewType: reviewType,
                           ),
                         ),
                       ),

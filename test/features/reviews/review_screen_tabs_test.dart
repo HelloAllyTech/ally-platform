@@ -8,8 +8,10 @@ import 'package:ally_mobile_flutter/core/permissions/permissions_repository.dart
 import 'package:ally_mobile_flutter/core/permissions/user_permissions.dart';
 import 'package:ally_mobile_flutter/features/reviews/data/review_models.dart';
 import 'package:ally_mobile_flutter/features/reviews/data/reviews_repository.dart';
+import 'package:ally_mobile_flutter/core/widgets/review_type_chip.dart';
 import 'package:ally_mobile_flutter/features/reviews/data/scribe_reviews_repository.dart';
 import 'package:ally_mobile_flutter/features/reviews/presentation/review_screen.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../support/fake_translations.dart';
 
@@ -106,11 +108,60 @@ void main() {
     expect(find.text('Simulation'), findsNothing);
     expect(find.text('Robin'), findsOneWidget);
 
-    // No ScribeReviewDetailsScreen port exists — tapping a scribe review
-    // does nothing, same as an account lacking VIEW_SCRIBE_REVIEW would see.
+    // VIEW_SCRIBE_REVIEWS (plural, list visibility) without VIEW_SCRIBE_REVIEW
+    // (singular, detail visibility) leaves the row disabled — same gating
+    // CallLogScreen/simulation reviews already use.
     await tester.tap(find.text('Robin'));
     await tester.pumpAndSettle();
     verifyNever(() => scribeRepository.markAsRead(any()));
+  });
+
+  testWidgets('with VIEW_SCRIBE_REVIEW too: tapping a scribe review marks it read and navigates', (
+    tester,
+  ) async {
+    final reviewsRepository = MockReviewsRepository();
+    final scribeRepository = MockScribeReviewsRepository();
+    when(() => scribeRepository.getScribeReviews())
+        .thenAnswer((_) async => [_review(id: 'r1', name: 'Robin')]);
+    when(() => scribeRepository.markAsRead('r1')).thenAnswer((_) async {});
+
+    final router = GoRouter(
+      initialLocation: '/',
+      routes: [
+        GoRoute(path: '/', builder: (context, state) => const ReviewScreen()),
+        GoRoute(
+          path: '/reviews/:id',
+          builder: (context, state) =>
+              Text('review-detail-${state.pathParameters['id']}-${state.extra}'),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          fixedTranslationsOverride(),
+          reviewsRepositoryProvider.overrideWithValue(reviewsRepository),
+          scribeReviewsRepositoryProvider.overrideWithValue(scribeRepository),
+          userPermissionsProvider.overrideWith(
+            (ref) async => [
+              UserPermissions.viewScribeReviews,
+              UserPermissions.viewScribeReview,
+            ],
+          ),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Robin'));
+    await tester.pumpAndSettle();
+
+    verify(() => scribeRepository.markAsRead('r1')).called(1);
+    expect(find.text('review-detail-r1-${ReviewType.scribe}'), findsOneWidget);
   });
 
   testWidgets('neither permission: empty state, no crash', (tester) async {

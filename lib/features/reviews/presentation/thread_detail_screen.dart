@@ -5,10 +5,12 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_chat_input.dart';
+import '../../../core/widgets/review_type_chip.dart';
 import '../../../core/widgets/tab_screen_header.dart';
 import '../../reactions/data/reactions_repository.dart';
 import '../data/review_models.dart';
 import '../data/reviews_repository.dart';
+import '../data/scribe_reviews_repository.dart';
 
 const _availableReactions = ['👍', '❤️', '😂', '🎉', '👏'];
 
@@ -19,15 +21,22 @@ const _availableReactions = ['👍', '❤️', '😂', '🎉', '👏'];
 /// (`addReactionToComment`). Starting a brand-new thread from a fresh
 /// transcript selection isn't wired here — see
 /// `reviews_repository.dart`'s `addThreadReply` doc comment for why.
+///
+/// [reviewType] picks simulation vs. scribe endpoints, same role it plays
+/// in `ReviewDetailsScreen` — see that class's doc comment.
 class ThreadDetailScreen extends ConsumerStatefulWidget {
   const ThreadDetailScreen({
     super.key,
     required this.reviewId,
     required this.thread,
+    this.reviewType = ReviewType.simulation,
   });
 
   final String reviewId;
   final ReviewThread thread;
+  final ReviewType reviewType;
+
+  bool get _isScribe => reviewType == ReviewType.scribe;
 
   @override
   ConsumerState<ThreadDetailScreen> createState() => _ThreadDetailScreenState();
@@ -60,9 +69,13 @@ class _ThreadDetailScreenState extends ConsumerState<ThreadDetailScreen> {
     if (root == null || _isLoadingReplies) return;
     setState(() => _isLoadingReplies = true);
     try {
-      final result = await ref
-          .read(reviewsRepositoryProvider)
-          .getCommentReplies(root.id, limit: 50);
+      final result = widget._isScribe
+          ? await ref
+              .read(scribeReviewsRepositoryProvider)
+              .getCommentReplies(root.id, limit: 50)
+          : await ref
+              .read(reviewsRepositoryProvider)
+              .getCommentReplies(root.id, limit: 50);
       setState(() {
         final seenIds = _comments.map((c) => c.id).toSet();
         _comments.addAll(result.replies.where((r) => !seenIds.contains(r.id)));
@@ -80,13 +93,23 @@ class _ThreadDetailScreenState extends ConsumerState<ThreadDetailScreen> {
     if (content.isEmpty) return;
     setState(() => _isSubmitting = true);
     try {
-      await ref
-          .read(reviewsRepositoryProvider)
-          .addThreadReply(
-            reviewId: widget.reviewId,
-            threadId: widget.thread.id,
-            content: content,
-          );
+      if (widget._isScribe) {
+        await ref
+            .read(scribeReviewsRepositoryProvider)
+            .addThreadReply(
+              reviewId: widget.reviewId,
+              threadId: widget.thread.id,
+              content: content,
+            );
+      } else {
+        await ref
+            .read(reviewsRepositoryProvider)
+            .addThreadReply(
+              reviewId: widget.reviewId,
+              threadId: widget.thread.id,
+              content: content,
+            );
+      }
       _replyController.clear();
       _hasLoadedReplies = false;
       await _loadReplies();
@@ -96,13 +119,23 @@ class _ThreadDetailScreenState extends ConsumerState<ThreadDetailScreen> {
   }
 
   Future<void> _react(ThreadComment comment, String emoji) async {
-    await ref
-        .read(reactionsRepositoryProvider)
-        .addReactionToComment(
-          commentId: comment.id,
-          reaction: emoji,
-          action: ReactionAction.add,
-        );
+    if (widget._isScribe) {
+      await ref
+          .read(scribeReactionsRepositoryProvider)
+          .addReactionToComment(
+            commentId: comment.id,
+            reaction: emoji,
+            action: ReactionAction.add,
+          );
+    } else {
+      await ref
+          .read(reactionsRepositoryProvider)
+          .addReactionToComment(
+            commentId: comment.id,
+            reaction: emoji,
+            action: ReactionAction.add,
+          );
+    }
     if (mounted) setState(() => _hasLoadedReplies = false);
     await _loadReplies();
   }

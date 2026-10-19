@@ -24,10 +24,7 @@ import '../data/scribe_reviews_repository.dart';
 /// specific styling evidence for this screen).
 ///
 /// Not ported: the read-filter (All/Read/Unread) row and sort dropdown
-/// `ReviewList.tsx` renders above its list, and the scribe-review detail
-/// thread screen (`ScribeReviewDetailsScreen` has no Flutter port yet) —
-/// tapping a scribe review is therefore always disabled here, same as a
-/// real account lacking `VIEW_SCRIBE_REVIEW` would see.
+/// `ReviewList.tsx` renders above its list.
 class ReviewScreen extends ConsumerStatefulWidget {
   const ReviewScreen({super.key});
 
@@ -55,6 +52,7 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
     final hasSimulation = permissions.contains(UserPermissions.viewSimulationReviews);
     final hasScribe = permissions.contains(UserPermissions.viewScribeReviews);
     final canViewSimulationDetail = permissions.contains(UserPermissions.viewSimulationReview);
+    final canViewScribeDetail = permissions.contains(UserPermissions.viewScribeReview);
 
     // Scribe listed first, matching the real REVIEW_TYPE_TABS order.
     if (hasScribe && hasSimulation) {
@@ -104,12 +102,12 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
                     : _ReviewList(
                         provider: scribeReviewsListProvider,
                         reviewType: ReviewType.scribe,
-                        // No ScribeReviewDetailsScreen port exists yet — same
-                        // visible effect as an account lacking
-                        // VIEW_SCRIBE_REVIEW: the list shows, tapping doesn't.
-                        canViewDetails: false,
+                        canViewDetails: canViewScribeDetail,
                         onReviewTapped: (review) async {
                           await ref.read(scribeReviewsRepositoryProvider).markAsRead(review.id);
+                          if (mounted) {
+                            context.push('/reviews/${review.id}', extra: ReviewType.scribe);
+                          }
                         },
                       ),
           ),
