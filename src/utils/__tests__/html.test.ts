@@ -1,4 +1,4 @@
-import {htmlToPlainText} from '../html';
+import {htmlToMultilineText, htmlToPlainText} from '../html';
 
 describe('htmlToPlainText', () => {
   it('returns empty string for nullish or empty input', () => {
@@ -54,5 +54,29 @@ describe('htmlToPlainText', () => {
 
   it('collapses runs of whitespace and trims the result', () => {
     expect(htmlToPlainText('  <p>  a   b  </p>  ')).toBe('a b');
+  });
+});
+
+describe('htmlToMultilineText', () => {
+  it('returns empty string for nullish or empty input', () => {
+    expect(htmlToMultilineText(undefined)).toBe('');
+    expect(htmlToMultilineText('<p></p>')).toBe('');
+  });
+
+  it('keeps paragraph and <br> breaks from a rich-text course description', () => {
+    expect(
+      htmlToMultilineText(
+        '<p>This is a short micro-course.<br /><br />This short module will take you 30-40 minutes.</p>',
+      ),
+    ).toBe(
+      'This is a short micro-course.\n\nThis short module will take you 30-40 minutes.',
+    );
+    expect(htmlToMultilineText('<p>a</p><p>b &amp; c</p>')).toBe('a\nb & c');
+  });
+
+  it('renders list items as bullets', () => {
+    expect(htmlToMultilineText('<ul><li>One</li><li>Two</li></ul>')).toBe(
+      '• One\n• Two',
+    );
   });
 });
