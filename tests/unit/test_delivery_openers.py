@@ -292,6 +292,27 @@ class TestValidateDelivery:
         )
         assert plan.interim == ("I'm not sure…", "hard to say")
 
+    def test_the_same_opening_as_a_recent_interim_is_dropped(self):
+        """8 of 13 Hindi interims opened "सोच रहा हूँ…" (prod, 2026-10-17)."""
+        plan = validate_delivery(
+            ProposedDelivery(interim=["सोच रहा हूँ कि...", "कहाँ से शुरू करूँ..."]),
+            None,
+            source="working_memory",
+            recent_interims=["सोच रहा हूँ...", "बस..."],
+        )
+        assert plan.interim == ("कहाँ से शुरू करूँ...",)
+
+    def test_turn_delivery_remembers_the_last_few_interims(self):
+        td = TurnDelivery()
+        for i in range(5):
+            td.set_plan(
+                DeliveryPlan(
+                    interim=(f"piece {i} a", f"piece {i} b"), source="working_memory"
+                )
+            )
+        assert list(td.recent_interims)[-1] == "piece 4 b"
+        assert len(td.recent_interims) == 9
+
     def test_at_most_three_pieces(self):
         plan = validate_delivery(
             ProposedDelivery(interim=["one two", "three four", "five six", "seven"]),
@@ -687,6 +708,22 @@ class TestLeadingHesitationTrimmer:
         )
         out = _stream(trimmer, ['"Just ', "thinking… I think ", "it might help."])
         assert out == "I think it might help."
+
+    def test_an_emotion_tag_is_kept_and_the_restatement_still_trimmed(self):
+        """ElevenLabs v3, Hindi prod (2026-10-17): "[thoughtful] क्या कहूँ…"
+        was released at the tag and restated the interim."""
+        trimmer = LeadingHesitationTrimmer(
+            is_active=lambda: True, phrases=lambda: ["क्या कहूँ..."]
+        )
+        out = _stream(trimmer, ["[thoughtful] ", "क्या कहूँ... ", "पापा जब पीते थे"])
+        assert out == "[thoughtful] पापा जब पीते थे"
+
+    def test_an_emotion_tag_alone_is_not_lost(self):
+        trimmer = LeadingHesitationTrimmer(is_active=lambda: True, phrases=lambda: [])
+        assert (
+            _stream(trimmer, ["[sad] ", "I just feel lost."])
+            == "[sad] I just feel lost."
+        )
 
     def test_strips_the_echoed_opener_phrase(self):
         """The first live run: every opener came back at the start of the reply."""

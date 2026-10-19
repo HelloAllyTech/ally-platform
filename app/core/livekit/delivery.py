@@ -33,8 +33,9 @@ same job confused the people editing the prompts.
 from __future__ import annotations
 
 import time
+from collections import deque
 from dataclasses import dataclass, field
-from typing import Callable, List, Optional, Sequence, Set
+from typing import Callable, Deque, List, Optional, Sequence, Set
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -53,6 +54,8 @@ MAX_INTERIM_PIECES = 3
 MAX_PIECE_WORDS = 8
 MAX_PIECE_CHARS = 60
 MAX_OPENER_IDS = 3
+#: About three turns of interim pieces.
+RECENT_INTERIM_PIECES = 9
 _SENTENCE_ENDS = (".", "!", "।", "॥", "。")
 _PRONOUN_I = frozenset(
     {"I", "I'm", "I've", "I'd", "I'll", "I’m", "I’ve", "I’d", "I’ll"}
@@ -209,6 +212,7 @@ def validate_delivery(
     source: str,
     made_after_turn: int = -1,
     recent_lines: Sequence[str] = (),
+    recent_interims: Sequence[str] = (),
 ) -> Optional[DeliveryPlan]:
     """Turn a proposal into a plan, or None when nothing usable came back.
 
@@ -238,7 +242,7 @@ def validate_delivery(
         # updater asked for "sigh" on most turns, and treating an unplayable
         # kind as "no sound fits" left 10 of 13 turns silent.
         kind = first.kind if first is not None else _NEAREST_KIND.get(kind, "hum")
-    interim = _validate_interim(proposal.interim, recent_lines)
+    interim = _validate_interim(proposal.interim, recent_lines, recent_interims)
     return DeliveryPlan(
         opener_kind=kind,
         opener_ids=tuple(ids),
@@ -249,7 +253,16 @@ def validate_delivery(
     )
 
 
-def _validate_interim(pieces: Sequence[str], recent_lines: Sequence[str]) -> tuple:
+def _opening(text: Optional[str]) -> tuple:
+    """The first two words, lower-cased: what makes two interims sound alike."""
+    return tuple(_words(text or "")[:2])
+
+
+def _validate_interim(
+    pieces: Sequence[str],
+    recent_lines: Sequence[str],
+    recent_interims: Sequence[str] = (),
+) -> tuple:
     """The pieces that survive, in order.
 
     A piece that replays a recent line is skipped and the rest are kept: ending
@@ -264,6 +277,13 @@ def _validate_interim(pieces: Sequence[str], recent_lines: Sequence[str]) -> tup
         strip_understanding_claim,
     )
 
+    # The same opening turn after turn reads as a tic: a Hindi prod session
+    # (2026-10-17) started 8 of 13 interims with "सोच रहा हूँ…", which the
+    # repeat check let through as "सोच रहा हूँ कि…". Openings are compared
+    # with recent interims only — the client's own replies share common first
+    # words with any line.
+    used = {o for o in (_opening(p) for p in recent_interims) if len(o) == 2}
+    recent = [*recent_lines, *recent_interims]
     kept: List[str] = []
     for raw in list(pieces or [])[:MAX_INTERIM_PIECES]:
         if not kept:
@@ -274,7 +294,7 @@ def _validate_interim(pieces: Sequence[str], recent_lines: Sequence[str]) -> tup
             raw = strip_understanding_claim(strip_leading_hesitation(raw or ""))
             if not raw.strip():
                 continue
-        if repeats_recent_line(raw, recent_lines):
+        if repeats_recent_line(raw, recent) or _opening(raw) in used:
             dropped = "repeats a recent line"
         elif _safe_piece(raw) is None:
             dropped = "unsafe or too long" if (raw or "").strip() else None
@@ -319,6 +339,9 @@ class TurnDelivery:
     def __init__(self, catalog: Optional[SessionCatalog] = None) -> None:
         self.catalog = catalog
         self._plan: DeliveryPlan = DEFAULT_PLAN
+        #: The interim pieces of the last few plans, newest last: the next
+        #: interim must not open the way any of them did.
+        self.recent_interims: Deque[str] = deque(maxlen=RECENT_INTERIM_PIECES)
         self._opener: Optional[OpenerRecord] = None
         self._listeners: List[Callable[[DeliveryPlan], None]] = []
         self.plans_received = 0
@@ -342,6 +365,7 @@ class TurnDelivery:
             return
         self._plan = plan
         self.plans_received += 1
+        self.recent_interims.extend(plan.interim)
         logger.info(
             "[DELIVERY] plan from %s after turn %d: kind=%s ids=%s hold=%s interim=%d",
             plan.source,

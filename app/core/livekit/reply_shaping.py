@@ -179,6 +179,9 @@ class LeadingHesitationTrimmer:
         self._decided = is_active is None
         self._buffer = ""
         self._done = not active
+        #: Non-pause audio tags met before the first word ("[thoughtful]"):
+        #: kept for the reply, while the words after them are still checked.
+        self._kept_tags = ""
 
     def _decide(self) -> None:
         if self._decided:
@@ -257,6 +260,8 @@ class LeadingHesitationTrimmer:
                 if final:
                     self._done = True
                     self._buffer = ""
+                    out, self._kept_tags = self._kept_tags, ""
+                    return out
                 return ""
             if stripped.startswith("["):
                 match = _TAG_RE.match(buf)
@@ -268,7 +273,13 @@ class LeadingHesitationTrimmer:
                 if tag in _PAUSE_TAGS:
                     self._buffer = buf[match.end() :]
                     continue
-                return self._release()
+                # An emotion tag stays, but what follows is still checked: on
+                # ElevenLabs v3 a reply opening "[thoughtful] क्या कहूँ…" was
+                # released at the tag, so it restated the interim "क्या कहूँ…"
+                # (prod, Hindi, 2026-10-17).
+                self._kept_tags += match.group(0).strip() + " "
+                self._buffer = buf[match.end() :]
+                continue
             if self._phrases:
                 new_buf, need_more = self._strip_phrase(buf, final)
                 if need_more:
@@ -295,7 +306,8 @@ class LeadingHesitationTrimmer:
         # Re-capitalise a Latin first letter left lower-case by the trim.
         if out and out[0].isalpha() and out[0].islower() and out[0].isascii():
             out = out[0].upper() + out[1:]
-        return out
+        tags, self._kept_tags = self._kept_tags, ""
+        return tags + out
 
 
 class AudioTagLimiter:
