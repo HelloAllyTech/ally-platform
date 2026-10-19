@@ -176,6 +176,24 @@ _IDLE_TIMEOUT_S = 90.0
 # How long (seconds) of silence marks the end of a counselor utterance.
 _SILENCE_GATE_S = 1.8
 
+# The agent's own turn state, published on its participant by LiveKit
+# (livekit.agents.types.ATTRIBUTE_AGENT_STATE): listening / thinking /
+# speaking. Waiting for it, not for transcript silence, is what keeps the
+# tester from talking over a reply. ElevenLabs v3 renders Hindi replies a
+# sentence at a time with gaps over the 1.5 s transcript debounce, so the
+# tester answered mid-reply and cut off nearly every Hindi reply in prod V2V
+# (2026-10-16..19).
+_AGENT_STATE_ATTRIBUTE = "lk.agent.state"
+# The agent must have been listening this long before the tester speaks: a
+# pause between two sentences of one reply is "speaking" throughout, but the
+# state can flicker at the boundary.
+_AGENT_IDLE_SETTLE_S = 1.0
+# Longest the tester waits for the agent to finish one reply.
+_AGENT_REPLY_MAX_WAIT_S = 60.0
+# Time for the last sentence's transcript to arrive after the agent stops
+# (the STT debounce is 1.5 s).
+_TRANSCRIPT_TAIL_S = 1.8
+
 
 class V2VTesterBot:
     """Simulated learner participant for automated V2V testing."""
@@ -232,6 +250,12 @@ class V2VTesterBot:
         # mid-session can take the pipeline over from the agent's own track.
         self._stt_task: Optional[asyncio.Task] = None
         self._stt_on_avatar = False
+        #: The agent's published turn state and when it last changed
+        #: (monotonic). None until the agent publishes one, in which case the
+        #: tester falls back to transcript silence alone.
+        self._agent_state: Optional[str] = None
+        self._agent_state_at: float = 0.0
+        self._agent_state_changed = asyncio.Event()
 
     # ── Public entry point ────────────────────────────────────────────────────
 
@@ -329,6 +353,11 @@ class V2VTesterBot:
                     pub.sid,
                 )
 
+            @room.on("participant_attributes_changed")
+            def _on_attributes_changed(changed: dict, participant) -> None:
+                if _AGENT_STATE_ATTRIBUTE in (changed or {}):
+                    self._note_agent_state(changed[_AGENT_STATE_ATTRIBUTE])
+
             @room.on("participant_connected")
             def _on_participant_connected(participant: rtc.RemoteParticipant) -> None:
                 logger.info(
@@ -345,8 +374,15 @@ class V2VTesterBot:
             connected = True
             logger.info("[V2V] joined room=%s as v2v-tester", self.room_name)
 
-            # Log who is already in the room when we join.
+            # Log who is already in the room when we join, and pick up the
+            # agent's turn state if it is already published.
             existing = list(room.remote_participants.values())
+            for p in existing:
+                state = (getattr(p, "attributes", None) or {}).get(
+                    _AGENT_STATE_ATTRIBUTE
+                )
+                if state:
+                    self._note_agent_state(state)
             if existing:
                 for p in existing:
                     logger.info(
@@ -455,6 +491,7 @@ class V2VTesterBot:
                 logger.debug("[V2V] empty counselor utterance, skipping")
                 continue
 
+            counselor_text = await self._finish_counselor_turn(counselor_text)
             logger.info("[V2V] counselor said: %r", counselor_text[:120])
 
             # Add counselor turn to history.
@@ -474,6 +511,65 @@ class V2VTesterBot:
 
         logger.info("[V2V] max_exchanges=%d reached", self.max_exchanges)
         self._metrics["endReason"] = "max_exchanges"
+
+    def _note_agent_state(self, state: Optional[str]) -> None:
+        import time
+
+        if state and state != self._agent_state:
+            self._agent_state = state
+            self._agent_state_at = time.monotonic()
+            self._agent_state_changed.set()
+
+    def _agent_idle_for(self) -> Optional[float]:
+        """Seconds the agent has been listening, 0 if it isn't, None if unknown."""
+        import time
+
+        if self._agent_state is None:
+            return None
+        if self._agent_state != "listening":
+            return 0.0
+        return time.monotonic() - self._agent_state_at
+
+    async def _finish_counselor_turn(self, first_part: str) -> str:
+        """Wait for the agent to finish its reply, merging what it says meanwhile.
+
+        The transcript arrives in pieces (one per pause), so the first piece is
+        often only the start of the reply. Until the agent has been listening
+        for _AGENT_IDLE_SETTLE_S, further pieces are folded into this turn, then
+        a short tail lets the last sentence's transcript land. Bounded by
+        _AGENT_REPLY_MAX_WAIT_S. With no published state, returns at once (the
+        old transcript-silence behaviour).
+        """
+        import time
+
+        if self._agent_idle_for() is None:
+            return first_part
+        parts = [first_part]
+        deadline = time.monotonic() + _AGENT_REPLY_MAX_WAIT_S
+        waited = False
+        while time.monotonic() < deadline:
+            idle = self._agent_idle_for()
+            if idle is not None and idle >= _AGENT_IDLE_SETTLE_S:
+                break
+            waited = True
+            parts.extend(self._drain_utterances())
+            await asyncio.sleep(0.2)
+        if waited:
+            await asyncio.sleep(_TRANSCRIPT_TAIL_S)
+        parts.extend(self._drain_utterances())
+        if len(parts) > 1:
+            logger.info("[V2V] merged %d transcript pieces into one reply", len(parts))
+        return " ".join(p for p in parts if p and p.strip())
+
+    def _drain_utterances(self) -> list:
+        out = []
+        while True:
+            try:
+                item = self._utterance_queue.get_nowait()
+            except asyncio.QueueEmpty:
+                return out
+            if item:
+                out.append(item)
 
     # ── Session end ───────────────────────────────────────────────────────────
 
