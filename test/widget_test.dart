@@ -20,7 +20,10 @@ void main() {
     await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
     await tester.pumpAndSettle();
 
-    expect(find.text('Ally'), findsOneWidget);
+    // "Ally" is the app's wordmark, nested inside the "Welcome to Ally"
+    // line (its own YesevaOne-Regular style) rather than its own standalone
+    // Text widget — see login_screen_test.dart for the fuller greeting check.
+    expect(find.text('Welcome to Ally'), findsOneWidget);
     expect(find.text('Next'), findsOneWidget);
   });
 }

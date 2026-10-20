@@ -102,6 +102,28 @@ void main() {
       );
     });
 
+    testWidgets(
+      'shows the real two-line greeting ("Hey," then "Welcome to Ally"), '
+      'which switches to a single OTP-step line once advanced',
+      (tester) async {
+        when(() => authRepository.generateOtp(any())).thenAnswer((_) async {});
+
+        await pumpLogin(tester);
+
+        expect(find.text('Hey,'), findsOneWidget);
+        expect(find.text('Welcome to Ally'), findsOneWidget);
+
+        await tester.enterText(find.byType(TextField), 'learner@example.com');
+        await tester.pump();
+        await tester.tap(find.text('Next'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Hey,'), findsNothing);
+        expect(find.text('Welcome to Ally'), findsNothing);
+        expect(find.text('Verify your email address'), findsOneWidget);
+      },
+    );
+
     testWidgets('disables the Google button when googleWebClientId is empty', (tester) async {
       await pumpLogin(tester);
 

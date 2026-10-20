@@ -199,17 +199,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // RN's SplashScreen renders the app name in its bespoke
-              // `allyText` style (YESEVA_ONE.REGULAR, nested inside the
-              // surrounding ReplayPro-Headline greeting) — not the
-              // ReplayPro Headline displayMedium default.
-              Text(
-                ref.t('common.appName'),
-                style: Theme.of(context)
-                    .textTheme
-                    .displayMedium
-                    ?.copyWith(fontFamily: AppFonts.yesevaOneRegular),
-              ),
+              _buildGreeting(context),
               const SizedBox(height: 24),
               if (_step == _Step.email) ...[
                 Align(
@@ -289,6 +279,37 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  /// RN's SplashScreen shows a different greeting per step: on the email
+  /// step, "Hey," then "Welcome to Ally" (both ReplayPro-Headline, except
+  /// "Ally" itself, in its bespoke `allyText` style, YESEVA_ONE.REGULAR);
+  /// on the OTP step, a single unrelated line ("Verify your email address"),
+  /// no "Ally" wordmark at all. Previously this always showed bare "Ally",
+  /// on both steps, which is neither of RN's two real greetings.
+  Widget _buildGreeting(BuildContext context) {
+    final titleStyle = Theme.of(context).textTheme.displayMedium;
+    if (_step == _Step.otp) {
+      return Text(ref.t('auth.login.otp.title'), style: titleStyle);
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(ref.t('auth.login.greetingLine1'), style: titleStyle),
+        Text.rich(
+          TextSpan(
+            style: titleStyle,
+            children: [
+              TextSpan(text: '${ref.t('auth.login.welcome')} '),
+              TextSpan(
+                text: ref.t('common.appName'),
+                style: TextStyle(fontFamily: AppFonts.yesevaOneRegular),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
