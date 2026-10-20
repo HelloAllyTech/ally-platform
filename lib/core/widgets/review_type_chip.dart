@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
+import '../theme/app_fonts.dart';
 import '../theme/app_radius.dart';
 
 enum ReviewType { simulation, scribe }
@@ -32,7 +33,13 @@ class ReviewTypeChip extends StatelessWidget {
       decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(AppRadius.lg)),
       child: Text(
         label,
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: fg),
+        // RN's styles.chipText: IBM_PLEX_SERIF.MEDIUM + typography.body.small
+        // — bodySmall already matches the size/line-height/letter-spacing
+        // exactly, but defaults to the Regular weight, not Medium.
+        style: Theme.of(context)
+            .textTheme
+            .bodySmall
+            ?.copyWith(color: fg, fontFamily: AppFonts.ibmPlexSerifMedium),
       ),
     );
   }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../theme/app_colors.dart';
+import '../theme/app_fonts.dart';
 
 /// Direct port of ally-mobile (React Native)'s `src/screens/CallLog/
 /// components/StatusBadge/StatusBadge.tsx` + `SUMMARY_STATUS_CONFIG` —
@@ -42,9 +43,22 @@ class StatusBadge extends StatelessWidget {
     ChatSummaryStatus.failed: (bg: AppColors.coralPink, dot: AppColors.brickRed, label: 'Error'),
   };
 
+  // RN's own styles.statusText: `fontFamily: IBM_PLEX_SERIF.REGULAR` +
+  // `typography.label.micro` (fontSize 9, lineHeight 10, letterSpacing
+  // 0.09) — a bespoke size with no equivalent Flutter TextTheme slot
+  // (labelSmall is 11/16/0.5), so this is its own explicit style rather
+  // than a theme-slot copyWith.
+  static const _textStyle = TextStyle(
+    fontFamily: AppFonts.ibmPlexSerifRegular,
+    fontSize: 9,
+    height: 10 / 9,
+    letterSpacing: 0.09,
+    color: AppColors.highEmphasis,
+  );
+
   @override
   Widget build(BuildContext context) {
-    final textStyle = Theme.of(context).textTheme.labelSmall?.copyWith(color: AppColors.highEmphasis);
+    const textStyle = _textStyle;
 
     if (status == ChatSummaryStatus.noAudio) {
       return Container(

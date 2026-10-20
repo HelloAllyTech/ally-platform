@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
+import '../theme/app_fonts.dart';
 
 /// Direct port of ally-mobile (React Native)'s `src/components/TabView/
 /// TabView.tsx` — an in-screen segmented-control tab switcher (distinct
@@ -48,7 +49,12 @@ class AppTabView<T> extends StatelessWidget {
                   child: Text(
                     tab.label,
                     textAlign: TextAlign.center,
+                    // RN's styles.tabText: IBM_PLEX_SERIF.REGULAR +
+                    // typography.label.medium — labelMedium already matches
+                    // the size/line-height/letter-spacing exactly, but
+                    // defaults to Roboto, not IBMPlexSerif.
                     style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                          fontFamily: AppFonts.ibmPlexSerifRegular,
                           color: tab.key == activeTab
                               ? AppColors.highEmphasis
                               : AppColors.mediumEmphasis,

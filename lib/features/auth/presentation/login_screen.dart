@@ -8,6 +8,7 @@ import '../../../core/auth/auth_state.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_fonts.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_text_field.dart';
 import '../data/auth_repository.dart';
@@ -198,7 +199,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(ref.t('common.appName'), style: Theme.of(context).textTheme.displayMedium),
+              // RN's SplashScreen renders the app name in its bespoke
+              // `allyText` style (YESEVA_ONE.REGULAR, nested inside the
+              // surrounding ReplayPro-Headline greeting) — not the
+              // ReplayPro Headline displayMedium default.
+              Text(
+                ref.t('common.appName'),
+                style: Theme.of(context)
+                    .textTheme
+                    .displayMedium
+                    ?.copyWith(fontFamily: AppFonts.yesevaOneRegular),
+              ),
               const SizedBox(height: 24),
               if (_step == _Step.email) ...[
                 Align(

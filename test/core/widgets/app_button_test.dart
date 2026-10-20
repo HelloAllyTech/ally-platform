@@ -1,3 +1,4 @@
+import 'package:ally_mobile_flutter/core/theme/app_fonts.dart';
 import 'package:ally_mobile_flutter/core/widgets/app_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -5,6 +6,18 @@ import 'package:flutter_test/flutter_test.dart';
 Widget _wrap(Widget child) => MaterialApp(home: Scaffold(body: child));
 
 void main() {
+  testWidgets(
+    'renders the label in Roboto, not the inherited bodyMedium serif '
+    '(RN\'s Button.tsx has no fontFamily override, so it renders in the '
+    'platform default — Roboto on Android)',
+    (tester) async {
+      await tester.pumpWidget(_wrap(AppButton(label: 'Save', onPressed: () {})));
+
+      final text = tester.widget<Text>(find.text('Save'));
+      expect(text.style?.fontFamily, AppFonts.robotoRegular);
+    },
+  );
+
   testWidgets('renders the label and calls onPressed when tapped', (tester) async {
     var tapped = false;
     await tester.pumpWidget(

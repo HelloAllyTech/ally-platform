@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
+import '../theme/app_fonts.dart';
 import '../theme/app_radius.dart';
 
 /// Direct port of ally-mobile (React Native)'s `src/components/Button/
@@ -94,10 +95,20 @@ class AppButton extends StatelessWidget {
                         child: Text(
                           label,
                           overflow: TextOverflow.ellipsis,
+                          // RN's Button.tsx uses `typography.body.medium`
+                          // (matches bodyMedium's size/line-height/letter-
+                          // spacing exactly) with no fontFamily override,
+                          // so it renders in the platform default (Roboto
+                          // on Android) — `fontFamily: null` in a copyWith
+                          // call does NOT clear a field, it means "keep the
+                          // existing value" (`fontFamily ?? this.fontFamily`
+                          // in copyWith's own implementation), so that
+                          // previously silently kept bodyMedium's
+                          // IBMPlexSerif instead of resetting to Roboto.
                           style: Theme.of(context)
                               .textTheme
                               .bodyMedium
-                              ?.copyWith(color: textColor, fontFamily: null),
+                              ?.copyWith(color: textColor, fontFamily: AppFonts.robotoRegular),
                         ),
                       ),
                       if (iconRight != null) ...[const SizedBox(width: 8), iconRight!],

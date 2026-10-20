@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/theme/app_fonts.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/tab_screen_header.dart';
 import '../data/simulations_repository.dart';
@@ -26,8 +27,14 @@ class SimulationsScreen extends ConsumerWidget {
             subtitle: ref.t('nav.tabs.learn'),
             italicSubtitle: true,
             trailing: creditsAsync.when(
+              // RN's styles.creditText: display.small size, but
+              // IBM_PLEX_SERIF.MEDIUM family — not the ambient default.
               data: (credits) => Text(
                 ref.t('simulations.creditsRemaining', {'count': credits.remaining}),
+                style: Theme.of(context)
+                    .textTheme
+                    .displaySmall
+                    ?.copyWith(fontFamily: AppFonts.ibmPlexSerifMedium),
               ),
               loading: () => const SizedBox.shrink(),
               error: (_, _) => const SizedBox.shrink(),

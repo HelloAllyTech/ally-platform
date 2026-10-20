@@ -11,6 +11,7 @@ import '../auth/auth_state.dart';
 import '../localization/translate_ref.dart';
 import '../permissions/user_permissions.dart';
 import '../theme/app_colors.dart';
+import '../theme/app_fonts.dart';
 
 /// Port of ally-mobile (React Native)'s `CustomDrawerContent.tsx` (exported
 /// there as `DrawerContent`) — org logo, user profile block, simulation
@@ -68,7 +69,13 @@ class AppDrawer extends ConsumerWidget {
                             user.name,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.bodyLarge,
+                            // RN's styles.name: body.large size, but
+                            // REPLAY_PRO.HEADLINE family — not bodyLarge's
+                            // IBMPlexSerif-Regular default.
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyLarge
+                                ?.copyWith(fontFamily: AppFonts.replayProHeadline),
                           ),
                           if (user.email.isNotEmpty)
                             Text(
@@ -221,7 +228,15 @@ class _CreditsSection extends ConsumerWidget {
             children: [
               SvgPicture.asset('assets/icons/bolt.svg', width: 16, height: 16),
               const SizedBox(width: 8),
-              Text(ref.t('user.creditUsage'), style: Theme.of(context).textTheme.labelLarge),
+              // RN's styles.creditTitle: label.large size, but
+              // IBM_PLEX_SERIF.REGULAR family — not labelLarge's Roboto.
+              Text(
+                ref.t('user.creditUsage'),
+                style: Theme.of(context)
+                    .textTheme
+                    .labelLarge
+                    ?.copyWith(fontFamily: AppFonts.ibmPlexSerifRegular),
+              ),
             ],
           ),
           const SizedBox(height: 8),
@@ -232,8 +247,14 @@ class _CreditsSection extends ConsumerWidget {
                 TextSpan(
                   children: [
                     TextSpan(
+                      // RN's styles.creditConsumedText: body.large size, but
+                      // IBM_PLEX_SERIF.MEDIUM family — not bodyLarge's
+                      // Regular weight.
                       text: '${credits.consumedCredits}',
-                      style: Theme.of(context).textTheme.bodyLarge,
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodyLarge
+                          ?.copyWith(fontFamily: AppFonts.ibmPlexSerifMedium),
                     ),
                     TextSpan(
                       text: '/${credits.creditLimit}',
