@@ -13,6 +13,7 @@ class UserPermissions {
   static const viewCounselorChat = 'view:chat:counselor';
   static const viewMessages = 'view:messages';
   static const archiveCallLog = 'archive:call-log';
+  static const viewTags = 'view:tags';
 
   // === SUMMARY ===
   static const editSummary = 'edit:summary';

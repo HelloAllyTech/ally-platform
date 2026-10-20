@@ -130,6 +130,194 @@ void main() {
       expect(logs.single.score, isNull);
       expect(logs.single.endedAt, '');
     });
+
+    test('parses details.summary.tags into CallTag, clamping out-of-range ratings', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>(
+          '/chats/call-logs',
+          queryParameters: any(named: 'queryParameters'),
+        ),
+      ).thenAnswer(
+        (_) async => _response({
+          'data': [
+            {
+              'id': 3,
+              'startedAt': '2026-01-01T00:00:00Z',
+              'status': 'generated',
+              'details': {
+                'summary': {
+                  'tags': [
+                    {'tag': 'anxious', 'positivity_rating': 1},
+                    // AI sometimes emits fractional/out-of-range values —
+                    // round-then-clamp to the nearest valid 1-5 key.
+                    {'tag': 'hopeful', 'positivity_rating': 0.3},
+                    {'tag': 'resolved', 'positivity_rating': 9},
+                  ],
+                },
+              },
+            },
+          ],
+        }),
+      );
+
+      final logs = await repository.getCallLogs();
+
+      final tags = logs.single.tags;
+      expect(tags, hasLength(3));
+      expect(tags[0].tag, 'anxious');
+      expect(tags[0].positivityRating, 1);
+      expect(tags[1].tag, 'hopeful');
+      expect(tags[1].positivityRating, 1);
+      expect(tags[2].tag, 'resolved');
+      expect(tags[2].positivityRating, 5);
+    });
+
+    test('a log with no details/summary/tags at all parses tags as empty', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>(
+          '/chats/call-logs',
+          queryParameters: any(named: 'queryParameters'),
+        ),
+      ).thenAnswer(
+        (_) async => _response({
+          'data': [
+            {'id': 4, 'startedAt': '2026-01-01T00:00:00Z', 'status': 'generated'},
+          ],
+        }),
+      );
+
+      final logs = await repository.getCallLogs();
+
+      expect(logs.single.tags, isEmpty);
+    });
+
+    test('forwards a non-empty CallLogFilterState as comma-joined query params', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>(
+          '/chats/call-logs',
+          queryParameters: {
+            'limit': 25,
+            'offset': 0,
+            'archive': false,
+            'startDate': '2026-01-01',
+            'endDate': '2026-01-31',
+            'minDuration': 5.0,
+            'maxDuration': 30.0,
+            'tags': 'anxious,hopeful',
+            'mode': 'SCRIBE,DICTATION',
+            'status': 'SUCCESS,FAILED',
+            'source': 'LIVE',
+          },
+        ),
+      ).thenAnswer((_) async => _response({'data': <dynamic>[]}));
+
+      await repository.getCallLogs(
+        filter: const CallLogFilterState(
+          startDate: '2026-01-01',
+          endDate: '2026-01-31',
+          minDuration: 5,
+          maxDuration: 30,
+          tags: ['anxious', 'hopeful'],
+          modes: ['SCRIBE', 'DICTATION'],
+          statuses: ['SUCCESS', 'FAILED'],
+          sources: ['LIVE'],
+        ),
+      );
+
+      verify(
+        () => dio.get<Map<String, dynamic>>(
+          '/chats/call-logs',
+          queryParameters: {
+            'limit': 25,
+            'offset': 0,
+            'archive': false,
+            'startDate': '2026-01-01',
+            'endDate': '2026-01-31',
+            'minDuration': 5.0,
+            'maxDuration': 30.0,
+            'tags': 'anxious,hopeful',
+            'mode': 'SCRIBE,DICTATION',
+            'status': 'SUCCESS,FAILED',
+            'source': 'LIVE',
+          },
+        ),
+      ).called(1);
+    });
+  });
+
+  group('getAllTags', () {
+    test('hits /chats/tags and returns the tag-name list', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>(
+          '/chats/tags',
+          queryParameters: <String, dynamic>{},
+        ),
+      ).thenAnswer(
+        (_) async => _response({
+          'data': ['anxious', 'hopeful', 'resolved'],
+        }),
+      );
+
+      final tags = await repository.getAllTags();
+
+      expect(tags, ['anxious', 'hopeful', 'resolved']);
+    });
+
+    test('forwards a search term', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>(
+          '/chats/tags',
+          queryParameters: {'search': 'anx'},
+        ),
+      ).thenAnswer((_) async => _response({'data': <dynamic>[]}));
+
+      await repository.getAllTags(search: 'anx');
+
+      verify(
+        () => dio.get<Map<String, dynamic>>(
+          '/chats/tags',
+          queryParameters: {'search': 'anx'},
+        ),
+      ).called(1);
+    });
+
+    test('returns an empty list when data is missing', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>(
+          '/chats/tags',
+          queryParameters: any(named: 'queryParameters'),
+        ),
+      ).thenAnswer((_) async => _response({}));
+
+      expect(await repository.getAllTags(), isEmpty);
+    });
+  });
+
+  group('CallLogFilterState', () {
+    test('isEmpty / activeCount reflect which fields are set', () {
+      const empty = CallLogFilterState();
+      expect(empty.isEmpty, isTrue);
+      expect(empty.activeCount, 0);
+
+      const partial = CallLogFilterState(minDuration: 5, tags: ['anxious']);
+      expect(partial.isEmpty, isFalse);
+      expect(partial.activeCount, 2);
+    });
+
+    test('copyWith overrides only the given fields', () {
+      const original = CallLogFilterState(startDate: '2026-01-01', tags: ['anxious']);
+
+      final updated = original.copyWith(endDate: '2026-01-31');
+
+      expect(updated.startDate, '2026-01-01');
+      expect(updated.endDate, '2026-01-31');
+      expect(updated.tags, ['anxious']);
+    });
+
+    test('toQueryParameters omits every field left unset', () {
+      const empty = CallLogFilterState();
+      expect(empty.toQueryParameters(), isEmpty);
+    });
   });
 
   group('getSimulationLogs', () {

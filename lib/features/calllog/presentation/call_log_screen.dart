@@ -11,6 +11,8 @@ import '../../../core/widgets/app_tab_view.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../../../core/widgets/tab_screen_header.dart';
 import '../data/call_log_repository.dart';
+import 'call_log_filter_sheet.dart';
+import 'call_tag_chip.dart';
 
 enum _LogTab { real, simulation }
 
@@ -26,8 +28,10 @@ enum _LogTab { real, simulation }
 /// recording is gated on `START_MICROPHONE_CHAT`/`START_CLOUD_TELEPHONY_CHAT`.
 ///
 /// Not ported: the real `StartSessionModal`'s "Create Note" manual-note
-/// path (no note-creation flow exists yet in this app), the call-log
-/// filter sheet, and the positivity `Tag` chips on expanded rows.
+/// path (no note-creation flow exists yet in this app). The filter sheet
+/// (`CallLogFilterSheet`) is ported for the built-in filters only — RN's
+/// dynamic, tenant-configured custom-field filters need a
+/// `CustomFieldDefinition` catalog client this app doesn't have yet.
 class CallLogScreen extends ConsumerStatefulWidget {
   const CallLogScreen({super.key});
 
@@ -56,6 +60,7 @@ class _CallLogScreenState extends ConsumerState<CallLogScreen> {
     final hasArchive = permissions.contains(UserPermissions.archiveCallLog);
     final hasChatDetails = permissions.contains(UserPermissions.viewChatDetails);
     final hasScenarioDetails = permissions.contains(UserPermissions.viewScenarioSessionDetails);
+    final hasTags = permissions.contains(UserPermissions.viewTags);
     final canStartCall = permissions.contains(UserPermissions.startMicrophoneChat) ||
         permissions.contains(UserPermissions.startCloudTelephonyChat);
 
@@ -72,6 +77,7 @@ class _CallLogScreenState extends ConsumerState<CallLogScreen> {
     final showTabs = hasReal && hasSimulation && !_isViewingArchive;
     final showArchiveAction =
         hasArchive && !_isViewingArchive && _activeTab == _LogTab.real;
+    final showFilterAction = hasReal && _activeTab == _LogTab.real;
 
     return Scaffold(
       body: Stack(
@@ -87,14 +93,22 @@ class _CallLogScreenState extends ConsumerState<CallLogScreen> {
                         onPressed: () => setState(() => _isViewingArchive = false),
                       )
                     : null,
-                trailing: showArchiveAction
-                    ? PopupMenuButton<void>(
-                        icon: const Icon(Icons.more_vert),
-                        itemBuilder: (context) => [
-                          PopupMenuItem(
-                            onTap: () => setState(() => _isViewingArchive = true),
-                            child: Text(ref.t('calls.menu.archives')),
-                          ),
+                trailing: (showFilterAction || showArchiveAction)
+                    ? Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (showFilterAction)
+                            _FilterButton(hasTagsPermission: hasTags),
+                          if (showArchiveAction)
+                            PopupMenuButton<void>(
+                              icon: const Icon(Icons.more_vert),
+                              itemBuilder: (context) => [
+                                PopupMenuItem(
+                                  onTap: () => setState(() => _isViewingArchive = true),
+                                  child: Text(ref.t('calls.menu.archives')),
+                                ),
+                              ],
+                            ),
                         ],
                       )
                     : null,
@@ -141,6 +155,43 @@ class _CallLogScreenState extends ConsumerState<CallLogScreen> {
             ),
         ],
       ),
+    );
+  }
+}
+
+class _FilterButton extends ConsumerWidget {
+  const _FilterButton({required this.hasTagsPermission});
+
+  final bool hasTagsPermission;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final activeCount = ref.watch(callLogFilterProvider).activeCount;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        IconButton(
+          icon: const Icon(Icons.filter_list),
+          onPressed: () =>
+              CallLogFilterSheet.show(context, hasTagsPermission: hasTagsPermission),
+        ),
+        if (activeCount > 0)
+          Positioned(
+            right: 4,
+            top: 4,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              decoration: const BoxDecoration(
+                color: AppColors.primary,
+                shape: BoxShape.circle,
+              ),
+              child: Text(
+                '$activeCount',
+                style: const TextStyle(color: Colors.white, fontSize: 10),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -204,7 +255,20 @@ class _RealLogsList extends ConsumerWidget {
             final row = ListTile(
               leading: SvgPicture.asset('assets/icons/call.svg', width: 24, height: 24),
               title: Text(log.sessionName ?? ref.t('calls.sessionNumber', {'id': log.id})),
-              subtitle: Text(log.startedAt),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(log.startedAt),
+                  if (log.tags.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Wrap(
+                        children: [for (final tag in log.tags) CallTagChip(tag: tag)],
+                      ),
+                    ),
+                ],
+              ),
+              isThreeLine: log.tags.isNotEmpty,
               trailing: StatusBadge(
                 status: chatSummaryStatusFromString(log.status),
                 noAudioLabel: ref.t('calls.status.noAudio'),

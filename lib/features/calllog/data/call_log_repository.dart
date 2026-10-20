@@ -1,7 +1,29 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
+
+/// Mirrors ally-be's `Tag` type (`src/chat/type/call.details.type.ts`) — a
+/// single AI-generated call tag plus its 1-5 positivity rating, read from
+/// `details.summary.tags` (snake_case `positivity_rating`, never camelCased
+/// by the backend even in its otherwise-camelCase summary payload).
+class CallTag {
+  CallTag({required this.tag, required this.positivityRating});
+
+  factory CallTag.fromJson(Map<String, dynamic> json) {
+    // The AI-written rating is expected to be an integer 1-5, but sometimes
+    // emits out-of-range or fractional values (e.g. 0.3) — same real-world
+    // data issue RN's CallLogItem.tsx normalizes for, clamping/rounding to
+    // a valid key rather than letting an unclamped lookup crash the row.
+    final rawRating = (json['positivity_rating'] as num?)?.toDouble() ?? 5;
+    final rating = rawRating.isFinite ? rawRating.round().clamp(1, 5) : 5;
+    return CallTag(tag: json['tag'] as String? ?? '', positivityRating: rating);
+  }
+
+  final String tag;
+  final int positivityRating;
+}
 
 /// Mirrors ally-mobile (React Native)'s `src/screens/CallLog/types/types.ts`
 /// `LogItem` — only the fields this scoped port surfaces.
@@ -13,17 +35,24 @@ class CallLogItem {
     required this.status,
     required this.sessionName,
     required this.score,
+    this.tags = const [],
   });
 
-  factory CallLogItem.fromJson(Map<String, dynamic> json) => CallLogItem(
-    id: (json['id'] as num).toInt(),
-    startedAt: json['startedAt'] as String,
-    endedAt: json['endedAt'] as String? ?? '',
-    status: json['status'] as String,
-    sessionName:
-        (json['metadata'] as Map<String, dynamic>?)?['sessionName'] as String?,
-    score: (json['score'] as num?)?.toDouble(),
-  );
+  factory CallLogItem.fromJson(Map<String, dynamic> json) {
+    final details = json['details'] as Map<String, dynamic>?;
+    final summary = details?['summary'] as Map<String, dynamic>?;
+    final rawTags = summary?['tags'] as List<dynamic>? ?? [];
+    return CallLogItem(
+      id: (json['id'] as num).toInt(),
+      startedAt: json['startedAt'] as String,
+      endedAt: json['endedAt'] as String? ?? '',
+      status: json['status'] as String,
+      sessionName:
+          (json['metadata'] as Map<String, dynamic>?)?['sessionName'] as String?,
+      score: (json['score'] as num?)?.toDouble(),
+      tags: rawTags.map((t) => CallTag.fromJson(t as Map<String, dynamic>)).toList(),
+    );
+  }
 
   final int id;
   final String startedAt;
@@ -31,6 +60,7 @@ class CallLogItem {
   final String status;
   final String? sessionName;
   final double? score;
+  final List<CallTag> tags;
 }
 
 /// The "Role play" sub-tab's row shape — mirrors a `/learn/scenario-sessions`
@@ -137,6 +167,125 @@ class CallSummaryDetails {
   String? get keyConcerns => fields['keyConcerns'] as String?;
 }
 
+/// Mirrors ally-mobile (React Native)'s `CallLogFilterSheet`'s built-in
+/// (non-custom-field) filters — date range, duration range, and the
+/// mode/status/channel/tags multiselects. The dynamic, tenant-configured
+/// custom-field filters (`fieldFilters`) aren't ported: those depend on a
+/// separate admin-defined `CustomFieldDefinition` catalog this app doesn't
+/// have a client for yet.
+class CallLogFilterState {
+  const CallLogFilterState({
+    this.startDate,
+    this.endDate,
+    this.minDuration,
+    this.maxDuration,
+    this.tags = const [],
+    this.modes = const [],
+    this.statuses = const [],
+    this.sources = const [],
+  });
+
+  final String? startDate;
+  final String? endDate;
+  final double? minDuration;
+  final double? maxDuration;
+  final List<String> tags;
+
+  /// `SCRIBE` | `DICTATION`.
+  final List<String> modes;
+
+  /// `SUCCESS` | `PROCESSING` | `FAILED` | `NO_AUDIO`.
+  final List<String> statuses;
+
+  /// `LIVE` | `UPLOAD`.
+  final List<String> sources;
+
+  bool get isEmpty =>
+      startDate == null &&
+      endDate == null &&
+      minDuration == null &&
+      maxDuration == null &&
+      tags.isEmpty &&
+      modes.isEmpty &&
+      statuses.isEmpty &&
+      sources.isEmpty;
+
+  /// Drives the badge on CallLogScreen's filter button — one count per
+  /// non-empty field, matching RN's `countActiveFilters`.
+  int get activeCount => [
+    startDate,
+    endDate,
+    minDuration,
+    maxDuration,
+  ].where((v) => v != null).length +
+      [tags, modes, statuses, sources].where((v) => v.isNotEmpty).length;
+
+  CallLogFilterState copyWith({
+    String? startDate,
+    String? endDate,
+    double? minDuration,
+    double? maxDuration,
+    List<String>? tags,
+    List<String>? modes,
+    List<String>? statuses,
+    List<String>? sources,
+  }) {
+    return CallLogFilterState(
+      startDate: startDate ?? this.startDate,
+      endDate: endDate ?? this.endDate,
+      minDuration: minDuration ?? this.minDuration,
+      maxDuration: maxDuration ?? this.maxDuration,
+      tags: tags ?? this.tags,
+      modes: modes ?? this.modes,
+      statuses: statuses ?? this.statuses,
+      sources: sources ?? this.sources,
+    );
+  }
+
+  /// Builds `getCallLogs`' query-parameter map — comma-joined for the
+  /// multiselect fields, matching the backend's `.split(',')` parsing
+  /// exactly (`chat.repository.ts`'s `applyTagFilters`/
+  /// `applyModeStatusSourceFilters`).
+  Map<String, dynamic> toQueryParameters() => {
+    'startDate': ?startDate,
+    'endDate': ?endDate,
+    'minDuration': ?minDuration,
+    'maxDuration': ?maxDuration,
+    if (tags.isNotEmpty) 'tags': tags.join(','),
+    if (modes.isNotEmpty) 'mode': modes.join(','),
+    if (statuses.isNotEmpty) 'status': statuses.join(','),
+    if (sources.isNotEmpty) 'source': sources.join(','),
+  };
+
+  // Structural equality, not identity — a runtime `copyWith()` result should
+  // compare equal to another instance with the same field values (e.g. so
+  // Riverpod's default `updateShouldNotify` and mocktail's argument matching
+  // both behave sensibly), unlike the default `Object.==`.
+  @override
+  bool operator ==(Object other) =>
+      other is CallLogFilterState &&
+      startDate == other.startDate &&
+      endDate == other.endDate &&
+      minDuration == other.minDuration &&
+      maxDuration == other.maxDuration &&
+      listEquals(tags, other.tags) &&
+      listEquals(modes, other.modes) &&
+      listEquals(statuses, other.statuses) &&
+      listEquals(sources, other.sources);
+
+  @override
+  int get hashCode => Object.hash(
+    startDate,
+    endDate,
+    minDuration,
+    maxDuration,
+    Object.hashAll(tags),
+    Object.hashAll(modes),
+    Object.hashAll(statuses),
+    Object.hashAll(sources),
+  );
+}
+
 /// Ported from ally-mobile (React Native)'s `src/services/callsApi.ts` +
 /// `callTranscriptApi.ts` + `callSummaryApi.ts`, including the full
 /// structured clinical summary form's get/update contract (see
@@ -152,15 +301,33 @@ class CallLogRepository {
     int limit = 25,
     int offset = 0,
     bool archive = false,
+    CallLogFilterState filter = const CallLogFilterState(),
   }) async {
     final response = await _dio.get<Map<String, dynamic>>(
       '/chats/call-logs',
-      queryParameters: {'limit': limit, 'offset': offset, 'archive': archive},
+      queryParameters: {
+        'limit': limit,
+        'offset': offset,
+        'archive': archive,
+        ...filter.toQueryParameters(),
+      },
     );
     final data = response.data?['data'] as List<dynamic>? ?? [];
     return data
         .map((e) => CallLogItem.fromJson(e as Map<String, dynamic>))
         .toList();
+  }
+
+  /// Tenant-wide distinct tag names, for the filter sheet's Tags multiselect
+  /// options — mirrors `GET /chats/tags` (gated on `VIEW_TAGS`), a separate
+  /// endpoint from the per-call tags embedded in each log's own summary.
+  Future<List<String>> getAllTags({String? search}) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/chats/tags',
+      queryParameters: {'search': ?search},
+    );
+    final data = response.data?['data'] as List<dynamic>? ?? [];
+    return data.cast<String>();
   }
 
   /// Mirrors ally-mobile (React Native)'s `useLazyGetSimulationLogsQuery` —
@@ -222,12 +389,40 @@ final callLogRepositoryProvider = Provider<CallLogRepository>((ref) {
   return CallLogRepository(ref.watch(apiClientProvider));
 });
 
+/// The filter sheet's currently-applied state. Riverpod 3.x has no
+/// `StateProvider` (removed along with `StateNotifier`) — a one-field
+/// `Notifier` is the idiomatic replacement, same pattern as
+/// `leaderboard_repository.dart`'s `LeaderboardWindowController`.
+/// `realCallLogsProvider`/`archivedCallLogsProvider` (both `watch` it)
+/// automatically refetch when a new filter is applied.
+class CallLogFilterController extends Notifier<CallLogFilterState> {
+  @override
+  CallLogFilterState build() => const CallLogFilterState();
+
+  void apply(CallLogFilterState filter) => state = filter;
+
+  void clear() => state = const CallLogFilterState();
+}
+
+final callLogFilterProvider =
+    NotifierProvider<CallLogFilterController, CallLogFilterState>(
+  CallLogFilterController.new,
+);
+
 final realCallLogsProvider = FutureProvider<List<CallLogItem>>((ref) {
-  return ref.watch(callLogRepositoryProvider).getCallLogs();
+  final filter = ref.watch(callLogFilterProvider);
+  return ref.watch(callLogRepositoryProvider).getCallLogs(filter: filter);
 });
 
 final archivedCallLogsProvider = FutureProvider<List<CallLogItem>>((ref) {
-  return ref.watch(callLogRepositoryProvider).getCallLogs(archive: true);
+  final filter = ref.watch(callLogFilterProvider);
+  return ref
+      .watch(callLogRepositoryProvider)
+      .getCallLogs(archive: true, filter: filter);
+});
+
+final callLogTagOptionsProvider = FutureProvider<List<String>>((ref) {
+  return ref.watch(callLogRepositoryProvider).getAllTags();
 });
 
 final simulationLogsProvider = FutureProvider<List<SimulationLogItem>>((ref) {
