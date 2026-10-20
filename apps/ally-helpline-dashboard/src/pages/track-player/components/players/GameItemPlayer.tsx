@@ -21,7 +21,7 @@ const gameUrl = (key: TrackGameKey) => `/games/${key.toLowerCase()}/index.html`;
  * it is given, so this is the one thing about a game the host has to know: the
  * runner is a 150px canvas, a board game needs room for a board.
  */
-const FRAME_HEIGHT: Record<TrackGameKey, string> = {
+const FRAME_HEIGHT: Partial<Record<TrackGameKey, string>> = {
   [TrackGameKey.TREX_RUNNER]: "h-[200px] sm:h-[280px]",
   [TrackGameKey.TIC_TAC_TOE]: "h-[420px] sm:h-[440px]",
   [TrackGameKey.MEMORY_MATCH]: "h-[380px] sm:h-[470px]",
@@ -211,6 +211,27 @@ export const GameItemPlayer: FC<GameItemPlayerProps> = ({ payload, itemId, onCom
     return () => window.removeEventListener("message", onMessage);
   }, [frameStrings, handleRunFinished]);
 
+  const heightClass = FRAME_HEIGHT[payload.gameKey];
+
+  if (!heightClass) {
+    return (
+      <div className="flex h-full min-h-0 flex-col">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6">
+          <div className="mx-auto flex max-w-[68ch] flex-col gap-4">
+            <div className="flex flex-col items-center justify-center py-12 px-6 rounded-xl border border-border-light bg-white text-center">
+              <NoResults className="w-16 h-16 text-typography-300 mb-4" />
+              <p className="text-lg font-medium text-typography-900 mb-2">Mobile-only activity</p>
+              <p className="text-sm text-typography-600">
+                This activity is designed for the Ally mobile app. You can skip it here and continue
+                with the rest of the course.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6">
@@ -221,7 +242,7 @@ export const GameItemPlayer: FC<GameItemPlayerProps> = ({ payload, itemId, onCom
 
           <div className="overflow-hidden rounded-xl border border-border-light bg-white">
             {frameFailed ? (
-              <div className={`flex items-center justify-center ${FRAME_HEIGHT[payload.gameKey]}`}>
+              <div className={`flex items-center justify-center ${heightClass}`}>
                 <FallbackUI
                   icon={<NoResults />}
                   mainMessage={t("tracks2.game.loadFailed")}
@@ -238,7 +259,7 @@ export const GameItemPlayer: FC<GameItemPlayerProps> = ({ payload, itemId, onCom
                 // No allow-same-origin: the bundle needs no storage or cookies,
                 // and without it the frame cannot touch anything of ours.
                 sandbox="allow-scripts"
-                className={`block w-full border-0 ${FRAME_HEIGHT[payload.gameKey]}`}
+                className={`block w-full border-0 ${heightClass}`}
                 // Reliable only for a genuine load failure on the initial
                 // document (e.g. a 404 on the bundle) — an in-app JS error
                 // inside the sandboxed frame won't trigger this. Still

@@ -1,5 +1,6 @@
 import {
   DEFAULT_ANNOTATION_SETTINGS,
+  DEFAULT_BREATHING_EXERCISE_CONTENT,
   DEFAULT_COMPLETION_CRITERIA,
   DEFAULT_GAME_CONTENT,
   DEFAULT_LIKERT_SCALE_PRESET,
@@ -47,6 +48,7 @@ import {
   StoryBeat,
   TrackDetail,
   TrackFormValues,
+  TrackGameKey,
   TrackItemContent,
   TrackItemFormValue,
   TrackItemType,
@@ -174,6 +176,9 @@ export const createItemFormValueFromTemplate = (template: {
       break;
     case TrackItemType.QUIZ:
       item.quiz = (template.content as QuizContent) ?? base.quiz;
+      break;
+    case TrackItemType.GAME:
+      item.game = (template.content as GameContent) ?? base.game;
       break;
     case TrackItemType.ANNOTATED_ARTIFACT: {
       const annotation = template.content as AnnotationContent | undefined;
@@ -697,6 +702,64 @@ const validateItem = (item: TrackItemFormValue): string[] => {
       }
       break;
     }
+    case TrackItemType.GAME: {
+      if (item.game?.gameKey === TrackGameKey.BREATHING_EXERCISE) {
+        const breathing = item.game.breathingExercise;
+        if (!breathing) {
+          errors.push("Breathing Exercise: configuration is missing");
+          break;
+        }
+        if (
+          typeof breathing.inhale !== "number" ||
+          !Number.isFinite(breathing.inhale) ||
+          breathing.inhale <= 0
+        ) {
+          errors.push("Breathing Exercise: inhale duration must be greater than 0");
+        }
+        if (
+          typeof breathing.holdIn !== "number" ||
+          !Number.isFinite(breathing.holdIn) ||
+          breathing.holdIn < 0
+        ) {
+          errors.push("Breathing Exercise: hold (in) duration cannot be negative");
+        }
+        if (
+          typeof breathing.exhale !== "number" ||
+          !Number.isFinite(breathing.exhale) ||
+          breathing.exhale <= 0
+        ) {
+          errors.push("Breathing Exercise: exhale duration must be greater than 0");
+        }
+        if (
+          typeof breathing.holdOut !== "number" ||
+          !Number.isFinite(breathing.holdOut) ||
+          breathing.holdOut < 0
+        ) {
+          errors.push("Breathing Exercise: hold (out) duration cannot be negative");
+        }
+        if (
+          typeof breathing.cycles !== "number" ||
+          !Number.isInteger(breathing.cycles) ||
+          breathing.cycles <= 0
+        ) {
+          errors.push("Breathing Exercise: cycles must be at least 1");
+        }
+
+        if (isBlank(breathing.inhaleText)) {
+          errors.push("Breathing Exercise: inhale text is required");
+        }
+        if (isBlank(breathing.holdInText)) {
+          errors.push("Breathing Exercise: hold (in) text is required");
+        }
+        if (isBlank(breathing.exhaleText)) {
+          errors.push("Breathing Exercise: exhale text is required");
+        }
+        if (isBlank(breathing.holdOutText)) {
+          errors.push("Breathing Exercise: hold (out) text is required");
+        }
+      }
+      break;
+    }
   }
   return errors;
 };
@@ -721,7 +784,10 @@ export const validateTrackForPublish = (values: TrackFormValues): PublishError[]
   values.sections?.forEach((section, sectionIndex) => {
     const key = sectionNodeKey(sectionIndex);
     if (isBlank(section.title)) {
-      errors.push({ nodeKey: key, message: `Section ${sectionIndex + 1}: title is required` });
+      errors.push({
+        nodeKey: key,
+        message: `Section ${sectionIndex + 1}: title is required`,
+      });
     }
     if (!section.items || section.items.length === 0) {
       errors.push({
@@ -731,7 +797,10 @@ export const validateTrackForPublish = (values: TrackFormValues): PublishError[]
     }
     section.items?.forEach((item, itemIndex) => {
       for (const message of validateItem(item)) {
-        errors.push({ nodeKey: itemNodeKey(sectionIndex, itemIndex), message });
+        errors.push({
+          nodeKey: itemNodeKey(sectionIndex, itemIndex),
+          message,
+        });
       }
     });
   });
@@ -926,6 +995,9 @@ export const serializeItem = (item: TrackItemFormValue, order: number): TrackStr
         ? {
             gameKey: item.game.gameKey,
             ...(isBlank(item.game.intro) ? {} : { intro: item.game.intro }),
+            ...(item.game.gameKey === TrackGameKey.BREATHING_EXERCISE && item.game.breathingExercise
+              ? { breathingExercise: { ...item.game.breathingExercise } }
+              : {}),
           }
         : undefined;
       break;
@@ -1241,6 +1313,13 @@ export const deserializeTrack = (detail: TrackDetail): TrackFormValues => ({
               formItem.game = {
                 gameKey: game?.gameKey ?? DEFAULT_GAME_CONTENT.gameKey,
                 intro: game?.intro ?? "",
+                ...(game?.gameKey === TrackGameKey.BREATHING_EXERCISE
+                  ? {
+                      breathingExercise: game.breathingExercise ?? {
+                        ...DEFAULT_BREATHING_EXERCISE_CONTENT,
+                      },
+                    }
+                  : {}),
               };
               break;
             }

@@ -10,6 +10,7 @@ import {
   AnnotationArtifactKind,
   AnnotationRevealKey,
   AnnotationSettings,
+  BreathingExerciseContent,
   CompletionCriteria,
   GameContent,
   QuizQuestionType,
@@ -259,6 +260,18 @@ export const TRACK_GAME_CATALOG: Array<{
 export const DEFAULT_GAME_CONTENT: GameContent = {
   gameKey: TrackGameKey.TREX_RUNNER,
   intro: "",
+};
+
+export const DEFAULT_BREATHING_EXERCISE_CONTENT: BreathingExerciseContent = {
+  inhale: 4,
+  holdIn: 4,
+  exhale: 4,
+  holdOut: 4,
+  cycles: 4,
+  inhaleText: "Inhale",
+  holdInText: "Hold",
+  exhaleText: "Exhale",
+  holdOutText: "Hold",
 };
 
 /* ---- Annotation (ANNOTATED_ARTIFACT) ---- */
