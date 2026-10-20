@@ -22,6 +22,7 @@ import {
 } from '@/hooks';
 import {
   AchievementsScreen,
+  BreathingExerciseScreen,
   BreathingScreen,
   BugReportScreen,
   CallSummaryScreen,
@@ -411,6 +412,11 @@ const NavigationContent = ({
           <Stack.Screen
             name={SCREEN_NAMES.BREATHING}
             component={BreathingScreen}
+          />
+          <Stack.Screen
+            name={SCREEN_NAMES.BREATHING_EXERCISE}
+            component={BreathingExerciseScreen}
+            options={{headerShown: false, animation: 'fade'}}
           />
           <Stack.Screen
             name={SCREEN_NAMES.SIMULATIONS}
