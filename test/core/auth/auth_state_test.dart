@@ -8,6 +8,11 @@ import 'package:ally_mobile_flutter/core/network/token_storage.dart';
 class MockTokenStorage extends Mock implements TokenStorage {}
 
 void main() {
+  // `sessionExpired()` reads `rootScaffoldMessengerKey.currentState`, which
+  // needs a binding instance even just to report "no state" — these plain
+  // `test()`s (no `testWidgets`/`pumpWidget`) never initialize one otherwise.
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   late MockTokenStorage tokenStorage;
   late ProviderContainer container;
 
@@ -96,6 +101,27 @@ void main() {
       expect(container.read(authControllerProvider).isAuthenticated, isTrue);
 
       await container.read(authControllerProvider.notifier).logout();
+
+      expect(container.read(authControllerProvider).isAuthenticated, isFalse);
+      verify(() => tokenStorage.clear()).called(1);
+    });
+  });
+
+  group('AuthController.sessionExpired', () {
+    test('clears storage and flips state to unauthenticated, same as logout', () async {
+      when(() => tokenStorage.accessToken).thenAnswer((_) async => 'stored-access-token');
+      when(() => tokenStorage.clear()).thenAnswer((_) async {});
+
+      container.read(authControllerProvider);
+      await Future<void>.delayed(Duration.zero);
+      expect(container.read(authControllerProvider).isAuthenticated, isTrue);
+
+      // No MaterialApp/ScaffoldMessenger is mounted in this container-only
+      // test, so `rootScaffoldMessengerKey.currentState` is null — the
+      // snackbar call is a guarded no-op here; see
+      // session_expired_snackbar_test.dart for the widget-level check that
+      // it actually shows one when a ScaffoldMessenger exists.
+      await container.read(authControllerProvider.notifier).sessionExpired();
 
       expect(container.read(authControllerProvider).isAuthenticated, isFalse);
       verify(() => tokenStorage.clear()).called(1);

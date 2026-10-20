@@ -26,7 +26,7 @@ final apiClientProvider = Provider<Dio>((ref) {
     AuthInterceptor(
       refreshDio: refreshDio,
       tokenStorage: tokenStorage,
-      onUnrecoverable: () => ref.read(authControllerProvider.notifier).logout(),
+      onUnrecoverable: () => ref.read(authControllerProvider.notifier).sessionExpired(),
     ),
   );
   return dio;

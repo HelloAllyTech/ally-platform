@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/localization/localization_controller.dart';
 import 'core/routing/app_router.dart';
 import 'core/theme/app_theme.dart';
+import 'core/widgets/root_scaffold_messenger.dart';
 
 void main() {
   runApp(const ProviderScope(child: AllyApp()));
@@ -27,6 +28,7 @@ class AllyApp extends ConsumerWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       routerConfig: router,
+      scaffoldMessengerKey: rootScaffoldMessengerKey,
       // Flutter's own built-in widget strings (date pickers, dialog button
       // labels) localized across the same 5 languages the app's own
       // content supports — separate from this app's own translation

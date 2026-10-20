@@ -1,15 +1,17 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../localization/localization_controller.dart';
 import '../network/token_storage.dart';
+import '../widgets/root_scaffold_messenger.dart';
 
 /// Minimal auth session state for Phase 0. Mirrors the one thing
 /// `userSlice.handleLogout` + the API layer's `baseQueryWithReauth` actually
 /// need from the rest of the app: a single `isAuthenticated` flag the router
-/// redirects on, and a `logout()` the network layer can call when a refresh
-/// irrecoverably fails. Session-expired messaging (RN's `showToast` call in
-/// `handleUserLogout`) is intentionally not wired yet — that needs this
-/// app's real toast/snackbar pattern decided first, tracked for a follow-up
-/// once Phase 0's UI shell exists.
+/// redirects on, a `logout()` for a deliberate, user-initiated sign-out, and
+/// `sessionExpired()` for when the network layer gives up on a refresh —
+/// same split RN has (`handleLogout` vs. `handleUserLogout`'s extra
+/// `showToast` call), now that the UI shell this needed exists.
 class AuthState {
   const AuthState({required this.isAuthenticated});
 
@@ -58,6 +60,25 @@ class AuthController extends Notifier<AuthState> {
   Future<void> logout() async {
     await _tokenStorage.clear();
     state = const AuthState(isAuthenticated: false);
+  }
+
+  /// Called by the network layer when a 401 can't be recovered from (no
+  /// stored tokens, or the refresh call itself failed) — same trigger as
+  /// RN's `handleUserLogout`. Clears the session exactly like [logout], but
+  /// also surfaces why, via a snackbar, matching RN's `showToast`: without
+  /// this, a screen whose request lost the race would otherwise render the
+  /// raw `DioException` the failed call carried, which is what actually
+  /// reached the user before this existed.
+  Future<void> sessionExpired() async {
+    await _tokenStorage.clear();
+    state = const AuthState(isAuthenticated: false);
+
+    final message =
+        ref.read(localizationControllerProvider).value?.t('auth.sessionExpired') ??
+        'auth.sessionExpired';
+    rootScaffoldMessengerKey.currentState
+      ?..clearSnackBars()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 }
 
