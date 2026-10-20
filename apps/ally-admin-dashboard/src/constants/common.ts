@@ -674,6 +674,9 @@ export const ApiEndpoints = {
     // it authorises spend, so it is not folded into a session PATCH.
     SESSION_BUDGET: (id: string) => `/v1/course-copilot/sessions/${id}/budget`,
     SESSION_ARCHIVE: (id: string) => `/v1/course-copilot/sessions/${id}/archive`,
+    // Drafts the story fields of a SAVED course's landing page. Returns the draft; saves nothing.
+    TRACK_LANDING_PAGE_DRAFT: (trackId: string) =>
+      `/v1/course-copilot/tracks/${trackId}/landing-page-draft`,
   },
   WHATSAPP_BOT: {
     // Corpus (ally-be src/knowledge-base)
