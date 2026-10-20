@@ -3,15 +3,19 @@ import { FC, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { CustomImage } from "@ally-ui-mono/ui-shared";
-import { useGenerateTrackCoverImageMutation } from "@api";
+import { useLazyGetTrackCoverImageJobQuery, useStartTrackCoverImageJobMutation } from "@api";
 import { Close } from "@assets";
 import { Button } from "@components";
 import { ButtonVariant } from "@components/types";
 import { KeyboardKeys } from "@constants";
+import {
+  IMAGE_GENERATION_FAILED_MESSAGE,
+  ImageGenerationError,
+  useImageGenerationJob,
+} from "@hooks";
+import { GenerateTrackCoverImageInput } from "@types";
 
 import { COVER_PROMPT_MAX_LENGTH, COVER_PROMPT_MIN_LENGTH } from "../coverImagePrompt";
-
-const GENERATE_FAILED_MESSAGE = "Couldn't generate an image this time. Try again in a moment.";
 
 interface GenerateCoverImageModalProps {
   /** What the textarea opens with: the trainer's last prompt, or the default. */
@@ -42,7 +46,14 @@ export const GenerateCoverImageModal: FC<GenerateCoverImageModalProps> = ({
   const [prompt, setPrompt] = useState(initialPrompt);
   const [generatedUrl, setGeneratedUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [generateCoverImage, { isLoading: isGenerating }] = useGenerateTrackCoverImageMutation();
+  const [startJob] = useStartTrackCoverImageJobMutation();
+  const [pollJob] = useLazyGetTrackCoverImageJobQuery();
+  // Generation runs as a backend job — it can outlast the load balancer's 60 s
+  // timeout — so this starts it and polls until it settles.
+  const { generate, isGenerating } = useImageGenerationJob(
+    (input: GenerateTrackCoverImageInput) => startJob(input).unwrap(),
+    (jobId: string) => pollJob(jobId).unwrap(),
+  );
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   // A response that lands after the trainer closed the pop-up is dropped.
   const isMountedRef = useRef(true);
@@ -75,16 +86,16 @@ export const GenerateCoverImageModal: FC<GenerateCoverImageModalProps> = ({
     if (!canGenerate) return;
     setError(null);
     try {
-      const { imageUrl } = await generateCoverImage({
+      const imageUrl = await generate({
         prompt: trimmedPrompt,
         ...(trackTitle?.trim() ? { trackTitle: trackTitle.trim() } : {}),
-      }).unwrap();
-      if (isMountedRef.current) setGeneratedUrl(imageUrl);
-    } catch (err: any) {
-      // Validation errors carry an array of field messages; only a sentence is shown as-is.
-      const message = err?.data?.message;
+      });
+      if (imageUrl && isMountedRef.current) setGeneratedUrl(imageUrl);
+    } catch (err) {
       if (isMountedRef.current) {
-        setError(typeof message === "string" && message ? message : GENERATE_FAILED_MESSAGE);
+        setError(
+          err instanceof ImageGenerationError ? err.message : IMAGE_GENERATION_FAILED_MESSAGE,
+        );
       }
     }
   };
@@ -179,7 +190,7 @@ export const GenerateCoverImageModal: FC<GenerateCoverImageModalProps> = ({
                   className="flex items-center gap-2 rounded-md bg-secondary-50 px-3 py-2 text-sm text-typography-700"
                 >
                   <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-500" />
-                  Generating your image — this can take a minute or more.
+                  Generating your image — this usually takes under a minute.
                 </div>
               )}
               {error && !isGenerating && (

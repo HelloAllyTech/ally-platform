@@ -153,7 +153,9 @@ export const ApiEndpoints = {
     GET_REPORT_TRANSCRIPT: (reportId: string) =>
       `/v1/learn/scenarios/reports/${reportId}/transcripts`,
     SCENARIO_COVER_IMAGE_LIBRARY: "/v1/scenario-cover-image-library",
-    GENERATE_COVER_IMAGE: "/v1/scenario-cover-image-library/generate",
+    // AI cover generation runs as a job: start, then poll until it settles.
+    COVER_IMAGE_JOBS: "/v1/scenario-cover-image-library/generate-jobs",
+    COVER_IMAGE_JOB: (jobId: string) => `/v1/scenario-cover-image-library/generate-jobs/${jobId}`,
     COMFORT_AUDIO_LIBRARY: "/v1/comfort-audio",
     COMFORT_AUDIO_UPLOAD_URL: "/v1/comfort-audio/upload-url",
     COMFORT_AUDIO_BY_ID: (id: string) => `/v1/comfort-audio/${id}`,
@@ -182,6 +184,7 @@ export const ApiEndpoints = {
     MEDIA_UPLOAD_URL: "/v1/learn/admin/tracks/media/upload-url",
     MEDIA: "/v1/learn/admin/tracks/media",
     GENERATE_COVER_IMAGE: "/v1/learn/admin/tracks/cover-image/generate",
+    COVER_IMAGE_JOB: (jobId: string) => `/v1/learn/admin/tracks/cover-image/generate/${jobId}`,
     // Per-language course translation.
     TRANSLATIONS: (id: string) => `/v1/learn/admin/tracks/${id}/translations`,
     TRANSLATE: (id: string) => `/v1/learn/admin/tracks/${id}/translations/translate`,

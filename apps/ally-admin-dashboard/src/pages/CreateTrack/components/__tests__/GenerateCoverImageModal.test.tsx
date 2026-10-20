@@ -1,14 +1,18 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockGenerate, mutationState } = vi.hoisted(() => ({
+const { mockGenerate, mockPoll } = vi.hoisted(() => ({
   mockGenerate: vi.fn(),
-  mutationState: { isLoading: false },
+  mockPoll: vi.fn(),
 }));
 
 vi.mock("@api", () => ({
-  useGenerateTrackCoverImageMutation: () => [mockGenerate, mutationState],
+  useStartTrackCoverImageJobMutation: () => [mockGenerate],
+  useLazyGetTrackCoverImageJobQuery: () => [mockPoll],
 }));
+
+// The real job hook, without the rest of the @hooks barrel.
+vi.mock("@hooks", async () => vi.importActual("../../../../hooks/useImageGenerationJob"));
 
 vi.mock("@assets", () => ({
   Close: () => <span data-testid="close-icon" />,
@@ -35,6 +39,10 @@ const IMAGE_URL = "https://bucket.s3.us-east-1.amazonaws.com/track-media/image/1
 
 const resolveWith = (value: unknown) => ({ unwrap: () => Promise.resolve(value) });
 const rejectWith = (error: unknown) => ({ unwrap: () => Promise.reject(error) });
+/** What the backend answers when the image is ready (or failed) by the first look. */
+const settled = (fields: Record<string, unknown>) =>
+  resolveWith({ jobId: "job-1", startedAt: "2026-10-20T00:00:00Z", ...fields });
+const succeeded = () => settled({ status: "succeeded", imageUrl: IMAGE_URL });
 
 const renderModal = (overrides: Partial<Parameters<typeof GenerateCoverImageModal>[0]> = {}) => {
   const props = {
@@ -55,11 +63,10 @@ const promptBox = () => screen.getByLabelText("Prompt") as HTMLTextAreaElement;
 describe("GenerateCoverImageModal", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mutationState.isLoading = false;
   });
 
   it("opens on the given prompt and sends it, trimmed, with the course title", async () => {
-    mockGenerate.mockReturnValue(resolveWith({ imageUrl: IMAGE_URL }));
+    mockGenerate.mockReturnValue(succeeded());
     renderModal({ initialPrompt: "  My own prompt for the cover  " });
 
     expect(promptBox().value).toBe("  My own prompt for the cover  ");
@@ -73,7 +80,7 @@ describe("GenerateCoverImageModal", () => {
   });
 
   it("accepting hands the image URL to the caller", async () => {
-    mockGenerate.mockReturnValue(resolveWith({ imageUrl: IMAGE_URL }));
+    mockGenerate.mockReturnValue(succeeded());
     const { onAccept } = renderModal();
 
     fireEvent.click(screen.getByRole("button", { name: "Generate" }));
@@ -83,7 +90,7 @@ describe("GenerateCoverImageModal", () => {
   });
 
   it("rejecting discards the image and returns to the prompt as the trainer left it", async () => {
-    mockGenerate.mockReturnValue(resolveWith({ imageUrl: IMAGE_URL }));
+    mockGenerate.mockReturnValue(succeeded());
     const { onAccept, onClose } = renderModal();
 
     fireEvent.change(promptBox(), { target: { value: "Watercolour of a park bench at dawn" } });
@@ -99,9 +106,9 @@ describe("GenerateCoverImageModal", () => {
     await waitFor(() => expect(mockGenerate).toHaveBeenCalledTimes(2));
   });
 
-  it("shows the server's message on failure and lets the trainer try again", async () => {
+  it("shows the job's failure wording and lets the trainer try again", async () => {
     mockGenerate.mockReturnValueOnce(
-      rejectWith({ data: { message: "The image service couldn't use this prompt." } }),
+      settled({ status: "failed", error: "The image service couldn't use this prompt." }),
     );
     renderModal();
 
@@ -154,13 +161,34 @@ describe("GenerateCoverImageModal", () => {
     expect(onPromptChange).toHaveBeenLastCalledWith(DEFAULT_PROMPT);
   });
 
-  it("locks the prompt and the button while an image is generating", () => {
-    mutationState.isLoading = true;
+  it("locks the prompt and the button while an image is generating", async () => {
+    mockGenerate.mockReturnValue({ unwrap: () => new Promise(() => undefined) });
     renderModal();
 
-    expect(promptBox()).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Generate" }));
+
+    await waitFor(() => expect(promptBox()).toBeDisabled());
     expect(screen.getByRole("button", { name: "Generating…" })).toBeDisabled();
-    expect(screen.getByRole("status")).toHaveTextContent(/a minute or more/);
+    expect(screen.getByRole("status")).toHaveTextContent(/under a minute/);
+  });
+
+  it("polls a running job until the image is ready", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      mockGenerate.mockReturnValue(settled({ status: "running" }));
+      mockPoll.mockReturnValueOnce(settled({ status: "running" })).mockReturnValueOnce(succeeded());
+      renderModal();
+
+      fireEvent.click(screen.getByRole("button", { name: "Generate" }));
+      await vi.advanceTimersByTimeAsync(3_000);
+      await vi.advanceTimersByTimeAsync(3_000);
+
+      expect(await screen.findByAltText("Generated cover image")).toHaveAttribute("src", IMAGE_URL);
+      expect(mockPoll).toHaveBeenCalledWith("job-1");
+      expect(mockPoll).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("closes on Escape and on Cancel", () => {
