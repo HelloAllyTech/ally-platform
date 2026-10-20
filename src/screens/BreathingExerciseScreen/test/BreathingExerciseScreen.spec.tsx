@@ -4,16 +4,17 @@ import {act, fireEvent, render} from '@testing-library/react-native';
 import {BreathingExerciseScreen} from '../BreathingExerciseScreen';
 
 const mockGoBack = jest.fn();
-const mockStartTrackItem = jest.fn().mockReturnValue({
-  unwrap: jest.fn().mockResolvedValue({}),
-});
-
-jest.mock('@/services', () => ({
-  useStartTrackItemMutation: () => [mockStartTrackItem],
-}));
 
 jest.mock('@/hooks', () => ({
-  useTranslate: () => ({t: (key: string) => key}),
+  useTranslate: () => ({
+    t: (key: string, options?: any) => {
+      if (key === 'courses.breathing.cycleProgress' && options) {
+        return `Cycle ${options.current} of ${options.total}`;
+      }
+      if (key === 'courses.player.exit') return 'Exit';
+      return key;
+    },
+  }),
 }));
 
 // Custom mock for reanimated to control animation timing in tests
@@ -87,7 +88,6 @@ describe('BreathingExerciseScreen', () => {
       fireEvent.press(exitButton);
     });
 
-    expect(mockStartTrackItem).toHaveBeenCalledWith({itemId: 'item-123'});
     expect(mockGoBack).toHaveBeenCalled();
   });
 

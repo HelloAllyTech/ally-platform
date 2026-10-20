@@ -893,7 +893,8 @@
     "breathing": {
       "title": "Breathing Exercise",
       "defaultIntro": "Take a moment to pause and regulate your breathing.",
-      "start": "Start"
+      "start": "Start",
+      "cycleProgress": "Cycle {{current}} of {{total}}"
     },
     "language": {
       "title": "Course language",

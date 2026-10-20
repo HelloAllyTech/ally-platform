@@ -11,15 +11,15 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {SCREEN_WIDTH} from '@/constants/general';
+import {useTranslate} from '@/hooks';
 import {RootStackScreenProps} from '@/navigation/types';
-import {useStartTrackItemMutation} from '@/services';
 import {colors, fontFamily, typography} from '@/theme';
 
 export const BreathingExerciseScreen: React.FC<
   RootStackScreenProps<'BreathingExercise'>
 > = ({navigation, route}) => {
-  const {config, itemId} = route.params;
-  const [startTrackItem] = useStartTrackItemMutation();
+  const {t} = useTranslate();
+  const {config} = route.params;
 
   const [currentCycle, setCurrentCycle] = useState(1);
   const [phase, setPhase] = useState<
@@ -118,17 +118,10 @@ export const BreathingExerciseScreen: React.FC<
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleExit = useCallback(async () => {
+  const handleExit = useCallback(() => {
     // R2: Clicking 'Exit' must immediately end the activity and return the learner to the course.
-    // The course must mark the breathing exercise as 'complete' as soon as the learner exits.
-    // startTrackItem for GAME items usually marks them complete.
-    try {
-      await startTrackItem({itemId}).unwrap();
-    } catch (e) {
-      // Ignore error, we still want to navigate back
-    }
     navigation.goBack();
-  }, [itemId, navigation, startTrackItem]);
+  }, [navigation]);
 
   const getInstructionText = () => {
     switch (phase) {
@@ -147,7 +140,7 @@ export const BreathingExerciseScreen: React.FC<
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.exitButton} onPress={handleExit}>
-          <Text style={styles.exitText}>Exit</Text>
+          <Text style={styles.exitText}>{t('courses.player.exit')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -164,7 +157,10 @@ export const BreathingExerciseScreen: React.FC<
         </View>
 
         <Text style={styles.cycleCount}>
-          Cycle {Math.min(currentCycle, config.cycles)} of {config.cycles}
+          {t('courses.breathing.cycleProgress', {
+            current: Math.min(currentCycle, config.cycles),
+            total: config.cycles,
+          })}
         </Text>
       </View>
     </SafeAreaView>

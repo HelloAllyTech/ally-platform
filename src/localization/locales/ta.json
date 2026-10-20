@@ -1843,7 +1843,8 @@
     "breathing": {
       "title": "சுவாசப் பயிற்சி",
       "defaultIntro": "உங்கள் சுவாசத்தை சீராக்க சிறிது நேரம் ஒதுக்குங்கள்.",
-      "start": "தொடங்கு"
+      "start": "தொடங்கு",
+      "cycleProgress": "சுழற்சி {{total}}-இல் {{current}}"
     },
     "language": {
       "title": "பாடத்தின் மொழி",
