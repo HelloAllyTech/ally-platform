@@ -542,6 +542,13 @@ export interface TrackMediaUploadUrlResponse {
   publicUrl: string;
 }
 
+/** Track settings → Generate cover image. The prompt is sent exactly as edited. Starts a job. */
+export interface GenerateTrackCoverImageInput {
+  prompt: string;
+  /** Names the stored file only; omitted for an untitled course. */
+  trackTitle?: string;
+}
+
 /* -------------------------------------------------------------------------- */
 /* Builder form state                                                         */
 /* -------------------------------------------------------------------------- */
