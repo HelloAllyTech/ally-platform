@@ -627,12 +627,16 @@ class TestWorker:
                 self.room = TestWorker.DummyRoom()
                 self.proc = types.SimpleNamespace(userid="u", userdata={"vad": "VAD"})
                 self._shutdown_callbacks = []
+                self.shutdown_calls = []
 
             async def connect(self):
                 return None
 
             def add_shutdown_callback(self, callback):
                 self._shutdown_callbacks.append(callback)
+
+            def shutdown(self, reason):
+                self.shutdown_calls.append(reason)
 
         ctx = Ctx()
 
@@ -741,12 +745,16 @@ class TestWorker:
                 self.room = TestWorker.DummyRoom()
                 self.proc = types.SimpleNamespace(userid="u", userdata={"vad": "VAD"})
                 self._shutdown_callbacks = []
+                self.shutdown_calls = []
 
             async def connect(self):
                 return None
 
             def add_shutdown_callback(self, callback):
                 self._shutdown_callbacks.append(callback)
+
+            def shutdown(self, reason):
+                self.shutdown_calls.append(reason)
 
         await worker.entrypoint(Ctx())
 
@@ -938,12 +946,16 @@ class TestWorker:
                 self.room = TestWorker.DummyRoom()
                 self.proc = types.SimpleNamespace(userid="u", userdata={"vad": "VAD"})
                 self._shutdown_callbacks = []
+                self.shutdown_calls = []
 
             async def connect(self):
                 return None
 
             def add_shutdown_callback(self, callback):
                 self._shutdown_callbacks.append(callback)
+
+            def shutdown(self, reason):
+                self.shutdown_calls.append(reason)
 
         ctx = Ctx()
 
@@ -1125,12 +1137,16 @@ class TestWorker:
                 self.room = TestWorker.DummyRoom()
                 self.proc = types.SimpleNamespace(userid="u", userdata={"vad": "VAD"})
                 self._shutdown_callbacks = []
+                self.shutdown_calls = []
 
             async def connect(self):
                 return None
 
             def add_shutdown_callback(self, callback):
                 self._shutdown_callbacks.append(callback)
+
+            def shutdown(self, reason):
+                self.shutdown_calls.append(reason)
 
         await worker.entrypoint(Ctx())
 
@@ -1475,12 +1491,16 @@ class TestWorker:
                 self.room = TestWorker.DummyRoom()
                 self.proc = types.SimpleNamespace(userid="u", userdata={"vad": "VAD"})
                 self._shutdown_callbacks = []
+                self.shutdown_calls = []
 
             async def connect(self):
                 return None
 
             def add_shutdown_callback(self, callback):
                 self._shutdown_callbacks.append(callback)
+
+            def shutdown(self, reason):
+                self.shutdown_calls.append(reason)
 
         await worker.entrypoint(Ctx())
 
@@ -1639,12 +1659,16 @@ class TestWorker:
                 self.room = TestWorker.DummyRoom()
                 self.proc = types.SimpleNamespace(userid="u", userdata={"vad": "VAD"})
                 self._shutdown_callbacks = []
+                self.shutdown_calls = []
 
             async def connect(self):
                 return None
 
             def add_shutdown_callback(self, callback):
                 self._shutdown_callbacks.append(callback)
+
+            def shutdown(self, reason):
+                self.shutdown_calls.append(reason)
 
         await worker.entrypoint(Ctx())
 
@@ -1779,6 +1803,7 @@ class TestWorker:
                 self.room = TestWorker.DummyRoom()
                 self.proc = types.SimpleNamespace(userid="u", userdata={"vad": "VAD"})
                 self._shutdown_callbacks = []
+                self.shutdown_calls = []
 
             async def connect(self):
                 return None
@@ -1787,7 +1812,7 @@ class TestWorker:
                 self._shutdown_callbacks.append(callback)
 
             def shutdown(self, reason):
-                pass
+                self.shutdown_calls.append(reason)
 
         ctx = Ctx()
         await worker.entrypoint(ctx)
@@ -1952,6 +1977,7 @@ class TestWorker:
                 self.room = TestWorker.DummyRoom()
                 self.proc = types.SimpleNamespace(userid="u", userdata={"vad": "VAD"})
                 self._shutdown_callbacks = []
+                self.shutdown_calls = []
 
             async def connect(self):
                 return None
@@ -1960,7 +1986,7 @@ class TestWorker:
                 self._shutdown_callbacks.append(callback)
 
             def shutdown(self, reason):
-                pass
+                self.shutdown_calls.append(reason)
 
         ctx = Ctx()
         await worker.entrypoint(ctx)
@@ -2379,12 +2405,16 @@ class TestWorker:
                 self.room = TestWorker.DummyRoom()
                 self.proc = types.SimpleNamespace(userid="u", userdata={"vad": "VAD"})
                 self._shutdown_callbacks = []
+                self.shutdown_calls = []
 
             async def connect(self):
                 return None
 
             def add_shutdown_callback(self, callback):
                 self._shutdown_callbacks.append(callback)
+
+            def shutdown(self, reason):
+                self.shutdown_calls.append(reason)
 
         ctx = Ctx()
         await worker.entrypoint(ctx)
