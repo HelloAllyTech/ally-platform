@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/theme/app_fonts.dart';
 import '../data/simulation_transcript_repository.dart';
 
 /// Port of ally-mobile (React Native)'s `TranscriptTab`/`SimulationTranscript`
@@ -138,9 +139,14 @@ class _SimulationTranscriptTabState
                 ? CrossAxisAlignment.end
                 : CrossAxisAlignment.start,
             children: [
+              // RN's SimulationTranscriptItem styles.timeText/timeInline:
+              // IBM_PLEX_SERIF.REGULAR — not labelSmall's Roboto.
               Text(
                 '${message.isLearner ? ref.t('transcription.youLabel') : ref.t('transcription.clientLabel')} · ${message.formattedTime}',
-                style: Theme.of(context).textTheme.labelSmall,
+                style: Theme.of(context)
+                    .textTheme
+                    .labelSmall
+                    ?.copyWith(fontFamily: AppFonts.ibmPlexSerifRegular),
               ),
               const SizedBox(height: 4),
               Container(

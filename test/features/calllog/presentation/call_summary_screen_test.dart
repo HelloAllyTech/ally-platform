@@ -92,6 +92,13 @@ void main() {
       // (not-yet-materialized) header exists, then expand it.
       final summaryList = find.byType(ListView).first;
       await tester.dragUntilVisible(find.text('Session Summary'), summaryList, const Offset(0, -300));
+      // `dragUntilVisible` only guarantees the widget's bounds intersect the
+      // viewport, not that it's fully clear of the edge — taller field-label
+      // rows above it (now IBMPlexSerif body.medium, not labelMedium) shift
+      // exactly where it lands, so a direct tap can miss. `ensureVisible`
+      // scrolls it fully into view first.
+      await tester.ensureVisible(find.text('Session Summary'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Session Summary'));
       await tester.pumpAndSettle();
 

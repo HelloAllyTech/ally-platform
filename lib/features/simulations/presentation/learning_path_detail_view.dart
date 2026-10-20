@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_fonts.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_card.dart';
 import '../data/simulation_models.dart';
@@ -95,9 +96,15 @@ class _LearningPathDetailViewState extends ConsumerState<LearningPathDetailView>
         if (details.title != null)
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
+            // RN's LearningPathListHeader styles.pathTitle: display.small
+            // size, but IBM_PLEX_SERIF.MEDIUM family — not headlineSmall's
+            // ReplayPro-Headline (that's a different, larger element).
             child: Text(
               details.title!,
-              style: Theme.of(context).textTheme.headlineSmall,
+              style: Theme.of(context)
+                  .textTheme
+                  .displaySmall
+                  ?.copyWith(fontFamily: AppFonts.ibmPlexSerifMedium),
             ),
           ),
         if (details.description != null) ...[

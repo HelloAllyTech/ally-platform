@@ -363,7 +363,10 @@ class _FieldEditor extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label, style: Theme.of(context).textTheme.labelMedium),
+            // RN's FieldRow styles.label: IBM_PLEX_SERIF.REGULAR +
+            // typography.body.medium — bodyMedium already matches both
+            // exactly; labelMedium would wrongly render it in Roboto.
+            Text(label, style: Theme.of(context).textTheme.bodyMedium),
             Text(display),
           ],
         ),

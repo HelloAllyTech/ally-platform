@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_fonts.dart';
 import '../../../core/widgets/app_dropdown.dart';
 import '../../../core/widgets/tab_screen_header.dart';
 import '../data/leaderboard_repository.dart';
@@ -32,9 +33,14 @@ class _RankBadge extends StatelessWidget {
     return CircleAvatar(
       radius: 13,
       backgroundColor: AppColors.surfaceContainerHigh,
+      // RN's styles.rankText: label.medium size, but IBM_PLEX_SERIF.MEDIUM
+      // family — not labelMedium's Roboto-Regular default.
       child: Text(
         '$rank',
-        style: Theme.of(context).textTheme.labelMedium?.copyWith(color: AppColors.mediumEmphasis),
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              fontFamily: AppFonts.ibmPlexSerifMedium,
+              color: AppColors.mediumEmphasis,
+            ),
       ),
     );
   }

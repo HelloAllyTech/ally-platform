@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_fonts.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/tab_screen_header.dart';
 import '../data/simulations_repository.dart';
@@ -73,9 +74,16 @@ class _SimulationDetailsScreenState
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // RN's styles.cardTitle: IBM_PLEX_SERIF.MEDIUM at 20px —
+                    // not headlineSmall's ReplayPro-Headline at 24px (that's
+                    // the screen's own pageTitle, a different element).
                     Text(
                       scenario.title,
-                      style: Theme.of(context).textTheme.headlineSmall,
+                      style: const TextStyle(
+                        fontFamily: AppFonts.ibmPlexSerifMedium,
+                        fontSize: 20,
+                        color: AppColors.highEmphasis,
+                      ),
                     ),
                     if (scenario.description != null) ...[
                       const SizedBox(height: 12),
