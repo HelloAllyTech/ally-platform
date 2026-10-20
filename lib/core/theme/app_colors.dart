@@ -98,5 +98,6 @@ class AppColors {
   static const deepPurple50 = Color(0xFFEDE7F6); // Simulation chip background
   static const deepPurple400 = Color(0xFF7E57C2); // Simulation chip text
   static const orange50 = Color(0xFFFFF3E0); // Scribe chip background
+  static const orange400 = Color(0xFFFFA726); // ReviewNote callout border
   static const orange900 = Color(0xFFE65100); // Scribe chip text
 }

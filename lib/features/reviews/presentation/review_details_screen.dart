@@ -10,6 +10,7 @@ import '../../../core/widgets/app_chat_input.dart';
 import '../../../core/widgets/review_type_chip.dart';
 import '../data/reviews_repository.dart';
 import '../data/scribe_reviews_repository.dart';
+import 'review_note_callout.dart';
 import 'thread_detail_screen.dart';
 
 /// Scoped port of ally-mobile (React Native)'s `ReviewDetailsScreen` — the
@@ -114,29 +115,26 @@ class _ReviewDetailsScreenState extends ConsumerState<ReviewDetailsScreen> {
             children: [
               Padding(
                 padding: const EdgeInsets.all(24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
                   children: [
-                    Row(
-                      children: [
-                        CircleAvatar(
-                          backgroundImage:
-                              review.createdBy.profileImage.isNotEmpty
-                              ? NetworkImage(review.createdBy.profileImage)
-                              : null,
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          review.createdBy.name,
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                      ],
+                    CircleAvatar(
+                      backgroundImage:
+                          review.createdBy.profileImage.isNotEmpty
+                          ? NetworkImage(review.createdBy.profileImage)
+                          : null,
                     ),
-                    const SizedBox(height: 16),
-                    Text(review.note),
+                    const SizedBox(width: 12),
+                    Text(
+                      review.createdBy.name,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
                   ],
                 ),
               ),
+              // RN renders ReviewNote as a bare list-header element (no
+              // padded wrapper of its own) — edge-to-edge, not inset to
+              // match the avatar/name block above it.
+              if (review.note.isNotEmpty) ReviewNoteCallout(note: review.note),
               const Divider(height: 1),
               Expanded(
                 child: TabBarView(
