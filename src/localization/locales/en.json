@@ -890,6 +890,12 @@
         "responsesSubmitted": "Responses submitted"
       }
     },
+    "breathing": {
+      "title": "Breathing Exercise",
+      "defaultIntro": "Take a moment to pause and regulate your breathing.",
+      "start": "Start",
+      "cycleProgress": "Cycle {{current}} of {{total}}"
+    },
     "language": {
       "title": "Course language",
       "subtitle": "Changes this course only — your app language stays as it is.",

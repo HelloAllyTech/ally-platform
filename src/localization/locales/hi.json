@@ -1840,6 +1840,12 @@
         "responsesSubmitted": "जवाब जमा हो गए"
       }
     },
+    "breathing": {
+      "title": "श्वसन अभ्यास",
+      "defaultIntro": "अपनी सांसों को नियंत्रित करने के लिए कुछ समय निकालें।",
+      "start": "शुरू करें",
+      "cycleProgress": "चक्र {{current}}/{{total}}"
+    },
     "language": {
       "title": "कोर्स की भाषा",
       "subtitle": "इससे सिर्फ़ यह कोर्स बदलेगा — ऐप की भाषा वही रहेगी।",

@@ -3,6 +3,7 @@ import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 
 import type {ReviewType} from '@/contexts/ReviewApiContext';
 import {ShareScreenSessionData} from '@/types';
+import {BreathingExerciseContent} from '@/types/courses';
 import {Scenario, SessionData} from '@/types/simulations';
 
 export type RootStackParamList = {
@@ -13,6 +14,11 @@ export type RootStackParamList = {
   CallSummary: {callId?: number; fromLogs?: boolean} | undefined;
   CallLog: undefined;
   Breathing: undefined;
+  BreathingExercise: {
+    config: BreathingExerciseContent;
+    itemId: string;
+    trackId: string;
+  };
   LiveKitTest: undefined;
   Simulations: undefined;
   SimulationDetails: {scenario: Scenario};
