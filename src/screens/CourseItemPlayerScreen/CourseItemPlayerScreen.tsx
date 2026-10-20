@@ -218,7 +218,10 @@ export const CourseItemPlayerScreen: React.FC<
           />
         );
       case TrackItemType.GAME:
-        if (payload.gameKey === TrackGameKey.BREATHING_EXERCISE) {
+        if (
+          payload.gameKey === TrackGameKey.BREATHING_EXERCISE &&
+          payload.breathingExercise
+        ) {
           return (
             <NativeGamePlayer
               payload={payload}
@@ -227,6 +230,11 @@ export const CourseItemPlayerScreen: React.FC<
               onCompleted={handleCompletion}
             />
           );
+        }
+        if (payload.gameKey === TrackGameKey.BREATHING_EXERCISE) {
+          // If the breathingExercise object is missing, fall back to the
+          // unsupported card below.
+          break;
         }
         return (
           <GamePlayer
