@@ -81,7 +81,11 @@ export const GenerateCoverImageModal: FC<GenerateCoverImageModalProps> = ({
       }).unwrap();
       if (isMountedRef.current) setGeneratedUrl(imageUrl);
     } catch (err: any) {
-      if (isMountedRef.current) setError(err?.data?.message || GENERATE_FAILED_MESSAGE);
+      // Validation errors carry an array of field messages; only a sentence is shown as-is.
+      const message = err?.data?.message;
+      if (isMountedRef.current) {
+        setError(typeof message === "string" && message ? message : GENERATE_FAILED_MESSAGE);
+      }
     }
   };
 
@@ -162,7 +166,7 @@ export const GenerateCoverImageModal: FC<GenerateCoverImageModalProps> = ({
                 onChange={event => updatePrompt(event.target.value)}
                 disabled={isGenerating}
                 maxLength={COVER_PROMPT_MAX_LENGTH}
-                rows={10}
+                rows={14}
                 className="w-full border border-border-light rounded-md px-3 py-2 text-sm leading-relaxed outline-none focus:border-primary-400 resize-y disabled:bg-gray-50 disabled:text-typography-500"
               />
               <p className="text-xs text-typography-500">
@@ -175,7 +179,7 @@ export const GenerateCoverImageModal: FC<GenerateCoverImageModalProps> = ({
                   className="flex items-center gap-2 rounded-md bg-secondary-50 px-3 py-2 text-sm text-typography-700"
                 >
                   <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-500" />
-                  Generating your image — this usually takes 20–60 seconds.
+                  Generating your image — this can take a minute or more.
                 </div>
               )}
               {error && !isGenerating && (

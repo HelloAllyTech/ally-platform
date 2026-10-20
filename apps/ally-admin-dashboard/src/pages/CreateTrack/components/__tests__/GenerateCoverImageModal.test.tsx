@@ -122,6 +122,19 @@ describe("GenerateCoverImageModal", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(/Couldn't generate an image/);
   });
 
+  it("does not show raw validation arrays to the trainer", async () => {
+    mockGenerate.mockReturnValueOnce(
+      rejectWith({
+        data: { message: ["prompt must be shorter than or equal to 4000 characters"] },
+      }),
+    );
+    renderModal();
+
+    fireEvent.click(screen.getByRole("button", { name: "Generate" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/Couldn't generate an image/);
+  });
+
   it("won't send a prompt that is too short to describe anything", () => {
     renderModal({ initialPrompt: "  cat  " });
     expect(screen.getByRole("button", { name: "Generate" })).toBeDisabled();
@@ -147,7 +160,7 @@ describe("GenerateCoverImageModal", () => {
 
     expect(promptBox()).toBeDisabled();
     expect(screen.getByRole("button", { name: "Generating…" })).toBeDisabled();
-    expect(screen.getByRole("status")).toHaveTextContent(/20–60 seconds/);
+    expect(screen.getByRole("status")).toHaveTextContent(/a minute or more/);
   });
 
   it("closes on Escape and on Cancel", () => {
