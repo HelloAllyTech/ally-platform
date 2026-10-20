@@ -8,6 +8,7 @@ export const SCREEN_NAMES = {
   CALL_SUMMARY: 'CallSummary',
   CALL_LOG: 'CallLog',
   BREATHING: 'Breathing',
+  BREATHING_EXERCISE: 'BreathingExercise',
   LIVE_KIT_TEST: 'LiveKitTest',
   SIMULATIONS: 'Simulations',
   SIMULATION_DETAILS: 'SimulationDetails',
