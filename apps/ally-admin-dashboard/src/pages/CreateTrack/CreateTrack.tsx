@@ -26,10 +26,16 @@ import {
 } from "@types";
 
 import { ItemEditorCanvas } from "./components/ItemEditorCanvas";
+import { LandingPageEditor } from "./components/landing/LandingPageEditor";
 import { TrackOutlineRail } from "./components/TrackOutlineRail";
 import { TrackSettingsEditor } from "./components/TrackSettingsEditor";
 import { TrackTranslationsEditor } from "./components/TrackTranslationsEditor";
-import { TrackSelection, isSettingsSelection, isTranslationsSelection } from "./components/types";
+import {
+  TrackSelection,
+  isLandingSelection,
+  isSettingsSelection,
+  isTranslationsSelection,
+} from "./components/types";
 import {
   createEmptySection,
   createItemFormValueFromTemplate,
@@ -211,7 +217,15 @@ export const CreateTrack: FC = () => {
         await updateTrackMetadata({ id: currentId, data: { status } }).unwrap();
       }
 
-      reset(getValues());
+      // Reset from the server's copy, not the form's: a section or component
+      // added in this session only gets its id here. Without it the next save
+      // would create it again, and the Landing page could not key a chapter's
+      // teaser to it. A failed refetch falls back to what was just sent.
+      try {
+        reset(deserializeTrack(await getTrackById(currentId).unwrap()));
+      } catch {
+        reset(getValues());
+      }
       return currentId;
     } catch (error: any) {
       const message =
@@ -267,6 +281,14 @@ export const CreateTrack: FC = () => {
     if (isSettingsSelection(selection)) {
       return (
         <TrackSettingsEditor
+          trackId={trackId}
+          isPublished={trackDetail?.status === SimulationStatus.ACTIVE}
+        />
+      );
+    }
+    if (isLandingSelection(selection)) {
+      return (
+        <LandingPageEditor
           trackId={trackId}
           isPublished={trackDetail?.status === SimulationStatus.ACTIVE}
         />
@@ -371,6 +393,7 @@ export const CreateTrack: FC = () => {
             selection={selection}
             errorKeys={errorKeys}
             onSelectSettings={() => setSelection("settings")}
+            onSelectLanding={() => setSelection("landing")}
             onSelectTranslations={() => setSelection("translations")}
             publishedLanguageCount={publishedLanguageCount}
             onSelectItem={(sectionIndex, itemIndex) => setSelection({ sectionIndex, itemIndex })}
