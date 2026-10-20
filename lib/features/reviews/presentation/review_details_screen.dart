@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/theme/app_fonts.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_chat_input.dart';
 import '../../../core/widgets/review_type_chip.dart';
@@ -177,10 +178,21 @@ class _ReviewDetailsScreenState extends ConsumerState<ReviewDetailsScreen> {
                     itemCount: comments.length,
                     itemBuilder: (context, index) {
                       final comment = comments[index];
+                      // RN's shared ReviewComment component: name is
+                      // IBM_PLEX_SERIF.MEDIUM (ListTile's default title
+                      // style is IBMPlexSerif, but Regular weight);
+                      // commentText is IBM_PLEX_SERIF.REGULAR, matching
+                      // ListTile's subtitle default already.
                       return ListTile(
                         dense: true,
                         leading: SvgPicture.asset('assets/icons/chatBubble.svg', width: 20, height: 20),
-                        title: Text(comment.authorName),
+                        title: Text(
+                          comment.authorName,
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(fontFamily: AppFonts.ibmPlexSerifMedium),
+                        ),
                         subtitle: Text(comment.content),
                       );
                     },

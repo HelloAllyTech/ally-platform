@@ -59,7 +59,16 @@ class SimulationsScreen extends ConsumerWidget {
                       padding: const EdgeInsets.only(bottom: 12),
                       child: AppCard(
                         child: ListTile(
-                          title: Text(scenario.title),
+                          // RN's shared SimulationCard: title is
+                          // IBM_PLEX_SERIF.MEDIUM — ListTile's default
+                          // title style is IBMPlexSerif but Regular weight.
+                          title: Text(
+                            scenario.title,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(fontFamily: AppFonts.ibmPlexSerifMedium),
+                          ),
                           subtitle: scenario.description != null
                               ? Text(
                                   scenario.description!,

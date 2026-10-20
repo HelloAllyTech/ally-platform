@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/theme/app_fonts.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/tab_screen_header.dart';
 import '../data/courses_repository.dart';
@@ -46,7 +47,17 @@ class CourseOverviewScreen extends ConsumerWidget {
                         padding: const EdgeInsets.only(bottom: 12),
                         child: AppCard(
                           child: ListTile(
-                            title: Text(track.title),
+                            // RN renders this via the shared SimulationCard
+                            // component (title: IBM_PLEX_SERIF.MEDIUM) —
+                            // ListTile's default title is IBMPlexSerif but
+                            // Regular weight.
+                            title: Text(
+                              track.title,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(fontFamily: AppFonts.ibmPlexSerifMedium),
+                            ),
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [

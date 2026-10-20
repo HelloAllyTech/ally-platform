@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/theme/app_fonts.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/tab_screen_header.dart';
 import '../data/course_models.dart';
@@ -69,9 +70,15 @@ class CourseDetailScreen extends ConsumerWidget {
                   for (final section in detail.sections) ...[
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 8),
+                      // RN's CourseSectionBlock styles.sectionTitle:
+                      // IBM_PLEX_SERIF.MEDIUM at body.large size (16/24/0.5)
+                      // — bodyLarge already matches that size exactly.
                       child: Text(
                         section.title,
-                        style: Theme.of(context).textTheme.titleMedium,
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodyLarge
+                            ?.copyWith(fontFamily: AppFonts.ibmPlexSerifMedium),
                       ),
                     ),
                     for (final item in section.items)

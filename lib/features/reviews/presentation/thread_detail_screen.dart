@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/localization/translate_ref.dart';
+import '../../../core/theme/app_fonts.dart';
 import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_chat_input.dart';
 import '../../../core/widgets/review_type_chip.dart';
@@ -236,9 +237,15 @@ class _CommentTile extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // RN's shared ReviewComment component: name is
+              // IBM_PLEX_SERIF.MEDIUM — titleSmall already matches family
+              // and size, just needs the Medium weight.
               Text(
                 comment.authorName,
-                style: Theme.of(context).textTheme.titleSmall,
+                style: Theme.of(context)
+                    .textTheme
+                    .titleSmall
+                    ?.copyWith(fontFamily: AppFonts.ibmPlexSerifMedium),
               ),
               const SizedBox(height: 4),
               Text(comment.content),
