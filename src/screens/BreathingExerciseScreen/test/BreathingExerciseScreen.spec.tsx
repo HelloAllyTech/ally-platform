@@ -1,5 +1,8 @@
-import React from 'react';
+import {RouteProp} from '@react-navigation/native';
+import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {act, fireEvent, render} from '@testing-library/react-native';
+
+import {RootStackParamList} from '@/navigation/types';
 
 import {BreathingExerciseScreen} from '../BreathingExerciseScreen';
 
@@ -7,7 +10,7 @@ const mockGoBack = jest.fn();
 
 jest.mock('@/hooks', () => ({
   useTranslate: () => ({
-    t: (key: string, options?: any) => {
+    t: (key: string, options?: Record<string, string | number>) => {
       if (key === 'courses.breathing.cycleProgress' && options) {
         return `Cycle ${options.current} of ${options.total}`;
       }
@@ -21,7 +24,11 @@ jest.mock('@/hooks', () => ({
 jest.mock('react-native-reanimated', () => {
   const Reanimated = require('react-native-reanimated/mock');
 
-  Reanimated.withTiming = (toValue: any, config: any, callback: any) => {
+  Reanimated.withTiming = (
+    toValue: unknown,
+    config: {duration: number},
+    callback: (finished: boolean) => void,
+  ) => {
     if (callback) {
       // Use a timer to delay the callback so we can test phases
       setTimeout(() => callback(true), config.duration);
@@ -43,7 +50,9 @@ const mockConfig = {
   holdOutText: 'Hold and relax',
 };
 
-const mockRoute = {
+const mockRoute: RouteProp<RootStackParamList, 'BreathingExercise'> = {
+  key: 'BreathingExercise-key',
+  name: 'BreathingExercise',
   params: {
     config: mockConfig,
     itemId: 'item-123',
@@ -51,7 +60,9 @@ const mockRoute = {
   },
 };
 
-const mockNavigation: any = {
+const mockNavigation: Partial<
+  NativeStackNavigationProp<RootStackParamList, 'BreathingExercise'>
+> = {
   goBack: mockGoBack,
 };
 
@@ -64,8 +75,13 @@ describe('BreathingExerciseScreen', () => {
   it('renders correctly and shows initial instruction', () => {
     const {getByText, getByTestId} = render(
       <BreathingExerciseScreen
-        navigation={mockNavigation}
-        route={mockRoute as any}
+        navigation={
+          mockNavigation as NativeStackNavigationProp<
+            RootStackParamList,
+            'BreathingExercise'
+          >
+        }
+        route={mockRoute}
       />,
     );
 
@@ -78,8 +94,13 @@ describe('BreathingExerciseScreen', () => {
   it('navigates back and marks complete when Exit is clicked', async () => {
     const {getByText} = render(
       <BreathingExerciseScreen
-        navigation={mockNavigation}
-        route={mockRoute as any}
+        navigation={
+          mockNavigation as NativeStackNavigationProp<
+            RootStackParamList,
+            'BreathingExercise'
+          >
+        }
+        route={mockRoute}
       />,
     );
 
@@ -94,8 +115,13 @@ describe('BreathingExerciseScreen', () => {
   it('cycles through breathing phases', () => {
     const {getByText} = render(
       <BreathingExerciseScreen
-        navigation={mockNavigation}
-        route={mockRoute as any}
+        navigation={
+          mockNavigation as NativeStackNavigationProp<
+            RootStackParamList,
+            'BreathingExercise'
+          >
+        }
+        route={mockRoute}
       />,
     );
 
