@@ -30,6 +30,7 @@ import {CelebrationKind, CelebrationModal} from './components/CelebrationModal';
 import {PlayerBottomNav} from './components/PlayerBottomNav';
 import {ArticlePlayer} from './components/players/ArticlePlayer';
 import {BranchingScenarioPlayer} from './components/players/BranchingScenarioPlayer';
+import {BucketSortPlayer} from './components/players/BucketSortPlayer';
 import {GamePlayer} from './components/players/GamePlayer';
 import {JournalPlayer} from './components/players/JournalPlayer';
 import {NativeGamePlayer} from './components/players/NativeGamePlayer';
@@ -254,6 +255,17 @@ export const CourseItemPlayerScreen: React.FC<
             onCompleted={handleCompletion}
             onRequestNext={goNextOrOverview}
             onBack={handleBackToOverview}
+          />
+        );
+      case TrackItemType.BUCKET_SORT:
+        return (
+          <BucketSortPlayer
+            // Two sorts back to back must not share a round.
+            key={nav.currentItemId}
+            payload={payload}
+            itemId={nav.currentItemId}
+            onCompleted={handleCompletion}
+            onRequestNext={goNextOrOverview}
           />
         );
       case TrackItemType.ROLEPLAY:

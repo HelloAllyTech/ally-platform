@@ -12,6 +12,7 @@ export enum TrackItemType {
   JOURNAL = 'JOURNAL',
   GAME = 'GAME',
   BRANCHING_SCENARIO = 'BRANCHING_SCENARIO',
+  BUCKET_SORT = 'BUCKET_SORT',
 }
 
 /** Games the app can render; each maps to a bundle under `players/games/`. */
@@ -646,6 +647,50 @@ export interface BranchingResult {
   recap: BranchingRecapEntry[];
 }
 
+export interface BucketSortBucket {
+  id: string;
+  label: string;
+  description?: string;
+}
+
+/** What the server says about one placed item; the key reaches the app only through this. */
+export interface BucketSortFeedback {
+  correct: boolean;
+  /** The bucket the learner chose on their first try. */
+  placedBucketId: string;
+  correctBucketId: string;
+  explanation: string | null;
+}
+
+/**
+ * The answer key is stripped: an item says what it is, never where it goes.
+ * `answered` carries the feedback for items already placed this round, so a
+ * reopened item resumes where the learner left off.
+ */
+export interface StartBucketSortItemPayload extends StartTrackItemBase {
+  type: TrackItemType.BUCKET_SORT;
+  bucketSort: {
+    intro?: string;
+    buckets: BucketSortBucket[];
+    items: {id: string; text: string}[];
+    answered: Record<string, BucketSortFeedback>;
+  };
+  rounds: number;
+  bestFirstTryPct: number | null;
+}
+
+/** Response to `POST .../bucket-sort/place`. */
+export interface BucketSortPlacementResult extends BucketSortFeedback {
+  sortItemId: string;
+  placedCount: number;
+  totalCount: number;
+  finished: boolean;
+  /** Share of items right on the first try; only once the round is finished. */
+  firstTryPct: number | null;
+  itemCompleted: boolean;
+  completion: TrackItemCompletionResult | null;
+}
+
 export type StartTrackItemResponse =
   | StartRoleplayItemPayload
   | StartCaseItemPayload
@@ -654,7 +699,8 @@ export type StartTrackItemResponse =
   | StartVideoItemPayload
   | StartJournalItemPayload
   | StartGameItemPayload
-  | StartBranchingScenarioItemPayload;
+  | StartBranchingScenarioItemPayload
+  | StartBucketSortItemPayload;
 
 // ---------------------------------------------------------------------------
 // Completion results

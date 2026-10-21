@@ -23,6 +23,7 @@ const TYPE_BADGE_LABEL: Record<TrackItemType, string> = {
   [TrackItemType.JOURNAL]: 'J',
   [TrackItemType.GAME]: 'G',
   [TrackItemType.BRANCHING_SCENARIO]: 'B',
+  [TrackItemType.BUCKET_SORT]: 'S',
 };
 
 export const CourseItemRow: React.FC<CourseItemRowProps> = ({
