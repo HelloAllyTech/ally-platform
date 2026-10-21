@@ -94,7 +94,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     },
     routes: [
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
-      GoRoute(path: '/home', builder: (context, state) => const AppShellScreen()),
+      GoRoute(
+        path: '/home',
+        builder: (context, state) => const AppShellScreen(),
+      ),
       GoRoute(
         path: '/complete-profile',
         builder: (context, state) => const CompleteProfileScreen(),
@@ -163,8 +166,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/simulation-paths/:pathId',
-        builder: (context, state) =>
-            SimulationPathDetailsScreen(pathId: state.pathParameters['pathId']!),
+        builder: (context, state) => SimulationPathDetailsScreen(
+          pathId: state.pathParameters['pathId']!,
+        ),
       ),
       GoRoute(
         path: '/leaderboard',
@@ -229,9 +233,19 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/share-for-review/:scenarioSessionId',
-        builder: (context, state) => ShareForReviewScreen(
-          scenarioSessionId: state.pathParameters['scenarioSessionId']!,
-        ),
+        builder: (context, state) {
+          // Edit-note mode (from ReviewDetailsScreen) passes the real
+          // reviewId/note via `extra` instead — the path's
+          // `scenarioSessionId` is a dummy value in that case since editing
+          // only PATCHes the existing review, it never needs the session id.
+          final editArgs = state.extra as ({String reviewId, String note})?;
+          return ShareForReviewScreen(
+            scenarioSessionId: state.pathParameters['scenarioSessionId']!,
+            reviewId: editArgs?.reviewId,
+            isEditNote: editArgs != null,
+            initialNote: editArgs?.note,
+          );
+        },
       ),
       GoRoute(
         path: '/reactions/:reviewId',

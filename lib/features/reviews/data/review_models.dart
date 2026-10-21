@@ -28,6 +28,7 @@ class ReviewItem {
     required this.createdBy,
     required this.commentsCount,
     required this.summaryName,
+    this.reviewStatus,
   });
 
   factory ReviewItem.fromJson(Map<String, dynamic> json) => ReviewItem(
@@ -37,6 +38,7 @@ class ReviewItem {
     createdBy: ReviewAuthor.fromJson(json['createdBy'] as Map<String, dynamic>),
     commentsCount: (json['commentsCount'] as num?)?.toInt() ?? 0,
     summaryName: json['summaryName'] as String?,
+    reviewStatus: json['reviewStatus'] as String?,
   );
 
   final String id;
@@ -45,6 +47,12 @@ class ReviewItem {
   final ReviewAuthor createdBy;
   final int commentsCount;
   final String? summaryName;
+
+  /// Mirrors RN's `ReviewStatus` enum ('HIDDEN' | 'IN_REVIEW'). A review is
+  /// private exactly when this is 'HIDDEN' — see `isPrivate` getter below.
+  final String? reviewStatus;
+
+  bool get isPrivate => reviewStatus == 'HIDDEN';
 }
 
 /// Mirrors ally-mobile (React Native)'s `MessageThreadComment` — used here
