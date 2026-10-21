@@ -1214,7 +1214,7 @@ describe("UserModal", () => {
 
       const modalContent = container.querySelector(".bg-white");
       expect(modalContent).toBeInTheDocument();
-      expect(modalContent?.className).toContain("rounded-[10px]");
+      expect(modalContent?.className).toContain("rounded-none");
     });
   });
 

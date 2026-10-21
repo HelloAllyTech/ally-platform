@@ -30,7 +30,7 @@ export const DetailLine: FC<{
   emphasis?: boolean;
 }> = ({ label, value, mono, emphasis }) => (
   <div>
-    <p className="text-[11px] text-typography-500">{label}</p>
+    <p className="text-xs text-typography-500">{label}</p>
     <p
       className={`text-xs whitespace-pre-wrap break-words ${mono ? "font-mono" : ""} ${
         emphasis ? "text-typography-900 font-medium" : "text-typography-700"
@@ -84,9 +84,7 @@ export const FindingConfidence: FC<{ finding: BugFindingDetail }> = ({ finding }
         </span>
         <InfoTip label={en.bugHunter.drawerConfidenceTooltip} />
         {finding.confidence < BUG_FINDING_LOW_CONFIDENCE_THRESHOLD && (
-          <span className="text-[11px] text-amber-700">
-            {en.bugHunter.findingLowConfidenceTooltip}
-          </span>
+          <span className="text-xs text-amber-700">{en.bugHunter.findingLowConfidenceTooltip}</span>
         )}
       </div>
     )}
@@ -221,7 +219,7 @@ export const FindingConfidence: FC<{ finding: BugFindingDetail }> = ({ finding }
           />
         )}
         {finding.faultLocation.layer !== "code" && (
-          <p className="text-[11px] text-amber-800">{en.bugHunter.drawerFaultDataNote}</p>
+          <p className="text-xs text-amber-800">{en.bugHunter.drawerFaultDataNote}</p>
         )}
       </div>
     )}

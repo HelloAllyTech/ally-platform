@@ -201,7 +201,7 @@ export const BugHunterDecisionsPanel = ({ query }: AnalyticsTabFilters) => {
               <h4 className="text-xs font-semibold text-typography-900 mt-3 mb-1">
                 {t.wrongFixesTitle}
               </h4>
-              <p className="text-[11px] text-typography-500 mb-1">{t.wrongFixesCaption}</p>
+              <p className="text-xs text-typography-500 mb-1">{t.wrongFixesCaption}</p>
               {brokenLinks.length === 0 ? (
                 <p className="text-xs text-typography-500" data-testid="wrong-fixes-empty">
                   {t.wrongFixesEmpty}

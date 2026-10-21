@@ -231,7 +231,7 @@ const SplitForm: React.FC<{
         {parts.map((part, index) => (
           <li key={part.id ?? `new-${index}`} className="border-border-light border p-3">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-x-2">
-              <span className="text-typography-secondary text-xs uppercase tracking-wide">
+              <span className="text-typography-secondary text-xs tracking-wide">
                 {part.id ? "Original — keeps its comments and shared links" : `Part ${index + 1}`}
               </span>
               <div className="flex items-center gap-3">

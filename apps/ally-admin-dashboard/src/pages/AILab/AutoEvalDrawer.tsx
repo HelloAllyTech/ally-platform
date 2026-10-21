@@ -130,7 +130,7 @@ export const AutoEvalDrawer: React.FC<AutoEvalDrawerProps> = ({ run, onClose }) 
           </div>
 
           <div>
-            <h4 className="text-xs uppercase tracking-wide text-typography-500 mb-2">
+            <h4 className="text-xs tracking-wide text-typography-500 mb-2">
               {en.aiLab.autoEval.priorHeading}
             </h4>
             {isFetching && prior.length === 0 ? (

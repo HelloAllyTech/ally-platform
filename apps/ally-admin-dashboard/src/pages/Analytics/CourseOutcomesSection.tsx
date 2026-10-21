@@ -103,7 +103,7 @@ const ROW_GRID =
  */
 export const CourseFunnelRows = ({ rows }: { rows: CourseFunnelRow[] }) => (
   <div className="flex flex-col">
-    <div className="mb-2 flex flex-wrap items-center gap-3 text-[11px] text-typography-500">
+    <div className="mb-2 flex flex-wrap items-center gap-3 text-xs text-typography-500">
       {FUNNEL_STAGES.map(stage => (
         <span key={stage} className="flex items-center gap-1">
           <span
@@ -122,7 +122,7 @@ export const CourseFunnelRows = ({ rows }: { rows: CourseFunnelRow[] }) => (
         <div key={r.key} className={`${ROW_GRID} border-t border-[#f0f0f0] py-1.5`}>
           <span className="flex min-w-0 flex-col">
             <span className="text-xs text-typography-900">{r.label}</span>
-            <span className="text-[11px] text-typography-500">{r.sublabel}</span>
+            <span className="text-xs text-typography-500">{r.sublabel}</span>
           </span>
           <span
             className="relative h-5 rounded"
@@ -143,7 +143,7 @@ export const CourseFunnelRows = ({ rows }: { rows: CourseFunnelRow[] }) => (
           </span>
           <span className="flex flex-col text-xs tabular-nums text-typography-700">
             <span>{r.counts.map(c => c.toLocaleString()).join(" → ")}</span>
-            <span className="text-[11px] text-typography-500">
+            <span className="text-xs text-typography-500">
               {finishedPct !== null ? `${pct(finishedPct)} finished · ` : ""}
               {r.stalled.toLocaleString()} stalled
               {r.stalledPct !== null ? ` (${pct(r.stalledPct)} of started)` : ""}
@@ -163,7 +163,7 @@ export const CourseFunnelRows = ({ rows }: { rows: CourseFunnelRow[] }) => (
  */
 export const GateRows = ({ rows }: { rows: GateRow[] }) => (
   <div className="flex flex-col">
-    <div className="mb-2 flex flex-wrap items-center gap-3 text-[11px] text-typography-500">
+    <div className="mb-2 flex flex-wrap items-center gap-3 text-xs text-typography-500">
       {GATE_OUTCOMES.map(o => (
         <span key={o} className="flex items-center gap-1">
           <span
@@ -181,7 +181,7 @@ export const GateRows = ({ rows }: { rows: GateRow[] }) => (
         <div key={r.key} className={`${ROW_GRID} border-t border-[#f0f0f0] py-1.5`}>
           <span className="flex min-w-0 flex-col">
             <span className="text-xs text-typography-900">{r.label}</span>
-            <span className="text-[11px] text-typography-500">{r.sublabel}</span>
+            <span className="text-xs text-typography-500">{r.sublabel}</span>
           </span>
           <span
             className="flex h-5 overflow-hidden rounded"
@@ -201,9 +201,7 @@ export const GateRows = ({ rows }: { rows: GateRow[] }) => (
             <span>
               {first ? `${pct(first.pct)} first time` : "none first time"} · n = {r.n}
             </span>
-            {r.flag && (
-              <span className="text-[11px] font-medium text-typography-900">{r.flag}</span>
-            )}
+            {r.flag && <span className="text-xs font-medium text-typography-900">{r.flag}</span>}
           </span>
         </div>
       );
@@ -224,7 +222,7 @@ const WithheldLine = ({
   const text = withheldList(quizzes.map(q => ({ title: q.title, n: q.firstAttempts })));
   if (!text) return null;
   return (
-    <p className="text-[11px] leading-snug text-typography-500">
+    <p className="text-xs leading-snug text-typography-500">
       Under {minN} {what}, so not rated: {text}.
     </p>
   );
@@ -432,7 +430,7 @@ export const CourseOutcomesSection = ({ query }: Pick<AnalyticsTabFilters, "quer
         <div className="flex flex-col gap-2">
           <CourseFunnelRows rows={funnelRows} />
           {offChart > 0 && (
-            <p className="text-[11px] text-typography-500">
+            <p className="text-xs text-typography-500">
               {offChart} more course{offChart === 1 ? "" : "s"} with fewer enrolments{" "}
               {offChart === 1 ? "is" : "are"} in the expanded view.
             </p>
@@ -463,7 +461,7 @@ export const CourseOutcomesSection = ({ query }: Pick<AnalyticsTabFilters, "quer
           <div className="flex flex-col gap-2">
             <SimpleBarChart data={bars} options={barOptions(barHeight(bars.length))} />
             {fpMeasurable.length > QUIZ_CHART_ROWS && (
-              <p className="text-[11px] text-typography-500">
+              <p className="text-xs text-typography-500">
                 The {QUIZ_CHART_ROWS} hardest of {fpMeasurable.length} rated quizzes; the rest are
                 in the expanded view.
               </p>
@@ -530,7 +528,7 @@ export const CourseOutcomesSection = ({ query }: Pick<AnalyticsTabFilters, "quer
         <div className="flex flex-col gap-2">
           <GateRows rows={gRows} />
           {gWithheld && (
-            <p className="text-[11px] leading-snug text-typography-500">
+            <p className="text-xs leading-snug text-typography-500">
               Under {gMinN} learners, so not split: {gWithheld}.
             </p>
           )}
@@ -561,13 +559,13 @@ export const CourseOutcomesSection = ({ query }: Pick<AnalyticsTabFilters, "quer
           <div className="flex flex-col gap-2">
             <LineChart data={curvePoints} options={curveOptions()} />
             {curve && curve.others.length > 0 && (
-              <p className="text-[11px] text-typography-500">
+              <p className="text-xs text-typography-500">
                 {curve.others.length} more measurable course
                 {curve.others.length === 1 ? " is" : "s are"} in the expanded view.
               </p>
             )}
             {curveBelow && (
-              <p className="text-[11px] leading-snug text-typography-500">
+              <p className="text-xs leading-snug text-typography-500">
                 Under {curveMinN} started learners, so not drawn: {curveBelow}.
               </p>
             )}
@@ -596,7 +594,7 @@ export const CourseOutcomesSection = ({ query }: Pick<AnalyticsTabFilters, "quer
         >
           <div className="flex flex-col gap-2">
             <ScatterChart data={knowPts} options={knowOptions()} />
-            {knowNote && <p className="text-[11px] leading-snug text-typography-500">{knowNote}</p>}
+            {knowNote && <p className="text-xs leading-snug text-typography-500">{knowNote}</p>}
           </div>
         </ChartCard>
       </div>
@@ -647,7 +645,7 @@ export const CourseOutcomesSection = ({ query }: Pick<AnalyticsTabFilters, "quer
                     <div key={q.trackItemId} className="text-xs text-typography-700">
                       <span className="font-medium">{q.title}</span>{" "}
                       <span className="text-typography-500">({q.trackTitle})</span>
-                      <ul className="ml-4 list-disc text-[11px] text-typography-600">
+                      <ul className="ml-4 list-disc text-xs text-typography-600">
                         {q.missedQuestions.map(m => (
                           <li key={m.questionId}>{missedQuestionText(m)}</li>
                         ))}

@@ -93,9 +93,7 @@ const EMPTY_XP_POINTS = [];
 const EMPTY_TOTAL_COST_POINTS = [];
 
 const SubHeading = ({ children }: { children: string }) => (
-  <h2 className="text-xs font-medium uppercase tracking-wide text-typography-500 mt-8 mb-3">
-    {children}
-  </h2>
+  <h2 className="text-xs font-medium tracking-wide text-typography-500 mt-8 mb-3">{children}</h2>
 );
 
 /**

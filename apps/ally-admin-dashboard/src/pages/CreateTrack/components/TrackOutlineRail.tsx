@@ -128,7 +128,7 @@ export const TrackOutlineRail: FC<TrackOutlineRailProps> = ({
         <Languages className="w-4 h-4" />
         <span className="text-sm font-medium flex-1 text-left">Languages</span>
         {publishedLanguageCount > 0 && (
-          <span className="rounded-full bg-success-50 px-1.5 py-0.5 text-xs lg:text-[10px] text-success-700">
+          <span className="rounded-full bg-success-50 px-1.5 py-0.5 text-xs text-success-700">
             {publishedLanguageCount}
           </span>
         )}

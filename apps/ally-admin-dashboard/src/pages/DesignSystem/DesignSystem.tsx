@@ -114,7 +114,7 @@ const Section: React.FC<{
 /** A labelled example within a section — a small caption over the live demo. */
 const Example: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
   <div>
-    <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">{label}</p>
+    <p className="mb-3 text-xs font-semibold tracking-wide text-gray-500">{label}</p>
     <div className="flex flex-wrap items-start gap-4">{children}</div>
   </div>
 );
@@ -279,9 +279,9 @@ export const DesignSystem: React.FC = () => {
               <span className="text-lg font-semibold" style={{ color: carbonTokens.primary }}>
                 Ally Design System
               </span>
-              <span className="text-sm text-gray-400">Carbon · White · IBM Plex Serif</span>
+              <span className="text-sm text-gray-500">Carbon · White · IBM Plex Serif</span>
             </div>
-            <span className="text-xs text-gray-400">@ally-ui-mono/ui-shared</span>
+            <span className="text-xs text-gray-500">@ally-ui-mono/ui-shared</span>
           </div>
           {/* One scrollable row on phones so the sticky header stays short. */}
           <nav className="mt-2 md:mt-3 -mx-4 px-4 md:mx-0 md:px-0 flex overflow-x-auto whitespace-nowrap md:flex-wrap md:overflow-visible md:whitespace-normal gap-x-4 gap-y-1 text-sm">
@@ -780,7 +780,7 @@ export const DesignSystem: React.FC = () => {
           </Example>
         </Section>
 
-        <footer className="border-t border-gray-200 py-10 text-sm text-gray-400">
+        <footer className="border-t border-gray-200 py-10 text-sm text-gray-500">
           Ally Design System — rendered live from{" "}
           <span className="font-mono">@ally-ui-mono/ui-shared</span>.
         </footer>

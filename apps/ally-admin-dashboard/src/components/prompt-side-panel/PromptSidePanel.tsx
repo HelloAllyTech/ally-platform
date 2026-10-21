@@ -114,14 +114,14 @@ interface FieldProps {
  * — the label sits above the control, both spanning the full drawer width.
  */
 const CARBON_FIELD =
-  "w-full h-10 rounded-none border-0 border-b border-border-dark bg-secondary-50 px-3 text-base text-neutral-800 placeholder:text-typography-600 focus:outline-none focus:border-b-2 focus:border-primary-500 transition-colors";
+  "w-full h-10 rounded-none border-0 border-b border-border-dark bg-secondary-50 px-3 text-base text-neutral-800 placeholder:text-typography-placeholder focus:outline-none focus:border-b-2 focus:border-primary-500 transition-colors";
 
 // AutoExpandableTextarea bakes in `px-0 py-0` and a negative `mt-[-8px]`
 // (leftovers from the old borderless inline layout); `!` overrides are needed
 // for the Carbon padding/margin to win — the component already uses `!text-md`,
 // so this matches its own precedence strategy.
 const CARBON_FIELD_TEXTAREA =
-  "w-full rounded-none border-0 border-b border-border-dark bg-secondary-50 !px-3 !py-2 !mt-0 text-neutral-800 placeholder:text-typography-600 focus:outline-none focus:border-b-2 focus:border-primary-500 resize-none overflow-y-auto custom-scrollbar transition-colors";
+  "w-full rounded-none border-0 border-b border-border-dark bg-secondary-50 !px-3 !py-2 !mt-0 text-neutral-800 placeholder:text-typography-placeholder focus:outline-none focus:border-b-2 focus:border-primary-500 resize-none overflow-y-auto custom-scrollbar transition-colors";
 
 /**
  * Single-column field: Carbon-style label (12px, secondary text) stacked
@@ -348,7 +348,7 @@ const LlmModelDropdown: React.FC<{
             />
             {groups.map(group => (
               <div key={group.provider}>
-                <div className="px-3 pt-2 pb-1 text-xs tracking-[0.32px] uppercase text-neutral-500">
+                <div className="px-3 pt-2 pb-1 text-xs tracking-[0.32px] text-neutral-500">
                   {group.label}
                 </div>
                 {group.models.map(model => (
@@ -1167,7 +1167,7 @@ export const PromptSidePanel: React.FC<PromptSidePanelProps> = ({
                 <span className="relative flex">
                   <Delete width={18} height={18} />
                   {isInUse && (
-                    <span className="absolute -top-2 -right-2 min-w-[15px] h-[15px] px-1 flex items-center justify-center rounded-full bg-neutral-500 text-white text-[10px] leading-none tabular-nums">
+                    <span className="absolute -top-2 -right-2 min-w-[15px] h-[15px] px-1 flex items-center justify-center rounded-full bg-neutral-500 text-white text-xs leading-none tabular-nums">
                       {inUseCount}
                     </span>
                   )}

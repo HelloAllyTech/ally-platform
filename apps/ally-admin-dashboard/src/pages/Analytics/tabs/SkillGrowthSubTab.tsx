@@ -498,7 +498,7 @@ export const SkillGrowthSubTab = ({ query }: AnalyticsTabFilters) => {
       </ChartCard>
 
       {data && (
-        <p className="max-w-4xl text-[11px] leading-relaxed text-typography-500">
+        <p className="max-w-4xl text-xs leading-relaxed text-typography-500">
           {data.provenance.note}
         </p>
       )}

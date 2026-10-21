@@ -57,7 +57,7 @@ export const AddMessageModal: FC<AddMessageModalProps> = ({
           id={field.id}
           {...register(field.id)}
           placeholder={field.placeholder}
-          className="border rounded-md px-2 py-2 outline-none text-base font-primary placeholder:text-typography-600"
+          className="border rounded-md px-2 py-2 outline-none text-base font-primary placeholder:text-typography-placeholder"
         />
       )}
     </div>

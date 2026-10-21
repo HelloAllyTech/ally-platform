@@ -126,13 +126,13 @@ export const OpportunityGrid = ({
         skills the scenario is tagged with
       </caption>
       <thead>
-        <tr className="text-[11px] text-typography-500">
+        <tr className="text-xs text-typography-500">
           <th />
           {tierSpans(columns).map(t => (
             <th
               key={t.tier}
               colSpan={t.span}
-              className="pb-0.5 text-center font-semibold uppercase tracking-wide"
+              className="pb-0.5 text-center font-semibold tracking-wide"
             >
               {t.label}
             </th>
@@ -144,7 +144,7 @@ export const OpportunityGrid = ({
             <th
               key={c.skill}
               title={c.name}
-              className="min-w-[44px] px-1 py-1 text-center text-[11px] font-medium"
+              className="min-w-[44px] px-1 py-1 text-center text-xs font-medium"
             >
               {c.short}
             </th>
@@ -157,7 +157,7 @@ export const OpportunityGrid = ({
             <th className="py-1 pr-3 text-left font-normal">
               <span className="flex flex-col">
                 <span className="text-typography-700">{r.title}</span>
-                <span className="text-[11px] text-typography-500">
+                <span className="text-xs text-typography-500">
                   {r.cuts} slices · {r.learners} learners
                 </span>
               </span>
@@ -184,7 +184,7 @@ export const OpportunityGrid = ({
         ))}
       </tbody>
     </table>
-    <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-typography-500">
+    <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-typography-500">
       <span>Share of slices with a chance:</span>
       {OPPORTUNITY_LEGEND.map(l => (
         <span key={l.label} className="flex items-center gap-1">
@@ -318,7 +318,7 @@ const BandLegend = ({
 }) => {
   const scale = bandScale(bands);
   return (
-    <div className="flex flex-wrap items-center gap-3 text-[11px] text-typography-500">
+    <div className="flex flex-wrap items-center gap-3 text-xs text-typography-500">
       <span>{title}</span>
       {bands.map(b => (
         <span key={b.key} className="flex items-center gap-1">
@@ -350,7 +350,7 @@ export const CalibrationRows = ({ rows }: { rows: CalibrationRowView[] }) => (
       >
         <span className="flex min-w-0 flex-col">
           <span className="text-xs text-typography-900">{r.label}</span>
-          <span className="text-[11px] text-typography-500">{r.sublabel}</span>
+          <span className="text-xs text-typography-500">{r.sublabel}</span>
         </span>
         <span
           className="flex h-5 overflow-hidden rounded"
@@ -371,7 +371,7 @@ export const CalibrationRows = ({ rows }: { rows: CalibrationRowView[] }) => (
             {r.difficulty ? `Labelled ${r.difficulty.toLowerCase()}` : "No difficulty label"}
           </span>
           {r.notes.map(note => (
-            <span key={note} className="text-[11px] font-medium text-typography-900">
+            <span key={note} className="text-xs font-medium text-typography-900">
               {note}
             </span>
           ))}
@@ -535,7 +535,7 @@ export const ScenarioContentSection = ({ query }: Pick<AnalyticsTabFilters, "que
         {cov && (
           <div className="flex flex-col gap-2">
             <OpportunityGrid rows={cov.scenarios} columns={columns} />
-            {below && <p className="text-[11px] leading-snug text-typography-500">{below}</p>}
+            {below && <p className="text-xs leading-snug text-typography-500">{below}</p>}
           </div>
         )}
       </ChartCard>
@@ -628,15 +628,13 @@ export const ScenarioContentSection = ({ query }: Pick<AnalyticsTabFilters, "que
         >
           {sel && sel.learners && (
             <div className="flex flex-col gap-2">
-              <p className="text-[11px] text-typography-500">
+              <p className="text-xs text-typography-500">
                 {sel.title ?? "This scenario"} {versionLabel(sel.versionNumber)} · {sel.pairs}{" "}
                 paired of {sel.repeaters} who replayed it
               </p>
               <ScoreSlope learners={sel.learners} row={row} />
               {editNote && (
-                <p className="text-[11px] font-medium leading-snug text-typography-900">
-                  {editNote}
-                </p>
+                <p className="text-xs font-medium leading-snug text-typography-900">{editNote}</p>
               )}
             </div>
           )}
@@ -680,7 +678,7 @@ export const ScenarioContentSection = ({ query }: Pick<AnalyticsTabFilters, "que
             )}
             <CalibrationRows rows={calRows} />
             {calBelow && (
-              <p className="text-[11px] leading-snug text-typography-500">
+              <p className="text-xs leading-snug text-typography-500">
                 Under {calMinN} scored sessions, so not banded: {calBelow}.
               </p>
             )}
@@ -732,13 +730,13 @@ export const ScenarioContentSection = ({ query }: Pick<AnalyticsTabFilters, "que
             <StackedBarChart data={progSeries} options={progOptions()} />
           </ScrollableChart>
           {progThin > 0 && (
-            <p className="text-[11px] text-typography-500">
+            <p className="text-xs text-typography-500">
               {progThin} {bucketTitle(progBucket).toLowerCase()}
               {progThin === 1 ? " has" : "s have"} sessions but fewer than {progMinN}: no bar.
             </p>
           )}
           {progUntracked && (
-            <p className="text-[11px] leading-snug text-typography-500">{progUntracked}</p>
+            <p className="text-xs leading-snug text-typography-500">{progUntracked}</p>
           )}
         </div>
       </ChartCard>

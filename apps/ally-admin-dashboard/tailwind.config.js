@@ -22,6 +22,42 @@ module.exports = {
       secondary: ["IBM Plex Serif", "serif"],
       tertiary: ["IBM Plex Serif", "serif"],
     },
+    fontWeight: {
+      // Carbon sets IBM Plex in three weights only — Light 300, Regular 400 and
+      // SemiBold 600 — and styles.css self-hosts exactly those faces. `medium`
+      // (500) and the heavier steps are aliased to SemiBold so the ~750 existing
+      // `font-medium`/`font-bold` usages render a Carbon weight with no per-file
+      // edits, the same way `secondary`/`tertiary` were aliased to serif above.
+      thin: "300",
+      extralight: "300",
+      light: "300",
+      normal: "400",
+      medium: "600",
+      semibold: "600",
+      bold: "600",
+      extrabold: "600",
+      black: "600",
+    },
+    borderRadius: {
+      // Carbon is square: buttons, fields, tiles, modals, notifications and data tables
+      // all have 0 corners, which is how every @carbon/react component already renders
+      // here. The scale below squares the ~850 custom surfaces that sat beside them at
+      // 4–8px. `sm` keeps Carbon's 2px for small details (checkbox, popover, tooltip);
+      // `full` keeps pills and circles (tags, toggles, avatars, status dots).
+      none: "0",
+      sm: "2px",
+      DEFAULT: "0",
+      md: "0",
+      lg: "0",
+      xl: "0",
+      "2xl": "0",
+      "3xl": "0",
+      full: "9999px",
+      // Paired with the consumer app's config for the shared Dropdown / ButtonGroup.
+      dropdown: "0",
+      "dropdown-item": "0",
+      "button-group": "0",
+    },
     extend: {
       fontSize: {
         // Type scale. Kept Carbon-compatible: these px steps already line up
@@ -31,6 +67,7 @@ module.exports = {
         // Carbon look comes from the serif type family + tokens + component shapes.
         // Custom font sizes used throughout the application
         xs: ["12px", { lineHeight: "16px" }], // Extra small - labels, captions
+        chip: "12px", // ui-shared ChipGroup at Carbon's 12px floor (consumer app: 11px)
         sm: ["13px", { lineHeight: "20px" }], // Small - table text, secondary content
         base: ["14px", { lineHeight: "24px" }], // Base - body text, form fields
         md: ["15px", { lineHeight: "24px" }], // Medium - tabs, emphasized text
@@ -68,6 +105,22 @@ module.exports = {
         terracotta: {
           DEFAULT: "#D76F4C",
           text: "#B34F2C",
+        },
+        // Dropdown and ButtonGroup — the shared ui-shared components' literals, paired
+        // with the consumer app's config (which keeps the old values). Here they are
+        // Carbon: border-subtle, field-01 and text-helper for the dropdown; the dark
+        // segmented group neutralised onto gray-90 / gray-60 / white / text-primary.
+        dropdown: {
+          border: "#e0e0e0",
+          "search-bg": "#f4f4f4",
+          "option-active": "#e8e8e8", // layer-hover-01
+          empty: "#6f6f6f",
+        },
+        "button-group": {
+          bg: "#262626",
+          divider: "#6f6f6f",
+          "active-bg": "#ffffff",
+          "active-fg": "#161616",
         },
         // Badge — the shared ui-shared/lib/badge component's three variants.
         // These are the exact literals Badge.tsx hardcoded before W4, lifted
@@ -185,9 +238,144 @@ module.exports = {
           secondary: "#f4f4f4", // layer-01 (gray-10)
           tertiary: "#e0e0e0", // layer-02 (gray-20)
         },
+        // Tailwind's default hues, re-pointed at Carbon's palettes (~430 usages, mostly
+        // status chips and badges). The map is lightness-fitted per family under the
+        // constraint that steps stay strictly increasing (so a `bg-*-100` chip never loses
+        // its `border-*-200` edge), and for every family the best fit turned out to be the
+        // same simple rule: Tailwind N00 -> Carbon N0, 50 -> 10, 100 -> Carbon's 10-hover
+        // tint, 950 -> 100. Families without a Carbon twin take the nearest one: amber
+        // joins yellow (Carbon's warning hue), sky is cyan, indigo is blue. Every text-on-
+        // tint pair in use clears 4.5:1; the 500 step is Carbon's 50, too light for text,
+        // so text uses 600 (Carbon's support/error step) and up.
+        red: {
+          50: "#fff1f1", // red-10
+          100: "#ffe0e0", // red-10-hover
+          200: "#ffd7d9", // red-20
+          300: "#ffb3b8", // red-30
+          400: "#ff8389", // red-40
+          500: "#fa4d56", // red-50
+          600: "#da1e28", // red-60
+          700: "#a2191f", // red-70
+          800: "#750e13", // red-80
+          900: "#520408", // red-90
+          950: "#2d0709", // red-100
+        },
+        orange: {
+          50: "#fff2e8", // orange-10
+          100: "#ffe2cc", // orange-10-hover
+          200: "#ffd9be", // orange-20
+          300: "#ffb784", // orange-30
+          400: "#ff832b", // orange-40
+          500: "#eb6200", // orange-50
+          600: "#ba4e00", // orange-60
+          700: "#8a3800", // orange-70
+          800: "#5e2900", // orange-80
+          900: "#3e1a00", // orange-90
+          950: "#231000", // orange-100
+        },
         amber: {
-          50: "#FFF8E1",
-          200: "#FFE082",
+          50: "#fcf4d6", // yellow-10
+          100: "#f8e6a0", // yellow-10-hover
+          200: "#fddc69", // yellow-20
+          300: "#f1c21b", // yellow-30
+          400: "#d2a106", // yellow-40
+          500: "#b28600", // yellow-50
+          600: "#8e6a00", // yellow-60
+          700: "#684e00", // yellow-70
+          800: "#483700", // yellow-80
+          900: "#302400", // yellow-90
+          950: "#1c1500", // yellow-100
+        },
+        yellow: {
+          50: "#fcf4d6", // yellow-10
+          100: "#f8e6a0", // yellow-10-hover
+          200: "#fddc69", // yellow-20
+          300: "#f1c21b", // yellow-30
+          400: "#d2a106", // yellow-40
+          500: "#b28600", // yellow-50
+          600: "#8e6a00", // yellow-60
+          700: "#684e00", // yellow-70
+          800: "#483700", // yellow-80
+          900: "#302400", // yellow-90
+          950: "#1c1500", // yellow-100
+        },
+        green: {
+          50: "#defbe6", // green-10
+          100: "#b6f6c8", // green-10-hover
+          200: "#a7f0ba", // green-20
+          300: "#6fdc8c", // green-30
+          400: "#42be65", // green-40
+          500: "#24a148", // green-50
+          600: "#198038", // green-60
+          700: "#0e6027", // green-70
+          800: "#044317", // green-80
+          900: "#022d0d", // green-90
+          950: "#071908", // green-100
+        },
+        teal: {
+          50: "#d9fbfb", // teal-10
+          100: "#acf6f6", // teal-10-hover
+          200: "#9ef0f0", // teal-20
+          300: "#3ddbd9", // teal-30
+          400: "#08bdba", // teal-40
+          500: "#009d9a", // teal-50
+          600: "#007d79", // teal-60
+          700: "#005d5d", // teal-70
+          800: "#004144", // teal-80
+          900: "#022b30", // teal-90
+          950: "#081a1c", // teal-100
+        },
+        sky: {
+          50: "#e5f6ff", // cyan-10
+          100: "#cceeff", // cyan-10-hover
+          200: "#bae6ff", // cyan-20
+          300: "#82cfff", // cyan-30
+          400: "#33b1ff", // cyan-40
+          500: "#1192e8", // cyan-50
+          600: "#0072c3", // cyan-60
+          700: "#00539a", // cyan-70
+          800: "#003a6d", // cyan-80
+          900: "#012749", // cyan-90
+          950: "#061727", // cyan-100
+        },
+        blue: {
+          50: "#edf5ff", // blue-10
+          100: "#dbebff", // blue-10-hover
+          200: "#d0e2ff", // blue-20
+          300: "#a6c8ff", // blue-30
+          400: "#78a9ff", // blue-40
+          500: "#4589ff", // blue-50
+          600: "#0f62fe", // blue-60
+          700: "#0043ce", // blue-70
+          800: "#002d9c", // blue-80
+          900: "#001d6c", // blue-90
+          950: "#001141", // blue-100
+        },
+        indigo: {
+          50: "#edf5ff", // blue-10
+          100: "#dbebff", // blue-10-hover
+          200: "#d0e2ff", // blue-20
+          300: "#a6c8ff", // blue-30
+          400: "#78a9ff", // blue-40
+          500: "#4589ff", // blue-50
+          600: "#0f62fe", // blue-60
+          700: "#0043ce", // blue-70
+          800: "#002d9c", // blue-80
+          900: "#001d6c", // blue-90
+          950: "#001141", // blue-100
+        },
+        purple: {
+          50: "#f6f2ff", // purple-10
+          100: "#ede5ff", // purple-10-hover
+          200: "#e8daff", // purple-20
+          300: "#d4bbff", // purple-30
+          400: "#be95ff", // purple-40
+          500: "#a56eff", // purple-50
+          600: "#8a3ffc", // purple-60
+          700: "#6929c4", // purple-70
+          800: "#491d8b", // purple-80
+          900: "#31135e", // purple-90
+          950: "#1c0f30", // purple-100
         },
         // Border Colors — IBM Carbon border tokens.
         border: {
@@ -198,19 +386,50 @@ module.exports = {
           blue: "#264D8E", // focus / interactive (brand blue)
           amber400: "#FFCA28",
         },
-        // Text Colors
+        // Text colours — Carbon's white-theme text tokens. This group used to be an
+        // alpha-black ramp (0.87 … 0.04) carried over from Material UI, whose lighter
+        // steps put body text at 1.7–2.7:1 contrast. The steps keep their order but fold
+        // onto Carbon's three readable tokens, each ≥ 4.5:1 on white, so the ~3,000
+        // existing `text-typography-*` usages re-point with no per-file edits:
+        //   900          → text-primary   (gray-100)
+        //   800, 700     → text-secondary (gray-70)
+        //   600 … 400    → text-helper    (gray-60)
+        // Placeholder and disabled text have their own Carbon tokens (alpha of
+        // gray-100) rather than borrowing a light step. 50–300 stay translucent: they
+        // are hairlines and washes, not text.
         typography: {
-          Default: "rgba(0, 0, 0, 0.87)",
-          50: "rgba(0, 0, 0, 0.04)",
-          100: "rgba(0, 0, 0, 0.08)", //"rgba(0, 0, 0, 0.08)"
-          200: "rgba(0, 0, 0, 0.12)", //"rgba(0, 0, 0, 0.12)"
-          300: "rgba(0, 0, 0, 0.16)", //"rgba(0, 0, 0, 0.16)" #E5E7EB
-          400: "rgba(0, 0, 0, 0.24)", //"rgba(0, 0, 0, 0.24)" #D1D5DB
-          500: "rgba(0, 0, 0, 0.32)", //"rgba(0, 0, 0, 0.32)"
-          600: "rgba(0, 0, 0, 0.38)", //"rgba(0, 0, 0, 0.38)"
-          700: "rgba(0, 0, 0, 0.54)", //"rgba(0, 0, 0, 0.54)"
-          800: "rgba(0, 0, 0, 0.6)", //"rgba(0, 0, 0, 0.6)"
-          900: "rgba(0, 0, 0, 0.87)", //"rgba(0, 0, 0, 0.87)"
+          Default: "#161616",
+          50: "rgba(22, 22, 22, 0.04)",
+          100: "rgba(22, 22, 22, 0.08)",
+          200: "rgba(22, 22, 22, 0.12)",
+          300: "rgba(22, 22, 22, 0.16)",
+          400: "#6f6f6f",
+          500: "#6f6f6f",
+          600: "#6f6f6f",
+          700: "#525252",
+          800: "#525252",
+          900: "#161616",
+          placeholder: "rgba(22, 22, 22, 0.4)", // text-placeholder
+          disabled: "rgba(22, 22, 22, 0.25)", // text-disabled
+        },
+        // Tailwind's default `gray` is a blue-tinted slate; Carbon's is neutral. Mapped
+        // by lightness (not by index, as `neutral` above is) so a `bg-gray-50` →
+        // `hover:bg-gray-100` pair still steps: 50/100 are layer-01 and its hover.
+        // Carbon has no pure black: its darkest neutral is gray-100. Re-pointing `black`
+        // keeps text-black at text-primary and makes bg-black/NN scrims Carbon's overlay.
+        black: "#161616",
+        gray: {
+          50: "#f4f4f4", // gray-10 (layer-01)
+          100: "#e8e8e8", // gray-10-hover (layer-hover-01)
+          200: "#e0e0e0", // gray-20 (border-subtle)
+          300: "#c6c6c6", // gray-30
+          400: "#a8a8a8", // gray-40
+          500: "#6f6f6f", // gray-60 (text-helper)
+          600: "#525252", // gray-70 (text-secondary)
+          700: "#393939", // gray-80
+          800: "#262626", // gray-90
+          900: "#161616", // gray-100 (text-primary)
+          950: "#161616",
         },
       },
       animation: {

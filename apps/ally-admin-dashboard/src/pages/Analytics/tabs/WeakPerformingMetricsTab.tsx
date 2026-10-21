@@ -521,7 +521,7 @@ const TurnConditionsSection: FC<{ data: WeakMetricTurnConditions }> = ({ data })
                       style={{
                         display: "block",
                         height: "0.5rem",
-                        borderRadius: "0.25rem",
+                        borderRadius: 0,
                         background: PALETTE.blue,
                         opacity: 0.85,
                         width: worst > 0 ? `${Math.max((band.rate / worst) * 100, 1)}%` : "1%",

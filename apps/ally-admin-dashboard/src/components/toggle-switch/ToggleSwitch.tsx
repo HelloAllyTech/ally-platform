@@ -11,14 +11,17 @@ export const ToggleSwitch: React.FC<{
       if (!disabled) onChange(!enabled);
     }}
     disabled={disabled}
-    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
-      enabled ? "bg-success-200" : "bg-neutral-200"
+    // Carbon toggle: 48×24 track, gray-50 off / green-50 on, 18px handle inset 3px,
+    // brand focus ring. aria-pressed carries the on/off state to assistive tech.
+    className={`relative inline-flex h-6 w-12 shrink-0 items-center rounded-full transition-colors focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary-500 ${
+      enabled ? "bg-success" : "bg-neutral-400"
     } ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
     aria-label={label ?? "Toggle"}
+    aria-pressed={enabled}
   >
     <span
-      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-        enabled ? "translate-x-6" : "translate-x-1"
+      className={`inline-block h-[18px] w-[18px] transform rounded-full bg-white transition-transform ${
+        enabled ? "translate-x-[27px]" : "translate-x-[3px]"
       }`}
       style={switchStyles}
     />

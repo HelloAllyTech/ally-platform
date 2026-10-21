@@ -7,9 +7,12 @@ const MAX_VISIBLE_PAGES = 7;
 const PAGINATION_BUTTON_CLASSES =
   "inline-flex h-10 w-10 items-center justify-center text-xl text-gray-400 hover:text-black disabled:text-gray-200 sm:h-auto sm:w-auto sm:px-1";
 const PAGINATION_EDGE_BUTTON_CLASSES = `${PAGINATION_BUTTON_CLASSES} max-sm:hidden`;
+// Carbon pagination: square page buttons in Regular; the current page is SemiBold with a
+// 4px interactive bar along its bottom edge rather than a filled circle.
 const PAGE_NUMBER_CLASSES =
-  "min-w-8 h-10 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-base font-medium transition-colors";
-const PAGE_NUMBER_ACTIVE_CLASSES = "bg-gray-200 text-black";
+  "min-w-8 h-10 sm:w-8 sm:h-8 rounded-none flex items-center justify-center text-base font-normal transition-colors";
+const PAGE_NUMBER_ACTIVE_CLASSES =
+  "font-semibold text-black shadow-[inset_0_-4px_0_0_theme(colors.primary.500)]";
 const PAGE_NUMBER_INACTIVE_CLASSES = "text-gray-700 hover:bg-gray-100";
 
 /**

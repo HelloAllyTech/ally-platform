@@ -66,7 +66,7 @@ export const ReportedBugPanel: React.FC<{ report: ReportedBugContext }> = ({ rep
           }
           align="top"
         >
-          <span className="inline-flex items-center rounded bg-purple-50 px-1.5 text-[10px] font-semibold text-purple-700 cursor-help">
+          <span className="inline-flex items-center rounded bg-purple-50 px-1.5 text-xs font-semibold text-purple-700 cursor-help">
             {isConsumer ? en.bugHunter.reporterConsumer : en.bugHunter.reporterStaff}
           </span>
         </Tooltip>

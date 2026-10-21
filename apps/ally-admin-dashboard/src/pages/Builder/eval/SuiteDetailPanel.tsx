@@ -135,7 +135,7 @@ const RunCard: React.FC<RunCardProps> = ({ run, kind, checklistText }) => {
         <div className="flex flex-col gap-4 border-t border-neutral-200 pt-3">
           {run.gates && (
             <section>
-              <h5 className="mb-1 text-xs font-semibold uppercase tracking-wide text-typography-500">
+              <h5 className="mb-1 text-xs font-semibold tracking-wide text-typography-500">
                 {strings.gatesHeading(gateViolationCount(run.gates))}
               </h5>
               <ul className="grid grid-cols-1 gap-x-6 gap-y-0.5 sm:grid-cols-2">
@@ -162,7 +162,7 @@ const RunCard: React.FC<RunCardProps> = ({ run, kind, checklistText }) => {
 
           {!isReview && metrics && (
             <section>
-              <h5 className="mb-1 text-xs font-semibold uppercase tracking-wide text-typography-500">
+              <h5 className="mb-1 text-xs font-semibold tracking-wide text-typography-500">
                 {strings.metricsHeading}
               </h5>
               <dl className="grid grid-cols-2 gap-x-6 gap-y-1 sm:grid-cols-3">
@@ -193,7 +193,7 @@ const RunCard: React.FC<RunCardProps> = ({ run, kind, checklistText }) => {
 
           {judge && (
             <section>
-              <h5 className="mb-1 text-xs font-semibold uppercase tracking-wide text-typography-500">
+              <h5 className="mb-1 text-xs font-semibold tracking-wide text-typography-500">
                 {strings.judgeHeading(judge.met, judge.total, formatJudgeScore(judge.score))}
               </h5>
               {judge.error && (
@@ -236,7 +236,7 @@ const RunCard: React.FC<RunCardProps> = ({ run, kind, checklistText }) => {
 
           {critic && (
             <section>
-              <h5 className="mb-1 text-xs font-semibold uppercase tracking-wide text-typography-500">
+              <h5 className="mb-1 text-xs font-semibold tracking-wide text-typography-500">
                 {strings.criticHeading}
               </h5>
               <p
@@ -270,7 +270,7 @@ const RunCard: React.FC<RunCardProps> = ({ run, kind, checklistText }) => {
 
           {!isReview && (
             <section>
-              <h5 className="mb-1 text-xs font-semibold uppercase tracking-wide text-typography-500">
+              <h5 className="mb-1 text-xs font-semibold tracking-wide text-typography-500">
                 {strings.transcriptHeading}
               </h5>
               <EvalTranscript turns={run.transcript} />

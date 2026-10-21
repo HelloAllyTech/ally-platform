@@ -252,7 +252,7 @@ export const MultiLevelCombinationTriggerConditions: React.FC<
     return (
       <div key={path} className="flex items-center gap-2 py-1">
         <div className="flex flex-row">
-          <span className="text-typography-900 bg-white h-[26px] w-[26px] rounded-[2px] mr-[4px] text-center items-center justify-center border border-border-light flex text-xs">
+          <span className="text-typography-900 bg-white h-[26px] w-[26px] rounded-sm mr-[4px] text-center items-center justify-center border border-border-light flex text-xs">
             {leafIndex !== -1 ? `E${leafIndex + 1}` : ""}
           </span>
           <TriggerConditionDropdown
@@ -286,7 +286,7 @@ export const MultiLevelCombinationTriggerConditions: React.FC<
         <Tooltip label="Remove this event" align="top">
           <button
             onClick={() => handleDeleteCondition(path)}
-            className="p-[2px] h-[25px] w-[25px] flex items-center justify-center hover:bg-neutral-100 border border-border-light rounded-[2px] transition-colors"
+            className="p-[2px] h-[25px] w-[25px] flex items-center justify-center hover:bg-neutral-100 border border-border-light rounded-sm transition-colors"
           >
             <Delete className="w-[12px] h-[12px]" />
           </button>
@@ -295,7 +295,7 @@ export const MultiLevelCombinationTriggerConditions: React.FC<
           <Tooltip label="Create a group and include a new condition" align="top">
             <button
               onClick={() => handleAddCondition(path)}
-              className="p-[5px] flex flex-row gap-1 min-w-[82px] items-center hover:bg-neutral-50 rounded-[2px] transition-colors text-primary-500 h-[25px] border-[0.5px] border-primary-500"
+              className="p-[5px] flex flex-row gap-1 min-w-[82px] items-center hover:bg-neutral-50 rounded-sm transition-colors text-primary-500 h-[25px] border-[0.5px] border-primary-500"
             >
               <AddBlue className="w-[12px] h-[12px]" />
               <span className="text-xs text-primary-500 pr-[4px]">Add Leaf</span>
@@ -407,7 +407,7 @@ export const MultiLevelCombinationTriggerConditions: React.FC<
             <Tooltip label="add new condition branch to this expression" align="top">
               <button
                 onClick={() => handleAddCondition()}
-                className="flex items-center gap-1 text-primary-500 hover:text-primary-600 text-sm font-normal self-start border-[0.5px] border-primary-500 rounded-[2px] p-[5px]"
+                className="flex items-center gap-1 text-primary-500 hover:text-primary-600 text-sm font-normal self-start border-[0.5px] border-primary-500 rounded-sm p-[5px]"
               >
                 <GroupBranch className="w-[12px] h-[12px]" />
                 <span className="text-xs pl-[4px]">{en.eventConfiguration.addBase}</span>

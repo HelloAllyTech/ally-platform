@@ -70,7 +70,7 @@ const PromptConfiguration: FC<PromptConfigurationProps> = ({
       <div className="flex flex-col border border-gray-200 rounded-lg pt-4">
         <label className="text-sm font-medium text-typography-900 mb-2 block px-4">
           {REPORT_GENERATION_MESSAGES.HELPER_AGENT_PROMPT}
-          <span className="text-red-500 ml-1">*</span>
+          <span className="text-red-600 ml-1">*</span>
         </label>
         <TextArea
           id="helper-agent-prompt"
@@ -85,7 +85,7 @@ const PromptConfiguration: FC<PromptConfigurationProps> = ({
           required
         />
         {showError && (
-          <p className="text-red-500 text-sm px-4 pb-2">Helper Agent prompt is required</p>
+          <p className="text-red-600 text-sm px-4 pb-2">Helper Agent prompt is required</p>
         )}
         <hr className="border-t border-border-light py-0 my-0" />
         {/* Language, Turns, and Button */}

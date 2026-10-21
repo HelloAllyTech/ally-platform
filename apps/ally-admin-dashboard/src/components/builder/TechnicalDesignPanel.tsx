@@ -247,7 +247,7 @@ export const TechnicalDesignPanel: React.FC<TechnicalDesignPanelProps> = ({
                       <p className="mt-1 text-typography-700">{asAgentText(contract.change)}</p>
                       {readers.length > 0 && (
                         <>
-                          <p className="mt-2 text-xs font-medium uppercase tracking-wide text-typography-500">
+                          <p className="mt-2 text-xs font-medium tracking-wide text-typography-500">
                             {strings.contractReaders}
                           </p>
                           <ul className="mt-0.5 list-disc pl-5 font-mono text-xs text-typography-700">

@@ -1381,7 +1381,7 @@ export const en = {
       },
       matchTypeHelp:
         'Any word matches whole words only — the safe default for short risk words, because a substring match on "rapist" would fire on "therapist".',
-      requiredBadge: "REQUIRED",
+      requiredBadge: "Required",
       requiredHelp:
         "This is a required safety reply. You can change its wording, but it cannot be switched off or removed.",
       cannotDeactivate: "Required safety replies cannot be switched off.",
@@ -1562,7 +1562,7 @@ export const en = {
       block: "Block",
       unblock: "Unblock",
       blocked: "Blocked",
-      blockedBadge: "BLOCKED",
+      blockedBadge: "Blocked",
       blockConfirmTitle: "Block this number?",
       blockConfirmDescription:
         "Messages from this number will be dropped without a reply. They are not told they have been blocked.",
@@ -1837,7 +1837,7 @@ export const en = {
       retryQueued: "Queued for another attempt",
       archive: "Archive",
       unarchive: "Unarchive",
-      archivedBadge: "ARCHIVED",
+      archivedBadge: "Archived",
       archiveConfirmTitle: "Archive this document?",
       archiveConfirmDescription:
         "The bot will stop using it immediately. Its passages are kept, so answers already sent keep their sources. You can unarchive it later.",

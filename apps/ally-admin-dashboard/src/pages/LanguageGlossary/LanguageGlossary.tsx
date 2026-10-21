@@ -396,7 +396,7 @@ export const LanguageGlossary: React.FC = () => {
                         </Pill>
                       )}
                       {proposals > 0 && (
-                        <Pill className="bg-amber-100 text-amber-800">
+                        <Pill className="bg-orange-100 text-orange-800">
                           {proposals} proposal{proposals > 1 ? "s" : ""}
                         </Pill>
                       )}

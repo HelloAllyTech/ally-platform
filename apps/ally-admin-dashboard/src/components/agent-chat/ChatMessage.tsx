@@ -133,7 +133,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
 
       {findings.length > 0 && (
         <Tile className="w-full max-w-[92%]">
-          <p className="text-xs font-medium uppercase tracking-wide text-typography-500">
+          <p className="text-xs font-medium tracking-wide text-typography-500">
             {strings.reviewHeading}
           </p>
           <ul className="mt-2 flex flex-col gap-2">

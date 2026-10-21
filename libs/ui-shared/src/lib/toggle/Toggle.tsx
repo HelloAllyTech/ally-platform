@@ -62,16 +62,11 @@ const Toggle: FC<ToggleProps> = ({ label, hideLabel, items, initialValue, onChan
       <div
         role="radiogroup"
         aria-label={label}
-        className="flex gap-2 rounded-full border-[0.5px] bg-[#F3F3F3] relative"
+        // Carbon content switcher: square segments in one bordered strip, the selected one
+        // inverse. (This replaces a sliding pill whose half-width indicator only lined up
+        // when there were exactly two options.)
+        className="inline-flex items-stretch border border-typography-900 bg-white"
       >
-        <div
-          className={`transition-all duration-200 absolute top-0 w-1/2 h-full rounded-full bg-white pointer-events-none ${
-            selectedValue === 0
-              ? "left-0 shadow-[3px_0px_9px_0px_#00000012]"
-              : "left-1/2 shadow-[-7px_0px_9px_0px_#00000012]"
-          }`}
-        />
-
         {items.map((item, index) => {
           const isSelected = selectedValue === index;
           return (
@@ -84,8 +79,10 @@ const Toggle: FC<ToggleProps> = ({ label, hideLabel, items, initialValue, onChan
               ref={el => (buttonRefs.current[index] = el)}
               onClick={() => handleChange(index)}
               onKeyDown={event => handleKeyDown(event, index)}
-              className={`rounded-full py-2 px-4 cursor-pointer z-10 transition-all duration-200 font-primary font-normal text-sm bg-transparent border-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 ${
-                isSelected ? "text-black" : "text-black/40"
+              className={`h-8 px-4 cursor-pointer transition-colors duration-200 font-primary font-normal text-sm border-0 focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary ${
+                isSelected
+                  ? "bg-typography-900 text-white"
+                  : "bg-transparent text-typography-700 hover:bg-gray-100 hover:text-typography-900"
               }`}
             >
               {item.label}

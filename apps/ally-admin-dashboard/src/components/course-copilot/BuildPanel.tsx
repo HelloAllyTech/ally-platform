@@ -371,7 +371,7 @@ export const BuildPanel: React.FC<BuildPanelProps> = ({
         <div className="space-y-4">
           {groups.map(group => (
             <section key={group.key} aria-label={group.title}>
-              <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-typography-700">
+              <h3 className="mb-1 text-xs font-semibold tracking-wide text-typography-700">
                 {group.title}
               </h3>
               <ul className="divide-y divide-neutral-100 rounded-md border border-neutral-200">
@@ -487,7 +487,7 @@ export const BuildPanel: React.FC<BuildPanelProps> = ({
       )}
 
       <section aria-label={strings.outlineHeading} className="space-y-2">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-typography-700">
+        <h3 className="text-xs font-semibold tracking-wide text-typography-700">
           {strings.outlineHeading}
         </h3>
         <CourseOutlinePanel

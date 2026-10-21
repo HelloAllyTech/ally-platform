@@ -277,7 +277,7 @@ export const FoundationalSkillsTimeSection = ({
                 <LineChart data={competencePoints} options={competenceOpts} />
               </ScrollableChart>
               {missing.length > 0 && (
-                <p className="text-[11px] leading-snug text-typography-500">
+                <p className="text-xs leading-snug text-typography-500">
                   Most often missing among learners not there yet — {missing.join(" · ")}.
                 </p>
               )}
@@ -370,7 +370,7 @@ export const FoundationalSkillsTimeSection = ({
             <div className="flex flex-col gap-3">
               <ChangeWhiskers rows={segmentRows(dt)} />
               {dt.withheld.length > 0 && (
-                <p className="text-[11px] leading-snug text-typography-500">
+                <p className="text-xs leading-snug text-typography-500">
                   Too few learners to read (under {dt.minSampleSize}): {withheldText(dt.withheld)}.
                 </p>
               )}

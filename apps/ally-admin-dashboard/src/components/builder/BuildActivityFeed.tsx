@@ -93,7 +93,7 @@ Markdown.displayName = "Markdown";
 /** A relative timestamp with the exact moment one hover away, per house convention. */
 const EventTimestamp: React.FC<{ createdAt: string }> = ({ createdAt }) => (
   <span
-    className="shrink-0 whitespace-nowrap text-[10px] tabular-nums text-typography-400"
+    className="shrink-0 whitespace-nowrap text-xs tabular-nums text-typography-400"
     title={formatTimestamp(createdAt)}
   >
     {formatRelativeTime(createdAt)}
@@ -122,7 +122,7 @@ const ExpandableRow: React.FC<{
         {detail && <span className="shrink-0 text-typography-400">{open ? "−" : "+"}</span>}
       </button>
       {open && detail && (
-        <pre className="mt-1 max-h-64 overflow-auto rounded bg-neutral-50 p-2 text-[11px] text-typography-700">
+        <pre className="mt-1 max-h-64 overflow-auto rounded bg-neutral-50 p-2 text-xs text-typography-700">
           {detail}
         </pre>
       )}
@@ -176,7 +176,7 @@ const FailureRow: React.FC<{ title: string; detail?: string | null }> = ({ title
             </button>
           )}
           {open && detail && (
-            <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap rounded bg-neutral-50 p-2 text-[11px] text-typography-700">
+            <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap rounded bg-neutral-50 p-2 text-xs text-typography-700">
               {detail}
             </pre>
           )}
@@ -424,7 +424,7 @@ export const BuildActivityFeed: React.FC<BuildActivityFeedProps> = ({
         return (
           <div key={event.id} style={style} className="flex items-center gap-2 py-1">
             <span className="h-px flex-1 bg-neutral-200" />
-            <span className="text-xs font-medium uppercase tracking-wide text-typography-500">
+            <span className="text-xs font-medium tracking-wide text-typography-500">
               {stageLabels[asAgentText(payload.stage)] ?? asAgentText(payload.stage)}
             </span>
             <span className="h-px flex-1 bg-neutral-200" />
@@ -434,7 +434,7 @@ export const BuildActivityFeed: React.FC<BuildActivityFeedProps> = ({
       case "plan":
         return (
           <Tile key={event.id} style={style} className="text-sm">
-            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-typography-500">
+            <p className="mb-1 text-xs font-semibold tracking-wide text-typography-500">
               {strings.planHeading}
             </p>
             <div className="prose prose-sm max-w-none">
@@ -475,7 +475,7 @@ export const BuildActivityFeed: React.FC<BuildActivityFeedProps> = ({
             ].join(" ")}
           >
             <div className="mb-1 flex items-center gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wide text-typography-500">
+              <span className="text-xs font-semibold tracking-wide text-typography-500">
                 {heading}
               </span>
               <Tag type={passed ? "green" : "red"} size="sm" className="shrink-0">
@@ -547,7 +547,7 @@ export const BuildActivityFeed: React.FC<BuildActivityFeedProps> = ({
             ].join(" ")}
           >
             <div className="mb-1 flex flex-wrap items-center gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wide text-typography-500">
+              <span className="text-xs font-semibold tracking-wide text-typography-500">
                 {asAgentText(payload.repo)}
                 {prNumber ? ` · ` : ""}
               </span>
@@ -608,7 +608,7 @@ export const BuildActivityFeed: React.FC<BuildActivityFeedProps> = ({
             ].join(" ")}
           >
             <div className="mb-1 flex items-center gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wide text-typography-500">
+              <span className="text-xs font-semibold tracking-wide text-typography-500">
                 {round ? strings.verificationRoundHeading(round) : strings.verificationHeading}
               </span>
               {verdict ? (
@@ -708,7 +708,7 @@ export const BuildActivityFeed: React.FC<BuildActivityFeedProps> = ({
       case "report":
         return (
           <Tile key={event.id} style={style} className="text-sm">
-            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-typography-500">
+            <p className="mb-1 text-xs font-semibold tracking-wide text-typography-500">
               {strings.reportHeading}
             </p>
             <div className="prose prose-sm max-w-none">
@@ -809,7 +809,7 @@ export const BuildActivityFeed: React.FC<BuildActivityFeedProps> = ({
               return (
                 <React.Fragment key={event.id}>
                   {gap && (
-                    <p className="py-0.5 text-center text-[10px] text-typography-400">
+                    <p className="py-0.5 text-center text-xs text-typography-400">
                       {strings.eventGap(gap)}
                     </p>
                   )}

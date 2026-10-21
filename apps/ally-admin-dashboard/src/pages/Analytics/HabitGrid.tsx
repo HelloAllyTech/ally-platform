@@ -88,7 +88,7 @@ export const HabitGrid = ({
                         {x ? countText(x.all) : "—"}
                         {arrow && (
                           <span
-                            className="ml-1 inline-block rounded-sm bg-white px-0.5 text-[10px] font-semibold leading-none"
+                            className="ml-1 inline-block rounded-sm bg-white px-0.5 text-xs font-semibold leading-none"
                             style={{ color: x?.clear === "adopted" ? PALETTE.green : PALETTE.red }}
                           >
                             {arrow}
@@ -103,7 +103,7 @@ export const HabitGrid = ({
           </tbody>
         </table>
       </div>
-      <div className="flex flex-wrap items-center gap-3 text-[11px] text-typography-500">
+      <div className="flex flex-wrap items-center gap-3 text-xs text-typography-500">
         <span>Rate:</span>
         {[
           { label: "under 25%", r: 0.1 },

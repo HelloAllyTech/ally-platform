@@ -58,7 +58,7 @@ const ScaleSparkline = ({
   height?: number;
 }) => {
   if (!values.some(v => v !== null)) {
-    return <span className="text-[11px] text-typography-500">—</span>;
+    return <span className="text-xs text-typography-500">—</span>;
   }
   const [lo, hi] = domain;
   const step = values.length > 1 ? width / (values.length - 1) : width;
@@ -124,7 +124,7 @@ const ScoreCell = ({ cell }: { cell: Cell }) => (
     >
       {cell.text}
     </span>
-    {cell.note && <span className="text-[11px] text-typography-500 tabular-nums">{cell.note}</span>}
+    {cell.note && <span className="text-xs text-typography-500 tabular-nums">{cell.note}</span>}
   </span>
 );
 
@@ -148,7 +148,7 @@ const ScorecardTable = ({
           <TableHeader>
             <span className="inline-flex items-center gap-1">
               Self-harm follow-up
-              <span className="rounded border border-[#a2191f] px-1 text-[10px] font-semibold uppercase tracking-wide text-[#a2191f]">
+              <span className="rounded border border-[#a2191f] px-1 text-xs font-semibold tracking-wide text-[#a2191f]">
                 Internal
               </span>
             </span>
@@ -165,7 +165,7 @@ const ScorecardTable = ({
                 <span className={r.platform ? "font-semibold" : "font-medium"}>{r.name}</span>
                 {r.code && <span className="text-typography-500"> · {r.code}</span>}
                 {m.belowFloor && (
-                  <span className="block text-[11px] text-typography-500">
+                  <span className="block text-xs text-typography-500">
                     under {data.minSampleSize} measurable learners — rates withheld
                   </span>
                 )}
@@ -173,7 +173,7 @@ const ScorecardTable = ({
               <TableCell>
                 <span className="flex flex-col leading-tight tabular-nums">
                   <span>{m.measurableLearners.toLocaleString()}</span>
-                  <span className="text-[11px] text-typography-500">
+                  <span className="text-xs text-typography-500">
                     {m.scoredCuts.toLocaleString()} slices
                   </span>
                 </span>

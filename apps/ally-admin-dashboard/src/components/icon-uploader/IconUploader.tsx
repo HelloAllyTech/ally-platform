@@ -200,14 +200,14 @@ export const IconUploader: React.FC<IconUploaderProps> = ({
       <div className="flex flex-col gap-2 pt-2">
         <div className="flex items-center gap-1 font-primary">
           <span className="text-base font-regular text-typography-800">{en.badge.icon}</span>
-          <span className="text-red-500">*</span>
+          <span className="text-red-600">*</span>
         </div>
         <p className="text-sm text-typography-500">{en.badge.iconUploadHint}</p>
         <button
           type="button"
           onClick={handleClick}
           disabled={isUploading}
-          className="text-primary-600 font-medium text-base hover:text-primary-700 text-left disabled:text-typography-400 disabled:cursor-not-allowed"
+          className="text-primary-600 font-medium text-base hover:text-primary-700 text-left disabled:text-typography-disabled disabled:cursor-not-allowed"
         >
           {isUploading
             ? en.badge.uploading

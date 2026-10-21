@@ -182,7 +182,7 @@ const UploadProgressDialog: FC = () => {
 
   return (
     <div className="fixed bottom-0 left-2 right-2 sm:left-auto sm:right-6 z-40 font-primary">
-      <div className="w-full sm:w-[360px] bg-white shadow-[0_2px_10px_rgba(0,0,0,0.15)] rounded-t-[8px] border border-[#E5E7EB] overflow-hidden">
+      <div className="w-full sm:w-[360px] bg-white shadow-[0_2px_10px_rgba(0,0,0,0.15)] rounded-t-none border border-[#E5E7EB] overflow-hidden">
         <UploadProgressDialogHeader
           uploads={displayedUploads}
           expanded={expanded}

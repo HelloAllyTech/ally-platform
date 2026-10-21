@@ -73,7 +73,7 @@ const calibrationTooltip =
 
 /** "Internal" marker for safety numbers from unaudited judge coding. */
 const InternalTag = () => (
-  <span className="rounded border border-[#a2191f] px-1 text-[10px] font-semibold uppercase tracking-wide text-[#a2191f]">
+  <span className="rounded border border-[#a2191f] px-1 text-xs font-semibold tracking-wide text-[#a2191f]">
     Internal
   </span>
 );
@@ -276,7 +276,7 @@ export const PerceptionSection = ({
                 </p>
               )}
               {flag && (
-                <p className="flex flex-wrap items-center gap-1.5 text-[11px] leading-snug text-typography-700">
+                <p className="flex flex-wrap items-center gap-1.5 text-xs leading-snug text-typography-700">
                   <InternalTag />
                   <span>
                     {safetyFlagText(flag)} {flag.note}

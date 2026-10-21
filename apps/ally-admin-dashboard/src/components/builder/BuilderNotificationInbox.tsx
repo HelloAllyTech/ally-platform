@@ -86,7 +86,7 @@ export const BuilderNotificationInbox: FC = () => {
                   }`}
                 >
                   <div className="flex items-baseline gap-2">
-                    <span className="text-xs font-semibold uppercase tracking-wide text-typography-600">
+                    <span className="text-xs font-semibold tracking-wide text-typography-600">
                       {strings.kinds[notification.kind] ?? notification.kind}
                     </span>
                     <span className="ml-auto whitespace-nowrap text-xs tabular-nums text-typography-500">

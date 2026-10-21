@@ -88,14 +88,12 @@ function FacetSection<T extends string>({
   return (
     <div className="py-2">
       <div className="flex items-baseline justify-between gap-2 px-3">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-typography-500">
-          {title}
-        </p>
+        <p className="text-xs font-semibold tracking-wide text-typography-500">{title}</p>
         {selected.length > 0 && (
           <button
             type="button"
             onClick={() => onChange([])}
-            className="text-[11px] text-primary-600 hover:underline cursor-pointer"
+            className="text-xs text-primary-600 hover:underline cursor-pointer"
           >
             {en.bugHunter.filterSectionClear}
           </button>
@@ -138,7 +136,7 @@ const AgeSection: FC<{
 
   return (
     <div className="py-2">
-      <p className="px-3 text-[11px] font-semibold uppercase tracking-wide text-typography-500">
+      <p className="px-3 text-xs font-semibold tracking-wide text-typography-500">
         {en.bugHunter.filterSectionAge}
       </p>
       <div className="mt-1">
@@ -293,7 +291,7 @@ export const FindingsFilterBar: FC<FindingsFilterBarProps> = ({
             aria-haspopup="dialog"
             aria-controls={open ? panelId : undefined}
             onClick={() => setOpen(value => !value)}
-            className={`inline-flex items-center gap-1.5 rounded border px-3 py-2 text-xs font-medium cursor-pointer transition-colors md:py-1.5 ${
+            className={`inline-flex items-center gap-1.5 rounded border px-3 py-2 text-xs font-normal cursor-pointer transition-colors md:py-1.5 ${
               facetCount > 0
                 ? "border-primary-300 bg-primary-50 text-primary-700"
                 : "border-border-light bg-white text-typography-800 hover:bg-neutral-50"
@@ -301,11 +299,11 @@ export const FindingsFilterBar: FC<FindingsFilterBarProps> = ({
           >
             {en.bugHunter.filtersButton}
             {facetCount > 0 && (
-              <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary-600 px-1 text-[10px] font-semibold text-white tabular-nums">
+              <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary-600 px-1 text-xs font-semibold text-white tabular-nums">
                 {facetCount}
               </span>
             )}
-            <span aria-hidden="true" className="text-[9px] text-typography-500">
+            <span aria-hidden="true" className="text-xs text-typography-500">
               ▼
             </span>
           </button>

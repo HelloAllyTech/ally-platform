@@ -126,7 +126,7 @@ export const TriggerConditionField: React.FC<TriggerConditionFieldProps> = ({
                 disabled={false}
                 minHeight={20}
                 maxLines={20}
-                className="text-sm focus:outline-none w-full !mt-0 placeholder:text-typography-500"
+                className="text-sm focus:outline-none w-full !mt-0 placeholder:text-typography-placeholder"
               />
             </div>
           </div>

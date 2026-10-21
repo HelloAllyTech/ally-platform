@@ -389,7 +389,7 @@ export const PrdDocPanel: React.FC<PrdDocPanelProps> = ({
                     </p>
                     {criteria.length > 0 && (
                       <>
-                        <p className="mt-2 text-xs font-medium uppercase tracking-wide text-typography-500">
+                        <p className="mt-2 text-xs font-medium tracking-wide text-typography-500">
                           {strings.acceptanceCriteria}
                         </p>
                         <ul className="mt-0.5 list-disc pl-5 text-sm text-typography-700">

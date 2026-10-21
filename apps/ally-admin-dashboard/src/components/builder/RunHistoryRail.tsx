@@ -103,7 +103,7 @@ export const RunHistoryRail: React.FC<RunHistoryRailProps> = ({
                 </Tag>
               </div>
               {!quiet && (
-                <div className="flex items-center gap-2 text-[11px] text-typography-500">
+                <div className="flex items-center gap-2 text-xs text-typography-500">
                   <span>{duration}</span>
                   {cost && <span>{cost}</span>}
                 </div>

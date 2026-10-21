@@ -48,9 +48,7 @@ export const ChangeLog: React.FC<ChangeLogProps> = ({ entries }) => {
 
   return (
     <section aria-label={strings.heading} className="space-y-2">
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-typography-700">
-        {strings.heading}
-      </h3>
+      <h3 className="text-xs font-semibold tracking-wide text-typography-700">{strings.heading}</h3>
       <ol className="space-y-1.5">
         {visible.map((entry, index) => (
           <li key={`${entry.at}-${index}`} className="flex items-baseline gap-2 text-sm">

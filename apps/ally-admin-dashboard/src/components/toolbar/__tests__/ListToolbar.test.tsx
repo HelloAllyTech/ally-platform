@@ -675,7 +675,7 @@ describe("ListToolbar", () => {
 
       const { container } = render(<ListToolbar {...defaultProps} filterChips={chips} />);
 
-      const chip = container.querySelector('[class*="rounded-[20px]"]');
+      const chip = container.querySelector('[class*="border-border-light rounded-full"]');
       expect(chip).toBeInTheDocument();
     });
   });

@@ -390,7 +390,7 @@ export const Cell = ({
     case cellTypes.status:
       element = (
         <div className="flex items-center">
-          <div className={`w-auto py-1 rounded-[4px] px-2 text-sm ${getStatusColor(value.value)}`}>
+          <div className={`w-auto py-1 rounded-full px-2 text-sm ${getStatusColor(value.value)}`}>
             {value.value === Status.ACTIVE
               ? formatCapitalizedEnum(Status.PUBLISHED)
               : formatCapitalizedEnum(value.value) || "--"}
@@ -418,7 +418,7 @@ export const Cell = ({
               value.value(row);
             }
           }}
-          className="cursor-pointer text-red-500 hover:text-red-700 p-2 flex items-center"
+          className="cursor-pointer text-red-600 hover:text-red-700 p-2 flex items-center"
         >
           <div className="w-4 h-4">
             <Trash />

@@ -338,7 +338,7 @@ export const TrackTranslationsEditor: FC<TrackTranslationsEditorProps> = ({ trac
                   {summary.languageLabel}
                 </span>
                 <span
-                  className={`rounded-full px-2 py-0.5 text-[11px] ${STATUS_CLASS[summary.status]}`}
+                  className={`rounded-full px-2 py-0.5 text-xs ${STATUS_CLASS[summary.status]}`}
                 >
                   {STATUS_LABEL[summary.status]}
                 </span>
@@ -554,7 +554,7 @@ export const TrackTranslationsEditor: FC<TrackTranslationsEditorProps> = ({ trac
                                 href={question.sourceUrl}
                                 target="_blank"
                                 rel="noreferrer noopener"
-                                className="text-[11px] text-primary-500 underline break-all"
+                                className="text-xs text-primary-500 underline break-all"
                               >
                                 View the English original
                               </a>
@@ -623,7 +623,7 @@ const FieldGroup: FC<FieldGroupProps> = ({
             <div key={field.path} className="grid grid-cols-1 lg:grid-cols-2 gap-3 p-3">
               <div className="flex flex-col gap-1">
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-[11px] uppercase tracking-wide text-typography-500">
+                  <span className="text-xs tracking-wide text-typography-500">
                     {KIND_LABEL[field.kind] ?? field.kind}
                   </span>
                   {field.scoring && (
@@ -631,18 +631,18 @@ const FieldGroup: FC<FieldGroupProps> = ({
                       label="This text decides what counts as a correct answer. It must be confirmed before this language can be published."
                       align="bottom"
                     >
-                      <span className="rounded-full bg-warning-50 px-1.5 py-0.5 text-[10px] text-warning-700">
+                      <span className="rounded-full bg-warning-50 px-1.5 py-0.5 text-xs text-warning-700">
                         affects scoring
                       </span>
                     </Tooltip>
                   )}
                   {field.needsReview && (
-                    <span className="rounded-full bg-warning-100 px-1.5 py-0.5 text-[10px] text-warning-800">
+                    <span className="rounded-full bg-warning-100 px-1.5 py-0.5 text-xs text-warning-800">
                       needs confirming
                     </span>
                   )}
                   {field.edited && (
-                    <span className="rounded-full bg-primary-50 px-1.5 py-0.5 text-[10px] text-primary-700">
+                    <span className="rounded-full bg-primary-50 px-1.5 py-0.5 text-xs text-primary-700">
                       your wording
                     </span>
                   )}
@@ -651,7 +651,7 @@ const FieldGroup: FC<FieldGroupProps> = ({
                       label="The English changed after this was written. Your wording was kept — check it still matches."
                       align="bottom"
                     >
-                      <span className="rounded-full bg-destructive-50 px-1.5 py-0.5 text-[10px] text-destructive-700">
+                      <span className="rounded-full bg-destructive-50 px-1.5 py-0.5 text-xs text-destructive-700">
                         English changed
                       </span>
                     </Tooltip>

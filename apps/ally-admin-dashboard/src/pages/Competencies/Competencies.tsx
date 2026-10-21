@@ -363,7 +363,7 @@ export const Competencies: FC = () => {
       {/* Below md the cluster rail stacks above the table (capped height). */}
       <div className="flex-1 min-h-0 mt-4 md:mt-6 flex flex-col md:flex-row gap-4 md:gap-6">
         <aside className="w-full md:w-[240px] shrink-0 max-h-[40dvh] md:max-h-none overflow-y-auto custom-scrollbar border-b md:border-b-0 border-border-light pb-3 md:pb-0">
-          <p className="px-3 pb-2 text-xs font-medium uppercase tracking-wide text-typography-600">
+          <p className="px-3 pb-2 text-xs font-medium tracking-wide text-typography-600">
             Clusters
           </p>
           <nav className="flex flex-col">

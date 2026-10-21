@@ -68,7 +68,7 @@ export const CollapsibleAside: React.FC<CollapsibleAsideProps> = ({
             ‹
           </span>
           <span
-            className="text-xs font-semibold uppercase tracking-wide text-typography-500"
+            className="text-xs font-semibold tracking-wide text-typography-500"
             style={{ writingMode: "vertical-rl" }}
           >
             {label}
@@ -81,9 +81,7 @@ export const CollapsibleAside: React.FC<CollapsibleAsideProps> = ({
   return (
     <aside className={`hidden flex-col border-l border-neutral-200 lg:flex ${widthClassName}`}>
       <div className="flex items-center justify-between px-4 pt-3">
-        <span className="text-xs font-semibold uppercase tracking-wide text-typography-500">
-          {label}
-        </span>
+        <span className="text-xs font-semibold tracking-wide text-typography-500">{label}</span>
         <button
           type="button"
           onClick={() => toggle(false)}

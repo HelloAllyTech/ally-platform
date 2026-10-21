@@ -35,7 +35,7 @@ vi.mock("@constants", () => ({
         block: "Block",
         unblock: "Unblock",
         blocked: "Blocked",
-        blockedBadge: "BLOCKED",
+        blockedBadge: "Blocked",
         blockConfirmTitle: "Block this number?",
         blockConfirmDescription: "Messages will be dropped.",
         empty: "No conversations yet",
@@ -247,7 +247,7 @@ describe("ConversationsTab", () => {
 
       renderTab();
 
-      expect(screen.getByText("BLOCKED")).toBeTruthy();
+      expect(screen.getByText("Blocked")).toBeTruthy();
     });
   });
 

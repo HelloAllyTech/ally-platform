@@ -65,7 +65,7 @@ export const VoiceShortlistStrip = ({ messages }: VoiceShortlistStripProps) => {
               className="border-b border-border-light last:border-b-0"
             >
               <div className="px-3 pt-2 flex items-center gap-2">
-                <span className="text-xs font-medium uppercase tracking-wide text-typography-600">
+                <span className="text-xs font-medium tracking-wide text-typography-600">
                   {shortlist.languageLabel}
                 </span>
                 {shortlist.noneChosen && (

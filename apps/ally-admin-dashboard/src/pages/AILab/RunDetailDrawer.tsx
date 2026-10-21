@@ -13,7 +13,7 @@ interface RunDetailDrawerProps {
 
 const Section: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
   <div>
-    <h4 className="text-xs uppercase tracking-wide text-typography-500 mb-1">{label}</h4>
+    <h4 className="text-xs tracking-wide text-typography-500 mb-1">{label}</h4>
     <div className="text-base text-typography-900">{children}</div>
   </div>
 );

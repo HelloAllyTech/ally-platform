@@ -100,7 +100,7 @@ export const NumberInput: React.FC<NumberInputProps> = ({
           disabled:disabled:text-typography-800 disabled:cursor-not-allowed
           hover:bg-transparent focus:outline-none
           text-left
-          placeholder:text-typography-500
+          placeholder:text-typography-placeholder
           ${inputClassName}
         `}
       />

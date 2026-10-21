@@ -94,10 +94,10 @@ describe("Toggle Component", () => {
   // --- Selection Tests ---
   describe("Selection Behavior", () => {
     it("should have first item selected by default", () => {
-      const { container } = render(<Toggle {...defaultProps} />);
+      render(<Toggle {...defaultProps} />);
 
-      const slidingIndicator = container.querySelector(".absolute.top-0");
-      expect(slidingIndicator).toHaveClass("left-0");
+      expect(screen.getByText("Option A")).toHaveAttribute("aria-checked", "true");
+      expect(screen.getByText("Option B")).toHaveAttribute("aria-checked", "false");
     });
 
     it("should call onChange with correct value when item is clicked", () => {
@@ -126,8 +126,8 @@ describe("Toggle Component", () => {
       const secondOption = screen.getByText("Option B");
       fireEvent.click(secondOption);
 
-      const slidingIndicator = container.querySelector(".absolute.top-0");
-      expect(slidingIndicator).toHaveClass("left-1/2");
+      expect(secondOption).toHaveAttribute("aria-checked", "true");
+      expect(container.querySelectorAll('[aria-checked="true"]')).toHaveLength(1);
     });
 
     it("should toggle back to first item when clicked", () => {
@@ -139,8 +139,8 @@ describe("Toggle Component", () => {
       // Click first option
       fireEvent.click(screen.getByText("Option A"));
 
-      const slidingIndicator = container.querySelector(".absolute.top-0");
-      expect(slidingIndicator).toHaveClass("left-0");
+      expect(screen.getByText("Option A")).toHaveAttribute("aria-checked", "true");
+      expect(container.querySelectorAll('[aria-checked="true"]')).toHaveLength(1);
     });
 
     it("should call onChange each time an item is clicked", () => {
@@ -173,11 +173,11 @@ describe("Toggle Component", () => {
     it("should apply correct inner container styles", () => {
       const { container } = render(<Toggle {...defaultProps} />);
 
-      const innerContainer = container.querySelector(".bg-\\[\\#F3F3F3\\]");
-      expect(innerContainer).toHaveClass("flex");
-      expect(innerContainer).toHaveClass("gap-2");
-      expect(innerContainer).toHaveClass("rounded-full");
-      expect(innerContainer).toHaveClass("relative");
+      const innerContainer = container.querySelector('[role="radiogroup"]');
+      expect(innerContainer).toHaveClass("inline-flex");
+      expect(innerContainer).toHaveClass("border");
+      expect(innerContainer).toHaveClass("border-typography-900");
+      expect(innerContainer).not.toHaveClass("rounded-full");
     });
 
     it("should apply correct item styles", () => {
@@ -186,8 +186,9 @@ describe("Toggle Component", () => {
       const items = container.querySelectorAll(".cursor-pointer");
       items.forEach(item => {
         expect(item).toHaveClass(
-          "rounded-full cursor-pointer z-10 transition-all duration-200 font-primary",
+          "h-8 px-4 cursor-pointer transition-colors font-primary font-normal",
         );
+        expect(item).not.toHaveClass("rounded-full");
       });
     });
 
@@ -195,7 +196,7 @@ describe("Toggle Component", () => {
       render(<Toggle {...defaultProps} />);
 
       const firstOption = screen.getByText("Option A");
-      expect(firstOption).toHaveClass("text-black");
+      expect(firstOption).toHaveClass("bg-typography-900", "text-white");
       expect(firstOption).toHaveAttribute("aria-checked", "true");
     });
 
@@ -203,7 +204,7 @@ describe("Toggle Component", () => {
       render(<Toggle {...defaultProps} />);
 
       const secondOption = screen.getByText("Option B");
-      expect(secondOption).toHaveClass("text-black/40");
+      expect(secondOption).toHaveClass("text-typography-700");
       expect(secondOption).toHaveAttribute("aria-checked", "false");
     });
 
@@ -215,39 +216,38 @@ describe("Toggle Component", () => {
       const firstOption = screen.getByText("Option A");
       const secondOption = screen.getByText("Option B");
 
-      expect(firstOption).toHaveClass("text-black/40");
-      expect(secondOption).toHaveClass("text-black");
+      expect(firstOption).toHaveClass("text-typography-700");
+      expect(secondOption).toHaveClass("bg-typography-900", "text-white");
     });
 
-    it("should have sliding indicator with correct styles", () => {
+    it("should mark the selection on the segment itself, with no sliding indicator", () => {
       const { container } = render(<Toggle {...defaultProps} />);
 
-      const slidingIndicator = container.querySelector(".absolute.top-0");
-      expect(slidingIndicator).toHaveClass("transition-all");
-      expect(slidingIndicator).toHaveClass("duration-200");
-      expect(slidingIndicator).toHaveClass("w-1/2");
-      expect(slidingIndicator).toHaveClass("h-full");
-      expect(slidingIndicator).toHaveClass("rounded-full");
-      expect(slidingIndicator).toHaveClass("bg-white");
+      expect(container.querySelector(".absolute")).toBeNull();
     });
   });
 
-  // --- Box Shadow Tests ---
-  describe("Box Shadow Styling", () => {
-    it("should apply left shadow when first item is selected", () => {
-      const { container } = render(<Toggle {...defaultProps} />);
+  // --- More than two options ---
+  describe("Three or more options", () => {
+    // The old sliding pill was half the group wide, so with a third option the
+    // highlight sat between segments. The selected segment now carries it itself.
+    it("highlights exactly the chosen segment among three", () => {
+      render(
+        <Toggle
+          items={[
+            { label: "Daily", value: "daily" },
+            { label: "Weekly", value: "weekly" },
+            { label: "Monthly", value: "monthly" },
+          ]}
+          onChange={vi.fn()}
+        />,
+      );
 
-      const slidingIndicator = container.querySelector(".absolute.top-0");
-      expect(slidingIndicator).toHaveClass("shadow-[3px_0px_9px_0px_#00000012]");
-    });
+      fireEvent.click(screen.getByText("Monthly"));
 
-    it("should apply right shadow when second item is selected", () => {
-      const { container } = render(<Toggle {...defaultProps} />);
-
-      fireEvent.click(screen.getByText("Option B"));
-
-      const slidingIndicator = container.querySelector(".absolute.top-0");
-      expect(slidingIndicator).toHaveClass("shadow-[-7px_0px_9px_0px_#00000012]");
+      expect(screen.getByText("Monthly")).toHaveClass("bg-typography-900");
+      expect(screen.getByText("Daily")).not.toHaveClass("bg-typography-900");
+      expect(screen.getByText("Weekly")).not.toHaveClass("bg-typography-900");
     });
   });
 
@@ -414,13 +414,12 @@ describe("Toggle Component", () => {
       expect(outerContainer?.childNodes.length).toBe(2);
     });
 
-    it("should render sliding indicator before items", () => {
+    it("should render one radio per item directly inside the group", () => {
       const { container } = render(<Toggle {...defaultProps} />);
 
-      const innerContainer = container.querySelector(".relative");
-      const firstChild = innerContainer?.firstChild as HTMLElement;
-
-      expect(firstChild).toHaveClass("absolute");
+      const group = container.querySelector('[role="radiogroup"]');
+      expect(group?.children).toHaveLength(mockItems.length);
+      expect(group?.firstElementChild).toHaveAttribute("role", "radio");
     });
   });
 });

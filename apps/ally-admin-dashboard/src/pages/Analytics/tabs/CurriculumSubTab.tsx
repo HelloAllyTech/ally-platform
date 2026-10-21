@@ -42,9 +42,7 @@ import {
 } from "../testingChart";
 
 const SubHeading = ({ children }: { children: string }) => (
-  <h2 className="text-xs font-medium uppercase tracking-wide text-typography-500 mt-8 mb-3">
-    {children}
-  </h2>
+  <h2 className="text-xs font-medium tracking-wide text-typography-500 mt-8 mb-3">{children}</h2>
 );
 
 /**

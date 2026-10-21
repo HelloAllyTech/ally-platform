@@ -44,7 +44,7 @@ const Harness = ({ name, defaultValue }: { name: string; defaultValue?: boolean 
 };
 
 const getSwitch = () => screen.getByRole("button", { name: "Post-Session Feedback" });
-const isOn = () => getSwitch().className.includes("bg-success-200");
+const isOn = () => getSwitch().getAttribute("aria-pressed") === "true";
 
 describe("ToggleSection default value (create path — form never reset)", () => {
   it("renders ON and seeds the form when the field config declares defaultValue: true", () => {

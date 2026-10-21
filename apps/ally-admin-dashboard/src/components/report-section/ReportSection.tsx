@@ -850,7 +850,7 @@ export const ReportSection = forwardRef<ReportSectionHandle, ReportSectionProps>
                   </span>
                   <span className="text-xs font-normal text-typography-600">{`${item.language.label || item.language.id}· ${item.config.turns} turns`}</span>
                   {item.scenarioVersionId && versionLabelById[item.scenarioVersionId] && (
-                    <span className="inline-flex w-fit items-center px-[6px] py-[1px] rounded-full text-[11px] bg-secondary-50 text-typography-700">
+                    <span className="inline-flex w-fit items-center px-[6px] py-[1px] rounded-full text-xs bg-secondary-50 text-typography-700">
                       {versionLabelById[item.scenarioVersionId]}
                     </span>
                   )}

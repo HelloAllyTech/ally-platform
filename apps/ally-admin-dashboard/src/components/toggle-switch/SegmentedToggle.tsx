@@ -18,7 +18,9 @@ export const SegmentedToggle = <T extends string = string>({
 }: SegmentedToggleProps<T>) => {
   return (
     <div
-      className="flex items-center gap-1 p-1 rounded-full border border-border-light bg-white"
+      // Carbon content switcher: square segments in one bordered strip; the selected
+      // segment is inverse (text-primary ground, white label), labels stay Regular.
+      className="inline-flex items-stretch border border-typography-900 bg-white"
       role="tablist"
       aria-label={label}
     >
@@ -31,10 +33,10 @@ export const SegmentedToggle = <T extends string = string>({
             type="button"
             role="tab"
             aria-selected={isSelected}
-            className={`px-3 py-1 text-sm font-medium rounded-full transition-colors focus:outline-none ${
+            className={`h-8 px-4 text-sm font-normal transition-colors focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-500 ${
               isSelected
-                ? "bg-primary-50 text-primary-500"
-                : "text-typography-600 hover:text-typography-900"
+                ? "bg-typography-900 text-white"
+                : "text-typography-700 hover:bg-gray-100 hover:text-typography-900"
             }`}
             onClick={() => onChange(option.value)}
           >

@@ -298,7 +298,7 @@ export const NotionTable = ({
                     // the row's editor there.
                     <button
                       type="button"
-                      className="absolute ml-auto p-2 md:p-1 bg-white border-[1px] border-border-light shadow-md rounded-[3px] z-10 right-[6px] opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+                      className="absolute ml-auto p-2 md:p-1 bg-white border-[1px] border-border-light shadow-md rounded-sm z-10 right-[6px] opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
                       onClick={() => onRowClick(rowIndex)}
                     >
                       <DockToRight />

@@ -229,7 +229,7 @@ export const PipelineRail: FC<PipelineRailProps> = ({
       aria-label={groupLabel}
     >
       {!dense && (
-        <div className="text-[11px] uppercase tracking-wide text-typography-500 mb-4">
+        <div className="text-xs tracking-wide text-typography-500 mb-4">
           {en.bugHunter.pipelineRailLabel}
         </div>
       )}
@@ -345,7 +345,7 @@ export const PipelineRail: FC<PipelineRailProps> = ({
                 </span>
                 {!dense && (
                   <span
-                    className={`text-[10px] uppercase tracking-wide whitespace-nowrap ${
+                    className={`text-xs tracking-wide whitespace-nowrap ${
                       isCurrent ? "text-typography-900 font-semibold" : "text-typography-500"
                     }`}
                   >

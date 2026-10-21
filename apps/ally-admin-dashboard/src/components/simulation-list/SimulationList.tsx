@@ -77,7 +77,7 @@ export const SimulationList: React.FC<SimulationListProps> = ({
           </p>
           <button
             onClick={onCreateSimulation}
-            className="bg-primary-500 hover:bg-primary-600 text-base text-white px-6 py-3 rounded-[100px] flex items-center gap-2 mx-auto font-primary transition-colors"
+            className="bg-primary-500 hover:bg-primary-600 text-base text-white px-6 py-3 rounded-none flex items-center gap-2 mx-auto font-primary transition-colors"
           >
             <Add />
             {en.simulation.createSimulation}
@@ -156,7 +156,7 @@ export const SimulationList: React.FC<SimulationListProps> = ({
       render: simulation => (
         <div className="flex items-center">
           <div
-            className={`w-auto py-1 rounded-[4px] px-2 text-sm ${getStatusColor(simulation.status)}`}
+            className={`w-auto py-1 rounded-full px-2 text-sm ${getStatusColor(simulation.status)}`}
           >
             {simulation.status === SimulationStatus.ACTIVE
               ? formatCapitalizedEnum(SimulationStatus.PUBLISHED)

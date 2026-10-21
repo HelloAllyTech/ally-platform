@@ -61,7 +61,7 @@ export const SkillCutGrid = ({
                 <tr key={`g-${r.group}`}>
                   <th
                     colSpan={cuts.length + 1}
-                    className="pb-0.5 pt-2 text-left text-[11px] font-semibold uppercase tracking-wide text-typography-500"
+                    className="pb-0.5 pt-2 text-left text-xs font-semibold tracking-wide text-typography-500"
                   >
                     {r.group}
                   </th>
@@ -91,7 +91,7 @@ export const SkillCutGrid = ({
           })}
         </tbody>
       </table>
-      <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-typography-500">
+      <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-typography-500">
         <span>Level:</span>
         {LEGEND.map(l => {
           const style = levelCellStyle(l.sample);

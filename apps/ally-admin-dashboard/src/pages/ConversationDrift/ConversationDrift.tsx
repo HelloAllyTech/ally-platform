@@ -147,9 +147,7 @@ const ratePctBars = (rows: { key: string; driftRate: number }[] = []) =>
   rows.map(r => ({ group: r.key, value: Number((r.driftRate * 100).toFixed(1)) }));
 
 const SubHeading = ({ children }: { children: string }) => (
-  <p className="text-xs font-medium uppercase tracking-wide text-typography-500 mt-8 mb-3">
-    {children}
-  </p>
+  <p className="text-xs font-medium tracking-wide text-typography-500 mt-8 mb-3">{children}</p>
 );
 
 // `range` and `language` come from the shared selectors at the top of the
@@ -501,9 +499,7 @@ export const ConversationDrift = ({ query, language }: AnalyticsTabFilters) => {
 
             {/* EXPERIMENT SLICE — one chart with a dimension selector */}
             <div className="flex flex-wrap items-center justify-between gap-4 mt-8 mb-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-typography-500">
-                By experiment
-              </p>
+              <p className="text-xs font-medium tracking-wide text-typography-500">By experiment</p>
               <div className="w-44">
                 <Dropdown
                   id="drift-exp-dim"

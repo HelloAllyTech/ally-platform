@@ -53,7 +53,7 @@ export const ListToolbar: React.FC<ListToolbarProps> = ({
     return (
       <div
         key={`${chip.label}-${chip.value}`}
-        className="flex items-center text-typography-900 px-2 text-sm border border-border-light rounded-[20px]"
+        className="flex items-center text-typography-900 px-2 text-sm border border-border-light rounded-full"
       >
         <span className="mr-1 text-xs">{chip.label}:</span>
         <div className="flex">

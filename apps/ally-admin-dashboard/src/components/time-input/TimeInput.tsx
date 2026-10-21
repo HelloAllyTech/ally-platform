@@ -160,7 +160,7 @@ export const TimeInput: React.FC<TimeInputProps> = ({
         disabled={disabled}
         maxLength={8}
         pattern="^([0-1][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$"
-        className={`w-full bg-transparent rounded-sm text-sm placeholder:text-typography-600 focus:outline-none px-2 py-1 h-6 disabled:cursor-not-allowed disabled:opacity-50 ${
+        className={`w-full bg-transparent rounded-sm text-sm placeholder:text-typography-placeholder focus:outline-none px-2 py-1 h-6 disabled:cursor-not-allowed disabled:opacity-50 ${
           hasError ? "border border-destructive-500" : ""
         } ${className}`}
       />

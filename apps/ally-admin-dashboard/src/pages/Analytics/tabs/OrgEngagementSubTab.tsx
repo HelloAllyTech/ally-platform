@@ -118,9 +118,7 @@ export const OrgEngagementSubTab = () => {
   return (
     <>
       <div className="mt-8 mb-3 flex items-center justify-between gap-4">
-        <h3 className="text-xs font-medium uppercase tracking-wide text-typography-500">
-          Active accounts
-        </h3>
+        <h3 className="text-xs font-medium tracking-wide text-typography-500">Active accounts</h3>
         {/* The window control sits on the KPI strip it actually governs. Putting
             it in a chart header below would imply it re-scoped that chart, which
             is per calendar month and does not move. */}
@@ -374,7 +372,5 @@ export const OrgEngagementSubTab = () => {
 };
 
 const SubHeading = ({ children }: { children: string }) => (
-  <h3 className="mb-3 mt-8 text-xs font-medium uppercase tracking-wide text-typography-500">
-    {children}
-  </h3>
+  <h3 className="mb-3 mt-8 text-xs font-medium tracking-wide text-typography-500">{children}</h3>
 );

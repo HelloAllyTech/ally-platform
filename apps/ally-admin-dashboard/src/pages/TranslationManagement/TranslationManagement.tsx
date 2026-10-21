@@ -441,7 +441,7 @@ export const TranslationManagement: React.FC = () => {
               {/* Below md only Section stays pinned: pinning Key as well (440px together) would
                   cover a phone screen and leave no room for the language columns. */}
               <Table className="w-full min-w-[1800px] border-separate border-spacing-0 text-left text-sm">
-                <TableHead className="sticky top-0 z-20 bg-neutral-50 text-xs uppercase text-typography-600">
+                <TableHead className="sticky top-0 z-20 bg-neutral-50 text-xs text-typography-600">
                   <TableRow>
                     <TableHeader className="sticky left-0 z-30 w-[160px] min-w-[160px] border-b border-neutral-200 bg-neutral-50 px-3 py-3">
                       Section
@@ -530,7 +530,7 @@ export const TranslationManagement: React.FC = () => {
                             {row.placeholders.map(placeholder => (
                               <span
                                 key={placeholder}
-                                className="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-[11px] text-typography-600"
+                                className="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-xs text-typography-600"
                               >
                                 {placeholder}
                               </span>

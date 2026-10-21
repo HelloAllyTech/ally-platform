@@ -33,7 +33,7 @@ export const DiffBlock: React.FC<DiffBlockProps> = ({ oldText, newText }) => {
 
   return (
     <div className="border-t border-neutral-200">
-      <div className="flex gap-3 border-b border-neutral-100 bg-neutral-50 px-2 py-1 text-[11px] font-medium">
+      <div className="flex gap-3 border-b border-neutral-100 bg-neutral-50 px-2 py-1 text-xs font-medium">
         {additions > 0 && (
           <span className="text-support-success">{strings.diffAdditions(additions)}</span>
         )}
@@ -41,7 +41,7 @@ export const DiffBlock: React.FC<DiffBlockProps> = ({ oldText, newText }) => {
           <span className="text-support-error">{strings.diffDeletions(deletions)}</span>
         )}
       </div>
-      <div className="max-h-72 overflow-auto font-mono text-[11px]">
+      <div className="max-h-72 overflow-auto font-mono text-xs">
         {lines.map((line, index) => (
           <div
             key={index}

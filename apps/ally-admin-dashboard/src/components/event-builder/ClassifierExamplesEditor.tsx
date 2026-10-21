@@ -116,7 +116,7 @@ const ExampleColumn: FC<ExampleColumnProps> = ({
         type="button"
         onClick={addOne}
         disabled={disabled || atCapacity}
-        className="flex w-fit items-center gap-1 text-sm text-primary-600 hover:underline disabled:cursor-not-allowed disabled:text-typography-400 disabled:no-underline"
+        className="flex w-fit items-center gap-1 text-sm text-primary-600 hover:underline disabled:cursor-not-allowed disabled:text-typography-disabled disabled:no-underline"
       >
         <Add width={12} height={12} />
         Add example

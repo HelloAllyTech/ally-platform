@@ -58,7 +58,7 @@ export const ItemNode: FC<ItemNodeProps> = ({
           <DragIndicator className="w-3.5 h-3.5" />
         </button>
       </Tooltip>
-      <span className="text-xs lg:text-[11px] uppercase tracking-wide text-typography-400 flex-shrink-0">
+      <span className="text-xs tracking-wide text-typography-400 flex-shrink-0">
         {TRACK_ITEM_TYPE_LABELS[item.type].slice(0, 4)}
       </span>
       <span className="text-sm truncate flex-1">{label}</span>

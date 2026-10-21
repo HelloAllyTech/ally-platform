@@ -176,7 +176,7 @@ const EventDropdown: React.FC<{
       </button>
 
       {isOpen && (
-        <div className="absolute z-10 bg-white border border-border-light min-w-[300px] max-md:min-w-0 max-md:w-full max-h-[300px] overflow-y-auto rounded-[6px] left-0 top-[40px] shadow-lg custom-scrollbar">
+        <div className="absolute z-10 bg-white border border-border-light min-w-[300px] max-md:min-w-0 max-md:w-full max-h-[300px] overflow-y-auto rounded-none left-0 top-[40px] shadow-lg custom-scrollbar">
           <div className="sticky top-0 bg-white p-2 border-b">
             <input
               ref={inputRef}

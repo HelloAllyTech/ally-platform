@@ -42,7 +42,7 @@ const Row: React.FC<RowProps> = ({ label, children }) => (
 
 const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
   <section className="space-y-2">
-    <h3 className="text-xs font-semibold uppercase tracking-wide text-typography-700">{title}</h3>
+    <h3 className="text-xs font-semibold tracking-wide text-typography-700">{title}</h3>
     {children}
   </section>
 );

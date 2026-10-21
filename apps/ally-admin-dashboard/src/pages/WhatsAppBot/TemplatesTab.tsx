@@ -114,12 +114,12 @@ export const TemplatesTab: React.FC = () => {
             <span className="font-medium flex items-center gap-2">
               {row.name}
               {row.mandatory && (
-                <span className="rounded bg-neutral-200 px-1.5 py-0.5 text-[10px] text-typography-600">
+                <span className="rounded bg-neutral-200 px-1.5 py-0.5 text-xs text-typography-600">
                   {en.whatsappBot.templates.requiredBadge}
                 </span>
               )}
               {!row.active && (
-                <span className="rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] text-typography-500">
+                <span className="rounded bg-neutral-100 px-1.5 py-0.5 text-xs text-typography-500">
                   OFF
                 </span>
               )}

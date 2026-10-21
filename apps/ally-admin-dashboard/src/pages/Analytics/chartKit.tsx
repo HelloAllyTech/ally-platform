@@ -583,7 +583,7 @@ export const ScrollableChart = ({
         {overflowing && <PinnedValueAxis scroller={scroller} />}
       </div>
       {overflowing && showNote && (
-        <p className="mt-1 text-[11px] leading-tight text-typography-500">
+        <p className="mt-1 text-xs leading-tight text-typography-500">
           Scroll sideways for the rest of the range.
         </p>
       )}
@@ -866,7 +866,7 @@ export const ChartIdBadge = ({ id }: { id?: string }) => {
           copy();
         }
       }}
-      className="shrink-0 cursor-pointer select-none rounded-sm border border-[#e0e0e0] px-1 py-px font-mono text-[10px] leading-none text-typography-400 hover:text-typography-700"
+      className="shrink-0 cursor-pointer select-none rounded-sm border border-[#e0e0e0] px-1 py-px font-mono text-xs leading-none text-typography-400 hover:text-typography-700"
     >
       {copied ? "copied" : id}
     </span>
@@ -1321,7 +1321,7 @@ export const ChartCard = ({
       <div className="mb-2" />
       {visualField}
       {source && !collapseMeta && (
-        <p className="mt-2 text-[11px] leading-tight text-typography-500">{source}</p>
+        <p className="mt-2 text-xs leading-tight text-typography-500">{source}</p>
       )}
     </>
   );
