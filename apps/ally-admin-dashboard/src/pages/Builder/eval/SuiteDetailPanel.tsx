@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from "react";
 
+import { toast } from "sonner";
+
 import { Button, InlineNotification, SidePanel, SkeletonText, Tag } from "@ally-ui-mono/ui-shared";
-import { useGetBuilderEvalSuiteQuery } from "@api";
+import { useCancelBuilderEvalSuiteMutation, useGetBuilderEvalSuiteQuery } from "@api";
 import { en } from "@constants";
 import type {
   BuilderEvalFixture,
@@ -296,8 +298,11 @@ const SuiteBody: React.FC<{
   suite: BuilderEvalSuiteDetail;
   fixtures: BuilderEvalFixture[] | undefined;
   onOpenSuite: (id: string) => void;
-}> = ({ suite, fixtures, onOpenSuite }) => {
+  onCancel?: () => Promise<void>;
+}> = ({ suite, fixtures, onOpenSuite, onCancel }) => {
   const strings = en.builder.eval.suiteDetail;
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const summary = suite.summary;
   const groups = groupRunsByFixture(suite, fixtures);
   const liveFixtures = new Map(asArray<BuilderEvalFixture>(fixtures).map(row => [row.id, row]));
@@ -340,12 +345,53 @@ const SuiteBody: React.FC<{
         </p>
       )}
 
+      {/* Two steps, not one: a suite is dozens of paid runs, and a stray click
+          should not throw away the ones still to come. A plain div, not a
+          notification — the controls are buttons. */}
+      {suite.status === "running" && onCancel && (
+        <div className="flex flex-wrap items-center gap-2">
+          {confirmingCancel ? (
+            <>
+              <p className="w-full text-sm text-typography-700">{strings.cancelAsk}</p>
+              <Button
+                kind="danger"
+                size="sm"
+                disabled={cancelling}
+                onClick={async () => {
+                  setCancelling(true);
+                  try {
+                    await onCancel();
+                    setConfirmingCancel(false);
+                  } finally {
+                    setCancelling(false);
+                  }
+                }}
+              >
+                {strings.cancelConfirm}
+              </Button>
+              <Button
+                kind="ghost"
+                size="sm"
+                disabled={cancelling}
+                onClick={() => setConfirmingCancel(false)}
+              >
+                {strings.cancelKeep}
+              </Button>
+            </>
+          ) : (
+            <Button kind="danger--ghost" size="sm" onClick={() => setConfirmingCancel(true)}>
+              {strings.cancel}
+            </Button>
+          )}
+        </div>
+      )}
+
       {suite.error && (
         <InlineNotification
-          kind="error"
+          kind={suite.status === "cancelled" ? "info" : "error"}
           lowContrast
           hideCloseButton
-          title={strings.errored}
+          title={suite.status === "cancelled" ? strings.cancelledTitle : strings.errored}
           subtitle={asAgentText(suite.error)}
         />
       )}
@@ -483,6 +529,15 @@ export const SuiteDetailPanel: React.FC<SuiteDetailPanelProps> = ({
     skip: !suiteId,
     pollingInterval: pollMs,
   });
+  const [cancelSuite] = useCancelBuilderEvalSuiteMutation();
+  const handleCancel = async () => {
+    if (!suiteId) return;
+    try {
+      await cancelSuite(suiteId).unwrap();
+    } catch {
+      toast.error(strings.cancelFailed);
+    }
+  };
 
   // `data` lingers from the previous suite while a new one loads, so it only counts
   // as "running" when it is the suite on screen.
@@ -509,7 +564,12 @@ export const SuiteDetailPanel: React.FC<SuiteDetailPanelProps> = ({
           </Button>
         </div>
       ) : (
-        <SuiteBody suite={data} fixtures={fixtures} onOpenSuite={onOpenSuite} />
+        <SuiteBody
+          suite={data}
+          fixtures={fixtures}
+          onOpenSuite={onOpenSuite}
+          onCancel={handleCancel}
+        />
       )}
     </SidePanel>
   );

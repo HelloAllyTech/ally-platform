@@ -27,6 +27,9 @@ import { baseAPI } from "./baseApi";
  * Fixtures carry what a production admin typed, so nothing here is persisted or
  * kept past its last subscriber: the export in particular is a one-shot read.
  */
+/** Published suites this tab has already refreshed the prompts for. */
+const seenPublishedSuites = new Set<string>();
+
 export const builderEvalAPI = baseAPI.injectEndpoints({
   endpoints: builder => ({
     /**
@@ -156,6 +159,34 @@ export const builderEvalAPI = baseAPI.injectEndpoints({
         params: params && params.limit ? { limit: params.limit } : undefined,
       }),
       providesTags: [TAG_TYPES.BUILDER_EVAL_SUITES],
+      // A prompt candidate is published by the server when its suite passes,
+      // minutes after it was submitted. When a suite turns up published that
+      // this tab has not seen before, the prompts it changed are stale here —
+      // refetch them, so the prompt editor shows the text that is now live.
+      async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          const fresh = (Array.isArray(data) ? data : []).filter(
+            suite => suite?.publishedAt && !seenPublishedSuites.has(suite.id),
+          );
+          if (!fresh.length) return;
+          fresh.forEach(suite => seenPublishedSuites.add(suite.id));
+          dispatch(baseAPI.util.invalidateTags([TAG_TYPES.PROMPTS]));
+        } catch {
+          // A failed list is the list's problem, not this refresh's.
+        }
+      },
+    }),
+
+    cancelBuilderEvalSuite: builder.mutation<BuilderEvalSuite, string>({
+      query: id => ({
+        url: ApiEndpoints.BUILDER.EVAL_SUITE_CANCEL(id),
+        method: HttpMethod.POST,
+      }),
+      invalidatesTags: (result, error, id) => [
+        TAG_TYPES.BUILDER_EVAL_SUITES,
+        { type: TAG_TYPES.BUILDER_EVAL_SUITES, id },
+      ],
     }),
 
     getBuilderEvalSuite: builder.query<BuilderEvalSuiteDetail, string>({
@@ -207,6 +238,7 @@ export const {
   useStartBuilderEvalSuiteMutation,
   useGetBuilderEvalSuitesQuery,
   useGetBuilderEvalSuiteQuery,
+  useCancelBuilderEvalSuiteMutation,
   useGetBuilderEvalRunQuery,
   useSubmitBuilderEvalPromptCandidateMutation,
 } = builderEvalAPI;

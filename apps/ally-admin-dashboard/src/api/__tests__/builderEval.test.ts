@@ -297,4 +297,37 @@ describe("builderEvalAPI", () => {
       });
     });
   });
+
+  describe("cancelling and publishing", () => {
+    it("cancels a suite by id", async () => {
+      await dispatch(builderEvalAPI.endpoints.cancelBuilderEvalSuite.initiate("s9"));
+
+      expect(sent[0]).toMatchObject({
+        method: "POST",
+        url: "/api/v1/builder/eval/suites/s9/cancel",
+      });
+    });
+
+    it("refreshes the prompts once when a suite turns up published", async () => {
+      const invalidate = vi.spyOn(baseAPI.util, "invalidateTags");
+      answers["GET /v1/builder/eval/suites"] = [
+        { id: "published-1", status: "completed", publishedAt: "2026-10-21T12:00:00Z" },
+        { id: "plain-1", status: "completed", publishedAt: null },
+      ];
+
+      await dispatch(builderEvalAPI.endpoints.getBuilderEvalSuites.initiate({ limit: 30 }));
+      await dispatch(
+        builderEvalAPI.endpoints.getBuilderEvalSuites.initiate(
+          { limit: 31 },
+          { forceRefetch: true },
+        ),
+      );
+
+      const promptRefreshes = invalidate.mock.calls.filter(([tags]) =>
+        JSON.stringify(tags).includes("prompts"),
+      );
+      expect(promptRefreshes).toHaveLength(1);
+      invalidate.mockRestore();
+    });
+  });
 });
