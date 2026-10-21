@@ -58,23 +58,100 @@ class _RankBadge extends StatelessWidget {
   }
 }
 
-/// Port of ally-mobile (React Native)'s `LeaderboardScreen` — ranked list,
-/// the current user's own rank pinned at top, and the same window-period
-/// dropdown (last 7/28/364 days, all time; defaults to last 7 days).
-class LeaderboardScreen extends ConsumerWidget {
+/// Fixed row height used for the sticky-footer scroll math below. RN
+/// measures the real row height at runtime via `onLayout`; a fixed value is
+/// an acceptable simplification since every row renders the same layout.
+const double _kRowHeight = 64;
+
+/// Port of ally-mobile (React Native)'s `LeaderboardScreen` — ranked list
+/// with pull-to-refresh, infinite-scroll pagination, the current user's row
+/// inline-highlighted in place (not a separate card), and RN's own
+/// conditional sticky footer (shown only while the current user's row is
+/// still below the visible viewport).
+class LeaderboardScreen extends ConsumerStatefulWidget {
   const LeaderboardScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final leaderboardAsync = ref.watch(leaderboardProvider);
+  ConsumerState<LeaderboardScreen> createState() => _LeaderboardScreenState();
+}
+
+class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
+  final _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      ref.read(leaderboardControllerProvider.notifier).loadMore();
+    }
+  }
+
+  Widget _row({
+    required BuildContext context,
+    required LeaderboardEntry entry,
+    required bool showRankColumn,
+    required bool isHighlighted,
+  }) {
+    final highlightColor = Theme.of(context).colorScheme.primaryContainer;
+    return Container(
+      color: isHighlighted ? highlightColor : null,
+      height: _kRowHeight,
+      child: ListTile(
+        leading: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (showRankColumn) ...[
+              _RankBadge(rank: entry.rank),
+              const SizedBox(width: 8),
+            ],
+            CircleAvatar(
+              backgroundImage: entry.profileImageUrl.isNotEmpty
+                  ? NetworkImage(entry.profileImageUrl)
+                  : null,
+              child: entry.profileImageUrl.isEmpty
+                  ? Text(entry.name.isNotEmpty ? entry.name[0].toUpperCase() : '?')
+                  : null,
+            ),
+          ],
+        ),
+        title: Text(entry.name),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(_formatDuration(entry.minutesPlayed)),
+            const SizedBox(width: 16),
+            SvgPicture.asset('assets/icons/badgeIcon.svg', width: 14, height: 14),
+            const SizedBox(width: 4),
+            Text('${entry.badgeCount}'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pageAsync = ref.watch(leaderboardControllerProvider);
     final myRankAsync = ref.watch(myRankProvider);
     final selectedWindow = ref.watch(leaderboardWindowProvider);
 
-    // RN's own doc comment on `community.title`: used here for both the
-    // Leaderboard header AND (elsewhere) the Achievements tooltip — the
-    // header's `rightContent` is the Badges button, not the period
-    // dropdown, which lives in its own row below instead.
-    final myBadgeCount = myRankAsync.maybeWhen(data: (myRank) => myRank?.badgeCount ?? 0, orElse: () => 0);
+    final myRank = myRankAsync.value;
+    final myBadgeCount = myRank?.badgeCount ?? 0;
+    // RN: `showRankColumn = !currentUserEntry?.hideRankInCommunity` — true
+    // (shown) until myRank is known to say otherwise.
+    final showRankColumn = !(myRank?.hideRankInCommunity ?? false);
 
     return Scaffold(
       body: Column(
@@ -105,66 +182,102 @@ class LeaderboardScreen extends ConsumerWidget {
             ),
           ),
           Expanded(
-            child: leaderboardAsync.when(
+            child: pageAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (error, _) => Center(child: Text('${ref.t('community.loadError')}: $error')),
-              data: (entries) => Column(
-                children: [
-                  myRankAsync.maybeWhen(
-                    data: (myRank) => myRank == null
-                        ? const SizedBox.shrink()
-                        : Card(
-                            margin: const EdgeInsets.all(12),
-                            color: Theme.of(context).colorScheme.primaryContainer,
-                            child: ListTile(
-                              leading: CircleAvatar(child: Text('${myRank.rank}')),
-                              title: Text(ref.t('community.yourRank')),
-                              subtitle: Text(
-                                '${_formatDuration(myRank.minutesPlayed)} · '
-                                '${myRank.badgeCount} ${ref.t('community.table.badges')}',
+              data: (page) {
+                if (page.items.isEmpty) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 32),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            ref.t('community.emptyLeaderboard'),
+                            style: Theme.of(context).textTheme.titleMedium,
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            ref.t('community.emptyLeaderBoardDescription'),
+                            style: Theme.of(context).textTheme.bodyMedium,
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+
+                final currentUserIndex =
+                    myRank == null ? -1 : page.items.indexWhere((e) => e.userId == myRank.userId);
+
+                return Stack(
+                  children: [
+                    RefreshIndicator(
+                      onRefresh: () => ref.refresh(leaderboardControllerProvider.future),
+                      child: ListView.separated(
+                        controller: _scrollController,
+                        itemCount: page.items.length + (page.isLoadingMore ? 1 : 0),
+                        separatorBuilder: (_, _) => const Divider(height: 1),
+                        itemBuilder: (context, index) {
+                          if (index >= page.items.length) {
+                            return const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 16),
+                              child: Center(child: CircularProgressIndicator()),
+                            );
+                          }
+                          return _row(
+                            context: context,
+                            entry: page.items[index],
+                            showRankColumn: showRankColumn,
+                            isHighlighted: index == currentUserIndex,
+                          );
+                        },
+                      ),
+                    ),
+                    // RN's sticky footer: pinned current-user row, shown only
+                    // while that row's position is still below the visible
+                    // viewport (not yet scrolled to) — never when already in
+                    // view or when the row hasn't loaded into this page yet.
+                    if (showRankColumn && myRank != null)
+                      AnimatedBuilder(
+                        animation: _scrollController,
+                        builder: (context, _) {
+                          final attached =
+                              _scrollController.hasClients && _scrollController.position.haveDimensions;
+                          final offset = attached ? _scrollController.offset : 0.0;
+                          final viewportHeight = attached ? _scrollController.position.viewportDimension : 0.0;
+                          final rowTop = currentUserIndex == -1 ? 0.0 : currentUserIndex * _kRowHeight;
+                          final shouldShow = rowTop > offset + viewportHeight;
+                          if (!shouldShow) return const SizedBox.shrink();
+                          return Align(
+                            key: const Key('leaderboard-sticky-footer'),
+                            alignment: Alignment.bottomCenter,
+                            child: Material(
+                              elevation: 8,
+                              color: Theme.of(context).colorScheme.surface,
+                              child: _row(
+                                context: context,
+                                entry: LeaderboardEntry(
+                                  userId: myRank.userId,
+                                  name: myRank.name,
+                                  profileImageUrl: myRank.profileImageUrl,
+                                  rank: myRank.rank,
+                                  minutesPlayed: myRank.minutesPlayed,
+                                  badgeCount: myRank.badgeCount,
+                                ),
+                                showRankColumn: showRankColumn,
+                                isHighlighted: true,
                               ),
                             ),
-                          ),
-                    orElse: () => const SizedBox.shrink(),
-                  ),
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: entries.length,
-                      itemBuilder: (context, index) {
-                        final entry = entries[index];
-                        return ListTile(
-                          leading: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              _RankBadge(rank: entry.rank),
-                              const SizedBox(width: 8),
-                              CircleAvatar(
-                                backgroundImage: entry.profileImageUrl.isNotEmpty
-                                    ? NetworkImage(entry.profileImageUrl)
-                                    : null,
-                                child: entry.profileImageUrl.isEmpty
-                                    ? Text(entry.name.isNotEmpty ? entry.name[0].toUpperCase() : '?')
-                                    : null,
-                              ),
-                            ],
-                          ),
-                          title: Text(entry.name),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(_formatDuration(entry.minutesPlayed)),
-                              const SizedBox(width: 16),
-                              SvgPicture.asset('assets/icons/badgeIcon.svg', width: 14, height: 14),
-                              const SizedBox(width: 4),
-                              Text('${entry.badgeCount}'),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
+                          );
+                        },
+                      ),
+                  ],
+                );
+              },
             ),
           ),
         ],

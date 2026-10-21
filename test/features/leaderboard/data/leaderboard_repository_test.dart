@@ -24,31 +24,52 @@ void main() {
 
   group('getLeaderboard', () {
     for (final window in LeaderboardWindow.values) {
-      test('sends window=${window.apiValue} for ${window.name}', () async {
+      test('sends window=${window.apiValue} with the default page size for ${window.name}', () async {
         when(
           () => dio.get<Map<String, dynamic>>(
             '/community/leaderboard',
-            queryParameters: {'window': window.apiValue},
+            queryParameters: {'window': window.apiValue, 'limit': kLeaderboardPageSize, 'offset': 0},
           ),
         ).thenAnswer(
           (_) async => _response({
             'data': [
               {'userId': 1, 'name': 'Alice', 'rank': 1},
             ],
+            'totalCount': 1,
           }),
         );
 
-        final entries = await repository.getLeaderboard(window);
+        final result = await repository.getLeaderboard(window);
 
         verify(
           () => dio.get<Map<String, dynamic>>(
             '/community/leaderboard',
-            queryParameters: {'window': window.apiValue},
+            queryParameters: {'window': window.apiValue, 'limit': kLeaderboardPageSize, 'offset': 0},
           ),
         ).called(1);
-        expect(entries.single.name, 'Alice');
+        expect(result.items.single.name, 'Alice');
+        expect(result.totalCount, 1);
       });
     }
+
+    test('passes custom limit/offset through', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>(
+          '/community/leaderboard',
+          queryParameters: {'window': LeaderboardWindow.lastWeek.apiValue, 'limit': 10, 'offset': 20},
+        ),
+      ).thenAnswer((_) async => _response({'data': <dynamic>[], 'totalCount': 0}));
+
+      final result = await repository.getLeaderboard(LeaderboardWindow.lastWeek, limit: 10, offset: 20);
+
+      expect(result.items, isEmpty);
+      verify(
+        () => dio.get<Map<String, dynamic>>(
+          '/community/leaderboard',
+          queryParameters: {'window': LeaderboardWindow.lastWeek.apiValue, 'limit': 10, 'offset': 20},
+        ),
+      ).called(1);
+    });
 
     test('maps minutesPlayed/badgeCount defaults when absent', () async {
       when(
@@ -64,14 +85,15 @@ void main() {
         }),
       );
 
-      final entries = await repository.getLeaderboard(LeaderboardWindow.lastWeek);
+      final result = await repository.getLeaderboard(LeaderboardWindow.lastWeek);
 
-      expect(entries.single.minutesPlayed, 0);
-      expect(entries.single.badgeCount, 0);
-      expect(entries.single.profileImageUrl, '');
+      expect(result.items.single.minutesPlayed, 0);
+      expect(result.items.single.badgeCount, 0);
+      expect(result.items.single.profileImageUrl, '');
+      expect(result.totalCount, 1, reason: 'falls back to the page length when totalCount is absent');
     });
 
-    test('returns an empty list when data is missing', () async {
+    test('returns an empty page when data/totalCount are missing', () async {
       when(
         () => dio.get<Map<String, dynamic>>(
           '/community/leaderboard',
@@ -79,9 +101,10 @@ void main() {
         ),
       ).thenAnswer((_) async => _response({}));
 
-      final entries = await repository.getLeaderboard(LeaderboardWindow.allTime);
+      final result = await repository.getLeaderboard(LeaderboardWindow.allTime);
 
-      expect(entries, isEmpty);
+      expect(result.items, isEmpty);
+      expect(result.totalCount, 0);
     });
   });
 
@@ -97,7 +120,7 @@ void main() {
           (_) async => _response({'userId': 9, 'name': 'Me', 'rank': 5}),
         );
 
-        final entry = await repository.getMyRank(window);
+        final myRank = await repository.getMyRank(window);
 
         verify(
           () => dio.get<Map<String, dynamic>>(
@@ -105,9 +128,25 @@ void main() {
             queryParameters: {'window': window.apiValue},
           ),
         ).called(1);
-        expect(entry?.rank, 5);
+        expect(myRank?.rank, 5);
+        expect(myRank?.hideRankInCommunity, isFalse);
       });
     }
+
+    test('parses hideRankInCommunity when true', () async {
+      when(
+        () => dio.get<Map<String, dynamic>>(
+          '/community/leaderboard/my-rank',
+          queryParameters: any(named: 'queryParameters'),
+        ),
+      ).thenAnswer(
+        (_) async => _response({'userId': 9, 'name': 'Me', 'rank': 5, 'hideRankInCommunity': true}),
+      );
+
+      final myRank = await repository.getMyRank(LeaderboardWindow.lastWeek);
+
+      expect(myRank?.hideRankInCommunity, isTrue);
+    });
 
     test('returns null when the response data is null', () async {
       when(
@@ -117,9 +156,9 @@ void main() {
         ),
       ).thenAnswer((_) async => _response(null));
 
-      final entry = await repository.getMyRank(LeaderboardWindow.lastMonth);
+      final myRank = await repository.getMyRank(LeaderboardWindow.lastMonth);
 
-      expect(entry, isNull);
+      expect(myRank, isNull);
     });
   });
 
