@@ -27,7 +27,7 @@ export interface GamePlayerProps {
 }
 
 /** Every game bundle the app can render, by key. */
-const GAME_HTML: Record<TrackGameKey, string> = {
+const GAME_HTML: Partial<Record<TrackGameKey, string>> = {
   [TrackGameKey.TREX_RUNNER]: TREX_RUNNER_HTML,
   [TrackGameKey.TIC_TAC_TOE]: TIC_TAC_TOE_HTML,
   [TrackGameKey.MEMORY_MATCH]: MEMORY_MATCH_HTML,
@@ -41,7 +41,7 @@ const GAME_HTML: Record<TrackGameKey, string> = {
  * viewport it is given, so this is the one thing about a game the host has to
  * know: the runner is a 150px canvas, a board game needs room for a board.
  */
-const GAME_HEIGHT: Record<TrackGameKey, number> = {
+const GAME_HEIGHT: Partial<Record<TrackGameKey, number>> = {
   [TrackGameKey.TREX_RUNNER]: 200,
   [TrackGameKey.TIC_TAC_TOE]: 400,
   [TrackGameKey.MEMORY_MATCH]: 380,
@@ -195,6 +195,7 @@ export const GamePlayer: React.FC<GamePlayerProps> = ({
   );
 
   const html = GAME_HTML[payload.gameKey];
+  const height = GAME_HEIGHT[payload.gameKey];
 
   /**
    * Handed over before the document runs rather than posted in afterwards, so
@@ -226,7 +227,7 @@ export const GamePlayer: React.FC<GamePlayerProps> = ({
   // hand an unrecognised key to the lookups below — a blank WebView sized to
   // NaN — say so plainly, the same way UnsupportedItemCard does for an
   // unrecognised item type.
-  if (!html) {
+  if (!html || !height) {
     return (
       <View style={styles.unsupported} testID="game-unsupported">
         <Text style={styles.unsupportedTitle}>
@@ -247,7 +248,7 @@ export const GamePlayer: React.FC<GamePlayerProps> = ({
       scrollEnabled>
       {payload.intro ? <Text style={styles.intro}>{payload.intro}</Text> : null}
 
-      <View style={[styles.frame, {height: ms(GAME_HEIGHT[payload.gameKey])}]}>
+      <View style={[styles.frame, {height: ms(height)}]}>
         <WebView
           source={{html}}
           onMessage={handleMessage}
@@ -267,20 +268,28 @@ export const GamePlayer: React.FC<GamePlayerProps> = ({
       </View>
 
       <Text style={styles.hint}>
-        {t(`courses.game.controlsTouch.${payload.gameKey}`)}
+        {t(
+          `courses.game.controlsTouch.${gameKey as keyof typeof GAME_HTML}` as any,
+        )}
       </Text>
 
       <View style={styles.scores}>
         {lastScore !== null ? (
           <Text style={styles.score}>
-            {t(`courses.game.lastScore.${payload.gameKey}`, {score: lastScore})}
+            {t(
+              `courses.game.lastScore.${gameKey as keyof typeof GAME_HTML}` as any,
+              {score: lastScore},
+            )}
           </Text>
         ) : null}
         {bestScore !== null ? (
           <Text style={styles.best}>
-            {t(`courses.game.bestScore.${payload.gameKey}`, {
-              score: bestScore,
-            })}
+            {t(
+              `courses.game.bestScore.${gameKey as keyof typeof GAME_HTML}` as any,
+              {
+                score: bestScore,
+              },
+            )}
           </Text>
         ) : null}
       </View>

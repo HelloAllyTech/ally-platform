@@ -41,3 +41,28 @@ export const htmlToPlainText = (value: string | undefined | null): string => {
 
   return decodeHtmlEntities(stripped).replace(/\s+/g, ' ').trim();
 };
+
+/**
+ * Like htmlToPlainText, but keeps the author's paragraph and line breaks
+ * (<br>, </p>, </li>, headings, …) as newlines, for places that show a full
+ * rich-text description rather than a one-line preview.
+ */
+export const htmlToMultilineText = (
+  value: string | undefined | null,
+): string => {
+  if (!value) return '';
+
+  const stripped = value
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<li[^>]*>/gi, '\n• ')
+    .replace(/<\/(p|div|ul|ol|h[1-6]|blockquote)>/gi, '\n')
+    .replace(/<[^>]*>/g, '');
+
+  return decodeHtmlEntities(stripped)
+    .replace(/[^\S\n]+/g, ' ')
+    .replace(/ *\n */g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+};

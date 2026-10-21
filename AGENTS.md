@@ -89,7 +89,7 @@ npm run build:prod           # release APK
 
 [`.docs-map.yml`](.docs-map.yml) declares which docs cover which code, and CI enforces it.
 Touching `src/navigation/**` or `src/services/**` needs the wiki's repo page updated — either
-do it, or apply the `docs:skip` label with a reason.
+do it, or apply the `docs:skip` label with a reason. Backticked file paths in any doc are checked too: `node scripts/docs-path-lint.mjs` fails on one that no longer exists — fix it, or mark a deliberate one `<!-- docs-path-lint: planned -->`.
 
 Pushing straight to `master`? The same check runs before the push (this repo ships the hook
 in `.husky/pre-push`, so you already have it), and the escape hatches move to the commit

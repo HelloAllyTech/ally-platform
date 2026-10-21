@@ -6,6 +6,7 @@ import {CloseIcon} from '@/assets';
 import {useTranslate} from '@/hooks';
 import type {FlatTrackItem} from '@/hooks/useTrackPlayerNavigation';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
+import {htmlToPlainText} from '@/utils';
 
 import {SegmentedProgressRail} from './SegmentedProgressRail';
 
@@ -67,7 +68,7 @@ export const PlayerTopBar: React.FC<PlayerTopBarProps> = ({
       </View>
       {itemDescription ? (
         <Text style={styles.description} numberOfLines={2}>
-          {itemDescription}
+          {htmlToPlainText(itemDescription)}
         </Text>
       ) : null}
       <SegmentedProgressRail

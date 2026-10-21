@@ -93,7 +93,7 @@ export const ArticleQuestionCard: React.FC<ArticleQuestionCardProps> = ({
     <View testID={`article-question-${question.id}`} style={styles.card}>
       <Text style={styles.title}>{t('courses.article.question.title')}</Text>
       {question.promptHtml ? (
-        <RichText html={question.promptHtml} textStyle={styles.prompt} />
+        <RichText html={question.promptHtml} textStyle={styles.promptRich} />
       ) : (
         <Text style={styles.prompt}>{question.prompt}</Text>
       )}
@@ -191,6 +191,14 @@ const styles = ScaledSheet.create({
     textTransform: 'uppercase',
   },
   prompt: {
+    ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
+    ...typography.body.medium,
+    fontWeight: fontWeights.medium,
+    color: colors.ds.typography.highEmphasis,
+  },
+  // Plain prompts stay medium, as before. Rich prompts start lighter so that
+  // bold inside them actually stands out.
+  promptRich: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     ...typography.body.medium,
     fontWeight: fontWeights.regular,
@@ -247,7 +255,7 @@ const styles = ScaledSheet.create({
     flex: 1,
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     ...typography.body.medium,
-    fontWeight: fontWeights.regular,
+    fontWeight: fontWeights.medium,
     color: colors.ds.typography.highEmphasis,
   },
   feedback: {
@@ -279,13 +287,13 @@ const styles = ScaledSheet.create({
   explanation: {
     ...fontFamily.ROBOTO.REGULAR,
     ...typography.body.small,
-    fontWeight: fontWeights.regular,
+    fontWeight: fontWeights.medium,
     color: colors.ds.typography.mediumEmphasis,
   },
   hint: {
     ...fontFamily.ROBOTO.REGULAR,
     ...typography.body.tiny,
-    fontWeight: fontWeights.regular,
+    fontWeight: fontWeights.medium,
     color: colors.ds.typography.lowEmphasis,
   },
 });
