@@ -179,11 +179,14 @@ void main() {
         ),
       );
 
-      final tile = tester.widget<ListTile>(find.byType(ListTile));
-      expect(tile.enabled, isFalse);
-      expect(tile.onTap, isNull);
+      // `find.byType(InkWell)` alone would also match AppButton's own
+      // internal InkWell — disambiguate via the row's title text.
+      final rowInkWell = tester.widget<InkWell>(
+        find.ancestor(of: find.text('Scenario 1'), matching: find.byType(InkWell)),
+      );
+      expect(rowInkWell.onTap, isNull);
 
-      await tester.tap(find.byType(ListTile));
+      await tester.tap(find.text('Scenario 1'));
       await tester.pumpAndSettle();
       expect(calls, isEmpty);
     });
@@ -243,10 +246,47 @@ void main() {
         ),
       );
 
-      await tester.tap(find.widgetWithText(ListTile, 'Scenario 2'));
+      await tester.tap(find.text('Scenario 2'));
       await tester.pumpAndSettle();
 
       expect(calls, ['s2']);
+    });
+
+    testWidgets('shows a lock overlay on a locked thumbnail and a Next badge on the resumable row', (
+      tester,
+    ) async {
+      final details = _details(
+        completedScenarios: 1,
+        scenarios: [
+          _scenario(
+            id: 's1',
+            scenarioId: 1,
+            order: 1,
+            status: SessionItemStatus.completed,
+            sessionId: 'sess-1',
+          ),
+          _scenario(id: 's2', scenarioId: 2, order: 2),
+          _scenario(id: 's3', scenarioId: 3, order: 3, status: SessionItemStatus.locked),
+        ],
+      );
+
+      await _pump(
+        tester,
+        LearningPathDetailView(
+          details: details,
+          onEnsureSession: () async {},
+          onStartScenario: (_) async {},
+          onViewFeedback: (_) async {},
+        ),
+      );
+
+      // RN's real card: "Role play N" prefix, a Next badge only on the
+      // first unlocked (resumable) scenario, and a dark lock overlay +
+      // icon on a locked row's thumbnail — not a numbered circle avatar.
+      expect(find.text('Role play 1'), findsOneWidget);
+      expect(find.text('Role play 2'), findsOneWidget);
+      expect(find.text('Next'), findsOneWidget, reason: 'only scenario 2 is the resumable one');
+      expect(find.byIcon(Icons.lock), findsOneWidget, reason: 'only scenario 3 is locked');
     });
   });
 }

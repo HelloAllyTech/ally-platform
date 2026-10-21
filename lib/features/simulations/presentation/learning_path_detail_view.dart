@@ -5,7 +5,6 @@ import '../../../core/localization/translate_ref.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
 import '../../../core/widgets/app_button.dart';
-import '../../../core/widgets/app_card.dart';
 import '../data/simulation_models.dart';
 
 /// Shared body for CaseDetailsScreen and SimulationPathDetailsScreen — ally-
@@ -48,10 +47,12 @@ class LearningPathDetailView extends ConsumerStatefulWidget {
   final Future<void> Function(PathScenario scenario) onViewFeedback;
 
   @override
-  ConsumerState<LearningPathDetailView> createState() => _LearningPathDetailViewState();
+  ConsumerState<LearningPathDetailView> createState() =>
+      _LearningPathDetailViewState();
 }
 
-class _LearningPathDetailViewState extends ConsumerState<LearningPathDetailView> {
+class _LearningPathDetailViewState
+    extends ConsumerState<LearningPathDetailView> {
   bool _isStarting = false;
   String? _error;
 
@@ -101,9 +102,7 @@ class _LearningPathDetailViewState extends ConsumerState<LearningPathDetailView>
             // ReplayPro-Headline (that's a different, larger element).
             child: Text(
               details.title!,
-              style: Theme.of(context)
-                  .textTheme
-                  .displaySmall
+              style: Theme.of(context).textTheme.displaySmall
                   ?.copyWith(fontFamily: AppFonts.ibmPlexSerifMedium),
             ),
           ),
@@ -172,35 +171,125 @@ class _ScenarioRow extends ConsumerWidget {
     final locked = scenario.status == SessionItemStatus.locked;
     final completed = scenario.status == SessionItemStatus.completed;
 
+    // RN's real `PathSimulationCard` has no description/subtitle at all —
+    // just a thumbnail, an "Role play N" + completed-check + Next-badge
+    // header row, and the title.
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: AppCard(
-        variant: AppCardVariant.flat,
-        child: ListTile(
-          tileColor: isNext ? Theme.of(context).colorScheme.primaryContainer : null,
-          leading: CircleAvatar(
-            child: locked
-                ? const Icon(Icons.lock_outline, size: 18)
-                : completed
-                ? const Icon(Icons.check, size: 18)
-                : Text('${scenario.order}'),
-          ),
-          title: Text(
-            scenario.title ??
-                ref.t('simulations.scenarioFallbackTitle', {'id': scenario.scenarioId}),
-          ),
-          subtitle: scenario.description != null
-              ? Text(scenario.description!)
-              : null,
-          trailing: completed && scenario.sessionId != null
-              ? IconButton(
-                  icon: const Icon(Icons.description_outlined),
+      child: Material(
+        color: Colors.white,
+        child: InkWell(
+          onTap: locked || isStarting ? null : onTap,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: scenario.coverImageUrl != null
+                        ? Image.network(
+                            scenario.coverImageUrl!,
+                            width: 120,
+                            height: 60,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => Container(
+                              width: 120,
+                              height: 60,
+                              color: AppColors.lightGray2,
+                            ),
+                          )
+                        : Container(
+                            width: 120,
+                            height: 60,
+                            color: AppColors.lightGray2,
+                          ),
+                  ),
+                  if (locked)
+                    Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Center(
+                          child: Icon(
+                            Icons.lock,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            '${ref.t('postSim.titlePrefix')} ${scenario.order}',
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: AppColors.lowEmphasis),
+                          ),
+                          if (completed) ...[
+                            const SizedBox(width: 8),
+                            const Icon(
+                              Icons.check_circle,
+                              color: Colors.green,
+                              size: 16,
+                            ),
+                          ],
+                          if (isNext) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.primaryLight.withValues(
+                                  alpha: 0.15,
+                                ),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Text(
+                                ref.t('common.next'),
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(color: AppColors.primary),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        scenario.title ??
+                            ref.t('simulations.scenarioFallbackTitle', {
+                              'id': scenario.scenarioId,
+                            }),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontFamily: AppFonts.ibmPlexSerifRegular,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (completed && scenario.sessionId != null)
+                IconButton(
+                  icon: const Icon(Icons.description_outlined, size: 18),
                   tooltip: ref.t('simulations.viewFeedback'),
                   onPressed: onViewFeedback,
-                )
-              : null,
-          enabled: !locked && !isStarting,
-          onTap: locked ? null : onTap,
+                ),
+            ],
+          ),
         ),
       ),
     );
