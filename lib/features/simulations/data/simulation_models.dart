@@ -1,3 +1,20 @@
+/// A selectable simulation-language option — RN's `LanguageOption`
+/// (`src/types/simulations.ts`). Only `language_id`/`label` are modeled;
+/// the original also carries an `active` flag and translation metadata the
+/// ported dropdown doesn't need.
+class ScenarioLanguageOption {
+  ScenarioLanguageOption({required this.languageId, required this.label});
+
+  factory ScenarioLanguageOption.fromJson(Map<String, dynamic> json) =>
+      ScenarioLanguageOption(
+        languageId: (json['language_id'] as num).toInt(),
+        label: json['label'] as String,
+      );
+
+  final int languageId;
+  final String label;
+}
+
 /// Mirrors ally-mobile (React Native)'s `src/types/simulations.ts` and
 /// `src/types/credits.ts`. Only the fields the ported screens use are
 /// modeled — the originals carry more (reminders, state-name mapping,
@@ -8,6 +25,10 @@ class Scenario {
     required this.title,
     required this.description,
     required this.coverImageUrl,
+    this.coverVideoUrl,
+    this.triggerWarnings = const [],
+    this.availableLanguages = const [],
+    this.completedAttemptCount = 0,
   });
 
   factory Scenario.fromJson(Map<String, dynamic> json) => Scenario(
@@ -15,12 +36,28 @@ class Scenario {
     title: json['title'] as String,
     description: json['description'] as String?,
     coverImageUrl: json['coverImageUrl'] as String?,
+    coverVideoUrl: json['coverVideoUrl'] as String?,
+    triggerWarnings: (json['triggerWarnings'] as List<dynamic>? ?? [])
+        .map((e) => (e as Map<String, dynamic>)['name'] as String)
+        .toList(),
+    availableLanguages: (json['availableLanguages'] as List<dynamic>? ?? [])
+        .map((e) => ScenarioLanguageOption.fromJson(e as Map<String, dynamic>))
+        .toList(),
+    completedAttemptCount:
+        (json['completion'] as Map<String, dynamic>?)?['attemptCount'] as int? ?? 0,
   );
 
   final int id;
   final String title;
   final String? description;
   final String? coverImageUrl;
+  final String? coverVideoUrl;
+  final List<String> triggerWarnings;
+  final List<ScenarioLanguageOption> availableLanguages;
+
+  /// Completing a scenario never locks it — RN's doc comment on this same
+  /// field: the CTA turns into "Practise again" rather than disappearing.
+  final int completedAttemptCount;
 }
 
 /// LiveKit connection pair returned by starting a session — the same shape
