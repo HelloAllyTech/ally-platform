@@ -14,7 +14,7 @@ class AuthInterceptor extends Interceptor {
   AuthInterceptor({
     required Dio refreshDio,
     required TokenStorage tokenStorage,
-    required Future<void> Function() onUnrecoverable,
+    required Future<String> Function() onUnrecoverable,
   })  : _refreshDio = refreshDio,
         _tokenStorage = tokenStorage,
         _onUnrecoverable = onUnrecoverable;
@@ -24,7 +24,11 @@ class AuthInterceptor extends Interceptor {
   // same interceptor on a 401 from the refresh endpoint.
   final Dio _refreshDio;
   final TokenStorage _tokenStorage;
-  final Future<void> Function() _onUnrecoverable;
+
+  /// Clears the session and returns the (already-translated) message to
+  /// show — see [_replace]'s doc comment for why the caller's own message
+  /// is what ends up on screen, not the original technical failure.
+  final Future<String> Function() _onUnrecoverable;
 
   // RN's `api.ts` matches with `url === v2Endpoint` (exact equality), not a
   // prefix check — `startsWith` here would wrongly also match e.g.
@@ -60,8 +64,7 @@ class AuthInterceptor extends Interceptor {
     final refreshToken = await _tokenStorage.refreshToken;
     final accessToken = await _tokenStorage.accessToken;
     if (refreshToken == null || accessToken == null) {
-      await _onUnrecoverable();
-      handler.next(err);
+      handler.next(await _replace(err));
       return;
     }
 
@@ -92,8 +95,21 @@ class AuthInterceptor extends Interceptor {
       final retryResponse = await _refreshDio.fetch(retryOptions);
       handler.resolve(retryResponse);
     } catch (_) {
-      await _onUnrecoverable();
-      handler.next(err);
+      handler.next(await _replace(err));
     }
+  }
+
+  /// Swaps the original (technical, user-hostile) failure for a short
+  /// `DioException` whose `message` is the session-expired copy the caller
+  /// already shows as a snackbar — previously this only showed that toast
+  /// *alongside* still forwarding the raw `err`, so whichever screen's
+  /// request lost this race rendered the real failure anyway (a multi-
+  /// paragraph "RequestOptions.validateStatus was configured to throw for
+  /// this status code..." dump, confirmed live). `DioException.toString()`
+  /// always prefixes with `DioException [type]: `, so this isn't fully
+  /// clean, but it's that one line instead of the technical essay.
+  Future<DioException> _replace(DioException original) async {
+    final message = await _onUnrecoverable();
+    return DioException(requestOptions: original.requestOptions, message: message);
   }
 }

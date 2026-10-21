@@ -70,6 +70,7 @@ void main() {
       tokenStorage: tokenStorage,
       onUnrecoverable: () async {
         unrecoverableCalls++;
+        return 'Your session has expired. Please sign in again.';
       },
     );
   });
@@ -146,7 +147,8 @@ void main() {
     });
 
     test(
-      '401 with no stored refresh/access token calls onUnrecoverable and gives up',
+      '401 with no stored refresh/access token calls onUnrecoverable and replaces '
+      'the propagated error with its message',
       () async {
         final requestOptions = RequestOptions(path: '/v1/users/me');
         final err = DioException(
@@ -159,7 +161,22 @@ void main() {
         final handler = _RecordingErrorHandler();
         await interceptor.onError(err, handler);
 
-        expect(handler.passedThroughError, same(err));
+        // Not `same(err)` — a screen whose request lost this race must not
+        // render the original technical failure (confirmed live: it did,
+        // even once onUnrecoverable also started showing a snackbar).
+        expect(handler.passedThroughError, isNot(same(err)));
+        expect(
+          handler.passedThroughError?.message,
+          'Your session has expired. Please sign in again.',
+        );
+        // What a generic `'${t('common.somethingWentWrong')} $error'` error
+        // branch actually interpolates — must read as the clean message,
+        // not the multi-paragraph "RequestOptions.validateStatus..." dump
+        // `err.toString()` itself would have produced.
+        expect(
+          handler.passedThroughError.toString(),
+          'DioException [unknown]: Your session has expired. Please sign in again.',
+        );
         expect(unrecoverableCalls, 1);
         verifyNever(() => refreshDio.post<Map<String, dynamic>>(any(), data: any(named: 'data')));
       },
@@ -209,7 +226,8 @@ void main() {
     });
 
     test(
-      '401 -> refresh returns incomplete data -> onUnrecoverable is called and the original error propagates',
+      '401 -> refresh returns incomplete data -> onUnrecoverable is called and its '
+      'message replaces the propagated error',
       () async {
         final requestOptions = RequestOptions(path: '/v1/users/me');
         final err = DioException(
@@ -229,7 +247,11 @@ void main() {
         final handler = _RecordingErrorHandler();
         await interceptor.onError(err, handler);
 
-        expect(handler.passedThroughError, same(err));
+        expect(handler.passedThroughError, isNot(same(err)));
+        expect(
+          handler.passedThroughError?.message,
+          'Your session has expired. Please sign in again.',
+        );
         expect(handler.resolvedWith, isNull);
         expect(unrecoverableCalls, 1);
         verifyNever(
@@ -242,7 +264,8 @@ void main() {
     );
 
     test(
-      '401 -> refresh call itself throws -> onUnrecoverable is called and the original error propagates',
+      '401 -> refresh call itself throws -> onUnrecoverable is called and its '
+      'message replaces the propagated error',
       () async {
         final requestOptions = RequestOptions(path: '/v1/users/me');
         final err = DioException(
@@ -261,7 +284,11 @@ void main() {
         final handler = _RecordingErrorHandler();
         await interceptor.onError(err, handler);
 
-        expect(handler.passedThroughError, same(err));
+        expect(handler.passedThroughError, isNot(same(err)));
+        expect(
+          handler.passedThroughError?.message,
+          'Your session has expired. Please sign in again.',
+        );
         expect(handler.resolvedWith, isNull);
         expect(unrecoverableCalls, 1);
       },

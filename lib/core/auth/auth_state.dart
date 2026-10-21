@@ -65,11 +65,16 @@ class AuthController extends Notifier<AuthState> {
   /// Called by the network layer when a 401 can't be recovered from (no
   /// stored tokens, or the refresh call itself failed) — same trigger as
   /// RN's `handleUserLogout`. Clears the session exactly like [logout], but
-  /// also surfaces why, via a snackbar, matching RN's `showToast`: without
-  /// this, a screen whose request lost the race would otherwise render the
-  /// raw `DioException` the failed call carried, which is what actually
-  /// reached the user before this existed.
-  Future<void> sessionExpired() async {
+  /// also surfaces why, via a snackbar, matching RN's `showToast`.
+  ///
+  /// Returns the same message so `AuthInterceptor` can swap it in for the
+  /// original technical failure, instead of also forwarding that raw error
+  /// to whatever screen's request lost this race — that still happened
+  /// after the snackbar alone was added (confirmed live: a 401 on Profile
+  /// Settings kept rendering the multi-paragraph "RequestOptions.
+  /// validateStatus..." dump even once the toast was showing), since
+  /// nothing was actually removing it from the propagated error.
+  Future<String> sessionExpired() async {
     await _tokenStorage.clear();
     state = const AuthState(isAuthenticated: false);
 
@@ -79,6 +84,7 @@ class AuthController extends Notifier<AuthState> {
     rootScaffoldMessengerKey.currentState
       ?..clearSnackBars()
       ..showSnackBar(SnackBar(content: Text(message)));
+    return message;
   }
 }
 
