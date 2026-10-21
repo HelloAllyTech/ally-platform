@@ -164,8 +164,8 @@ export const VideoInterjectionModal: React.FC<VideoInterjectionModalProps> = ({
                 {question.promptHtml ? (
                   <RichText
                     html={question.promptHtml}
-                    style={styles.prompt}
-                    textStyle={styles.prompt}
+                    style={styles.promptRichBlock}
+                    textStyle={styles.promptRichText}
                   />
                 ) : (
                   <Text style={styles.prompt}>{question.prompt}</Text>
@@ -256,6 +256,18 @@ const styles = ScaledSheet.create({
     fontWeight: fontWeights.regular,
     color: colors.ds.typography.highEmphasis,
     marginBottom: '16@ms',
+  },
+  // Rich prompts: the last paragraph already carries RichText's own 8pt
+  // bottom margin, so the block adds the other 8 to match `prompt` above.
+  // The text style must not repeat the margin, or every paragraph gets 16.
+  promptRichBlock: {
+    marginBottom: '8@ms',
+  },
+  promptRichText: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...typography.body.medium,
+    fontWeight: fontWeights.regular,
+    color: colors.ds.typography.highEmphasis,
   },
   statusPill: {
     alignSelf: 'center',

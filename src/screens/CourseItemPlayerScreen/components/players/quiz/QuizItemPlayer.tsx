@@ -288,8 +288,8 @@ export const QuizItemPlayer: React.FC<QuizItemPlayerProps> = ({
         {question.promptHtml ? (
           <RichText
             html={question.promptHtml}
-            style={styles.prompt}
-            textStyle={styles.prompt}
+            style={styles.promptRichBlock}
+            textStyle={styles.promptRichText}
           />
         ) : (
           <Text style={styles.prompt}>{question.prompt}</Text>
@@ -353,6 +353,16 @@ const styles = ScaledSheet.create({
     color: colors.ds.typography.highEmphasis,
     fontSize: '16@ms',
     marginBottom: '16@ms',
+  },
+  // Rich prompts: the last paragraph already carries RichText's own 8pt
+  // bottom margin, so the block adds the other 8 to match `prompt` above.
+  // The text style must not repeat the margin, or every paragraph gets 16.
+  promptRichBlock: {
+    marginBottom: '8@ms',
+  },
+  promptRichText: {
+    color: colors.ds.typography.highEmphasis,
+    fontSize: '16@ms',
   },
   footer: {
     flexDirection: 'row',
