@@ -3,11 +3,10 @@ import { FC } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
-import { CustomImage } from "@ally-ui-mono/ui-shared";
+import { CustomImage, RichTextRenderer } from "@ally-ui-mono/ui-shared";
 import { ArrowRight } from "@assets";
 import { ROUTES } from "@constants";
 import { TrackDetail } from "@types";
-import { sanitizeHtml } from "@utils";
 
 interface TrackProgressHeaderProps {
   track: TrackDetail;
@@ -114,11 +113,9 @@ export const TrackProgressHeader: FC<TrackProgressHeaderProps> = ({
         </button>
 
         {track.description && (
-          <div
-            className="text-sm sm:text-base text-typography-800 mb-4 leading-relaxed break-words"
-            dangerouslySetInnerHTML={{
-              __html: sanitizeHtml(track.description),
-            }}
+          <RichTextRenderer
+            content={track.description}
+            className="text-sm sm:text-base mb-4 break-words"
           />
         )}
 

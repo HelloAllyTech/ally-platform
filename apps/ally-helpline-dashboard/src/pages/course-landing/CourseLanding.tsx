@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 
-import { CustomImage } from "@ally-ui-mono/ui-shared";
+import { CustomImage, RichTextRenderer } from "@ally-ui-mono/ui-shared";
 import {
   useEnrollTrackMutation,
   useGetPublicTrackOutlineQuery,
@@ -18,7 +18,6 @@ import { LOCAL_STORAGE_KEYS, ROUTES, buildTrackItemRoute, buildTrackRoute } from
 import { ANALYTICS_EVENTS, ANALYTICS_PROPS } from "@constants/analyticsEvents";
 import { useAnalytics, useUser } from "@hooks";
 import { TrackAccessDenialReason } from "@types";
-import { sanitizeHtml } from "@utils";
 
 import { CourseOutline } from "./components/CourseOutline";
 import { StoryLanding } from "./story/StoryLanding";
@@ -302,9 +301,9 @@ export const CourseLanding: FC = () => {
           </p>
 
           {outline.description && (
-            <div
-              className="mb-4 break-words text-sm leading-relaxed text-typography-800 sm:text-base"
-              dangerouslySetInnerHTML={{ __html: sanitizeHtml(outline.description) }}
+            <RichTextRenderer
+              content={outline.description}
+              className="mb-4 break-words text-sm sm:text-base"
             />
           )}
 
