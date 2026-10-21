@@ -473,3 +473,39 @@ describe("logoPathOps", () => {
     expect(curve).toEqual({ op: "c", c: [4, 4, 8, 8, 12, 12] });
   });
 });
+
+describe("transcriptToBlocks — the situation brief", () => {
+  it("records each line with the admin's verdict", () => {
+    const blocks = transcriptToBlocks(
+      [
+        {
+          id: "b1",
+          role: "assistant",
+          content: "",
+          brief: {
+            id: "brief-1",
+            message: "Here is what exists.",
+            lines: [
+              { id: "X1", kind: "exists", text: "Auto-improve", cites: [] },
+              { id: "P1", kind: "proposal", approach: "new", text: "A rating", cites: [] },
+            ],
+          },
+          answeredBrief: {
+            briefId: "brief-1",
+            lines: [
+              { id: "X1", verdict: "confirm" },
+              { id: "P1", verdict: "correct", correction: "Extend the rating" },
+            ],
+            note: "Keep it cheap",
+          },
+        },
+      ] as never,
+      "Sam",
+    );
+    const texts = blocks.map(block => ("text" in block ? block.text : ""));
+    expect(texts).toContain("Builder · Situation brief");
+    expect(texts).toContain("X1 Auto-improve — confirmed");
+    expect(texts).toContain("P1 A rating — corrected: Extend the rating");
+    expect(texts).toContain("Also: Keep it cheap");
+  });
+});

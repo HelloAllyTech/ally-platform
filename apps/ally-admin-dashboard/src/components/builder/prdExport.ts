@@ -4,6 +4,7 @@ import { en } from "@constants";
 import { BuilderChatMessage, BuilderPrdDocument } from "@types";
 import { asAgentText, asAgentTextList } from "@utils";
 
+import { normalizeSituationBrief } from "../../utils/builderBrief";
 import { normalizeTurnReceipt } from "../../utils/builderReceipt";
 
 /**
@@ -481,6 +482,35 @@ export const transcriptToBlocks = (
   let questionNumber = 0;
   for (const message of feed) {
     const content = asAgentText(message.content).trim();
+
+    // The situation brief, line by line, with the admin's verdict on each — the record of what
+    // the interview started from, which a reader of the PDF cannot see in the PRD itself.
+    if (message.brief) {
+      const brief = normalizeSituationBrief(message.brief);
+      if (brief) {
+        const verdicts = new Map(
+          asArray<{ id: string; verdict: string; correction?: string }>(
+            message.answeredBrief?.lines,
+          ).map(line => [line.id, line]),
+        );
+        blocks.push({ kind: "speaker", text: strings.brief });
+        brief.lines.forEach(line => {
+          const verdict = verdicts.get(line.id);
+          const status = !message.answeredBrief
+            ? ""
+            : verdict?.verdict === "correct"
+              ? ` — ${strings.briefCorrected(verdict.correction ?? "")}`
+              : ` — ${strings.briefConfirmed}`;
+          blocks.push({ kind: "bullet", text: `${line.id} ${line.text}${status}` });
+        });
+        if (!message.answeredBrief) {
+          blocks.push({ kind: "placeholder", text: strings.notAnswered });
+        } else if (message.answeredBrief.note) {
+          blocks.push({ kind: "placeholder", text: strings.briefNote(message.answeredBrief.note) });
+        }
+      }
+      continue;
+    }
 
     if (message.question) {
       questionNumber += 1;

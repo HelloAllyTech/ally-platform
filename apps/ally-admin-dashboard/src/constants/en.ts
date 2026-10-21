@@ -3645,6 +3645,38 @@ export const en = {
         warningsHeading: "Delivered with warnings",
         prdUnchanged: (reason: string) => `PRD unchanged: ${reason}`,
       },
+      // The situation brief: the interview's opening card under the protocol.
+      brief: {
+        label: "Situation brief",
+        heading: "What I found before asking anything",
+        instructions:
+          "Confirm each line that's right and correct any that isn't. Builder writes the PRD from your answers, and asks nothing until you've sent them.",
+        sections: {
+          exists: "Already exists",
+          alreadyMet: "Already does what you asked",
+          proposal: "Proposed",
+          repo: "Where the work lands",
+        },
+        approaches: { reuse: "Reuse", extend: "Extend", new: "New" },
+        foundBy: "Based on",
+        confirm: "Right",
+        correct: "Correct it",
+        undo: "Undo",
+        confirmed: "Confirmed",
+        corrected: "Corrected",
+        correctionLabel: "What's true instead?",
+        correctionPlaceholder: "e.g. This already lives in Auto-improve — extend that instead",
+        noteLabel: "Anything else Builder should know? (optional)",
+        send: "Send",
+        confirmAllAndSend: "Confirm all and send",
+        sendConfirmingRest: (count: number) =>
+          count === 1 ? "Confirm the last line and send" : `Confirm the other ${count} and send`,
+        needsCorrection: "Say what's true instead for each line you're correcting.",
+        answered: "Answered",
+        summary: (confirmed: number, corrected: number) =>
+          corrected ? `Confirmed ${confirmed}, corrected ${corrected}.` : "Confirmed the brief.",
+        note: (text: string) => `Also: ${text}`,
+      },
     },
 
     // The living PRD
@@ -3748,6 +3780,10 @@ export const en = {
           builder: "Builder",
           question: (n: number) => `Builder · Question ${n}`,
           whyAsked: (rationale: string) => `Why it was asked: ${rationale}`,
+          brief: "Builder · Situation brief",
+          briefConfirmed: "confirmed",
+          briefCorrected: (correction: string) => `corrected: ${correction}`,
+          briefNote: (note: string) => `Also: ${note}`,
           options: "Options offered",
           recommended: "recommended",
           chosen: "chosen",
@@ -4272,6 +4308,9 @@ export const en = {
       validatedTurnsLabel: "Validated interview turns",
       validatedTurnsHelp:
         "Builder's reply reaches you only after it has read what it looked up and its PRD edits have landed, with a receipt of what it did. Turn off to fall back to the previous interview loop, where the reply streams in as it is written.",
+      situationBriefLabel: "Situation brief before the first question",
+      situationBriefHelp:
+        "A new interview opens by searching the platform map, docs and code, then shows you what already exists to confirm or correct before Builder asks anything. Every later question says why it is yours to decide. Needs validated interview turns.",
       autoReviewLabel: "Review its own pull requests",
       autoReviewHelp:
         "On, Builder reads the finished diff of its own open pull requests the way the first person to open one would, and files what it finds. The safer half of autonomy: a review writes findings and touches no branch, so it is worth running on its own with the switch below off — the findings land for you to read and nothing pushes. Only runs once checks are green, at most twice per pull request.",

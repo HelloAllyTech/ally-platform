@@ -32,6 +32,7 @@ type SettingsDraft = Pick<
   BuilderSettingsType,
   | "enabled"
   | "validatedTurns"
+  | "situationBrief"
   | "autoReviewEnabled"
   | "autoApproveEnabled"
   | "autoMergeEnabled"
@@ -172,6 +173,7 @@ export const BuilderSettings: React.FC = () => {
       setDraft({
         enabled: data.enabled,
         validatedTurns: data.validatedTurns,
+        situationBrief: data.situationBrief,
         autoReviewEnabled: data.autoReviewEnabled,
         autoApproveEnabled: data.autoApproveEnabled,
         autoMergeEnabled: data.autoMergeEnabled,
@@ -224,6 +226,7 @@ export const BuilderSettings: React.FC = () => {
         // Undefined only when the server does not know the field yet (the toggle is not shown
         // then): left alone, because a server that predates it would reject the unknown key.
         ...(draft.validatedTurns !== undefined ? { validatedTurns: draft.validatedTurns } : {}),
+        ...(draft.situationBrief !== undefined ? { situationBrief: draft.situationBrief } : {}),
         // A picked level is sent as the level, and the server sets the
         // switches from it; otherwise the switches go as they stand.
         ...(levelPicked && level !== "custom"
@@ -306,6 +309,21 @@ export const BuilderSettings: React.FC = () => {
                 onToggle={(checked: boolean) => set("validatedTurns", checked)}
               />
               <p className="pt-1 text-xs text-typography-500">{strings.validatedTurnsHelp}</p>
+              {/* The protocol rides on validated turns, so it sits under them and goes grey
+                  when they are off rather than pretending to do something. */}
+              {draft.situationBrief !== undefined && (
+                <div className="mt-3 border-t border-border-light pt-3">
+                  <CarbonToggle
+                    id="builder-settings-situation-brief"
+                    labelText={strings.situationBriefLabel}
+                    size="sm"
+                    toggled={draft.situationBrief}
+                    disabled={!draft.validatedTurns}
+                    onToggle={(checked: boolean) => set("situationBrief", checked)}
+                  />
+                  <p className="pt-1 text-xs text-typography-500">{strings.situationBriefHelp}</p>
+                </div>
+              )}
             </section>
           )}
 

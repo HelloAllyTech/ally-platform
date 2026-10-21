@@ -320,3 +320,104 @@ describe("useBuilderStream — turn receipts", () => {
     expect(assistant.toolNotes).toEqual(["github_read_file"]);
   });
 });
+
+describe("useBuilderStream — the situation brief", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.clearAllMocks();
+  });
+
+  const brief = {
+    id: "brief-1",
+    message: "Here is what exists.",
+    lines: [
+      { id: "X1", kind: "exists", text: "Auto-improve", cites: [{ ref: "E1", label: "map" }] },
+      { id: "P1", kind: "proposal", approach: "new", text: "A rating", cites: [] },
+    ],
+  };
+
+  it("draws the brief as its own card after the reply, and answers on it", async () => {
+    const stream = controlledSseResponse();
+    const second = controlledSseResponse();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(stream.response)
+      .mockResolvedValueOnce(second.response);
+    vi.stubGlobal("fetch", fetchMock);
+    const { result } = renderHook(() => useBuilderStream({ sessionId: "sess-1" }));
+
+    let turn!: Promise<void>;
+    act(() => {
+      turn = result.current.sendMessage("Let learners rate the debrief");
+    });
+    await act(async () => {
+      stream.push(
+        frame("token", { delta: "Here is what exists." }) + frame("situation_brief", brief) + DONE,
+      );
+      stream.close();
+      await turn;
+    });
+
+    const card = result.current.messages.find(message => message.brief);
+    expect(card?.brief?.lines.map(line => line.id)).toEqual(["X1", "P1"]);
+    expect(result.current.messages.indexOf(card!)).toBe(2);
+
+    const response = {
+      briefId: "brief-1",
+      lines: [
+        { id: "X1", verdict: "confirm" as const },
+        { id: "P1", verdict: "correct" as const, correction: "Extend the rating" },
+      ],
+    };
+    let answer!: Promise<void>;
+    act(() => {
+      answer = result.current.sendMessage("Confirmed 1, corrected 1.", { briefResponse: response });
+    });
+    await act(async () => {
+      second.push(DONE);
+      second.close();
+      await answer;
+    });
+
+    // Marked on the card, no bubble saying the same thing under it.
+    expect(result.current.messages.find(message => message.brief)?.answeredBrief).toEqual(response);
+    expect(
+      result.current.messages.filter(message => message.role === "user").map(m => m.content),
+    ).toEqual(["Let learners rate the debrief"]);
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toMatchObject({
+      message: "Confirmed 1, corrected 1.",
+      briefResponse: response,
+    });
+  });
+
+  it("rebuilds the brief on reload, answered, without the answer as a bubble", () => {
+    const feed = mapServerMessagesToFeed([
+      { id: "u1", seq: 1, role: "user", content: "Rate the debrief", createdAt: "" },
+      {
+        id: "a1",
+        seq: 2,
+        role: "assistant",
+        content: "Here is what exists.",
+        metadata: { situationBrief: brief },
+        createdAt: "",
+      },
+      {
+        id: "u2",
+        seq: 3,
+        role: "user",
+        content: "[responds to situation brief brief-1]\nConfirmed: X1, P1.",
+        metadata: {
+          briefResponse: { briefId: "brief-1", lines: [{ id: "X1", verdict: "confirm" }] },
+        },
+        createdAt: "",
+      },
+    ] as never);
+
+    expect(feed.map(row => (row.brief ? "brief" : row.role))).toEqual([
+      "user",
+      "assistant",
+      "brief",
+    ]);
+    expect(feed[2].answeredBrief?.lines).toEqual([{ id: "X1", verdict: "confirm" }]);
+  });
+});
