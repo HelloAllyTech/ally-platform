@@ -537,3 +537,19 @@ export interface GetChatHistoryResponse {
 export interface PresignedUrlResponse {
   presignedUrl: string;
 }
+
+export interface SubmitDebriefFeedbackRequest {
+  sessionId: string;
+  rating: "positive" | "negative";
+  comment?: string;
+}
+
+export interface SubmitDebriefFeedbackResponse {
+  id: string;
+  tenantId: string;
+  scenarioSessionId: string;
+  rating: "positive" | "negative";
+  comment: string | null;
+  createdAt: string;
+  updatedAt: string;
+}

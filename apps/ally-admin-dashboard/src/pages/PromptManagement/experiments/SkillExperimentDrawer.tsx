@@ -160,6 +160,7 @@ const DrawerBody: React.FC<{
         rubric={rubric}
         challengerPercent={settings.challengerTrafficPercent}
         live={live}
+        judgeModel={experiment?.judgeModel ?? null}
       />
       <ExperimentTimeline events={detail.events} />
     </div>
