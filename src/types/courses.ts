@@ -276,6 +276,7 @@ export interface SanitizedQuizQuestion {
   id: string;
   type: QuizQuestionType;
   prompt: string;
+  promptHtml?: string;
   points: number;
   /**
    * false = answered but not scored; absent (older backend) reads as true.
@@ -423,6 +424,7 @@ export interface QuizAttemptResult {
 export interface JournalPrompt {
   id: string;
   prompt: string;
+  promptHtml?: string;
   required: boolean;
   placeholder: string | null;
 }

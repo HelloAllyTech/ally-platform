@@ -2,7 +2,7 @@ import React, {useState} from 'react';
 import {Text, TouchableOpacity, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {Button} from '@/components';
+import {Button, RichText} from '@/components';
 import {useTranslate} from '@/hooks';
 import {useSubmitArticleQuestionAnswerMutation} from '@/services';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
@@ -92,7 +92,11 @@ export const ArticleQuestionCard: React.FC<ArticleQuestionCardProps> = ({
   return (
     <View testID={`article-question-${question.id}`} style={styles.card}>
       <Text style={styles.title}>{t('courses.article.question.title')}</Text>
-      <Text style={styles.prompt}>{question.prompt}</Text>
+      {question.promptHtml ? (
+        <RichText html={question.promptHtml} textStyle={styles.promptRich} />
+      ) : (
+        <Text style={styles.prompt}>{question.prompt}</Text>
+      )}
       <QuestionMedia media={question.media} />
 
       <View style={styles.list}>
@@ -190,6 +194,14 @@ const styles = ScaledSheet.create({
     ...fontFamily.IBM_PLEX_SERIF.MEDIUM,
     ...typography.body.medium,
     fontWeight: fontWeights.medium,
+    color: colors.ds.typography.highEmphasis,
+  },
+  // Plain prompts stay medium, as before. Rich prompts start lighter so that
+  // bold inside them actually stands out.
+  promptRich: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...typography.body.medium,
+    fontWeight: fontWeights.regular,
     color: colors.ds.typography.highEmphasis,
   },
   list: {

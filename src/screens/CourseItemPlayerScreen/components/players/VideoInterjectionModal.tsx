@@ -2,7 +2,7 @@ import React, {useEffect, useState} from 'react';
 import {Modal, ScrollView, Text, View} from 'react-native';
 import {ScaledSheet} from 'react-native-size-matters';
 
-import {Button} from '@/components';
+import {Button, RichText} from '@/components';
 import {useTranslate} from '@/hooks';
 import {useSubmitInterjectionAnswerMutation} from '@/services';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
@@ -161,7 +161,15 @@ export const VideoInterjectionModal: React.FC<VideoInterjectionModalProps> = ({
               <ScrollView
                 style={styles.scroll}
                 contentContainerStyle={styles.scrollContent}>
-                <Text style={styles.prompt}>{question.prompt}</Text>
+                {question.promptHtml ? (
+                  <RichText
+                    html={question.promptHtml}
+                    style={styles.promptRichBlock}
+                    textStyle={styles.promptRichText}
+                  />
+                ) : (
+                  <Text style={styles.prompt}>{question.prompt}</Text>
+                )}
                 <QuestionMedia media={question.media} />
                 {renderWidget()}
               </ScrollView>
@@ -248,6 +256,18 @@ const styles = ScaledSheet.create({
     fontWeight: fontWeights.regular,
     color: colors.ds.typography.highEmphasis,
     marginBottom: '16@ms',
+  },
+  // Rich prompts: the last paragraph already carries RichText's own 8pt
+  // bottom margin, so the block adds the other 8 to match `prompt` above.
+  // The text style must not repeat the margin, or every paragraph gets 16.
+  promptRichBlock: {
+    marginBottom: '8@ms',
+  },
+  promptRichText: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...typography.body.medium,
+    fontWeight: fontWeights.regular,
+    color: colors.ds.typography.highEmphasis,
   },
   statusPill: {
     alignSelf: 'center',
