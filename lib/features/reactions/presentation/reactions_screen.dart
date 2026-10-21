@@ -3,9 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/widgets/review_type_chip.dart';
+import '../data/emoji_catalog.dart';
 import '../data/reactions_repository.dart';
-
-const _availableReactions = ['👍', '❤️', '😂', '🎉', '👏'];
 
 /// Port of ally-mobile (React Native)'s `ReactionsScreen` — reaction-count
 /// summary + who-reacted list for a review, plus an emoji picker to add
@@ -40,16 +39,19 @@ class ReactionsScreen extends ConsumerWidget {
             child: Wrap(
               spacing: 8,
               children: [
-                for (final emoji in _availableReactions)
+                // Sent as the backend's unicode-codepoint reaction id (e.g.
+                // "1f44d"), not the glyph — see emoji_catalog.dart's doc
+                // comment for why that matters cross-client.
+                for (final reactionId in kPlatformEmojiIds)
                   ActionChip(
-                    label: Text(emoji, style: const TextStyle(fontSize: 20)),
+                    label: Text(emojiGlyphFor(reactionId), style: const TextStyle(fontSize: 20)),
                     onPressed: () async {
                       if (isScribe) {
                         await ref
                             .read(scribeReactionsRepositoryProvider)
                             .addReactionToReview(
                               reviewId: reviewId,
-                              reaction: emoji,
+                              reaction: reactionId,
                               action: ReactionAction.add,
                             );
                         ref.invalidate(scribeReactionsListProvider(reviewId));
@@ -59,7 +61,7 @@ class ReactionsScreen extends ConsumerWidget {
                             .read(reactionsRepositoryProvider)
                             .addReactionToReview(
                               reviewId: reviewId,
-                              reaction: emoji,
+                              reaction: reactionId,
                               action: ReactionAction.add,
                             );
                         ref.invalidate(reactionsListProvider(reviewId));
@@ -79,7 +81,7 @@ class ReactionsScreen extends ConsumerWidget {
                       spacing: 12,
                       children: [
                         for (final entry in counts.entries)
-                          Text('${entry.key} ${entry.value}'),
+                          Text('${emojiGlyphFor(entry.key)} ${entry.value}'),
                       ],
                     ),
                   ),
@@ -106,7 +108,7 @@ class ReactionsScreen extends ConsumerWidget {
                     final reaction = reactions[index];
                     return ListTile(
                       leading: Text(
-                        reaction.reaction,
+                        emojiGlyphFor(reaction.reaction),
                         style: const TextStyle(fontSize: 24),
                       ),
                       title: Text(reaction.createdBy.name),

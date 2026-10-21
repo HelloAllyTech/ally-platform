@@ -26,7 +26,7 @@ void main() {
 
     when(() => reactionsRepository.addReactionToComment(
           commentId: 'rc-1',
-          reaction: '👍',
+          reaction: '1f44d',
           action: ReactionAction.add,
         )).thenAnswer((_) async {});
     // `_loadReplies()` only ever *appends* ids it hasn't already rendered
@@ -50,7 +50,7 @@ void main() {
 
     verify(() => reactionsRepository.addReactionToComment(
           commentId: 'rc-1',
-          reaction: '👍',
+          reaction: '1f44d',
           action: ReactionAction.add,
         )).called(1);
     // Called once more after the reaction (beyond the implicit initial

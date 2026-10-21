@@ -14,19 +14,22 @@ void main() {
       (tester) async {
     final repository = MockReactionsRepository();
     var callCount = 0;
+    // Backend data is keyed by the unicode-codepoint reaction id (what RN's
+    // EMOJI_UNICODE_MAP also keys off), not the glyph — the screen maps it
+    // to a glyph for display via emojiGlyphFor.
     when(() => repository.getReactions('rev-1')).thenAnswer((_) async {
       callCount++;
       if (callCount == 1) return [];
       return [
-        Reaction(reaction: '🎉', createdBy: ReactionUser(id: '1', name: 'Alex', profileImage: null)),
+        Reaction(reaction: '1f44d', createdBy: ReactionUser(id: '1', name: 'Alex', profileImage: null)),
       ];
     });
     when(() => repository.getReactionsCount('rev-1')).thenAnswer((_) async {
-      return callCount <= 1 ? {} : {'🎉': 1};
+      return callCount <= 1 ? {} : {'1f44d': 1};
     });
     when(() => repository.addReactionToReview(
           reviewId: 'rev-1',
-          reaction: '🎉',
+          reaction: '1f44d',
           action: ReactionAction.add,
         )).thenAnswer((_) async {});
 
@@ -38,15 +41,15 @@ void main() {
 
     expect(find.text('No reactions yet'), findsOneWidget);
 
-    await tester.tap(find.text('🎉'));
+    await tester.tap(find.text('👍'));
     await tester.pumpAndSettle();
 
     verify(() => repository.addReactionToReview(
           reviewId: 'rev-1',
-          reaction: '🎉',
+          reaction: '1f44d',
           action: ReactionAction.add,
         )).called(1);
     expect(find.text('Alex'), findsOneWidget);
-    expect(find.text('🎉 1'), findsOneWidget);
+    expect(find.text('👍 1'), findsOneWidget);
   });
 }

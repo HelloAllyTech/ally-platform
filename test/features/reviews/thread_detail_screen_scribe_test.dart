@@ -64,7 +64,7 @@ void main() {
       );
       when(() => scribeReactions.addReactionToComment(
             commentId: 'rc-1',
-            reaction: '👍',
+            reaction: '1f44d',
             action: ReactionAction.add,
           )).thenAnswer((_) async {});
 
@@ -95,7 +95,7 @@ void main() {
 
       verify(() => scribeReactions.addReactionToComment(
             commentId: 'rc-1',
-            reaction: '👍',
+            reaction: '1f44d',
             action: ReactionAction.add,
           )).called(1);
     },

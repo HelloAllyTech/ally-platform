@@ -8,12 +8,11 @@ import '../../../core/widgets/app_card.dart';
 import '../../../core/widgets/app_chat_input.dart';
 import '../../../core/widgets/review_type_chip.dart';
 import '../../../core/widgets/tab_screen_header.dart';
+import '../../reactions/data/emoji_catalog.dart';
 import '../../reactions/data/reactions_repository.dart';
 import '../data/review_models.dart';
 import '../data/reviews_repository.dart';
 import '../data/scribe_reviews_repository.dart';
-
-const _availableReactions = ['👍', '❤️', '😂', '🎉', '👏'];
 
 /// Port of ally-mobile (React Native)'s thread-detail view — a transcript-
 /// anchored discussion (`Thread`/`MessageThreadComment`): the anchor
@@ -119,13 +118,13 @@ class _ThreadDetailScreenState extends ConsumerState<ThreadDetailScreen> {
     }
   }
 
-  Future<void> _react(ThreadComment comment, String emoji) async {
+  Future<void> _react(ThreadComment comment, String reactionId) async {
     if (widget._isScribe) {
       await ref
           .read(scribeReactionsRepositoryProvider)
           .addReactionToComment(
             commentId: comment.id,
-            reaction: emoji,
+            reaction: reactionId,
             action: ReactionAction.add,
           );
     } else {
@@ -133,7 +132,7 @@ class _ThreadDetailScreenState extends ConsumerState<ThreadDetailScreen> {
           .read(reactionsRepositoryProvider)
           .addReactionToComment(
             commentId: comment.id,
-            reaction: emoji,
+            reaction: reactionId,
             action: ReactionAction.add,
           );
     }
@@ -224,7 +223,7 @@ class _CommentTile extends StatelessWidget {
   const _CommentTile({required this.comment, required this.onReact});
 
   final ThreadComment comment;
-  final void Function(ThreadComment comment, String emoji) onReact;
+  final void Function(ThreadComment comment, String reactionId) onReact;
 
   @override
   Widget build(BuildContext context) {
@@ -254,9 +253,13 @@ class _CommentTile extends StatelessWidget {
                 spacing: 6,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
+                  // `entry.key` is the backend's unicode-codepoint reaction
+                  // id (e.g. "1f44d"), not the glyph — same ids RN's
+                  // EMOJI_UNICODE_MAP keys off, so a reaction added from
+                  // either client renders correctly in both.
                   for (final entry in comment.reactions.entries)
                     Chip(
-                      label: Text('${entry.key} ${entry.value}'),
+                      label: Text('${emojiGlyphFor(entry.key)} ${entry.value}'),
                       visualDensity: VisualDensity.compact,
                       backgroundColor: comment.myReaction == entry.key
                           ? Theme.of(context).colorScheme.primaryContainer
@@ -264,13 +267,13 @@ class _CommentTile extends StatelessWidget {
                     ),
                   PopupMenuButton<String>(
                     icon: SvgPicture.asset('assets/icons/addReaction.svg', width: 18, height: 18),
-                    onSelected: (emoji) => onReact(comment, emoji),
+                    onSelected: (reactionId) => onReact(comment, reactionId),
                     itemBuilder: (context) => [
-                      for (final emoji in _availableReactions)
+                      for (final id in kPlatformEmojiIds)
                         PopupMenuItem(
-                          value: emoji,
+                          value: id,
                           child: Text(
-                            emoji,
+                            emojiGlyphFor(id),
                             style: const TextStyle(fontSize: 18),
                           ),
                         ),
