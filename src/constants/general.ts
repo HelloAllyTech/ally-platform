@@ -234,6 +234,8 @@ export const API_ROUTES = {
       `/learn/tracks/items/${itemId}/quiz-attempts/${attemptId}/regrade`,
     GAME_RESULT: (itemId: string) =>
       `/learn/tracks/items/${itemId}/game-result`,
+    BRANCHING_RESULT: (itemId: string) =>
+      `/learn/tracks/items/${itemId}/branching-result`,
     JOURNAL_DRAFT: (itemId: string) => `/learn/tracks/items/${itemId}/journal`,
     JOURNAL_SUBMIT: (itemId: string) =>
       `/learn/tracks/items/${itemId}/journal/submit`,
