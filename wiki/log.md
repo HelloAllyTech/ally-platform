@@ -8,6 +8,10 @@ summary: A chronological log tracking all wiki updates and modifications.
 
 This is an append-only log of modifications, updates, and indexing runs performed on the wiki. All logs use the parseable prefix format: `## [YYYY-MM-DD] action | description`.
 
+## [2026-10-21] add | Auto-improve (System Skills) now has its own page; docs path linter added.
+- `platform/auto-improve.md` describes the system as built: what it is for, which skills are connected and why only connected call sites can run it, the loop (designer drafts a challenger, the router splits live traffic per call, a blind LLM judge scores against the admin's rubric, champion/challenger comparison), what the target means and when it is checked, the five pause reasons, and Apply, Resume and Turn off. It ends with the known limits: a random per-call split with unmatched inputs, an LLM judge as the only signal (no human rating), text-only variation, bounded judging throughput, the ally-ai override-key gap, and the supervisor-note template that ally-ai loads from disk. Drawn only from ally-be's `docs/skill-experiments.md`, `src/skill-experiment/` and the admin dashboard's experiments screen. Registered in `index.md`, linked from `repos/ally-be.md`; routing index regenerated.
+- `contributing/docs-system.md` §6 mentions `scripts/docs-path-lint.mjs`, which this repo and the five code repos now run in CI (`docs-paths` job in `wiki-health.yml`) to fail on a backticked path that no longer exists. Broken references in this wiki were fixed: paths now carry their repo prefix, moved files point at their new location, and references to removed code are marked. `last_reconciled` is unchanged on pages that only had references fixed.
+
 ## [2026-10-14] update | ally-be: Course Copilot (`course-copilot/`) and its `/course-copilot` gateway.
 - `repos/ally-be.md` gains `course-copilot/` under "Agents that build": interview → blueprint approval → durable job build → edit loop, with the three invariants (writes through `upsertStructure` with mapped ids, a resumable job table, confirmations enforced in code), and the `/course-copilot` socket namespace beside `/builder`.
 
