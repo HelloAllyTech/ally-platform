@@ -84,6 +84,7 @@ class _SimulationDetailsScreenState
             'liveKitServerUrl': session.liveKitServerUrl,
             'accessToken': session.accessToken,
             'scenarioSessionId': session.id,
+            'scenario': scenario,
           },
         );
       }

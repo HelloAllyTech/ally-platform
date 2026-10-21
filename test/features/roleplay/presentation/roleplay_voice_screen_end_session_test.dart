@@ -40,11 +40,16 @@ void main() {
       ],
     );
     await tester.tap(find.text('Connect'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    // See roleplay_voice_screen_connected_flow_test.dart: the 3-2-1
+    // countdown blocks the live-call UI for 3s after connecting, and the
+    // session timer it starts is a live `Timer.periodic` for the rest of
+    // this test — bounded `pump()` from here on, not `pumpAndSettle()`.
+    await tester.pump(const Duration(seconds: 3));
     expect(find.text('End session'), findsOneWidget);
 
     await tester.tap(find.text('End session'));
-    await tester.pumpAndSettle();
+    await tester.pump();
 
     // Navigating to SimulationFeedbackScreen needs a real GoRouter ancestor,
     // which this harness doesn't provide (pump_app.dart wraps with a plain

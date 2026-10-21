@@ -36,7 +36,19 @@ void main() {
       );
 
       await tester.tap(find.text('Connect'));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      // A fixed 3-2-1 countdown overlay blocks the live-call UI for 3s after
+      // connecting (mirrors RN's own SimulationCountdown) — advance past it
+      // explicitly; `pump(duration)` already rebuilds once after firing the
+      // pending timers, so no extra pump is needed to see the result.
+      //
+      // From here on this screen's session timer is a live
+      // `Timer.periodic` (1 tick/second) for the rest of the test, so every
+      // later step uses a bounded `pump()` instead of `pumpAndSettle()` —
+      // the periodic `setState` keeps scheduling new frames forever, which
+      // `pumpAndSettle()` would wait on indefinitely (same class of issue
+      // as this codebase's other indefinite-animation gotchas).
+      await tester.pump(const Duration(seconds: 3));
 
       expect(find.text('Connected to room'), findsOneWidget);
       expect(find.text('Mute'), findsOneWidget);
@@ -45,13 +57,13 @@ void main() {
       verify(() => liveKitService.setMicrophoneEnabled(true)).called(1);
 
       await tester.tap(find.text('Mute'));
-      await tester.pumpAndSettle();
+      await tester.pump();
 
       expect(find.text('Unmute'), findsOneWidget);
       verify(() => liveKitService.setMicrophoneEnabled(false)).called(1);
 
       await tester.tap(find.text('Disconnect'));
-      await tester.pumpAndSettle();
+      await tester.pump();
 
       expect(find.text('Not connected'), findsOneWidget);
       verify(() => liveKitService.disconnect()).called(1);

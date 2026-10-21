@@ -29,6 +29,9 @@ class Scenario {
     this.triggerWarnings = const [],
     this.availableLanguages = const [],
     this.completedAttemptCount = 0,
+    this.maxTimeValue,
+    this.pauseEnabled = false,
+    this.experienceMode,
   });
 
   factory Scenario.fromJson(Map<String, dynamic> json) => Scenario(
@@ -47,6 +50,13 @@ class Scenario {
         (json['completion'] as Map<String, dynamic>?)?['attemptCount']
             as int? ??
         0,
+    // "HH:MM:SS" — mirrors RN's own `Scenario.maxTimeValue`, parsed by
+    // `parseMaxTimeSec` at the point of use (see roleplay_voice_screen.dart).
+    maxTimeValue: json['maxTimeValue'] as String?,
+    // Opt-in default: only an explicit `true` shows the pause control, same
+    // as RN's own `scenario?.pauseEnabled === true` check.
+    pauseEnabled: json['pauseEnabled'] as bool? ?? false,
+    experienceMode: json['experienceMode'] as String?,
   );
 
   final int id;
@@ -60,6 +70,14 @@ class Scenario {
   /// Completing a scenario never locks it — RN's doc comment on this same
   /// field: the CTA turns into "Practise again" rather than disappearing.
   final int completedAttemptCount;
+
+  final String? maxTimeValue;
+  final bool pauseEnabled;
+
+  /// RN's `ExperienceMode` ('FEEDBACK'/'CHECKLIST'/'NONE') — only used here
+  /// to gate the live roleplay screen's focus-mode button
+  /// (`showFocusButton = !isNoneMode`).
+  final String? experienceMode;
 }
 
 /// LiveKit connection pair returned by starting a session — the same shape

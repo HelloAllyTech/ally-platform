@@ -27,6 +27,7 @@ import '../../features/reviews/presentation/share_for_review_screen.dart';
 import '../../features/roleplay/presentation/roleplay_voice_screen.dart';
 import '../../features/scribe/presentation/scribe_recording_screen.dart';
 import '../../features/search/presentation/search_screen.dart';
+import '../../features/simulations/data/simulation_models.dart';
 import '../../features/simulations/presentation/case_details_screen.dart';
 import '../../features/suspended/presentation/suspended_account_screen.dart';
 import '../../features/simulations/presentation/simulation_details_screen.dart';
@@ -143,14 +144,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/roleplay',
         builder: (context, state) {
           // `extra` mirrors RN's route.params for liveKitServerUrl/
-          // accessToken — a real session-creation screen supplies these in
-          // a later phase; this route exists to exercise the connection
-          // itself against a real backend-issued pair.
-          final params = state.extra as Map<String, String>? ?? const {};
+          // accessToken/scenario — `scenario` carries the timer/pause/
+          // focus-mode config the live call UI needs (maxTimeValue,
+          // pauseEnabled, experienceMode, title, triggerWarnings).
+          final params = state.extra as Map<String, dynamic>? ?? const {};
           return RoleplayVoiceScreen(
-            liveKitServerUrl: params['liveKitServerUrl'] ?? '',
-            accessToken: params['accessToken'] ?? '',
-            scenarioSessionId: params['scenarioSessionId'],
+            liveKitServerUrl: params['liveKitServerUrl'] as String? ?? '',
+            accessToken: params['accessToken'] as String? ?? '',
+            scenarioSessionId: params['scenarioSessionId'] as String?,
+            scenario: params['scenario'] as Scenario?,
           );
         },
       ),
