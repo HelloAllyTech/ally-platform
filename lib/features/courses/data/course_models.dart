@@ -134,6 +134,7 @@ class TrackDetail {
     required this.id,
     required this.title,
     required this.description,
+    required this.coverImageUrl,
     required this.status,
     required this.totalItems,
     required this.completedItems,
@@ -146,6 +147,7 @@ class TrackDetail {
         id: json['id'] as String,
         title: json['title'] as String,
         description: json['description'] as String?,
+        coverImageUrl: json['coverImageUrl'] as String?,
         status: json['status'] as String? ?? '',
         totalItems: (json['totalItems'] as num?)?.toInt() ?? 0,
         completedItems: (json['completedItems'] as num?)?.toInt() ?? 0,
@@ -159,6 +161,7 @@ class TrackDetail {
   final String id;
   final String title;
   final String? description;
+  final String? coverImageUrl;
   final String status;
   final int totalItems;
   final int completedItems;

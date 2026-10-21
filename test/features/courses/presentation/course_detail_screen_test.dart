@@ -7,10 +7,12 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:ally_mobile_flutter/core/widgets/app_button.dart';
 import 'package:ally_mobile_flutter/features/courses/data/course_models.dart';
 import 'package:ally_mobile_flutter/features/courses/data/courses_repository.dart';
 import 'package:ally_mobile_flutter/features/courses/presentation/course_detail_screen.dart';
 
+import '../../../support/fake_network_image.dart';
 import '../../../support/pump_app.dart';
 
 class MockCoursesRepository extends Mock implements CoursesRepository {}
@@ -37,14 +39,23 @@ TrackDetailItem _item({
       maxWatchedPct: null,
     );
 
-TrackDetail _detail({required List<TrackDetailItem> items, String trackId = 't1'}) => TrackDetail(
+TrackDetail _detail({
+  required List<TrackDetailItem> items,
+  String trackId = 't1',
+  String? description,
+  String? coverImageUrl,
+  int completedItems = 0,
+  bool enrolled = true,
+}) =>
+    TrackDetail(
       id: trackId,
       title: 'My Track',
-      description: null,
+      description: description,
+      coverImageUrl: coverImageUrl,
       status: 'IN_PROGRESS',
       totalItems: items.length,
-      completedItems: 0,
-      enrolled: true,
+      completedItems: completedItems,
+      enrolled: enrolled,
       trackEnrollmentId: 'e1',
       sections: [TrackSection(id: 's1', title: 'Section 1', order: 0, items: items)],
     );
@@ -199,5 +210,122 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('progress:t1'), findsOneWidget);
+  });
+
+  testWidgets('header title is the static "Course" label, not the track\'s own title', (tester) async {
+    when(() => repository.getLearnTrackDetail('t1')).thenAnswer((_) async => _detail(items: []));
+
+    await pump(tester);
+
+    expect(find.text('learn.choose.course'), findsOneWidget);
+    expect(find.text('My Track'), findsOneWidget, reason: 'renders in the body banner instead');
+  });
+
+  testWidgets('renders the description and a progress bar once at least one item is completed',
+      (tester) async {
+    when(() => repository.getLearnTrackDetail('t1')).thenAnswer(
+      (_) async => _detail(
+        items: [
+          _item(id: 'i1', type: TrackItemType.article, status: TrackItemStatus.completed),
+          _item(id: 'i2', type: TrackItemType.article, status: TrackItemStatus.unlocked),
+        ],
+        description: 'A short course description',
+        completedItems: 1,
+      ),
+    );
+
+    await pump(tester);
+
+    expect(find.text('A short course description'), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+    expect(find.textContaining('1'), findsWidgets);
+  });
+
+  testWidgets('no progress bar is shown before anything is completed', (tester) async {
+    when(() => repository.getLearnTrackDetail('t1')).thenAnswer(
+      (_) async => _detail(
+        items: [_item(id: 'i1', type: TrackItemType.article, status: TrackItemStatus.unlocked)],
+      ),
+    );
+
+    await pump(tester);
+
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+  });
+
+  testWidgets('Start/Continue button label reflects enrollment and progress', (tester) async {
+    when(() => repository.getLearnTrackDetail('t1')).thenAnswer(
+      (_) async => _detail(
+        items: [_item(id: 'i1', type: TrackItemType.article, status: TrackItemStatus.unlocked)],
+        enrolled: false,
+      ),
+    );
+
+    await pump(tester);
+
+    expect(find.text('common.start'), findsOneWidget);
+  });
+
+  testWidgets('no Start/Continue button once the track is fully completed', (tester) async {
+    when(() => repository.getLearnTrackDetail('t1')).thenAnswer(
+      (_) async => _detail(
+        items: [_item(id: 'i1', type: TrackItemType.article, status: TrackItemStatus.completed)],
+        completedItems: 1,
+      ),
+    );
+
+    await pump(tester);
+
+    expect(find.byType(AppButton), findsNothing);
+  });
+
+  testWidgets('tapping Start when not enrolled calls enrollTrack then opens the next unlocked item',
+      (tester) async {
+    when(() => repository.getLearnTrackDetail('t1')).thenAnswer(
+      (_) async => _detail(
+        items: [
+          _item(id: 'i1', type: TrackItemType.article, status: TrackItemStatus.unlocked, title: 'Open item'),
+        ],
+        enrolled: false,
+      ),
+    );
+    when(() => repository.enrollTrack('t1')).thenAnswer((_) async {});
+
+    final router = GoRouter(
+      routes: [
+        GoRoute(path: '/', builder: (context, state) => const CourseDetailScreen(trackId: 't1')),
+        GoRoute(
+          path: '/courses/item/:id',
+          builder: (context, state) => Text('item:${state.pathParameters['id']}'),
+        ),
+      ],
+    );
+
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [coursesRepositoryProvider.overrideWithValue(repository)],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('common.start'));
+    await tester.pumpAndSettle();
+
+    verify(() => repository.enrollTrack('t1')).called(1);
+    expect(find.text('item:i1'), findsOneWidget);
+  });
+
+  testWidgets('shows the cover image when present, a placeholder otherwise', (tester) async {
+    await withFakeNetworkImages(() async {
+      when(() => repository.getLearnTrackDetail('t1')).thenAnswer(
+        (_) async => _detail(items: [], coverImageUrl: 'https://cdn.example.com/cover.png'),
+      );
+
+      await pump(tester);
+
+      expect(find.byType(Image), findsOneWidget);
+    });
   });
 }
