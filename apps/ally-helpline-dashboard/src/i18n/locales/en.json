@@ -76,7 +76,8 @@
   "nav": {
     "sidebar": {
       "expand": "Expand sidebar",
-      "collapse": "Collapse sidebar"
+      "collapse": "Collapse sidebar",
+      "pin": "Keep sidebar open"
     },
     "language": {
       "label": "App language",

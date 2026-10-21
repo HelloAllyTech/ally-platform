@@ -1,5 +1,5 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { act, render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { describe, it, expect, vi, beforeAll, beforeEach, afterAll, afterEach } from "vitest";
 import { BrowserRouter } from "react-router-dom";
 
 // --- Mocks Setup ---
@@ -86,7 +86,7 @@ vi.mock("@assets", () => ({
   DockToRight: (props: any) => <svg {...props} data-testid="dock-to-right" />,
   RedirectIcon: (props: any) => <svg {...props} data-testid="redirect-icon" />,
   LogoutIllustration: (props: any) => <svg data-testid="logout-illustration" {...props} />,
-  WarningTriangle: (props: any) => <svg {...props} data-testid="warning-triangle-icon" />,
+  ReportProblemNavIcon: (props: any) => <svg {...props} data-testid="report-problem-icon" />,
 }));
 
 vi.mock("@components", () => ({
@@ -152,6 +152,7 @@ vi.mock("@constants", () => {
     ANALYTICS_PROPS: { NAME_CHANGED: "name_changed", IMAGE_CHANGED: "image_changed" },
     hasAllyAdminAccess: mockHasAllyAdminAccess,
     adminAppUrl: "https://admin.example.test",
+    LOCAL_STORAGE_KEYS: { NAV_SIDEBAR_PINNED: "navSidebarPinned" },
     TooltipLocation: {
       LEARN_TAB: "learn_tab",
       REVIEW_TAB: "review_tab",
@@ -284,6 +285,15 @@ const renderComponent = (props: Partial<NavSideBarProps> = {}) => {
   );
 };
 
+const PINNED_KEY = "navSidebarPinned";
+
+// The desktop rail starts collapsed, where tabs are bare icons. Tests about a
+// tab's visible label render it the way a user who pinned it open sees it.
+const renderPinned = (props: Partial<NavSideBarProps> = {}) => {
+  localStorage.setItem(PINNED_KEY, "true");
+  return renderComponent(props);
+};
+
 describe("NavSideBar", () => {
   beforeEach(() => {
     mockLogout.mockClear();
@@ -293,6 +303,7 @@ describe("NavSideBar", () => {
     mockHasAllyAdminAccess.mockReset();
     mockHasAllyAdminAccess.mockReturnValue(false);
     mockUseCanViewAnalytics.mockReturnValue({ canView: true, isGateLoading: false });
+    localStorage.clear();
     // Reset window.innerWidth
     Object.defineProperty(window, "innerWidth", {
       writable: true,
@@ -311,7 +322,7 @@ describe("NavSideBar", () => {
 
   it("should render the DockToRight toggle button", () => {
     renderComponent();
-    const toggleButton = screen.getByTitle("Collapse sidebar");
+    const toggleButton = screen.getByTitle("Expand sidebar");
     expect(toggleButton).toBeInTheDocument();
     expect(screen.getByTestId("nav-sidebar-toggle")).toBeInTheDocument();
   });
@@ -362,22 +373,23 @@ describe("NavSideBar", () => {
 
   it("should toggle sidebar expansion when toggle button is clicked", async () => {
     renderComponent();
-    const toggleButton = screen.getByTitle("Collapse sidebar");
-
-    // Initially expanded
     const sidebar = screen.getByTestId("nav-sidebar");
-    expect(sidebar).toHaveClass("w-64");
 
-    fireEvent.click(toggleButton);
+    // Initially collapsed
+    expect(sidebar).toHaveClass("w-24");
 
-    // After toggle, should be collapsed
+    fireEvent.click(screen.getByTitle("Expand sidebar"));
+
+    // Pinned open, and the button now collapses it
+    await waitFor(() => {
+      expect(sidebar).toHaveClass("w-64");
+    });
+    fireEvent.click(screen.getByTitle("Collapse sidebar"));
+
     await waitFor(() => {
       expect(sidebar).toHaveClass("w-24");
     });
-
-    // Button title should change
-    const expandButton = screen.getByTitle("Expand sidebar");
-    expect(expandButton).toBeInTheDocument();
+    expect(screen.getByTitle("Expand sidebar")).toBeInTheDocument();
   });
 
   it("should close logout dialog when close button is clicked", async () => {
@@ -428,7 +440,7 @@ describe("NavSideBar", () => {
     // own answer — the tab no longer consults `permissions` directly.
     mockUseCanViewAnalytics.mockReturnValue({ canView: false, isGateLoading: false });
 
-    renderComponent();
+    renderPinned();
 
     // Sessions should render (has VIEW_CALL_LOGS permission)
     expect(screen.getByText("Sessions")).toBeInTheDocument();
@@ -447,7 +459,7 @@ describe("NavSideBar", () => {
     });
     mockUseCanViewAnalytics.mockReturnValue({ canView: false, isGateLoading: false });
 
-    renderComponent();
+    renderPinned();
 
     expect(screen.getByText("Sessions")).toBeInTheDocument();
     expect(screen.queryByTestId(`nav-tab-${TabId.ANALYTICS}`)).not.toBeInTheDocument();
@@ -468,40 +480,245 @@ describe("NavSideBar", () => {
 
   // --- Resize Tests ---
 
-  it("should collapse sidebar when window width is less than EXPANDED_WIDTH", async () => {
+  it("starts collapsed at every desktop width, wide screens included", () => {
+    renderComponent();
+    expect(screen.getByTestId("nav-sidebar")).toHaveClass("w-24");
+    expect(screen.getByTestId("nav-sidebar-rail")).toHaveClass("md:w-24");
+  });
+
+  it("always opens expanded as the phone drawer, pinned or not", async () => {
+    renderComponent();
+    expect(screen.getByTestId("nav-sidebar")).toHaveClass("w-24");
+
     Object.defineProperty(window, "innerWidth", {
       writable: true,
       configurable: true,
-      value: 800,
+      value: 500,
     });
-
-    renderComponent();
-
-    // Trigger resize event
     fireEvent(window, new Event("resize"));
 
     await waitFor(() => {
-      const sidebar = screen.getByTestId("nav-sidebar");
-      expect(sidebar).toHaveClass("w-24");
+      expect(screen.getByTestId("nav-sidebar")).toHaveClass("w-64");
     });
   });
 
-  // --- Styling Tests ---
+  // --- Pinning ---
 
-  it("should apply correct classes when expanded", () => {
-    renderComponent();
-    const sidebar = screen.getByTestId("nav-sidebar");
-    expect(sidebar).toHaveClass("w-64");
+  describe("pinning", () => {
+    it("opens pinned when the pin was left on, and the rail reserves full width", () => {
+      localStorage.setItem(PINNED_KEY, "true");
+      renderComponent();
+
+      expect(screen.getByTestId("nav-sidebar")).toHaveClass("w-64");
+      expect(screen.getByTestId("nav-sidebar-rail")).toHaveClass("md:w-64");
+      expect(screen.getByTitle("Collapse sidebar")).toBeInTheDocument();
+    });
+
+    it("remembers the choice across loads", () => {
+      const { unmount } = renderComponent();
+      fireEvent.click(screen.getByTitle("Expand sidebar"));
+      expect(localStorage.getItem(PINNED_KEY)).toBe("true");
+      unmount();
+
+      renderComponent();
+      expect(screen.getByTestId("nav-sidebar")).toHaveClass("w-64");
+      fireEvent.click(screen.getByTitle("Collapse sidebar"));
+      expect(localStorage.getItem(PINNED_KEY)).toBe("false");
+    });
+
+    it("still works when storage is unavailable", () => {
+      // Throws for the pin's key only: the expanded rail mounts other storage
+      // readers (the language selector, when its flag is on) that are not
+      // under test here.
+      const { getItem: realGet, setItem: realSet } = Storage.prototype;
+      const getItem = vi.spyOn(Storage.prototype, "getItem").mockImplementation(function (
+        this: Storage,
+        key: string,
+      ) {
+        if (key === PINNED_KEY) throw new Error("SecurityError");
+        return realGet.call(this, key);
+      });
+      const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (
+        this: Storage,
+        key: string,
+        value: string,
+      ) {
+        if (key === PINNED_KEY) throw new Error("SecurityError");
+        realSet.call(this, key, value);
+      });
+
+      try {
+        renderComponent();
+        expect(screen.getByTestId("nav-sidebar")).toHaveClass("w-24");
+        fireEvent.click(screen.getByTitle("Expand sidebar"));
+        expect(screen.getByTestId("nav-sidebar")).toHaveClass("w-64");
+      } finally {
+        getItem.mockRestore();
+        setItem.mockRestore();
+      }
+    });
   });
 
-  it("should apply correct classes when collapsed", async () => {
-    renderComponent();
-    const toggleButton = screen.getByTitle("Collapse sidebar");
-    fireEvent.click(toggleButton);
+  // --- Hover to peek ---
 
-    await waitFor(() => {
-      const sidebar = screen.getByTestId("nav-sidebar");
-      expect(sidebar).toHaveClass("w-24");
+  describe("hover to peek", () => {
+    const sidebar = () => screen.getByTestId("nav-sidebar");
+    const hover = () => fireEvent.pointerEnter(sidebar(), { pointerType: "mouse" });
+    const unhover = () => fireEvent.pointerLeave(sidebar(), { pointerType: "mouse" });
+    const advance = (ms: number) => act(() => vi.advanceTimersByTime(ms));
+
+    // jsdom has no PointerEvent, so fireEvent would build a plain Event and drop
+    // `pointerType` — leaving the touch case untestable.
+    const hadPointerEvent = "PointerEvent" in window;
+    beforeAll(() => {
+      if (hadPointerEvent) return;
+      class PointerEventStub extends MouseEvent {
+        pointerType: string;
+        constructor(type: string, init: PointerEventInit = {}) {
+          super(type, init);
+          this.pointerType = init.pointerType ?? "";
+        }
+      }
+      (window as any).PointerEvent = PointerEventStub;
+    });
+
+    afterAll(() => {
+      if (!hadPointerEvent) delete (window as any).PointerEvent;
+    });
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("opens over the page shortly after the cursor arrives, without reserving width", () => {
+      renderComponent();
+      hover();
+
+      advance(99);
+      expect(sidebar()).toHaveClass("w-24");
+
+      advance(1);
+      expect(sidebar()).toHaveClass("w-64");
+      expect(sidebar()).toHaveAttribute("data-peeking", "true");
+      expect(sidebar()).toHaveClass("md:shadow-xl");
+      // The page keeps its layout: only the collapsed rail is reserved.
+      expect(screen.getByTestId("nav-sidebar-rail")).toHaveClass("md:w-24");
+      expect(screen.getByTestId(`nav-tab-title-${TabId.CALLS}`)).toHaveTextContent("Sessions");
+    });
+
+    it("doesn't open for a cursor that only passes over it", () => {
+      renderComponent();
+      hover();
+      advance(50);
+      unhover();
+      advance(500);
+
+      expect(sidebar()).toHaveClass("w-24");
+    });
+
+    it("collapses shortly after the cursor leaves, forgiving a brief slip", () => {
+      renderComponent();
+      hover();
+      advance(100);
+
+      unhover();
+      advance(100);
+      expect(sidebar()).toHaveClass("w-64");
+      // Back inside before the grace runs out: stays open.
+      hover();
+      advance(500);
+      expect(sidebar()).toHaveClass("w-64");
+
+      unhover();
+      advance(150);
+      expect(sidebar()).toHaveClass("w-24");
+      expect(sidebar()).toHaveAttribute("data-peeking", "false");
+    });
+
+    it("offers to keep it open, and pinning holds it open after the cursor leaves", () => {
+      renderComponent();
+      hover();
+      advance(100);
+
+      fireEvent.click(screen.getByTitle("Keep sidebar open"));
+      unhover();
+      advance(500);
+
+      expect(sidebar()).toHaveClass("w-64");
+      expect(sidebar()).not.toHaveClass("md:shadow-xl");
+      expect(screen.getByTestId("nav-sidebar-rail")).toHaveClass("md:w-64");
+      expect(localStorage.getItem(PINNED_KEY)).toBe("true");
+    });
+
+    it("collapses at once when unpinned, even with the cursor still on it", () => {
+      localStorage.setItem(PINNED_KEY, "true");
+      renderComponent();
+      hover();
+      advance(100);
+
+      fireEvent.click(screen.getByTitle("Collapse sidebar"));
+
+      expect(sidebar()).toHaveClass("w-24");
+      advance(500);
+      expect(sidebar()).toHaveClass("w-24");
+    });
+
+    it("ignores touch, which only hovers for the instant of a tap", () => {
+      renderComponent();
+      fireEvent.pointerEnter(sidebar(), { pointerType: "touch" });
+      advance(500);
+
+      expect(sidebar()).toHaveClass("w-24");
+    });
+
+    it("opens for keyboard focus at once, but not for focus left by a mouse click", () => {
+      const realMatches = Element.prototype.matches;
+      let keyboard = false;
+      const matches = vi.spyOn(Element.prototype, "matches").mockImplementation(function (
+        this: Element,
+        selector: string,
+      ) {
+        return selector === ":focus-visible" ? keyboard : realMatches.call(this, selector);
+      });
+      renderComponent();
+      const tab = screen.getByTestId(`nav-tab-${TabId.CALLS}`);
+
+      // A clicked tab keeps focus; that must not hold the rail open.
+      fireEvent.focus(tab);
+      advance(500);
+      expect(sidebar()).toHaveClass("w-24");
+      fireEvent.blur(tab, { relatedTarget: document.body });
+
+      keyboard = true;
+      fireEvent.focus(tab);
+      advance(0);
+      expect(sidebar()).toHaveClass("w-64");
+
+      // Moving between items inside keeps it open; tabbing out closes it.
+      fireEvent.blur(tab, { relatedTarget: screen.getByTestId(`nav-tab-${TabId.ANALYTICS}`) });
+      advance(500);
+      expect(sidebar()).toHaveClass("w-64");
+      fireEvent.blur(tab, { relatedTarget: document.body });
+      advance(150);
+      expect(sidebar()).toHaveClass("w-24");
+
+      matches.mockRestore();
+    });
+
+    it("names collapsed tabs for assistive tech, and drops the name once the label shows", () => {
+      renderComponent();
+      expect(screen.getByTestId(`nav-tab-${TabId.CALLS}`)).toHaveAttribute(
+        "aria-label",
+        "Sessions",
+      );
+
+      hover();
+      advance(100);
+      expect(screen.getByTestId(`nav-tab-${TabId.CALLS}`)).not.toHaveAttribute("aria-label");
     });
   });
 
@@ -557,7 +774,7 @@ describe("NavSideBar", () => {
     const reportProblemTab = () => screen.getByTestId(`nav-tab-${TabId.REPORT_PROBLEM}`);
 
     it("is always visible, in the primary tab list", () => {
-      renderComponent();
+      renderPinned();
       expect(reportProblemTab()).toBeInTheDocument();
       expect(screen.getByTestId(`nav-tab-title-${TabId.REPORT_PROBLEM}`)).toHaveTextContent(
         "Report a problem",
@@ -598,7 +815,7 @@ describe("NavSideBar", () => {
 
     it("is shown for an account that also has admin-console access", () => {
       mockHasAllyAdminAccess.mockReturnValue(true);
-      renderComponent();
+      renderPinned();
       expect(allyAdminTab()).toBeInTheDocument();
       expect(screen.getByTestId(`nav-tab-title-${TabId.ALLY_ADMIN}`)).toHaveTextContent(
         "Ally Admin",
