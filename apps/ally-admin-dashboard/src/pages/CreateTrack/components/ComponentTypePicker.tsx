@@ -35,6 +35,7 @@ const TYPE_ORDER: TrackItemType[] = [
   TrackItemType.ROLEPLAY,
   TrackItemType.CASE,
   TrackItemType.QUIZ,
+  TrackItemType.BRANCHING_SCENARIO,
   TrackItemType.ANNOTATED_ARTIFACT,
   TrackItemType.ARTICLE,
   TrackItemType.VIDEO,
