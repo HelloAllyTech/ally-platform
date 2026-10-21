@@ -137,7 +137,7 @@ export const JournalPlayer: React.FC<JournalPlayerProps> = ({
                   <>
                     <RichText
                       html={prompt.promptHtml}
-                      textStyle={styles.prompt}
+                      textStyle={styles.promptRich}
                     />
                     {prompt.required && (
                       <Text style={styles.requiredTag}>
@@ -255,6 +255,14 @@ const styles = ScaledSheet.create({
     flex: 1,
   },
   prompt: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...typography.body.medium,
+    fontWeight: fontWeights.medium,
+    color: colors.ds.typography.highEmphasis,
+  },
+  // Plain prompts stay medium, as before. Rich prompts start lighter so that
+  // bold inside them actually stands out.
+  promptRich: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
     ...typography.body.medium,
     fontWeight: fontWeights.regular,

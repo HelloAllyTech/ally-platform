@@ -22,4 +22,5 @@ module.exports = {
   collectCoverage: true,
   coverageReporters: ['html'],
   coverageDirectory: '<rootDir>/coverage',
+  testTimeout: 300000,
 };

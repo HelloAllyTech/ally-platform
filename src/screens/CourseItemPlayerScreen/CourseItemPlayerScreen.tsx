@@ -15,6 +15,7 @@ import {
 import {colors} from '@/theme';
 import {
   StartTrackItemResponse,
+  TrackGameKey,
   TrackItemCompletionResult,
   TrackItemStatus,
   TrackItemType,
@@ -30,6 +31,7 @@ import {PlayerBottomNav} from './components/PlayerBottomNav';
 import {ArticlePlayer} from './components/players/ArticlePlayer';
 import {GamePlayer} from './components/players/GamePlayer';
 import {JournalPlayer} from './components/players/JournalPlayer';
+import {NativeGamePlayer} from './components/players/NativeGamePlayer';
 import {QuizItemPlayer} from './components/players/quiz/QuizItemPlayer';
 import {RoleplayCasePlayer} from './components/players/RoleplayCasePlayer';
 import {VideoItemPlayer} from './components/players/VideoItemPlayer';
@@ -216,6 +218,24 @@ export const CourseItemPlayerScreen: React.FC<
           />
         );
       case TrackItemType.GAME:
+        if (
+          payload.gameKey === TrackGameKey.BREATHING_EXERCISE &&
+          payload.breathingExercise
+        ) {
+          return (
+            <NativeGamePlayer
+              payload={payload}
+              itemId={nav.currentItemId}
+              trackId={trackId}
+              onCompleted={handleCompletion}
+            />
+          );
+        }
+        if (payload.gameKey === TrackGameKey.BREATHING_EXERCISE) {
+          // If the breathingExercise object is missing, fall back to the
+          // unsupported card below.
+          break;
+        }
         return (
           <GamePlayer
             payload={payload}

@@ -6,6 +6,7 @@ export {CompleteProfileScreen} from './CompleteProfileScreen';
 export {CallSummaryScreen} from './CallSummaryScreen';
 export {UserAnalyticsScreen} from './UserAnalyticsScreen';
 export {BreathingScreen} from './BoxBreathingScreen';
+export {BreathingExerciseScreen} from './BreathingExerciseScreen/BreathingExerciseScreen';
 export {CommunityScreen} from './CommunityScreen';
 export {SearchScreen} from './SearchScreen';
 export {DrawerContent} from './LogoutScreen/components/CustomDrawerContent';

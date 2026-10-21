@@ -21,6 +21,7 @@ export enum TrackGameKey {
   CUB_N_PUP = 'CUB_N_PUP',
   SNAKE = 'SNAKE',
   SPROUT = 'SPROUT',
+  BREATHING_EXERCISE = 'BREATHING_EXERCISE',
 }
 
 // There is no IN_PROGRESS status server-side — "in progress" is derived as
@@ -435,6 +436,22 @@ export interface JournalSavedResponse {
 }
 
 // ---------------------------------------------------------------------------
+// Breathing Exercise
+// ---------------------------------------------------------------------------
+
+export interface BreathingExerciseContent {
+  inhale: number;
+  holdIn: number;
+  exhale: number;
+  holdOut: number;
+  cycles: number;
+  inhaleText: string;
+  holdInText: string;
+  exhaleText: string;
+  holdOutText: string;
+}
+
+// ---------------------------------------------------------------------------
 // Start-item payload (type-discriminated)
 // ---------------------------------------------------------------------------
 
@@ -552,6 +569,7 @@ export interface StartGameItemPayload extends StartTrackItemBase {
   bestScore: number | null;
   playCount: number;
   completion: TrackItemCompletionResult;
+  breathingExercise?: BreathingExerciseContent;
 }
 
 export type StartTrackItemResponse =
