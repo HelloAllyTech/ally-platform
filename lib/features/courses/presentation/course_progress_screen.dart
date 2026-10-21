@@ -31,8 +31,10 @@ class CourseProgressScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(progress.title, style: Theme.of(context).textTheme.headlineSmall),
-              const SizedBox(height: 24),
+              // RN's `CourseProgressBody` never renders the track's own
+              // title anywhere — confirmed by reading the real component:
+              // it goes straight from the header (already static "Progress"
+              // above) into the progress bar. No title heading in the body.
               LinearProgressIndicator(value: progress.completionPct / 100),
               const SizedBox(height: 8),
               Text(ref.t('courses.player.overallProgress', {

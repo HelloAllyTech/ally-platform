@@ -53,7 +53,9 @@ void main() {
     expect(find.textContaining('courses.progressDashboard.notFound'), findsOneWidget);
   });
 
-  testWidgets('renders the title, completion percentage, and item counts', (tester) async {
+  testWidgets('renders a static header (not the track title) plus completion percentage and item counts', (
+    tester,
+  ) async {
     when(() => repository.getLearnTrackProgress('t1')).thenAnswer(
       (_) async => TrackProgressDashboard(
         trackId: 't1',
@@ -70,7 +72,12 @@ void main() {
       overrides: [coursesRepositoryProvider.overrideWithValue(repository)],
     );
 
-    expect(find.text('My Track'), findsOneWidget);
+    // RN's real header is always the static "Progress" label
+    // (`courses.progressDashboard.title`) and its body never renders the
+    // track's own title at all — confirmed by reading `CourseProgressBody`
+    // directly.
+    expect(find.textContaining('courses.progressDashboard.title'), findsOneWidget);
+    expect(find.text('My Track'), findsNothing);
     expect(find.byType(LinearProgressIndicator), findsOneWidget);
     final bar = tester.widget<LinearProgressIndicator>(find.byType(LinearProgressIndicator));
     expect(bar.value, closeTo(0.375, 0.0001));
