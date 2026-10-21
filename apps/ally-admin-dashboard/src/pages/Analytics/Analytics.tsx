@@ -17,13 +17,14 @@ import {
   CarbonTabs as Tabs,
   Theme,
 } from "@ally-ui-mono/ui-shared";
-import { AnalyticsWindowQuery, useGetScenarioLanguagesQuery } from "@api";
+import { AnalyticsWindowQuery, useGetScenarioLanguagesQuery, useGetTenantsQuery } from "@api";
 import { en, FeatureToggleKey } from "@constants";
 import { RootState } from "@store";
 import { AnalyticsRange } from "@types";
 import { hasFeature } from "@utils";
 
 import { AnalyticsTabFilters } from "./analyticsFilters";
+import { AnalyticsOrgScopeProvider } from "./analyticsOrgScope";
 import { BugAgentPerformance } from "./BugAgentPerformance";
 import { CodingAgentCost } from "./CodingAgentCost";
 import { FixSessionEngineCost } from "./FixSessionEngineCost";
@@ -74,6 +75,12 @@ interface TabDef {
    * served by not knowing it exists than by a tab whose every request 403s.
    */
   visibleTo?: (ctx: { features: string[] }) => boolean;
+  /**
+   * Open to a platform admin restricted to some organizations: every request
+   * the tab makes narrows to the page's org (or is skipped for them). Every
+   * other tab is hidden from them — the backend would refuse its requests.
+   */
+  orgScoped?: true;
 }
 
 /** Query-string key that selects an Analytics tab by its `TabDef.id`. */
@@ -97,6 +104,7 @@ const TABS: TabDef[] = [
     id: "highlights",
     label: "Highlights",
     uses: { language: false, range: false },
+    orgScoped: true,
     render: f => <HighlightsTab {...f} />,
   },
   {
@@ -184,6 +192,7 @@ const TABS: TabDef[] = [
   },
   {
     id: "scribe",
+    orgScoped: true,
     label: "Scribe",
     uses: { language: false, range: true },
     render: f => <ScribeTab {...f} />,
@@ -267,9 +276,32 @@ export const Analytics = () => {
   // gates on the analytics feature toggle); a tab may declare a narrower gate
   // of its own.
   const features = useSelector((state: RootState) => state.user.features);
+  // A platform admin restricted to some organizations sees one of them at a
+  // time, and only the tabs that can narrow to it (TabDef.orgScoped).
+  const restrictedTenantIds = useSelector(
+    (state: RootState) => state.user.user?.restrictedTenantIds ?? null,
+  );
+  const restricted = restrictedTenantIds !== null;
+  const { data: tenantData } = useGetTenantsQuery({ limit: 200 }, { skip: !restricted });
+  const orgItems = useMemo(
+    () =>
+      (restrictedTenantIds ?? [])
+        .map(id => ({
+          id,
+          label: tenantData?.data?.find(t => t.id === id)?.name ?? "Your organisation",
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    [restrictedTenantIds, tenantData],
+  );
+  const [pickedOrgId, setPickedOrgId] = useState<string>("");
+  const selectedOrg = orgItems.find(o => o.id === pickedOrgId) ?? orgItems[0];
+  const orgScope = useMemo(
+    () => ({ restricted, tenantId: restricted ? selectedOrg?.id : undefined }),
+    [restricted, selectedOrg],
+  );
   const tabs = useMemo(
-    () => TABS.filter(t => !t.visibleTo || t.visibleTo({ features })),
-    [features],
+    () => TABS.filter(t => (restricted ? t.orgScoped : !t.visibleTo || t.visibleTo({ features }))),
+    [features, restricted],
   );
   const tabIndex = Math.max(
     0,
@@ -309,8 +341,11 @@ export const Analytics = () => {
   // A tab with no range picker reads all-time data. Derived from the same flag
   // that hides the picker, so the two cannot disagree.
   const query: AnalyticsWindowQuery = useMemo(
-    () => ({ range: activeTab.uses.range ? range : "all" }),
-    [range, activeTab],
+    () => ({
+      range: activeTab.uses.range ? range : "all",
+      ...(orgScope.tenantId ? { tenantId: orgScope.tenantId } : {}),
+    }),
+    [range, activeTab, orgScope.tenantId],
   );
   const filters: AnalyticsTabFilters = useMemo(
     () => ({ query, language, onSelectLanguage: setLanguage }),
@@ -329,8 +364,10 @@ export const Analytics = () => {
             <div>
               <Heading className="text-2xl">Analytics</Heading>
               <p className="text-sm text-typography-500 mt-1">
-                Platform-wide metrics, excluding internal and test organisations. Each panel states
-                what it is derived from and how many observations back it.
+                {restricted
+                  ? `Metrics for ${selectedOrg?.label ?? "your organisation"} only. Charts that span every organisation are not shown to admins restricted to some organisations.`
+                  : "Platform-wide metrics, excluding internal and test organisations."}{" "}
+                Each panel states what it is derived from and how many observations back it.
                 {/* Says where the window went, for a tab that has no picker. A
                     missing control reads as an omission unless it is explained. */}
                 {!activeTab.uses.range &&
@@ -342,6 +379,23 @@ export const Analytics = () => {
                 flex row puts the last control off-screen with no scrollbar to
                 reach it. Wrapped, it stays one contiguous block of filters. */}
             <div className="flex flex-wrap items-end gap-3">
+              {restricted && orgItems.length > 1 && (
+                <div className="w-full sm:w-56">
+                  <Dropdown
+                    id="analytics-org"
+                    size="md"
+                    titleText="Organisation"
+                    hideLabel
+                    label="Organisation"
+                    items={orgItems}
+                    selectedItem={selectedOrg}
+                    itemToString={item => item?.label ?? ""}
+                    onChange={({ selectedItem }) => {
+                      if (selectedItem) setPickedOrgId(selectedItem.id);
+                    }}
+                  />
+                </div>
+              )}
               {activeTab.uses.language && (
                 <div className="w-full sm:w-44">
                   <Dropdown
@@ -389,36 +443,45 @@ export const Analytics = () => {
             </div>
           </div>
 
-          <Tabs
-            selectedIndex={tabIndex}
-            onChange={({ selectedIndex }) => setTabIndex(selectedIndex)}
-          >
-            <TabList aria-label="Analytics sections">
-              {tabs.map(t => (
-                <Tab key={t.id}>{t.label}</Tab>
-              ))}
-            </TabList>
-            <TabPanels>
-              {/*
+          {restricted && orgItems.length === 0 ? (
+            <p className="text-sm text-typography-700">
+              You are not assigned to any organisation yet, so there is nothing to show here. Ask
+              whoever manages admin access to assign you one.
+            </p>
+          ) : (
+            <AnalyticsOrgScopeProvider value={orgScope}>
+              <Tabs
+                selectedIndex={tabIndex}
+                onChange={({ selectedIndex }) => setTabIndex(selectedIndex)}
+              >
+                <TabList aria-label="Analytics sections">
+                  {tabs.map(t => (
+                    <Tab key={t.id}>{t.label}</Tab>
+                  ))}
+                </TabList>
+                <TabPanels>
+                  {/*
                 Only the ACTIVE panel's component is mounted. Carbon's TabPanel
                 merely sets `hidden`, so rendering every tab's children fired one
                 query per chart across all tabs on first paint — most of them for
                 panels nobody was looking at. Depth stays available on demand; it
                 just is not all fetched up front.
               */}
-              {tabs.map((t, i) => (
-                // No side padding on phones: the page wrapper already has its
-                // gutter, and Carbon's panel padding stacks on top of it.
-                <TabPanel key={t.id} className="max-sm:!px-0">
-                  {i === tabIndex ? (
-                    <TabControlsSlotProvider value={controlsSlot}>
-                      {t.render(filters)}
-                    </TabControlsSlotProvider>
-                  ) : null}
-                </TabPanel>
-              ))}
-            </TabPanels>
-          </Tabs>
+                  {tabs.map((t, i) => (
+                    // No side padding on phones: the page wrapper already has its
+                    // gutter, and Carbon's panel padding stacks on top of it.
+                    <TabPanel key={t.id} className="max-sm:!px-0">
+                      {i === tabIndex ? (
+                        <TabControlsSlotProvider value={controlsSlot}>
+                          {t.render(filters)}
+                        </TabControlsSlotProvider>
+                      ) : null}
+                    </TabPanel>
+                  ))}
+                </TabPanels>
+              </Tabs>
+            </AnalyticsOrgScopeProvider>
+          )}
         </Section>
       </Theme>
     </div>

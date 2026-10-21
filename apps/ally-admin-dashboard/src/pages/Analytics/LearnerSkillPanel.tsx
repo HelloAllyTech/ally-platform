@@ -5,6 +5,7 @@ import { LineChart } from "@carbon/charts-react";
 import { InlineNotification, SidePanel, SkeletonPlaceholder } from "@ally-ui-mono/ui-shared";
 import { useGetSkillGrowthLearnerSeriesQuery } from "@api/analytics";
 
+import { useAnalyticsOrgScope } from "./analyticsOrgScope";
 import { CHART_HEIGHT, ScrollableChart, boundedDomainNote, lineOpts } from "./chartKit";
 import {
   KNOWLEDGE_SCALE,
@@ -63,9 +64,14 @@ export const LearnerSkillPanel = ({
 }) => {
   // `skip` is what keeps the list to one request: no learner series is fetched
   // until a row is actually opened.
-  const { data, isFetching, isError } = useGetSkillGrowthLearnerSeriesQuery(learnerId as number, {
-    skip: learnerId === null,
-  });
+  // Set only for an org-restricted admin, whose drill-down is held to their org.
+  const { tenantId } = useAnalyticsOrgScope();
+  const { data, isFetching, isError } = useGetSkillGrowthLearnerSeriesQuery(
+    { userId: learnerId as number, tenantId },
+    {
+      skip: learnerId === null,
+    },
+  );
 
   const composite = useMemo(
     () => buildLearnerCompositeSeries(data?.sessions ?? []),

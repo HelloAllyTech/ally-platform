@@ -4,6 +4,7 @@ import { Button, CarbonDropdown as Dropdown } from "@ally-ui-mono/ui-shared";
 import { useGetCourseImpactQuery, useGetTenantsQuery } from "@api";
 
 import { asOfStamp } from "../analyticsFilters";
+import { useAnalyticsOrgScope } from "../analyticsOrgScope";
 import { ChangeWhiskers } from "../ChangeWhiskers";
 import { ChartCard, buildSource } from "../chartKit";
 import {
@@ -112,7 +113,10 @@ const defaultCourse = (courses: CourseImpactCourse[]): string | undefined =>
  * carries its own org filter.
  */
 export const CourseImpactSubTab = () => {
-  const [tenantId, setTenantId] = useState<string>(ALL_ORGS);
+  // An org-restricted admin's org comes from the page picker; theirs is hidden.
+  const scope = useAnalyticsOrgScope();
+  const [pickedTenantId, setTenantId] = useState<string>(ALL_ORGS);
+  const tenantId = scope.restricted ? (scope.tenantId ?? ALL_ORGS) : pickedTenantId;
   const [trackId, setTrackId] = useState<string | undefined>(undefined);
   const [showAll, setShowAll] = useState(false);
 
@@ -197,16 +201,18 @@ export const CourseImpactSubTab = () => {
 
   return (
     <div className="flex flex-col gap-6 md:gap-8">
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="text-sm font-medium text-typography-900">Org:</span>
-        <InlinePicker
-          id="course-impact-org"
-          label="Org"
-          items={orgItems}
-          selected={tenantId}
-          onChange={pickOrg}
-        />
-      </div>
+      {!scope.restricted && (
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-sm font-medium text-typography-900">Org:</span>
+          <InlinePicker
+            id="course-impact-org"
+            label="Org"
+            items={orgItems}
+            selected={tenantId}
+            onChange={pickOrg}
+          />
+        </div>
+      )}
 
       <Section
         title="Every course"
