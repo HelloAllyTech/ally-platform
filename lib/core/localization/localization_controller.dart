@@ -11,6 +11,17 @@ import '../config/app_config.dart';
 import 'translations.dart';
 
 const _supportedLanguages = ['en', 'hi', 'mr', 'ta', 'kn'];
+
+/// Mirrors RN's `LanguageSelectorSheet.tsx`'s `LANGUAGE_OPTIONS` — same
+/// codes, same order, same native-script labels.
+const supportedLanguageOptions = [
+  (code: 'en', label: 'English'),
+  (code: 'hi', label: 'हिंदी'),
+  (code: 'mr', label: 'मराठी'),
+  (code: 'ta', label: 'தமிழ்'),
+  (code: 'kn', label: 'ಕನ್ನಡ'),
+];
+
 const _defaultLanguage = 'en';
 const _prefLanguageKey = 'ui_language';
 const _prefI18nVersionKey = 'i18n_version';
@@ -60,6 +71,11 @@ class LocalizationController extends AsyncNotifier<Translations> with WidgetsBin
   String _language = _defaultLanguage;
   Timer? _pollTimer;
   Future<void>? _refreshInFlight;
+
+  /// The currently-applied UI language code — for Profile Settings' real
+  /// "Language" field (RN's `i18nInstance.resolvedLanguage`), distinct from
+  /// `preferences_repository.dart`'s default *simulation* language.
+  String get currentLanguage => _language;
 
   @override
   Future<Translations> build() async {
