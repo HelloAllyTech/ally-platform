@@ -185,6 +185,8 @@ reconciler; prose should state invariants that survive a refactor:
 If you catch yourself typing a number that a script could count, put it in `platform/stats.md`
 and link to it.
 
+File paths rot the same way: `scripts/docs-path-lint.mjs` (the same file in every Ally repo, run as the `docs-paths` CI job) fails on a backticked path in a doc that no longer exists — fix the path, or mark a deliberate one `<!-- docs-path-lint: planned -->` (or `ignore`).
+
 ---
 
 ## 7. Adding to the system

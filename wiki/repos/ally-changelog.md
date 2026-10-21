@@ -18,9 +18,9 @@ changelog file plus the workflow that appends to it.
 
 1. A source repo (`ally-be`, `ally-ai`, `ally-ai-learn`, `ally-web`, `ally-mobile`,
    `infra`) merges to its release branch. That repo's
-   `.github/workflows/changelog-notify.yml` fires on the push and fetches its actual
+   `.github/workflows/changelog-notify.yml` fires on the push and fetches its actual <!-- docs-path-lint: ignore -->
    logic at runtime from [`HelloAllyTech/.github`](https://github.com/HelloAllyTech/.github)'s
-   `scripts/changelog-notify.sh` — one copy of that logic, not six.
+   `scripts/changelog-notify.sh` — one copy of that logic, not six. <!-- docs-path-lint: ignore -->
 2. That script determines whether the push was a merged PR (pulling title/body/author/
    url) or a direct push (falling back to the raw commit list), and — for `ally-web`
    only — which of its three apps changed.
@@ -43,7 +43,7 @@ changelog file plus the workflow that appends to it.
 
 Nothing here changes. In the new repo:
 
-1. Add `.github/workflows/changelog-notify.yml` (copy from any existing source repo,
+1. Add `.github/workflows/changelog-notify.yml` (copy from any existing source repo, <!-- docs-path-lint: ignore -->
    swap the release branch if it isn't `master`).
 2. Add the `CHANGELOG_DISPATCH_TOKEN` secret (same PAT value already used elsewhere).
 
@@ -62,4 +62,4 @@ The new repo starts showing up in `CHANGELOG.md` on its next merge.
 ## Canonical docs
 
 - [`HelloAllyTech/.github`](https://github.com/HelloAllyTech/.github) — the shared
-  `scripts/changelog-notify.sh` every source repo's workflow calls.
+  `scripts/changelog-notify.sh` every source repo's workflow calls. <!-- docs-path-lint: ignore -->

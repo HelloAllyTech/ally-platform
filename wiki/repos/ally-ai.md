@@ -140,7 +140,7 @@ poetry run python scripts/migrate.py all    # or: make migrate
 poetry run python app/main.py
 ```
 
-Migration helpers: `scripts/migrate.py status | history | up | down | all | generate "<name>"`; `scripts/test_weaviate_connection.py`; `scripts/list_reference_documents.py`. Sync prompts to the backend with `poetry run python scripts/sync_prompts.py` (or `make sync-prompts`).
+Migration helpers: `scripts/migrate.py status | history | up | down | all | generate "<name>"`. Sync prompts to the backend with `poetry run python scripts/sync_prompts.py` (or `make sync-prompts`).
 
 **Full local stack** (API + Weaviate + LocalStack SQS/S3) via `docker-compose.full.yml`:
 

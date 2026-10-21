@@ -42,7 +42,7 @@
         "automation"
       ],
       "last_reconciled": "2026-08-06",
-      "words": 1366,
+      "words": 1413,
       "url": "https://tech.helloally.ai/#/wiki/contributing/docs-system.md",
       "skip_reason": ""
     },
@@ -73,7 +73,7 @@
         "workflow"
       ],
       "last_reconciled": "2026-09-15",
-      "words": 2848,
+      "words": 2856,
       "url": "https://tech.helloally.ai/#/wiki/contributing/planning-with-stacks.md",
       "skip_reason": ""
     },
@@ -89,7 +89,7 @@
         "deployment"
       ],
       "last_reconciled": "2026-09-17",
-      "words": 1278,
+      "words": 1282,
       "url": "https://tech.helloally.ai/#/wiki/contributing/release-process.md",
       "skip_reason": ""
     },
@@ -113,7 +113,7 @@
       "summary": "",
       "tags": [],
       "last_reconciled": "",
-      "words": 693,
+      "words": 731,
       "url": "https://tech.helloally.ai/#/wiki/index.md",
       "skip_reason": "human navigation catalog — ROUTING.md supersedes it for agents"
     },
@@ -126,7 +126,7 @@
         "log"
       ],
       "last_reconciled": "",
-      "words": 10308,
+      "words": 10577,
       "url": "https://tech.helloally.ai/#/wiki/log.md",
       "skip_reason": "append-only history — read only when auditing what changed"
     },
@@ -220,8 +220,27 @@
         "storage"
       ],
       "last_reconciled": "2026-07-11",
-      "words": 683,
+      "words": 685,
       "url": "https://tech.helloally.ai/#/wiki/platform/architecture.md",
+      "skip_reason": ""
+    },
+    {
+      "path": "platform/auto-improve.md",
+      "title": "Auto-improve — Rubric-Judged Testing for System Skills",
+      "summary": "How System Skills' Auto-improve works — which skills can run it, the loop (designer drafts a challenger, the router splits live traffic, an LLM judge scores against an admin's rubric), what the target means, why a loop pauses, what Apply does, and the limits to know before trusting a winner.",
+      "tags": [
+        "platform",
+        "auto-improve",
+        "skills",
+        "prompts",
+        "evaluation",
+        "llm-judge",
+        "admin",
+        "experiments"
+      ],
+      "last_reconciled": "2026-10-21",
+      "words": 2107,
+      "url": "https://tech.helloally.ai/#/wiki/platform/auto-improve.md",
       "skip_reason": ""
     },
     {
@@ -404,7 +423,7 @@
         "metrics"
       ],
       "last_reconciled": "2026-07-30",
-      "words": 5658,
+      "words": 5667,
       "url": "https://tech.helloally.ai/#/wiki/product/data-visualisation.md",
       "skip_reason": ""
     },
@@ -490,7 +509,7 @@
         "python"
       ],
       "last_reconciled": "2026-09-03",
-      "words": 3470,
+      "words": 3414,
       "url": "https://tech.helloally.ai/#/wiki/repos/ally-ai-learn.md",
       "skip_reason": ""
     },
@@ -506,7 +525,7 @@
         "python"
       ],
       "last_reconciled": "2026-09-03",
-      "words": 3060,
+      "words": 3058,
       "url": "https://tech.helloally.ai/#/wiki/repos/ally-ai.md",
       "skip_reason": ""
     },
@@ -521,7 +540,7 @@
         "api"
       ],
       "last_reconciled": "2026-08-06",
-      "words": 4046,
+      "words": 4058,
       "url": "https://tech.helloally.ai/#/wiki/repos/ally-be.md",
       "skip_reason": ""
     },
@@ -536,7 +555,7 @@
         "github-actions"
       ],
       "last_reconciled": "2026-08-14",
-      "words": 404,
+      "words": 420,
       "url": "https://tech.helloally.ai/#/wiki/repos/ally-changelog.md",
       "skip_reason": ""
     },

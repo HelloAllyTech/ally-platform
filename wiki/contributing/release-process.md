@@ -10,16 +10,16 @@ last_reconciled: 2026-09-17
 Every Ally service releases the same way: you pick a version, trigger one workflow, and
 review the draft it produces. This page is the **shared** half of that process.
 
-Each repo keeps a short `.github/RELEASE_GUIDE.md` for the half that genuinely differs —
+Each repo keeps a short `.github/RELEASE_GUIDE.md` for the half that genuinely differs — <!-- docs-path-lint: ignore -->
 its workflow name, runtime, and deployment target names. Those stay in the private repos;
 this site is public, so it carries no infrastructure identifiers.
 
 | Repo | Its guide |
 |---|---|
-| ally-be | [`.github/RELEASE_GUIDE.md`](https://github.com/HelloAllyTech/ally-be/blob/main/.github/RELEASE_GUIDE.md) |
-| ally-ai | [`.github/RELEASE_GUIDE.md`](https://github.com/HelloAllyTech/ally-ai/blob/main/.github/RELEASE_GUIDE.md) |
-| ally-ai-learn | [`.github/RELEASE_GUIDE.md`](https://github.com/HelloAllyTech/ally-ai-learn/blob/main/.github/RELEASE_GUIDE.md) |
-| ally-web | [`.github/RELEASE_GUIDE.md`](https://github.com/HelloAllyTech/ally-web/blob/main/.github/RELEASE_GUIDE.md) — three independently versioned services |
+| ally-be | [`ally-be/.github/RELEASE_GUIDE.md`](https://github.com/HelloAllyTech/ally-be/blob/main/.github/RELEASE_GUIDE.md) |
+| ally-ai | [`ally-ai/.github/RELEASE_GUIDE.md`](https://github.com/HelloAllyTech/ally-ai/blob/main/.github/RELEASE_GUIDE.md) |
+| ally-ai-learn | [`ally-ai-learn/.github/RELEASE_GUIDE.md`](https://github.com/HelloAllyTech/ally-ai-learn/blob/main/.github/RELEASE_GUIDE.md) |
+| ally-web | [`ally-web/.github/RELEASE_GUIDE.md`](https://github.com/HelloAllyTech/ally-web/blob/main/.github/RELEASE_GUIDE.md) — three independently versioned services |
 
 ---
 

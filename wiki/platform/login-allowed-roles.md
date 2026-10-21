@@ -64,7 +64,7 @@ the same skew strands those users until they update from the store.
 
 ## The contract now
 
-`IsAllowedRoles()` (`src/common/decorator/allowed-roles.decorator.ts`) replaced
+`IsAllowedRoles()` (`ally-be/src/common/decorator/allowed-roles.decorator.ts`) replaced
 the strict enum check on all five entry points:
 
 - **Unrecognised names are dropped** before validation; the recognised ones decide the request.
@@ -82,7 +82,7 @@ decorator; the probe protects the deployed system.
 
 ### Automated (ally-be)
 
-`src/common/decorator/test/allowed-roles.decorator.spec.ts` drives the decorator
+`ally-be/src/common/decorator/test/allowed-roles.decorator.spec.ts` drives the decorator
 through `plainToInstance` + `validateSync` — the same pair the global
 `ValidationPipe({ transform: true })` applies — and asserts:
 

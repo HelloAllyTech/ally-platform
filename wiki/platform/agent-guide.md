@@ -20,7 +20,7 @@ This page helps AI agents (and developers) quickly orient in the Ally workspace 
 
 ### [ally-be](../repos/ally-be.md) — Core Backend
 - **Stack**: NestJS 11 / TypeScript 5.9 / Node 24 / PostgreSQL 14 / Redis 7 / TypeORM
-- **Entry**: `src/main.ts` → `src/app.module.ts` (current counts: [Platform Stats](stats.md))
+- **Entry**: `ally-be/src/main.ts` → `ally-be/src/app.module.ts` (current counts: [Platform Stats](stats.md))
 - **Key modules**: auth, learn, livekit, ai, chat, audio-ingest, conversational-guardrails, badge, community, prompt, tenant, user, authorization, scenario-report
 - **DB migrations**: `src/database/migrations/` (TypeORM, `synchronize: false`, never edit a merged one); seeds in `src/database/seeds/` are idempotent
 - **WebSocket gateways**: `microphone-chat.gateway.ts`, `cloud-telephony.gateway.ts`, `scenario-report.gateway.ts`
@@ -29,20 +29,20 @@ This page helps AI agents (and developers) quickly orient in the Ally workspace 
 
 ### [ally-ai](../repos/ally-ai.md) — AI Service
 - **Stack**: FastAPI / Python 3.12 / Poetry / Weaviate / LangChain / OpenAI
-- **Entry**: `app/main.py`
+- **Entry**: `ally-ai/app/main.py`
 - **Key services**: `app/core/conversations/`, `summaries/`, `text_generations/`, `reference_documents/`, `transcriptions/`, `queue/`
 - **Prompts**: `app/prompts/` (file-based, dynamically loaded)
-- **Vector DB**: Weaviate collections in `app/core/vector_db/constants.py`; schema migrations in `app/migrations/`
-- **Background worker**: SQS transcription worker in `app/core/queue/transcription_request_sqs_worker.py`
+- **Vector DB**: Weaviate collections in `ally-ai/app/core/vector_db/constants.py`; schema migrations in `app/migrations/`
+- **Background worker**: SQS transcription worker in `ally-ai/app/core/queue/transcription_request_sqs_worker.py`
 - **Key patterns**: Abstract base classes for services, FastAPI dependency injection, Pydantic settings, HIPAA audit logging
 
 ### [ally-ai-learn](../repos/ally-ai-learn.md) — Training Agent
 - **Stack**: FastAPI + LiveKit Agents / Python 3.12 / Poetry / LangGraph / multi-provider TTS/STT/LLM
-- **Entry**: `app/main.py` (FastAPI), `app/worker.py` (LiveKit agent)
+- **Entry**: `ally-ai-learn/app/main.py` (FastAPI), `ally-ai-learn/app/worker.py` (LiveKit agent)
 - **Graph pipeline**: `app/core/graph/` (LangGraph: process_events → resolve_branching → generate_response/detect_behaviors → apply_voice → send_feedback)
-- **Event system**: `app/core/events/` — one package per event type (SENTENCE_SIMILARITY, SEMANTIC_SIMILARITY, BINARY_CLASSIFIER, TIME, SCORE, COMBINATION, HELPER_*); the authoritative list is `docs/04-event-types-reference.md`, current count in [Platform Stats](stats.md)
-- **Provider factories**: `app/tts/factory.py`, `app/stt/factory.py`, `app/llms/factory.py`
-- **Prompts**: `app/prompts/` (system, branching, prosody, events); extensive numbered `docs/`, indexed by intent in `docs/readme.md`
+- **Event system**: `app/core/events/` — one package per event type (SENTENCE_SIMILARITY, SEMANTIC_SIMILARITY, BINARY_CLASSIFIER, TIME, SCORE, COMBINATION, HELPER_*); the authoritative list is `ally-ai-learn/docs/04-event-types-reference.md`, current count in [Platform Stats](stats.md)
+- **Provider factories**: `ally-ai-learn/app/tts/factory.py`, `ally-ai-learn/app/stt/factory.py`, `ally-ai-learn/app/llms/factory.py`
+- **Prompts**: `app/prompts/` (system, branching, prosody, events); extensive numbered `docs/`, indexed by intent in `ally-ai-learn/docs/readme.md`
 - **Key patterns**: Factory pattern for providers, LiveKit agent lifecycle (configure/initialize/start), event orchestration with eligibility constraints
 
 ### [ally-web](../repos/ally-web.md) — Web Frontend Monorepo
@@ -54,7 +54,7 @@ This page helps AI agents (and developers) quickly orient in the Ally workspace 
 
 ### [ally-mobile](../repos/ally-mobile.md) — Mobile App
 - **Stack**: React Native 0.79 / TypeScript 5 / React 19 / Redux Toolkit + RTK Query
-- **Entry**: `index.js` → `src/App.tsx`; navigation via React Navigation 7 (native-stack + bottom-tabs + drawer)
+- **Entry**: `index.js` → `ally-mobile/src/App.tsx`; navigation via React Navigation 7 (native-stack + bottom-tabs + drawer)
 - **Services**: RTK Query slices in `src/services/`; custom hooks in `src/hooks/`
 - **Real-time**: Socket.IO + LiveKit React Native; `react-native-live-audio-stream` for recording
 - **Key patterns**: Dual listening modes (microphone + conference), AsyncStorage for tokens, Firebase Crashlytics
@@ -62,7 +62,7 @@ This page helps AI agents (and developers) quickly orient in the Ally workspace 
 ### [infra](../repos/infra.md) — Infrastructure
 - **Stack**: Ansible 13 + Terraform + Docker Compose
 - **Playbooks**: `ansible/` — `baremetal.yml`, `ally_core.yml`, `ally_ai.yml`, `ally_learn.yml`, `ally_web.yml`, `ci.yml`
-- **Scripts**: `scripts/bootstrap.sh` (clone repos), `scripts/dev_env.sh` (start dev), `scripts/colima.sh`
+- **Scripts**: `infra/bootstrap.sh` (clone repos), `infra/dev_env.sh` (start dev), `infra/colima.sh`
 - **Secrets**: Ansible Vault; **Key patterns**: Incus containers on Hetzner, Consul discovery, Caddy proxy, Wireguard VPN
 
 ## Cross-Repo Conventions
@@ -87,7 +87,7 @@ This page helps AI agents (and developers) quickly orient in the Ally workspace 
 
 **Adding a new AI capability** — ally-ai: prompt templates in `app/prompts/`, service logic in `app/core/`, endpoint in `app/api/v1/endpoints/`; ally-be: integration call in `src/ai/`.
 
-**Adding a new event type (ally-ai-learn)** — create the event class in `app/core/events/event_types/`, register in `app/core/events/factory.py`, add prompts in `app/prompts/events/` (see `docs/04-event-types-reference.md`).
+**Adding a new event type (ally-ai-learn)** — create the event class in `app/core/events/event_types/`, register in `ally-ai-learn/app/core/events/factory.py`, add prompts in `app/prompts/events/` (see `ally-ai-learn/docs/04-event-types-reference.md`).
 
 **Adding a TTS/STT/LLM provider (ally-ai-learn)** — create the provider class in `app/tts|stt|llms/`, extend the corresponding `factory.py` (see `docs/05-07`).
 
@@ -100,7 +100,7 @@ This page helps AI agents (and developers) quickly orient in the Ally workspace 
 - **Lima/Colima VM**: local dev commonly runs Docker inside a Lima/Colima VM on macOS; commands execute within the VM context.
 - **HIPAA**: never log PII/PHI outside designated audit loggers. Use `phi_logger` in ally-ai.
 - **Multi-tenant**: all ally-be queries must respect tenant isolation; entities have `tenantId` columns.
-- **Prompt sync**: prompts in ally-ai can be overridden at runtime via ally-be's prompt management; `scripts/sync_prompts.py` pushes defaults.
+- **Prompt sync**: prompts in ally-ai can be overridden at runtime via ally-be's prompt management; `ally-ai/scripts/sync_prompts.py` pushes defaults.
 - **LiveKit rooms**: ally-ai-learn agents join rooms created by ally-be; room metadata carries scenario configuration.
 - **SQS in dev**: use LocalStack (auto-started by docker-compose). Queue URLs differ between local and production.
 - **Node versions**: ally-be requires Node 24; ally-web requires Node 22. **Python**: both AI repos require 3.12+.

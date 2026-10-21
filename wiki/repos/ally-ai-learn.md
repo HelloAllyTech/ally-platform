@@ -17,7 +17,7 @@ ally-ai-learn (internal package name `ally-learn-core`) is the voice-based train
 - Publishes all events to AWS SQS (`sqs-learn-message-and-event-queue`) for downstream processing in ally-be.
 - Supports multiple TTS/STT/LLM providers, selectable per scenario via room metadata.
 
-It runs two LiveKit workers side by side: the v1 runtime (`app/worker.py`) and Roleplay Studio v2 (`app/worker_v2.py`, package `app/roleplay_v2/`), an Actor+Director-driven studio for authoring and running voice roleplays from a versioned Scenario Spec.
+It runs one LiveKit voice worker (`app/worker.py`). A second runtime, Roleplay Studio v2 — an Actor+Director-driven studio for roleplays authored as a versioned Scenario Spec — was removed on 2026-08-31, after ally-web stopped calling its studio endpoints and ally-be removed them.
 
 ## Tech Stack
 
@@ -39,7 +39,6 @@ The service is composed of a FastAPI app plus LiveKit agent workers. The core of
 **Entry points**
 - `app/main.py` — FastAPI application: `GET /api/health`, `/api/v1` routers (scenario report, voice preview), CORS/middleware.
 - `app/worker.py` — v1 `AgentWorker`; 3-phase session lifecycle (configure → initialize → start).
-- `app/worker_v2.py` — Roleplay Studio v2 worker (gated by `ROLEPLAY_V2_ENABLED`, default on).
 
 **Worker connection lifecycle and health signals**
 
@@ -82,11 +81,11 @@ A roleplay can also run typed both ways, for training staff on text-based helpli
 
 **Live supervisor notes** (`app/core/supervisor/`)
 - A second, cheap LLM watching the same committed turns as the actor, which occasionally sends the learner a one-line coaching hint rendered in a **Supervisor** tab in the session sidebar. Opt-in per simulation (`promptData.supervisorNotesEnabled`, default off) behind the `SUPERVISOR_NOTES_ENABLED` global kill-switch, so it is a no-op for almost every session.
-- **It can never delay a reply.** `on_learner_turn_committed` schedules a tracked task with a hard `SUPERVISOR_NOTES_TIMEOUT_S`, mirroring the v2 Director. A slow or failing supervisor loses a note; it does not slow the voice path. Same reasoning as the deferred-naturalness setup — a session must keep running when an optional extra fails.
+- **It can never delay a reply.** `on_learner_turn_committed` schedules a tracked task with a hard `SUPERVISOR_NOTES_TIMEOUT_S`. A slow or failing supervisor loses a note; it does not slow the voice path. Same reasoning as the deferred-naturalness setup — a session must keep running when an optional extra fails.
 - **Sparsity is enforced in code, not the prompt.** An LLM asked whether it should speak will tend to say yes, so `SUPERVISOR_NOTES_MAX_PER_SESSION` (10), `SUPERVISOR_NOTES_MIN_TURN_GAP` (2), one call in flight at a time, and a re-check of both caps after the call returns are all applied around the model rather than inside it.
 - **Delivery and persistence are separate paths.** Notes go to the browser on the `supervisor` data-channel topic *and* to ally-be as a `supervisor_note` SQS message. `seq` is 1-based per session; it is what makes the ally-be write idempotent, and it is the order the post-session debrief reads them in.
 - Notes are written in the session language, from `scenario.language_code`. Prompt: `app/prompts/supervisor/live_note.txt`.
-- v1 only — `worker.py`. Not wired into `worker_v2.py`, whose Director already emits per-turn `trainee_feedback`.
+- Wired into `worker.py`, the repo's one voice worker.
 
 **AI video actor** (`app/core/livekit/video_actor.py`, v1, experimental — publishes nothing today)
 
@@ -135,7 +134,6 @@ Everything here is best-effort by construction: any failure loses that layer for
 - **AWS SQS**: all triggered events are published to `sqs-learn-message-and-event-queue` (`SQS_MESSAGE_EVENT_QUEUE_NAME`) via `app/core/queue/sqs.py` (`SQSQueue`, async through `asyncio.to_thread`). Message schema `CoreEventMessageType` (`message_type: event`, `room_id`, serialized `event_data`, timestamp).
 - **Deferred termination**: auto-termination events are held (`EventSender.deferred_termination_event`) until the agent finishes speaking the termination message, then sent to SQS with `autoTerminationStatus=true` in the shutdown callback — so ally-be doesn't close the room prematurely.
 - **LiveKit**: WebRTC audio to/from LiveKit rooms; UI event feedback is sent over LiveKit **data channels** (not SQS), schema `CustomUIEventMessageType`.
-- **Roleplay Studio v2**: shares the Scenario Spec model with ally-be (owner of the spec + Copilot authoring) and ally-web (`ally-admin-dashboard` studio UI); this repo owns the v2 runtime and the Actor/Director prompts.
 
 ## Local Setup
 
@@ -159,7 +157,7 @@ poetry run python -m app.worker dev
 poetry run uvicorn app.main:app --reload --port 8000
 ```
 
-**Run — startup script** (starts uvicorn + v1 worker + v2 worker in parallel, with supervisor restart for v2):
+**Run — startup script** (starts uvicorn and the voice worker in parallel; if either exits the container stops, so the orchestrator restarts it):
 ```bash
 ./start.sh
 ```
@@ -214,7 +212,6 @@ docker compose -f docker-compose.local.yml up -d
 - `docs/13-event-termination.md` — auto-termination configuration and flow.
 - `docs/text-chat.md` — text-chat roleplays: what is shared with voice, what is switched off, the persona's texting guidance.
 - `docs/events-off-gate-design.md` — event gating design notes.
-- `ROLEPLAY_STUDIO_V2.md` — cross-repo reference for the Actor/Director roleplay studio and Scenario Spec.
 - `CONTRIBUTING.md`, `tests/README.md`, `.github/RELEASE_GUIDE.md` — contribution, test, and release guides.
 
 ---

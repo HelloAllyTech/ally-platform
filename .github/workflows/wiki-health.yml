@@ -15,7 +15,12 @@ on:
     - cron: "0 6 * * 1"
   workflow_dispatch:
   pull_request:
-    paths: ["wiki/**", "scripts/wiki_lint.py"]
+    paths:
+      - "wiki/**"
+      - "scripts/wiki_lint.py"
+      - "scripts/docs-path-lint.mjs"
+      - ".docs-path-lint-ignore"
+      - "*.md"
 
 permissions:
   contents: write
@@ -171,3 +176,25 @@ jobs:
           else
             gh issue edit "$EXISTING" --body "$BODY"
           fi
+
+  # Docs that name files which no longer exist. A separate job from the sweep: it needs
+  # no code checkouts and no write access, and a failure should read "a path is broken"
+  # rather than join the rolling health issue. The wiki names files in other repos
+  # constantly (`ally-be/src/...`); those are checked only where the sibling checkout
+  # exists, so CI skips them rather than guessing. Not a required check — fix the path, or
+  # mark a deliberate one `<!-- docs-path-lint: planned -->` (or `ignore`).
+  docs-paths:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Check documented file paths
+        run: node scripts/docs-path-lint.mjs
