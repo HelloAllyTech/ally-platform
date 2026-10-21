@@ -1702,6 +1702,11 @@
             "title_one": "Game",
             "title_other": "Games",
             "hint": "Just for fun"
+          },
+          "scenario": {
+            "title_one": "Scenario",
+            "title_other": "Scenarios",
+            "hint": "Choose, then see what happens"
           }
         }
       },
