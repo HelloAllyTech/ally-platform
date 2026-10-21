@@ -18,6 +18,7 @@ import {
 } from "@types";
 import { logger } from "@utils";
 
+import { normalizeAgentReceipt } from "../utils/agentReceipt";
 import { userTurnText } from "../utils/userTurnText";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
@@ -194,10 +195,15 @@ export const mapServerMessagesToFeed = (
       return;
     }
 
-    const toolNotes = (Array.isArray(row.toolResults) ? row.toolResults : [])
-      .filter(result => result && TOOL_NOTE_NAMES.has(result.name))
-      .map(result => summaryOf(result.result))
-      .filter((summary): summary is string => Boolean(summary));
+    // A row with a receipt never gets tool notes: the receipt is the record of what the turn did,
+    // the same as the live feed once its `receipt` frame lands.
+    const receipt = normalizeAgentReceipt(metadata.receipt);
+    const toolNotes = receipt
+      ? []
+      : (Array.isArray(row.toolResults) ? row.toolResults : [])
+          .filter(result => result && TOOL_NOTE_NAMES.has(result.name))
+          .map(result => summaryOf(result.result))
+          .filter((summary): summary is string => Boolean(summary));
 
     // A turn that died mid-flight leaves a row with no prose. It used to render as nothing, so
     // after a reload the trainer saw their own message answered by silence — indistinguishable from
@@ -211,12 +217,13 @@ export const mapServerMessagesToFeed = (
     const hasFindings = Array.isArray(findings) && findings.length > 0;
     const hasActions = Array.isArray(suggestedActions) && suggestedActions.length > 0;
 
-    if (content || errored || toolNotes.length || hasFindings || hasActions) {
+    if (content || errored || toolNotes.length || hasFindings || hasActions || receipt) {
       feed.push({
         id: baseId,
         role: "assistant",
         content,
         ...(toolNotes.length ? { toolNotes } : {}),
+        ...(receipt ? { receipt } : {}),
         ...(errorText ? { error: errorText } : {}),
         // The server does not send a code today; honouring one if it ever does keeps a reloaded
         // provider failure retryable instead of silently dropping the chip.
@@ -447,6 +454,15 @@ export const useCourseCopilotStream = ({
         case "build_started":
           callbacksRef.current.onBuildStarted?.(event.data);
           break;
+        case "receipt": {
+          // What the turn did, built by the server; it replaces the tool notes the turn showed
+          // while it ran, as a reload of the row would.
+          flushTokens();
+          const receipt = normalizeAgentReceipt(event.data);
+          const id = currentAssistantIdRef.current;
+          if (receipt && id) patchMessage(id, { receipt, toolNotes: undefined });
+          break;
+        }
         case "error": {
           flushTokens();
           sawErrorRef.current = true;

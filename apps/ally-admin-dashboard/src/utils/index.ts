@@ -16,6 +16,7 @@ export * from "./availableVariables";
 export * from "./navigation";
 export * from "./errorMessage";
 export * from "./agentAuthored";
+export * from "./agentReceipt";
 export * from "./characterData";
 export * from "./userTurnText";
 export * from "./builderReceipt";

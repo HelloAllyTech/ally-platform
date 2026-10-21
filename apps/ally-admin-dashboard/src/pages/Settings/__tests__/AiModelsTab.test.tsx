@@ -28,10 +28,22 @@ vi.mock("@ally-ui-mono/ui-shared", () => ({
   ),
   SelectItem: ({ value, text }: any) => <option value={value}>{text}</option>,
   Tooltip: ({ children }: any) => <>{children}</>,
+  CarbonToggle: ({ id, labelText, toggled, disabled, onToggle }: any) => (
+    <input
+      type="checkbox"
+      id={id}
+      aria-label={labelText}
+      checked={toggled}
+      disabled={disabled}
+      onChange={event => onToggle(event.target.checked)}
+    />
+  ),
 }));
 
 const updateBugHunterSettings = vi.fn().mockReturnValue({ unwrap: () => Promise.resolve({}) });
 const updateBuilderSettings = vi.fn().mockReturnValue({ unwrap: () => Promise.resolve({}) });
+const updateValidatedTurns = vi.fn();
+let validatedTurnsResult: any;
 let bugHunterResult: any;
 let builderResult: any;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -45,6 +57,8 @@ vi.mock("@api", () => ({
   useUpdateBugHunterDecisionOwnerMutation: () => [updateOwner, { isLoading: false }],
   useGetBuilderSettingsQuery: () => builderResult,
   useUpdateBuilderSettingsMutation: () => [updateBuilderSettings, { isLoading: false }],
+  useGetValidatedAgentTurnsQuery: () => validatedTurnsResult,
+  useUpdateValidatedAgentTurnsMutation: () => [updateValidatedTurns, { isLoading: false }],
 }));
 
 // eslint-disable-next-line import/first
@@ -56,6 +70,13 @@ describe("AiModelsTab", () => {
     updateBuilderSettings.mockClear();
     toastSuccess.mockClear();
     toastError.mockClear();
+    updateValidatedTurns.mockReset();
+    updateValidatedTurns.mockReturnValue({ unwrap: () => Promise.resolve({}) });
+    validatedTurnsResult = {
+      data: { courseCopilot: true, characterInterview: true },
+      isLoading: false,
+      isError: false,
+    };
     bugHunterResult = {
       data: {
         engine: "claude-code",
@@ -238,6 +259,50 @@ describe("AiModelsTab", () => {
     render(<AiModelsTab />);
 
     expect(screen.getAllByLabelText("Engine")).toHaveLength(1);
+  });
+
+  describe("validated turns", () => {
+    it("shows one switch per agent, as the server has them", () => {
+      validatedTurnsResult.data = { courseCopilot: true, characterInterview: false };
+      render(<AiModelsTab />);
+
+      expect(screen.getByText("Validated turns")).toBeInTheDocument();
+      expect(screen.getByLabelText("Course Copilot")).toBeChecked();
+      expect(screen.getByLabelText("Character interview")).not.toBeChecked();
+    });
+
+    it("saves a switch the moment it is flipped, and only that switch", async () => {
+      render(<AiModelsTab />);
+
+      fireEvent.click(screen.getByLabelText("Course Copilot"));
+
+      await waitFor(() =>
+        expect(updateValidatedTurns).toHaveBeenCalledWith({ courseCopilot: false }),
+      );
+      await waitFor(() =>
+        expect(toastSuccess).toHaveBeenCalledWith("Course Copilot: validated turns off."),
+      );
+      expect(updateBuilderSettings).not.toHaveBeenCalled();
+    });
+
+    it("says so when the switch could not be saved", async () => {
+      updateValidatedTurns.mockReturnValue({ unwrap: () => Promise.reject(new Error("403")) });
+      render(<AiModelsTab />);
+
+      fireEvent.click(screen.getByLabelText("Character interview"));
+
+      await waitFor(() =>
+        expect(toastError).toHaveBeenCalledWith("Couldn't save the validated-turn setting."),
+      );
+    });
+
+    it("shows a load failure instead of switches", () => {
+      validatedTurnsResult = { data: undefined, isLoading: false, isError: true };
+      render(<AiModelsTab />);
+
+      expect(screen.getByText("Couldn't load the validated-turn settings.")).toBeInTheDocument();
+      expect(screen.queryByLabelText("Course Copilot")).toBeNull();
+    });
   });
 
   it("shows an error only for the section that failed to load", () => {

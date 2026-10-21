@@ -3,6 +3,8 @@
  * `enum/course-copilot.enum.ts`. Change both sides together.
  */
 
+import type { AgentTurnReceipt } from "./agentChat";
+
 /* ── Enums ─────────────────────────────────────────────────────────────── */
 
 export type CourseCopilotMode = "CREATE" | "EDIT";
@@ -431,6 +433,8 @@ export type CourseCopilotStreamEvent =
   | { type: "blueprint"; data: CourseCopilotBlueprintResponse }
   | { type: "course_patch"; data: { summary: string; outline: CourseOutline | null } }
   | { type: "build_started"; data: { jobCount: number; estimateUsd?: number } }
+  /** Once per turn, just before `done`. */
+  | { type: "receipt"; data: AgentTurnReceipt }
   | { type: "error"; data: { code: string; message: string } }
   | { type: "done"; data: CourseCopilotDoneEvent }
   | { type: "ping"; data: { at: number } };
@@ -451,6 +455,11 @@ export interface CourseCopilotChatMessage {
   /** The reviewer's findings, rendered as a list with action chips. */
   reviewFindings?: CourseReviewFinding[];
   suggestedActions?: CourseCopilotSuggestedAction[];
+  /**
+   * What the turn did, drawn under the bubble. Replaces the turn's tool notes once it lands — the
+   * receipt is the record. Absent on rows from before receipts existed.
+   */
+  receipt?: AgentTurnReceipt;
 }
 
 /**

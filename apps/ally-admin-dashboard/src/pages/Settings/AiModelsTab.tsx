@@ -4,6 +4,7 @@ import { toast } from "sonner";
 
 import {
   Button,
+  CarbonToggle,
   InlineNotification,
   Select,
   SelectItem,
@@ -14,13 +15,20 @@ import {
   useGetBugHunterDecisionOwnersQuery,
   useGetBugHunterModelSettingsQuery,
   useGetBuilderSettingsQuery,
+  useGetValidatedAgentTurnsQuery,
   useUpdateBugHunterDecisionOwnerMutation,
   useUpdateBugHunterModelSettingsMutation,
   useUpdateBuilderSettingsMutation,
+  useUpdateValidatedAgentTurnsMutation,
 } from "@api";
 import { TooltipIcon } from "@assets";
 import { en } from "@constants";
-import { BugHuntDecisionOwner, BugHuntDecisionPoint, BugHunterModelSettings } from "@types";
+import {
+  BugHuntDecisionOwner,
+  BugHuntDecisionPoint,
+  BugHunterModelSettings,
+  ValidatedAgentTurnsSettings,
+} from "@types";
 
 /**
  * The Claude Code models Bug Hunter's pipeline runs on. Not the full platform
@@ -468,10 +476,87 @@ const DecisionOwnersSection: React.FC = () => {
   );
 };
 
+/**
+ * The validated-turn kill switches for Course Copilot and the character interview: on, a turn's
+ * reply reaches the person only once it has been checked against what the turn did; off, that
+ * agent runs its previous loop. Each toggle saves on its own — a kill switch that waits for a
+ * Save button is one more step between noticing a problem and stopping it.
+ */
+const ValidatedTurnsSection: React.FC = () => {
+  const strings = en.settings.aiModels;
+  const { data, isLoading, isError } = useGetValidatedAgentTurnsQuery();
+  const [update, { isLoading: isSaving }] = useUpdateValidatedAgentTurnsMutation();
+
+  const agents: { key: keyof ValidatedAgentTurnsSettings; label: string; id: string }[] = [
+    {
+      key: "courseCopilot",
+      label: strings.validatedTurnsCourseCopilot,
+      id: "settings-validated-turns-course-copilot",
+    },
+    {
+      key: "characterInterview",
+      label: strings.validatedTurnsCharacterInterview,
+      id: "settings-validated-turns-character-interview",
+    },
+  ];
+
+  const handleToggle = async (
+    key: keyof ValidatedAgentTurnsSettings,
+    label: string,
+    on: boolean,
+  ) => {
+    try {
+      await update({ [key]: on }).unwrap();
+      toast.success(strings.validatedTurnsSaved(label, on));
+    } catch {
+      toast.error(strings.validatedTurnsSaveFailed);
+    }
+  };
+
+  return (
+    <section className="mt-4 rounded-md border border-border-light p-4">
+      <h3 className="text-base font-secondary text-typography-900">
+        {strings.validatedTurnsHeading}
+      </h3>
+      <p className="pt-1 text-xs text-typography-500">{strings.validatedTurnsHelp}</p>
+
+      {isError && (
+        <InlineNotification
+          kind="error"
+          lowContrast
+          hideCloseButton
+          title={strings.validatedTurnsLoadFailed}
+        />
+      )}
+
+      {isLoading ? (
+        <SkeletonText paragraph lineCount={2} className="mt-3" />
+      ) : (
+        data && (
+          <div className="relative mt-3 flex flex-col gap-3">
+            {agents.map(agent => (
+              <CarbonToggle
+                key={agent.key}
+                id={agent.id}
+                labelText={agent.label}
+                size="sm"
+                toggled={data[agent.key]}
+                disabled={isSaving}
+                onToggle={(checked: boolean) => void handleToggle(agent.key, agent.label, checked)}
+              />
+            ))}
+          </div>
+        )
+      )}
+    </section>
+  );
+};
+
 export const AiModelsTab: React.FC = () => (
   <div>
     <BugHunterModelSection />
     <DecisionOwnersSection />
     <BuilderModelSection />
+    <ValidatedTurnsSection />
   </div>
 );

@@ -20,6 +20,7 @@ export * from "./uxSignals";
 export * from "./superDuperAdmins";
 export * from "./legalContent";
 export * from "./turnEndpointing";
+export * from "./validatedAgentTurns";
 export * from "./roleplaySessionLogs";
 export * from "./awsLogs";
 export * from "./mobileReleases";

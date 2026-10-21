@@ -1,5 +1,7 @@
 import { CharacterData } from "./simulation";
 
+import type { AgentTurnReceipt } from "./agentChat";
+
 /**
  * Character Library interview agent — mirrors the backend SSE contract in
  * ally-be src/scenario-character/type/character-interview-sse.type.ts.
@@ -77,6 +79,8 @@ export type CharacterInterviewStreamEvent =
   | { type: "tool_result"; data: CharacterInterviewToolResultEvent }
   | { type: "question"; data: CharacterInterviewQuestionEvent }
   | { type: "character_draft"; data: CharacterDraftEvent }
+  /** Once per turn, just before `done`. */
+  | { type: "receipt"; data: AgentTurnReceipt }
   | { type: "error"; data: CharacterInterviewErrorEvent }
   // Server heartbeat during long generations — carries no payload.
   | { type: "ping"; data: Record<string, unknown> }
@@ -100,6 +104,11 @@ export interface CharacterInterviewChatMessage {
   /** True while tokens are still streaming into this message. */
   isStreaming?: boolean;
   error?: string;
+  /**
+   * What the turn did, drawn under the bubble. Replaces the turn's tool notes once it lands.
+   * Absent on rows from before receipts existed.
+   */
+  receipt?: AgentTurnReceipt;
 }
 
 /** A persisted character_interview_messages row (resume path). */

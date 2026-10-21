@@ -772,6 +772,7 @@ export const ApiEndpoints = {
     TERMS: "/v1/settings/terms",
     PRIVACY: "/v1/settings/privacy",
     TURN_ENDPOINTING: "/v1/settings/turn-endpointing",
+    VALIDATED_AGENT_TURNS: "/v1/settings/validated-agent-turns",
   },
   // Cards on the public product roadmap (app.helloally.ai/blog/roadmap), edited
   // from Settings → Roadmap. Same gate as Terms/Privacy: Settings toggle + system access.
@@ -1016,6 +1017,9 @@ export const TAG_TYPES = {
   // Also registered in baseApi.ts's `tagTypes` — an unregistered tag is
   // silently ignored and its invalidation never fires.
   BUG_HUNTER_MODEL_SETTINGS: "bugHunterModelSettings",
+  // Course Copilot's and the character interview's validated-turn switches. Also registered in
+  // baseApi.ts's `tagTypes`.
+  VALIDATED_AGENT_TURNS: "validatedAgentTurns",
   BUG_HUNTER_RUNS: "bugHunterRuns",
   BUG_HUNTER_FINDINGS: "bugHunterFindings",
   BUG_HUNTER_NOTIFICATIONS: "bugHunterNotifications",

@@ -1137,6 +1137,11 @@ export const en = {
       interrupted: "(interrupted)",
       thinking: "Thinking…",
     },
+    // Nearly every turn of the interview asks the next question and changes nothing, so a quiet
+    // turn draws no receipt here; lookups, the saved draft and any failure still show.
+    receipt: {
+      noActivity: "",
+    },
     question: {
       submitAnswer: "Submit answer",
       freeTextPlaceholder: "Type your answer…",
@@ -1273,6 +1278,15 @@ export const en = {
       decisionOwnerModel: "The model",
       decisionOwnerFixed: "Fixed in code",
       decisionOwnerSaved: "{point} now decided by {owner}.",
+      validatedTurnsHeading: "Validated turns",
+      validatedTurnsHelp:
+        "The agent's reply reaches the person only after it has read what it looked up and its changes have landed, with a receipt of what it did. Turn one off to fall back to that agent's previous loop, where the reply streams in as it is written. Takes effect on its next message. Builder's switch is on Builder → Settings.",
+      validatedTurnsCourseCopilot: "Course Copilot",
+      validatedTurnsCharacterInterview: "Character interview",
+      validatedTurnsLoadFailed: "Couldn't load the validated-turn settings.",
+      validatedTurnsSaveFailed: "Couldn't save the validated-turn setting.",
+      validatedTurnsSaved: (agent: string, on: boolean) =>
+        `${agent}: validated turns ${on ? "on" : "off"}.`,
     },
     legalDescription:
       "Edit the content shown on the public Terms of Service and Privacy Policy pages.",
@@ -4894,6 +4908,23 @@ export const en = {
       selectedCountLabel: (count: number) => (count === 1 ? "1 selected" : `${count} selected`),
       minSelectionsHint: (min: number) => `pick at least ${min}`,
       answeredLabel: "Answered",
+    },
+    // The receipt under an agent's reply (Course Copilot, the character interview). Builder's
+    // own wording, with the PRD version, is en.builder.chat.receipt.
+    receipt: {
+      label: "What this turn did",
+      read: (count: number) => `Read ${count}`,
+      searched: (count: number) => `Searched ${count}`,
+      changed: (count: number) => (count === 1 ? "1 change" : `${count} changes`),
+      noActivity: "No lookups, nothing changed",
+      // The summary when a reason for nothing changing is shown on its own line below it.
+      noLookups: "No lookups",
+      readHeading: "Read",
+      searchedHeading: "Searched",
+      changedHeading: "Changed",
+      failedHeading: "Failed",
+      warningsHeading: "Delivered with warnings",
+      unchanged: (reason: string) => `Nothing changed: ${reason}`,
     },
   },
   // Course builder -> Landing page: the story-led layout of the course's public share page.

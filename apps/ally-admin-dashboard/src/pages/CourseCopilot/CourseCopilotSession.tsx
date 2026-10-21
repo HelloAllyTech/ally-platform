@@ -21,7 +21,12 @@ import {
   useUpdateCourseCopilotBlueprintMutation,
 } from "@api";
 import { ActionConfirmationPopup } from "@components/action-confirmation-popup";
-import { AgentAnswerPayload, ChatComposer, ChatMessage } from "@components/agent-chat";
+import {
+  AgentAnswerPayload,
+  AgentReceipt,
+  ChatComposer,
+  ChatMessage,
+} from "@components/agent-chat";
 import { CourseCopilotWorkPane } from "@components/course-copilot";
 import { ErrorBoundary } from "@components/error-boundary";
 import { ButtonVariant } from "@components/types";
@@ -654,16 +659,27 @@ export const CourseCopilotSession: React.FC = () => {
               </p>
             ) : (
               <div className="flex flex-col gap-3">
-                {messages.map(message => (
-                  <ChatMessage
-                    key={message.id}
-                    message={message}
-                    onAnswerQuestion={handleAnswer}
-                    onSendSuggestion={handleSendFromPane}
-                    onRetry={() => void retryLast()}
-                    disabled={isStreaming || isArchived}
-                  />
-                ))}
+                {messages.map(message => {
+                  // What the turn did, under its reply — never under a question card or the
+                  // trainer's own messages.
+                  const showReceipt =
+                    message.role === "assistant" && !message.question && Boolean(message.receipt);
+                  return (
+                    <div
+                      key={message.id}
+                      className={showReceipt ? "flex flex-col gap-1" : undefined}
+                    >
+                      <ChatMessage
+                        message={message}
+                        onAnswerQuestion={handleAnswer}
+                        onSendSuggestion={handleSendFromPane}
+                        onRetry={() => void retryLast()}
+                        disabled={isStreaming || isArchived}
+                      />
+                      {showReceipt && <AgentReceipt receipt={message.receipt} />}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
