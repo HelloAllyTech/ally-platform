@@ -68,16 +68,20 @@ class _AppShellScreenState extends ConsumerState<AppShellScreen> {
                     index: currentIndex,
                     children: [for (final tab in visibleTabs) tab.screenBuilder(context)],
                   ),
-                Positioned(
-                  top: 8,
-                  left: 8,
-                  child: SafeArea(
-                    child: IconButton(
-                      icon: SvgPicture.asset('assets/icons/drawerMenu.svg', width: 24, height: 24),
-                      onPressed: () => Scaffold.of(context).openDrawer(),
+                // RN's `useTabScreenHeader`: `showHamburger: isFirstTab` —
+                // the drawer-menu icon only ever appears on the first
+                // visible tab, not on every tab's screen.
+                if (currentIndex == 0)
+                  Positioned(
+                    top: 8,
+                    left: 8,
+                    child: SafeArea(
+                      child: IconButton(
+                        icon: SvgPicture.asset('assets/icons/drawerMenu.svg', width: 24, height: 24),
+                        onPressed: () => Scaffold.of(context).openDrawer(),
+                      ),
                     ),
                   ),
-                ),
                 if (visibleTabs.isNotEmpty)
                   AppBottomTabBar(
                     visibleTabs: visibleTabs,
