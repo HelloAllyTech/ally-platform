@@ -131,7 +131,7 @@ CALL_FEEDBACK_FORM_OPENED: "call_feedback_form_opened",
 // No new props needed — CALL_ID and CALL_TYPE already exist
 ```
 
-**`src/pages/calls/FeedbackForm.tsx`**
+**`src/pages/calls/FeedbackForm.tsx`** <!-- docs-path-lint: ignore -->
 
 ```typescript
 import { useAnalytics } from "@hooks";
@@ -152,7 +152,7 @@ export function FeedbackForm({ callId, callType }: Props) {
 }
 ```
 
-**`src/pages/calls/__tests__/FeedbackForm.test.tsx`**
+**`src/pages/calls/__tests__/FeedbackForm.test.tsx`** <!-- docs-path-lint: ignore -->
 
 ```typescript
 it("fires call_feedback_form_opened when feedback button is clicked", async () => {

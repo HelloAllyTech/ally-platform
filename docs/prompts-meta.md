@@ -15,7 +15,7 @@ For each prompt file `subdir/<stem>.txt`, the corresponding meta file is:
 subdir/_meta/<stem>.meta.json
 ```
 
-Example: prompt `openai_translation/guardrail_translation.txt` → meta `openai_translation/_meta/guardrail_translation.meta.json`.
+Example: prompt `ally-be/src/prompts/openai_translation/session_event.txt` → meta `ally-be/src/prompts/openai_translation/_meta/session_event.meta.json`.
 
 ## Schema
 
@@ -40,7 +40,7 @@ If a key is missing or empty, the backend falls back to a path-derived label (e.
 ## How the dashboard gets name/description
 
 1. **ally-be:** On app startup, `PromptsSyncService` scans `src/prompts/`, reads each `.txt` and, when present, the matching `_meta/<stem>.meta.json`. It syncs to the database (add new prompts; for existing, update `defaultPrompt`, `name`, `description`). The dashboard then loads prompts via `GET /api/v1/prompts` and displays the stored `name` and `description`.
-2. **ally-ai-learn:** The script `scripts/sync_prompts.py` scans `app/prompts/`, reads each `.txt` and, when present, the matching `_meta/<stem>.meta.json`. It sends the payload to ally-be’s `POST /api/v1/prompts/sync`, which updates the same DB. So ally-ai-learn prompts also show up in the dashboard with the names and descriptions from their meta files.
+2. **ally-ai-learn:** The script `ally-ai-learn/scripts/sync_prompts.py` scans `app/prompts/`, reads each `.txt` and, when present, the matching `_meta/<stem>.meta.json`. It sends the payload to ally-be’s `POST /api/v1/prompts/sync`, which updates the same DB. So ally-ai-learn prompts also show up in the dashboard with the names and descriptions from their meta files.
 
 ## Important
 
