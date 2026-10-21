@@ -16,7 +16,7 @@ import { useNavigate } from "react-router-dom";
 import { Tooltip } from "@ally-ui-mono/ui-shared";
 import { CustomImage, FEATURE_FLAGS_MAP } from "@ally-ui-mono/ui-shared";
 import { useGetLogoUrlQuery, useGetUnreadReviewCountQuery } from "@api";
-import { DockToRight, LogoutIllustration, RedirectIcon, WarningTriangle } from "@assets";
+import { DockToRight, LogoutIllustration, RedirectIcon, ReportProblemNavIcon } from "@assets";
 import {
   AppTooltip,
   ConfirmationDialog,
@@ -511,7 +511,7 @@ const NavSideBar: FC<NavSideBarProps> = ({ activeTab, onTabChange, isOpen, onClo
             first so the modal isn't left rendering behind it. */}
         <Tab
           id={TabId.REPORT_PROBLEM}
-          Icon={WarningTriangle}
+          Icon={ReportProblemNavIcon}
           title="Report a problem"
           tKey="user.reportProblem"
           activeTab={activeTab}

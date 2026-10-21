@@ -111,6 +111,9 @@ import ProgressLadderIcon from "./progress-ladder.svg?react";
 import RedirectIcon from "./redirect-icon.svg?react";
 import ReferralsProvided from "./referrals-provided.svg?react";
 import Refresh from "./refresh.svg?react";
+// The nav rail's copy of warning-triangle: cropped to the glyph like its sibling
+// tab icons (the original carries ~3px of padding) and in their ink, not blue.
+import ReportProblemNavIcon from "./report-problem-nav-icon.svg?react";
 import ResumeIcon from "./resume-icon.svg?react";
 import ReviewIcon from "./review-icon.svg?react";
 import ReviewNavIcon from "./review-nav-icon.svg?react";
@@ -248,6 +251,7 @@ export {
   ResumeIcon,
   ReviewIcon,
   ReviewNavIcon,
+  ReportProblemNavIcon,
   ReviewsEmptyState,
   RoundCheckmark,
   ScenarioIcon,

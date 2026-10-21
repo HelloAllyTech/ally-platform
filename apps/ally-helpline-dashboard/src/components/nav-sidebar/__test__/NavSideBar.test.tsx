@@ -86,7 +86,7 @@ vi.mock("@assets", () => ({
   DockToRight: (props: any) => <svg {...props} data-testid="dock-to-right" />,
   RedirectIcon: (props: any) => <svg {...props} data-testid="redirect-icon" />,
   LogoutIllustration: (props: any) => <svg data-testid="logout-illustration" {...props} />,
-  WarningTriangle: (props: any) => <svg {...props} data-testid="warning-triangle-icon" />,
+  ReportProblemNavIcon: (props: any) => <svg {...props} data-testid="report-problem-icon" />,
 }));
 
 vi.mock("@components", () => ({
@@ -527,20 +527,35 @@ describe("NavSideBar", () => {
     });
 
     it("still works when storage is unavailable", () => {
-      const getItem = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
-        throw new Error("SecurityError");
+      // Throws for the pin's key only: the expanded rail mounts other storage
+      // readers (the language selector, when its flag is on) that are not
+      // under test here.
+      const { getItem: realGet, setItem: realSet } = Storage.prototype;
+      const getItem = vi.spyOn(Storage.prototype, "getItem").mockImplementation(function (
+        this: Storage,
+        key: string,
+      ) {
+        if (key === PINNED_KEY) throw new Error("SecurityError");
+        return realGet.call(this, key);
       });
-      const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
-        throw new Error("SecurityError");
+      const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (
+        this: Storage,
+        key: string,
+        value: string,
+      ) {
+        if (key === PINNED_KEY) throw new Error("SecurityError");
+        realSet.call(this, key, value);
       });
 
-      renderComponent();
-      expect(screen.getByTestId("nav-sidebar")).toHaveClass("w-24");
-      fireEvent.click(screen.getByTitle("Expand sidebar"));
-      expect(screen.getByTestId("nav-sidebar")).toHaveClass("w-64");
-
-      getItem.mockRestore();
-      setItem.mockRestore();
+      try {
+        renderComponent();
+        expect(screen.getByTestId("nav-sidebar")).toHaveClass("w-24");
+        fireEvent.click(screen.getByTitle("Expand sidebar"));
+        expect(screen.getByTestId("nav-sidebar")).toHaveClass("w-64");
+      } finally {
+        getItem.mockRestore();
+        setItem.mockRestore();
+      }
     });
   });
 
