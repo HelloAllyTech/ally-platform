@@ -3,6 +3,7 @@ import { FC, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
+import { RichTextRenderer, htmlToPlainText } from "@ally-ui-mono/ui-shared";
 import { useSubmitInterjectionAnswerMutation } from "@api";
 import { SubmitInterjectionAnswerResponse, VideoInterjection } from "@types";
 
@@ -94,7 +95,16 @@ export const VideoInterjectionOverlay: FC<VideoInterjectionOverlayProps> = ({
         <p className="mb-3 text-xs font-medium uppercase tracking-wide text-typography-600">
           {t("tracks2.video.interjection.title")}
         </p>
-        <h2 className="mb-4 text-lg font-semibold text-typography-900">{question.prompt}</h2>
+        <div className="mb-4 text-lg font-semibold text-typography-900">
+          {question.promptHtml && htmlToPlainText(question.promptHtml).trim().length > 0 ? (
+            <RichTextRenderer
+              content={question.promptHtml}
+              className="!text-lg !font-semibold !text-typography-900"
+            />
+          ) : (
+            question.prompt
+          )}
+        </div>
         <QuestionMedia media={question.media} />
 
         {renderWidget()}
