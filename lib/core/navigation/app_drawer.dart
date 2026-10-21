@@ -341,8 +341,12 @@ class _VersionFooterState extends State<_VersionFooter> {
   @override
   void initState() {
     super.initState();
+    // RN's `getAppVersion()` (`react-native-version-check`'s
+    // `getCurrentVersion`) returns only the marketing version — no build
+    // number appended. Previously showed "1.2.3+45"; the real drawer shows
+    // just "1.2.3".
     PackageInfo.fromPlatform().then((info) {
-      if (mounted) setState(() => _version = '${info.version}+${info.buildNumber}');
+      if (mounted) setState(() => _version = info.version);
     });
   }
 
