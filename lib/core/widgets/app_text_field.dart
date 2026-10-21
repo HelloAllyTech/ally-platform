@@ -27,6 +27,7 @@ class AppTextField extends StatelessWidget {
     this.shape = AppTextFieldShape.boxed,
     this.isError = false,
     this.maxLines = 1,
+    this.maxLength,
     this.keyboardType,
     this.onChanged,
     this.onSubmitted,
@@ -37,6 +38,12 @@ class AppTextField extends StatelessWidget {
   final AppTextFieldShape shape;
   final bool isError;
   final int? maxLines;
+
+  /// When set, Flutter's own built-in counter is hidden (`counterText: ''`)
+  /// — callers that want a visible count build their own `Text`, matching
+  /// RN screens that show it separately from the input itself (e.g.
+  /// BugReportScreen's "123/1000" below the text area).
+  final int? maxLength;
   final TextInputType? keyboardType;
   final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onSubmitted;
@@ -94,14 +101,16 @@ class AppTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final decoration = decorationFor(context, shape: shape, placeholder: placeholder, isError: isError);
     return TextField(
       controller: controller,
       maxLines: maxLines,
+      maxLength: maxLength,
       keyboardType: keyboardType,
       onChanged: onChanged,
       onSubmitted: onSubmitted,
       style: textStyleFor(context),
-      decoration: decorationFor(context, shape: shape, placeholder: placeholder, isError: isError),
+      decoration: maxLength != null ? decoration.copyWith(counterText: '') : decoration,
     );
   }
 }
