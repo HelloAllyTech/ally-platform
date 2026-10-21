@@ -100,6 +100,8 @@ export interface TenantParams {
   offset?: number;
   sortBy?: string;
   sortOrder?: string;
+  /** Matches name or code, case-insensitively, on the server. */
+  search?: string;
 }
 
 export interface UsersParams {

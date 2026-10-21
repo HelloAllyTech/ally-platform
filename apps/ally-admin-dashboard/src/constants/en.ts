@@ -913,6 +913,10 @@ export const en = {
     remove: "Remove",
     selectOrganizations: "Select organizations to assign",
     noOrganizationsToAdd: "All organizations already assigned",
+    noOrganizationsMatch: "No organizations match your search",
+    searchOrganizationsPlaceholder: "Search organizations by name or code",
+    organizationsTruncated: (shown: number, total: number) =>
+      `Showing the first ${shown} of ${total} organizations. Search to find the rest.`,
   },
   eventConfiguration: {
     selectEvent: "Select an event",
