@@ -134,12 +134,17 @@ const renderListItem = (
   index: number,
   key: string,
   variant: RichTextVariant,
+  textStyle?: StyleProp<TextStyle>,
 ): React.ReactNode => {
   const itemBody = item.children.some(isBlockChild) ? (
-    renderBlocks(item.children, key, variant)
+    renderBlocks(item.children, key, variant, textStyle)
   ) : (
     <Text
-      style={[styles.listItemText, variant === 'dark' && darkOverrides.text]}>
+      style={[
+        styles.listItemText,
+        variant === 'dark' && darkOverrides.text,
+        textStyle,
+      ]}>
       {renderInline(item.children, key)}
     </Text>
   );
@@ -147,7 +152,11 @@ const renderListItem = (
   return (
     <View key={key} style={styles.listItem}>
       <Text
-        style={[styles.listMarker, variant === 'dark' && darkOverrides.text]}>
+        style={[
+          styles.listMarker,
+          variant === 'dark' && darkOverrides.text,
+          textStyle,
+        ]}>
         {ordered ? `${index + 1}.` : '•'}
       </Text>
       <View style={styles.listItemContent}>{itemBody}</View>
@@ -159,24 +168,25 @@ const renderBlockElement = (
   node: HtmlElementNode,
   key: string,
   variant: RichTextVariant,
+  textStyle?: StyleProp<TextStyle>,
 ): React.ReactNode => {
-  const textStyle = variant === 'dark' && darkOverrides.text;
+  const baseTextStyle = [variant === 'dark' && darkOverrides.text, textStyle];
   switch (node.tag) {
     case 'h1':
       return (
-        <Text key={key} style={[styles.h1, textStyle]}>
+        <Text key={key} style={[styles.h1, ...baseTextStyle]}>
           {renderInline(node.children, key)}
         </Text>
       );
     case 'h2':
       return (
-        <Text key={key} style={[styles.h2, textStyle]}>
+        <Text key={key} style={[styles.h2, ...baseTextStyle]}>
           {renderInline(node.children, key)}
         </Text>
       );
     case 'h3':
       return (
-        <Text key={key} style={[styles.h3, textStyle]}>
+        <Text key={key} style={[styles.h3, ...baseTextStyle]}>
           {renderInline(node.children, key)}
         </Text>
       );
@@ -195,7 +205,7 @@ const renderBlockElement = (
             styles.blockquote,
             variant === 'dark' && darkOverrides.blockquote,
           ]}>
-          {renderBlocks(node.children, key, variant)}
+          {renderBlocks(node.children, key, variant, textStyle)}
         </View>
       );
     case 'ul':
@@ -208,14 +218,21 @@ const renderBlockElement = (
       return (
         <View key={key} style={styles.list}>
           {items.map((item, index) =>
-            renderListItem(item, ordered, index, `${key}-${index}`, variant),
+            renderListItem(
+              item,
+              ordered,
+              index,
+              `${key}-${index}`,
+              variant,
+              textStyle,
+            ),
           )}
         </View>
       );
     }
     case 'p':
       return (
-        <Text key={key} style={[styles.paragraph, textStyle]}>
+        <Text key={key} style={[styles.paragraph, ...baseTextStyle]}>
           {renderInline(node.children, key)}
         </Text>
       );
@@ -223,7 +240,7 @@ const renderBlockElement = (
       // Unknown wrappers (e.g. div, section) are unwrapped.
       return (
         <React.Fragment key={key}>
-          {renderBlocks(node.children, key, variant)}
+          {renderBlocks(node.children, key, variant, textStyle)}
         </React.Fragment>
       );
   }
@@ -233,6 +250,7 @@ function renderBlocks(
   nodes: HtmlNode[],
   keyPrefix: string,
   variant: RichTextVariant,
+  textStyle?: StyleProp<TextStyle>,
 ): React.ReactNode[] {
   const blocks: React.ReactNode[] = [];
   let inlineBuffer: HtmlNode[] = [];
@@ -249,7 +267,11 @@ function renderBlocks(
       blocks.push(
         <Text
           key={key}
-          style={[styles.paragraph, variant === 'dark' && darkOverrides.text]}>
+          style={[
+            styles.paragraph,
+            variant === 'dark' && darkOverrides.text,
+            textStyle,
+          ]}>
           {renderInline(inlineBuffer, key)}
         </Text>,
       );
@@ -268,7 +290,9 @@ function renderBlocks(
       return;
     }
     flushInline();
-    blocks.push(renderBlockElement(node, `${keyPrefix}-${index}`, variant));
+    blocks.push(
+      renderBlockElement(node, `${keyPrefix}-${index}`, variant, textStyle),
+    );
   });
 
   flushInline();
@@ -278,6 +302,7 @@ function renderBlocks(
 export interface RichTextProps {
   html: string | undefined | null;
   style?: StyleProp<ViewStyle>;
+  textStyle?: StyleProp<TextStyle>;
   /** 'dark' recolors text for dark backgrounds (e.g. the roleplay screen's
    * Session Info panel). Defaults to 'light' — the original light-background
    * behavior used by the pre-practice scenario details screen. */
@@ -287,12 +312,13 @@ export interface RichTextProps {
 export const RichText: React.FC<RichTextProps> = ({
   html,
   style,
+  textStyle,
   variant = 'light',
 }) => {
   const blocks = useMemo(() => {
     if (!html || html.trim().length === 0) return null;
-    return renderBlocks(parseHtml(html).children, 'rt', variant);
-  }, [html, variant]);
+    return renderBlocks(parseHtml(html).children, 'rt', variant, textStyle);
+  }, [html, variant, textStyle]);
 
   if (!blocks || blocks.length === 0) return null;
 
