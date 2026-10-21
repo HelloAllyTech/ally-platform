@@ -91,22 +91,18 @@ export const RaiseCeilingDialog: React.FC<RaiseCeilingDialogProps> = ({
 
           <dl className="flex gap-6 text-sm">
             <div>
-              <dt className="text-xs uppercase tracking-wide text-typography-700">
-                {strings.spentLabel}
-              </dt>
+              <dt className="text-xs tracking-wide text-typography-700">{strings.spentLabel}</dt>
               <dd className="font-medium text-typography-900">{formatUsd(spentUsd)}</dd>
             </div>
             <div>
-              <dt className="text-xs uppercase tracking-wide text-typography-700">
-                {strings.currentLabel}
-              </dt>
+              <dt className="text-xs tracking-wide text-typography-700">{strings.currentLabel}</dt>
               <dd className="font-medium text-typography-900">
                 {ceilingUsd > 0 ? formatUsd(ceilingUsd) : strings.currentNone}
               </dd>
             </div>
             {neededUsd !== null && (
               <div>
-                <dt className="text-xs uppercase tracking-wide text-typography-700">
+                <dt className="text-xs tracking-wide text-typography-700">
                   {strings.estimateLabel}
                 </dt>
                 <dd className="font-medium text-typography-900">{formatUsd(neededUsd)}</dd>

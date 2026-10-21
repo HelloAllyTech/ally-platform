@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 
 interface CollapsibleSectionProps {
-  /** The uppercase label the section already showed. */
+  /** The label the section already showed. */
   heading: string;
   /**
    * A count or status shown beside the heading, so a collapsed section still
@@ -58,9 +58,7 @@ export const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
           >
             ›
           </span>
-          <span className="text-xs font-semibold uppercase tracking-wide text-typography-500">
-            {heading}
-          </span>
+          <span className="text-xs font-semibold tracking-wide text-typography-500">{heading}</span>
         </span>
         {meta ? <span className="text-xs text-typography-500">{meta}</span> : null}
       </summary>

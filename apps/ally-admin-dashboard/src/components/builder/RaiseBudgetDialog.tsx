@@ -82,17 +82,13 @@ export const RaiseBudgetDialog: React.FC<RaiseBudgetDialogProps> = ({
 
           <dl className="flex gap-6 text-sm">
             <div>
-              <dt className="text-xs uppercase tracking-wide text-typography-500">
-                {strings.spentLabel}
-              </dt>
+              <dt className="text-xs tracking-wide text-typography-500">{strings.spentLabel}</dt>
               <dd className="font-medium text-typography-900">
                 {money(budget.spentUsd) ?? "$0.00"}
               </dd>
             </div>
             <div>
-              <dt className="text-xs uppercase tracking-wide text-typography-500">
-                {strings.currentLabel}
-              </dt>
+              <dt className="text-xs tracking-wide text-typography-500">{strings.currentLabel}</dt>
               <dd className="font-medium text-typography-900">
                 {money(budget.budgetUsd) ?? strings.currentNone}
               </dd>

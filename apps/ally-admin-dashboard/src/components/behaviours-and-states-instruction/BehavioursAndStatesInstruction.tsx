@@ -365,10 +365,10 @@ export const BehavioursAndStatesInstruction: FC<BehavioursAndStatesInstructionPr
         <div
           className={`${RUBRIC_GRID} border-l-[3px] border-l-transparent bg-white border-b border-border-light`}
         >
-          <div className="px-4 py-2.5 text-xs font-medium text-typography-600 uppercase tracking-wide">
+          <div className="px-4 py-2.5 text-xs font-medium text-typography-600 tracking-wide">
             Helper Behaviour Class
           </div>
-          <div className="px-4 py-2.5 text-xs font-medium text-typography-600 uppercase tracking-wide border-l border-border-light">
+          <div className="px-4 py-2.5 text-xs font-medium text-typography-600 tracking-wide border-l border-border-light">
             Category
           </div>
           <div />

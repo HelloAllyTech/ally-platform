@@ -260,7 +260,7 @@ export const RoadmapFilterBar: React.FC<RoadmapFilterBarProps> = props => {
           {chips.map(chip => (
             <span
               key={chip.id}
-              className="text-typography-900 border-border-light flex min-w-0 max-w-full items-center rounded-[20px] border px-2 py-0.5"
+              className="text-typography-900 border-border-light flex min-w-0 max-w-full items-center rounded-full border px-2 py-0.5"
             >
               <span className="text-typography-secondary mr-1 text-xs">{chip.label}:</span>
               <Tooltip label={chip.values.join(", ")} align="top">

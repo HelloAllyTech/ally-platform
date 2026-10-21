@@ -207,7 +207,7 @@ const ConvergenceMatrix = ({ data }: { data: MeasurementConvergenceResponse }) =
                   <span className="block">
                     {row.key} {row.label}
                   </span>
-                  <span className="block text-[11px] text-typography-500">
+                  <span className="block text-xs text-typography-500">
                     {row.cuts.toLocaleString()} slices
                   </span>
                 </th>
@@ -233,7 +233,7 @@ const ConvergenceMatrix = ({ data }: { data: MeasurementConvergenceResponse }) =
                           <span className="block text-sm text-typography-900">
                             r = {rText(p.r)}
                           </span>
-                          <span className="block text-[11px] text-typography-500">n = {p.n}</span>
+                          <span className="block text-xs text-typography-500">n = {p.n}</span>
                         </>
                       )}
                     </td>
@@ -244,7 +244,7 @@ const ConvergenceMatrix = ({ data }: { data: MeasurementConvergenceResponse }) =
           </tbody>
         </table>
       </div>
-      <dl className="flex flex-col gap-0.5 text-[11px] leading-snug text-typography-500">
+      <dl className="flex flex-col gap-0.5 text-xs leading-snug text-typography-500">
         {data.rulers.map(r => (
           <div key={r.key}>
             <dt className="inline font-medium text-typography-700">
@@ -307,7 +307,7 @@ const JudgeAgreementTable = ({ data }: { data: JudgeAgreementResponse }) => {
             <tr key={r.key} className="border-t border-[#f0f0f0]">
               <th scope="row" className="py-1 pr-3 text-left font-normal">
                 <span className="block text-typography-900">{r.label}</span>
-                <span className="block text-[11px] text-typography-500">{r.sublabel}</span>
+                <span className="block text-xs text-typography-500">{r.sublabel}</span>
               </th>
               {cell(r.judge.weightedKappa)}
               {cell(r.judge.kappa)}
@@ -550,7 +550,7 @@ export const FoundationalSkillsValiditySection = ({
             {ja && (
               <div className="flex flex-col gap-2">
                 <JudgeAgreementTable data={ja} />
-                <p className="text-[11px] leading-snug text-typography-500">
+                <p className="text-xs leading-snug text-typography-500">
                   {judgeCoverageText(ja.coverage)}.
                 </p>
               </div>

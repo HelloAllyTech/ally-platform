@@ -29,7 +29,7 @@ const Field: React.FC<FieldProps> = ({ label, children, multiline = false, requi
     <div className={`w-full md:w-[40%] ${multiline && "md:mt-[8px]"}`}>
       <span className="text-base font-regular text-typography-800">
         {label}
-        {required && <span className="text-red-500 ml-1">*</span>}
+        {required && <span className="text-red-600 ml-1">*</span>}
       </span>
     </div>
     <div className="w-full md:w-[60%] flex text-left justify-start text-neutral-800">
@@ -117,7 +117,7 @@ export const GuardrailSidePanel: React.FC<GuardrailSidePanelProps> = ({
               value={formData.name || ""}
               onChange={e => handleChange("name", e.target.value)}
               placeholder={isNew ? "New Guardrail" : "Edit Guardrail"}
-              className="text-2xl font-light text-typography-900 bg-transparent border-none outline-none w-full placeholder-typography-400 focus:placeholder-typography-300"
+              className="text-2xl font-light text-typography-900 bg-transparent border-none outline-none w-full placeholder-typography-placeholder focus:placeholder-typography-placeholder"
               autoFocus={isNew}
             />
           </div>

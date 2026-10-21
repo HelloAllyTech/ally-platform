@@ -300,9 +300,7 @@ export const Builder: React.FC = () => {
   ): React.ReactNode =>
     group.length > 0 ? (
       <section className="mb-6">
-        <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-typography-500">
-          {heading}
-        </h2>
+        <h2 className="mb-2 text-xs font-semibold tracking-wide text-typography-500">{heading}</h2>
         <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
           {group.map((session, index) => (
             <SessionCard

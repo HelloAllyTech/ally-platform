@@ -91,7 +91,7 @@ export const ReadinessRing: React.FC<ReadinessRingProps> = ({ readiness, size = 
       </svg>
 
       <div className="flex flex-col">
-        <span className="text-xs font-medium uppercase tracking-wide text-typography-500">
+        <span className="text-xs font-medium tracking-wide text-typography-500">
           {strings.heading}
         </span>
         <span

@@ -413,7 +413,5 @@ export const UsageLevelsSubTab = ({ query }: AnalyticsTabFilters) => {
 const pickTenant = ({ tenantId }: { tenantId?: string }) => (tenantId ? { tenantId } : {});
 
 const SubHeading = ({ children }: { children: string }) => (
-  <h3 className="mb-3 mt-8 text-xs font-medium uppercase tracking-wide text-typography-500">
-    {children}
-  </h3>
+  <h3 className="mb-3 mt-8 text-xs font-medium tracking-wide text-typography-500">{children}</h3>
 );

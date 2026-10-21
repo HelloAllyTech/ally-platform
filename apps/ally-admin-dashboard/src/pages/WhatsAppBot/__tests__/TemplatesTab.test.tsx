@@ -33,7 +33,7 @@ vi.mock("@constants", () => ({
           any_of: "Any word",
           regex: "Regex",
         },
-        requiredBadge: "REQUIRED",
+        requiredBadge: "Required",
         cannotDeactivate: "Required safety replies cannot be switched off.",
         moveUp: "Move earlier",
         moveDown: "Move later",

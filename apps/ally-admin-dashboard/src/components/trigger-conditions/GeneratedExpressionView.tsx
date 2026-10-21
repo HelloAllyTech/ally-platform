@@ -14,7 +14,7 @@ export const GeneratedExpressionView = ({ node, leafNodePaths }: GeneratedExpres
     path: string = "root",
   ): React.ReactNode => {
     if (!n) {
-      return <span className="text-red-500 text-sm mx-1"> ? </span>;
+      return <span className="text-red-600 text-sm mx-1"> ? </span>;
     }
 
     // Handle NOT wrapper
@@ -41,7 +41,7 @@ export const GeneratedExpressionView = ({ node, leafNodePaths }: GeneratedExpres
     // Handle leaf nodes
     if (!n.id) {
       return (
-        <span key={path} className="text-red-500 text-sm mx-1">
+        <span key={path} className="text-red-600 text-sm mx-1">
           {" "}
           ?{" "}
         </span>
@@ -58,7 +58,7 @@ export const GeneratedExpressionView = ({ node, leafNodePaths }: GeneratedExpres
   };
 
   return (
-    <div className="mt-[14px] overflow-hidden rounded-[2px] min-h-[20px] flex items-center  bg-white border-[0.5px] border-border  font-mono">
+    <div className="mt-[14px] overflow-hidden rounded-sm min-h-[20px] flex items-center  bg-white border-[0.5px] border-border  font-mono">
       <span className="text-xs px-2 h-full align-middle vertical-align-middle py-2 mr-1 text-typography-900 bg-neutral-100 border-r-[0.5px] border-border">
         Expression
       </span>

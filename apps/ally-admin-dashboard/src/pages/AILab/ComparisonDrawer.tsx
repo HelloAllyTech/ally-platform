@@ -74,7 +74,7 @@ export const ComparisonDrawer: React.FC<ComparisonDrawerProps> = ({ run, allRuns
                         {r.variableValues.map(v => (
                           <span
                             key={v.name}
-                            className="font-mono text-[10px] bg-background-secondary border border-border-light rounded px-1 py-0.5"
+                            className="font-mono text-xs bg-background-secondary border border-border-light rounded px-1 py-0.5"
                             title={`${v.name}: ${v.value}`}
                           >
                             {`{{${v.name}}}`}

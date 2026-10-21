@@ -20,7 +20,7 @@ const languageColor = (status: TranslationLanguageStatus): string => {
   if (status === "translated") return "text-green-600";
   if (status === "translating") return "text-blue-600";
   if (status === "failed") return "text-red-600";
-  return "text-gray-400";
+  return "text-gray-500";
 };
 
 const TranslationProgressJob: FC<{
@@ -49,7 +49,7 @@ const TranslationProgressJob: FC<{
         <button
           type="button"
           onClick={() => onDismiss(job.jobId)}
-          className="text-gray-400 hover:text-gray-600 ml-2"
+          className="text-gray-500 hover:text-gray-600 ml-2"
           aria-label="Dismiss"
         >
           {"✕"}

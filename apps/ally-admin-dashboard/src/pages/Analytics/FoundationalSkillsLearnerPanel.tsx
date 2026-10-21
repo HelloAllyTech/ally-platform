@@ -214,7 +214,7 @@ export const FoundationalSkillsLearnerPanel = ({
                           <td className="py-1 pr-3">
                             <span className="text-typography-800">{d?.text ?? x.code}</span>
                             {d && (
-                              <span className="block text-[11px] text-typography-500">
+                              <span className="block text-xs text-typography-500">
                                 {trackabilityLabel(d)}
                               </span>
                             )}

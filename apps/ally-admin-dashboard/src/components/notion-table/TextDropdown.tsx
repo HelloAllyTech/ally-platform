@@ -245,7 +245,7 @@ export const TextDropdown = ({
             },
           )}
         >
-          <div className={clsx("break-words mr-1", { "text-typography-500": !value })}>
+          <div className={clsx("break-words mr-1", { "text-typography-placeholder": !value })}>
             {finalDisplayValue}
           </div>
           {!disabled && <ArrowDownFilled width={8} height={8} />}
@@ -327,7 +327,7 @@ export const TextDropdown = ({
                 return (
                   <React.Fragment key={option?.value}>
                     {showGroupHeader && (
-                      <div className="sticky top-0 z-10 bg-background-secondary px-3 py-1 text-xs font-medium uppercase tracking-wide text-typography-600">
+                      <div className="sticky top-0 z-10 bg-background-secondary px-3 py-1 text-xs font-medium tracking-wide text-typography-600">
                         {option.groupLabel}
                       </div>
                     )}

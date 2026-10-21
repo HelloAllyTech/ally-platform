@@ -140,7 +140,7 @@ export const UserModal: React.FC<UserModalProps> = ({
               id={field.id}
               type={field.inputType}
               placeholder={field.placeholder}
-              className={`border rounded-md px-2 py-2 outline-none text-base font-primary placeholder:text-typography-600 ${
+              className={`border rounded-md px-2 py-2 outline-none text-base font-primary placeholder:text-typography-placeholder ${
                 fieldState.error ? "border-destructive-500" : "border-border-light"
               }`}
             />
@@ -368,7 +368,7 @@ export const UserModal: React.FC<UserModalProps> = ({
       onMouseDown={handleBackdropMouseDown}
       onMouseUp={handleBackdropMouseUp}
     >
-      <div className="p-4 md:py-5 md:px-6 bg-white w-[520px] max-w-[calc(100vw-2rem)] md:max-w-[90vw] max-h-[90dvh] flex flex-col gap-4 md:gap-5 relative font-primary rounded-[10px] shadow-2xl animate-fadeIn">
+      <div className="p-4 md:py-5 md:px-6 bg-white w-[520px] max-w-[calc(100vw-2rem)] md:max-w-[90vw] max-h-[90dvh] flex flex-col gap-4 md:gap-5 relative font-primary rounded-none shadow-2xl animate-fadeIn">
         {/* Header */}
         <div className="text-typography-900 flex justify-center w-full text-xl md:text-2xl text-center font-primary relative flex-shrink-0">
           {title}

@@ -23,7 +23,7 @@ const STATUS_STYLES: Record<LandingBlockStatus, string> = {
 
 export const LandingStatusTag: FC<{ status: LandingBlockStatus }> = ({ status }) => (
   <span
-    className={`flex-shrink-0 rounded-full px-1.5 py-0.5 text-xs lg:text-[10px] ${STATUS_STYLES[status]}`}
+    className={`flex-shrink-0 rounded-full px-1.5 py-0.5 text-xs ${STATUS_STYLES[status]}`}
     data-testid="landing-status-tag"
   >
     {en.courseLanding.status[status]}

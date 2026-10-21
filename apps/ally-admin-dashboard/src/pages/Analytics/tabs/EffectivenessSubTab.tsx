@@ -468,7 +468,7 @@ export const EffectivenessSubTab = () => {
                   ))}
                 </div>
               </div>
-              {clamp && <p className="text-[11px] leading-snug text-typography-500">{clamp}</p>}
+              {clamp && <p className="text-xs leading-snug text-typography-500">{clamp}</p>}
             </div>
           )}
         </ChartCard>
@@ -502,11 +502,11 @@ export const EffectivenessSubTab = () => {
             <div className="flex flex-col gap-3">
               <ChangeWhiskers rows={segmentRows(s)} />
               {s.withheld.length > 0 && (
-                <p className="text-[11px] leading-snug text-typography-500">
+                <p className="text-xs leading-snug text-typography-500">
                   Too few learners to read (under {s.minSampleSize}): {withheldText(s.withheld)}.
                 </p>
               )}
-              <p className="text-[11px] leading-snug text-typography-500">
+              <p className="text-xs leading-snug text-typography-500">
                 {DIMENSION_NOTES[s.dimension] ?? ""}
               </p>
             </div>

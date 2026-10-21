@@ -237,7 +237,7 @@ export const LearnerSkillPanel = ({
             </div>
           </section>
 
-          <p className="text-[11px] leading-relaxed text-typography-500">
+          <p className="text-xs leading-relaxed text-typography-500">
             {data.provenance.derivation}. {data.provenance.note}
           </p>
         </div>

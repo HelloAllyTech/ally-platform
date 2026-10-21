@@ -48,9 +48,7 @@ export const PrdReviewFindings: React.FC<PrdReviewFindingsProps> = ({
 
   const heading = (
     <div className="flex items-center gap-1.5">
-      <h4 className="text-xs font-medium uppercase tracking-wide text-typography-500">
-        {strings.heading}
-      </h4>
+      <h4 className="text-xs font-medium tracking-wide text-typography-500">{strings.heading}</h4>
       <Tooltip label={strings.tooltip} align="bottom">
         <button type="button" className="inline-flex cursor-pointer items-center">
           <TooltipIcon />

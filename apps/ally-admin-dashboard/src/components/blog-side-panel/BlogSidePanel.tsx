@@ -89,7 +89,7 @@ const Field: React.FC<FieldProps> = ({ label, required, children, hint }) => (
   <div className="flex flex-col gap-1.5">
     <label className="text-sm font-medium text-typography-800">
       {label}
-      {required && <span className="text-red-500 ml-1">*</span>}
+      {required && <span className="text-red-600 ml-1">*</span>}
     </label>
     {children}
     {hint && <span className="text-xs text-typography-400">{hint}</span>}

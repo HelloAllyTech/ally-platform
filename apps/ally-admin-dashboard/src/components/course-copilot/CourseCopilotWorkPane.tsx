@@ -301,7 +301,7 @@ export const CourseCopilotWorkPane: React.FC<CourseCopilotWorkPaneProps> = ({
                 isActive
                   ? "border-primary-500 font-medium text-primary-700"
                   : "border-transparent text-typography-800 hover:text-typography-900"
-              } disabled:cursor-not-allowed disabled:text-typography-500`}
+              } disabled:cursor-not-allowed disabled:text-typography-disabled`}
             >
               {strings.tabs[tab]}
               {tab === "blueprint" && blueprintUpdated && (

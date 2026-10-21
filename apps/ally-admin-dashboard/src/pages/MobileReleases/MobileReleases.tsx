@@ -494,9 +494,7 @@ export const MobileReleases: FC = () => {
             )}
           </div>
           <div>
-            <p className="text-xs uppercase tracking-wide text-typography-600 mb-1.5">
-              Release actions
-            </p>
+            <p className="text-xs tracking-wide text-typography-600 mb-1.5">Release actions</p>
             <div className="flex flex-wrap gap-2">
               <Tooltip
                 label="Skips the 2-day cadence and immediately builds and uploads both platforms to their internal tracks (Play Store internal track, TestFlight). Tests still gate the build."
@@ -553,7 +551,7 @@ export const MobileReleases: FC = () => {
             </div>
           </div>
           <div>
-            <p className="text-xs uppercase tracking-wide text-typography-600 mb-1.5">
+            <p className="text-xs tracking-wide text-typography-600 mb-1.5">
               Force-update settings
             </p>
             <div className="flex flex-wrap gap-2">

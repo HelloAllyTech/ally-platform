@@ -38,6 +38,7 @@ export default {
       fontSize: {
         // Custom font sizes used throughout the application
         xs: ["12px", { lineHeight: "16px" }], // Extra small - labels, captions
+        chip: "11px", // ui-shared ChipGroup; admin pairs it at Carbon's 12px floor
         sm: ["13px", { lineHeight: "20px" }], // Small - table text, secondary content
         base: ["14px", { lineHeight: "24px" }], // Base - body text, form fields
         md: ["15px", { lineHeight: "24px" }], // Medium - tabs, emphasized text
@@ -208,6 +209,24 @@ export default {
           lightBg: "#EAE7DE",
           lightFg: "#565045",
         },
+        /*
+         * Dropdown and ButtonGroup — paired with the admin console's config like
+         * `badge` above. These hold the literals ui-shared hardcoded until now, so
+         * this app renders exactly as before; admin resolves the same names to
+         * Carbon values.
+         */
+        dropdown: {
+          border: "#DBDBDB",
+          "search-bg": "#F5F5F7",
+          "option-active": "#F5F5F7",
+          empty: "rgba(0, 0, 0, 0.5)",
+        },
+        "button-group": {
+          bg: "#282B31",
+          divider: "#5A5F6A",
+          "active-bg": "#FDFDFD",
+          "active-fg": "#1E2025",
+        },
         // Primary Colors
         primary: {
           DEFAULT: "rgb(var(--color-primary-DEFAULT) / <alpha-value>)",
@@ -375,6 +394,11 @@ export default {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        // Paired with admin (see `dropdown` colours): today's literals here, Carbon's
+        // square corners there.
+        dropdown: "8px",
+        "dropdown-item": "4px",
+        "button-group": "8px",
       },
     },
   },

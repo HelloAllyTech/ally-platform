@@ -165,7 +165,7 @@ export const GenerateCoverImageModal: FC<GenerateCoverImageModalProps> = ({
                   type="button"
                   onClick={() => updatePrompt(defaultPrompt)}
                   disabled={isGenerating || prompt === defaultPrompt}
-                  className="text-xs text-primary-500 hover:text-primary-600 disabled:text-typography-400 disabled:cursor-not-allowed"
+                  className="text-xs text-primary-500 hover:text-primary-600 disabled:text-typography-disabled disabled:cursor-not-allowed"
                 >
                   Reset to default
                 </button>
@@ -178,7 +178,7 @@ export const GenerateCoverImageModal: FC<GenerateCoverImageModalProps> = ({
                 disabled={isGenerating}
                 maxLength={COVER_PROMPT_MAX_LENGTH}
                 rows={14}
-                className="w-full border border-border-light rounded-md px-3 py-2 text-sm leading-relaxed outline-none focus:border-primary-400 resize-y disabled:bg-gray-50 disabled:text-typography-500"
+                className="w-full border border-border-light rounded-md px-3 py-2 text-sm leading-relaxed outline-none focus:border-primary-400 resize-y disabled:bg-gray-50 disabled:text-typography-disabled"
               />
               <p className="text-xs text-typography-500">
                 Describe the picture you want. The image is made from this text exactly as written,

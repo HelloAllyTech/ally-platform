@@ -81,7 +81,7 @@ export const CourseLiftWhiskers = ({
           <span className={`text-xs text-typography-900 ${head ? "font-semibold" : ""}`}>
             {r.label}
           </span>
-          {r.sublabel && <span className="text-[11px] text-typography-500">{r.sublabel}</span>}
+          {r.sublabel && <span className="text-xs text-typography-500">{r.sublabel}</span>}
         </span>
         <span className="relative flex h-8 flex-col" aria-hidden>
           <span
@@ -114,7 +114,7 @@ export const CourseLiftWhiskers = ({
   return (
     <div className="flex flex-col">
       {reference && (
-        <p className="mb-2 flex flex-wrap items-center gap-2 text-[11px] text-typography-500">
+        <p className="mb-2 flex flex-wrap items-center gap-2 text-xs text-typography-500">
           <span aria-hidden className="inline-flex w-6 items-center">
             <span className="h-px w-full" style={{ background: CONTEXT.line }} />
           </span>
@@ -126,7 +126,7 @@ export const CourseLiftWhiskers = ({
           </span>
         </p>
       )}
-      <div className={`${GRID} mb-1 text-[11px] text-typography-500`}>
+      <div className={`${GRID} mb-1 text-xs text-typography-500`}>
         <span className="hidden sm:block" />
         <span className="flex justify-between tabular-nums">
           <span>{signed(-extent)}</span>

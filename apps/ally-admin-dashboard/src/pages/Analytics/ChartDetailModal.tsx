@@ -208,7 +208,7 @@ export const ChartDetailModal = ({
           render({ height: CHART_HEIGHT_EXPANDED, zoomed })
         )}
 
-        {source && <p className="mt-4 text-[11px] leading-tight text-typography-500">{source}</p>}
+        {source && <p className="mt-4 text-xs leading-tight text-typography-500">{source}</p>}
       </ModalBody>
     </ComposedModal>
   );

@@ -173,7 +173,7 @@ const TurnCard: React.FC<{
           {t.turn} {turn.turn}
         </span>
         {showScore && (
-          <span className={`text-[11px] ${tone.meta}`}>
+          <span className={`text-xs ${tone.meta}`}>
             {t.score} {turn.score}
             {delta != null && delta !== 0 ? ` (${delta > 0 ? "+" : ""}${delta})` : ""}
           </span>
@@ -211,15 +211,11 @@ const TurnCard: React.FC<{
           diagnostic panel go unread. */}
       {sectionKeys.length > 0 && (
         <div className={`mt-2 border-t pt-2 ${tone.divider}`}>
-          <p className={`mb-1 text-[11px] font-medium uppercase tracking-wide ${tone.meta}`}>
-            {t.sentToActor}
-          </p>
+          <p className={`mb-1 text-xs font-medium tracking-wide ${tone.meta}`}>{t.sentToActor}</p>
           {sectionKeys.map(key => (
             <div key={key} className="leading-snug">
-              <span className={`text-[11px] ${tone.meta}`}>{key}: </span>
-              <span
-                className={`whitespace-pre-wrap font-mono text-[11px] leading-snug ${tone.mono}`}
-              >
+              <span className={`text-xs ${tone.meta}`}>{key}: </span>
+              <span className={`whitespace-pre-wrap font-mono text-xs leading-snug ${tone.mono}`}>
                 {turn.sections[key]}
               </span>
             </div>
@@ -321,13 +317,13 @@ export const InternalMonologuePanel: React.FC<InternalMonologuePanelProps> = ({
         <header className="flex items-start justify-between gap-2 px-3 py-2.5">
           <div className="min-w-0">
             <h2 className={`text-sm font-medium ${c.title}`}>{t.title}</h2>
-            <p className={`text-[11px] ${c.subtitle}`}>{t.subtitle}</p>
+            <p className={`text-xs ${c.subtitle}`}>{t.subtitle}</p>
           </div>
           {onHide && (
             <button
               type="button"
               onClick={onHide}
-              className={`shrink-0 text-[11px] ${c.action}`}
+              className={`shrink-0 text-xs ${c.action}`}
               aria-label={t.hide}
             >
               {t.hide}

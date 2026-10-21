@@ -48,7 +48,7 @@ describe("ToggleSwitch", () => {
     render(<ToggleSwitch enabled={false} onChange={onChange} label="Test Toggle" />);
     const button = screen.getByRole("button", { name: "Test Toggle" });
     expect(button.className).toContain("h-6");
-    expect(button.className).toContain("w-11");
+    expect(button.className).toContain("w-12");
   });
 
   it("has rounded corners", () => {
@@ -80,7 +80,7 @@ describe("ToggleSwitch", () => {
       <ToggleSwitch enabled={true} onChange={onChange} label="Test Toggle" />,
     );
     const indicator = container.querySelector("span");
-    expect(indicator?.className).toContain("translate-x-6");
+    expect(indicator?.className).toContain("translate-x-[27px]");
   });
 
   it("indicator has correct position when disabled", () => {
@@ -89,7 +89,23 @@ describe("ToggleSwitch", () => {
       <ToggleSwitch enabled={false} onChange={onChange} label="Test Toggle" />,
     );
     const indicator = container.querySelector("span");
-    expect(indicator?.className).toContain("translate-x-1");
+    expect(indicator?.className).toContain("translate-x-[3px]");
+  });
+
+  it("exposes its on/off state via aria-pressed", () => {
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <ToggleSwitch enabled={true} onChange={onChange} label="Test Toggle" />,
+    );
+    expect(screen.getByRole("button", { name: "Test Toggle" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    rerender(<ToggleSwitch enabled={false} onChange={onChange} label="Test Toggle" />);
+    expect(screen.getByRole("button", { name: "Test Toggle" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
   });
 
   it("indicator has transition classes", () => {
@@ -107,8 +123,8 @@ describe("ToggleSwitch", () => {
       <ToggleSwitch enabled={false} onChange={onChange} label="Test Toggle" />,
     );
     const indicator = container.querySelector("span");
-    expect(indicator?.className).toContain("h-4");
-    expect(indicator?.className).toContain("w-4");
+    expect(indicator?.className).toContain("h-[18px]");
+    expect(indicator?.className).toContain("w-[18px]");
   });
 
   it("indicator is white", () => {

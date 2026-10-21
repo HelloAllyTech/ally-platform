@@ -94,7 +94,7 @@ export const OTP: FC<OTPProps> = ({
           disabled={disabled}
           autoFocus={autoFocus && index === 0}
           placeholder={placeholder}
-          className={`max-w-14 h-14 sm:max-w-[64px] sm:h-[64px] bg-neutral-100 rounded-[20px] text-center text-3xl font-medium placeholder:text-neutral-400 placeholder:font-normal placeholder:text-3xl border-0 focus-visible:ring-0 ${inputClassName ?? ""}`}
+          className={`max-w-14 h-14 sm:max-w-[64px] sm:h-[64px] bg-neutral-100 rounded-none text-center text-3xl font-medium placeholder:text-neutral-400 placeholder:font-normal placeholder:text-3xl border-0 focus-visible:ring-0 ${inputClassName ?? ""}`}
         />
       ))}
     </div>

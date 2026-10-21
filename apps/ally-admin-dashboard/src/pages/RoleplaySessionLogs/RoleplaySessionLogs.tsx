@@ -250,7 +250,7 @@ export const RoleplaySessionLogs: FC = () => {
                     <div className="flex items-center gap-2">
                       <span>{row.scenarioTitle || "—"}</span>
                       {row.isV2VTest && (
-                        <span className="inline-flex items-center px-[6px] py-[2px] rounded-full text-[11px] font-medium bg-primary-100 text-primary-700 whitespace-nowrap">
+                        <span className="inline-flex items-center px-[6px] py-[2px] rounded-full text-xs font-medium bg-primary-100 text-primary-700 whitespace-nowrap">
                           V2V Test
                         </span>
                       )}

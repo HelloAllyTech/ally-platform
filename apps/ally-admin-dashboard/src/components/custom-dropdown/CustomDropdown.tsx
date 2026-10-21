@@ -127,7 +127,7 @@ export const CustomDropdown: React.FC<CustomDropdownProps> = ({
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
                     placeholder="Search..."
-                    className="w-full px-2 py-1 text-sm border rounded outline-none font-primary text-typography-900 placeholder:text-typography-500 focus:border-primary"
+                    className="w-full px-2 py-1 text-sm border rounded outline-none font-primary text-typography-900 placeholder:text-typography-placeholder focus:border-primary"
                     onClick={e => e.stopPropagation()}
                   />
                 </div>

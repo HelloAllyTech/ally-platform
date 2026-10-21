@@ -226,7 +226,7 @@ export const ComfortAudioSettings = ({ hideHeading = false }: ComfortAudioSettin
               {track.isArchived && (
                 <span
                   title={en.comfortAudio.archivedHelp}
-                  className="shrink-0 text-xs font-medium uppercase tracking-wide text-typography-600 border border-border-light rounded px-1.5 py-0.5"
+                  className="shrink-0 text-xs font-medium tracking-wide text-typography-600 border border-border-light rounded px-1.5 py-0.5"
                 >
                   {en.comfortAudio.archivedBadge}
                 </span>

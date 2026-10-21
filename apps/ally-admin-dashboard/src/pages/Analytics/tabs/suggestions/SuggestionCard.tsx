@@ -72,14 +72,14 @@ export const SuggestionCard: React.FC<SuggestionCardProps> = ({
 
       {suggestion.rationale && (
         <div>
-          <div className="text-typography-600 text-xs uppercase">{strings.rationaleLabel}</div>
+          <div className="text-typography-600 text-xs">{strings.rationaleLabel}</div>
           <p className="text-typography-700 text-sm">{suggestion.rationale}</p>
         </div>
       )}
 
       {suggestion.evidence.length > 0 && (
         <div>
-          <div className="text-typography-600 text-xs uppercase">{strings.evidenceLabel}</div>
+          <div className="text-typography-600 text-xs">{strings.evidenceLabel}</div>
           <ul className="text-typography-700 list-disc pl-5 text-sm">
             {suggestion.evidence.map(item => (
               <li key={item}>{item}</li>

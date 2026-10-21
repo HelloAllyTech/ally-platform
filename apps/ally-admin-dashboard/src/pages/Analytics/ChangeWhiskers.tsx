@@ -43,7 +43,7 @@ export const ChangeWhiskers = ({
   // the full width, so they still share one axis.
   return (
     <div className="flex flex-col">
-      <div className="mb-1 grid grid-cols-1 gap-1 text-[11px] text-typography-500 sm:grid-cols-[minmax(9rem,14rem)_1fr_10.5rem] sm:gap-3">
+      <div className="mb-1 grid grid-cols-1 gap-1 text-xs text-typography-500 sm:grid-cols-[minmax(9rem,14rem)_1fr_10.5rem] sm:gap-3">
         <span className="hidden sm:block" />
         <span className="flex justify-between tabular-nums">
           <span>{signed(-extent, decimals)}</span>
@@ -61,7 +61,7 @@ export const ChangeWhiskers = ({
           >
             <span className="flex flex-col">
               <span className="text-xs text-typography-900">{r.label}</span>
-              {r.sublabel && <span className="text-[11px] text-typography-500">{r.sublabel}</span>}
+              {r.sublabel && <span className="text-xs text-typography-500">{r.sublabel}</span>}
             </span>
             <span className="relative h-5" aria-hidden>
               <span

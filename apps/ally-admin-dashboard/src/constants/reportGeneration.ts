@@ -56,7 +56,7 @@ export enum ReportGenerationStatus {
 // custom Accordion component accepts a className string for its root container
 // instead. This keeps the report-history look (bottom divider only, no shadow,
 // square corners) that the MUI sx previously produced.
-export const REPORT_ACCORDION_SX = "shadow-none border-b-[0.5px] border-[#dbdbdb] bg-white";
+export const REPORT_ACCORDION_SX = "shadow-none border-b-[0.5px] border-border-light bg-white";
 
 export enum ReportGenerationMetrics {
   COLLOQUIALISM = "colloquialism",

@@ -148,7 +148,7 @@ export const BlueprintSection: React.FC<BlueprintSectionProps> = ({
             <DragIndicator className="h-4 w-4" />
           </button>
         )}
-        <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-typography-700">
+        <span className="shrink-0 text-xs font-semibold tracking-wide text-typography-700">
           {strings.sectionNumber(index + 1)}
         </span>
         {readOnly ? (
@@ -227,7 +227,7 @@ export const BlueprintSection: React.FC<BlueprintSectionProps> = ({
             title={atItemLimit ? strings.itemLimitReached(BLUEPRINT_LIMITS.items) : undefined}
             aria-expanded={showPicker}
             onClick={() => setShowPicker(open => !open)}
-            className="inline-flex items-center gap-1 rounded py-1 text-xs font-medium text-primary-600 hover:text-primary-700 disabled:cursor-not-allowed disabled:text-typography-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500"
+            className="inline-flex items-center gap-1 rounded py-1 text-xs font-medium text-primary-600 hover:text-primary-700 disabled:cursor-not-allowed disabled:text-typography-disabled focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500"
           >
             <Plus className="h-3.5 w-3.5" />
             {strings.addItem}

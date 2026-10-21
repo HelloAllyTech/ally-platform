@@ -90,7 +90,7 @@ const Dropdown: FC<DropdownProps> = ({
 
   return (
     <div
-      className={`p-2 absolute bg-white border border-[#DBDBDB] rounded-[8px] z-50 shadow-lg ${className}`}
+      className={`p-2 absolute bg-white border border-dropdown-border rounded-dropdown z-50 shadow-lg ${className}`}
       style={style}
       onClick={e => e.stopPropagation()}
     >
@@ -108,7 +108,7 @@ const Dropdown: FC<DropdownProps> = ({
           onChange={e => handleSearch(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={searchPlaceholder || "Search"}
-          className="w-full mb-2 px-2 py-1.5 text-base rounded-[4px] bg-[#F5F5F7] border border-[#DBDBDB] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          className="w-full mb-2 px-2 py-1.5 text-base rounded-dropdown-item bg-dropdown-search-bg border border-dropdown-border focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         />
       )}
       <div
@@ -118,7 +118,7 @@ const Dropdown: FC<DropdownProps> = ({
         style={{ maxHeight: optionsMaxHeight ?? 240 }}
       >
         {filteredOptions.length === 0 ? (
-          <span className="px-1 py-1 text-sm text-black/50">No results</span>
+          <span className="px-1 py-1 text-sm text-dropdown-empty">No results</span>
         ) : (
           filteredOptions.map((option, index) => (
             <button
@@ -129,8 +129,10 @@ const Dropdown: FC<DropdownProps> = ({
               aria-selected={index === activeIndex}
               onClick={() => handleChange(option)}
               onMouseEnter={() => setActiveIndex(index)}
-              className={`text-left cursor-pointer text-base font-primary rounded-[4px] px-2 py-1.5 bg-transparent border-0 focus:outline-none ${
-                index === activeIndex ? "bg-[#F5F5F7] text-primary" : "text-typography-900"
+              className={`text-left cursor-pointer text-base font-primary rounded-dropdown-item px-2 py-1.5 bg-transparent border-0 focus:outline-none ${
+                index === activeIndex
+                  ? "bg-dropdown-option-active text-primary"
+                  : "text-typography-900"
               }`}
             >
               {option}

@@ -84,7 +84,7 @@ const Stat: React.FC<{ label: string; value: React.ReactNode; help?: string }> =
   help,
 }) => (
   <div className="border border-border-light rounded-md px-4 py-3 flex-1" title={help}>
-    <div className="text-xs uppercase tracking-wide text-typography-500">{label}</div>
+    <div className="text-xs tracking-wide text-typography-500">{label}</div>
     <div className="text-2xl text-typography-900 mt-1">{value}</div>
   </div>
 );
@@ -284,7 +284,7 @@ export const RunResultsDrawer: React.FC<RunResultsDrawerProps> = ({ run, onClose
               ))}
 
               <div>
-                <h4 className="text-xs uppercase tracking-wide text-typography-500 mb-2">
+                <h4 className="text-xs tracking-wide text-typography-500 mb-2">
                   {en.aiLab.results.evaluatorsHeading}
                 </h4>
                 <div className="border border-border-light rounded-md divide-y divide-border-light">

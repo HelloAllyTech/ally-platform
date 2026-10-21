@@ -21,9 +21,7 @@ const Line: React.FC<{ label: string; text: string; tone?: "correction" }> = ({
       tone === "correction" ? "border-l-4 border-warning-300 bg-warning-50 py-1 pl-2" : "pl-3"
     }
   >
-    <span className="text-xs font-semibold uppercase tracking-wide text-typography-500">
-      {label}
-    </span>
+    <span className="text-xs font-semibold tracking-wide text-typography-500">{label}</span>
     <p className="whitespace-pre-wrap text-sm text-typography-900">{text}</p>
   </div>
 );

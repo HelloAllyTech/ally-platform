@@ -21,13 +21,13 @@ export const StudyDetails: FC<{ study: BugFixStudy }> = ({ study }) => (
       <InfoTip label={en.bugHunter.drawerStudyTooltip} />
     </div>
     {study.recordedAt && (
-      <p className="text-[11px] text-typography-500">
+      <p className="text-xs text-typography-500">
         {en.bugHunter.drawerStudyRecorded.replace("{date}", formatDateTime(study.recordedAt))}
       </p>
     )}
     <DetailLine label={en.bugHunter.drawerStudyFeature} value={study.feature} />
     <div>
-      <p className="text-[11px] text-typography-500">{en.bugHunter.drawerStudyHowItWorks}</p>
+      <p className="text-xs text-typography-500">{en.bugHunter.drawerStudyHowItWorks}</p>
       <ol className="list-decimal pl-5 text-xs text-typography-700 flex flex-col gap-0.5">
         {study.howItWorksToday.map((step, i) => (
           <li key={i} className="break-words">
@@ -88,7 +88,7 @@ export const StudyDetails: FC<{ study: BugFixStudy }> = ({ study }) => (
     )}
     {study.review && (
       <div>
-        <p className="text-[11px] text-typography-500">
+        <p className="text-xs text-typography-500">
           {(study.review.concerns.length
             ? en.bugHunter.drawerStudyReviewConcerns
             : en.bugHunter.drawerStudyReviewNone
@@ -162,7 +162,7 @@ export const PostmortemDetails: FC<{ postmortem: BugFixPostmortem }> = ({ postmo
       {showAll && (
         <>
           {postmortem.recordedAt && (
-            <p className="text-[11px] text-typography-500">
+            <p className="text-xs text-typography-500">
               {en.bugHunter.drawerPostmortemRecorded.replace(
                 "{date}",
                 formatDateTime(postmortem.recordedAt),

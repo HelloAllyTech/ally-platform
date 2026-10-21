@@ -61,7 +61,7 @@ export const PathwayList: React.FC<PathwayListProps> = ({
           {onCreatePathway && (
             <button
               onClick={onCreatePathway}
-              className="bg-primary-500 hover:bg-primary-600 text-base text-white px-6 py-3 rounded-[100px] flex items-center gap-2 mx-auto font-primary transition-colors"
+              className="bg-primary-500 hover:bg-primary-600 text-base text-white px-6 py-3 rounded-none flex items-center gap-2 mx-auto font-primary transition-colors"
             >
               <Add />
               {en.simulation.createPathway}

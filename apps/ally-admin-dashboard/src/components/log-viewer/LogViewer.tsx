@@ -94,11 +94,11 @@ export const LogViewer = () => {
   const getLevelColor = (level: string) => {
     switch (level) {
       case "ERROR":
-        return "text-red-500";
+        return "text-red-600";
       case "WARN":
-        return "text-yellow-500";
+        return "text-yellow-600";
       case "INFO":
-        return "text-blue-500";
+        return "text-blue-600";
       case "DEBUG":
         return "text-gray-500";
       default:
@@ -126,28 +126,28 @@ export const LogViewer = () => {
       case SocketConnectionStatus.CONNECTED:
         return {
           text: "Connected",
-          color: "text-green-500",
+          color: "text-green-600",
           bgColor: "bg-green-500/10",
           dotColor: "bg-green-500",
         };
       case SocketConnectionStatus.CONNECTING:
         return {
           text: "Connecting...",
-          color: "text-blue-500",
+          color: "text-blue-600",
           bgColor: "bg-blue-500/10",
           dotColor: "bg-blue-500 animate-pulse",
         };
       case SocketConnectionStatus.RECONNECTING:
         return {
           text: `Reconnecting (attempt ${socketStatus.connectionAttempts})`,
-          color: "text-yellow-500",
+          color: "text-yellow-600",
           bgColor: "bg-yellow-500/10",
           dotColor: "bg-yellow-500 animate-pulse",
         };
       case SocketConnectionStatus.ERROR:
         return {
           text: socketStatus.lastError || "Connection Error",
-          color: "text-red-500",
+          color: "text-red-600",
           bgColor: "bg-red-500/10",
           dotColor: "bg-red-500",
         };
@@ -198,7 +198,7 @@ export const LogViewer = () => {
               </button>
               <button
                 onClick={handleClose}
-                className="text-gray-400 hover:text-white transition-colors border border-red-500 rounded-full"
+                className="text-gray-500 hover:text-white transition-colors border border-red-500 rounded-full"
                 title="Close"
               >
                 <CloseRed />
@@ -235,7 +235,7 @@ export const LogViewer = () => {
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-2">
                   <div className={`w-2 h-2 rounded-full ${statusInfo.dotColor}`} />
-                  <span className="text-xs text-gray-400">Scenario Reports Socket:</span>
+                  <span className="text-xs text-gray-500">Scenario Reports Socket:</span>
                 </div>
                 <span className={`text-xs font-medium ${statusInfo.color}`}>{statusInfo.text}</span>
               </div>

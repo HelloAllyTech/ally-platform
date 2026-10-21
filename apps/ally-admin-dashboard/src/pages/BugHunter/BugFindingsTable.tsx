@@ -82,7 +82,7 @@ import {
  * it is the informative half.
  */
 const CONSUMER_BADGE_STYLE =
-  "inline-flex items-center rounded bg-purple-50 px-1 text-[10px] font-semibold text-purple-700";
+  "inline-flex items-center rounded bg-purple-50 px-1 text-xs font-semibold text-purple-700";
 
 /**
  * The severity dot before a title — what is left of the Severity column.
@@ -212,7 +212,7 @@ const SortableHeader: FC<{
               respond to a click. */}
           <span
             aria-hidden="true"
-            className={`text-[10px] ${isActive ? "text-typography-700" : "text-typography-300"}`}
+            className={`text-xs ${isActive ? "text-typography-700" : "text-typography-300"}`}
           >
             {isActive ? (direction === "asc" ? "▲" : "▼") : "↕"}
           </span>
@@ -1242,7 +1242,7 @@ export const BugFindingsTable: FC<BugFindingsTableProps> = ({
                                 )}
                                 align="top"
                               >
-                                <span className="shrink-0 inline-flex items-center whitespace-nowrap rounded border border-border-light bg-neutral-100 px-1.5 text-[10px] font-semibold text-typography-600 cursor-help">
+                                <span className="shrink-0 inline-flex items-center whitespace-nowrap rounded border border-border-light bg-neutral-100 px-1.5 text-xs font-semibold text-typography-600 cursor-help">
                                   {en.bugHunter.duplicateTag.replace(
                                     "{count}",
                                     String(duplicateCount),
@@ -1256,7 +1256,7 @@ export const BugFindingsTable: FC<BugFindingsTableProps> = ({
                               badge is the only coloured thing on a row. */}
                             {(finding.regressed || finding.regressionOf) && (
                               <Tooltip label={en.bugHunter.findingRegressedTooltip} align="top">
-                                <span className="shrink-0 inline-flex items-center whitespace-nowrap rounded border border-border-light bg-neutral-100 px-1.5 text-[10px] font-semibold text-typography-700 cursor-help">
+                                <span className="shrink-0 inline-flex items-center whitespace-nowrap rounded border border-border-light bg-neutral-100 px-1.5 text-xs font-semibold text-typography-700 cursor-help">
                                   {finding.regressionOf
                                     ? en.bugHunter.findingRegressionOfChip
                                     : en.bugHunter.findingRegressedChip}
@@ -1271,7 +1271,7 @@ export const BugFindingsTable: FC<BugFindingsTableProps> = ({
                                   label={en.bugHunter.findingLowConfidenceTooltip}
                                   align="top"
                                 >
-                                  <span className="shrink-0 inline-flex items-center whitespace-nowrap rounded border border-border-light bg-neutral-100 px-1.5 text-[10px] font-semibold text-typography-600 cursor-help">
+                                  <span className="shrink-0 inline-flex items-center whitespace-nowrap rounded border border-border-light bg-neutral-100 px-1.5 text-xs font-semibold text-typography-600 cursor-help">
                                     {en.bugHunter.findingLowConfidenceChip}
                                   </span>
                                 </Tooltip>

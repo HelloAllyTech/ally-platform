@@ -1,5 +1,5 @@
 export const BUTTON_STYLES = {
-  base: "flex text-base justify-center items-center w-1/2 px-4 py-2 rounded-[50px] transition-colors font-medium",
+  base: "flex text-base justify-center items-center w-1/2 px-4 py-2 rounded-none transition-colors font-normal",
   primary: "bg-primary-600 text-white hover:bg-primary-700",
   secondary: "text-typography-800 hover:bg-background-secondary",
   danger: "bg-destructive-600 text-white hover:bg-destructive-700",

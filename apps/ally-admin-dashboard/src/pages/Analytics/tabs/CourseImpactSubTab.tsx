@@ -61,9 +61,9 @@ const Section = ({
 /** A small labelled number. Text carries the meaning; nothing here is colour-only. */
 const Stat = ({ label, value, note }: { label: string; value: string; note: string }) => (
   <div className="flex flex-col gap-0.5 rounded border border-[#e0e0e0] p-3">
-    <span className="text-[11px] text-typography-500">{label}</span>
+    <span className="text-xs text-typography-500">{label}</span>
     <span className="text-2xl font-semibold tabular-nums text-typography-900">{value}</span>
-    <span className="text-[11px] leading-snug text-typography-500">{note}</span>
+    <span className="text-xs leading-snug text-typography-500">{note}</span>
   </div>
 );
 
@@ -282,7 +282,7 @@ export const CourseImpactSubTab = () => {
               emptyLabel="too few learners"
             />
             {refNote && (
-              <p className="max-w-4xl text-[11px] leading-snug text-typography-500">{refNote}</p>
+              <p className="max-w-4xl text-xs leading-snug text-typography-500">{refNote}</p>
             )}
             <div className="flex flex-wrap items-center gap-3 text-xs text-typography-500">
               {rows.length > COURSE_ROWS_COLLAPSED && (
@@ -298,7 +298,7 @@ export const CourseImpactSubTab = () => {
               )}
             </div>
             {data?.provenance && (
-              <p className="max-w-4xl text-[11px] leading-snug text-typography-500">
+              <p className="max-w-4xl text-xs leading-snug text-typography-500">
                 {data.provenance}
               </p>
             )}
@@ -403,7 +403,7 @@ export const CourseImpactSubTab = () => {
               <div className="flex flex-col gap-3">
                 <ChangeWhiskers rows={skillRows(detail.skills, chosen?.competencySource)} />
                 {detail.competencies.length > 0 && (
-                  <p className="text-[11px] leading-snug text-typography-500">
+                  <p className="text-xs leading-snug text-typography-500">
                     Competencies this course teaches{taughtFrom ? ` (${taughtFrom})` : ""}:{" "}
                     {detail.competencies.join(", ")}.
                   </p>

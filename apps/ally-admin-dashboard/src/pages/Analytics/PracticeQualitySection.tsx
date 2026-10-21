@@ -263,7 +263,7 @@ export const PracticeQualitySection = ({ tenantId }: { tenantId?: string }) => {
 
   return (
     <>
-      <h3 className="mb-3 mt-8 text-xs font-medium uppercase tracking-wide text-typography-500">
+      <h3 className="mb-3 mt-8 text-xs font-medium tracking-wide text-typography-500">
         Practice quality — was it practice?
       </h3>
 

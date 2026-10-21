@@ -20,7 +20,7 @@ interface DraftAnswer {
 
 const Section: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
   <div>
-    <h3 className="text-xs uppercase tracking-wide text-typography-500 mb-1">{label}</h3>
+    <h3 className="text-xs tracking-wide text-typography-500 mb-1">{label}</h3>
     {children}
   </div>
 );

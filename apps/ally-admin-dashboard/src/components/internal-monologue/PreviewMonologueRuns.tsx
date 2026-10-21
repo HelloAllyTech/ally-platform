@@ -46,12 +46,12 @@ const RunRow: React.FC<{
       }`}
     >
       <p className="text-xs font-medium text-typography-900">{formatRelativeTime(run.startedAt)}</p>
-      <p className="mt-0.5 text-[11px] text-typography-600">
+      <p className="mt-0.5 text-xs text-typography-600">
         {run.endedAt ? t.turns(run.turnCount) : t.inProgress}
         {run.startedByName ? ` · ${t.ranBy(run.startedByName)}` : ""}
       </p>
       {(languageLabel || run.scenarioVersionId) && (
-        <p className="mt-0.5 text-[11px] text-typography-600">
+        <p className="mt-0.5 text-xs text-typography-600">
           {[languageLabel, run.scenarioVersionId ? t.draftVersion : null]
             .filter(Boolean)
             .join(" · ")}

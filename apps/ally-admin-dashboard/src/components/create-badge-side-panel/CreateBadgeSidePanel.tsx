@@ -30,7 +30,7 @@ const Field: React.FC<FieldProps> = ({ label, children, multiline = false, requi
     <div className={`w-full md:w-[40%] ${multiline && "md:mt-[8px]"}`}>
       <span className="text-base font-regular text-typography-800">
         {label}
-        {required && <span className="text-red-500">*</span>}
+        {required && <span className="text-red-600">*</span>}
       </span>
     </div>
     <div className="w-full md:w-[60%] flex text-left justify-start text-neutral-800">

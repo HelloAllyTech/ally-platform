@@ -63,7 +63,7 @@ export const BuilderNotificationBell: FC = () => {
         {!isLoading && unread > 0 && (
           <span
             aria-label={`${unread} unread`}
-            className="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary-600 px-1 text-[10px] font-semibold text-white"
+            className="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary-600 px-1 text-xs font-semibold text-white"
           >
             {unread}
           </span>
@@ -98,7 +98,7 @@ export const BuilderNotificationBell: FC = () => {
                     }`}
                   >
                     <div className="flex items-baseline gap-2">
-                      <span className="text-xs font-semibold uppercase tracking-wide text-typography-600">
+                      <span className="text-xs font-semibold tracking-wide text-typography-600">
                         {strings.kinds[notification.kind] ?? notification.kind}
                       </span>
                       <span className="ml-auto whitespace-nowrap text-xs tabular-nums text-typography-500">

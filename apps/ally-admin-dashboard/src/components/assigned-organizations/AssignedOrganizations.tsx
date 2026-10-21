@@ -216,7 +216,7 @@ export const AssignedOrganizations: React.FC<AssignedOrganizationsProps> = ({
             if (e.target === e.currentTarget) closeAddModal();
           }}
         >
-          <div className="bg-white rounded-[10px] shadow-2xl w-[calc(100vw-2rem)] sm:w-auto sm:min-w-[360px] max-w-[90vw] max-h-[80dvh] flex flex-col p-4 sm:p-5 gap-4 font-primary animate-fadeIn">
+          <div className="bg-white rounded-none shadow-2xl w-[calc(100vw-2rem)] sm:w-auto sm:min-w-[360px] max-w-[90vw] max-h-[80dvh] flex flex-col p-4 sm:p-5 gap-4 font-primary animate-fadeIn">
             {/* Modal header */}
             <h3 className="text-lg font-semibold text-typography-900">
               {en.userManagement.selectOrganizations}
@@ -228,7 +228,7 @@ export const AssignedOrganizations: React.FC<AssignedOrganizationsProps> = ({
               onChange={e => setSearch(e.target.value)}
               placeholder={en.userManagement.searchOrganizationsPlaceholder}
               aria-label={en.userManagement.searchOrganizationsPlaceholder}
-              className="w-full rounded-lg border border-border-light px-3 py-2 text-sm text-typography-900 placeholder:text-typography-600 focus:outline-none focus:ring-1 focus:ring-primary-500"
+              className="w-full rounded-lg border border-border-light px-3 py-2 text-sm text-typography-900 placeholder:text-typography-placeholder focus:outline-none focus:ring-1 focus:ring-primary-500"
             />
 
             {/* Tenant list */}

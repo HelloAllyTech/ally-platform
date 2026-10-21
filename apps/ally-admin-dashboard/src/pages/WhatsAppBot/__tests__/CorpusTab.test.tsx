@@ -46,7 +46,7 @@ vi.mock("@constants", () => ({
         retryQueued: "Queued",
         archive: "Archive",
         unarchive: "Unarchive",
-        archivedBadge: "ARCHIVED",
+        archivedBadge: "Archived",
         archiveConfirmTitle: "Archive this document?",
         archiveConfirmDescription: "The bot will stop using it.",
         empty: "No documents yet",

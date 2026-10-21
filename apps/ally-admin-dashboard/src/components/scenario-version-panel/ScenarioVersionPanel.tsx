@@ -49,7 +49,7 @@ const STATUS_PILL: Record<ScenarioVersionStatus, string> = {
 
 const StatusPill: React.FC<{ status: ScenarioVersionStatus }> = ({ status }) => (
   <span
-    className={`inline-flex items-center px-[6px] py-[1px] rounded-full text-[11px] font-regular ${
+    className={`inline-flex items-center px-[6px] py-[1px] rounded-full text-xs font-regular ${
       STATUS_PILL[status] ?? STATUS_PILL[ScenarioVersionStatus.DRAFT]
     }`}
   >
@@ -202,7 +202,7 @@ export const ScenarioVersionPanel: React.FC<ScenarioVersionPanelProps> = ({
         {/* Inline create row (blank or branch) — no modal. */}
         {createMode && (
           <div className="px-4 py-3 border-b border-border-light bg-secondary-50">
-            <p className="text-[11px] text-typography-500 mb-1.5">
+            <p className="text-xs text-typography-500 mb-1.5">
               {createMode.empty
                 ? t.newBlankTitle
                 : t.branchingFrom(branchFrom ? formatVersionLabel(branchFrom) : "")}
@@ -292,19 +292,17 @@ export const ScenarioVersionPanel: React.FC<ScenarioVersionPanelProps> = ({
                         </span>
                         <StatusPill status={version.status} />
                         {version.type === ScenarioVersionType.AUTOMATIC && (
-                          <span className="inline-flex items-center px-[6px] py-[1px] rounded-full text-[11px] font-regular bg-secondary-100 text-typography-700 shrink-0">
+                          <span className="inline-flex items-center px-[6px] py-[1px] rounded-full text-xs font-regular bg-secondary-100 text-typography-700 shrink-0">
                             {t.autoBadge}
                           </span>
                         )}
                         {isActive && (
-                          <span className="text-[11px] text-typography-500 shrink-0">
-                            {t.editing}
-                          </span>
+                          <span className="text-xs text-typography-500 shrink-0">{t.editing}</span>
                         )}
                       </button>
                     )}
                     {!isRenamingThis && (
-                      <span className="text-[11px] text-typography-500 shrink-0">
+                      <span className="text-xs text-typography-500 shrink-0">
                         {formatDate(version.createdAt)}
                       </span>
                     )}

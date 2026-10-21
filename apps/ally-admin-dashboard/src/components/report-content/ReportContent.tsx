@@ -53,7 +53,7 @@ const markdownComponents: Components = {
   tbody: ({ children }) => <tbody className="divide-y divide-gray-100">{children}</tbody>,
   tr: ({ children }) => <tr>{children}</tr>,
   th: ({ children }) => (
-    <th className="text-left text-sm font-medium text-gray-500 uppercase tracking-wider px-4 py-2 border-b border-gray-200">
+    <th className="text-left text-sm font-medium text-gray-500 px-4 py-2 border-b border-gray-200">
       {children}
     </th>
   ),

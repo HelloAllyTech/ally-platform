@@ -143,7 +143,7 @@ export const AutoTerminationRuleField: React.FC<AutoTerminationRuleFieldProps> =
         <button
           type="button"
           onClick={handleAddTermination}
-          className="text-primary-500 flex gap-3 items-center font-medium font-tertiary text-base disabled:opacity-40"
+          className="text-primary-500 flex gap-3 items-center font-normal font-tertiary text-base disabled:opacity-40"
           disabled={
             watchedRules.length >= RULE_LIMIT ||
             (watchedRules.length > 0 && !watchedRules[watchedRules.length - 1]?.id)

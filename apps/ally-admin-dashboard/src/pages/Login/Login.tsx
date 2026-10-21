@@ -236,13 +236,13 @@ export const Login: React.FC = () => {
           </div>
           <Button
             type="button"
-            className="w-full rounded-[5px] mt-6"
+            className="w-full rounded-none mt-6"
             disabled={isLoading || isSubmitDisabled}
             onClick={handleNext}
           >
             {isLoading ? (
               <div className="flex items-center justify-center">
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-[5px] animate-spin mr-2"></div>
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
                 {en.auth.generatingOTP}
               </div>
             ) : (
@@ -325,13 +325,13 @@ export const Login: React.FC = () => {
         </div>
         <Button
           type="button"
-          className="w-full rounded-[5px] mt-2 font-tertiary"
+          className="w-full rounded-none mt-2 font-tertiary"
           disabled={isLoading || isSubmitDisabled}
           onClick={handleVerify}
         >
           {isLoading ? (
             <div className="flex items-center justify-center">
-              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-[5px] animate-spin mr-2"></div>
+              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
               {en.auth.signingIn}
             </div>
           ) : (
@@ -351,7 +351,7 @@ export const Login: React.FC = () => {
         <CustomImage
           src={LoginImage}
           alt="Login"
-          className="w-full h-full object-cover lg:rounded-[16px]"
+          className="w-full h-full object-cover lg:rounded-none"
         />
         <div
           className="flex items-center gap-2 p-3 rounded-tl-2xl bg-background absolute bottom-0 right-0 cursor-pointer"
@@ -366,7 +366,7 @@ export const Login: React.FC = () => {
 
       {/* Below md the photo is hidden, so the card sits in the page flow at full width instead
           of floating over it in the middle 50%. */}
-      <div className="flex-1 static md:absolute min-h-[35vh] p-4 md:p-5 rounded-[10px] bottom-[10%] right-[25%] left-[25%] lg:static bg-background flex flex-col items-center justify-center md:min-h-auto">
+      <div className="flex-1 static md:absolute min-h-[35vh] p-4 md:p-5 rounded-none bottom-[10%] right-[25%] left-[25%] lg:static bg-background flex flex-col items-center justify-center md:min-h-auto">
         <div className="w-full max-w-md flex flex-col gap-4 sm:gap-6">
           <AnimatePresence mode="wait">{getLoginSection()}</AnimatePresence>
         </div>

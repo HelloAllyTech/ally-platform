@@ -64,7 +64,7 @@ export const PlatformStatusCard: FC<PlatformStatusCardProps> = ({
               <span className="text-sm text-typography-600 ml-1.5">{liveVersionSuffix}</span>
             )}
           </p>
-          <p className="text-xs uppercase tracking-wide text-typography-600 mt-0.5">Live version</p>
+          <p className="text-xs tracking-wide text-typography-600 mt-0.5">Live version</p>
         </>
       )}
 

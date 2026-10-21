@@ -89,7 +89,7 @@ const shortcutGroups = (canTriage: boolean): { title: string; shortcuts: Shortcu
 ];
 
 const KeyCap: FC<{ children: string }> = ({ children }) => (
-  <kbd className="inline-flex items-center justify-center min-w-[1.5rem] px-1.5 py-0.5 rounded border border-border-light bg-neutral-50 text-[11px] font-mono text-typography-800">
+  <kbd className="inline-flex items-center justify-center min-w-[1.5rem] px-1.5 py-0.5 rounded border border-border-light bg-neutral-50 text-xs font-mono text-typography-800">
     {children}
   </kbd>
 );
@@ -145,9 +145,7 @@ export const KeyboardShortcutSheet: FC<KeyboardShortcutSheetProps> = ({
               {/* Serif: a group heading is a word, not a key. The `<kbd>` above
                   keeps its monospace, which is what the config's code/ID
                   carve-out is for. */}
-              <p className="text-[11px] uppercase tracking-wide text-typography-500 mb-2">
-                {group.title}
-              </p>
+              <p className="text-xs tracking-wide text-typography-500 mb-2">{group.title}</p>
               <ul className="flex flex-col gap-1.5">
                 {group.shortcuts.map(shortcut => (
                   <li key={shortcut.label} className="flex items-center justify-between gap-4">

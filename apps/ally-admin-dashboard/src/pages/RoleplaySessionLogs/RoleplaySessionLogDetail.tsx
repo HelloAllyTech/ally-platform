@@ -691,7 +691,7 @@ export const RoleplaySessionLogDetail: FC = () => {
                       <div className="flex items-baseline justify-between gap-2">
                         <span className="text-xs text-typography-700">{m.label}</span>
                         <span
-                          className={`text-xs md:text-[10px] px-1.5 py-0.5 rounded ${
+                          className={`text-xs px-1.5 py-0.5 rounded ${
                             WEAK_METRIC_STATE_CLASS[m.state] ?? ""
                           }`}
                         >

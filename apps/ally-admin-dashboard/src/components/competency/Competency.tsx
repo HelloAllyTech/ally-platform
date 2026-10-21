@@ -1000,7 +1000,7 @@ export const Competency: React.FC<CompetencyProps> = ({
               <div>
                 {groups.clusterUnits.length > 0 && (
                   <div className="bg-background-secondary px-3 py-1.5">
-                    <span className="text-xs font-medium uppercase tracking-wide text-typography-700">
+                    <span className="text-xs font-medium tracking-wide text-typography-700">
                       Individual competencies
                     </span>
                   </div>

@@ -202,9 +202,9 @@ const InlinePicker = <T extends { id: string; label: string }>({
 /** A small labelled number for the precision strip. */
 const Stat = ({ label, value, note }: { label: string; value: string; note: string }) => (
   <div className="flex flex-col gap-0.5 rounded border border-[#e0e0e0] p-3">
-    <span className="text-[11px] text-typography-500">{label}</span>
+    <span className="text-xs text-typography-500">{label}</span>
     <span className="text-lg font-semibold tabular-nums text-typography-900">{value}</span>
-    <span className="text-[11px] leading-snug text-typography-500">{note}</span>
+    <span className="text-xs leading-snug text-typography-500">{note}</span>
   </div>
 );
 
@@ -906,7 +906,7 @@ export const FoundationalSkillsSubTab = () => {
             />
             {notMeasurable.length > 0 && (
               <div className="mt-4">
-                <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-typography-500">
+                <p className="mb-1 text-xs font-semibold tracking-wide text-typography-500">
                   Not measurable on this rubric yet
                 </p>
                 <ul className="flex flex-col gap-1 text-xs text-typography-700">
@@ -1033,7 +1033,7 @@ export const FoundationalSkillsSubTab = () => {
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex flex-col gap-0.5">
                         <p className="text-sm text-typography-900">{bh.text}</p>
-                        <p className="text-[11px] text-typography-500">
+                        <p className="text-xs text-typography-500">
                           {skillName.get(bh.skill) ?? bh.skill} · n = {bh.everLearners}
                         </p>
                       </div>
@@ -1141,7 +1141,7 @@ export const FoundationalSkillsSubTab = () => {
                       { label: "Unclear", value: sh.cutsAmbiguous, color: CONTEXT.faint },
                     ]}
                   />
-                  <p className="text-[11px] text-typography-500">
+                  <p className="text-xs text-typography-500">
                     {sh.cutsWithAdvanced} slice(s) also explored risk or agreed a safety plan.
                   </p>
                 </div>
@@ -1455,7 +1455,7 @@ export const FoundationalSkillsSubTab = () => {
       <FoundationalSkillsValiditySection tenantId={tenantId} windowLabel={allTime} />
 
       {data && (
-        <p className="max-w-4xl text-[11px] leading-relaxed text-typography-500">
+        <p className="max-w-4xl text-xs leading-relaxed text-typography-500">
           {data.provenance.derivation} {data.provenance.note}
         </p>
       )}

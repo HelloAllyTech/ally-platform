@@ -201,7 +201,7 @@ export const QuestionSetDrawer: React.FC<QuestionSetDrawerProps> = ({
               disabled={isReadOnly}
               onChange={e => setName(e.target.value)}
               placeholder={en.aiLab.questionSets.namePlaceholder}
-              className="border border-border-light rounded-md px-3 py-2 w-full outline-none text-base bg-white disabled:bg-background-secondary disabled:text-typography-500"
+              className="border border-border-light rounded-md px-3 py-2 w-full outline-none text-base bg-white disabled:bg-background-secondary disabled:text-typography-disabled"
             />
           </div>
           <div className="flex flex-col gap-1.5">
@@ -214,7 +214,7 @@ export const QuestionSetDrawer: React.FC<QuestionSetDrawerProps> = ({
               onChange={e => setDescription(e.target.value)}
               placeholder={en.aiLab.questionSets.descriptionPlaceholder}
               rows={2}
-              className="border border-border-light rounded-md px-3 py-2 w-full outline-none text-base bg-white disabled:bg-background-secondary disabled:text-typography-500"
+              className="border border-border-light rounded-md px-3 py-2 w-full outline-none text-base bg-white disabled:bg-background-secondary disabled:text-typography-disabled"
             />
           </div>
 
@@ -266,7 +266,7 @@ export const QuestionSetDrawer: React.FC<QuestionSetDrawerProps> = ({
                   disabled={isReadOnly}
                   onChange={e => updateQuestion(index, { question: e.target.value })}
                   placeholder={en.aiLab.questionSets.questionPlaceholder}
-                  className="border border-border-light rounded-md px-3 py-2 w-full outline-none text-base bg-white disabled:bg-background-secondary disabled:text-typography-500"
+                  className="border border-border-light rounded-md px-3 py-2 w-full outline-none text-base bg-white disabled:bg-background-secondary disabled:text-typography-disabled"
                 />
                 <div className="flex gap-4">
                   <div className="flex flex-col gap-1 flex-1">

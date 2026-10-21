@@ -180,7 +180,7 @@ export const QuestionSetsTab: React.FC = () => {
                           {set.isArchived && (
                             <span
                               title={en.aiLab.questionSets.archivedHelp}
-                              className="text-xs font-medium uppercase tracking-wide text-typography-600 border border-border-light rounded px-1.5 py-0.5"
+                              className="text-xs font-medium tracking-wide text-typography-600 border border-border-light rounded px-1.5 py-0.5"
                             >
                               {en.aiLab.questionSets.archivedBadge}
                             </span>
