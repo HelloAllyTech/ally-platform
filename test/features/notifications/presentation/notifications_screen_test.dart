@@ -22,15 +22,21 @@ NotificationItem _item({
   required String title,
   required String body,
   String? readAt,
+  String type = 'SYSTEM',
+  Map<String, dynamic>? data,
 }) =>
     NotificationItem(
       id: id,
-      type: 'SYSTEM',
+      type: type,
       title: title,
       body: body,
       readAt: readAt,
       createdAt: '2026-10-01T10:00:00.000Z',
+      data: data,
     );
+
+({List<NotificationItem> items, int count}) _page(List<NotificationItem> items) =>
+    (items: items, count: items.length);
 
 void main() {
   late MockNotificationsRepository repository;
@@ -40,7 +46,7 @@ void main() {
   });
 
   testWidgets('shows a loading indicator while the list is in flight', (tester) async {
-    final completer = Completer<List<NotificationItem>>();
+    final completer = Completer<({List<NotificationItem> items, int count})>();
     when(() => repository.list()).thenAnswer((_) => completer.future);
 
     // A never-resolving list future keeps CircularProgressIndicator's own
@@ -75,7 +81,7 @@ void main() {
   });
 
   testWidgets('shows the empty message when there are no notifications', (tester) async {
-    when(() => repository.list()).thenAnswer((_) async => []);
+    when(() => repository.list()).thenAnswer((_) async => _page([]));
 
     await preWarmTranslations(tester);
     await pumpApp(
@@ -88,10 +94,10 @@ void main() {
   });
 
   testWidgets('renders read and unread notifications with the right styling', (tester) async {
-    when(() => repository.list()).thenAnswer((_) async => [
+    when(() => repository.list()).thenAnswer((_) async => _page([
           _item(id: 'n1', title: 'Unread title', body: 'Unread body'),
           _item(id: 'n2', title: 'Read title', body: 'Read body', readAt: '2026-10-02T00:00:00.000Z'),
-        ]);
+        ]));
 
     await preWarmTranslations(tester);
     await pumpApp(
@@ -107,9 +113,9 @@ void main() {
   });
 
   testWidgets('tapping an unread notification marks it read and refreshes', (tester) async {
-    when(() => repository.list()).thenAnswer((_) async => [
+    when(() => repository.list()).thenAnswer((_) async => _page([
           _item(id: 'n1', title: 'Unread title', body: 'Unread body'),
-        ]);
+        ]));
     when(() => repository.markRead('n1')).thenAnswer((_) async {});
 
     await preWarmTranslations(tester);
@@ -126,9 +132,9 @@ void main() {
   });
 
   testWidgets('tapping an already-read notification does not call markRead', (tester) async {
-    when(() => repository.list()).thenAnswer((_) async => [
+    when(() => repository.list()).thenAnswer((_) async => _page([
           _item(id: 'n2', title: 'Read title', body: 'Read body', readAt: '2026-10-02T00:00:00.000Z'),
-        ]);
+        ]));
 
     await preWarmTranslations(tester);
     await pumpApp(
@@ -144,9 +150,9 @@ void main() {
   });
 
   testWidgets('mark all read calls the repository', (tester) async {
-    when(() => repository.list()).thenAnswer((_) async => [
+    when(() => repository.list()).thenAnswer((_) async => _page([
           _item(id: 'n1', title: 'Unread title', body: 'Unread body'),
-        ]);
+        ]));
     when(() => repository.markAllRead()).thenAnswer((_) async {});
 
     await preWarmTranslations(tester);
@@ -163,9 +169,9 @@ void main() {
   });
 
   testWidgets('hides "Mark all read" entirely when nothing is unread', (tester) async {
-    when(() => repository.list()).thenAnswer((_) async => [
+    when(() => repository.list()).thenAnswer((_) async => _page([
           _item(id: 'n1', title: 'Read title', body: 'Read body', readAt: '2026-10-02T00:00:00.000Z'),
-        ]);
+        ]));
 
     await preWarmTranslations(tester);
     await pumpApp(
@@ -179,7 +185,7 @@ void main() {
 
   testWidgets('shows a relative "time ago" timestamp per item', (tester) async {
     when(() => repository.list()).thenAnswer(
-      (_) async => [_item(id: 'n1', title: 'Unread title', body: 'Unread body')],
+      (_) async => _page([_item(id: 'n1', title: 'Unread title', body: 'Unread body')]),
     );
 
     await preWarmTranslations(tester);
@@ -195,7 +201,7 @@ void main() {
   });
 
   testWidgets('has a real back button that pops the route', (tester) async {
-    when(() => repository.list()).thenAnswer((_) async => []);
+    when(() => repository.list()).thenAnswer((_) async => _page([]));
 
     final router = await pumpRouterApp(
       tester,
@@ -213,5 +219,68 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('HOME'), findsOneWidget);
+  });
+
+  testWidgets('scrolling near the bottom loads the next page and appends it', (tester) async {
+    final page1 = List.generate(
+      20,
+      (i) => _item(id: 'n$i', title: 'Title $i', body: 'Body $i'),
+    );
+    final page2 = [_item(id: 'n20', title: 'Title 20', body: 'Body 20')];
+    when(() => repository.list(limit: 25, offset: 0)).thenAnswer(
+      (_) async => (items: page1, count: 21),
+    );
+    when(() => repository.list(limit: 25, offset: 20)).thenAnswer(
+      (_) async => (items: page2, count: 21),
+    );
+
+    await preWarmTranslations(tester);
+    await pumpApp(
+      tester,
+      const NotificationsScreen(),
+      overrides: [notificationsRepositoryProvider.overrideWithValue(repository)],
+    );
+
+    expect(find.text('Title 20'), findsNothing, reason: 'not loaded yet');
+
+    await tester.drag(find.byType(ListView), const Offset(0, -20000));
+    await tester.pumpAndSettle();
+
+    verify(() => repository.list(limit: 25, offset: 20)).called(1);
+    expect(find.text('Title 20'), findsOneWidget);
+  });
+
+  testWidgets('tapping a course-discussion-reply notification navigates to the track', (tester) async {
+    when(() => repository.list()).thenAnswer(
+      (_) async => _page([
+        _item(
+          id: 'n1',
+          title: 'New reply',
+          body: 'Someone replied',
+          type: 'COURSE_DISCUSSION_REPLY',
+          data: {'trackId': 't1', 'itemId': 'i1', 'postId': 'p1'},
+        ),
+      ]),
+    );
+    when(() => repository.markRead('n1')).thenAnswer((_) async {});
+
+    await pumpRouterApp(
+      tester,
+      initialLocation: '/notifications',
+      routes: [
+        GoRoute(path: '/notifications', builder: (context, state) => const NotificationsScreen()),
+        GoRoute(
+          path: '/courses/:trackId',
+          builder: (context, state) => Text('TRACK:${state.pathParameters['trackId']}'),
+        ),
+      ],
+      overrides: [notificationsRepositoryProvider.overrideWithValue(repository)],
+    );
+
+    await tester.tap(find.text('New reply'));
+    await tester.pumpAndSettle();
+
+    verify(() => repository.markRead('n1')).called(1);
+    expect(find.text('TRACK:t1'), findsOneWidget);
   });
 }

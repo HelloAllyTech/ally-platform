@@ -22,11 +22,12 @@ void main() {
   });
 
   group('list', () {
-    test('defaults to limit=25/offset=0 and maps every entry', () async {
+    test('defaults to limit=25/offset=0, maps every entry, and surfaces the real total count', () async {
       when(() => dio.get<Map<String, dynamic>>(
             '/notifications',
             queryParameters: {'limit': 25, 'offset': 0},
           )).thenAnswer((_) async => _response({
+            'count': 40,
             'data': [
               {
                 'id': 'n1',
@@ -38,40 +39,43 @@ void main() {
               },
               {
                 'id': 'n2',
-                'type': 'REMINDER',
+                'type': 'COURSE_DISCUSSION_REPLY',
                 'title': 'Title 2',
                 'body': 'Body 2',
                 'readAt': '2026-10-02T09:00:00.000Z',
                 'createdAt': '2026-10-02T08:00:00.000Z',
+                'data': {'trackId': 't1', 'itemId': 'i1', 'postId': 'p1'},
               },
             ],
           }));
 
       final result = await repository.list();
 
-      expect(result, hasLength(2));
-      expect(result[0].id, 'n1');
-      expect(result[0].isRead, isFalse);
-      expect(result[1].id, 'n2');
-      expect(result[1].isRead, isTrue);
+      expect(result.count, 40);
+      expect(result.items, hasLength(2));
+      expect(result.items[0].id, 'n1');
+      expect(result.items[0].isRead, isFalse);
+      expect(result.items[1].id, 'n2');
+      expect(result.items[1].isRead, isTrue);
+      expect(result.items[1].data, {'trackId': 't1', 'itemId': 'i1', 'postId': 'p1'});
     });
 
     test('passes custom limit/offset through', () async {
       when(() => dio.get<Map<String, dynamic>>(
             '/notifications',
             queryParameters: {'limit': 10, 'offset': 20},
-          )).thenAnswer((_) async => _response({'data': <dynamic>[]}));
+          )).thenAnswer((_) async => _response({'data': <dynamic>[], 'count': 0}));
 
       final result = await repository.list(limit: 10, offset: 20);
 
-      expect(result, isEmpty);
+      expect(result.items, isEmpty);
       verify(() => dio.get<Map<String, dynamic>>(
             '/notifications',
             queryParameters: {'limit': 10, 'offset': 20},
           )).called(1);
     });
 
-    test('returns an empty list when the response has no data field', () async {
+    test('returns an empty page when the response has no data/count field', () async {
       when(() => dio.get<Map<String, dynamic>>(
             '/notifications',
             queryParameters: {'limit': 25, 'offset': 0},
@@ -79,7 +83,8 @@ void main() {
 
       final result = await repository.list();
 
-      expect(result, isEmpty);
+      expect(result.items, isEmpty);
+      expect(result.count, 0);
     });
   });
 
