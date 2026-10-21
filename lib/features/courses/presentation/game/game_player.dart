@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../../../core/localization/translate_ref.dart';
+import '../../data/course_models.dart';
 import '../../data/courses_repository.dart';
 import '../../data/start_item_payload.dart';
 
@@ -66,7 +67,7 @@ class GamePlayer extends ConsumerStatefulWidget {
 
   final StartItemPayload payload;
   final String itemId;
-  final VoidCallback onCompleted;
+  final void Function(TrackItemCompletionResult result) onCompleted;
 
   @override
   ConsumerState<GamePlayer> createState() => _GamePlayerState();
@@ -94,7 +95,16 @@ class _GamePlayerState extends ConsumerState<GamePlayer> {
     // callback still fires effectively immediately (before the next
     // frame), just safely outside the build phase.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) widget.onCompleted();
+      if (mounted) {
+        widget.onCompleted(
+          widget.payload.gameCompletion ??
+              TrackItemCompletionResult(
+                completed: true,
+                sectionCompleted: false,
+                trackCompleted: false,
+              ),
+        );
+      }
     });
     _loadGame();
   }
@@ -109,7 +119,10 @@ class _GamePlayerState extends ConsumerState<GamePlayer> {
     final html = await rootBundle.loadString(assetPath);
     final controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..addJavaScriptChannel('AllyGameChannel', onMessageReceived: _handleMessage)
+      ..addJavaScriptChannel(
+        'AllyGameChannel',
+        onMessageReceived: _handleMessage,
+      )
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageFinished: (_) {
@@ -154,7 +167,12 @@ class _GamePlayerState extends ConsumerState<GamePlayer> {
     final height = _gameHeights[gameKey] ?? 300;
 
     if (_loadError != null) {
-      return Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_loadError!)));
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(_loadError!),
+        ),
+      );
     }
 
     return ListView(
@@ -182,11 +200,15 @@ class _GamePlayerState extends ConsumerState<GamePlayer> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             if (_lastScore != null) ...[
-              Text(ref.t('courses.game.lastScore.$gameKey', {'score': _lastScore})),
+              Text(
+                ref.t('courses.game.lastScore.$gameKey', {'score': _lastScore}),
+              ),
               const SizedBox(width: 16),
             ],
             if (_bestScore != null)
-              Text(ref.t('courses.game.bestScore.$gameKey', {'score': _bestScore})),
+              Text(
+                ref.t('courses.game.bestScore.$gameKey', {'score': _bestScore}),
+              ),
           ],
         ),
         const SizedBox(height: 8),

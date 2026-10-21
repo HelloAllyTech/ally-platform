@@ -2,7 +2,16 @@
 /// learner types. Only the fields the ported screens actually use are
 /// modeled; the RN type file has more (discussion flags) that later
 /// screens will need as they're ported.
-enum TrackItemType { roleplay, caseItem, quiz, article, video, journal, game, unknown }
+enum TrackItemType {
+  roleplay,
+  caseItem,
+  quiz,
+  article,
+  video,
+  journal,
+  game,
+  unknown,
+}
 
 TrackItemType trackItemTypeFromString(String? value) {
   switch (value) {
@@ -40,6 +49,31 @@ TrackItemStatus trackItemStatusFromString(String? value) {
   }
 }
 
+/// Mirrors ally-mobile (React Native)'s `TrackItemCompletionResult` — the
+/// shape every completion-triggering endpoint returns (article read, video
+/// progress, journal submit, a game's initial payload, a quiz attempt).
+/// `unlockedItemIds` isn't modeled: this scoped port's `CourseItemPlayerScreen`
+/// has no track-wide navigation/unlock-gating of its own to feed it (see the
+/// full-app audit's "CourseItemPlayerScreen track-level navigation" item).
+class TrackItemCompletionResult {
+  TrackItemCompletionResult({
+    required this.completed,
+    required this.sectionCompleted,
+    required this.trackCompleted,
+  });
+
+  factory TrackItemCompletionResult.fromJson(Map<String, dynamic> json) =>
+      TrackItemCompletionResult(
+        completed: json['completed'] as bool? ?? false,
+        sectionCompleted: json['sectionCompleted'] as bool? ?? false,
+        trackCompleted: json['trackCompleted'] as bool? ?? false,
+      );
+
+  final bool completed;
+  final bool sectionCompleted;
+  final bool trackCompleted;
+}
+
 class TrackListItem {
   TrackListItem({
     required this.id,
@@ -53,15 +87,15 @@ class TrackListItem {
   });
 
   factory TrackListItem.fromJson(Map<String, dynamic> json) => TrackListItem(
-        id: json['id'] as String,
-        title: json['title'] as String,
-        description: json['description'] as String?,
-        coverImageUrl: json['coverImageUrl'] as String?,
-        totalItems: (json['totalItems'] as num?)?.toInt() ?? 0,
-        completedItems: (json['completedItems'] as num?)?.toInt() ?? 0,
-        enrolled: json['enrolled'] as bool? ?? false,
-        trackEnrollmentId: json['trackEnrollmentId'] as String?,
-      );
+    id: json['id'] as String,
+    title: json['title'] as String,
+    description: json['description'] as String?,
+    coverImageUrl: json['coverImageUrl'] as String?,
+    totalItems: (json['totalItems'] as num?)?.toInt() ?? 0,
+    completedItems: (json['completedItems'] as num?)?.toInt() ?? 0,
+    enrolled: json['enrolled'] as bool? ?? false,
+    trackEnrollmentId: json['trackEnrollmentId'] as String?,
+  );
 
   final String id;
   final String title;
@@ -85,7 +119,8 @@ class TrackDetailItem {
     required this.maxWatchedPct,
   });
 
-  factory TrackDetailItem.fromJson(Map<String, dynamic> json) => TrackDetailItem(
+  factory TrackDetailItem.fromJson(Map<String, dynamic> json) =>
+      TrackDetailItem(
         id: json['id'] as String,
         type: trackItemTypeFromString(json['type'] as String?),
         order: (json['order'] as num?)?.toInt() ?? 0,
@@ -115,13 +150,13 @@ class TrackSection {
   });
 
   factory TrackSection.fromJson(Map<String, dynamic> json) => TrackSection(
-        id: json['id'] as String,
-        title: json['title'] as String,
-        order: (json['order'] as num?)?.toInt() ?? 0,
-        items: (json['items'] as List<dynamic>? ?? [])
-            .map((e) => TrackDetailItem.fromJson(e as Map<String, dynamic>))
-            .toList(),
-      );
+    id: json['id'] as String,
+    title: json['title'] as String,
+    order: (json['order'] as num?)?.toInt() ?? 0,
+    items: (json['items'] as List<dynamic>? ?? [])
+        .map((e) => TrackDetailItem.fromJson(e as Map<String, dynamic>))
+        .toList(),
+  );
 
   final String id;
   final String title;
@@ -144,19 +179,19 @@ class TrackDetail {
   });
 
   factory TrackDetail.fromJson(Map<String, dynamic> json) => TrackDetail(
-        id: json['id'] as String,
-        title: json['title'] as String,
-        description: json['description'] as String?,
-        coverImageUrl: json['coverImageUrl'] as String?,
-        status: json['status'] as String? ?? '',
-        totalItems: (json['totalItems'] as num?)?.toInt() ?? 0,
-        completedItems: (json['completedItems'] as num?)?.toInt() ?? 0,
-        enrolled: json['enrolled'] as bool? ?? false,
-        trackEnrollmentId: json['trackEnrollmentId'] as String?,
-        sections: (json['sections'] as List<dynamic>? ?? [])
-            .map((e) => TrackSection.fromJson(e as Map<String, dynamic>))
-            .toList(),
-      );
+    id: json['id'] as String,
+    title: json['title'] as String,
+    description: json['description'] as String?,
+    coverImageUrl: json['coverImageUrl'] as String?,
+    status: json['status'] as String? ?? '',
+    totalItems: (json['totalItems'] as num?)?.toInt() ?? 0,
+    completedItems: (json['completedItems'] as num?)?.toInt() ?? 0,
+    enrolled: json['enrolled'] as bool? ?? false,
+    trackEnrollmentId: json['trackEnrollmentId'] as String?,
+    sections: (json['sections'] as List<dynamic>? ?? [])
+        .map((e) => TrackSection.fromJson(e as Map<String, dynamic>))
+        .toList(),
+  );
 
   final String id;
   final String title;

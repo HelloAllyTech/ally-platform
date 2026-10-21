@@ -8,6 +8,7 @@ import '../../../../core/localization/translate_ref.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/app_text_field.dart';
+import '../../data/course_models.dart';
 import '../../data/courses_repository.dart';
 import '../../data/start_item_payload.dart';
 
@@ -27,7 +28,7 @@ class JournalPlayer extends ConsumerStatefulWidget {
   final StartItemPayload payload;
   final String itemId;
   final bool alreadyCompleted;
-  final VoidCallback onCompleted;
+  final void Function(TrackItemCompletionResult result) onCompleted;
 
   @override
   ConsumerState<JournalPlayer> createState() => _JournalPlayerState();
@@ -54,7 +55,12 @@ class _JournalPlayerState extends ConsumerState<JournalPlayer> {
     _controllers = {
       for (final prompt in _prompts)
         prompt.id: TextEditingController(
-          text: saved.where((r) => r.promptId == prompt.id).firstOrNull?.response ?? '',
+          text:
+              saved
+                  .where((r) => r.promptId == prompt.id)
+                  .firstOrNull
+                  ?.response ??
+              '',
         ),
     };
   }
@@ -68,8 +74,9 @@ class _JournalPlayerState extends ConsumerState<JournalPlayer> {
     super.dispose();
   }
 
-  bool get _allRequiredAnswered =>
-      _prompts.every((p) => !p.required || _controllers[p.id]!.text.trim().isNotEmpty);
+  bool get _allRequiredAnswered => _prompts.every(
+    (p) => !p.required || _controllers[p.id]!.text.trim().isNotEmpty,
+  );
 
   void _onChanged(String _) {
     if (_submitted) return;
@@ -81,7 +88,9 @@ class _JournalPlayerState extends ConsumerState<JournalPlayer> {
   Future<void> _persist() async {
     setState(() => _autosaveStatus = _AutosaveStatus.saving);
     try {
-      await ref.read(coursesRepositoryProvider).saveJournalDraft(
+      await ref
+          .read(coursesRepositoryProvider)
+          .saveJournalDraft(
             itemId: widget.itemId,
             responses: [
               for (final prompt in _prompts)
@@ -100,12 +109,14 @@ class _JournalPlayerState extends ConsumerState<JournalPlayer> {
     try {
       _debounce?.cancel();
       await _persist();
-      await ref.read(coursesRepositoryProvider).submitJournal(widget.itemId);
+      final result = await ref
+          .read(coursesRepositoryProvider)
+          .submitJournal(widget.itemId);
       setState(() {
         _submitted = true;
         _submitting = false;
       });
-      widget.onCompleted();
+      widget.onCompleted(result);
     } catch (_) {
       // Submit stays available so the learner can retry, same as the RN
       // screen.
@@ -143,7 +154,10 @@ class _JournalPlayerState extends ConsumerState<JournalPlayer> {
                 alignment: Alignment.centerRight,
                 child: Text(
                   _autosaveLabel,
-                  style: TextStyle(color: _autosaveColor(context), fontSize: 12),
+                  style: TextStyle(
+                    color: _autosaveColor(context),
+                    fontSize: 12,
+                  ),
                 ),
               ),
               const SizedBox(height: 8),
@@ -170,8 +184,12 @@ class _JournalPlayerState extends ConsumerState<JournalPlayer> {
                                       TextSpan(text: _prompts[i].prompt),
                                       if (_prompts[i].required)
                                         TextSpan(
-                                          text: ' (${ref.t('courses.journal.required')})',
-                                          style: const TextStyle(color: Colors.red, fontSize: 12),
+                                          text:
+                                              ' (${ref.t('courses.journal.required')})',
+                                          style: const TextStyle(
+                                            color: Colors.red,
+                                            fontSize: 12,
+                                          ),
                                         ),
                                     ],
                                   ),
@@ -188,7 +206,9 @@ class _JournalPlayerState extends ConsumerState<JournalPlayer> {
                             style: AppTextField.textStyleFor(context),
                             decoration: AppTextField.decorationFor(
                               context,
-                              placeholder: _prompts[i].placeholder ?? ref.t('courses.journal.placeholder'),
+                              placeholder:
+                                  _prompts[i].placeholder ??
+                                  ref.t('courses.journal.placeholder'),
                             ),
                           ),
                         ],
@@ -206,7 +226,11 @@ class _JournalPlayerState extends ConsumerState<JournalPlayer> {
                 ? Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      SvgPicture.asset('assets/icons/checkCircle.svg', width: 24, height: 24),
+                      SvgPicture.asset(
+                        'assets/icons/checkCircle.svg',
+                        width: 24,
+                        height: 24,
+                      ),
                       const SizedBox(width: 8),
                       Text(ref.t('courses.journal.submitted')),
                     ],

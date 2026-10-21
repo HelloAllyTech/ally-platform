@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:ally_mobile_flutter/features/courses/data/course_models.dart';
 import 'package:ally_mobile_flutter/features/courses/data/courses_repository.dart';
 import 'package:ally_mobile_flutter/features/courses/data/start_item_payload.dart';
 import 'package:ally_mobile_flutter/features/courses/presentation/game/game_player.dart';
@@ -40,48 +41,95 @@ void main() {
     );
   }
 
-  StartItemPayload payloadFor(String? gameKey) => StartItemPayload(
-        trackItemProgressId: 'p1',
-        type: 'GAME',
-        gameKey: gameKey,
-        gameIntro: 'Have fun!',
-        gameBestScore: 7,
+  StartItemPayload payloadFor(
+    String? gameKey, {
+    TrackItemCompletionResult? completion,
+  }) => StartItemPayload(
+    trackItemProgressId: 'p1',
+    type: 'GAME',
+    gameKey: gameKey,
+    gameIntro: 'Have fun!',
+    gameBestScore: 7,
+    gameCompletion: completion,
+  );
+
+  testWidgets(
+    'onCompleted fires immediately on mount with the payload\'s real completion result',
+    (tester) async {
+      // The server already marked a GAME item complete the moment
+      // `startTrackItem` returned (see the class doc in game_player.dart) —
+      // `onCompleted` fires synchronously from `initState`, independent of
+      // whether the gameKey is even recognized, carrying whatever
+      // section/track-completed flags the initial payload came with.
+      TrackItemCompletionResult? received;
+      await pump(
+        tester,
+        GamePlayer(
+          payload: payloadFor(
+            'NOT_A_REAL_GAME',
+            completion: TrackItemCompletionResult(
+              completed: true,
+              sectionCompleted: true,
+              trackCompleted: false,
+            ),
+          ),
+          itemId: 'item1',
+          onCompleted: (result) => received = result,
+        ),
       );
 
-  testWidgets('onCompleted fires immediately on mount, before any WebView work happens',
-      (tester) async {
-    // The server already marked a GAME item complete the moment
-    // `startTrackItem` returned (see the class doc in game_player.dart) —
-    // `onCompleted` fires synchronously from `initState`, independent of
-    // whether the gameKey is even recognized.
-    var completedCalled = false;
-    await pump(
-      tester,
-      GamePlayer(payload: payloadFor('NOT_A_REAL_GAME'), itemId: 'item1', onCompleted: () {
-        completedCalled = true;
-      }),
-    );
+      expect(received?.completed, isTrue);
+      expect(received?.sectionCompleted, isTrue);
+      expect(received?.trackCompleted, isFalse);
+    },
+  );
 
-    expect(completedCalled, isTrue);
-  });
+  testWidgets(
+    'falls back to a bare completed result when the payload carries none',
+    (tester) async {
+      TrackItemCompletionResult? received;
+      await pump(
+        tester,
+        GamePlayer(
+          payload: payloadFor('NOT_A_REAL_GAME'),
+          itemId: 'item1',
+          onCompleted: (result) => received = result,
+        ),
+      );
 
-  testWidgets('an unrecognized gameKey shows the not-supported fallback instead of crashing',
-      (tester) async {
-    await pump(
-      tester,
-      GamePlayer(payload: payloadFor('NOT_A_REAL_GAME'), itemId: 'item1', onCompleted: () {}),
-    );
-    await tester.pumpAndSettle();
+      expect(received?.completed, isTrue);
+      expect(received?.sectionCompleted, isFalse);
+      expect(received?.trackCompleted, isFalse);
+    },
+  );
 
-    // No `runAsync`, so localization hasn't resolved — the raw key is a
-    // fine signal that the unsupported-fallback branch rendered.
-    expect(find.text('courses.player.unsupportedTitle'), findsOneWidget);
-  });
+  testWidgets(
+    'an unrecognized gameKey shows the not-supported fallback instead of crashing',
+    (tester) async {
+      await pump(
+        tester,
+        GamePlayer(
+          payload: payloadFor('NOT_A_REAL_GAME'),
+          itemId: 'item1',
+          onCompleted: (_) {},
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // No `runAsync`, so localization hasn't resolved — the raw key is a
+      // fine signal that the unsupported-fallback branch rendered.
+      expect(find.text('courses.player.unsupportedTitle'), findsOneWidget);
+    },
+  );
 
   testWidgets('a null gameKey also falls back cleanly', (tester) async {
     await pump(
       tester,
-      GamePlayer(payload: payloadFor(null), itemId: 'item1', onCompleted: () {}),
+      GamePlayer(
+        payload: payloadFor(null),
+        itemId: 'item1',
+        onCompleted: (_) {},
+      ),
     );
     await tester.pumpAndSettle();
 

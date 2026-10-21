@@ -10,10 +10,10 @@ import 'package:ally_mobile_flutter/features/courses/data/start_item_payload.dar
 class MockDio extends Mock implements Dio {}
 
 Response<T> _response<T>(T? data, {int statusCode = 200}) => Response<T>(
-      data: data,
-      statusCode: statusCode,
-      requestOptions: RequestOptions(path: ''),
-    );
+  data: data,
+  statusCode: statusCode,
+  requestOptions: RequestOptions(path: ''),
+);
 
 void main() {
   late MockDio dio;
@@ -56,27 +56,31 @@ void main() {
 
   group('getLearnTrackDetail', () {
     test('GETs /learn/tracks/{id} and parses the full detail', () async {
-      when(() => dio.get<Map<String, dynamic>>('/learn/tracks/track-1')).thenAnswer(
-        (_) async => _response({
-          'id': 'track-1',
-          'title': 'Managing anxiety',
-          'status': 'IN_PROGRESS',
-          'sections': <dynamic>[],
-        }),
-      );
+      when(() => dio.get<Map<String, dynamic>>('/learn/tracks/track-1'))
+          .thenAnswer(
+            (_) async => _response({
+              'id': 'track-1',
+              'title': 'Managing anxiety',
+              'status': 'IN_PROGRESS',
+              'sections': <dynamic>[],
+            }),
+          );
 
       final result = await repository.getLearnTrackDetail('track-1');
 
       expect(result, isA<TrackDetail>());
       expect(result.id, 'track-1');
       expect(result.title, 'Managing anxiety');
-      verify(() => dio.get<Map<String, dynamic>>('/learn/tracks/track-1')).called(1);
+      verify(() => dio.get<Map<String, dynamic>>('/learn/tracks/track-1'))
+          .called(1);
     });
   });
 
   group('getLearnTrackProgress', () {
     test('GETs /learn/tracks/{id}/progress and parses the dashboard', () async {
-      when(() => dio.get<Map<String, dynamic>>('/learn/tracks/track-1/progress')).thenAnswer(
+      when(
+        () => dio.get<Map<String, dynamic>>('/learn/tracks/track-1/progress'),
+      ).thenAnswer(
         (_) async => _response({
           'trackId': 'track-1',
           'title': 'Managing anxiety',
@@ -91,7 +95,9 @@ void main() {
       expect(result, isA<TrackProgressDashboard>());
       expect(result.completedItems, 5);
       expect(result.completionPct, 50.0);
-      verify(() => dio.get<Map<String, dynamic>>('/learn/tracks/track-1/progress')).called(1);
+      verify(
+        () => dio.get<Map<String, dynamic>>('/learn/tracks/track-1/progress'),
+      ).called(1);
     });
   });
 
@@ -107,75 +113,129 @@ void main() {
   });
 
   group('startTrackItem', () {
-    test('POSTs /learn/tracks/items/{id}/start and parses the payload', () async {
-      when(() => dio.post<Map<String, dynamic>>('/learn/tracks/items/item-1/start')).thenAnswer(
-        (_) async => _response({
-          'trackItemProgressId': 'prog-1',
-          'type': 'GAME',
-          'gameKey': 'breathing-exercise',
-        }),
-      );
+    test(
+      'POSTs /learn/tracks/items/{id}/start and parses the payload',
+      () async {
+        when(
+          () => dio.post<Map<String, dynamic>>(
+            '/learn/tracks/items/item-1/start',
+          ),
+        ).thenAnswer(
+          (_) async => _response({
+            'trackItemProgressId': 'prog-1',
+            'type': 'GAME',
+            'gameKey': 'breathing-exercise',
+          }),
+        );
 
-      final result = await repository.startTrackItem('item-1');
+        final result = await repository.startTrackItem('item-1');
 
-      expect(result, isA<StartItemPayload>());
-      expect(result.type, 'GAME');
-      expect(result.gameKey, 'breathing-exercise');
-      verify(() => dio.post<Map<String, dynamic>>('/learn/tracks/items/item-1/start')).called(1);
-    });
+        expect(result, isA<StartItemPayload>());
+        expect(result.type, 'GAME');
+        expect(result.gameKey, 'breathing-exercise');
+        verify(
+          () => dio.post<Map<String, dynamic>>(
+            '/learn/tracks/items/item-1/start',
+          ),
+        ).called(1);
+      },
+    );
   });
 
   group('markArticleRead', () {
-    test('POSTs /learn/tracks/items/{id}/article-read', () async {
-      when(() => dio.post<void>('/learn/tracks/items/item-1/article-read'))
-          .thenAnswer((_) async => _response<void>(null));
+    test('POSTs /learn/tracks/items/{id}/article-read and parses the completion result', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/learn/tracks/items/item-1/article-read',
+        ),
+      ).thenAnswer(
+        (_) async => _response({
+          'completed': true,
+          'sectionCompleted': true,
+          'trackCompleted': false,
+        }),
+      );
 
-      await repository.markArticleRead('item-1');
+      final result = await repository.markArticleRead('item-1');
 
-      verify(() => dio.post<void>('/learn/tracks/items/item-1/article-read')).called(1);
+      expect(result.completed, true);
+      expect(result.sectionCompleted, true);
+      expect(result.trackCompleted, false);
+      verify(
+        () => dio.post<Map<String, dynamic>>(
+          '/learn/tracks/items/item-1/article-read',
+        ),
+      ).called(1);
     });
   });
 
   group('reportVideoProgress', () {
-    test('POSTs watchedPct and parses completed/maxWatchedPct from the response', () async {
-      when(() => dio.post<Map<String, dynamic>>(
-            '/learn/tracks/items/item-1/video-progress',
-            data: {'watchedPct': 55.0},
-          )).thenAnswer((_) async => _response({'completed': false, 'maxWatchedPct': 55.0}));
+    test('POSTs watchedPct and parses completed/maxWatchedPct/section+trackCompleted', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/learn/tracks/items/item-1/video-progress',
+          data: {'watchedPct': 55.0},
+        ),
+      ).thenAnswer(
+        (_) async => _response({
+          'completed': true,
+          'maxWatchedPct': 55.0,
+          'sectionCompleted': true,
+          'trackCompleted': true,
+        }),
+      );
 
-      final result = await repository.reportVideoProgress(itemId: 'item-1', watchedPct: 55.0);
+      final result = await repository.reportVideoProgress(
+        itemId: 'item-1',
+        watchedPct: 55.0,
+      );
 
-      expect(result.completed, false);
+      expect(result.completed, true);
       expect(result.maxWatchedPct, 55.0);
-      verify(() => dio.post<Map<String, dynamic>>(
-            '/learn/tracks/items/item-1/video-progress',
-            data: {'watchedPct': 55.0},
-          )).called(1);
+      expect(result.sectionCompleted, true);
+      expect(result.trackCompleted, true);
+      verify(
+        () => dio.post<Map<String, dynamic>>(
+          '/learn/tracks/items/item-1/video-progress',
+          data: {'watchedPct': 55.0},
+        ),
+      ).called(1);
     });
 
-    test('defaults completed to false and maxWatchedPct to the sent value when absent', () async {
-      when(() => dio.post<Map<String, dynamic>>(
-            '/learn/tracks/items/item-1/video-progress',
-            data: {'watchedPct': 30.0},
-          )).thenAnswer((_) async => _response(<String, dynamic>{}));
+    test('defaults every field to false/the sent value when absent', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/learn/tracks/items/item-1/video-progress',
+          data: {'watchedPct': 30.0},
+        ),
+      ).thenAnswer((_) async => _response(<String, dynamic>{}));
 
-      final result = await repository.reportVideoProgress(itemId: 'item-1', watchedPct: 30.0);
+      final result = await repository.reportVideoProgress(
+        itemId: 'item-1',
+        watchedPct: 30.0,
+      );
 
       expect(result.completed, false);
       expect(result.maxWatchedPct, 30.0);
+      expect(result.sectionCompleted, false);
+      expect(result.trackCompleted, false);
     });
   });
 
   group('submitArticleQuestionAnswer', () {
     test('POSTs selectedOptionId and parses grading fields', () async {
-      when(() => dio.post<Map<String, dynamic>>(
-            '/learn/tracks/items/item-1/article-questions/q-1/answer',
-            data: {'selectedOptionId': 'opt-a'},
-          )).thenAnswer((_) async => _response({
-            'correct': true,
-            'correctOptionId': 'opt-a',
-            'explanation': 'Nicely done',
-          }));
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/learn/tracks/items/item-1/article-questions/q-1/answer',
+          data: {'selectedOptionId': 'opt-a'},
+        ),
+      ).thenAnswer(
+        (_) async => _response({
+          'correct': true,
+          'correctOptionId': 'opt-a',
+          'explanation': 'Nicely done',
+        }),
+      );
 
       final result = await repository.submitArticleQuestionAnswer(
         itemId: 'item-1',
@@ -186,23 +246,29 @@ void main() {
       expect(result.correct, true);
       expect(result.correctOptionId, 'opt-a');
       expect(result.explanation, 'Nicely done');
-      verify(() => dio.post<Map<String, dynamic>>(
-            '/learn/tracks/items/item-1/article-questions/q-1/answer',
-            data: {'selectedOptionId': 'opt-a'},
-          )).called(1);
+      verify(
+        () => dio.post<Map<String, dynamic>>(
+          '/learn/tracks/items/item-1/article-questions/q-1/answer',
+          data: {'selectedOptionId': 'opt-a'},
+        ),
+      ).called(1);
     });
   });
 
   group('submitInterjectionAnswer', () {
     test('POSTs the answer JSON and parses nested grading', () async {
       final answer = QuizAnswerInput(questionId: 'q-1', booleanAnswer: true);
-      when(() => dio.post<Map<String, dynamic>>(
-            '/learn/tracks/items/item-1/interjections/int-1/answer',
-            data: answer.toJson(),
-          )).thenAnswer((_) async => _response({
-            'correct': true,
-            'grading': {'pointsAwarded': 2, 'pointsPossible': 2},
-          }));
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/learn/tracks/items/item-1/interjections/int-1/answer',
+          data: answer.toJson(),
+        ),
+      ).thenAnswer(
+        (_) async => _response({
+          'correct': true,
+          'grading': {'pointsAwarded': 2, 'pointsPossible': 2},
+        }),
+      );
 
       final result = await repository.submitInterjectionAnswer(
         itemId: 'item-1',
@@ -213,21 +279,25 @@ void main() {
       expect(result.correct, true);
       expect(result.pointsAwarded, 2);
       expect(result.pointsPossible, 2);
-      verify(() => dio.post<Map<String, dynamic>>(
-            '/learn/tracks/items/item-1/interjections/int-1/answer',
-            data: answer.toJson(),
-          )).called(1);
+      verify(
+        () => dio.post<Map<String, dynamic>>(
+          '/learn/tracks/items/item-1/interjections/int-1/answer',
+          data: answer.toJson(),
+        ),
+      ).called(1);
     });
 
     test('defaults pointsAwarded/pointsPossible to 0 when grading fields are missing', () async {
       final answer = QuizAnswerInput(questionId: 'q-1', text: 'open answer');
-      when(() => dio.post<Map<String, dynamic>>(
-            '/learn/tracks/items/item-1/interjections/int-2/answer',
-            data: answer.toJson(),
-          )).thenAnswer((_) async => _response({
-            'correct': null,
-            'grading': <String, dynamic>{},
-          }));
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/learn/tracks/items/item-1/interjections/int-2/answer',
+          data: answer.toJson(),
+        ),
+      ).thenAnswer(
+        (_) async =>
+            _response({'correct': null, 'grading': <String, dynamic>{}}),
+      );
 
       final result = await repository.submitInterjectionAnswer(
         itemId: 'item-1',
@@ -247,94 +317,136 @@ void main() {
         QuizAnswerInput(questionId: 'q-1', selectedOptionIds: ['a']),
         QuizAnswerInput(questionId: 'q-2', booleanAnswer: true),
       ];
-      when(() => dio.post<Map<String, dynamic>>(
-            '/learn/tracks/items/item-1/quiz-attempts',
-            data: {'answers': answers.map((a) => a.toJson()).toList()},
-          )).thenAnswer((_) async => _response({
-            'attemptId': 'attempt-1',
-            'scorePct': 90.0,
-            'passed': true,
-            'passScore': 70,
-            'attemptsUsed': 1,
-            'maxAttempts': 3,
-            'questionResults': <dynamic>[],
-          }));
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/learn/tracks/items/item-1/quiz-attempts',
+          data: {'answers': answers.map((a) => a.toJson()).toList()},
+        ),
+      ).thenAnswer(
+        (_) async => _response({
+          'attemptId': 'attempt-1',
+          'scorePct': 90.0,
+          'passed': true,
+          'passScore': 70,
+          'attemptsUsed': 1,
+          'maxAttempts': 3,
+          'questionResults': <dynamic>[],
+        }),
+      );
 
-      final result = await repository.submitQuizAttempt(itemId: 'item-1', answers: answers);
+      final result = await repository.submitQuizAttempt(
+        itemId: 'item-1',
+        answers: answers,
+      );
 
       expect(result, isA<QuizAttemptResult>());
       expect(result.passed, true);
       expect(result.scorePct, 90.0);
-      verify(() => dio.post<Map<String, dynamic>>(
-            '/learn/tracks/items/item-1/quiz-attempts',
-            data: {'answers': answers.map((a) => a.toJson()).toList()},
-          )).called(1);
+      verify(
+        () => dio.post<Map<String, dynamic>>(
+          '/learn/tracks/items/item-1/quiz-attempts',
+          data: {'answers': answers.map((a) => a.toJson()).toList()},
+        ),
+      ).called(1);
     });
   });
 
   group('saveJournalDraft', () {
     test('POSTs the responses in the expected shape', () async {
-      when(() => dio.post<void>(
-            '/learn/tracks/items/item-1/journal',
-            data: {
-              'responses': [
-                {'promptId': 'p-1', 'response': 'Grateful for today'},
-              ],
-            },
-          )).thenAnswer((_) async => _response<void>(null));
+      when(
+        () => dio.post<void>(
+          '/learn/tracks/items/item-1/journal',
+          data: {
+            'responses': [
+              {'promptId': 'p-1', 'response': 'Grateful for today'},
+            ],
+          },
+        ),
+      ).thenAnswer((_) async => _response<void>(null));
 
       await repository.saveJournalDraft(
         itemId: 'item-1',
         responses: [(promptId: 'p-1', response: 'Grateful for today')],
       );
 
-      verify(() => dio.post<void>(
-            '/learn/tracks/items/item-1/journal',
-            data: {
-              'responses': [
-                {'promptId': 'p-1', 'response': 'Grateful for today'},
-              ],
-            },
-          )).called(1);
+      verify(
+        () => dio.post<void>(
+          '/learn/tracks/items/item-1/journal',
+          data: {
+            'responses': [
+              {'promptId': 'p-1', 'response': 'Grateful for today'},
+            ],
+          },
+        ),
+      ).called(1);
     });
   });
 
   group('submitJournal', () {
-    test('POSTs /learn/tracks/items/{id}/journal/submit', () async {
-      when(() => dio.post<void>('/learn/tracks/items/item-1/journal/submit'))
-          .thenAnswer((_) async => _response<void>(null));
+    test('POSTs /learn/tracks/items/{id}/journal/submit and parses the completion result', () async {
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/learn/tracks/items/item-1/journal/submit',
+        ),
+      ).thenAnswer(
+        (_) async => _response({
+          'completed': true,
+          'sectionCompleted': false,
+          'trackCompleted': false,
+        }),
+      );
 
-      await repository.submitJournal('item-1');
+      final result = await repository.submitJournal('item-1');
 
-      verify(() => dio.post<void>('/learn/tracks/items/item-1/journal/submit')).called(1);
+      expect(result.completed, true);
+      verify(
+        () => dio.post<Map<String, dynamic>>(
+          '/learn/tracks/items/item-1/journal/submit',
+        ),
+      ).called(1);
     });
   });
 
   group('recordGameResult', () {
     test('POSTs the score and returns bestScore from the response', () async {
-      when(() => dio.post<Map<String, dynamic>>(
-            '/learn/tracks/items/item-1/game-result',
-            data: {'score': 42},
-          )).thenAnswer((_) async => _response({'bestScore': 99}));
+      when(
+        () => dio.post<Map<String, dynamic>>(
+          '/learn/tracks/items/item-1/game-result',
+          data: {'score': 42},
+        ),
+      ).thenAnswer((_) async => _response({'bestScore': 99}));
 
-      final result = await repository.recordGameResult(itemId: 'item-1', score: 42);
+      final result = await repository.recordGameResult(
+        itemId: 'item-1',
+        score: 42,
+      );
 
       expect(result, 99);
-      verify(() => dio.post<Map<String, dynamic>>(
-            '/learn/tracks/items/item-1/game-result',
-            data: {'score': 42},
-          )).called(1);
+      verify(
+        () => dio.post<Map<String, dynamic>>(
+          '/learn/tracks/items/item-1/game-result',
+          data: {'score': 42},
+        ),
+      ).called(1);
     });
 
-    test('falls back to the submitted score when bestScore is absent', () async {
-      when(() => dio.post<Map<String, dynamic>>(
+    test(
+      'falls back to the submitted score when bestScore is absent',
+      () async {
+        when(
+          () => dio.post<Map<String, dynamic>>(
             '/learn/tracks/items/item-1/game-result',
             data: {'score': 10},
-          )).thenAnswer((_) async => _response(<String, dynamic>{}));
+          ),
+        ).thenAnswer((_) async => _response(<String, dynamic>{}));
 
-      final result = await repository.recordGameResult(itemId: 'item-1', score: 10);
+        final result = await repository.recordGameResult(
+          itemId: 'item-1',
+          score: 10,
+        );
 
-      expect(result, 10);
-    });
+        expect(result, 10);
+      },
+    );
   });
 }

@@ -15,16 +15,16 @@ enum QuizQuestionType {
 }
 
 QuizQuestionType quizQuestionTypeFromString(String? value) => switch (value) {
-      'mcq_single' => QuizQuestionType.mcqSingle,
-      'mcq_multi' => QuizQuestionType.mcqMulti,
-      'true_false' => QuizQuestionType.trueFalse,
-      'ordering' => QuizQuestionType.ordering,
-      'matching' => QuizQuestionType.matching,
-      'fill_blank' => QuizQuestionType.fillBlank,
-      'open_ended' => QuizQuestionType.openEnded,
-      'likert_scale' => QuizQuestionType.likertScale,
-      _ => QuizQuestionType.unknown,
-    };
+  'mcq_single' => QuizQuestionType.mcqSingle,
+  'mcq_multi' => QuizQuestionType.mcqMulti,
+  'true_false' => QuizQuestionType.trueFalse,
+  'ordering' => QuizQuestionType.ordering,
+  'matching' => QuizQuestionType.matching,
+  'fill_blank' => QuizQuestionType.fillBlank,
+  'open_ended' => QuizQuestionType.openEnded,
+  'likert_scale' => QuizQuestionType.likertScale,
+  _ => QuizQuestionType.unknown,
+};
 
 class QuizOption {
   QuizOption({required this.id, required this.text});
@@ -147,20 +147,29 @@ class QuizAnswerInput {
   final List<({String statementId, String scaleOptionId})>? ratings;
 
   Map<String, dynamic> toJson() => {
-        'questionId': questionId,
-        if (selectedOptionIds != null) 'selectedOptionIds': selectedOptionIds,
-        if (booleanAnswer != null) 'booleanAnswer': booleanAnswer,
-        if (orderedItemIds != null) 'orderedItemIds': orderedItemIds,
-        if (pairs != null)
-          'pairs': pairs!.map((p) => {'leftId': p.leftId, 'rightId': p.rightId}).toList(),
-        if (blanks != null)
-          'blanks': blanks!.map((b) => {'blankId': b.blankId, 'answer': b.answer}).toList(),
-        if (text != null) 'text': text,
-        if (ratings != null)
-          'ratings': ratings!
-              .map((r) => {'statementId': r.statementId, 'scaleOptionId': r.scaleOptionId})
-              .toList(),
-      };
+    'questionId': questionId,
+    if (selectedOptionIds != null) 'selectedOptionIds': selectedOptionIds,
+    if (booleanAnswer != null) 'booleanAnswer': booleanAnswer,
+    if (orderedItemIds != null) 'orderedItemIds': orderedItemIds,
+    if (pairs != null)
+      'pairs': pairs!
+          .map((p) => {'leftId': p.leftId, 'rightId': p.rightId})
+          .toList(),
+    if (blanks != null)
+      'blanks': blanks!
+          .map((b) => {'blankId': b.blankId, 'answer': b.answer})
+          .toList(),
+    if (text != null) 'text': text,
+    if (ratings != null)
+      'ratings': ratings!
+          .map(
+            (r) => {
+              'statementId': r.statementId,
+              'scaleOptionId': r.scaleOptionId,
+            },
+          )
+          .toList(),
+  };
 }
 
 class QuizQuestionResult {
@@ -172,7 +181,8 @@ class QuizQuestionResult {
     required this.explanation,
   });
 
-  factory QuizQuestionResult.fromJson(Map<String, dynamic> json) => QuizQuestionResult(
+  factory QuizQuestionResult.fromJson(Map<String, dynamic> json) =>
+      QuizQuestionResult(
         questionId: json['questionId'] as String,
         correct: json['correct'] as bool?,
         pointsAwarded: (json['pointsAwarded'] as num?)?.toInt() ?? 0,
@@ -196,9 +206,12 @@ class QuizAttemptResult {
     required this.attemptsUsed,
     required this.maxAttempts,
     required this.questionResults,
+    required this.sectionCompleted,
+    required this.trackCompleted,
   });
 
-  factory QuizAttemptResult.fromJson(Map<String, dynamic> json) => QuizAttemptResult(
+  factory QuizAttemptResult.fromJson(Map<String, dynamic> json) =>
+      QuizAttemptResult(
         attemptId: json['attemptId'] as String,
         scorePct: (json['scorePct'] as num?)?.toDouble(),
         passed: json['passed'] as bool,
@@ -208,6 +221,11 @@ class QuizAttemptResult {
         questionResults: (json['questionResults'] as List<dynamic>? ?? [])
             .map((e) => QuizQuestionResult.fromJson(e as Map<String, dynamic>))
             .toList(),
+        // Mirrors RN's `QuizAttemptResult` — these sit flat on the attempt
+        // response itself, not nested under a `completion` object the way
+        // article/video/journal results are.
+        sectionCompleted: json['sectionCompleted'] as bool? ?? false,
+        trackCompleted: json['trackCompleted'] as bool? ?? false,
       );
 
   final String attemptId;
@@ -217,4 +235,6 @@ class QuizAttemptResult {
   final int attemptsUsed;
   final int? maxAttempts;
   final List<QuizQuestionResult> questionResults;
+  final bool sectionCompleted;
+  final bool trackCompleted;
 }

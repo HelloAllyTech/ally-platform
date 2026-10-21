@@ -5,6 +5,7 @@ import '../../../../core/localization/translate_ref.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_card.dart';
+import '../../data/course_models.dart';
 import '../../data/courses_repository.dart';
 import '../../data/quiz_models.dart';
 import 'quiz_question_widget.dart';
@@ -28,7 +29,7 @@ class QuizPlayer extends ConsumerStatefulWidget {
   final SanitizedQuiz quiz;
   final int attemptsUsed;
   final int? maxAttempts;
-  final VoidCallback onCompleted;
+  final void Function(TrackItemCompletionResult result) onCompleted;
 
   @override
   ConsumerState<QuizPlayer> createState() => _QuizPlayerState();
@@ -61,7 +62,15 @@ class _QuizPlayerState extends ConsumerState<QuizPlayer> {
             answers: widget.quiz.questions.map((q) => _answers[q.id]!).toList(),
           );
       setState(() => _result = result);
-      if (result.passed) widget.onCompleted();
+      if (result.passed) {
+        widget.onCompleted(
+          TrackItemCompletionResult(
+            completed: true,
+            sectionCompleted: result.sectionCompleted,
+            trackCompleted: result.trackCompleted,
+          ),
+        );
+      }
     } catch (e) {
       setState(
         () => _error = '${ref.tr('courses.quiz.question.submitError')}: $e',

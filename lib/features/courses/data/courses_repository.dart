@@ -29,14 +29,16 @@ class CoursesRepository {
   }
 
   Future<TrackDetail> getLearnTrackDetail(String trackId) async {
-    final response =
-        await _dio.get<Map<String, dynamic>>('/learn/tracks/$trackId');
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/learn/tracks/$trackId',
+    );
     return TrackDetail.fromJson(response.data!);
   }
 
   Future<TrackProgressDashboard> getLearnTrackProgress(String trackId) async {
-    final response = await _dio
-        .get<Map<String, dynamic>>('/learn/tracks/$trackId/progress');
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/learn/tracks/$trackId/progress',
+    );
     return TrackProgressDashboard.fromJson(response.data!);
   }
 
@@ -48,12 +50,17 @@ class CoursesRepository {
   /// HTML + inline questions, video URL + interjections) — same
   /// discriminated-union contract as RN's `StartTrackItemResponse`.
   Future<StartItemPayload> startTrackItem(String itemId) async {
-    final response = await _dio.post<Map<String, dynamic>>('/learn/tracks/items/$itemId/start');
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/learn/tracks/items/$itemId/start',
+    );
     return StartItemPayload.fromJson(response.data!);
   }
 
-  Future<void> markArticleRead(String itemId) async {
-    await _dio.post<void>('/learn/tracks/items/$itemId/article-read');
+  Future<TrackItemCompletionResult> markArticleRead(String itemId) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/learn/tracks/items/$itemId/article-read',
+    );
+    return TrackItemCompletionResult.fromJson(response.data ?? {});
   }
 
   /// Fires via [VideoWatchProgressTracker]'s own throttling (every ~10s or
@@ -61,7 +68,15 @@ class CoursesRepository {
   /// `coursesApi.ts`. The response's `completed` flips once the server's
   /// `requiredWatchPct` threshold is crossed — server-side monotonic max,
   /// so a dropped report is recovered by the next one.
-  Future<({bool completed, double maxWatchedPct})> reportVideoProgress({
+  Future<
+    ({
+      bool completed,
+      double maxWatchedPct,
+      bool sectionCompleted,
+      bool trackCompleted,
+    })
+  >
+  reportVideoProgress({
     required String itemId,
     required double watchedPct,
   }) async {
@@ -71,11 +86,15 @@ class CoursesRepository {
     );
     return (
       completed: response.data?['completed'] as bool? ?? false,
-      maxWatchedPct: (response.data?['maxWatchedPct'] as num?)?.toDouble() ?? watchedPct,
+      maxWatchedPct:
+          (response.data?['maxWatchedPct'] as num?)?.toDouble() ?? watchedPct,
+      sectionCompleted: response.data?['sectionCompleted'] as bool? ?? false,
+      trackCompleted: response.data?['trackCompleted'] as bool? ?? false,
     );
   }
 
-  Future<({bool correct, String correctOptionId, String? explanation})> submitArticleQuestionAnswer({
+  Future<({bool correct, String correctOptionId, String? explanation})>
+  submitArticleQuestionAnswer({
     required String itemId,
     required String questionId,
     required String selectedOptionId,
@@ -91,7 +110,8 @@ class CoursesRepository {
     );
   }
 
-  Future<({bool? correct, int pointsAwarded, int pointsPossible})> submitInterjectionAnswer({
+  Future<({bool? correct, int pointsAwarded, int pointsPossible})>
+  submitInterjectionAnswer({
     required String itemId,
     required String interjectionId,
     required QuizAnswerInput answer,
@@ -127,20 +147,27 @@ class CoursesRepository {
       '/learn/tracks/items/$itemId/journal',
       data: {
         'responses': [
-          for (final r in responses) {'promptId': r.promptId, 'response': r.response},
+          for (final r in responses)
+            {'promptId': r.promptId, 'response': r.response},
         ],
       },
     );
   }
 
-  Future<void> submitJournal(String itemId) async {
-    await _dio.post<void>('/learn/tracks/items/$itemId/journal/submit');
+  Future<TrackItemCompletionResult> submitJournal(String itemId) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/learn/tracks/items/$itemId/journal/submit',
+    );
+    return TrackItemCompletionResult.fromJson(response.data ?? {});
   }
 
   /// A game item is already complete server-side by the time this fires
   /// (the server marks it done the moment it's opened) — this just records
   /// a personal-best run, same as the RN screen's own doc comment.
-  Future<int> recordGameResult({required String itemId, required int score}) async {
+  Future<int> recordGameResult({
+    required String itemId,
+    required int score,
+  }) async {
     final response = await _dio.post<Map<String, dynamic>>(
       '/learn/tracks/items/$itemId/game-result',
       data: {'score': score},
@@ -157,12 +184,16 @@ final learnTracksProvider = FutureProvider<List<TrackListItem>>((ref) {
   return ref.watch(coursesRepositoryProvider).getLearnTracks();
 });
 
-final trackDetailProvider =
-    FutureProvider.family<TrackDetail, String>((ref, trackId) {
+final trackDetailProvider = FutureProvider.family<TrackDetail, String>((
+  ref,
+  trackId,
+) {
   return ref.watch(coursesRepositoryProvider).getLearnTrackDetail(trackId);
 });
 
 final trackProgressProvider =
     FutureProvider.family<TrackProgressDashboard, String>((ref, trackId) {
-  return ref.watch(coursesRepositoryProvider).getLearnTrackProgress(trackId);
-});
+      return ref
+          .watch(coursesRepositoryProvider)
+          .getLearnTrackProgress(trackId);
+    });

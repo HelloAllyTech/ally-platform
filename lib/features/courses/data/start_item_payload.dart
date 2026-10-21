@@ -1,3 +1,4 @@
+import 'course_models.dart';
 import 'quiz_models.dart';
 
 /// Covers the ARTICLE, VIDEO, QUIZ, JOURNAL, and GAME variants of
@@ -14,11 +15,11 @@ class JournalPrompt {
   });
 
   factory JournalPrompt.fromJson(Map<String, dynamic> json) => JournalPrompt(
-        id: json['id'] as String,
-        prompt: json['prompt'] as String,
-        required: json['required'] as bool? ?? false,
-        placeholder: json['placeholder'] as String?,
-      );
+    id: json['id'] as String,
+    prompt: json['prompt'] as String,
+    required: json['required'] as bool? ?? false,
+    placeholder: json['placeholder'] as String?,
+  );
 
   final String id;
   final String prompt;
@@ -29,7 +30,8 @@ class JournalPrompt {
 class JournalSavedResponse {
   JournalSavedResponse({required this.promptId, required this.response});
 
-  factory JournalSavedResponse.fromJson(Map<String, dynamic> json) => JournalSavedResponse(
+  factory JournalSavedResponse.fromJson(Map<String, dynamic> json) =>
+      JournalSavedResponse(
         promptId: json['promptId'] as String,
         response: json['response'] as String? ?? '',
       );
@@ -37,6 +39,7 @@ class JournalSavedResponse {
   final String promptId;
   final String response;
 }
+
 class ArticleQuestion {
   ArticleQuestion({
     required this.id,
@@ -47,14 +50,16 @@ class ArticleQuestion {
     required this.explanation,
   });
 
-  factory ArticleQuestion.fromJson(Map<String, dynamic> json) => ArticleQuestion(
+  factory ArticleQuestion.fromJson(Map<String, dynamic> json) =>
+      ArticleQuestion(
         id: json['id'] as String,
         prompt: json['prompt'] as String,
         options: (json['options'] as List<dynamic>? ?? [])
             .map((e) => QuizOption.fromJson(e as Map<String, dynamic>))
             .toList(),
         answeredOptionId:
-            (json['answered'] as Map<String, dynamic>?)?['selectedOptionId'] as String?,
+            (json['answered'] as Map<String, dynamic>?)?['selectedOptionId']
+                as String?,
         correctOptionId: json['correctOptionId'] as String?,
         explanation: json['explanation'] as String?,
       );
@@ -75,11 +80,15 @@ class VideoInterjection {
     required this.answeredPassed,
   });
 
-  factory VideoInterjection.fromJson(Map<String, dynamic> json) => VideoInterjection(
+  factory VideoInterjection.fromJson(Map<String, dynamic> json) =>
+      VideoInterjection(
         id: json['id'] as String,
         timestampSeconds: (json['timestampSeconds'] as num).toDouble(),
-        question: SanitizedQuizQuestion.fromJson(json['question'] as Map<String, dynamic>),
-        answeredPassed: (json['answered'] as Map<String, dynamic>?)?['passed'] as bool?,
+        question: SanitizedQuizQuestion.fromJson(
+          json['question'] as Map<String, dynamic>,
+        ),
+        answeredPassed:
+            (json['answered'] as Map<String, dynamic>?)?['passed'] as bool?,
       );
 
   final String id;
@@ -109,6 +118,7 @@ class StartItemPayload {
     this.gameKey,
     this.gameIntro,
     this.gameBestScore,
+    this.gameCompletion,
   });
 
   factory StartItemPayload.fromJson(Map<String, dynamic> json) {
@@ -116,15 +126,17 @@ class StartItemPayload {
     return StartItemPayload(
       trackItemProgressId: json['trackItemProgressId'] as String,
       type: type,
-      quiz: type == 'QUIZ' ? SanitizedQuiz.fromJson(json['quiz'] as Map<String, dynamic>) : null,
+      quiz: type == 'QUIZ'
+          ? SanitizedQuiz.fromJson(json['quiz'] as Map<String, dynamic>)
+          : null,
       attemptsUsed: (json['attemptsUsed'] as num?)?.toInt(),
       maxAttempts: (json['maxAttempts'] as num?)?.toInt(),
       html: json['html'] as String?,
       minReadSeconds: (json['minReadSeconds'] as num?)?.toInt(),
       articleQuestions: type == 'ARTICLE'
           ? (json['questions'] as List<dynamic>? ?? [])
-              .map((e) => ArticleQuestion.fromJson(e as Map<String, dynamic>))
-              .toList()
+                .map((e) => ArticleQuestion.fromJson(e as Map<String, dynamic>))
+                .toList()
           : null,
       videoSource: type == 'VIDEO' ? json['source'] as String? : null,
       videoUrl: json['url'] as String?,
@@ -133,22 +145,35 @@ class StartItemPayload {
       maxWatchedPct: (json['maxWatchedPct'] as num?)?.toDouble(),
       interjections: type == 'VIDEO'
           ? (json['interjections'] as List<dynamic>? ?? [])
-              .map((e) => VideoInterjection.fromJson(e as Map<String, dynamic>))
-              .toList()
+                .map(
+                  (e) => VideoInterjection.fromJson(e as Map<String, dynamic>),
+                )
+                .toList()
           : null,
       journalPrompts: type == 'JOURNAL'
           ? (json['prompts'] as List<dynamic>? ?? [])
-              .map((e) => JournalPrompt.fromJson(e as Map<String, dynamic>))
-              .toList()
+                .map((e) => JournalPrompt.fromJson(e as Map<String, dynamic>))
+                .toList()
           : null,
       journalSavedResponses: type == 'JOURNAL'
           ? (json['savedResponses'] as List<dynamic>? ?? [])
-              .map((e) => JournalSavedResponse.fromJson(e as Map<String, dynamic>))
-              .toList()
+                .map(
+                  (e) =>
+                      JournalSavedResponse.fromJson(e as Map<String, dynamic>),
+                )
+                .toList()
           : null,
       gameKey: type == 'GAME' ? json['gameKey'] as String? : null,
       gameIntro: type == 'GAME' ? json['intro'] as String? : null,
       gameBestScore: (json['bestScore'] as num?)?.toInt(),
+      // A game is already complete server-side the moment it's opened, so
+      // (unlike every other item type) its completion result rides on the
+      // initial payload rather than a later submit response.
+      gameCompletion: type == 'GAME' && json['completion'] != null
+          ? TrackItemCompletionResult.fromJson(
+              json['completion'] as Map<String, dynamic>,
+            )
+          : null,
     );
   }
 
@@ -184,4 +209,5 @@ class StartItemPayload {
   final String? gameKey;
   final String? gameIntro;
   final int? gameBestScore;
+  final TrackItemCompletionResult? gameCompletion;
 }

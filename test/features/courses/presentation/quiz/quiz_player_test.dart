@@ -97,7 +97,7 @@ void main() {
           quiz: _twoQuestionQuiz(),
           attemptsUsed: 0,
           maxAttempts: 3,
-          onCompleted: () => completed = true,
+          onCompleted: (_) => completed = true,
         ),
         overrides: [coursesRepositoryProvider.overrideWithValue(repository)],
       );
@@ -153,7 +153,7 @@ void main() {
           quiz: _twoQuestionQuiz(),
           attemptsUsed: 0,
           maxAttempts: 3,
-          onCompleted: () => completed = true,
+          onCompleted: (_) => completed = true,
         ),
         overrides: [coursesRepositoryProvider.overrideWithValue(repository)],
       );
@@ -205,7 +205,7 @@ void main() {
           quiz: _twoQuestionQuiz(),
           attemptsUsed: 0,
           maxAttempts: 3,
-          onCompleted: () => completed = true,
+          onCompleted: (_) => completed = true,
         ),
         overrides: [coursesRepositoryProvider.overrideWithValue(repository)],
       );
@@ -250,7 +250,7 @@ void main() {
           quiz: _twoQuestionQuiz(),
           attemptsUsed: 3,
           maxAttempts: 3,
-          onCompleted: () {},
+          onCompleted: (_) {},
         ),
         overrides: [coursesRepositoryProvider.overrideWithValue(repository)],
       );
@@ -290,7 +290,7 @@ void main() {
           quiz: surveyQuiz,
           attemptsUsed: 0,
           maxAttempts: null,
-          onCompleted: () {},
+          onCompleted: (_) {},
         ),
         overrides: [coursesRepositoryProvider.overrideWithValue(repository)],
       );

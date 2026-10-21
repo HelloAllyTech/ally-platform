@@ -7,6 +7,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/theme/app_colors.dart';
@@ -17,6 +18,7 @@ import '../../../core/widgets/tab_screen_header.dart';
 import '../data/course_models.dart';
 import '../data/courses_repository.dart';
 import '../data/start_item_payload.dart';
+import 'celebration_modal.dart';
 import 'game/game_player.dart';
 import 'journal/journal_player.dart';
 import 'quiz/quiz_player.dart';
@@ -39,11 +41,13 @@ class CourseItemPlayerScreen extends ConsumerStatefulWidget {
       _CourseItemPlayerScreenState();
 }
 
-class _CourseItemPlayerScreenState extends ConsumerState<CourseItemPlayerScreen> {
+class _CourseItemPlayerScreenState
+    extends ConsumerState<CourseItemPlayerScreen> {
   StartItemPayload? _payload;
   bool _isLoading = true;
   String? _error;
   bool _completed = false;
+  CelebrationKind? _celebration;
 
   @override
   void initState() {
@@ -53,7 +57,9 @@ class _CourseItemPlayerScreenState extends ConsumerState<CourseItemPlayerScreen>
 
   Future<void> _start() async {
     try {
-      final payload = await ref.read(coursesRepositoryProvider).startTrackItem(widget.item.id);
+      final payload = await ref
+          .read(coursesRepositoryProvider)
+          .startTrackItem(widget.item.id);
       setState(() {
         _payload = payload;
         _isLoading = false;
@@ -67,23 +73,57 @@ class _CourseItemPlayerScreenState extends ConsumerState<CourseItemPlayerScreen>
   }
 
   Future<void> _markArticleComplete() async {
-    await ref.read(coursesRepositoryProvider).markArticleRead(widget.item.id);
-    if (mounted) setState(() => _completed = true);
+    final result = await ref
+        .read(coursesRepositoryProvider)
+        .markArticleRead(widget.item.id);
+    if (mounted) _handleCompletion(result);
+  }
+
+  /// Mirrors RN's `handleCompletion` — a track-complete celebration always
+  /// wins over a section-complete one (a track can't finish without its
+  /// last section finishing too, so showing both would be redundant).
+  void _handleCompletion(TrackItemCompletionResult result) {
+    if (!result.completed) return;
+    setState(() {
+      _completed = true;
+      if (result.trackCompleted) {
+        _celebration = CelebrationKind.track;
+      } else if (result.sectionCompleted) {
+        _celebration = CelebrationKind.section;
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Column(
+      body: Stack(
         children: [
-          TabScreenHeader(title: widget.item.title),
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _error != null
-                    ? Center(child: Text(_error!, style: const TextStyle(color: AppColors.red400)))
+          Column(
+            children: [
+              TabScreenHeader(title: widget.item.title),
+              Expanded(
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _error != null
+                    ? Center(
+                        child: Text(
+                          _error!,
+                          style: const TextStyle(color: AppColors.red400),
+                        ),
+                      )
                     : _buildBody(),
+              ),
+            ],
           ),
+          if (_celebration != null)
+            Positioned.fill(
+              child: CelebrationModal(
+                kind: _celebration!,
+                onContinue: () => setState(() => _celebration = null),
+                onBackToLearn: () => context.go('/home'),
+              ),
+            ),
         ],
       ),
     );
@@ -98,7 +138,7 @@ class _CourseItemPlayerScreenState extends ConsumerState<CourseItemPlayerScreen>
           quiz: payload.quiz!,
           attemptsUsed: payload.attemptsUsed ?? 0,
           maxAttempts: payload.maxAttempts,
-          onCompleted: () => setState(() => _completed = true),
+          onCompleted: _handleCompletion,
         );
       case 'ARTICLE':
         return _ArticleView(
@@ -112,20 +152,20 @@ class _CourseItemPlayerScreenState extends ConsumerState<CourseItemPlayerScreen>
           payload: payload,
           itemId: widget.item.id,
           alreadyCompleted: _completed,
-          onCompleted: () => setState(() => _completed = true),
+          onCompleted: _handleCompletion,
         );
       case 'JOURNAL':
         return JournalPlayer(
           payload: payload,
           itemId: widget.item.id,
           alreadyCompleted: _completed,
-          onCompleted: () => setState(() => _completed = true),
+          onCompleted: _handleCompletion,
         );
       case 'GAME':
         return GamePlayer(
           payload: payload,
           itemId: widget.item.id,
-          onCompleted: () => setState(() => _completed = true),
+          onCompleted: _handleCompletion,
         );
       default:
         return Center(child: Text(ref.t('courses.player.unsupportedTitle')));
@@ -152,11 +192,17 @@ class _ArticleView extends ConsumerStatefulWidget {
 
 class _ArticleViewState extends ConsumerState<_ArticleView> {
   final Map<String, String> _answeredOptionIds = {};
-  final Map<String, ({bool correct, String correctOptionId, String? explanation})> _results = {};
+  final Map<
+    String,
+    ({bool correct, String correctOptionId, String? explanation})
+  >
+  _results = {};
 
   Future<void> _answer(ArticleQuestion question, String optionId) async {
     try {
-      final result = await ref.read(coursesRepositoryProvider).submitArticleQuestionAnswer(
+      final result = await ref
+          .read(coursesRepositoryProvider)
+          .submitArticleQuestionAnswer(
             itemId: widget.itemId,
             questionId: question.id,
             selectedOptionId: optionId,
@@ -189,7 +235,10 @@ class _ArticleViewState extends ConsumerState<_ArticleView> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(question.prompt, style: Theme.of(context).textTheme.titleSmall),
+                    Text(
+                      question.prompt,
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
                     for (final option in question.options)
                       RadioListTile<String>(
                         title: Text(option.text),
@@ -205,7 +254,9 @@ class _ArticleViewState extends ConsumerState<_ArticleView> {
                             ? ref.t('courses.article.question.correct')
                             : ref.t('courses.article.question.incorrect'),
                         style: TextStyle(
-                          color: _results[question.id]!.correct ? Colors.green : AppColors.red400,
+                          color: _results[question.id]!.correct
+                              ? Colors.green
+                              : AppColors.red400,
                         ),
                       ),
                   ],
@@ -217,7 +268,11 @@ class _ArticleViewState extends ConsumerState<_ArticleView> {
         if (widget.completed)
           Row(
             children: [
-              SvgPicture.asset('assets/icons/checkCircle.svg', width: 24, height: 24),
+              SvgPicture.asset(
+                'assets/icons/checkCircle.svg',
+                width: 24,
+                height: 24,
+              ),
               const SizedBox(width: 8),
               Text(ref.t('courses.article.read')),
             ],
@@ -231,4 +286,3 @@ class _ArticleViewState extends ConsumerState<_ArticleView> {
     );
   }
 }
-

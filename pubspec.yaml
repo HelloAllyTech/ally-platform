@@ -61,6 +61,7 @@ dependencies:
   flutter_svg: ^2.2.1
   lottie: ^3.3.2
   package_info_plus: ^10.2.2
+  confetti: ^0.8.0
 
 dev_dependencies:
   flutter_test:

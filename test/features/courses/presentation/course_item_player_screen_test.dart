@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 
 import 'package:ally_mobile_flutter/core/widgets/html_rich_text.dart';
@@ -10,6 +11,7 @@ import 'package:ally_mobile_flutter/features/courses/data/course_models.dart';
 import 'package:ally_mobile_flutter/features/courses/data/courses_repository.dart';
 import 'package:ally_mobile_flutter/features/courses/data/quiz_models.dart';
 import 'package:ally_mobile_flutter/features/courses/data/start_item_payload.dart';
+import 'package:ally_mobile_flutter/features/courses/presentation/celebration_modal.dart';
 import 'package:ally_mobile_flutter/features/courses/presentation/course_item_player_screen.dart';
 import 'package:ally_mobile_flutter/features/courses/presentation/game/game_player.dart';
 import 'package:ally_mobile_flutter/features/courses/presentation/journal/journal_player.dart';
@@ -17,10 +19,12 @@ import 'package:ally_mobile_flutter/features/courses/presentation/quiz/quiz_play
 import 'package:ally_mobile_flutter/features/courses/presentation/video/video_item_player.dart';
 
 import '../../../support/pump_app.dart';
+import '../../../support/pump_router_app.dart';
 
 class MockCoursesRepository extends Mock implements CoursesRepository {}
 
-TrackDetailItem _item({TrackItemType type = TrackItemType.article}) => TrackDetailItem(
+TrackDetailItem _item({TrackItemType type = TrackItemType.article}) =>
+    TrackDetailItem(
       id: 'item1',
       type: type,
       order: 0,
@@ -46,10 +50,11 @@ void main() {
     );
   }
 
-  testWidgets('shows a loading indicator while startTrackItem is in flight', (tester) async {
-    when(() => repository.startTrackItem('item1')).thenAnswer(
-      (_) => Completer<StartItemPayload>().future,
-    );
+  testWidgets('shows a loading indicator while startTrackItem is in flight', (
+    tester,
+  ) async {
+    when(() => repository.startTrackItem('item1'))
+        .thenAnswer((_) => Completer<StartItemPayload>().future);
 
     await tester.pumpWidget(
       ProviderScope(
@@ -61,7 +66,9 @@ void main() {
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
   });
 
-  testWidgets('shows an error message when startTrackItem fails', (tester) async {
+  testWidgets('shows an error message when startTrackItem fails', (
+    tester,
+  ) async {
     when(() => repository.startTrackItem('item1')).thenThrow(Exception('boom'));
 
     await pump(tester);
@@ -81,7 +88,12 @@ void main() {
       (_) async => StartItemPayload(
         trackItemProgressId: 'p1',
         type: 'QUIZ',
-        quiz: SanitizedQuiz(passScore: 70, maxAttempts: 3, questions: const [], totalPoints: 0),
+        quiz: SanitizedQuiz(
+          passScore: 70,
+          maxAttempts: 3,
+          questions: const [],
+          totalPoints: 0,
+        ),
         attemptsUsed: 0,
         maxAttempts: 3,
       ),
@@ -92,7 +104,9 @@ void main() {
     expect(find.byType(QuizPlayer), findsOneWidget);
   });
 
-  testWidgets('ARTICLE payload renders the article view (HtmlRichText)', (tester) async {
+  testWidgets('ARTICLE payload renders the article view (HtmlRichText)', (
+    tester,
+  ) async {
     when(() => repository.startTrackItem('item1')).thenAnswer(
       (_) async => StartItemPayload(
         trackItemProgressId: 'p1',
@@ -166,9 +180,156 @@ void main() {
     expect(find.byType(GamePlayer), findsOneWidget);
   });
 
-  testWidgets('an unsupported payload type shows the not-available message', (tester) async {
+  testWidgets(
+    'a section-complete article shows the celebration modal with confetti',
+    (tester) async {
+      when(() => repository.startTrackItem('item1')).thenAnswer(
+        (_) async => StartItemPayload(
+          trackItemProgressId: 'p1',
+          type: 'ARTICLE',
+          html: '<p>Hello world</p>',
+          articleQuestions: const [],
+        ),
+      );
+      when(() => repository.markArticleRead('item1')).thenAnswer(
+        (_) async => TrackItemCompletionResult(
+          completed: true,
+          sectionCompleted: true,
+          trackCompleted: false,
+        ),
+      );
+
+      final router = await pumpRouterApp(
+        tester,
+        initialLocation: '/courses/item/item1',
+        routes: [
+          GoRoute(
+            path: '/courses/item/item1',
+            builder: (context, state) => CourseItemPlayerScreen(item: _item()),
+          ),
+          GoRoute(
+            path: '/home',
+            builder: (context, state) => const Text('HOME'),
+          ),
+        ],
+        overrides: [coursesRepositoryProvider.overrideWithValue(repository)],
+      );
+
+      // Bounded pumps rather than `pumpAndSettle()`: the confetti burst's
+      // particle-simulation ticker doesn't quiesce on its own within a test's
+      // patience, the same class of issue as `AppButton`'s own spinner
+      // elsewhere in this codebase.
+      await tester.tap(find.text('Mark as read'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.byType(CelebrationModal), findsOneWidget);
+      expect(find.text('Section complete!'), findsOneWidget);
+      expect(find.text('Course complete!'), findsNothing);
+
+      // Dismissing a section-complete celebration stays on this screen.
+      await tester.tap(find.text('Continue'));
+      await tester.pump();
+
+      expect(find.byType(CelebrationModal), findsNothing);
+      expect(
+        router.routerDelegate.currentConfiguration.uri.path,
+        '/courses/item/item1',
+      );
+    },
+  );
+
+  testWidgets(
+    'a track-complete article shows the bigger celebration and Back to Learn navigates home',
+    (tester) async {
+      when(() => repository.startTrackItem('item1')).thenAnswer(
+        (_) async => StartItemPayload(
+          trackItemProgressId: 'p1',
+          type: 'ARTICLE',
+          html: '<p>Hello world</p>',
+          articleQuestions: const [],
+        ),
+      );
+      when(() => repository.markArticleRead('item1')).thenAnswer(
+        (_) async => TrackItemCompletionResult(
+          completed: true,
+          sectionCompleted: true,
+          trackCompleted: true,
+        ),
+      );
+
+      await pumpRouterApp(
+        tester,
+        initialLocation: '/courses/item/item1',
+        routes: [
+          GoRoute(
+            path: '/courses/item/item1',
+            builder: (context, state) => CourseItemPlayerScreen(item: _item()),
+          ),
+          GoRoute(
+            path: '/home',
+            builder: (context, state) => const Text('HOME'),
+          ),
+        ],
+        overrides: [coursesRepositoryProvider.overrideWithValue(repository)],
+      );
+
+      await tester.tap(find.text('Mark as read'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      // Track-complete wins over section-complete (RN's own handleCompletion
+      // ordering), and there's no track-wide item list in this scoped screen
+      // to compute the stats pill from, so it's simply never shown.
+      expect(find.text('Course complete!'), findsOneWidget);
+      expect(find.text('Section complete!'), findsNothing);
+      expect(
+        find.textContaining('items completed'),
+        findsNothing,
+        reason: 'no completedCount supplied',
+      );
+
+      await tester.tap(find.text('Back to Learn'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('HOME'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'no celebration appears when the article completes without finishing a section',
+    (tester) async {
+      when(() => repository.startTrackItem('item1')).thenAnswer(
+        (_) async => StartItemPayload(
+          trackItemProgressId: 'p1',
+          type: 'ARTICLE',
+          html: '<p>Hello world</p>',
+          articleQuestions: const [],
+        ),
+      );
+      when(() => repository.markArticleRead('item1')).thenAnswer(
+        (_) async => TrackItemCompletionResult(
+          completed: true,
+          sectionCompleted: false,
+          trackCompleted: false,
+        ),
+      );
+
+      await pump(tester);
+
+      await tester.tap(find.text('courses.article.markRead'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(CelebrationModal), findsNothing);
+    },
+  );
+
+  testWidgets('an unsupported payload type shows the not-available message', (
+    tester,
+  ) async {
     when(() => repository.startTrackItem('item1')).thenAnswer(
-      (_) async => StartItemPayload(trackItemProgressId: 'p1', type: 'ROLEPLAY'),
+      (_) async =>
+          StartItemPayload(trackItemProgressId: 'p1', type: 'ROLEPLAY'),
     );
 
     await pump(tester);

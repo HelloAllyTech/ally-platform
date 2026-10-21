@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../../core/localization/translate_ref.dart';
+import '../../data/course_models.dart';
 import '../../data/courses_repository.dart';
 import '../../data/start_item_payload.dart';
 import '../../data/video_watch_progress.dart';
@@ -26,7 +27,7 @@ class VideoItemPlayer extends ConsumerStatefulWidget {
   final StartItemPayload payload;
   final String itemId;
   final bool alreadyCompleted;
-  final VoidCallback onCompleted;
+  final void Function(TrackItemCompletionResult result) onCompleted;
 
   @override
   ConsumerState<VideoItemPlayer> createState() => _VideoItemPlayerState();
@@ -65,7 +66,9 @@ class _VideoItemPlayerState extends ConsumerState<VideoItemPlayer> {
 
   Future<void> _reportProgress(int watchedPct) async {
     try {
-      final result = await ref.read(coursesRepositoryProvider).reportVideoProgress(
+      final result = await ref
+          .read(coursesRepositoryProvider)
+          .reportVideoProgress(
             itemId: widget.itemId,
             watchedPct: watchedPct.toDouble(),
           );
@@ -74,7 +77,13 @@ class _VideoItemPlayerState extends ConsumerState<VideoItemPlayer> {
           _completed = true;
           _tracker.disabled = true;
         });
-        widget.onCompleted();
+        widget.onCompleted(
+          TrackItemCompletionResult(
+            completed: true,
+            sectionCompleted: result.sectionCompleted,
+            trackCompleted: result.trackCompleted,
+          ),
+        );
       }
     } catch (_) {
       // Server-side monotonic max — a dropped report is recovered by the
@@ -89,7 +98,15 @@ class _VideoItemPlayerState extends ConsumerState<VideoItemPlayer> {
           .reportVideoProgress(itemId: widget.itemId, watchedPct: 100);
       if (mounted) {
         setState(() => _completed = _completed || result.completed);
-        if (result.completed) widget.onCompleted();
+        if (result.completed) {
+          widget.onCompleted(
+            TrackItemCompletionResult(
+              completed: true,
+              sectionCompleted: result.sectionCompleted,
+              trackCompleted: result.trackCompleted,
+            ),
+          );
+        }
       }
     } catch (_) {
       // Button stays available so the learner can retry, same as the RN
@@ -133,7 +150,10 @@ class _VideoItemPlayerState extends ConsumerState<VideoItemPlayer> {
     await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => VideoInterjectionDialog(itemId: widget.itemId, interjection: interjection),
+      builder: (_) => VideoInterjectionDialog(
+        itemId: widget.itemId,
+        interjection: interjection,
+      ),
     );
     _answeredInterjectionIds.add(interjection.id);
     if (mounted) setState(() => _activeInterjection = null);
@@ -149,7 +169,8 @@ class _VideoItemPlayerState extends ConsumerState<VideoItemPlayer> {
   @override
   Widget build(BuildContext context) {
     final payload = widget.payload;
-    final isS3 = payload.videoSource == 's3' && (payload.videoUrl ?? '').isNotEmpty;
+    final isS3 =
+        payload.videoSource == 's3' && (payload.videoUrl ?? '').isNotEmpty;
 
     return Column(
       children: [
@@ -173,7 +194,11 @@ class _VideoItemPlayerState extends ConsumerState<VideoItemPlayer> {
               ? Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    SvgPicture.asset('assets/icons/checkCircle.svg', width: 24, height: 24),
+                    SvgPicture.asset(
+                      'assets/icons/checkCircle.svg',
+                      width: 24,
+                      height: 24,
+                    ),
                     const SizedBox(width: 8),
                     Text(ref.t('courses.video.watched')),
                   ],
@@ -182,7 +207,9 @@ class _VideoItemPlayerState extends ConsumerState<VideoItemPlayer> {
                   width: 160,
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(3),
-                    child: LinearProgressIndicator(value: _tracker.watchedPct / 100),
+                    child: LinearProgressIndicator(
+                      value: _tracker.watchedPct / 100,
+                    ),
                   ),
                 ),
         ),
