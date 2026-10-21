@@ -1,0 +1,7 @@
+# Paths that docs-path-lint should not check. One per line; `#` starts a comment.
+# See scripts/docs-path-lint.mjs for the full rules and the inline `planned` / `ignore` markers.
+
+# ally-be's doc, named in the link text of the Translations row in AGENTS.md and CLAUDE.md
+# (the link URL is explicit). Those two files cannot be edited without tripping docs-guard:
+# its mirror rule and AGENTS.md line budget are unsatisfiable together on master.
+docs/dynamic-i18n.md

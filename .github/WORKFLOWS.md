@@ -312,15 +312,15 @@ Check the Actions tab for detailed logs of each step:
 
 When adding new features to the workflow system:
 
-1. Update the reusable workflow (`.github/workflows/reusable/deploy-ecs-service.yml`)
+1. Update the reusable workflow (`.github/workflows/deploy-ecs-service.yml`)
 2. Update composite actions in `.github/actions/` as needed
 3. Test with a sample application
 4. Update this documentation
-5. Update the template file (`.github/workflows/templates/deploy-app-template.yml`)
+5. Update the template file (`.github/workflows/deploy-app-template.txt`)
 
 ## 🔄 Migration from Existing Workflows
 
-To migrate from the existing `apps/ally-helpline-dashboard/.github/workflows/main.yaml`:
+To migrate from the former per-app `apps/ally-helpline-dashboard/.github/workflows/main.yaml` (no longer in the repo): <!-- docs-path-lint: ignore -->
 
 1. The new system provides the same functionality with better modularity
 2. Environment variables and AWS resources remain the same

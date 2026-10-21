@@ -21,4 +21,4 @@ now exactly one canonical statement of each rule.
 
 Your PR must keep documentation in step with your code. [`.docs-map.yml`](.docs-map.yml)
 declares which docs cover which paths and CI enforces it. If a doc genuinely doesn't need
-to move, apply the `docs:skip` label — with a reason in the PR description.
+to move, apply the `docs:skip` label — with a reason in the PR description. Backticked file paths in any doc are checked too: `node scripts/docs-path-lint.mjs` fails on one that no longer exists — fix it, or mark a deliberate one `<!-- docs-path-lint: planned -->`.
