@@ -661,6 +661,20 @@ export const ApiEndpoints = {
     LESSON_BY_ID: (id: string) => `/v1/builder/lessons/${id}`,
     LESSONS_CONSOLIDATE: "/v1/builder/lessons/consolidate",
     EXEMPLARS: "/v1/builder/exemplars",
+    // Replay eval: recorded interviews (fixtures), suites of runs, and the gate
+    // that publishes a Builder prompt change only when its suite passes.
+    EVAL_GATED_PROMPTS: "/v1/builder/eval/gated-prompts",
+    EVAL_FIXTURES: "/v1/builder/eval/fixtures",
+    EVAL_FIXTURES_EXPORT: "/v1/builder/eval/fixtures/export",
+    EVAL_FIXTURES_IMPORT: "/v1/builder/eval/fixtures/import",
+    EVAL_FIXTURE_FROM_SESSION: (sessionId: string) =>
+      `/v1/builder/eval/fixtures/from-session/${sessionId}`,
+    EVAL_FIXTURE_FROM_EXPORT: "/v1/builder/eval/fixtures/from-export",
+    EVAL_FIXTURE_BY_ID: (id: string) => `/v1/builder/eval/fixtures/${id}`,
+    EVAL_SUITES: "/v1/builder/eval/suites",
+    EVAL_SUITE_BY_ID: (id: string) => `/v1/builder/eval/suites/${id}`,
+    EVAL_RUN_BY_ID: (id: string) => `/v1/builder/eval/runs/${id}`,
+    EVAL_PROMPT_CANDIDATES: "/v1/builder/eval/prompt-candidates",
   },
   COURSE_COPILOT: {
     SESSIONS: "/v1/course-copilot/sessions",
@@ -827,6 +841,7 @@ export const ROUTES = {
   BUILDER_SCOREBOARD: "/builder/scoreboard",
   BUILDER_PIPELINE: "/builder/pipeline",
   BUILDER_KNOWLEDGE: "/builder/knowledge",
+  BUILDER_EVAL: "/builder/eval",
   COURSE_COPILOT: "/course-copilot",
   // Registered before the session route in RouteLayout: "new" would otherwise match `:sessionId`.
   // Optional `?trackId=` binds the session to an existing course (EDIT mode).
@@ -1020,6 +1035,8 @@ export const TAG_TYPES = {
   BUILDER_NOTIFICATIONS: "builderNotifications",
   BUILDER_LESSONS: "builderLessons",
   BUILDER_EXEMPLARS: "builderExemplars",
+  BUILDER_EVAL_FIXTURES: "builderEvalFixtures",
+  BUILDER_EVAL_SUITES: "builderEvalSuites",
   // Course Copilot. Also registered in baseApi.ts's `tagTypes`.
   COURSE_COPILOT_SESSIONS: "courseCopilotSessions",
   COURSE_COPILOT_SESSION: "courseCopilotSession",

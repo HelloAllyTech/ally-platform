@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState, useEffect } from "react";
 
-import { BarChart3, Book, MachineLearningModel, Settings, Timer } from "@icons";
+import { BarChart3, Book, Chemistry, MachineLearningModel, Settings, Timer } from "@icons";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -349,6 +349,14 @@ export const Builder: React.FC = () => {
               iconDescription={strings.knowledgeLink}
               renderIcon={Book}
               onClick={() => navigate(ROUTES.BUILDER_KNOWLEDGE)}
+            />
+            <Button
+              kind="ghost"
+              size="sm"
+              hasIconOnly
+              iconDescription={strings.evalLink}
+              renderIcon={Chemistry}
+              onClick={() => navigate(ROUTES.BUILDER_EVAL)}
             />
             <Button
               kind="ghost"
