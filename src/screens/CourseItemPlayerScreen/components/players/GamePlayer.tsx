@@ -269,7 +269,7 @@ export const GamePlayer: React.FC<GamePlayerProps> = ({
 
       <Text style={styles.hint}>
         {t(
-          `courses.game.controlsTouch.${gameKey as keyof typeof GAME_HTML}` as any,
+          `courses.game.controlsTouch.${gameKey as keyof typeof GAME_HTML}` as TranslationType,
         )}
       </Text>
 
@@ -277,7 +277,7 @@ export const GamePlayer: React.FC<GamePlayerProps> = ({
         {lastScore !== null ? (
           <Text style={styles.score}>
             {t(
-              `courses.game.lastScore.${gameKey as keyof typeof GAME_HTML}` as any,
+              `courses.game.lastScore.${gameKey as keyof typeof GAME_HTML}` as TranslationType,
               {score: lastScore},
             )}
           </Text>
@@ -285,7 +285,7 @@ export const GamePlayer: React.FC<GamePlayerProps> = ({
         {bestScore !== null ? (
           <Text style={styles.best}>
             {t(
-              `courses.game.bestScore.${gameKey as keyof typeof GAME_HTML}` as any,
+              `courses.game.bestScore.${gameKey as keyof typeof GAME_HTML}` as TranslationType,
               {
                 score: bestScore,
               },
