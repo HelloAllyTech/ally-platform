@@ -479,6 +479,90 @@ void main() {
       expect(summary.counselorId, isNull);
       expect(summary.sessionSummary, isNull);
       expect(summary.fields['callId'], 9);
+      expect(summary.isSummaryAvailable, isFalse, reason: 'no details.summary object');
+      expect(summary.summaryStatus, isNull);
+      expect(summary.isSummaryFeedbackAdded, isFalse);
+    });
+
+    test('parses summaryStatus (top-level) and isSummaryAvailable/isSummaryFeedbackAdded', () async {
+      when(() => dio.get<Map<String, dynamic>>('/chats/9')).thenAnswer(
+        (_) async => _response({
+          'id': 9,
+          'summaryStatus': 'SUCCESS',
+          'details': {
+            'summary': {'sessionSummary': 'Done'},
+            'callInfo': {'isSummaryFeedbackAdded': true},
+          },
+        }),
+      );
+
+      final summary = await repository.getCallSummary(9);
+
+      expect(summary.summaryStatus, 'SUCCESS');
+      expect(summary.isSummaryAvailable, isTrue);
+      expect(summary.isSummaryFeedbackAdded, isTrue);
+      expect(summary.isManualNote, isFalse);
+    });
+
+    test('isManualNote is true for a SUCCESS status with no AI summary object', () async {
+      when(() => dio.get<Map<String, dynamic>>('/chats/9')).thenAnswer(
+        (_) async => _response({
+          'id': 9,
+          'summaryStatus': 'SUCCESS',
+          'details': {'callInfo': <String, dynamic>{}},
+        }),
+      );
+
+      final summary = await repository.getCallSummary(9);
+
+      expect(summary.isSummaryAvailable, isFalse);
+      expect(summary.isManualNote, isTrue);
+    });
+  });
+
+  group('retrySummary', () {
+    test('POSTs /chats/{id}/retry-summary and parses success/message', () async {
+      when(() => dio.post<Map<String, dynamic>>('/chats/9/retry-summary')).thenAnswer(
+        (_) async => _response({'success': true, 'message': 'Regenerating'}),
+      );
+
+      final result = await repository.retrySummary(9);
+
+      expect(result.success, isTrue);
+      expect(result.message, 'Regenerating');
+      verify(() => dio.post<Map<String, dynamic>>('/chats/9/retry-summary')).called(1);
+    });
+
+    test('defaults success to false and message to null when absent', () async {
+      when(() => dio.post<Map<String, dynamic>>('/chats/9/retry-summary'))
+          .thenAnswer((_) async => _response(<String, dynamic>{}));
+
+      final result = await repository.retrySummary(9);
+
+      expect(result.success, isFalse);
+      expect(result.message, isNull);
+    });
+  });
+
+  group('addSummaryFeedback', () {
+    test('POSTs rating and nested feedback.issues/comment', () async {
+      when(() => dio.post<void>(
+            '/chats/9/summary-feedback',
+            data: {
+              'rating': 4,
+              'feedback': {'issues': <String>[], 'comment': 'Great summary'},
+            },
+          )).thenAnswer((_) async => _response<void>(null));
+
+      await repository.addSummaryFeedback(chatId: 9, rating: 4, comment: 'Great summary');
+
+      verify(() => dio.post<void>(
+            '/chats/9/summary-feedback',
+            data: {
+              'rating': 4,
+              'feedback': {'issues': <String>[], 'comment': 'Great summary'},
+            },
+          )).called(1);
     });
   });
 

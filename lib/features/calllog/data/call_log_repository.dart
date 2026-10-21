@@ -124,7 +124,16 @@ class ChatMessage {
 /// map keyed by field key (same keys as `SUMMARY_FIELDS`'s values), so
 /// adding a field to the catalog doesn't require touching this parser.
 class CallSummaryDetails {
-  CallSummaryDetails({required this.counselorId, required this.fields});
+  CallSummaryDetails({
+    required this.counselorId,
+    required this.fields,
+    this.summaryStatus,
+    // Defaults true: every pre-existing call site/test fixture that builds
+    // this directly (rather than via fromJson) predates the generation-state
+    // concept and assumes the summary form shows immediately.
+    this.isSummaryAvailable = true,
+    this.isSummaryFeedbackAdded = false,
+  });
 
   factory CallSummaryDetails.fromJson(Map<String, dynamic> json) {
     final details = json['details'] as Map<String, dynamic>?;
@@ -154,6 +163,15 @@ class CallSummaryDetails {
     return CallSummaryDetails(
       counselorId: (json['counselorId'] as num?)?.toInt(),
       fields: fields,
+      // Mirrors RN's `ChatSummaryStatus` ('PENDING'/'IN_PROGRESS'/'SUCCESS'/
+      // 'FAILED'/'NO_AUDIO') — a top-level field on the response, not nested
+      // under `details`.
+      summaryStatus: json['summaryStatus'] as String?,
+      // Mirrors RN's `useSummaryState`'s `isSummaryAvailable`: whether the
+      // AI-generated summary object itself is present, not just that the
+      // chat/call record exists.
+      isSummaryAvailable: summary != null,
+      isSummaryFeedbackAdded: callInfo?['isSummaryFeedbackAdded'] as bool? ?? false,
     );
   }
 
@@ -162,6 +180,14 @@ class CallSummaryDetails {
   /// Flat `fieldKey -> value` map backing every [SummaryFieldDef] in
   /// `call_summary_fields.dart`'s catalog.
   final Map<String, dynamic> fields;
+  final String? summaryStatus;
+  final bool isSummaryAvailable;
+  final bool isSummaryFeedbackAdded;
+
+  /// Mirrors RN's `isManualNote`: an already-ended DICTATION chat with
+  /// `summaryStatus` SUCCESS but no AI summary object — the counsellor fills
+  /// the fields by hand instead of waiting on generation.
+  bool get isManualNote => summaryStatus == 'SUCCESS' && !isSummaryAvailable;
 
   String? get sessionSummary => fields['sessionSummary'] as String?;
   String? get keyConcerns => fields['keyConcerns'] as String?;
@@ -372,6 +398,32 @@ class CallLogRepository {
       data: {'summary': changedFields},
     );
     return CallSummaryDetails.fromJson(response.data!);
+  }
+
+  /// Regenerates a failed/stuck summary — mirrors RN's `retrySummary`
+  /// mutation (the backend re-transcribes from stored audio when no
+  /// transcript exists yet).
+  Future<({bool success, String? message})> retrySummary(int chatId) async {
+    final response = await _dio.post<Map<String, dynamic>>('/chats/$chatId/retry-summary');
+    return (
+      success: response.data?['success'] as bool? ?? false,
+      message: response.data?['message'] as String?,
+    );
+  }
+
+  Future<void> addSummaryFeedback({
+    required int chatId,
+    required int rating,
+    required String comment,
+    List<String> issues = const [],
+  }) async {
+    await _dio.post<void>(
+      '/chats/$chatId/summary-feedback',
+      data: {
+        'rating': rating,
+        'feedback': {'issues': issues, 'comment': comment},
+      },
+    );
   }
 
   Future<List<ChatMessage>> getChatMessages(int chatId) async {
