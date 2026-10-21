@@ -45,6 +45,11 @@ export interface User {
   role: UserRole;
   /** Every role the user holds. Absent on responses predating the field. */
   roles?: UserRole[];
+  /**
+   * The organizations a platform admin is restricted to; null (or absent) when
+   * they are not. Analytics pins its org picker to these.
+   */
+  restrictedTenantIds?: string[] | null;
   userId: number;
 }
 
