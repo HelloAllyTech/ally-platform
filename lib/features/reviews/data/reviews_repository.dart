@@ -61,6 +61,22 @@ class ReviewsRepository {
     );
   }
 
+  /// Matches ally-mobile (React Native)'s `useUpdateReviewStatusMutation` —
+  /// same route/method, used both for the real status transitions (e.g.
+  /// hiding a review) and, with `status: 'IN_REVIEW'`, as the actual
+  /// edit-note save/re-share call `ShareForReviewScreen` makes once a
+  /// review already exists.
+  Future<void> updateReviewStatus({
+    required String reviewId,
+    required String status,
+    String? note,
+  }) async {
+    await _dio.patch<void>(
+      '/scenario-session-reviews/$reviewId',
+      data: {'status': status, 'note': ?note},
+    );
+  }
+
   /// Flat, non-transcript-anchored discussion on a review. The real RN app
   /// (`reviewsApi.ts`'s `getGeneralReviewComments`/`addReviewComment`) hits
   /// GET/POST `/scenario-session-reviews/:reviewId/comments` — the same

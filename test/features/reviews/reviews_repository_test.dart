@@ -160,6 +160,36 @@ void main() {
     });
   });
 
+  group('updateReviewStatus', () {
+    test('patches status and note to the review\'s own route', () async {
+      when(() => dio.patch<void>(
+            '/scenario-session-reviews/rev-1',
+            data: {'status': 'IN_REVIEW', 'note': 'updated'},
+          )).thenAnswer((_) async => _response<void>(null));
+
+      await repository.updateReviewStatus(reviewId: 'rev-1', status: 'IN_REVIEW', note: 'updated');
+
+      verify(() => dio.patch<void>(
+            '/scenario-session-reviews/rev-1',
+            data: {'status': 'IN_REVIEW', 'note': 'updated'},
+          )).called(1);
+    });
+
+    test('omits note entirely when not supplied', () async {
+      when(() => dio.patch<void>(
+            '/scenario-session-reviews/rev-1',
+            data: {'status': 'HIDDEN'},
+          )).thenAnswer((_) async => _response<void>(null));
+
+      await repository.updateReviewStatus(reviewId: 'rev-1', status: 'HIDDEN');
+
+      verify(() => dio.patch<void>(
+            '/scenario-session-reviews/rev-1',
+            data: {'status': 'HIDDEN'},
+          )).called(1);
+    });
+  });
+
   group('getGeneralComments', () {
     test('fetches and parses the flat comment list', () async {
       when(() => dio.get<Map<String, dynamic>>('/scenario-session-reviews/rev-1/comments'))
