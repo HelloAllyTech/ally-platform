@@ -340,4 +340,6 @@ export interface AssignAdminTenantsBody {
 export interface RemoveAdminTenantsBody {
   userId: number;
   tenantIds: string[];
+  /** Required to remove the last organization, which lifts the restriction. */
+  liftRestriction?: boolean;
 }

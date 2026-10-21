@@ -33,6 +33,15 @@ vi.mock("@components", () => ({
       {children}
     </button>
   ),
+  ActionConfirmationPopup: ({ isOpen, title, description, primaryButton, secondaryButton }: any) =>
+    isOpen ? (
+      <div data-testid="confirmation-popup">
+        <div>{title}</div>
+        <div>{description}</div>
+        <button onClick={primaryButton.onClick}>{primaryButton.label}</button>
+        <button onClick={secondaryButton.onClick}>{secondaryButton.label}</button>
+      </div>
+    ) : null,
 }));
 
 // Mock sonner toast
@@ -57,6 +66,9 @@ vi.mock("@constants", () => ({
       confirm: "Confirm",
       removeOrganizationSuccess: "Organization removed successfully",
       removeOrganizationError: "Failed to remove organization",
+      liftRestrictionTitle: "Lift the organization restriction?",
+      liftRestrictionDescription: (name: string) => `${name} is their last organization.`,
+      liftRestrictionConfirm: "Remove and lift restriction",
       assignOrganizationSuccess: "Organization(s) assigned successfully",
       assignOrganizationError: "Failed to assign organization(s)",
     },
@@ -184,13 +196,21 @@ describe("AssignedOrganizations", () => {
     });
   });
 
+  const twoOrgs = {
+    data: [
+      { id: "t1", name: "Tenant 1", logoUrl: "" },
+      { id: "t2", name: "Tenant 2", logoUrl: "" },
+    ],
+    count: 2,
+  };
+
   it("allows removing an assigned organization", async () => {
+    (useGetAdminTenantsQuery as any).mockReturnValue({ data: twoOrgs, isFetching: false });
     render(
       <AssignedOrganizations userId={mockUserId} canEdit={true} allTenants={mockAllTenants} />,
     );
 
-    const removeBtn = screen.getByTitle("Remove");
-    fireEvent.click(removeBtn);
+    fireEvent.click(screen.getAllByTitle("Remove")[0]);
 
     await waitFor(() => {
       expect(mockRemoveMutation).toHaveBeenCalledWith({
@@ -226,16 +246,51 @@ describe("AssignedOrganizations", () => {
       unwrap: vi.fn().mockRejectedValue({}),
     });
     (useRemoveAdminTenantsMutation as any).mockReturnValue([errorMutation, { isLoading: false }]);
+    (useGetAdminTenantsQuery as any).mockReturnValue({ data: twoOrgs, isFetching: false });
 
+    render(
+      <AssignedOrganizations userId={mockUserId} canEdit={true} allTenants={mockAllTenants} />,
+    );
+
+    fireEvent.click(screen.getAllByTitle("Remove")[0]);
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith("Failed to remove organization");
+    });
+  });
+
+  it("asks before removing the last organization, then lifts the restriction", async () => {
     render(
       <AssignedOrganizations userId={mockUserId} canEdit={true} allTenants={mockAllTenants} />,
     );
 
     fireEvent.click(screen.getByTitle("Remove"));
 
+    expect(screen.getByTestId("confirmation-popup")).toBeInTheDocument();
+    expect(screen.getByText("Tenant 1 is their last organization.")).toBeInTheDocument();
+    expect(mockRemoveMutation).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByText("Remove and lift restriction"));
+
     await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith("Failed to remove organization");
+      expect(mockRemoveMutation).toHaveBeenCalledWith({
+        userId: mockUserId,
+        tenantIds: ["t1"],
+        liftRestriction: true,
+      });
     });
+  });
+
+  it("keeps the last organization when the lift is cancelled", () => {
+    render(
+      <AssignedOrganizations userId={mockUserId} canEdit={true} allTenants={mockAllTenants} />,
+    );
+
+    fireEvent.click(screen.getByTitle("Remove"));
+    fireEvent.click(screen.getAllByText("Cancel")[0]);
+
+    expect(screen.queryByTestId("confirmation-popup")).not.toBeInTheDocument();
+    expect(mockRemoveMutation).not.toHaveBeenCalled();
   });
 
   it("closes modal on cancel", () => {

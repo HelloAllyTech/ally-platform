@@ -9,7 +9,7 @@ import {
   useAssignAdminTenantsMutation,
   useRemoveAdminTenantsMutation,
 } from "@api";
-import { Button } from "@components";
+import { ActionConfirmationPopup, Button } from "@components";
 import { ButtonVariant } from "@components/types";
 import { en } from "@constants";
 import { Tenant, AdminTenant } from "@types";
@@ -27,6 +27,11 @@ export const AssignedOrganizations: React.FC<AssignedOrganizationsProps> = ({
 }) => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  // The org whose removal would leave the allowlist empty. An empty allowlist
+  // means unrestricted, so that removal widens the admin to every
+  // organization; the backend refuses it unless asked to lift the restriction,
+  // and this asks the person first.
+  const [pendingLift, setPendingLift] = useState<AdminTenant | null>(null);
 
   const { data: adminTenantsData, isFetching } = useGetAdminTenantsQuery(userId, {
     skip: !userId,
@@ -41,13 +46,32 @@ export const AssignedOrganizations: React.FC<AssignedOrganizationsProps> = ({
   const assignedIds = new Set(assignedTenants.map(t => t.id));
   const availableTenants = allTenants.filter(t => !assignedIds.has(t.id));
 
-  const handleRemove = async (tenantId: string) => {
+  const removeTenant = async (tenantId: string, liftRestriction = false) => {
     try {
-      await removeAdminTenants({ userId, tenantIds: [tenantId] }).unwrap();
+      await removeAdminTenants({
+        userId,
+        tenantIds: [tenantId],
+        ...(liftRestriction ? { liftRestriction: true } : {}),
+      }).unwrap();
       toast.success(en.userManagement.removeOrganizationSuccess);
     } catch (err: any) {
       toast.error(err?.data?.message || en.userManagement.removeOrganizationError);
     }
+  };
+
+  const handleRemove = (tenant: AdminTenant) => {
+    if (assignedTenants.length === 1) {
+      setPendingLift(tenant);
+      return;
+    }
+    removeTenant(tenant.id);
+  };
+
+  const confirmLift = async () => {
+    if (!pendingLift) return;
+    const tenantId = pendingLift.id;
+    setPendingLift(null);
+    await removeTenant(tenantId, true);
   };
 
   const handleAssign = async () => {
@@ -118,7 +142,7 @@ export const AssignedOrganizations: React.FC<AssignedOrganizationsProps> = ({
               {canEdit && (
                 <button
                   type="button"
-                  onClick={() => handleRemove(tenant.id)}
+                  onClick={() => handleRemove(tenant)}
                   disabled={isRemoving}
                   title={en.userManagement.remove}
                   aria-label={en.userManagement.remove}
@@ -131,6 +155,24 @@ export const AssignedOrganizations: React.FC<AssignedOrganizationsProps> = ({
           ))
         )}
       </div>
+
+      {pendingLift && (
+        <ActionConfirmationPopup
+          isOpen
+          onClose={() => setPendingLift(null)}
+          title={en.userManagement.liftRestrictionTitle}
+          description={en.userManagement.liftRestrictionDescription(pendingLift.name)}
+          primaryButton={{
+            label: en.userManagement.liftRestrictionConfirm,
+            onClick: confirmLift,
+            variant: ButtonVariant.DESTRUCTIVE,
+          }}
+          secondaryButton={{
+            label: en.userManagement.cancel,
+            onClick: () => setPendingLift(null),
+          }}
+        />
+      )}
 
       {/* Add Organization Modal */}
       {showAddModal && (
