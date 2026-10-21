@@ -48,6 +48,10 @@ export const LOCAL_STORAGE_KEYS = {
   ROOM_DATA: "roomData",
   // Pins an in-progress character-interview session across a page reload.
   CHARACTER_INTERVIEW_SESSION_ID: "characterInterviewSessionId",
+  // The desktop nav sidebar's pin: "true" keeps it expanded; anything else
+  // leaves it collapsed and opening on hover. Survives logout on purpose — it
+  // is a per-browser layout preference, not account state.
+  NAV_SIDEBAR_PINNED: "navSidebarPinned",
 };
 
 export const SESSION_STORAGE_KEYS = {

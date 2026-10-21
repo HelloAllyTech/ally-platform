@@ -1,4 +1,12 @@
-import { FC, useEffect, useRef, useState, type KeyboardEvent } from "react";
+import {
+  FC,
+  useEffect,
+  useRef,
+  useState,
+  type FocusEvent,
+  type KeyboardEvent,
+  type PointerEvent,
+} from "react";
 
 import { XIcon } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -27,6 +35,7 @@ import {
   TooltipLocation,
   hasAllyAdminAccess,
   adminAppUrl,
+  LOCAL_STORAGE_KEYS,
 } from "@constants";
 import {
   useAnalytics,
@@ -44,11 +53,47 @@ import LanguageSelector from "../language-selector/LanguageSelector";
 import NotificationBadge from "../notification-badge/NotificationBadge";
 import { NotificationBell } from "../notification-feed";
 
-const EXPANDED_WIDTH = 1200;
 // Below Tailwind's `md` the sidebar is an off-canvas drawer opened from the
 // mobile top bar. A drawer of bare icons gives a phone user nothing to read,
 // so it always opens expanded there, whatever the desktop rail was set to.
 const MOBILE_MAX_WIDTH = 768;
+
+// On desktop the rail is collapsed unless pinned, and a mouse over it opens it
+// temporarily, floating over the page. The open delay is hover intent: long
+// enough that a cursor crossing the rail on its way to the window edge doesn't
+// flash it open, short enough to feel immediate. The close delay is grace, so
+// a brief slip past the edge doesn't snap it shut mid-reach.
+const PEEK_OPEN_DELAY_MS = 100;
+const PEEK_CLOSE_DELAY_MS = 150;
+
+// Storage can be unavailable (private windows, blocked site data); the pin then
+// lasts only until the next load rather than breaking the sidebar.
+const readPinned = (): boolean => {
+  try {
+    return localStorage.getItem(LOCAL_STORAGE_KEYS.NAV_SIDEBAR_PINNED) === "true";
+  } catch {
+    return false;
+  }
+};
+
+const writePinned = (pinned: boolean) => {
+  try {
+    localStorage.setItem(LOCAL_STORAGE_KEYS.NAV_SIDEBAR_PINNED, String(pinned));
+  } catch {
+    // See readPinned.
+  }
+};
+
+// Keyboard focus opens the rail the way hover does, so its labels are readable
+// while tabbing through it. Focus left behind by a mouse click must not: the
+// clicked tab keeps focus, and would hold the rail open after the cursor left.
+const isKeyboardFocus = (element: Element): boolean => {
+  try {
+    return element.matches(":focus-visible");
+  } catch {
+    return false;
+  }
+};
 
 // Built lazily (inside the component) so `TabId`/`TooltipLocation` are not
 // dereferenced at module load — keeps tests that mock @constants from breaking.
@@ -93,6 +138,7 @@ const Tab: FC<TabProps> = ({
   // with aria-current so it is announced rather than only coloured.
   const Wrapper = href ? "a" : "div";
   const isActive = activeTab === id;
+  const label = tKey ? t(tKey) : title;
   const wrapperProps = href
     ? { href, target: "_blank" as const, rel: "noopener noreferrer" }
     : {
@@ -117,6 +163,9 @@ const Tab: FC<TabProps> = ({
           transition-all duration-300 group
         `}
       onClick={onClick}
+      // Collapsed is the default rail, and there the tab is a bare icon: name it
+      // for assistive tech, which can't see the label a hover would reveal.
+      aria-label={isExpanded ? undefined : label}
       {...wrapperProps}
     >
       <div className="relative flex-shrink-0">
@@ -141,7 +190,7 @@ const Tab: FC<TabProps> = ({
                   : "text-typography-800 font-[400]"
               } font-primary text-lg truncate`}
             >
-              {tKey ? t(tKey) : title}
+              {label}
             </div>
             {tagKey && (
               <span
@@ -233,8 +282,15 @@ const NavSideBar: FC<NavSideBarProps> = ({ activeTab, onTabChange, isOpen, onClo
   const navigate = useNavigate();
   const { data: tenantData } = useGetLogoUrlQuery();
 
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isPinned, setIsPinned] = useState(readPinned);
+  const [isPeeking, setIsPeeking] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < MOBILE_MAX_WIDTH);
   const [openSettings, setOpenSettings] = useState(false);
+
+  const isExpanded = isMobile || isPinned || isPeeking;
+  // Only a hover-opened rail floats over the page. Pinned, it takes its own
+  // column and the page reflows around it, as it always has.
+  const isOverlaying = isPeeking && !isPinned && !isMobile;
 
   const profileSettingsForm = useForm({
     defaultValues: defaultProfileUploadValues,
@@ -243,19 +299,8 @@ const NavSideBar: FC<NavSideBarProps> = ({ activeTab, onTabChange, isOpen, onClo
 
   const profileUrl = profileSettingsForm.watch("profileImageUrl");
 
-  // Tracks whether the user has manually toggled the sidebar — once they have,
-  // their choice sticks and auto-resize stops overriding it.
-  const userToggledRef = useRef(false);
-
   useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth < MOBILE_MAX_WIDTH) {
-        setIsExpanded(true);
-        return;
-      }
-      if (userToggledRef.current) return;
-      setIsExpanded(window.innerWidth >= EXPANDED_WIDTH);
-    };
+    const handleResize = () => setIsMobile(window.innerWidth < MOBILE_MAX_WIDTH);
 
     handleResize();
 
@@ -263,15 +308,75 @@ const NavSideBar: FC<NavSideBarProps> = ({ activeTab, onTabChange, isOpen, onClo
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  // What is holding the rail open. Refs, not state: they only decide where the
+  // next timer lands, and must be current inside handlers that fire in a burst.
+  const peekSourcesRef = useRef({ pointer: false, keyboard: false });
+  const peekTimerRef = useRef<number>();
+
+  useEffect(() => () => window.clearTimeout(peekTimerRef.current), []);
+
+  const syncPeek = () => {
+    const { pointer, keyboard } = peekSourcesRef.current;
+    const shouldPeek = pointer || keyboard;
+    // Keyboard focus is always deliberate, so it skips the hover-intent delay.
+    const delay = !shouldPeek ? PEEK_CLOSE_DELAY_MS : keyboard ? 0 : PEEK_OPEN_DELAY_MS;
+    window.clearTimeout(peekTimerRef.current);
+    peekTimerRef.current = window.setTimeout(() => setIsPeeking(shouldPeek), delay);
+  };
+
+  // A touch or pen "hovers" only for the instant of a tap, so a peek would open
+  // and shut again on every tap. Those users open the rail with its pin button.
+  const isHoverPointer = (event: PointerEvent<HTMLElement>) =>
+    event.pointerType !== "touch" && event.pointerType !== "pen";
+
+  const handlePointerEnter = (event: PointerEvent<HTMLElement>) => {
+    if (!isHoverPointer(event)) return;
+    peekSourcesRef.current.pointer = true;
+    syncPeek();
+  };
+
+  const handlePointerLeave = (event: PointerEvent<HTMLElement>) => {
+    if (!isHoverPointer(event)) return;
+    // Leaving with the mouse collapses the rail even if keyboard focus is still
+    // parked inside it — e.g. returned there by a modal closed with Escape.
+    // Focusing into it again from the keyboard reopens it.
+    peekSourcesRef.current = { pointer: false, keyboard: false };
+    syncPeek();
+  };
+
+  const handleFocus = (event: FocusEvent<HTMLElement>) => {
+    if (!isKeyboardFocus(event.target)) return;
+    peekSourcesRef.current.keyboard = true;
+    syncPeek();
+  };
+
+  const handleBlur = (event: FocusEvent<HTMLElement>) => {
+    if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+    peekSourcesRef.current.keyboard = false;
+    syncPeek();
+  };
+
   const onTabClick = (path: string) => {
     onTabChange(path);
     onClose();
   };
 
-  const handleToggleSidebar = () => {
-    userToggledRef.current = true;
-    setIsExpanded(!isExpanded);
+  const handleTogglePin = () => {
+    const nextPinned = !isPinned;
+    setIsPinned(nextPinned);
+    writePinned(nextPinned);
+    // Unpinning means "collapse", so drop the hover-expansion as well, or the
+    // rail would stay open under the very cursor that just clicked it. It peeks
+    // again on the next hover.
+    window.clearTimeout(peekTimerRef.current);
+    setIsPeeking(false);
   };
+
+  const toggleTitle = isPinned
+    ? t("nav.sidebar.collapse")
+    : isExpanded
+      ? t("nav.sidebar.pin")
+      : t("nav.sidebar.expand");
 
   const handleLogout = () => {
     setIsLogoutDialogOpen(true);
@@ -471,102 +576,117 @@ const NavSideBar: FC<NavSideBarProps> = ({ activeTab, onTabChange, isOpen, onClo
 
   return (
     <>
-      {/* Mobile: an off-canvas drawer above the sticky top bar (z-30) and its
+      {/* Desktop: this wrapper is the sidebar's column in the page layout. It
+          reserves only the collapsed rail's width, or the full width once
+          pinned, so a hover-opened panel floats over the page instead of
+          reflowing it. On a phone it is empty: the panel is a fixed drawer. */}
+      <div
+        data-testid="nav-sidebar-rail"
+        className={`shrink-0 md:relative md:transition-[width] md:duration-150 ${
+          isPinned ? "md:w-64" : "md:w-24"
+        }`}
+      >
+        {/* Mobile: an off-canvas drawer above the sticky top bar (z-30) and its
           own overlay (z-40). `invisible` while closed takes the off-screen
           links out of the tab order and the accessibility tree; visibility
           transitions discretely, so the slide-out still animates. */}
-      <div
-        id="app-nav-sidebar"
-        data-testid="nav-sidebar"
-        className={`fixed md:static inset-y-0 left-0 z-50 max-w-[85vw] bg-background h-dvh flex flex-col justify-between border-r border-r-border-light transition-all duration-300 ${
-          isExpanded ? "w-64" : "w-24"
-        } p-[12px] font-primary ${
-          isOpen ? "translate-x-0" : "-translate-x-full invisible md:visible"
-        } md:translate-x-0 max-md:overflow-y-auto max-md:overscroll-contain`}
-      >
-        {/* Logo container */}
         <div
-          className="relative flex items-center justify-between h-[72px]"
-          data-testid="nav-sidebar-header"
+          id="app-nav-sidebar"
+          data-testid="nav-sidebar"
+          data-peeking={isOverlaying}
+          onPointerEnter={handlePointerEnter}
+          onPointerLeave={handlePointerLeave}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
+          className={`fixed md:absolute inset-y-0 left-0 z-50 max-w-[85vw] bg-background h-dvh flex flex-col justify-between border-r border-r-border-light transition-all duration-300 md:duration-150 ${
+            isExpanded ? "w-64" : "w-24"
+          } ${isOverlaying ? "md:shadow-xl" : ""} p-[12px] font-primary ${
+            isOpen ? "translate-x-0" : "-translate-x-full invisible md:visible"
+          } md:translate-x-0 max-md:overflow-y-auto max-md:overscroll-contain`}
         >
-          {/* Logo */}
+          {/* Logo container */}
+          <div
+            className="relative flex items-center justify-between h-[72px]"
+            data-testid="nav-sidebar-header"
+          >
+            {/* Logo */}
 
-          {/* No `overflow-hidden` here: the org-name Tooltip renders its bubble
+            {/* No `overflow-hidden` here: the org-name Tooltip renders its bubble
               inline (Carbon Tooltip is not portaled), so an overflow-hidden
               ancestor would clip it off-screen. The logo image is still clipped
               to the rounded box by the inner wrapper's own overflow-hidden. */}
-          <div className="relative w-14 h-14 border-[0.5px] group ml-2 rounded-md box-border flex items-center justify-center">
-            {/* Toggle button - covers logo when collapsed */}
-            <Tooltip label={tenantData?.name ?? ""} align="right">
-              <div className="w-14 h-14  group rounded-md box-border overflow-hidden flex items-center justify-center">
-                <CustomImage
-                  src={tenantData?.logoUrl}
-                  alt="org-logo"
-                  className={`object-cover w-full h-full transition-opacity duration-200 rounded-md ${
-                    !isExpanded ? "group-hover:opacity-20" : ""
-                  }`}
-                  fallbackClassName="w-14 h-14  group rounded-md box-border overflow-hidden flex items-center justify-center bg-neutral-100"
-                  fallbackText={tenantData?.name?.slice(0, 1)?.toUpperCase() ?? "NA"}
-                />
-              </div>
-            </Tooltip>
-            {!isExpanded && (
-              <button
-                data-testid="nav-sidebar-toggle"
-                onClick={handleToggleSidebar}
-                className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-gray-50 hover:rounded-md"
-                title={t("nav.sidebar.expand")}
-              >
-                <DockToRight />
-              </button>
-            )}
-          </div>
+            <div className="relative w-14 h-14 border-[0.5px] ml-2 rounded-md box-border flex items-center justify-center">
+              <Tooltip label={tenantData?.name ?? ""} align="right">
+                <div className="w-14 h-14 rounded-md box-border overflow-hidden flex items-center justify-center">
+                  <CustomImage
+                    src={tenantData?.logoUrl}
+                    alt="org-logo"
+                    className="object-cover w-full h-full rounded-md"
+                    fallbackClassName="w-14 h-14 rounded-md box-border overflow-hidden flex items-center justify-center bg-neutral-100"
+                    fallbackText={tenantData?.name?.slice(0, 1)?.toUpperCase() ?? "NA"}
+                  />
+                </div>
+              </Tooltip>
+            </div>
 
-          {isExpanded && (
+            {/* The pin. Expanded — hover-opened or pinned — it sits beside the
+              logo. Collapsed it lies invisibly over the logo: a mouse never
+              meets it there (hovering opens the rail first), but a tap pins the
+              rail open on a touch screen, which has no hover to open it with.
+              One element across both states, so keyboard focus on it survives
+              the rail opening around it. */}
             <button
+              type="button"
               data-testid="nav-sidebar-toggle"
-              onClick={handleToggleSidebar}
-              className="hidden md:block p-3 transition-all duration-200 hover:bg-gray-50 hover:rounded-md"
-              title={t("nav.sidebar.collapse")}
+              onClick={handleTogglePin}
+              className={
+                isExpanded
+                  ? "hidden md:block p-3 transition-all duration-200 hover:bg-gray-50 hover:rounded-md"
+                  : "hidden md:flex absolute left-2 top-1/2 -translate-y-1/2 w-14 h-14 items-center justify-center rounded-md opacity-0 focus-visible:opacity-100"
+              }
+              title={toggleTitle}
             >
               <DockToRight />
             </button>
-          )}
-          {/* The drawer's own way out on a phone, where the desktop
+            {/* The drawer's own way out on a phone, where the desktop
               collapse toggle above has no meaning. */}
-          <button
-            type="button"
-            data-testid="nav-sidebar-close"
-            onClick={onClose}
-            aria-label={t("nav.sidebar.collapse")}
-            className="md:hidden inline-flex h-11 w-11 items-center justify-center rounded-md hover:bg-background-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+            <button
+              type="button"
+              data-testid="nav-sidebar-close"
+              onClick={onClose}
+              aria-label={t("nav.sidebar.collapse")}
+              className="md:hidden inline-flex h-11 w-11 items-center justify-center rounded-md hover:bg-background-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+            >
+              <XIcon aria-hidden="true" />
+            </button>
+          </div>
+          {renderTabs()}
+
+          <div
+            className="flex flex-col items-start gap-3 mx-4 my-3"
+            data-testid="nav-sidebar-footer"
           >
-            <XIcon aria-hidden="true" />
-          </button>
-        </div>
-        {renderTabs()}
+            <hr className="w-full border-t border-gray-200" data-testid="nav-sidebar-divider" />
 
-        <div className="flex flex-col items-start gap-3 mx-4 my-3" data-testid="nav-sidebar-footer">
-          <hr className="w-full border-t border-gray-200" data-testid="nav-sidebar-divider" />
+            <NotificationBell isExpanded={isExpanded} />
 
-          <NotificationBell isExpanded={isExpanded} />
+            {isExpanded && FEATURE_FLAGS_MAP.LANGUAGE_SELECTOR_FLAG && (
+              <AppTooltip location={TooltipLocation.LANGUAGE_SELECTOR}>
+                <div className="w-full" data-testid="nav-sidebar-language-selector">
+                  <LanguageSelector label={t("nav.language.label")} />
+                </div>
+              </AppTooltip>
+            )}
 
-          {isExpanded && FEATURE_FLAGS_MAP.LANGUAGE_SELECTOR_FLAG && (
-            <AppTooltip location={TooltipLocation.LANGUAGE_SELECTOR}>
-              <div className="w-full" data-testid="nav-sidebar-language-selector">
-                <LanguageSelector label={t("nav.language.label")} />
-              </div>
-            </AppTooltip>
-          )}
-
-          <UserInfo
-            user={user}
-            onLogout={handleLogout}
-            isExpanded={isExpanded}
-            onProfileSettings={handleSettingsClick}
-            profileUrl={user?.profileImageUrl}
-            name={user?.name}
-          />
+            <UserInfo
+              user={user}
+              onLogout={handleLogout}
+              isExpanded={isExpanded}
+              onProfileSettings={handleSettingsClick}
+              profileUrl={user?.profileImageUrl}
+              name={user?.name}
+            />
+          </div>
         </div>
       </div>
       <ConfirmationDialog
