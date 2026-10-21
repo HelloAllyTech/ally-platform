@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/theme/app_colors.dart';
@@ -48,7 +49,16 @@ class _AchievementsScreenState extends ConsumerState<AchievementsScreen> {
     return Scaffold(
       body: Column(
         children: [
-          TabScreenHeader(title: ref.t('achievements.title')),
+          TabScreenHeader(
+            title: ref.t('achievements.title'),
+            // RN's real header always has a back arrow — this screen is
+            // also reachable via a direct push (e.g. from Leaderboard's
+            // Badges button), not only as the Achievements bottom tab, so
+            // only show it when there's actually somewhere to pop back to.
+            leading: GoRouter.of(context).canPop()
+                ? IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop())
+                : null,
+          ),
           _buildFilterRow(context),
           Expanded(child: _buildBody(context, badgesAsync)),
         ],

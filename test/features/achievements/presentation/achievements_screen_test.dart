@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 
 import 'package:ally_mobile_flutter/features/achievements/data/achievements_repository.dart';
 import 'package:ally_mobile_flutter/features/achievements/presentation/achievements_screen.dart';
 
-import '../../../support/pump_app.dart';
+import '../../../support/pump_router_app.dart';
 
 class MockAchievementsRepository extends Mock implements AchievementsRepository {}
+
+List<GoRoute> _routes() => [
+  GoRoute(path: '/achievements', builder: (context, state) => const AchievementsScreen()),
+];
 
 void main() {
   testWidgets(
@@ -53,11 +58,17 @@ void main() {
       );
       when(() => repository.markBadgeAsViewed(any())).thenAnswer((_) async {});
 
-      await pumpApp(
+      await pumpRouterApp(
         tester,
-        const AchievementsScreen(),
+        initialLocation: '/achievements',
+        routes: _routes(),
         overrides: [achievementsRepositoryProvider.overrideWithValue(repository)],
       );
+
+      // No back arrow when this is the root route (nothing to pop to) —
+      // e.g. reached as the Achievements bottom tab, not pushed from
+      // elsewhere.
+      expect(find.byIcon(Icons.arrow_back), findsNothing);
 
       // --- All tab (default): every badge from every category shows, ---
       // --- each with its RN-real translated category label (mapped   ---
@@ -102,17 +113,42 @@ void main() {
       // --- A fresh mount whose repository throws shows an error message. ---
       // (Combined into this same test body — see pumpApp's doc comment in
       // test/support/pump_app.dart on why a second, separate `testWidgets`
-      // in this file reliably fails to load translations.)
+      // in this file reliably fails to load translations; pumpRouterApp
+      // uses a different, synchronous translations override so this isn't
+      // at risk the same way, but keeping the sequential-steps shape.)
       final failingRepository = MockAchievementsRepository();
       when(() => failingRepository.getBadges()).thenThrow(Exception('boom'));
 
-      await pumpApp(
+      await pumpRouterApp(
         tester,
-        const AchievementsScreen(),
+        initialLocation: '/achievements',
+        routes: _routes(),
         overrides: [achievementsRepositoryProvider.overrideWithValue(failingRepository)],
       );
 
       expect(find.textContaining('Unable to Load Achievements'), findsOneWidget);
     },
   );
+
+  testWidgets('shows a back arrow that pops when reached via a direct push', (tester) async {
+    final repository = MockAchievementsRepository();
+    when(() => repository.getBadges()).thenAnswer((_) async => []);
+
+    final router = await pumpRouterApp(
+      tester,
+      initialLocation: '/leaderboard',
+      routes: [
+        GoRoute(path: '/leaderboard', builder: (context, state) => const Scaffold(body: Text('LEADERBOARD'))),
+        ..._routes(),
+      ],
+      overrides: [achievementsRepositoryProvider.overrideWithValue(repository)],
+    );
+    router.push('/achievements');
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.arrow_back));
+    await tester.pumpAndSettle();
+
+    expect(find.text('LEADERBOARD'), findsOneWidget);
+  });
 }
