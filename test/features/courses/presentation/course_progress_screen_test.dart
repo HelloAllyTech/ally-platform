@@ -14,8 +14,8 @@ import '../../../support/pump_app.dart';
 
 class MockCoursesRepository extends Mock implements CoursesRepository {}
 
-// See course_overview_screen_test.dart's file-level comment on why these
-// assert the raw i18n key rather than translated copy.
+// These assert the raw i18n key rather than translated copy, which was
+// flaky across multiple tests sharing a process here.
 
 void main() {
   late MockCoursesRepository repository;

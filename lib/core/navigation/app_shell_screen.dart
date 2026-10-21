@@ -15,9 +15,7 @@ import 'tab_config.dart';
 /// owns the side drawer and the floating permission-gated bottom tab bar,
 /// swapping tab bodies locally (not through go_router) exactly like the RN
 /// `Tab.Navigator` does. Also where push-notification device-token
-/// registration fires, same "once per landed on Home authenticated" timing
-/// `HomeScreen` (the screen this replaces as the real post-login landing
-/// surface) used.
+/// registration fires ("once per landed on Home authenticated").
 class AppShellScreen extends ConsumerStatefulWidget {
   const AppShellScreen({super.key});
 

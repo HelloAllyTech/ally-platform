@@ -17,10 +17,9 @@ import '../../../support/pump_app.dart';
 
 class MockCoursesRepository extends Mock implements CoursesRepository {}
 
-// See course_overview_screen_test.dart's file-level comment: these
-// assertions check `ref.t()`'s raw-key fallback deterministically rather
-// than the translated copy, which was flaky across multiple tests sharing
-// a process here.
+// These assertions check `ref.t()`'s raw-key fallback deterministically
+// rather than the translated copy, which was flaky across multiple tests
+// sharing a process here.
 
 TrackDetailItem _item({
   required String id,

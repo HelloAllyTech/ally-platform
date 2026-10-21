@@ -16,7 +16,6 @@ import '../../features/community/presentation/community_screen.dart';
 import '../../features/courses/data/course_models.dart';
 import '../../features/courses/presentation/course_detail_screen.dart';
 import '../../features/courses/presentation/course_item_player_screen.dart';
-import '../../features/courses/presentation/course_overview_screen.dart';
 import '../../features/courses/presentation/course_progress_screen.dart';
 import '../../features/leaderboard/presentation/leaderboard_screen.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
@@ -29,7 +28,6 @@ import '../../features/roleplay/presentation/roleplay_voice_screen.dart';
 import '../../features/scribe/presentation/scribe_recording_screen.dart';
 import '../../features/search/presentation/search_screen.dart';
 import '../../features/simulations/presentation/case_details_screen.dart';
-import '../../features/simulations/presentation/cases_list_screen.dart';
 import '../../features/suspended/presentation/suspended_account_screen.dart';
 import '../../features/simulations/presentation/simulation_details_screen.dart';
 import '../../features/simulations/presentation/simulation_feedback_screen.dart';
@@ -120,10 +118,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           // user's id once auth/profile screens are ported.
           return const ScribeRecordingScreen(userId: 'dev-user');
         },
-      ),
-      GoRoute(
-        path: '/courses',
-        builder: (context, state) => const CourseOverviewScreen(),
       ),
       GoRoute(
         path: '/courses/:trackId',
@@ -227,10 +221,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/box-breathing',
         builder: (context, state) => const BoxBreathingScreen(),
-      ),
-      GoRoute(
-        path: '/cases',
-        builder: (context, state) => const CasesListScreen(),
       ),
       GoRoute(
         path: '/cases/:caseId',
