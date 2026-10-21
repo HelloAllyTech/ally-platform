@@ -181,12 +181,62 @@ export interface BuilderPrdReadinessSection {
   detail?: string;
 }
 
+export type BuilderPrdReviewCategory =
+  | "contradiction"
+  | "unsupported_claim"
+  | "unapplied_correction"
+  | "missed_reuse"
+  | "missing_success_metric";
+
+/** One thing the cold PRD reviewer objected to. Mirrors ally-be's BuilderPrdReviewFinding. */
+export interface BuilderPrdReviewFinding {
+  /** "F1", "F2"… */
+  id: string;
+  category: BuilderPrdReviewCategory;
+  /** The PRD key it is about — a key of `en.builder.prd.sections`. */
+  section: string;
+  detail: string;
+  fix: string;
+  quote?: string;
+  status: "open" | "fixed" | "dismissed";
+  raisedInVersion: number;
+  fixedInVersion?: number;
+  /** The recheck's one line on why it reads resolved, or still open. */
+  checkNote?: string;
+  dismissal?: {
+    reason: string;
+    by: number;
+    at: string;
+    /** `interview` when the agent recorded the admin's own words. */
+    via: "admin" | "interview";
+  };
+}
+
+/**
+ * The cold reviewer's record on the PRD. It runs once, the first time every
+ * other readiness row passes; each open finding then blocks until a recheck
+ * finds it fixed or someone dismisses it with a reason.
+ */
+export interface BuilderPrdReview {
+  /** `failed`: the reviewer itself could not run. That does not block. */
+  status: "done" | "failed";
+  versionNumber: number;
+  checkedVersion: number;
+  model: string | null;
+  reviewedAt: string;
+  checkedAt: string;
+  findings: BuilderPrdReviewFinding[];
+  error?: string | null;
+}
+
 export interface BuilderPrdReadiness {
   score: number;
   ready: boolean;
   sections: BuilderPrdReadinessSection[];
   /** `hint` + `detail` per blocked section. Counted here, not read. */
   blockers: string[];
+  /** Null before the first review; absent from servers that predate it. */
+  review?: BuilderPrdReview | null;
 }
 
 export interface BuilderPrdVersion {
@@ -595,6 +645,18 @@ export interface PatchBuilderPrdRequest {
   id: string;
   ops: BuilderPrdPatchOp[];
   changeSummary?: string;
+}
+
+export interface DismissBuilderReviewFindingRequest {
+  id: string;
+  findingId: string;
+  reason: string;
+}
+
+export interface DismissBuilderReviewFindingResponse {
+  readiness: BuilderPrdReadiness;
+  /** The session status after re-scoring — a dismissal can make the PRD ready. */
+  status: BuilderSessionStatus;
 }
 
 export interface PatchBuilderPrdResponse {

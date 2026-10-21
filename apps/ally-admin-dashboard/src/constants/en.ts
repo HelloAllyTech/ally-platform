@@ -3640,6 +3640,34 @@ export const en = {
       noRequirements: "No requirements captured yet.",
       noAssumptions: "Nothing assumed so far.",
       noOpenQuestions: "Nothing outstanding.",
+      // The cold reviewer: a second model that reads the PRD the first time it
+      // reads ready. Its findings block "Start build" until fixed or dismissed.
+      review: {
+        heading: "Review findings",
+        tooltip:
+          "A second AI reads the PRD the first time everything else passes, against what the interview actually read and heard. Each finding blocks the build until the PRD is fixed (it rechecks after each change) or you dismiss it with a reason. Your reasons are kept — they're how the reviewer gets corrected.",
+        categories: {
+          contradiction: "Contradiction",
+          unsupported_claim: "Unsupported claim",
+          unapplied_correction: "Correction not applied",
+          missed_reuse: "Missed reuse",
+          missing_success_metric: "No success metric",
+        } as Record<string, string>,
+        fixLabel: "Fix:",
+        sectionLabel: (section: string) => `In ${section}`,
+        dismiss: "Dismiss",
+        dismissPlaceholder: "Why is this finding wrong?",
+        dismissHint: (min: number) => `At least ${min} characters — the reason is kept.`,
+        confirmDismiss: "Dismiss finding",
+        dismissFailed: "Couldn't dismiss that finding.",
+        resolvedHeading: (count: number) => `Resolved (${count})`,
+        fixed: "Fixed",
+        dismissed: "Dismissed",
+        dismissedBecause: (reason: string) => `Dismissed: "${reason}"`,
+        failed:
+          "The review couldn't run this time. It tries again on the next change — until then it doesn't block.",
+        clean: "Reviewed — nothing to fix.",
+      },
       export: {
         // "Download" rather than "Export": the file lands in the browser's
         // downloads folder, and nothing is sent anywhere.

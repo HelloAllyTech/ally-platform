@@ -89,6 +89,7 @@ const startBuild = vi.fn().mockReturnValue({ unwrap: () => Promise.resolve({}) }
 vi.mock("@api", () => ({
   useGetBuilderSessionQuery: () => sessionResult,
   usePatchBuilderPrdMutation: () => [vi.fn()],
+  useDismissBuilderReviewFindingMutation: () => [vi.fn()],
   useCancelBuilderSessionMutation: () => [vi.fn(), { isLoading: false }],
   useGetBuilderPullRequestsQuery: () => ({ data: pullRequests }),
   useGetBuilderRunsQuery: () => ({ data: runs }),
