@@ -286,6 +286,28 @@ export interface BuilderDoneEvent {
   readinessScore: number;
 }
 
+/**
+ * What one assistant turn read, searched, changed in the PRD and failed at — composed by the server
+ * from what actually happened, so every string is ready to display. Mirrors ally-be's
+ * `BuilderTurnReceipt`. Agent-adjacent JSON: read every field through an `Array.isArray` guard.
+ */
+export interface BuilderTurnReceipt {
+  /** Files and pages read: `ally-be/src/builder/x.ts`, `Stacks: 2 chunks`. */
+  read: string[];
+  /** Searches and lookups with what came back: `Code search "debrief rating" — 4 matches`. */
+  searched: string[];
+  /** What changed in the PRD, by section, requirement id and repo: `Requirements: added R4`. */
+  changed: string[];
+  /** PRD version before and after the turn; equal when nothing changed. */
+  prdVersion: { from: number; to: number };
+  /** Lookups and edits that failed: `Read ally-be/src/x.ts — Not Found`. */
+  failed: string[];
+  /** Problems the reply was delivered with anyway. */
+  warnings: string[];
+  /** Builder's stated reason the PRD did not change after a message in the admin's own words. */
+  prdUnchangedBecause?: string | null;
+}
+
 export type BuilderStreamEvent =
   | { type: "token"; data: { delta: string } }
   | { type: "tool_call"; data: { name: string; input: Record<string, unknown> } }
@@ -296,6 +318,8 @@ export type BuilderStreamEvent =
       data: { draft: BuilderPrdDocument; versionNumber: number };
     }
   | { type: "readiness"; data: BuilderPrdReadiness }
+  /** Once per turn, just before `done`. */
+  | { type: "receipt"; data: BuilderTurnReceipt }
   | { type: "error"; data: { code: string; message: string } }
   | { type: "done"; data: BuilderDoneEvent }
   | { type: "ping"; data: { at: number } };
@@ -305,8 +329,14 @@ export interface BuilderChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
-  /** Tool activity for this turn, shown as chips above the bubble. */
+  /**
+   * Tool activity for this turn, shown as chips above the bubble. Live progress only: once the
+   * turn's `receipt` lands the chips are cleared, and a reloaded row that has a receipt never gets
+   * them — the receipt is the record.
+   */
   toolNotes?: string[];
+  /** What the turn did, drawn under the bubble. Absent on rows from before receipts existed. */
+  receipt?: BuilderTurnReceipt;
   question?: BuilderQuestionEvent;
   /** Set on resume so an answered card renders locked. */
   answeredWith?: string;
@@ -332,6 +362,10 @@ export interface BuilderServerMessage {
     errored?: boolean;
     /** What to tell the admin about it; falls back to generic copy. */
     errorMessage?: string;
+    /** What the turn did. Absent on rows from before receipts existed. */
+    receipt?: BuilderTurnReceipt;
+    /** The agent's private prose for the turn. Never rendered. */
+    workingNotes?: string[];
     [key: string]: unknown;
   } | null;
   createdAt: string;
@@ -595,6 +629,12 @@ export interface BuilderSettings {
   automationTimeboxMs?: number;
   /** Most Builder may spend on one pull request's review and fixes, USD; null/0 = no limit. */
   maxPrAutomationUsd?: string | null;
+  /**
+   * The interview kill switch for validated turns: the reply arrives after the agent's lookups
+   * were read and its PRD edits landed, with a receipt. Off falls back to the previous loop.
+   * Absent from servers that predate it.
+   */
+  validatedTurns?: boolean;
 }
 
 export type BuilderAutonomyLevel = "off" | "assist" | "auto_merge" | "auto" | "custom";

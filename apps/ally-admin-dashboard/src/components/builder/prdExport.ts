@@ -4,6 +4,8 @@ import { en } from "@constants";
 import { BuilderChatMessage, BuilderPrdDocument } from "@types";
 import { asAgentText, asAgentTextList } from "@utils";
 
+import { normalizeTurnReceipt } from "../../utils/builderReceipt";
+
 /**
  * Exporting the PRD out of Builder, as Markdown or as PDF.
  *
@@ -426,12 +428,39 @@ const inline = (text: string): string => {
 type PdfBlock = PrdBlock | { kind: "speaker"; text: string } | { kind: "pageBreak" };
 
 /**
+ * A turn receipt as the transcript's lines — only the groups that have something in them, so a turn
+ * that did nothing prints nothing rather than four empty headings.
+ */
+const receiptToLines = (receipt: unknown): string[] => {
+  const normalized = normalizeTurnReceipt(receipt);
+  if (!normalized) return [];
+  const strings = en.builder.prd.export.transcript;
+  const join = (items: string[]) => items.join("; ");
+
+  const lines: string[] = [];
+  const checked = [...normalized.read, ...normalized.searched];
+  if (checked.length) lines.push(strings.checked(join(checked)));
+  if (normalized.changed.length) lines.push(strings.changedInPrd(join(normalized.changed)));
+  if (normalized.failed.length) lines.push(strings.failedLookups(join(normalized.failed)));
+  if (normalized.warnings.length) {
+    lines.push(strings.deliveredWithWarnings(join(normalized.warnings)));
+  }
+  if (normalized.prdUnchangedBecause) {
+    lines.push(strings.prdUnchanged(normalized.prdUnchangedBecause));
+  }
+  return lines;
+};
+
+/**
  * The interview as the PDF's closing appendix — the record of who decided
  * what, and how. Read from the same feed the chat renders, so a question card
  * and the answer locked onto it come out together, the way the admin saw them.
  *
  * Tool chips are left out: they are the agent's working (`read_file`,
- * `search_code`), not part of the conversation a stakeholder is reading.
+ * `search_code`), not part of the conversation a stakeholder is reading. What a
+ * turn read, changed and failed at is not the same thing — that is its receipt,
+ * the server's record of the turn, and it is printed under the reply it
+ * belongs to so a reader can check the reply against it.
  */
 export const transcriptToBlocks = (
   messages: BuilderChatMessage[],
@@ -495,10 +524,13 @@ export const transcriptToBlocks = (
     const notes: string[] = [];
     if (message.error) notes.push(strings.failedTurn(asAgentText(message.error)));
     if (message.interrupted) notes.push(strings.interrupted);
-    if (!content && !notes.length) continue;
+    const receiptLines = message.role === "assistant" ? receiptToLines(message.receipt) : [];
+    if (!content && !notes.length && !receiptLines.length) continue;
 
     blocks.push({ kind: "speaker", text: speaker });
     if (content) blocks.push({ kind: "md", text: content });
+    // Muted, like the other asides: the receipt annotates the reply, it is not part of it.
+    receiptLines.forEach(line => blocks.push({ kind: "placeholder", text: line }));
     notes.forEach(note => blocks.push({ kind: "placeholder", text: note }));
   }
   return blocks;

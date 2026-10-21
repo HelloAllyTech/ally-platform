@@ -383,6 +383,8 @@ export const builderAPI = baseAPI.injectEndpoints({
         autoMergeEnabled?: boolean;
         autoReleaseEnabled?: boolean;
         autoFixEnabled?: boolean;
+        /** Interview kill switch: false falls back to the previous (streaming) loop. */
+        validatedTurns?: boolean;
         maxFixRunsPerPr?: number;
         /** USD per pull request for review and fixes; 0 = no limit. */
         maxPrAutomationUsd?: number;

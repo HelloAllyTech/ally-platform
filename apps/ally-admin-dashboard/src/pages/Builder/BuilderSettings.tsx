@@ -31,6 +31,7 @@ import { formatDate, formatRelativeTime } from "@utils";
 type SettingsDraft = Pick<
   BuilderSettingsType,
   | "enabled"
+  | "validatedTurns"
   | "autoReviewEnabled"
   | "autoApproveEnabled"
   | "autoMergeEnabled"
@@ -170,6 +171,7 @@ export const BuilderSettings: React.FC = () => {
       setLevelPicked(false);
       setDraft({
         enabled: data.enabled,
+        validatedTurns: data.validatedTurns,
         autoReviewEnabled: data.autoReviewEnabled,
         autoApproveEnabled: data.autoApproveEnabled,
         autoMergeEnabled: data.autoMergeEnabled,
@@ -219,6 +221,9 @@ export const BuilderSettings: React.FC = () => {
     try {
       await updateSettings({
         enabled: draft.enabled,
+        // Undefined only when the server does not know the field yet (the toggle is not shown
+        // then): left alone, because a server that predates it would reject the unknown key.
+        ...(draft.validatedTurns !== undefined ? { validatedTurns: draft.validatedTurns } : {}),
         // A picked level is sent as the level, and the server sets the
         // switches from it; otherwise the switches go as they stand.
         ...(levelPicked && level !== "custom"
@@ -284,6 +289,25 @@ export const BuilderSettings: React.FC = () => {
             />
             <p className="pt-1 text-xs text-typography-500">{strings.enabledHelp}</p>
           </section>
+
+          {/* The interview loop's own kill switch, directly under Builder's. It
+              changes what every admin sees in the chat — the reply arrives whole,
+              after its lookups were read and its PRD edits landed, with a receipt —
+              so someone who finds that wrong during an incident has to be able to
+              reach the previous loop from here without a deploy. Only shown when
+              the server reports the field. */}
+          {draft.validatedTurns !== undefined && (
+            <section className="rounded-md border border-border-light p-4">
+              <CarbonToggle
+                id="builder-settings-validated-turns"
+                labelText={strings.validatedTurnsLabel}
+                size="sm"
+                toggled={draft.validatedTurns}
+                onToggle={(checked: boolean) => set("validatedTurns", checked)}
+              />
+              <p className="pt-1 text-xs text-typography-500">{strings.validatedTurnsHelp}</p>
+            </section>
+          )}
 
           {/* One control for how much Builder does on its own, ordered by how
               much it lets go of. Stacks, "Design autonomy sliders to build user
