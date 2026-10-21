@@ -110,7 +110,7 @@ docker compose up web|helpline|admin                      # or a single service
 
 Switch Docker backends with `./scripts/docker-switch.sh desktop|colima`. Environment variables are per-app `.env` files (see `compose.yaml`): `VITE_API_BASE_URL` (dashboards), `VITE_LIVEKIT_URL` (admin).
 
-At the workspace level, the wider Ally dev environment can be bootstrapped from the `infra` repo (`infra/scripts/dev_env.sh`).
+At the workspace level, the wider Ally dev environment can be bootstrapped from the `infra` repo (`infra/dev_env.sh`).
 
 **Production builds:**
 ```bash

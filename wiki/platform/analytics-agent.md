@@ -18,7 +18,7 @@ questions are asked once — "which orgs started a track but never finished one?
 not worth a panel. This tab covers the long tail without adding a chart for each of them.
 
 The code lives in [ally-web](../repos/ally-web.md)
-(`apps/ally-admin-dashboard/src/pages/Analytics/tabs/AnalyticsAgentTab.tsx`),
+(`ally-web/apps/ally-admin-dashboard/src/pages/Analytics/tabs/AnalyticsAgentTab.tsx`),
 [ally-be](../repos/ally-be.md) (`src/analytics-agent/`) and
 [ally-ai](../repos/ally-ai.md) (`app/core/analytics_agent/`). This page is the conceptual
 overview; the code is the source of truth.
@@ -53,8 +53,8 @@ same seam as the [language-quality](language-quality-eval.md) and drift judges: 
 selects and persists, ally-ai transforms.
 
 The consequence worth stating: everything that could expose data lives in three files in
-ally-be (`constants/analytics-agent.constants.ts`, `util/sql-guard.util.ts`,
-`service/sql-executor.service.ts`). The LLM half can be re-prompted, re-tuned, or moved to
+ally-be (`ally-be/src/analytics-agent/constants/analytics-agent.constants.ts`, `ally-be/src/analytics-agent/util/sql-guard.util.ts`,
+`ally-be/src/analytics-agent/service/sql-executor.service.ts`). The LLM half can be re-prompted, re-tuned, or moved to
 a different model without reopening the security question.
 
 ### Two LLM calls, not one

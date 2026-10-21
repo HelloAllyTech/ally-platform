@@ -73,7 +73,7 @@
         "workflow"
       ],
       "last_reconciled": "2026-09-15",
-      "words": 2848,
+      "words": 2856,
       "url": "https://tech.helloally.ai/#/wiki/contributing/planning-with-stacks.md",
       "skip_reason": ""
     },
@@ -89,7 +89,7 @@
         "deployment"
       ],
       "last_reconciled": "2026-09-17",
-      "words": 1278,
+      "words": 1282,
       "url": "https://tech.helloally.ai/#/wiki/contributing/release-process.md",
       "skip_reason": ""
     },
@@ -126,7 +126,7 @@
         "log"
       ],
       "last_reconciled": "",
-      "words": 10521,
+      "words": 10577,
       "url": "https://tech.helloally.ai/#/wiki/log.md",
       "skip_reason": "append-only history — read only when auditing what changed"
     },
@@ -220,7 +220,7 @@
         "storage"
       ],
       "last_reconciled": "2026-07-11",
-      "words": 683,
+      "words": 685,
       "url": "https://tech.helloally.ai/#/wiki/platform/architecture.md",
       "skip_reason": ""
     },
@@ -423,7 +423,7 @@
         "metrics"
       ],
       "last_reconciled": "2026-07-30",
-      "words": 5658,
+      "words": 5667,
       "url": "https://tech.helloally.ai/#/wiki/product/data-visualisation.md",
       "skip_reason": ""
     },
@@ -509,7 +509,7 @@
         "python"
       ],
       "last_reconciled": "2026-09-03",
-      "words": 3470,
+      "words": 3414,
       "url": "https://tech.helloally.ai/#/wiki/repos/ally-ai-learn.md",
       "skip_reason": ""
     },
@@ -525,7 +525,7 @@
         "python"
       ],
       "last_reconciled": "2026-09-03",
-      "words": 3060,
+      "words": 3058,
       "url": "https://tech.helloally.ai/#/wiki/repos/ally-ai.md",
       "skip_reason": ""
     },
@@ -555,7 +555,7 @@
         "github-actions"
       ],
       "last_reconciled": "2026-08-14",
-      "words": 404,
+      "words": 420,
       "url": "https://tech.helloally.ai/#/wiki/repos/ally-changelog.md",
       "skip_reason": ""
     },

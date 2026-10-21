@@ -196,7 +196,7 @@ and nobody has to add or invoke anything by hand:
 | `.claude/skills/stacks/SKILL.md` | A skill whose description names the trigger moments. Its one-line description sits in context every turn at negligible cost, so the rule keeps re-asserting itself deep into a long session, where a `CLAUDE.md` line read at startup has long since stopped competing for attention |
 
 **The `UserPromptSubmit` hook was retired on 2026-08-10.** Every repo used to commit
-`.claude/settings.json` and `.claude/hooks/stacks-search.sh`, a keyword-gated hook that pulled a
+`.claude/settings.json` and `.claude/hooks/stacks-search.sh`, a keyword-gated hook that pulled a <!-- docs-path-lint: ignore -->
 small context block when a prompt *looked* product-shaped. It existed only because an agent could
 not search for itself; once `search_chunks` came back it was redundant, and keeping it would have
 meant two paths spending the same quota on overlapping queries.
@@ -239,7 +239,7 @@ session that got no context looked identical to a library with nothing to say. A
 that: with no key there is no server at all, and it exits with a message naming the fix.
 
 **Its copies have no sync mechanism.** Nine files in all — the canonical
-`clients/stacks-bridge.mjs` in the Stacks server repo, plus eight deployed copies (the `ally-code`
+`clients/stacks-bridge.mjs` in the Stacks server repo, plus eight deployed copies (the `ally-code` <!-- docs-path-lint: ignore -->
 workspace root and the seven Ally repos). Nothing fails loudly when one drifts, so **diff the
 copies before blaming the server.**
 

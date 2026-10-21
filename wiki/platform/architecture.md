@@ -60,7 +60,7 @@ The counselor-facing surfaces ([ally-web](../repos/ally-web.md), [ally-mobile](.
 - **Embeddings** — OpenAI embeddings stored in Weaviate.
 - **TTS providers** — Deepgram, ElevenLabs, Google, Hume, Sarvam.
 - **STT providers** — Deepgram, Google, Sarvam, OpenAI Whisper.
-- **Prompt management** — file-based templates with runtime overrides, synced to the backend. Prompts in ally-ai/ally-ai-learn can be overridden at runtime via ally-be's prompt management (`scripts/sync_prompts.py` pushes defaults).
+- **Prompt management** — file-based templates with runtime overrides, synced to the backend. Prompts in ally-ai/ally-ai-learn can be overridden at runtime via ally-be's prompt management (`ally-ai/scripts/sync_prompts.py` and `ally-ai-learn/scripts/sync_prompts.py` push defaults).
 
 ## Message Queues (AWS SQS)
 

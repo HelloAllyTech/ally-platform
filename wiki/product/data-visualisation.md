@@ -325,10 +325,10 @@ The mechanics, because they are what make this affordable and honest:
   daily one: the partial bucket is a visible cliff rather than one short bar.
 
 Implemented as `analyticsGrouping.ts` (+ `GroupingPicker` in `chartKit.tsx`) and
-`tabs/HighlightsTab.tsx` in [ally-web](../repos/ally-web.md), against `range=all` /
+`ally-web/apps/ally-admin-dashboard/src/pages/Analytics/tabs/HighlightsTab.tsx` in [ally-web](../repos/ally-web.md), against `range=all` /
 `bucket=day|week|month|year` on `/v1/analytics/highlights` and `/v1/analytics/overview` in
-[ally-be](../repos/ally-be.md) (`analytics/util/analytics-window.util.ts`,
-`analytics/util/data-floor.util.ts`).
+[ally-be](../repos/ally-be.md) (`ally-be/src/analytics/util/analytics-window.util.ts`,
+`ally-be/src/analytics/util/data-floor.util.ts`).
 
 ### Minimum width per x-axis category: **28px**, then scroll
 
@@ -353,7 +353,7 @@ clipped by it. Scrolling a little brings it back. Fixing it means reaching insid
 service, which is not worth it for a hover that the drill-down table already answers exactly.
 
 Implemented as `MIN_CATEGORY_WIDTH` and the `ScrollableChart` wrapper in
-[ally-web](../repos/ally-web.md), `apps/ally-admin-dashboard/src/pages/Analytics/chartKit.tsx`
+[ally-web](../repos/ally-web.md), `ally-web/apps/ally-admin-dashboard/src/pages/Analytics/chartKit.tsx`
 (+ `.analytics-chart-scroll` in `analytics-carbon.scss`), applied to every time-bucketed and
 open-ended-categorical plot on the Analytics tabs and in their expanded views.
 
@@ -372,7 +372,7 @@ applies.
 Counts, sums and volumes have no minimum — they are not estimates of anything.
 
 Implemented as `MIN_N_FOR_SCORE` in [ally-web](../repos/ally-web.md),
-`apps/ally-admin-dashboard/src/pages/Analytics/chartKit.tsx`.
+`ally-web/apps/ally-admin-dashboard/src/pages/Analytics/chartKit.tsx`.
 
 ### Minimum group size for a per-person breakdown: **n = 5**
 
@@ -449,7 +449,7 @@ What staging does and does not license:
 - **The tab is a queue, not a home.** Panels leave it in one of two directions. A candidate nobody
   has moved or cut is a decision that has not been made.
 
-Implemented as `tabs/TestingTab.tsx` + `testingChart.ts` + `OrgHealthCard.tsx` in
+Implemented as the former Testing tab (its charts now live in `ally-web/apps/ally-admin-dashboard/src/pages/Analytics/tabs/HighlightsTab.tsx`) + `ally-web/apps/ally-admin-dashboard/src/pages/Analytics/testingChart.ts` + `ally-web/apps/ally-admin-dashboard/src/pages/Analytics/OrgHealthCard.tsx` in
 [ally-web](../repos/ally-web.md) (gated by `isSuperDuperAdminRole` in the tab registry, so the tab is
 absent rather than present-and-refusing), against ten read-only endpoints in
 [ally-be](../repos/ally-be.md)'s `analytics/` module.
