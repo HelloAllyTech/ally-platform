@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -148,6 +149,36 @@ void main() {
       expect(Platform.isIOS, isFalse);
       expect(find.text('Continue with Apple'), findsNothing);
     });
+
+    testWidgets(
+      'shows the subtitle, the real Google logo (not a generic icon), and the '
+      'Terms/Privacy footer with its real double period',
+      (tester) async {
+        await pumpLogin(tester);
+
+        expect(find.text('Enter your email address to continue'), findsOneWidget);
+
+        final googleIcon = tester.widget<SvgPicture>(
+          find.descendant(
+            of: find.ancestor(
+              of: find.text('Continue with Google'),
+              matching: find.byType(OutlinedButton),
+            ),
+            matching: find.byType(SvgPicture),
+          ),
+        );
+        expect(
+          (googleIcon.bytesLoader as SvgAssetLoader).assetName,
+          'assets/icons/google.svg',
+        );
+
+        expect(
+          find.textContaining("By proceeding, i agree to Ally's"),
+          findsOneWidget,
+        );
+        expect(find.textContaining('Privacy Policy..'), findsOneWidget);
+      },
+    );
   });
 
   group('otp step', () {
@@ -195,7 +226,14 @@ void main() {
         // checkbox/Agree button. Not pumpAndSettle here either — same
         // indefinite-spinner reason as above, still true until Agree is
         // tapped.
-        await tester.fling(find.byType(SingleChildScrollView), const Offset(0, -5000), 8000);
+        // `.last`: the terms modal's own scroll view, not LoginScreen's
+        // (now that it also has one, wrapping the email/OTP form so the
+        // added subtitle/footer text can't overflow a short screen).
+        await tester.fling(
+          find.byType(SingleChildScrollView).last,
+          const Offset(0, -5000),
+          8000,
+        );
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 350));
 

@@ -1,8 +1,11 @@
 import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform;
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/auth/auth_state.dart';
 import '../../../core/config/app_config.dart';
@@ -13,6 +16,10 @@ import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_text_field.dart';
 import '../data/auth_repository.dart';
 import 'terms_and_agreement_modal.dart';
+
+// RN's src/constants/general.ts.
+const _termsAndConditionsUrl = 'https://app.helloally.ai/terms';
+const _privacyPolicyUrl = 'https://app.helloally.ai/privacy';
 
 /// Real email+OTP, Google, and Apple sign-in, matching ally-mobile (React
 /// Native)'s `generateOtp`/`verifyOtp`/`loginWithGoogle`/`loginWithApple`
@@ -193,8 +200,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(
-        child: Padding(
+      // RN wraps this whole screen in a `KeyboardAwareScrollView` — the
+      // OTP/email forms plus the new subtitle/footer text can exceed a
+      // short screen's height (confirmed: a plain Center+Column overflowed
+      // once this content was added), and the content starts from the top
+      // in the real app rather than being vertically centered regardless.
+      body: SafeArea(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -202,6 +214,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               _buildGreeting(context),
               const SizedBox(height: 24),
               if (_step == _Step.email) ...[
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(ref.t('auth.login.subtitle')),
+                ),
+                const SizedBox(height: 16),
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Text(ref.t('auth.login.email.label'), style: Theme.of(context).textTheme.labelLarge),
@@ -236,7 +253,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 const SizedBox(height: 16),
                 OutlinedButton.icon(
                   onPressed: (_isSubmitting || _googleInitFuture == null) ? null : _signInWithGoogle,
-                  icon: const Icon(Icons.g_mobiledata),
+                  icon: SvgPicture.asset('assets/icons/google.svg', width: 18, height: 18),
                   label: Text(ref.t('auth.login.google.button')),
                 ),
                 if (defaultTargetPlatform == TargetPlatform.iOS) ...[
@@ -247,6 +264,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     label: Text(ref.t('auth.login.apple.button')),
                   ),
                 ],
+                const SizedBox(height: 24),
+                _buildTermsFooter(context),
               ] else ...[
                 Text('${ref.t('auth.login.otp.enterCode')} ${_emailController.text.trim()}'),
                 const SizedBox(height: 16),
@@ -310,6 +329,44 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  /// RN's EmailLogin footer: "By proceeding, i agree to Ally's **Terms &
+  /// Conditions** and acknowledge **Privacy Policy.**." — yes, a double
+  /// period: `auth.login.privacy` already ends in one, and the JSX appends
+  /// a literal `.` after it regardless. Reproduced exactly rather than
+  /// "corrected", since that's what actually ships.
+  Widget _buildTermsFooter(BuildContext context) {
+    final linkStyle = const TextStyle(decoration: TextDecoration.underline);
+    return Text.rich(
+      TextSpan(
+        style: Theme.of(context).textTheme.bodySmall,
+        children: [
+          TextSpan(text: '${ref.t('auth.login.proceedAgree')} '),
+          TextSpan(
+            text: ref.t('auth.login.terms'),
+            style: linkStyle,
+            recognizer: TapGestureRecognizer()
+              ..onTap = () => launchUrl(
+                    Uri.parse(_termsAndConditionsUrl),
+                    mode: LaunchMode.externalApplication,
+                  ),
+          ),
+          TextSpan(text: ' ${ref.t('auth.login.and')} '),
+          TextSpan(
+            text: ref.t('auth.login.privacy'),
+            style: linkStyle,
+            recognizer: TapGestureRecognizer()
+              ..onTap = () => launchUrl(
+                    Uri.parse(_privacyPolicyUrl),
+                    mode: LaunchMode.externalApplication,
+                  ),
+          ),
+          const TextSpan(text: '.'),
+        ],
+      ),
+      textAlign: TextAlign.center,
     );
   }
 }
