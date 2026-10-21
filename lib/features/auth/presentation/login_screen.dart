@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -20,6 +23,9 @@ import 'terms_and_agreement_modal.dart';
 // RN's src/constants/general.ts.
 const _termsAndConditionsUrl = 'https://app.helloally.ai/terms';
 const _privacyPolicyUrl = 'https://app.helloally.ai/privacy';
+const _otpLength = 4;
+const _resendCountdownSeconds = 60;
+const _defaultOtpExpiryMinutes = 10;
 
 /// Real email+OTP, Google, and Apple sign-in, matching ally-mobile (React
 /// Native)'s `generateOtp`/`verifyOtp`/`loginWithGoogle`/`loginWithApple`
@@ -40,10 +46,15 @@ enum _Step { email, otp }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailController = TextEditingController();
-  final _otpController = TextEditingController();
+  final _otpControllers = List.generate(_otpLength, (_) => TextEditingController());
+  final _otpFocusNodes = List.generate(_otpLength, (_) => FocusNode());
   _Step _step = _Step.email;
   bool _isSubmitting = false;
+  bool _isResending = false;
   String? _error;
+  Timer? _resendTimer;
+  int _resendCountdown = 0;
+  int _otpExpiryMinutes = _defaultOtpExpiryMinutes;
 
   /// `GoogleSignIn.instance.initialize` must be called exactly once and
   /// awaited before any other call on the singleton — scheduled on mount
@@ -62,13 +73,44 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         serverClientId: AppConfig.googleWebClientId,
       );
     }
+    // Rebuilds the Verify button's enabled state as digits fill in.
+    for (final controller in _otpControllers) {
+      controller.addListener(_onOtpDigitsChanged);
+    }
   }
 
   @override
   void dispose() {
     _emailController.dispose();
-    _otpController.dispose();
+    for (final controller in _otpControllers) {
+      controller.dispose();
+    }
+    for (final node in _otpFocusNodes) {
+      node.dispose();
+    }
+    _resendTimer?.cancel();
     super.dispose();
+  }
+
+  void _onOtpDigitsChanged() => setState(() {});
+
+  bool get _isOtpComplete => _otpControllers.every((c) => c.text.isNotEmpty);
+
+  void _startResendCountdown(int? expiresInSeconds) {
+    _resendTimer?.cancel();
+    setState(() {
+      _resendCountdown = _resendCountdownSeconds;
+      _otpExpiryMinutes =
+          expiresInSeconds != null ? (expiresInSeconds / 60).ceil() : _defaultOtpExpiryMinutes;
+    });
+    _resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_resendCountdown <= 1) {
+        timer.cancel();
+        setState(() => _resendCountdown = 0);
+      } else {
+        setState(() => _resendCountdown--);
+      }
+    });
   }
 
   Future<void> _signInWithGoogle() async {
@@ -160,8 +202,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _error = null;
     });
     try {
-      await ref.read(authRepositoryProvider).generateOtp(email);
+      final expiresIn = await ref.read(authRepositoryProvider).generateOtp(email);
+      if (!mounted) return;
       setState(() => _step = _Step.otp);
+      _startResendCountdown(expiresIn);
     } catch (e) {
       setState(() => _error = '${ref.tr('auth.login.errors.generateOtp')}: $e');
     } finally {
@@ -169,8 +213,31 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
+  Future<void> _resendOtp() async {
+    setState(() => _isResending = true);
+    try {
+      final expiresIn =
+          await ref.read(authRepositoryProvider).generateOtp(_emailController.text.trim());
+      if (!mounted) return;
+      for (final controller in _otpControllers) {
+        controller.clear();
+      }
+      setState(() => _error = null);
+      _startResendCountdown(expiresIn);
+      _otpFocusNodes.first.requestFocus();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('${ref.tr('auth.login.errors.generateOtp')}: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _isResending = false);
+    }
+  }
+
   Future<void> _verifyCode() async {
-    final otp = _otpController.text.trim();
+    final otp = _otpControllers.map((c) => c.text).join();
     if (otp.isEmpty) {
       setState(() => _error = ref.tr('auth.login.otp.emptyCodeError'));
       return;
@@ -267,27 +334,66 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 const SizedBox(height: 24),
                 _buildTermsFooter(context),
               ] else ...[
-                Text('${ref.t('auth.login.otp.enterCode')} ${_emailController.text.trim()}'),
-                const SizedBox(height: 16),
+                // RN's headerText/emailText: same size, different family —
+                // not one flat "enter code <email>" line.
                 Align(
                   alignment: Alignment.centerLeft,
-                  child: Text('Code', style: Theme.of(context).textTheme.labelLarge),
+                  child: Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: ref.t('auth.login.otp.enterCode'),
+                          style: const TextStyle(fontFamily: AppFonts.replayProHeadline, fontSize: 20),
+                        ),
+                        const TextSpan(text: '\n'),
+                        TextSpan(
+                          text: _emailController.text.trim(),
+                          style: const TextStyle(fontFamily: AppFonts.ibmPlexSerifRegular, fontSize: 20),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-                const SizedBox(height: 8),
-                AppTextField(
-                  controller: _otpController,
-                  keyboardType: TextInputType.number,
-                ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 24),
+                _buildOtpBoxes(context),
                 if (_error != null)
                   Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.only(top: 16),
                     child: Text(_error!, style: const TextStyle(color: AppColors.red400)),
                   ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        ref.t('auth.login.otp.expires', {'minutes': _otpExpiryMinutes}),
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      TextButton(
+                        onPressed: (_resendCountdown > 0 || _isResending) ? null : _resendOtp,
+                        style: TextButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          alignment: Alignment.centerLeft,
+                        ),
+                        child: Text(
+                          _resendCountdown > 0
+                              ? '${ref.t('auth.login.otp.resend')} (${_resendCountdown}s)'
+                              : ref.t('auth.login.otp.resend'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
                 AppButton(
                   label: ref.t('auth.login.otp.verify'),
                   onPressed: _verifyCode,
                   isLoading: _isSubmitting,
+                  isDisabled: !_isOtpComplete,
                 ),
                 TextButton(
                   onPressed: () => setState(() => _step = _Step.email),
@@ -299,6 +405,76 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ),
       ),
     );
+  }
+
+  /// RN's `OtpInput` — four boxed, individually-focused digit fields with
+  /// auto-advance on entry, backspace-to-previous when the current box is
+  /// already empty, and a paste shortcut (typing/pasting multiple digits
+  /// into the first box fills the rest). Previously this was one plain
+  /// `AppTextField` taking the whole code as free text.
+  Widget _buildOtpBoxes(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        for (var index = 0; index < _otpLength; index++)
+          SizedBox(
+            width: 60,
+            height: 60,
+            // Backspace on an already-empty box has nothing to delete, so
+            // `TextField`'s own handling leaves it unhandled and it bubbles
+            // up here — that's when it moves focus back a box.
+            child: Focus(
+              onKeyEvent: (node, event) {
+                if (event is KeyDownEvent &&
+                    event.logicalKey == LogicalKeyboardKey.backspace &&
+                    _otpControllers[index].text.isEmpty &&
+                    index > 0) {
+                  _otpControllers[index - 1].clear();
+                  _otpFocusNodes[index - 1].requestFocus();
+                  return KeyEventResult.handled;
+                }
+                return KeyEventResult.ignored;
+              },
+              child: TextField(
+                controller: _otpControllers[index],
+                focusNode: _otpFocusNodes[index],
+                textAlign: TextAlign.center,
+                keyboardType: TextInputType.number,
+                maxLength: index == 0 ? _otpLength : 1,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w600),
+                decoration: InputDecoration(
+                  counterText: '',
+                  filled: true,
+                  fillColor: const Color(0xFFF5F5F5),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: _error != null ? AppColors.red400 : AppColors.lightGray2,
+                    ),
+                  ),
+                ),
+                onChanged: (value) => _handleOtpDigitChanged(value, index),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  void _handleOtpDigitChanged(String value, int index) {
+    if (value.length > 1) {
+      // A paste landed in one box — spread its digits across the rest.
+      for (var i = 0; i < _otpLength; i++) {
+        _otpControllers[i].text = i < value.length ? value[i] : '';
+      }
+      final lastFilled = value.length.clamp(0, _otpLength) - 1;
+      if (lastFilled >= 0) _otpFocusNodes[lastFilled].requestFocus();
+      return;
+    }
+    if (value.isNotEmpty && index < _otpLength - 1) {
+      _otpFocusNodes[index + 1].requestFocus();
+    }
   }
 
   /// RN's SplashScreen shows a different greeting per step: on the email

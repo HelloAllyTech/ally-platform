@@ -32,11 +32,15 @@ class AuthRepository {
 
   final Dio _dio;
 
-  Future<void> generateOtp(String email) async {
-    await _dio.post<void>(
+  /// Returns the OTP's real server-side expiry in seconds, when the backend
+  /// sends one — RN's `GenerateOtpResponse.expiresIn`, used to show "this
+  /// code expires in N minutes" rather than always assuming the default.
+  Future<int?> generateOtp(String email) async {
+    final response = await _dio.post<Map<String, dynamic>>(
       ApiRoutes.authGenerateOtp,
       data: {'email': email, 'allowedRoles': _allowedRoles, 'appType': 'APP'},
     );
+    return (response.data?['expiresIn'] as num?)?.toInt();
   }
 
   /// Returns the real accessToken/refreshToken pair on success.

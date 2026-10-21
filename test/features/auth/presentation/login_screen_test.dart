@@ -74,7 +74,7 @@ void main() {
     });
 
     testWidgets('calls generateOtp and advances to the OTP step on success', (tester) async {
-      when(() => authRepository.generateOtp('learner@example.com')).thenAnswer((_) async {});
+      when(() => authRepository.generateOtp('learner@example.com')).thenAnswer((_) async => null);
 
       await pumpLogin(tester);
 
@@ -84,7 +84,9 @@ void main() {
       await tester.pumpAndSettle();
 
       verify(() => authRepository.generateOtp('learner@example.com')).called(1);
-      expect(find.text('Enter the security code sent to learner@example.com'), findsOneWidget);
+      // Two separately-styled spans in one `Text.rich` (RN's headerText +
+      // emailText) — rendered on their own line, not one flat sentence.
+      expect(find.text('Enter the security code sent to\nlearner@example.com'), findsOneWidget);
     });
 
     testWidgets('shows an error when generateOtp fails', (tester) async {
@@ -107,7 +109,7 @@ void main() {
       'shows the real two-line greeting ("Hey," then "Welcome to Ally"), '
       'which switches to a single OTP-step line once advanced',
       (tester) async {
-        when(() => authRepository.generateOtp(any())).thenAnswer((_) async {});
+        when(() => authRepository.generateOtp(any())).thenAnswer((_) async => null);
 
         await pumpLogin(tester);
 
@@ -183,7 +185,7 @@ void main() {
 
   group('otp step', () {
     Future<void> advanceToOtpStep(WidgetTester tester) async {
-      when(() => authRepository.generateOtp('learner@example.com')).thenAnswer((_) async {});
+      when(() => authRepository.generateOtp('learner@example.com')).thenAnswer((_) async => null);
       await pumpLogin(tester);
       await tester.enterText(find.byType(TextField), 'learner@example.com');
       await tester.pump();
@@ -191,25 +193,41 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    testWidgets('shows a validation error and does not call verifyOtp when empty', (tester) async {
+    /// The OTP step renders exactly 4 boxed digit `TextField`s (in order) —
+    /// enters one digit into each.
+    Future<void> enterOtp(WidgetTester tester, String digits) async {
+      final fields = find.byType(TextField);
+      for (var i = 0; i < digits.length; i++) {
+        await tester.enterText(fields.at(i), digits[i]);
+      }
+      await tester.pump();
+    }
+
+    testWidgets('disables Verify until all 4 digits are entered, then enables it', (tester) async {
       await advanceToOtpStep(tester);
 
-      await tester.tap(find.text('Verify'));
-      await tester.pumpAndSettle();
+      var verifyButton = tester.widget<AppButton>(find.widgetWithText(AppButton, 'Verify'));
+      expect(verifyButton.isDisabled, isTrue);
 
-      expect(find.text('Enter the code.'), findsOneWidget);
+      await enterOtp(tester, '123');
+      verifyButton = tester.widget<AppButton>(find.widgetWithText(AppButton, 'Verify'));
+      expect(verifyButton.isDisabled, isTrue, reason: 'only 3 of 4 boxes filled');
+
+      await enterOtp(tester, '1234');
+      verifyButton = tester.widget<AppButton>(find.widgetWithText(AppButton, 'Verify'));
+      expect(verifyButton.isDisabled, isFalse);
+
       verifyNever(() => authRepository.verifyOtp(email: any(named: 'email'), otp: any(named: 'otp')));
     });
 
     testWidgets(
       'calls verifyOtp, shows the terms modal, and only signs in once agreed',
       (tester) async {
-        when(() => authRepository.verifyOtp(email: 'learner@example.com', otp: '123456'))
+        when(() => authRepository.verifyOtp(email: 'learner@example.com', otp: '1234'))
             .thenAnswer((_) async => ('access-tok', 'refresh-tok'));
 
         await advanceToOtpStep(tester);
-        await tester.enterText(find.byType(TextField).last, '123456');
-        await tester.pump();
+        await enterOtp(tester, '1234');
         await tester.tap(find.text('Verify'));
         // Not pumpAndSettle: the Verify button's spinner animates
         // indefinitely while `TermsAndAgreementModal.show` is awaiting the
@@ -217,7 +235,7 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 300));
 
-        verify(() => authRepository.verifyOtp(email: 'learner@example.com', otp: '123456')).called(1);
+        verify(() => authRepository.verifyOtp(email: 'learner@example.com', otp: '1234')).called(1);
         expect(authController.signInCalls, 0, reason: 'tokens are held until the terms are agreed to');
         expect(find.text('Terms and agreement'), findsOneWidget);
         expect(find.byKey(const Key('scroll-to-bottom-button')), findsOneWidget);
@@ -261,8 +279,7 @@ void main() {
           .thenThrow(Exception('bad code'));
 
       await advanceToOtpStep(tester);
-      await tester.enterText(find.byType(TextField).last, '000000');
-      await tester.pump();
+      await enterOtp(tester, '0000');
       await tester.tap(find.text('Verify'));
       await tester.pumpAndSettle();
 
@@ -284,6 +301,51 @@ void main() {
       // The previously entered email is preserved in the controller, same
       // as the raw _emailController state login_screen.dart keeps around.
       expect(find.text('learner@example.com'), findsOneWidget);
+    });
+
+    testWidgets('shows a 60s resend countdown that disables Resend, then re-enables it', (tester) async {
+      await advanceToOtpStep(tester);
+
+      expect(find.text('Resend (60s)'), findsOneWidget);
+      var resendButton = tester.widget<TextButton>(find.widgetWithText(TextButton, 'Resend (60s)'));
+      expect(resendButton.onPressed, isNull);
+
+      await tester.pump(const Duration(seconds: 60));
+
+      expect(find.text('Resend'), findsOneWidget);
+      resendButton = tester.widget<TextButton>(find.widgetWithText(TextButton, 'Resend'));
+      expect(resendButton.onPressed, isNotNull);
+    });
+
+    testWidgets(
+      'tapping Resend once enabled calls generateOtp again, clears the boxes, and restarts the countdown',
+      (tester) async {
+        await advanceToOtpStep(tester);
+        await enterOtp(tester, '1234');
+        await tester.pump(const Duration(seconds: 60));
+
+        when(() => authRepository.generateOtp('learner@example.com')).thenAnswer((_) async => 120);
+
+        await tester.tap(find.text('Resend'));
+        await tester.pumpAndSettle();
+
+        verify(() => authRepository.generateOtp('learner@example.com')).called(2);
+        expect(find.text('Resend (60s)'), findsOneWidget);
+        final verifyButton = tester.widget<AppButton>(find.widgetWithText(AppButton, 'Verify'));
+        expect(verifyButton.isDisabled, isTrue, reason: 'resending clears the previously entered digits');
+      },
+    );
+
+    testWidgets('shows the expiry minutes from the real generateOtp response', (tester) async {
+      when(() => authRepository.generateOtp('learner@example.com')).thenAnswer((_) async => 300);
+
+      await pumpLogin(tester);
+      await tester.enterText(find.byType(TextField), 'learner@example.com');
+      await tester.pump();
+      await tester.tap(find.text('Next'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('This code will expire in 5. Need a new code?'), findsOneWidget);
     });
   });
 }

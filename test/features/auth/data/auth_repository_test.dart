@@ -34,18 +34,28 @@ void main() {
   });
 
   group('generateOtp', () {
-    test('posts email + allowedRoles + appType', () async {
-      when(() => dio.post<void>(
+    test('posts email + allowedRoles + appType and returns the expiresIn seconds', () async {
+      when(() => dio.post<Map<String, dynamic>>(
             ApiRoutes.authGenerateOtp,
             data: {'email': 'a@b.com', 'allowedRoles': _allowedRoles, 'appType': 'APP'},
-          )).thenAnswer((_) async => _response<void>(null));
+          )).thenAnswer((_) async => _response({'success': true, 'expiresIn': 600}));
 
-      await repository.generateOtp('a@b.com');
+      final expiresIn = await repository.generateOtp('a@b.com');
 
-      verify(() => dio.post<void>(
+      expect(expiresIn, 600);
+      verify(() => dio.post<Map<String, dynamic>>(
             ApiRoutes.authGenerateOtp,
             data: {'email': 'a@b.com', 'allowedRoles': _allowedRoles, 'appType': 'APP'},
           )).called(1);
+    });
+
+    test('returns null when the response omits expiresIn', () async {
+      when(() => dio.post<Map<String, dynamic>>(
+            ApiRoutes.authGenerateOtp,
+            data: {'email': 'a@b.com', 'allowedRoles': _allowedRoles, 'appType': 'APP'},
+          )).thenAnswer((_) async => _response({'success': true}));
+
+      expect(await repository.generateOtp('a@b.com'), isNull);
     });
   });
 
