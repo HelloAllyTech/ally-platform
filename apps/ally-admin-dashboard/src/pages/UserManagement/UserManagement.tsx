@@ -282,7 +282,6 @@ export const UserManagement: FC = () => {
                 <AssignedOrganizations
                   userId={selectedUser?.id as number}
                   canEdit={canEditMultiTenantAdmins}
-                  allTenants={tenants}
                 />
               ) : undefined
             }
@@ -306,7 +305,6 @@ export const UserManagement: FC = () => {
                     <AssignedOrganizations
                       userId={selectedUser?.id as number}
                       canEdit={canEditMultiTenantAdmins}
-                      allTenants={tenants}
                     />
                   )}
                 </div>

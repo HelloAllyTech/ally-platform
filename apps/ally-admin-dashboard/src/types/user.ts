@@ -100,6 +100,8 @@ export interface TenantParams {
   offset?: number;
   sortBy?: string;
   sortOrder?: string;
+  /** Matches name or code, case-insensitively, on the server. */
+  search?: string;
 }
 
 export interface UsersParams {
@@ -340,4 +342,6 @@ export interface AssignAdminTenantsBody {
 export interface RemoveAdminTenantsBody {
   userId: number;
   tenantIds: string[];
+  /** Required to remove the last organization, which lifts the restriction. */
+  liftRestriction?: boolean;
 }
