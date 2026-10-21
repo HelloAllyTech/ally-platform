@@ -1,24 +1,33 @@
-import React, {useCallback, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {Image, Pressable, ScrollView, Text, View} from 'react-native';
 import {ms, ScaledSheet} from 'react-native-size-matters';
 
 import {Button} from '@/components';
 import {useTranslate} from '@/hooks';
-import {useRecordBranchingResultMutation} from '@/services';
+import {
+  useRecordBranchingResultMutation,
+  useStartTrackItemMutation,
+} from '@/services';
 import {colors, fontFamily, fontWeights, typography} from '@/theme';
 import {
   BranchingNode,
   BranchingOutcome,
+  BranchingRecapEntry,
   BranchingResult,
   StartBranchingScenarioItemPayload,
+  StartTrackItemResponse,
   TrackItemCompletionResult,
+  TrackItemType,
 } from '@/types';
+import {getTimeUntil} from '@/utils';
 
 export interface BranchingScenarioPlayerProps {
   payload: StartBranchingScenarioItemPayload;
   itemId: string;
   onCompleted: (result: TrackItemCompletionResult) => void;
   onRequestNext: () => void;
+  /** Leave the item for the course overview (the exhausted screen's exit). */
+  onBack: () => void;
 }
 
 const OUTCOME_COLORS: Record<BranchingOutcome, {bg: string; fg: string}> = {
@@ -44,6 +53,27 @@ const isAttemptsExhaustedError = (error: unknown): boolean => {
   return e?.status === 400 && /used all attempts/i.test(text);
 };
 
+const UNIT_KEYS = {
+  minute: 'untilMinutes',
+  hour: 'untilHours',
+  day: 'untilDays',
+} as const;
+
+/** The round is spent: what the learner reached, and when more opens. */
+interface Pause {
+  nextRoundAt: string | null;
+  recap: BranchingRecapEntry[];
+}
+
+const pauseFrom = (source: {
+  exhausted: boolean;
+  nextRoundAt: string | null;
+  recap: BranchingRecapEntry[];
+}): Pause | null =>
+  source.exhausted
+    ? {nextRoundAt: source.nextRoundAt, recap: source.recap ?? []}
+    : null;
+
 /**
  * Branching scenario: the learner reads a scene, picks a reply, and lives the
  * next scene. The whole graph arrives in the start payload and is walked
@@ -52,47 +82,65 @@ const isAttemptsExhaustedError = (error: unknown): boolean => {
  *
  * A choice is final within a run — there is no back, so the consequence lands.
  * "Try again" restarts from the first scene.
+ *
+ * Running out of attempts is a pause, not a dead end: the learner sees what
+ * they reached, and once `nextRoundAt` passes a fresh round of attempts opens
+ * (re-fetched from the server, never assumed locally).
  */
 export const BranchingScenarioPlayer: React.FC<
   BranchingScenarioPlayerProps
-> = ({payload, itemId, onCompleted, onRequestNext}) => {
+> = ({payload, itemId, onCompleted, onRequestNext, onBack}) => {
   const {t} = useTranslate();
   const [recordResult, {isLoading: isSaving}] =
     useRecordBranchingResultMutation();
+  const [startItem, {isLoading: isStarting}] = useStartTrackItemMutation();
 
+  // The start payload, replaced when a new round is fetched.
+  const [data, setData] = useState(payload);
   const nodesById = useMemo(
-    () => new Map(payload.nodes.map(node => [node.id, node])),
-    [payload.nodes],
+    () => new Map(data.nodes.map(node => [node.id, node])),
+    [data.nodes],
   );
   const endingCount = useMemo(
-    () => payload.nodes.filter(n => !n.choices?.length).length,
-    [payload.nodes],
+    () => data.nodes.filter(n => !n.choices?.length).length,
+    [data.nodes],
   );
 
-  const [nodeId, setNodeId] = useState(payload.startNodeId);
+  const [nodeId, setNodeId] = useState(data.startNodeId);
   const [path, setPath] = useState<string[]>([]);
   const [result, setResult] = useState<BranchingResult | null>(null);
   const [saveFailed, setSaveFailed] = useState(false);
-  const [exhausted, setExhausted] = useState(false);
-  const [endingsSeen, setEndingsSeen] = useState(payload.endingsReached.length);
+  // Exhausted but the start payload could not be re-fetched: say it plainly.
+  const [plainExhausted, setPlainExhausted] = useState(false);
+  const [pause, setPause] = useState<Pause | null>(() => pauseFrom(payload));
+  const [roundLoadFailed, setRoundLoadFailed] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+  const [endingsSeen, setEndingsSeen] = useState(data.endingsReached.length);
   // Once the item is complete a replay costs nothing, so it is never gated.
-  const [replayFree, setReplayFree] = useState(payload.completed);
+  const [replayFree, setReplayFree] = useState(data.completed);
 
   const node = nodesById.get(nodeId);
   const isEnding = !!node && !node.choices?.length;
-  const gated = payload.passScore !== null;
+  const gated = data.passScore !== null;
 
-  // Attempts already gone on arrival: say so instead of letting the learner
-  // play a run the server will refuse to record.
-  const exhaustedOnArrival =
-    !payload.completed &&
-    payload.maxAttempts !== null &&
-    payload.attemptsUsed >= payload.maxAttempts;
+  const nextRoundMs = pause?.nextRoundAt ? Date.parse(pause.nextRoundAt) : NaN;
+  const roundOpen = !Number.isNaN(nextRoundMs) && now >= nextRoundMs;
+
+  // Minute resolution is enough for "about 23 hours"; the timer also lands on
+  // the exact moment the new round opens.
+  useEffect(() => {
+    if (Number.isNaN(nextRoundMs) || Date.now() >= nextRoundMs) return;
+    const id = setTimeout(
+      () => setNow(Date.now()),
+      Math.min(60_000, nextRoundMs - Date.now()),
+    );
+    return () => clearTimeout(id);
+  }, [nextRoundMs, now]);
 
   const chosenText = useCallback(
     (index: number) => {
       // Text of the choice made at step `index` of the path.
-      let current = nodesById.get(payload.startNodeId);
+      let current = nodesById.get(data.startNodeId);
       for (let i = 0; i <= index && current; i++) {
         const choice = current.choices?.find(c => c.id === path[i]);
         if (i === index) return choice?.text ?? '';
@@ -100,14 +148,54 @@ export const BranchingScenarioPlayer: React.FC<
       }
       return '';
     },
-    [nodesById, path, payload.startNodeId],
+    [nodesById, path, data.startNodeId],
   );
+
+  const enterPause = useCallback((spent: Pause) => {
+    setNow(Date.now());
+    setPause(spent);
+  }, []);
+
+  const resetRun = useCallback((startNodeId: string) => {
+    setNodeId(startNodeId);
+    setPath([]);
+    setResult(null);
+    setSaveFailed(false);
+    setPlainExhausted(false);
+  }, []);
+
+  // Adopt a freshly fetched start payload: a spent round pauses, an open one
+  // starts over from the first scene.
+  const applyFresh = useCallback(
+    (fresh: StartTrackItemResponse) => {
+      if (fresh.type !== TrackItemType.BRANCHING_SCENARIO) return;
+      setData(fresh);
+      setEndingsSeen(fresh.endingsReached.length);
+      setReplayFree(fresh.completed);
+      const spent = pauseFrom(fresh);
+      if (spent) enterPause(spent);
+      else setPause(null);
+      resetRun(fresh.startNodeId);
+    },
+    [enterPause, resetRun],
+  );
+
+  const handleStartNewRound = async () => {
+    setRoundLoadFailed(false);
+    try {
+      applyFresh(await startItem({itemId}).unwrap());
+    } catch {
+      setRoundLoadFailed(true);
+    }
+  };
 
   const submit = useCallback(
     async (finalPath: string[]) => {
       setSaveFailed(false);
       try {
         const res = await recordResult({itemId, path: finalPath}).unwrap();
+        const spent = pauseFrom(res);
+        if (spent) enterPause(spent);
         setResult(res);
         setEndingsSeen(res.endingsReached.length);
         if (res.itemCompleted) setReplayFree(true);
@@ -116,13 +204,18 @@ export const BranchingScenarioPlayer: React.FC<
         }
       } catch (error) {
         if (isAttemptsExhaustedError(error)) {
-          setExhausted(true);
+          // The start payload carries nextRoundAt and the recap.
+          try {
+            applyFresh(await startItem({itemId}).unwrap());
+          } catch {
+            setPlainExhausted(true);
+          }
         } else {
           setSaveFailed(true);
         }
       }
     },
-    [itemId, onCompleted, recordResult],
+    [itemId, onCompleted, recordResult, startItem, applyFresh, enterPause],
   );
 
   const handleChoose = (choiceId: string, nextNodeId: string) => {
@@ -136,25 +229,122 @@ export const BranchingScenarioPlayer: React.FC<
     }
   };
 
-  const handleRestart = () => {
-    setNodeId(payload.startNodeId);
-    setPath([]);
-    setResult(null);
-    setSaveFailed(false);
-    setExhausted(false);
-  };
+  const handleRestart = () => resetRun(data.startNodeId);
 
   const exhaustedMessage = (
-    <Text style={styles.notice} testID="branching-exhausted">
+    <Text style={styles.notice} testID="branching-exhausted-plain">
       {t('courses.branching.attemptsUsedUp')}
     </Text>
   );
 
-  if (exhaustedOnArrival) {
-    return (
-      <View style={styles.centered} testID="branching-player">
-        {exhaustedMessage}
+  const renderOutcomeBadge = (outcome?: BranchingOutcome) =>
+    outcome ? (
+      <View
+        style={[styles.badge, {backgroundColor: OUTCOME_COLORS[outcome].bg}]}>
+        <Text style={[styles.badgeText, {color: OUTCOME_COLORS[outcome].fg}]}>
+          {t(`courses.branching.outcome.${outcome}`)}
+        </Text>
       </View>
+    ) : null;
+
+  if (pause) {
+    const until = roundOpen ? null : getTimeUntil(nextRoundMs, now);
+    const nextRoundLine = until
+      ? t('courses.branching.newRoundIn', {
+          time: t(`courses.branching.${UNIT_KEYS[until.unit]}`, {
+            count: until.count,
+          }),
+        })
+      : roundOpen
+        ? t('courses.branching.newRoundReady')
+        : t('courses.branching.newRoundLater');
+
+    return (
+      <ScrollView
+        contentContainerStyle={styles.content}
+        testID="branching-player">
+        <Text
+          style={styles.exhaustedTitle}
+          accessibilityRole="header"
+          testID="branching-exhausted">
+          {t('courses.branching.exhaustedTitle')}
+        </Text>
+        {/* Not a live region: the minute-by-minute change is not announced. */}
+        <Text style={styles.sceneText} testID="branching-next-round">
+          {nextRoundLine}
+        </Text>
+
+        {pause.recap.length > 0 ? (
+          <>
+            <Text style={styles.recapHeading} accessibilityRole="header">
+              {t('courses.branching.whatYouReached')}
+            </Text>
+            <View
+              style={styles.recapList}
+              accessibilityRole="list"
+              accessibilityLabel={t('courses.branching.recapLabel')}>
+              {pause.recap.map((entry, i) => {
+                const ending = nodesById.get(entry.endingNodeId);
+                const outcomeLabel = ending?.outcome
+                  ? t(`courses.branching.outcome.${ending.outcome}`)
+                  : '';
+                const scoreLabel =
+                  data.passScore !== null
+                    ? t('courses.branching.score', {score: entry.score})
+                    : '';
+                return (
+                  <View
+                    key={`${entry.at}-${i}`}
+                    style={styles.recapRow}
+                    testID="branching-recap-row"
+                    accessible
+                    accessibilityLabel={[
+                      outcomeLabel,
+                      ending?.text,
+                      scoreLabel,
+                      ending?.takeaway,
+                    ]
+                      .filter(Boolean)
+                      .join('. ')}>
+                    {renderOutcomeBadge(ending?.outcome)}
+                    {ending ? (
+                      <Text style={styles.sceneText}>{ending.text}</Text>
+                    ) : null}
+                    {scoreLabel ? (
+                      <Text style={styles.scoreMeta}>{scoreLabel}</Text>
+                    ) : null}
+                    {ending?.takeaway ? (
+                      <Text style={styles.takeaway}>{ending.takeaway}</Text>
+                    ) : null}
+                  </View>
+                );
+              })}
+            </View>
+          </>
+        ) : null}
+
+        {roundLoadFailed ? (
+          <Text style={styles.notice} accessibilityRole="alert">
+            {t('courses.player.loadFailed')}
+          </Text>
+        ) : null}
+        <View style={styles.actions}>
+          {roundOpen ? (
+            <Button
+              testID="branching-start-round"
+              label={t('courses.branching.startNewRound')}
+              onPress={handleStartNewRound}
+              isLoading={isStarting}
+            />
+          ) : null}
+          <Button
+            testID="branching-back"
+            label={t('courses.player.backToCourse')}
+            variant={roundOpen ? 'secondary' : 'primary'}
+            onPress={onBack}
+          />
+        </View>
+      </ScrollView>
     );
   }
 
@@ -207,7 +397,7 @@ export const BranchingScenarioPlayer: React.FC<
   const renderEnding = (ending: BranchingNode) => {
     const outcome = ending.outcome;
     // Server response is the truth; before it lands there is nothing to score.
-    const passScore = result ? result.passScore : payload.passScore;
+    const passScore = result ? result.passScore : data.passScore;
     const canRetry =
       replayFree ||
       !result ||
@@ -218,18 +408,7 @@ export const BranchingScenarioPlayer: React.FC<
 
     return (
       <>
-        {outcome ? (
-          <View
-            style={[
-              styles.badge,
-              {backgroundColor: OUTCOME_COLORS[outcome].bg},
-            ]}>
-            <Text
-              style={[styles.badgeText, {color: OUTCOME_COLORS[outcome].fg}]}>
-              {t(`courses.branching.outcome.${outcome}`)}
-            </Text>
-          </View>
-        ) : null}
+        {renderOutcomeBadge(outcome)}
         {renderScene(ending)}
 
         {showScore && result ? (
@@ -271,7 +450,7 @@ export const BranchingScenarioPlayer: React.FC<
             />
           </>
         ) : null}
-        {exhausted ? exhaustedMessage : null}
+        {plainExhausted ? exhaustedMessage : null}
 
         {result ? (
           <View style={styles.actions}>
@@ -302,8 +481,8 @@ export const BranchingScenarioPlayer: React.FC<
     <ScrollView
       contentContainerStyle={styles.content}
       testID="branching-player">
-      {path.length === 0 && payload.intro ? (
-        <Text style={styles.intro}>{payload.intro}</Text>
+      {path.length === 0 && data.intro ? (
+        <Text style={styles.intro}>{data.intro}</Text>
       ) : null}
       {path.length === 0 && endingsSeen > 0 && endingCount > 0 ? (
         <Text style={styles.progressNote} testID="branching-endings-seen">
@@ -311,9 +490,9 @@ export const BranchingScenarioPlayer: React.FC<
             seen: endingsSeen,
             total: endingCount,
           })}
-          {gated && payload.bestScore !== null
+          {gated && data.bestScore !== null
             ? ` · ${t('courses.branching.bestScore', {
-                score: payload.bestScore,
+                score: data.bestScore,
               })}`
             : ''}
         </Text>
@@ -468,6 +647,27 @@ const styles = ScaledSheet.create({
     borderLeftWidth: 3,
     borderLeftColor: colors.ds.theme.primary,
     paddingLeft: '12@ms',
+  },
+  exhaustedTitle: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...typography.body.large,
+    fontWeight: fontWeights.medium,
+    color: colors.ds.typography.highEmphasis,
+  },
+  recapHeading: {
+    ...fontFamily.IBM_PLEX_SERIF.REGULAR,
+    ...typography.body.medium,
+    fontWeight: fontWeights.medium,
+    color: colors.ds.typography.mediumEmphasis,
+    marginTop: '8@ms',
+  },
+  recapList: {gap: '10@ms'},
+  recapRow: {
+    gap: '8@ms',
+    borderWidth: 1.5,
+    borderColor: colors.ds.stroke.primary,
+    borderRadius: '12@ms',
+    padding: '12@ms',
   },
   notice: {
     ...fontFamily.IBM_PLEX_SERIF.REGULAR,
