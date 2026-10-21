@@ -18,3 +18,4 @@ export * from "./errorMessage";
 export * from "./agentAuthored";
 export * from "./characterData";
 export * from "./userTurnText";
+export * from "./builderReceipt";

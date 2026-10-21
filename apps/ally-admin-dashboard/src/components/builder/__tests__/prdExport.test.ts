@@ -69,6 +69,7 @@ import {
   prdExportFilename,
   prdToMarkdown,
   toPdfText,
+  transcriptToBlocks,
   type PrdExportMeta,
 } from "../prdExport";
 
@@ -316,6 +317,111 @@ describe("downloadPrdPdf — transcript", () => {
 
     expect(pdfCalls.text).not.toContain("Interview transcript");
     expect(prdToMarkdown(prd, { ...meta, transcript })).not.toContain("Tenants need to switch");
+  });
+});
+
+describe("downloadPrdPdf — transcript receipts", () => {
+  const receipt = {
+    read: ["ally-be/src/builder/x.ts", "Stacks: 2 chunks"],
+    searched: ['Code search "debrief rating" — 4 matches'],
+    changed: ["Requirements: added R4", "Repo plan: ally-be"],
+    prdVersion: { from: 3, to: 4 },
+    failed: ["Read ally-be/src/gone.ts — Not Found"],
+    warnings: ["Builder said the PRD changed, but no edit landed this turn."],
+    prdUnchangedBecause: "Waiting on your call about the repo.",
+  };
+  const withReceipt: BuilderChatMessage[] = [
+    { id: "u1", role: "user", content: "Add the banner toggle." },
+    {
+      id: "a1",
+      role: "assistant",
+      content: "Added R4.",
+      // Chips stay out of the transcript even if a row carries both.
+      toolNotes: ["read_file"],
+      receipt,
+    },
+  ];
+
+  it("prints what the turn did under its reply, as muted lines", () => {
+    const blocks = transcriptToBlocks(withReceipt, "Asha Rao");
+    const reply = blocks.findIndex(block => "text" in block && block.text === "Added R4.");
+
+    expect(blocks.slice(reply + 1)).toEqual([
+      {
+        kind: "placeholder",
+        text: 'Checked: ally-be/src/builder/x.ts; Stacks: 2 chunks; Code search "debrief rating" — 4 matches',
+      },
+      {
+        kind: "placeholder",
+        text: "Changed in the PRD: Requirements: added R4; Repo plan: ally-be",
+      },
+      { kind: "placeholder", text: "Failed: Read ally-be/src/gone.ts — Not Found" },
+      {
+        kind: "placeholder",
+        text: "Delivered with warnings: Builder said the PRD changed, but no edit landed this turn.",
+      },
+      { kind: "placeholder", text: "PRD unchanged: Waiting on your call about the repo." },
+    ]);
+  });
+
+  it("reaches the PDF", () => {
+    resetPdfCalls();
+    downloadPrdPdf(prd, { ...meta, createdByName: "Asha Rao", transcript: withReceipt });
+
+    expect(pdfCalls.text).toContain("Failed: Read ally-be/src/gone.ts — Not Found");
+    expect(pdfCalls.text.some(line => line.includes("read_file"))).toBe(false);
+  });
+
+  it("prints only the groups that have something in them", () => {
+    const blocks = transcriptToBlocks(
+      [
+        {
+          id: "a1",
+          role: "assistant",
+          content: "Nothing to change.",
+          receipt: {
+            ...receipt,
+            read: [],
+            searched: [],
+            changed: [],
+            failed: [],
+            warnings: [],
+            prdUnchangedBecause: null,
+          },
+        },
+      ],
+      "Asha Rao",
+    );
+
+    const text = blocks.map(block => ("text" in block ? block.text : ""));
+    expect(
+      text.filter(line => /^(Checked|Changed|Failed|Delivered|PRD unchanged)/.test(line)),
+    ).toEqual([]);
+  });
+
+  it("keeps a reply-less turn that has a receipt, and drops one that has neither", () => {
+    const blocks = transcriptToBlocks(
+      [
+        { id: "a1", role: "assistant", content: "", receipt },
+        { id: "a2", role: "assistant", content: "" },
+      ],
+      "Asha Rao",
+    );
+
+    const speakers = blocks.filter(block => block.kind === "speaker");
+    expect(speakers).toEqual([{ kind: "speaker", text: "Builder" }]);
+    expect(blocks.some(block => "text" in block && block.text.startsWith("Failed: "))).toBe(true);
+  });
+
+  it("ignores something that is not a receipt", () => {
+    const blocks = transcriptToBlocks(
+      [{ id: "a1", role: "assistant", content: "Hi.", receipt: "oops" as never }],
+      "Asha Rao",
+    );
+
+    // Only the appendix's own intro is a muted line; the reply is kept, nothing is added to it.
+    expect(blocks.filter(block => block.kind === "placeholder")).toHaveLength(1);
+    expect(blocks.some(block => "text" in block && block.text === "Hi.")).toBe(true);
   });
 });
 

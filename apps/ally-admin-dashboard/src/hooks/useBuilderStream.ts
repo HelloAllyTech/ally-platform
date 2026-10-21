@@ -16,6 +16,7 @@ import {
 } from "@types";
 import { logger } from "@utils";
 
+import { normalizeTurnReceipt } from "../utils/builderReceipt";
 import { userTurnText } from "../utils/userTurnText";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
@@ -116,7 +117,13 @@ export const mapServerMessagesToFeed = (
       continue;
     }
 
-    const toolNotes = (message.toolResults ?? []).map(result => result.name);
+    // A row with a receipt shows the receipt and no chips. The chips were never a clean record:
+    // live ones come from `tool_call` names and reloaded ones from `toolResults[].name` — two
+    // sources, never de-duplicated, and neither could say a lookup had failed. The receipt can,
+    // so once there is one it is the only account of what the turn did. A row from before
+    // receipts existed (or whose receipt is not readable) keeps its chips.
+    const receipt = normalizeTurnReceipt(message.metadata?.receipt);
+    const toolNotes = receipt ? [] : (message.toolResults ?? []).map(result => result.name);
     // A turn that died mid-flight leaves a row with no prose and no tools. It
     // used to render as nothing at all, so after a reload the admin saw their
     // own message answered by silence and no way to tell a broken turn from
@@ -125,12 +132,15 @@ export const mapServerMessagesToFeed = (
     const errorText = errored
       ? (message.metadata?.errorMessage ?? en.builder.chat.streamFailed)
       : undefined;
-    if (content || toolNotes.length || errored) {
+    // A receipt alone is enough to draw the row: a turn that only looked things up and changed
+    // nothing has no prose, and the receipt is what says so.
+    if (content || toolNotes.length || errored || receipt) {
       feed.push({
         id: `srv_${message.id}`,
         role: "assistant",
         content,
         ...(toolNotes.length ? { toolNotes } : {}),
+        ...(receipt ? { receipt } : {}),
         ...(errorText ? { error: errorText } : {}),
       });
     }
@@ -283,6 +293,16 @@ export const useBuilderStream = ({
         case "readiness":
           onReadiness?.(event.data);
           break;
+
+        case "receipt": {
+          // The receipt replaces the progress chips, exactly as it does on a reload. Chips are
+          // the "something is happening" signal while the reply is withheld; once the turn has a
+          // record of what it did they would only repeat it. An unreadable receipt replaces
+          // nothing, so the chips stay.
+          const receipt = normalizeTurnReceipt(event.data);
+          if (receipt) patchAssistantMessage(assistantId, { receipt, toolNotes: undefined });
+          break;
+        }
 
         case "question": {
           flushTokens();

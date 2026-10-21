@@ -3612,6 +3612,25 @@ export const en = {
       emptyTitle: "Tell me what you want to build",
       emptyBody:
         "A sentence is enough to start. I'll read the codebase and ask about what I can't work out on my own.",
+      // What a turn did, drawn under Builder's reply. The summary is one muted line; failures and
+      // warnings are never folded away; the lists behind "Details" are the long form.
+      receipt: {
+        label: "What this turn did",
+        read: (count: number) => `Read ${count}`,
+        searched: (count: number) => `Searched ${count}`,
+        changed: (count: number) =>
+          count === 1 ? "Changed 1 section" : `Changed ${count} sections`,
+        prdVersion: (from: number, to: number) => `PRD v${from} → v${to}`,
+        noActivity: "No lookups, PRD unchanged",
+        // The summary when a reason for the PRD standing still is shown on its own line below it.
+        noLookups: "No lookups",
+        readHeading: "Read",
+        searchedHeading: "Searched",
+        changedHeading: "Changed in the PRD",
+        failedHeading: "Failed",
+        warningsHeading: "Delivered with warnings",
+        prdUnchanged: (reason: string) => `PRD unchanged: ${reason}`,
+      },
     },
 
     // The living PRD
@@ -3722,6 +3741,12 @@ export const en = {
           notAnswered: "Not answered.",
           failedTurn: (message: string) => `This turn failed: ${message}`,
           interrupted: "Stopped before it finished.",
+          // What the turn did, from its receipt — printed under the reply it belongs to.
+          checked: (lines: string) => `Checked: ${lines}`,
+          changedInPrd: (lines: string) => `Changed in the PRD: ${lines}`,
+          failedLookups: (lines: string) => `Failed: ${lines}`,
+          deliveredWithWarnings: (lines: string) => `Delivered with warnings: ${lines}`,
+          prdUnchanged: (reason: string) => `PRD unchanged: ${reason}`,
         },
       },
     },
@@ -4230,6 +4255,9 @@ export const en = {
       enabledLabel: "Builder enabled",
       enabledHelp:
         "Off means no build will dispatch, whatever a session's own readiness says. The Builder tab stays visible; nothing behind it will run.",
+      validatedTurnsLabel: "Validated interview turns",
+      validatedTurnsHelp:
+        "Builder's reply reaches you only after it has read what it looked up and its PRD edits have landed, with a receipt of what it did. Turn off to fall back to the previous interview loop, where the reply streams in as it is written.",
       autoReviewLabel: "Review its own pull requests",
       autoReviewHelp:
         "On, Builder reads the finished diff of its own open pull requests the way the first person to open one would, and files what it finds. The safer half of autonomy: a review writes findings and touches no branch, so it is worth running on its own with the switch below off — the findings land for you to read and nothing pushes. Only runs once checks are green, at most twice per pull request.",

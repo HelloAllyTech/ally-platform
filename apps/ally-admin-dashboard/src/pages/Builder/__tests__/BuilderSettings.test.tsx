@@ -160,6 +160,71 @@ describe("BuilderSettings", () => {
     });
   });
 
+  describe("validated interview turns", () => {
+    const label = "Validated interview turns";
+
+    it("shows the switch on, as the server reports it, with what it does", () => {
+      settingsResult = {
+        data: { ...baseSettings, validatedTurns: true },
+        isLoading: false,
+        isError: false,
+      };
+      render(<BuilderSettings />);
+
+      expect(screen.getByLabelText(label)).toBeChecked();
+      expect(
+        screen.getByText(/reply reaches you only after it has read what it looked up/),
+      ).toBeInTheDocument();
+    });
+
+    it("saves the switch turned off, so the previous loop can be reached from here", async () => {
+      settingsResult = {
+        data: { ...baseSettings, validatedTurns: true },
+        isLoading: false,
+        isError: false,
+      };
+      render(<BuilderSettings />);
+
+      fireEvent.click(screen.getByLabelText(label));
+      fireEvent.click(screen.getByText("Save"));
+
+      await vi.waitFor(() =>
+        expect(updateSettings).toHaveBeenCalledWith(
+          expect.objectContaining({ validatedTurns: false, enabled: true }),
+        ),
+      );
+    });
+
+    it("shows and saves a switch the server reports as off", async () => {
+      settingsResult = {
+        data: { ...baseSettings, validatedTurns: false },
+        isLoading: false,
+        isError: false,
+      };
+      render(<BuilderSettings />);
+
+      expect(screen.getByLabelText(label)).not.toBeChecked();
+      fireEvent.click(screen.getByLabelText(label));
+      fireEvent.click(screen.getByText("Save"));
+
+      await vi.waitFor(() =>
+        expect(updateSettings).toHaveBeenCalledWith(
+          expect.objectContaining({ validatedTurns: true }),
+        ),
+      );
+    });
+
+    it("neither shows nor sends the switch when the server does not report it yet", async () => {
+      render(<BuilderSettings />);
+
+      expect(screen.queryByLabelText(label)).not.toBeInTheDocument();
+      fireEvent.click(screen.getByText("Save"));
+
+      await vi.waitFor(() => expect(updateSettings).toHaveBeenCalled());
+      expect(updateSettings.mock.calls[0][0]).not.toHaveProperty("validatedTurns");
+    });
+  });
+
   it("clears a model tier back to the platform default by sending an empty string", async () => {
     render(<BuilderSettings />);
 
