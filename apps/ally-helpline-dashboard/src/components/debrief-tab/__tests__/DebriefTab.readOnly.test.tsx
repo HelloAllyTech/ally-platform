@@ -48,6 +48,10 @@ vi.mock("../DebriefReplyInput", () => ({
   DebriefReplyInput: () => <div data-testid="reply-input" />,
 }));
 
+vi.mock("../DebriefFeedback", () => ({
+  DebriefFeedback: () => <div data-testid="debrief-feedback" />,
+}));
+
 const NOTE = "You opened well and stayed with her silence.";
 
 const summaryWithNote = () =>
@@ -98,6 +102,7 @@ describe("DebriefTab — readOnly (revisit)", () => {
     expect(screen.queryByText("Why was that a miss?")).not.toBeInTheDocument();
     expect(screen.queryByText(/you moved on/)).not.toBeInTheDocument();
     expect(screen.queryByTestId("reply-input")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("debrief-feedback")).not.toBeInTheDocument();
   });
 
   it("does not even fetch the conversation", () => {
@@ -150,6 +155,7 @@ describe("DebriefTab — full mode (just finished)", () => {
     expect(screen.getByTestId("supervisor-note")).toBeInTheDocument();
     expect(screen.getByText("Why was that a miss?")).toBeInTheDocument();
     expect(screen.getByTestId("reply-input")).toBeInTheDocument();
+    expect(screen.getByTestId("debrief-feedback")).toBeInTheDocument();
     expect(mockChatHistoryQuery).toHaveBeenCalledWith({ sessionId: "s-1" }, { skip: false });
   });
 });

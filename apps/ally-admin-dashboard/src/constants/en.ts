@@ -5862,6 +5862,8 @@ export const en = {
       judged: (count: number) => `${count} judged`,
       score: "Score",
       noScore: "Not scored yet",
+      positive: "Positive",
+      negative: "Negative",
       changeSummary: "What changed",
       hypothesis: "Why it should score higher",
       outcome: "Outcome",

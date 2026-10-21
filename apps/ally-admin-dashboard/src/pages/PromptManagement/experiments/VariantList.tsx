@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 
+import { ThumbsDown, ThumbsUp } from "@icons";
+
 import { en } from "@constants";
 import { RubricCriterion, SkillExperimentVariant } from "@types";
 
@@ -11,11 +13,15 @@ const VariantCard: React.FC<{
   variant: SkillExperimentVariant;
   rubric: RubricCriterion[];
   trafficLabel?: string;
-}> = ({ promptId, variant, rubric, trafficLabel }) => {
+  isUserFeedback?: boolean;
+}> = ({ promptId, variant, rubric, trafficLabel, isUserFeedback }) => {
   const copy = en.skillExperiments.variants;
   const [showText, setShowText] = useState(false);
   const [showOutputs, setShowOutputs] = useState(false);
   const means = variant.criterionMeans ?? {};
+
+  const positiveCount = Math.round(((variant.meanScore ?? 0) / 100) * variant.judgedCount);
+  const negativeCount = variant.judgedCount - positiveCount;
 
   return (
     <div className="flex flex-col gap-2 rounded-md border border-border-light p-3">
@@ -32,6 +38,19 @@ const VariantCard: React.FC<{
               <span className="text-xs text-typography-500">
                 {" "}
                 · {copy.judged(variant.judgedCount)}
+                {isUserFeedback && (
+                  <>
+                    {" "}
+                    ·{" "}
+                    <ThumbsUp
+                      size={14}
+                      className="inline-block align-text-bottom text-primary-600"
+                    />{" "}
+                    <span data-testid="positive-count">{positiveCount}</span> ·{" "}
+                    <ThumbsDown size={14} className="inline-block align-text-bottom text-red-600" />{" "}
+                    <span data-testid="negative-count">{negativeCount}</span>
+                  </>
+                )}
               </span>
             </>
           )}
@@ -107,11 +126,13 @@ export const VariantList: React.FC<{
   rubric: RubricCriterion[];
   challengerPercent: number;
   live: boolean;
-}> = ({ promptId, variants, currentRun, rubric, challengerPercent, live }) => {
+  judgeModel: string | null;
+}> = ({ promptId, variants, currentRun, rubric, challengerPercent, live, judgeModel }) => {
   const copy = en.skillExperiments.variants;
   const current = variants.filter(v => v.run === currentRun);
   const earlier = variants.filter(v => v.run !== currentRun);
   const challengerLive = live && current.some(v => v.status === "challenger");
+  const isUserFeedback = judgeModel === "user-feedback";
 
   const traffic = (v: SkillExperimentVariant) => {
     if (!live) return undefined;
@@ -135,6 +156,7 @@ export const VariantList: React.FC<{
           variant={v}
           rubric={rubric}
           trafficLabel={traffic(v)}
+          isUserFeedback={isUserFeedback}
         />
       ))}
       {earlier.length > 0 && (
@@ -149,6 +171,7 @@ export const VariantList: React.FC<{
                 promptId={promptId}
                 variant={{ ...v, label: `${copy.run(v.run)} · ${v.label}` }}
                 rubric={rubric}
+                isUserFeedback={isUserFeedback}
               />
             ))}
           </div>

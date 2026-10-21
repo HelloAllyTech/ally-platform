@@ -6,6 +6,7 @@ export * from "./calls";
 export * from "./callSummary";
 export * from "./search";
 export * from "./learn";
+export * from "./sessionApi";
 export * from "./simulationCredits";
 export * from "./termsAndAgreement";
 export * from "./user";

@@ -62,7 +62,8 @@
     },
     "practiceAgain": "Practise again",
     "refresh": "Refresh",
-    "play": "Play"
+    "play": "Play",
+    "submit": "Submit"
   },
   "carousel": {
     "slides": {
@@ -831,7 +832,12 @@
       },
       "replyPlaceholder": "Reply to Ally about this session…",
       "transcriptReferences": "Transcript References",
-      "replyPrompt": "Have a question about any of this? Reply below."
+      "replyPrompt": "Have a question about any of this? Reply below.",
+      "feedback": {
+        "question": "Was this helpful?",
+        "thankYou": "Thank you for your feedback!",
+        "commentPlaceholder": "What did you like or dislike? (Optional)"
+      }
     }
   },
   "review": {

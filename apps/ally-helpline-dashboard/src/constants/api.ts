@@ -85,6 +85,8 @@ export const ApiEndpoints = {
     GET_SIMULATION_SUMMARY: (sessionId: string) => `/v1/learn/scenario-session/${sessionId}`,
     SUBMIT_SIMULATION_FEEDBACK: (sessionId: string) =>
       `/v1/learn/scenario-session/${sessionId}/feedback`,
+    SUBMIT_DEBRIEF_FEEDBACK: (sessionId: string) =>
+      `/v1/scenario-sessions/${sessionId}/debrief-feedback`,
     GET_SIMULATION_TRANSCRIPT: (sessionId: string) =>
       `/v1/learn/scenario-session/${sessionId}/messages`,
     GET_UP_COMING_SIMULATION: (sessionId: string) =>

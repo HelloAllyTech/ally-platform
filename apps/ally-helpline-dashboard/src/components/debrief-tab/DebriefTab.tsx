@@ -10,6 +10,7 @@ import { initSession } from "@reducer";
 import { RootState } from "@store";
 import { ChatMessagePayload, SimulationSummary as SimulationSummaryType } from "@types";
 
+import { DebriefFeedback } from "./DebriefFeedback";
 import { DebriefReplyInput } from "./DebriefReplyInput";
 import { getDebriefViewState } from "./debriefViewState";
 import { ReplyBubble } from "./ReplyBubble";
@@ -143,7 +144,10 @@ export const DebriefTab: FC<DebriefTabProps> = ({
               </p>
             </div>
           ) : viewState === "note" ? (
-            <SupervisorNote note={note} onOpenMoment={onOpenMoment} hideClosing={readOnly} />
+            <>
+              <SupervisorNote note={note} onOpenMoment={onOpenMoment} hideClosing={readOnly} />
+              {!readOnly && <DebriefFeedback sessionId={sessionId} />}
+            </>
           ) : viewState === "timedOut" ? (
             // Not a failure: the summary is likely still being written for a
             // longer session. Say so, and let the learner ask again instead

@@ -117,6 +117,8 @@ import {
   Template as CTemplate,
   LogoGithub as CLogoGithub,
   PullRequest as CPullRequest,
+  ThumbsUp as CThumbsUp,
+  ThumbsDown as CThumbsDown,
 } from "@carbon/icons-react";
 import { Heading1 as LHeading1, Heading2 as LHeading2, Heading3 as LHeading3 } from "lucide-react";
 
@@ -239,6 +241,8 @@ export const Refresh = createCarbonIcon(CRenew);
 export const Save = createCarbonIcon(CSave);
 export const Search = createCarbonIcon(CSearch);
 export const TableIcon = createCarbonIcon(CDataTable);
+export const ThumbsUp = createCarbonIcon(CThumbsUp);
+export const ThumbsDown = createCarbonIcon(CThumbsDown);
 export const ThreeDot = createCarbonIcon(COverflowMenuHorizontal);
 export const Tick = createCarbonIcon(CCheckmark);
 export const Timer = createCarbonIcon(CTime);
