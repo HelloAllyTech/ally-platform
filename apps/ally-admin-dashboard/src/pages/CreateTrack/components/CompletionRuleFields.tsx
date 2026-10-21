@@ -45,7 +45,9 @@ export const CompletionRuleFields: FC<CompletionRuleFieldsProps> = ({
     type === TrackItemType.ANNOTATED_ARTIFACT ||
     type === TrackItemType.GAME ||
     // Its pass mark and attempts live in the scenario editor strip.
-    type === TrackItemType.BRANCHING_SCENARIO
+    type === TrackItemType.BRANCHING_SCENARIO ||
+    // Completes once every item is placed; nothing to configure.
+    type === TrackItemType.BUCKET_SORT
   ) {
     return null;
   }

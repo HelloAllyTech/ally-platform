@@ -27,6 +27,7 @@ const ITEM_TYPE_ICONS: Record<CourseItemType, IconComponent> = {
   ANNOTATED_ARTIFACT: Edit,
   GAME: Play,
   BRANCHING_SCENARIO: GroupBranch,
+  BUCKET_SORT: GroupBranch,
 };
 
 export const getItemTypeIcon = (type: CourseItemType): IconComponent =>

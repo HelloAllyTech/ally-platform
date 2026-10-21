@@ -75,6 +75,7 @@ export const TRACK_ITEM_TYPE_LABELS: Record<TrackItemType, string> = {
   [TrackItemType.ANNOTATED_ARTIFACT]: "Annotation",
   [TrackItemType.GAME]: "Game",
   [TrackItemType.BRANCHING_SCENARIO]: "Scenario quiz (SJT)",
+  [TrackItemType.BUCKET_SORT]: "Bucket sort",
 };
 
 export const TRACK_ITEM_TYPE_DESCRIPTIONS: Record<TrackItemType, string> = {
@@ -88,6 +89,8 @@ export const TRACK_ITEM_TYPE_DESCRIPTIONS: Record<TrackItemType, string> = {
   [TrackItemType.GAME]: "A short arcade break between heavier components",
   [TrackItemType.BRANCHING_SCENARIO]:
     "Situational judgement: learners choose, then live the consequence",
+  [TrackItemType.BUCKET_SORT]:
+    "Sort items into categories with instant feedback on each, to surface misconceptions",
 };
 
 /**
@@ -203,6 +206,8 @@ export const DEFAULT_COMPLETION_CRITERIA: Record<TrackItemType, CompletionCriter
   [TrackItemType.GAME]: {},
   // The pass mark lives in the scenario settings; the server mirrors it here.
   [TrackItemType.BRANCHING_SCENARIO]: {},
+  // Completes once every item is placed; it is practice, never a gate.
+  [TrackItemType.BUCKET_SORT]: {},
 };
 
 /* ---- Games (GAME) ---- */
@@ -278,6 +283,16 @@ export const DEFAULT_BREATHING_EXERCISE_CONTENT: BreathingExerciseContent = {
   exhaleText: "Exhale",
   holdOutText: "Hold",
 };
+
+/* ---- Bucket sort (BUCKET_SORT) — limits mirror ally-be ---- */
+export const MIN_BUCKET_SORT_BUCKETS = 2;
+export const MAX_BUCKET_SORT_BUCKETS = 6;
+export const MIN_BUCKET_SORT_ITEMS = 2;
+export const MAX_BUCKET_SORT_ITEMS = 30;
+export const MAX_BUCKET_SORT_LABEL = 60;
+export const MAX_BUCKET_SORT_DESCRIPTION = 160;
+export const MAX_BUCKET_SORT_ITEM_TEXT = 200;
+export const MAX_BUCKET_SORT_EXPLANATION = 500;
 
 /* ---- Branching scenario (BRANCHING_SCENARIO) — limits mirror ally-be ---- */
 

@@ -1734,6 +1734,11 @@
             "title_one": "Scenario",
             "title_other": "Scenarios",
             "hint": "Choose, then see what happens"
+          },
+          "bucketSort": {
+            "title_one": "Bucket sort",
+            "title_other": "Bucket sorts",
+            "hint": "Sort, then see why"
           }
         }
       },
@@ -1830,7 +1835,10 @@
       "labels": "{{count}} label",
       "labels_other": "{{count}} labels",
       "game": "Game · just for fun",
-      "branching": "Scenario quiz"
+      "branching": "Scenario quiz",
+      "bucketSort": "Bucket sort",
+      "sortItems": "{{count}} item",
+      "sortItems_other": "{{count}} items"
     },
     "continueLearning": {
       "label": "Continue learning"
@@ -1996,6 +2004,26 @@
         "notHere": "{{count}} marked in error",
         "notHere_other": "{{count}} marked in error"
       }
+    },
+    "bucketSort": {
+      "whereDoesItGo": "Where does this belong?",
+      "progress": "{{placed}} of {{total}} sorted",
+      "dragHint": "Drag the card onto a bucket, or tap a bucket.",
+      "bucketAria": "Put \"{{item}}\" in {{bucket}}",
+      "correct": "Right!",
+      "notQuite": "Not quite",
+      "belongsIn": "It belongs in {{bucket}}.",
+      "youChose": "You chose {{bucket}}.",
+      "next": "Next item",
+      "seeResults": "See results",
+      "resultsHeading": "All sorted",
+      "firstTry": "{{pct}}% right on the first try",
+      "best": "Best so far: {{pct}}%",
+      "reviewHeading": "Worth another look",
+      "allRight": "Every item went in the right bucket first time.",
+      "practiceAgain": "Sort again",
+      "continue": "Continue",
+      "yourItem": "Item to sort"
     },
     "branching": {
       "sceneHeading": "Scene",

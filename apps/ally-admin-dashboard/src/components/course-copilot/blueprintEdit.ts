@@ -38,6 +38,7 @@ export const DEFAULT_ITEM_MINUTES: Record<CourseItemType, number> = {
   ANNOTATED_ARTIFACT: 10,
   GAME: 3,
   BRANCHING_SCENARIO: 8,
+  BUCKET_SORT: 4,
   VIDEO: 5,
   ROLEPLAY: 15,
   CASE: 30,

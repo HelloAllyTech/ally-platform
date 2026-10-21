@@ -15,6 +15,7 @@ export enum TrackItemType {
   ANNOTATED_ARTIFACT = "ANNOTATED_ARTIFACT",
   GAME = "GAME",
   BRANCHING_SCENARIO = "BRANCHING_SCENARIO",
+  BUCKET_SORT = "BUCKET_SORT",
 }
 
 /** Games the app can serve; each maps to `public/games/<key>/index.html`. */
@@ -85,6 +86,9 @@ export interface TrackItemContentMeta {
   labelCount?: number;
   // GAME
   gameKey?: TrackGameKey;
+  // BUCKET_SORT — counts only; which bucket an item belongs in is the answer.
+  itemCount?: number;
+  bucketCount?: number;
 }
 
 export interface TrackDetailItem {
@@ -804,6 +808,46 @@ export interface BranchingResult {
   recap: BranchingRecapRun[];
 }
 
+export interface BucketSortBucket {
+  id: string;
+  label: string;
+  description?: string;
+}
+
+/** What the server says about one placed item; the key reaches the client only through this. */
+export interface BucketSortFeedback {
+  correct: boolean;
+  /** The bucket the learner chose on their first try. */
+  placedBucketId: string;
+  correctBucketId: string;
+  explanation: string | null;
+}
+
+export interface StartBucketSortItemPayload extends StartTrackItemBase {
+  type: TrackItemType.BUCKET_SORT;
+  bucketSort: {
+    intro?: string;
+    buckets: BucketSortBucket[];
+    /** The answer key is stripped: an item says what it is, never where it goes. */
+    items: { id: string; text: string }[];
+    /** Items already placed (this round), so a reload resumes with their feedback. */
+    answered: Record<string, BucketSortFeedback>;
+  };
+  rounds: number;
+  bestFirstTryPct: number | null;
+}
+
+export interface BucketSortPlacementResult extends BucketSortFeedback {
+  sortItemId: string;
+  placedCount: number;
+  totalCount: number;
+  finished: boolean;
+  /** Share of items right on the first try; only once the round is finished. */
+  firstTryPct: number | null;
+  itemCompleted: boolean;
+  completion: TrackItemCompletionResult | null;
+}
+
 export type StartTrackItemResponse =
   | StartRoleplayItemPayload
   | StartCaseItemPayload
@@ -813,7 +857,8 @@ export type StartTrackItemResponse =
   | StartJournalItemPayload
   | StartAnnotationItemPayload
   | StartGameItemPayload
-  | StartBranchingScenarioItemPayload;
+  | StartBranchingScenarioItemPayload
+  | StartBucketSortItemPayload;
 
 // ---------------------------------------------------------------------------
 // Completion results

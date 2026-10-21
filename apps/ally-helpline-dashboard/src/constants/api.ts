@@ -142,6 +142,8 @@ export const ApiEndpoints = {
     INTERJECTION_ANSWER: (itemId: string, interjectionId: string) =>
       `/v1/learn/tracks/items/${itemId}/interjections/${interjectionId}/answer`,
     GAME_RESULT: (itemId: string) => `/v1/learn/tracks/items/${itemId}/game-result`,
+    BUCKET_SORT_PLACE: (itemId: string) => `/v1/learn/tracks/items/${itemId}/bucket-sort/place`,
+    BUCKET_SORT_RESTART: (itemId: string) => `/v1/learn/tracks/items/${itemId}/bucket-sort/restart`,
     BRANCHING_RESULT: (itemId: string) => `/v1/learn/tracks/items/${itemId}/branching-result`,
     JOURNAL_DRAFT: (itemId: string) => `/v1/learn/tracks/items/${itemId}/journal`,
     JOURNAL_SUBMIT: (itemId: string) => `/v1/learn/tracks/items/${itemId}/journal/submit`,

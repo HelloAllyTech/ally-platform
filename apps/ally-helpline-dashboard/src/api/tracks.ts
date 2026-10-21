@@ -12,6 +12,7 @@ import {
   AnnotationAttemptResult,
   AnnotationMarkInput,
   BranchingResult,
+  BucketSortPlacementResult,
   ArticleResourceEmbeddabilityResponse,
   EnrollTrackResponse,
   GetLearnTracksResponse,
@@ -394,6 +395,26 @@ const tracksAPI = baseAPI.injectEndpoints({
       }),
       invalidatesTags: ALL_TRACK_TAGS,
     }),
+
+    /** One placement in a bucket sort; the response is that item's verdict and explanation. */
+    placeBucketSortItem: builder.mutation<
+      BucketSortPlacementResult,
+      { itemId: string; sortItemId: string; bucketId: string }
+    >({
+      query: ({ itemId, sortItemId, bucketId }) => ({
+        url: ApiEndpoints.TRACKS.BUCKET_SORT_PLACE(itemId),
+        method: HttpMethod.POST,
+        body: { sortItemId, bucketId },
+      }),
+      invalidatesTags: ALL_TRACK_TAGS,
+    }),
+
+    restartBucketSort: builder.mutation<{ success: boolean }, { itemId: string }>({
+      query: ({ itemId }) => ({
+        url: ApiEndpoints.TRACKS.BUCKET_SORT_RESTART(itemId),
+        method: HttpMethod.POST,
+      }),
+    }),
   }),
 });
 
@@ -421,6 +442,8 @@ export const {
   useSubmitAnnotationAttemptMutation,
   useRecordGameResultMutation,
   useRecordBranchingResultMutation,
+  usePlaceBucketSortItemMutation,
+  useRestartBucketSortMutation,
 } = tracksAPI;
 
 export { tracksAPI };

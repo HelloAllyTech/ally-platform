@@ -105,6 +105,14 @@ export const TrackTypeIcon: FC<TrackTypeIconProps> = ({ type, className = "w-5 h
           <path d="M4 7l2-2 2 2M16 7l2-2 2 2" />
         </svg>
       );
+    case TrackItemType.BUCKET_SORT:
+      // Two buckets with an item dropping in
+      return (
+        <svg {...common}>
+          <path d="M3 13h7v7H3zM14 13h7v7h-7z" />
+          <path d="M6.5 4v5M4.5 7l2 2 2-2" />
+        </svg>
+      );
     default:
       return null;
   }

@@ -18,6 +18,7 @@ export enum TrackItemType {
   ANNOTATED_ARTIFACT = "ANNOTATED_ARTIFACT",
   GAME = "GAME",
   BRANCHING_SCENARIO = "BRANCHING_SCENARIO",
+  BUCKET_SORT = "BUCKET_SORT",
 }
 
 /**
@@ -376,6 +377,29 @@ export interface BranchingScenarioContent {
   nodes: BranchingNode[];
 }
 
+/* ---- Bucket sort (BUCKET_SORT) ---- */
+
+export interface BucketSortBucket {
+  id: string;
+  label: string;
+  description?: string;
+}
+
+export interface BucketSortItem {
+  id: string;
+  text: string;
+  /** The bucket this item belongs in. */
+  bucketId: string;
+  /** Why it belongs there; shown to the learner as feedback after they place it. */
+  explanation?: string;
+}
+
+export interface BucketSortContent {
+  intro?: string;
+  buckets: BucketSortBucket[];
+  items: BucketSortItem[];
+}
+
 export type TrackItemContent =
   | ArticleContent
   | VideoContent
@@ -383,7 +407,8 @@ export type TrackItemContent =
   | QuizContent
   | AnnotationContent
   | GameContent
-  | BranchingScenarioContent;
+  | BranchingScenarioContent
+  | BucketSortContent;
 
 export interface CompletionCriteria {
   /** Roleplay, 0 or above (score depends on configured behaviours and can exceed 100). */
@@ -763,6 +788,7 @@ export interface TrackItemFormValue {
   annotation?: AnnotationFormValue;
   game?: GameContent;
   branching?: BranchingScenarioContent;
+  bucketSort?: BucketSortContent;
   completionCriteria: CompletionCriteria;
   /** Per-item "Enable discussion" switch; defaults off. */
   hasDiscussion?: boolean;

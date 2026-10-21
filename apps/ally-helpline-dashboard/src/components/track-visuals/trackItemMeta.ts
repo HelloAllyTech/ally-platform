@@ -68,6 +68,11 @@ export const getTrackItemMeta = (item: TrackDetailItem, t: TFunction): string =>
         ? `${t("tracks2.meta.branching")} · ${t("tracks2.meta.passScore", { score: passScore })}`
         : t("tracks2.meta.branching");
     }
+    case TrackItemType.BUCKET_SORT: {
+      const parts = [t("tracks2.meta.bucketSort")];
+      if (meta?.itemCount) parts.push(t("tracks2.meta.sortItems", { count: meta.itemCount }));
+      return parts.join(" · ");
+    }
     default:
       return "";
   }

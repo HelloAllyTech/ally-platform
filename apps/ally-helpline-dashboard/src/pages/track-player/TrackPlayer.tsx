@@ -21,6 +21,7 @@ import { PlayerBottomNav } from "./components/PlayerBottomNav";
 import { AnnotationItemPlayer } from "./components/players/annotation/AnnotationItemPlayer";
 import { ArticleItemPlayer } from "./components/players/ArticleItemPlayer";
 import { BranchingScenarioPlayer } from "./components/players/BranchingScenarioPlayer";
+import { BucketSortPlayer } from "./components/players/BucketSortPlayer";
 import { GameItemPlayer } from "./components/players/GameItemPlayer";
 import { JournalItemPlayer } from "./components/players/JournalItemPlayer";
 import { QuizItemPlayer } from "./components/players/quiz/QuizItemPlayer";
@@ -235,6 +236,15 @@ export const TrackPlayer: FC = () => {
             onCompleted={handleCompletion}
             onRequestNext={goNextOrOverview}
             onBackToCourse={nav.exitToOverview}
+          />
+        );
+      case TrackItemType.BUCKET_SORT:
+        return (
+          <BucketSortPlayer
+            payload={payload}
+            itemId={itemId}
+            onCompleted={handleCompletion}
+            onRequestNext={goNextOrOverview}
           />
         );
       case TrackItemType.ROLEPLAY:

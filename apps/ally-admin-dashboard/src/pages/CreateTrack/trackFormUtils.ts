@@ -28,6 +28,7 @@ import {
   AnnotationFormValue,
   ArticleContent,
   BranchingScenarioContent,
+  BucketSortContent,
   CompletionCriteria,
   FillBlankQuestion,
   GameContent,
@@ -69,6 +70,7 @@ import {
   serializeBranching,
   validateBranching,
 } from "./branchingScenario";
+import { createBucketSortTemplate, serializeBucketSort, validateBucketSort } from "./bucketSort";
 
 const newId = () => crypto.randomUUID();
 
@@ -134,6 +136,8 @@ export const createItemOfType = (type: TrackItemType): TrackItemFormValue => {
       return { ...base, game: { ...DEFAULT_GAME_CONTENT } };
     case TrackItemType.BRANCHING_SCENARIO:
       return { ...base, branching: createBranchingTemplate() };
+    case TrackItemType.BUCKET_SORT:
+      return { ...base, bucketSort: createBucketSortTemplate() };
     case TrackItemType.ROLEPLAY:
       return { ...base, scenarioId: null };
     case TrackItemType.CASE:
@@ -775,6 +779,12 @@ const validateItem = (item: TrackItemFormValue): string[] => {
       });
       break;
     }
+    case TrackItemType.BUCKET_SORT: {
+      validateBucketSort(item.bucketSort).forEach(message => {
+        errors.push(`Bucket sort: ${message}`);
+      });
+      break;
+    }
   }
   return errors;
 };
@@ -1007,6 +1017,9 @@ export const serializeItem = (item: TrackItemFormValue, order: number): TrackStr
       break;
     case TrackItemType.BRANCHING_SCENARIO:
       payload.content = item.branching ? serializeBranching(item.branching) : undefined;
+      break;
+    case TrackItemType.BUCKET_SORT:
+      payload.content = item.bucketSort ? serializeBucketSort(item.bucketSort) : undefined;
       break;
     case TrackItemType.GAME:
       payload.content = item.game
@@ -1339,6 +1352,13 @@ export const deserializeTrack = (detail: TrackDetail): TrackFormValues => ({
                     }
                   : {}),
               };
+              break;
+            }
+            case TrackItemType.BUCKET_SORT: {
+              const bucketSort = item.content as BucketSortContent | undefined;
+              formItem.bucketSort = bucketSort
+                ? { ...bucketSort, intro: bucketSort.intro ?? "" }
+                : createBucketSortTemplate();
               break;
             }
             case TrackItemType.BRANCHING_SCENARIO: {
