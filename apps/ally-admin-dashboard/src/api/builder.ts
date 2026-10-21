@@ -24,6 +24,8 @@ import {
   BuilderSettings,
   CreateBuilderSessionRequest,
   PatchBuilderLessonRequest,
+  DismissBuilderReviewFindingRequest,
+  DismissBuilderReviewFindingResponse,
   PatchBuilderPrdRequest,
   PatchBuilderPrdResponse,
   UpdateBuilderSessionRequest,
@@ -157,6 +159,26 @@ export const builderAPI = baseAPI.injectEndpoints({
       invalidatesTags: (result, error, { id }) => [
         { type: TAG_TYPES.BUILDER_SESSION, id },
         { type: TAG_TYPES.BUILDER_PRD_VERSIONS, id },
+        TAG_TYPES.BUILDER_SESSIONS,
+      ],
+    }),
+
+    /**
+     * Dismiss one of the cold reviewer's findings, with the reason it is
+     * wrong. Answers with readiness and the session status, because a
+     * dismissal can be the last thing between the PRD and ready.
+     */
+    dismissBuilderReviewFinding: builder.mutation<
+      DismissBuilderReviewFindingResponse,
+      DismissBuilderReviewFindingRequest
+    >({
+      query: ({ id, findingId, reason }) => ({
+        url: ApiEndpoints.BUILDER.SESSION_PRD_REVIEW_DISMISS(id, findingId),
+        method: HttpMethod.POST,
+        body: { reason },
+      }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: TAG_TYPES.BUILDER_SESSION, id },
         TAG_TYPES.BUILDER_SESSIONS,
       ],
     }),
@@ -480,6 +502,7 @@ export const {
   useArchiveBuilderSessionMutation,
   useUnarchiveBuilderSessionMutation,
   usePatchBuilderPrdMutation,
+  useDismissBuilderReviewFindingMutation,
   useGetBuilderPrdVersionsQuery,
   useGetBuilderRepoCommandsQuery,
   useGetBuilderRepoMapsQuery,

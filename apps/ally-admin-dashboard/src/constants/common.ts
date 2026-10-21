@@ -623,6 +623,8 @@ export const ApiEndpoints = {
     SESSION_UNARCHIVE: (id: string) => `/v1/builder/sessions/${id}/unarchive`,
     SESSION_PRD: (id: string) => `/v1/builder/sessions/${id}/prd`,
     SESSION_PRD_VERSIONS: (id: string) => `/v1/builder/sessions/${id}/prd/versions`,
+    SESSION_PRD_REVIEW_DISMISS: (id: string, findingId: string) =>
+      `/v1/builder/sessions/${id}/prd/review/findings/${encodeURIComponent(findingId)}/dismiss`,
     // SSE — driven by useBuilderStream (fetch + getReader), not RTK Query.
     SESSION_MESSAGES_STREAM: (id: string) => `/v1/builder/sessions/${id}/messages/stream`,
     REPO_COMMANDS: "/v1/builder/repo-commands",
