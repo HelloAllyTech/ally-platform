@@ -19,6 +19,8 @@ in a hurry.
 not by a file), `mirror` (the watched files must be byte-identical to each other), or `none`
 (watched deliberately, nothing required).
 
+Separately, [`scripts/docs-path-lint.mjs`](../scripts/docs-path-lint.mjs) fails the `docs-paths` job when a backticked file path in any doc no longer exists — fix the path, or mark a deliberate one `<!-- docs-path-lint: planned -->` (or `ignore`).
+
 ## AGENTS.md has a line budget
 
 The checker holds a **120-line budget for `AGENTS.md`**, and unlike the rules above it is
