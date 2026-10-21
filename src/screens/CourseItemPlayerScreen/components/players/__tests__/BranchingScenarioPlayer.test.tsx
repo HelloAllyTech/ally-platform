@@ -1,5 +1,5 @@
 import React from 'react';
-import {fireEvent, render, waitFor} from '@testing-library/react-native';
+import {act, fireEvent, render, waitFor} from '@testing-library/react-native';
 
 import {BranchingNode, TrackItemType} from '@/types';
 
@@ -26,9 +26,14 @@ jest.mock('@/components', () => {
 });
 
 const mockRecord = jest.fn();
+const mockStart = jest.fn();
 jest.mock('@/services', () => ({
   useRecordBranchingResultMutation: jest.fn(() => [
     (args: unknown) => ({unwrap: () => mockRecord(args)}),
+    {isLoading: false},
+  ]),
+  useStartTrackItemMutation: jest.fn(() => [
+    (args: unknown) => ({unwrap: () => mockStart(args)}),
     {isLoading: false},
   ]),
 }));
@@ -73,6 +78,9 @@ const buildPayload = (overrides = {}) => ({
   bestScore: null,
   completed: false,
   endingsReached: [],
+  exhausted: false,
+  nextRoundAt: null,
+  recap: [],
   ...overrides,
 });
 
@@ -88,21 +96,34 @@ const result = (overrides = {}) => ({
   endingsReached: ['quiet'],
   itemCompleted: false,
   completion: null,
+  exhausted: false,
+  nextRoundAt: null,
+  recap: [],
   ...overrides,
 });
+
+const iso = (ms: number) => new Date(ms).toISOString();
+const recapOf = (...ids: string[]) =>
+  ids.map((endingNodeId, i) => ({
+    endingNodeId,
+    score: endingNodeId === 'open' ? 100 : 50,
+    at: iso(Date.now() - (ids.length - i) * 60_000),
+  }));
 
 const setup = (payload = buildPayload()) => {
   const onCompleted = jest.fn();
   const onRequestNext = jest.fn();
+  const onBack = jest.fn();
   const utils = render(
     <BranchingScenarioPlayer
       payload={payload}
       itemId="item-1"
       onCompleted={onCompleted}
       onRequestNext={onRequestNext}
+      onBack={onBack}
     />,
   );
-  return {...utils, onCompleted, onRequestNext};
+  return {...utils, onCompleted, onRequestNext, onBack};
 };
 
 describe('BranchingScenarioPlayer', () => {
@@ -181,24 +202,132 @@ describe('BranchingScenarioPlayer', () => {
     expect(onRequestNext).toHaveBeenCalled();
   });
 
-  it('hides Try again and explains when the server says no attempts are left', async () => {
-    mockRecord.mockResolvedValue(result({attemptsLeft: 0, attemptsUsed: 3}));
-    const {getByTestId, getByText, queryByTestId} = setup();
+  it('switches to the exhausted screen with a recap after the final failed run', async () => {
+    const nextRoundAt = iso(Date.now() + 23 * 3_600_000);
+    mockRecord.mockResolvedValue(
+      result({
+        attemptsLeft: 0,
+        attemptsUsed: 3,
+        exhausted: true,
+        nextRoundAt,
+        recap: recapOf('quiet', 'quiet', 'quiet'),
+      }),
+    );
+    const {getByTestId, getAllByTestId, queryByTestId, queryByText} = setup();
     fireEvent.press(getByTestId('branching-choice-c1'));
 
     await waitFor(() => expect(getByTestId('branching-exhausted')).toBeTruthy());
-    expect(getByText('courses.branching.attemptsUsedUp')).toBeTruthy();
+    expect(getAllByTestId('branching-recap-row')).toHaveLength(3);
+    expect(queryByTestId('branching-try-again')).toBeNull();
+    expect(queryByTestId('branching-start-round')).toBeNull();
+    expect(queryByText('Priya sits down.')).toBeNull();
+  });
+
+  it('shows the recap rows when the item opens already exhausted', () => {
+    const {getByTestId, getAllByTestId, getByText, getAllByText, queryByText, onBack} =
+      setup(
+        buildPayload({
+          attemptsUsed: 2,
+          maxAttempts: 2,
+          exhausted: true,
+          nextRoundAt: iso(Date.now() + 23.4 * 3_600_000),
+          recap: recapOf('quiet', 'open'),
+        }),
+      );
+    expect(getByTestId('branching-exhausted')).toBeTruthy();
+    expect(
+      getByText(
+        String.raw`courses.branching.newRoundIn:{"time":"courses.branching.untilHours:{\"count\":23}"}`,
+      ),
+    ).toBeTruthy();
+    expect(getAllByTestId('branching-recap-row')).toHaveLength(2);
+    expect(getByText('She goes quiet.')).toBeTruthy();
+    expect(getByText('She opens up.')).toBeTruthy();
+    expect(getByText('Name the feeling first.')).toBeTruthy();
+    expect(getAllByText('courses.branching.outcome.MIXED')).toHaveLength(1);
+    expect(getByText('courses.branching.score:{"score":50}')).toBeTruthy();
+    expect(queryByText('Priya sits down.')).toBeNull();
+    fireEvent.press(getByTestId('branching-back'));
+    expect(onBack).toHaveBeenCalled();
+  });
+
+  it('omits scores in the recap when there is no pass mark', () => {
+    const {queryByText} = setup(
+      buildPayload({
+        passScore: null,
+        exhausted: true,
+        nextRoundAt: iso(Date.now() + 3_600_000),
+        recap: recapOf('quiet'),
+      }),
+    );
+    expect(queryByText(/courses.branching.score/)).toBeNull();
+  });
+
+  it('on a 400 "used all attempts" re-fetches the item and shows the exhausted screen', async () => {
+    mockRecord.mockRejectedValue({
+      status: 400,
+      data: {message: 'You have used all attempts for this scenario.'},
+    });
+    mockStart.mockResolvedValue(
+      buildPayload({
+        exhausted: true,
+        nextRoundAt: iso(Date.now() + 5 * 3_600_000),
+        recap: recapOf('quiet'),
+      }),
+    );
+    const {getByTestId, getAllByTestId} = setup();
+    fireEvent.press(getByTestId('branching-choice-c1'));
+
+    await waitFor(() => expect(getByTestId('branching-exhausted')).toBeTruthy());
+    expect(mockStart).toHaveBeenCalledWith({itemId: 'item-1'});
+    expect(getAllByTestId('branching-recap-row')).toHaveLength(1);
+  });
+
+  it('falls back to the plain message when that re-fetch fails', async () => {
+    mockRecord.mockRejectedValue({
+      status: 400,
+      data: {message: 'You have used all attempts for this scenario.'},
+    });
+    mockStart.mockRejectedValue({status: 500});
+    const {getByTestId, queryByTestId} = setup();
+    fireEvent.press(getByTestId('branching-choice-c1'));
+
+    await waitFor(() =>
+      expect(getByTestId('branching-exhausted-plain')).toBeTruthy(),
+    );
     expect(queryByTestId('branching-try-again')).toBeNull();
   });
 
-  it('shows the same message for a 400 "used all attempts" on the POST', async () => {
-    mockRecord.mockRejectedValue({
-      status: 400,
-      data: {message: 'You have used all attempts'},
+  describe('when the new round opens', () => {
+    beforeEach(() => jest.useFakeTimers());
+    afterEach(() => jest.useRealTimers());
+
+    it('offers Start a new round, which re-fetches and returns to the first scene', async () => {
+      mockStart.mockResolvedValue(buildPayload());
+      const {getByTestId, queryByTestId, getByText} = setup(
+        buildPayload({
+          exhausted: true,
+          nextRoundAt: iso(Date.now() + 2 * 60_000),
+          recap: recapOf('quiet'),
+        }),
+      );
+      expect(queryByTestId('branching-start-round')).toBeNull();
+
+      // One act per tick: the effect re-arms its timer after each render.
+      for (let i = 0; i < 3; i++) {
+        act(() => {
+          jest.advanceTimersByTime(60_000);
+        });
+      }
+      expect(getByTestId('branching-start-round')).toBeTruthy();
+
+      await act(async () => {
+        fireEvent.press(getByTestId('branching-start-round'));
+      });
+      expect(mockStart).toHaveBeenCalledWith({itemId: 'item-1'});
+      expect(getByText('Priya sits down.')).toBeTruthy();
+      expect(queryByTestId('branching-exhausted')).toBeNull();
     });
-    const {getByTestId} = setup();
-    fireEvent.press(getByTestId('branching-choice-c1'));
-    await waitFor(() => expect(getByTestId('branching-exhausted')).toBeTruthy());
   });
 
   it('offers a retry when saving fails for another reason', async () => {
@@ -220,13 +349,5 @@ describe('BranchingScenarioPlayer', () => {
     fireEvent.press(getByTestId('branching-choice-c1'));
     await waitFor(() => expect(getByTestId('branching-continue')).toBeTruthy());
     expect(queryByTestId('branching-score')).toBeNull();
-  });
-
-  it('blocks play up front when attempts were already used without a pass', () => {
-    const {getByTestId, queryByText} = setup(
-      buildPayload({attemptsUsed: 3, maxAttempts: 3}),
-    );
-    expect(getByTestId('branching-exhausted')).toBeTruthy();
-    expect(queryByText('Priya sits down.')).toBeNull();
   });
 });

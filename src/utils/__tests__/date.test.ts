@@ -5,6 +5,7 @@ import {
   formatMinutesToDuration,
   formatTime,
   formatTimeHHmm,
+  getTimeUntil,
 } from '../date';
 
 describe('Date Utilities', () => {
@@ -37,6 +38,20 @@ describe('Date Utilities', () => {
       expect(formatMinutesToDuration(120)).toBe('2 h');
       expect(formatMinutesToDuration(872)).toBe('14 h 32 min');
       expect(formatMinutesToDuration(0)).toBe('0 min');
+    });
+  });
+
+  describe('getTimeUntil', () => {
+    const now = 1_000_000_000;
+    it('is null once the moment has passed', () => {
+      expect(getTimeUntil(now, now)).toBeNull();
+      expect(getTimeUntil(now - 5, now)).toBeNull();
+    });
+    it('rounds to minutes, hours and days, never to zero', () => {
+      expect(getTimeUntil(now + 10_000, now)).toEqual({unit: 'minute', count: 1});
+      expect(getTimeUntil(now + 25 * 60_000, now)).toEqual({unit: 'minute', count: 25});
+      expect(getTimeUntil(now + 23.4 * 3_600_000, now)).toEqual({unit: 'hour', count: 23});
+      expect(getTimeUntil(now + 48 * 3_600_000, now)).toEqual({unit: 'day', count: 2});
     });
   });
 });

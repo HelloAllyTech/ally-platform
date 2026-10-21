@@ -431,3 +431,25 @@ export const formatDurationAsMMSS = (startedAt?: string, endedAt?: string) => {
   const seconds = Math.floor((duration % (1000 * 60)) / 1000);
   return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')} Min`;
 };
+
+/**
+ * Coarse time left until a future moment, for "opens in about 23 hours".
+ * Rounds to the nearest minute, hour or day (never zero) and returns the unit
+ * and count so the caller can localise it. `null` once the moment has passed.
+ * @example
+ * getTimeUntil(now + 23.4 * 3600_000, now) // {unit: 'hour', count: 23}
+ */
+export const getTimeUntil = (
+  targetMs: number,
+  nowMs: number,
+): {unit: 'minute' | 'hour' | 'day'; count: number} | null => {
+  const seconds = (targetMs - nowMs) / 1000;
+  if (seconds <= 0) return null;
+  if (seconds < SECONDS_IN.hour) {
+    return {unit: 'minute', count: Math.max(1, Math.round(seconds / 60))};
+  }
+  if (seconds < SECONDS_IN.day) {
+    return {unit: 'hour', count: Math.round(seconds / SECONDS_IN.hour)};
+  }
+  return {unit: 'day', count: Math.round(seconds / SECONDS_IN.day)};
+};

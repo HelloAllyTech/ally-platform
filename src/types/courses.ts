@@ -594,6 +594,14 @@ export interface BranchingNode {
   takeaway?: string;
 }
 
+/** One finished run of the current round, shown while the learner waits. */
+export interface BranchingRecapEntry {
+  endingNodeId: string;
+  score: number;
+  /** ISO timestamp. */
+  at: string;
+}
+
 /**
  * The whole scenario ships to the learner and is played locally; the server
  * scores the finished path (see `BranchingResult`) and is the only truth.
@@ -605,10 +613,17 @@ export interface StartBranchingScenarioItemPayload extends StartTrackItemBase {
   nodes: BranchingNode[];
   passScore: number | null;
   maxAttempts: number | null;
+  /** Attempts used in the CURRENT round. */
   attemptsUsed: number;
   bestScore: number | null;
   completed: boolean;
   endingsReached: string[];
+  /** The round's attempts are gone; a new round opens at `nextRoundAt`. */
+  exhausted: boolean;
+  /** ISO timestamp. */
+  nextRoundAt: string | null;
+  /** Non-empty only while exhausted. */
+  recap: BranchingRecapEntry[];
 }
 
 /** Response to `POST .../branching-result`. */
@@ -625,6 +640,10 @@ export interface BranchingResult {
   endingsReached: string[];
   itemCompleted: boolean;
   completion: TrackItemCompletionResult | null;
+  exhausted: boolean;
+  nextRoundAt: string | null;
+  /** This round's runs, filled when this was the last attempt and not passed. */
+  recap: BranchingRecapEntry[];
 }
 
 export type StartTrackItemResponse =

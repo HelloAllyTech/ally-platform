@@ -253,6 +253,7 @@ export const CourseItemPlayerScreen: React.FC<
             itemId={nav.currentItemId}
             onCompleted={handleCompletion}
             onRequestNext={goNextOrOverview}
+            onBack={handleBackToOverview}
           />
         );
       case TrackItemType.ROLEPLAY:
