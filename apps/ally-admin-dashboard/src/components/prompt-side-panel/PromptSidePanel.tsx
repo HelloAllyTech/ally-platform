@@ -1,10 +1,16 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 
 import { createPortal } from "react-dom";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import { AutoExpandableTextarea, Tooltip } from "@ally-ui-mono/ui-shared";
-import { useGetPromptUsageQuery, useGetLlmModelsQuery } from "@api";
+import {
+  useGetPromptUsageQuery,
+  useGetLlmModelsQuery,
+  useGetBuilderEvalGatedPromptsQuery,
+  useSubmitBuilderEvalPromptCandidateMutation,
+} from "@api";
 import {
   Refresh,
   DoubleArrowRight,
@@ -22,9 +28,11 @@ import {
   PROMPT_LLM_MODEL_OPTIONS,
   PROMPT_TEMPERATURE_DEFAULT,
   providerForModel,
+  ROUTES,
 } from "@constants";
 import { useCreatePortal } from "@hooks";
-import { Prompt, LlmProviderName } from "@types";
+import { Prompt, LlmProviderName, SubmitBuilderEvalPromptCandidateRequest } from "@types";
+import { getErrorMessage } from "@utils/errorMessage";
 
 import PromptTranslationsSection from "./PromptTranslationsSection";
 import { SkillExperimentNotice } from "./SkillExperimentNotice";
@@ -53,6 +61,13 @@ const HIDDEN_PLACEHOLDERS = new Set<string>(["language_characteristics"]);
 
 /** Idle time after the last edit before an auto-save is persisted. */
 const AUTO_SAVE_DEBOUNCE_MS = 700;
+
+/**
+ * One id for the "this prompt goes through the eval" refusal, so however many
+ * saves the server turns down the admin sees a single toast, not one per
+ * keystroke (sonner replaces a toast that shares an id).
+ */
+const GATE_REFUSAL_TOAST_ID = "prompt-eval-gate-refusal";
 
 interface PromptSidePanelProps {
   selectedPrompt: Prompt | null;
@@ -134,8 +149,10 @@ const SaveStatusIndicator: React.FC<{
   state: SaveState;
   isDirty: boolean;
   isValid: boolean;
+  /** A gated prompt with text or model edits that have not been through the eval. */
+  staged?: boolean;
   onRetry: () => void;
-}> = ({ state, isDirty, isValid, onRetry }) => {
+}> = ({ state, isDirty, isValid, staged = false, onRetry }) => {
   if (state === "saving") {
     return (
       <span className="flex items-center gap-1.5 text-sm text-typography-700">
@@ -164,6 +181,13 @@ const SaveStatusIndicator: React.FC<{
   }
   if (isDirty) {
     return <span className="text-sm text-typography-600">Unsaved changes…</span>;
+  }
+  if (staged) {
+    return (
+      <span className="text-sm text-warning-text" title={en.builder.eval.promptGate.stagedHint}>
+        {en.builder.eval.promptGate.stagedBadge}
+      </span>
+    );
   }
   return (
     <span className="flex items-center gap-1.5 text-sm text-typography-600">
@@ -438,13 +462,32 @@ export const PromptSidePanel: React.FC<PromptSidePanelProps> = ({
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [editingBlock, setEditingBlock] = useState<Prompt | null>(null);
 
+  // ── Builder's eval gate ──────────────────────────────────────────────────
+  // A few Builder prompts go live only after the replay eval passes, so for
+  // those the text and model fields are staged here rather than autosaved, and
+  // "Run eval and publish" submits them as a candidate. Which prompts is the
+  // server's list; a 409 on a save also puts the panel in this mode, so a prompt
+  // the list missed (not loaded yet, or a request that failed) still behaves.
+  const navigate = useNavigate();
+  const { data: gatedPromptCodes } = useGetBuilderEvalGatedPromptsQuery(undefined, {
+    skip: !isOpen || !selectedPrompt,
+  });
+  const [submitCandidate, { isLoading: isSubmittingCandidate }] =
+    useSubmitBuilderEvalPromptCandidateMutation();
+  const [refusedPromptId, setRefusedPromptId] = useState<string | null>(null);
+  const isGated =
+    Boolean(selectedPrompt?.promptCode) &&
+    ((Array.isArray(gatedPromptCodes) &&
+      gatedPromptCodes.includes(selectedPrompt?.promptCode as string)) ||
+      (Boolean(selectedPrompt?.id) && refusedPromptId === selectedPrompt?.id));
+
   // ── Auto-save ────────────────────────────────────────────────────────────
   // Every field edit is debounced and persisted silently via `onAutoSave`;
   // `saveState` drives the inline header indicator. `lastSavedRef` holds the
   // serialized editable fields of the last-persisted state so we can tell a
   // real edit from a no-op (and from the initial load, which must not save).
   const [saveState, setSaveState] = useState<SaveState>("saved");
-  const lastSavedRef = useRef<string>("");
+  const lastSavedRef = useRef<{ full: string; gated: string }>({ full: "", gated: "" });
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const doSaveRef = useRef<() => void>(() => {});
   const formDataRef = useRef(formData);
@@ -461,14 +504,22 @@ export const PromptSidePanel: React.FC<PromptSidePanelProps> = ({
   // Only the fields this panel can edit — used both for change detection and
   // as the shape the parent persists. Model/temperature are normalized so a
   // no-op reselect of the same value doesn't register as a change.
+  //
+  // For a gated prompt the text and model settings are not part of what
+  // autosaves (they are staged for the eval instead), so they are left out of
+  // the serialization: an edit to them is not an unsaved change.
   const serializeEditable = useCallback(
-    (d: Partial<Prompt>) =>
+    (d: Partial<Prompt>, gated: boolean) =>
       JSON.stringify({
         name: d.name ?? "",
         description: d.description ?? "",
-        prompt: d.prompt ?? "",
-        model: d.model ?? "",
-        temperature: typeof d.temperature === "number" ? d.temperature : null,
+        ...(gated
+          ? {}
+          : {
+              prompt: d.prompt ?? "",
+              model: d.model ?? "",
+              temperature: typeof d.temperature === "number" ? d.temperature : null,
+            }),
         translationEnabled: !!d.translationEnabled,
         // Normalized to a boolean so undefined (pre-flag rows) and true — both
         // meaning "visible" — don't read as a change and trigger a no-op save.
@@ -476,6 +527,19 @@ export const PromptSidePanel: React.FC<PromptSidePanelProps> = ({
       }),
     [],
   );
+
+  // Both serializations of a persisted state, so the baseline is right whichever
+  // mode the panel is in when it is compared (the gate list can arrive after the
+  // form has been seeded).
+  const snapshotOf = useCallback(
+    (d: Partial<Prompt>) => ({
+      full: serializeEditable(d, false),
+      gated: serializeEditable(d, true),
+    }),
+    [serializeEditable],
+  );
+  const baselineOf = (gated: boolean) =>
+    gated ? lastSavedRef.current.gated : lastSavedRef.current.full;
 
   const getBlockByCode = useCallback(
     (code: string) => {
@@ -599,7 +663,7 @@ export const PromptSidePanel: React.FC<PromptSidePanelProps> = ({
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     if (selectedPrompt) {
       setFormData(selectedPrompt);
-      lastSavedRef.current = serializeEditable(selectedPrompt);
+      lastSavedRef.current = snapshotOf(selectedPrompt);
     } else {
       const empty = {
         name: "",
@@ -609,10 +673,10 @@ export const PromptSidePanel: React.FC<PromptSidePanelProps> = ({
         useDashboardOverride: false,
       };
       setFormData(empty);
-      lastSavedRef.current = serializeEditable(empty);
+      lastSavedRef.current = snapshotOf(empty);
     }
     setSaveState("saved");
-  }, [selectedPrompt, serializeEditable]);
+  }, [selectedPrompt, snapshotOf]);
 
   // Live parse the current textarea content for `{name}` placeholders.
   // Mirrors the regex used server-side in parseVariablesFromPrompt; the
@@ -720,9 +784,28 @@ export const PromptSidePanel: React.FC<PromptSidePanelProps> = ({
   // override the moment an admin edits.
   const buildPayload = useCallback((): Prompt | null => {
     const promptCode = selectedPrompt?.promptCode ?? formData.promptCode ?? "";
-    if (!formData.name || !formData.description || !promptCode || !formData.prompt) {
-      return null;
+    if (!formData.name || !formData.description || !promptCode) return null;
+    if (isGated) {
+      // The prompt's metadata only. The text, the override flag and the model
+      // settings are left out altogether, so the server cannot read the save as
+      // a behaviour change (it refuses those with a 409): they reach the prompt
+      // through the eval, or not at all.
+      return {
+        name: formData.name || "",
+        description: formData.description || "",
+        promptCode,
+        promptType: formData.promptType ?? selectedPrompt?.promptType,
+        translationEnabled:
+          formData.translationEnabled ?? selectedPrompt?.translationEnabled ?? false,
+        visibleInStudio: (formData.visibleInStudio ?? selectedPrompt?.visibleInStudio) !== false,
+        ...(selectedPrompt?.id && {
+          id: selectedPrompt.id,
+          createdAt: selectedPrompt.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }),
+      } as unknown as Prompt;
     }
+    if (!formData.prompt) return null;
     // Did the body itself change, or is this a metadata-only save (a rename, a
     // model pick, the studio-visibility switch)?
     //
@@ -774,27 +857,30 @@ export const PromptSidePanel: React.FC<PromptSidePanelProps> = ({
         updatedAt: new Date().toISOString(),
       }),
     } as unknown as Prompt;
-  }, [formData, selectedPrompt, resolveProvider, selectedModelSupportsTemperature]);
+  }, [formData, selectedPrompt, resolveProvider, selectedModelSupportsTemperature, isGated]);
 
   // Required-field gate — the same rule the old Save button enforced.
   const isFormValid = useMemo(() => {
     const promptCode = selectedPrompt?.promptCode ?? formData.promptCode;
-    return !!(formData.name && formData.description && promptCode && formData.prompt);
+    // A gated prompt's text is staged, not saved, so an emptied editor does not
+    // block saving its name.
+    return !!(formData.name && formData.description && promptCode && (isGated || formData.prompt));
   }, [
     formData.name,
     formData.description,
     formData.promptCode,
     formData.prompt,
     selectedPrompt?.promptCode,
+    isGated,
   ]);
 
   // Serialized editable state vs the last-persisted baseline → is there an
   // unsaved edit right now?
   const currentSerialized = useMemo(
-    () => serializeEditable(formData),
-    [formData, serializeEditable],
+    () => serializeEditable(formData, isGated),
+    [formData, serializeEditable, isGated],
   );
-  const isDirty = currentSerialized !== lastSavedRef.current;
+  const isDirty = currentSerialized !== baselineOf(isGated);
 
   // Latest-ref save closure: reassigned every render so the debounce timer and
   // the flush-on-close path always persist the newest values (no stale reads).
@@ -802,20 +888,36 @@ export const PromptSidePanel: React.FC<PromptSidePanelProps> = ({
     if (!onAutoSave) return;
     const payload = buildPayload();
     if (!payload) return;
-    const snapshot = currentSerialized;
+    const savedData = formData;
+    const savedPromptId = selectedPrompt?.id ?? null;
     setSaveState("saving");
     onAutoSave(payload)
       .then(() => {
         if (!mountedRef.current) return;
-        lastSavedRef.current = snapshot;
+        lastSavedRef.current = snapshotOf(savedData);
         // If the user kept typing during the request, stay "unsaved" so the
         // follow-up debounce persists the newer content.
         setSaveState(
-          serializeEditable(formDataRef.current) === lastSavedRef.current ? "saved" : "unsaved",
+          serializeEditable(formDataRef.current, isGated) === baselineOf(isGated)
+            ? "saved"
+            : "unsaved",
         );
       })
-      .catch(() => {
-        if (mountedRef.current) setSaveState("error");
+      .catch((error: unknown) => {
+        if (!mountedRef.current) return;
+        if ((error as { status?: unknown } | null)?.status === 409) {
+          // The server refuses a change to this prompt's text or model outside
+          // the eval. Say so once, and move the panel into gated mode: from here
+          // on it saves only metadata, so nothing more is sent that could be
+          // refused, and the staged edits are still in the editor for the eval.
+          if (savedPromptId) setRefusedPromptId(savedPromptId);
+          toast.error(getErrorMessage(error, en.builder.eval.promptGate.blocked), {
+            id: GATE_REFUSAL_TOAST_ID,
+          });
+          setSaveState("saved");
+          return;
+        }
+        setSaveState("error");
       });
   };
 
@@ -846,11 +948,72 @@ export const PromptSidePanel: React.FC<PromptSidePanelProps> = ({
       selectedPrompt?.id &&
       onAutoSave &&
       isFormValid &&
-      serializeEditable(formDataRef.current) !== lastSavedRef.current
+      serializeEditable(formDataRef.current, isGated) !== baselineOf(isGated)
     ) {
       doSaveRef.current();
     }
-  }, [selectedPrompt?.id, onAutoSave, isFormValid, serializeEditable]);
+  }, [selectedPrompt?.id, onAutoSave, isFormValid, serializeEditable, isGated]);
+
+  // What a gated prompt has staged: edits to the text or the model settings that
+  // are not live and will not be saved by typing. Compared with the saved row,
+  // so editing back to what is live clears it.
+  const stagedText = isGated && (formData.prompt ?? "") !== (selectedPrompt?.prompt ?? "");
+  const stagedModel = isGated && (formData.model ?? "") !== (selectedPrompt?.model ?? "");
+  const nextTemperature =
+    selectedModelSupportsTemperature && typeof formData.temperature === "number"
+      ? formData.temperature
+      : null;
+  const savedTemperature =
+    typeof selectedPrompt?.temperature === "number" ? selectedPrompt.temperature : null;
+  const stagedTemperature = isGated && nextTemperature !== savedTemperature;
+  const hasStagedChange = stagedText || stagedModel || stagedTemperature;
+  // A candidate with emptied text would publish a blank prompt; the server trims
+  // it away and reads the rest as a model-only change, which is not what was typed.
+  const candidateTextBlank = stagedText && !(formData.prompt ?? "").trim();
+
+  const handleSubmitCandidate = useCallback(async () => {
+    if (!selectedPrompt?.promptCode || !isGated || !hasStagedChange || candidateTextBlank) return;
+    const strings = en.builder.eval.promptGate;
+    // Only what changed: the text when the text changed, the model settings when
+    // those did. The endpoint takes either alone, and sending unchanged text would
+    // pin a copy of it as the candidate.
+    const request: SubmitBuilderEvalPromptCandidateRequest = {
+      promptCode: selectedPrompt.promptCode,
+      ...(stagedText ? { content: formData.prompt ?? "" } : {}),
+      ...(stagedModel
+        ? {
+            provider: formData.model ? (resolveProvider(formData.model) ?? "") : "",
+            model: formData.model ?? "",
+          }
+        : {}),
+      ...(stagedTemperature ? { temperature: nextTemperature } : {}),
+    };
+    try {
+      await submitCandidate(request).unwrap();
+      toast.success(strings.submitted, {
+        action: { label: strings.openEval, onClick: () => navigate(ROUTES.BUILDER_EVAL) },
+      });
+    } catch (error) {
+      // A 403 was already toasted by the base query; a 400 or 409 says what to do
+      // (nothing to try, a change to this prompt already being evaluated).
+      if ((error as { status?: unknown } | null)?.status === 403) return;
+      toast.error(getErrorMessage(error, strings.failed));
+    }
+  }, [
+    selectedPrompt?.promptCode,
+    isGated,
+    hasStagedChange,
+    candidateTextBlank,
+    stagedText,
+    stagedModel,
+    stagedTemperature,
+    nextTemperature,
+    formData.prompt,
+    formData.model,
+    resolveProvider,
+    submitCandidate,
+    navigate,
+  ]);
 
   const handleDuplicate = useCallback(async () => {
     if (!selectedPrompt?.id || !onDuplicate || isDuplicating) return;
@@ -975,6 +1138,7 @@ export const PromptSidePanel: React.FC<PromptSidePanelProps> = ({
               state={saveState}
               isDirty={isDirty}
               isValid={isFormValid}
+              staged={hasStagedChange}
               onRetry={flushSave}
             />
           </div>
@@ -1010,7 +1174,9 @@ export const PromptSidePanel: React.FC<PromptSidePanelProps> = ({
                 </span>
               </IconButton>
             )}
-            {Boolean(selectedPrompt?.useDashboardOverride) && (
+            {/* A revert is a behaviour change like any other, and the server refuses it for a
+                gated prompt, so the button is not offered. */}
+            {Boolean(selectedPrompt?.useDashboardOverride) && !isGated && (
               <button
                 onClick={handleRevertClick}
                 className="flex items-center gap-1.5 pl-2 pr-1 h-9 text-typography-600 hover:text-neutral-800 transition-colors"
@@ -1026,6 +1192,38 @@ export const PromptSidePanel: React.FC<PromptSidePanelProps> = ({
         <div className="h-[calc(100dvh-72px)] md:h-[calc(100vh-100px)] px-4 md:px-8 pt-2 overflow-y-auto custom-scrollbar">
           <div className="space-y-6">
             <SkillExperimentNotice promptId={selectedPrompt?.id} />
+            {isGated && (
+              // A plain div, not an InlineNotification: the notice carries a button,
+              // and Carbon throws on an interactive child in a notification.
+              <div
+                role="note"
+                data-testid="prompt-gate-notice"
+                className="border-l-4 border-primary-500 bg-primary-50 p-4"
+              >
+                <p className="text-base font-medium text-typography-900">
+                  {en.builder.eval.promptGate.noticeTitle}
+                </p>
+                <p className="mt-1 text-sm text-typography-700">
+                  {en.builder.eval.promptGate.noticeBody}
+                </p>
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  <Button
+                    variant={ButtonVariant.PRIMARY}
+                    onClick={() => void handleSubmitCandidate()}
+                    disabled={!hasStagedChange || candidateTextBlank || isSubmittingCandidate}
+                  >
+                    {isSubmittingCandidate
+                      ? en.builder.eval.promptGate.submitting
+                      : en.builder.eval.promptGate.submit}
+                  </Button>
+                  <span className="text-xs text-typography-600">
+                    {hasStagedChange
+                      ? en.builder.eval.promptGate.costHint
+                      : en.builder.eval.promptGate.nothingChanged}
+                  </span>
+                </div>
+              </div>
+            )}
             <Field label="UUID">
               <div className="w-full select-all border-b border-border-light bg-secondary-50 px-3 py-2 font-mono text-base text-neutral-700 break-all">
                 {selectedPrompt?.id ?? "—"}

@@ -1,4 +1,5 @@
 export * from "./Builder";
+export * from "./BuilderEval";
 export * from "./BuilderKnowledge";
 export * from "./BuilderPipeline";
 export * from "./BuilderScoreboard";
