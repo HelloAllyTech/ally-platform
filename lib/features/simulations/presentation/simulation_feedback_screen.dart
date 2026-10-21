@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/localization/localization_controller.dart';
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_button.dart';
@@ -36,6 +37,7 @@ class SimulationFeedbackScreen extends ConsumerStatefulWidget {
 class _SimulationFeedbackScreenState
     extends ConsumerState<SimulationFeedbackScreen> {
   int _rating = 0;
+  final _selectedTags = <String>{};
   final _commentController = TextEditingController();
   bool _isSubmitting = false;
   bool _submitted = false;
@@ -63,36 +65,74 @@ class _SimulationFeedbackScreenState
             scenarioSessionId: widget.scenarioSessionId,
             rating: _rating,
             comment: _commentController.text.trim(),
+            tags: _selectedTags.toList(),
           );
       if (mounted) setState(() => _submitted = true);
     } catch (e) {
-      setState(() => _error = '${ref.tr('callFeedback.failSubmitFeedback')}: $e');
+      setState(
+        () => _error = '${ref.tr('callFeedback.failSubmitFeedback')}: $e',
+      );
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
+  /// Mirrors RN's forced-feedback exit interception
+  /// (`handleFeedbackAndNavigate`/`feedbackPopupSource.current = 'leave'`):
+  /// leaving before rating re-surfaces the ask instead of silently letting
+  /// the learner go. This port's rating form is already inline (no separate
+  /// popup to auto-open), so the prompt is a plain confirm dialog rather
+  /// than reopening a modal.
+  Future<void> _confirmLeave() async {
+    final shouldLeave = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(ref.tr('postSim.feedback.ratingPrompt')),
+        content: Text(ref.tr('postSim.feedback.ratingRequired')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(ref.tr('common.cancel')),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(ref.tr('common.discard')),
+          ),
+        ],
+      ),
+    );
+    if (shouldLeave == true && mounted) Navigator.of(context).pop();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(ref.t('postSim.feedback.sessionFeedback')),
-          bottom: TabBar(
-            tabs: [
-              Tab(text: ref.t('postSim.tabs.debrief')),
-              Tab(text: ref.t('postSim.tabs.transcript')),
+    return PopScope(
+      // Already submitted (or came in with feedback already present) —
+      // nothing forcing an exit prompt.
+      canPop: _submitted,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) _confirmLeave();
+      },
+      child: DefaultTabController(
+        length: 2,
+        child: Scaffold(
+          appBar: AppBar(
+            title: Text(ref.t('postSim.feedback.sessionFeedback')),
+            bottom: TabBar(
+              tabs: [
+                Tab(text: ref.t('postSim.tabs.debrief')),
+                Tab(text: ref.t('postSim.tabs.transcript')),
+              ],
+            ),
+          ),
+          body: TabBarView(
+            children: [
+              _buildDebriefTab(context),
+              SimulationTranscriptTab(
+                scenarioSessionId: widget.scenarioSessionId,
+              ),
             ],
           ),
-        ),
-        body: TabBarView(
-          children: [
-            _buildDebriefTab(context),
-            SimulationTranscriptTab(
-              scenarioSessionId: widget.scenarioSessionId,
-            ),
-          ],
         ),
       ),
     );
@@ -150,7 +190,13 @@ class _SimulationFeedbackScreenState
                   final starValue = index + 1;
                   return IconButton(
                     iconSize: 36,
-                    onPressed: () => setState(() => _rating = starValue),
+                    // Matches RN's `setStarRating`: picking a new rating
+                    // clears any tags chosen for the previous one (each
+                    // rating has its own distinct tag set).
+                    onPressed: () => setState(() {
+                      _rating = starValue;
+                      _selectedTags.clear();
+                    }),
                     icon: Icon(
                       starValue <= _rating ? Icons.star : Icons.star_border,
                       color: Colors.amber,
@@ -158,6 +204,7 @@ class _SimulationFeedbackScreenState
                   );
                 }),
               ),
+              if (_rating > 0) _buildRatingTags(),
               const SizedBox(height: 16),
               AppTextField(
                 controller: _commentController,
@@ -177,6 +224,44 @@ class _SimulationFeedbackScreenState
             ],
           ),
       ],
+    );
+  }
+
+  /// Mirrors RN's `FeedbackPopup`'s `ratingTagOptions`/`handleTagSelectionChange`
+  /// — a rating-specific set of short descriptor tags
+  /// (`postSim.feedback.dialog.rating.tags.<rating>`, a translated string
+  /// array rather than a single interpolatable key, hence `.raw(...)` not
+  /// `.t(...)`), toggled on tap and included in the feedback submission.
+  Widget _buildRatingTags() {
+    final tags =
+        ref
+                .watch(localizationControllerProvider)
+                .value
+                ?.raw('postSim.feedback.dialog.rating.tags.$_rating')
+            as List<dynamic>? ??
+        const [];
+    if (tags.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          for (final tag in tags.cast<String>())
+            FilterChip(
+              label: Text(tag),
+              selected: _selectedTags.contains(tag),
+              onSelected: (selected) => setState(() {
+                if (selected) {
+                  _selectedTags.add(tag);
+                } else {
+                  _selectedTags.remove(tag);
+                }
+              }),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -219,7 +304,9 @@ class _SummarySection extends ConsumerWidget {
                 ],
                 if (duration != null)
                   Text(
-                    ref.t('postSim.feedback.sessionDuration', {'minutes': duration.inMinutes}),
+                    ref.t('postSim.feedback.sessionDuration', {
+                      'minutes': duration.inMinutes,
+                    }),
                   ),
               ],
             ),
