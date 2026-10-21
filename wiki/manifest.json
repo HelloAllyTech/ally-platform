@@ -25,8 +25,8 @@
         "onboarding",
         "environment"
       ],
-      "last_reconciled": "2026-07-11",
-      "words": 637,
+      "last_reconciled": "2026-10-21",
+      "words": 1374,
       "url": "https://tech.helloally.ai/#/wiki/contributing/dev-setup.md",
       "skip_reason": ""
     },
@@ -113,7 +113,7 @@
       "summary": "",
       "tags": [],
       "last_reconciled": "",
-      "words": 731,
+      "words": 733,
       "url": "https://tech.helloally.ai/#/wiki/index.md",
       "skip_reason": "human navigation catalog — ROUTING.md supersedes it for agents"
     },
@@ -126,7 +126,7 @@
         "log"
       ],
       "last_reconciled": "",
-      "words": 10577,
+      "words": 11283,
       "url": "https://tech.helloally.ai/#/wiki/log.md",
       "skip_reason": "append-only history — read only when auditing what changed"
     },
@@ -175,7 +175,7 @@
     {
       "path": "platform/ai-lab.md",
       "title": "AI Lab — Prompt Workbench & Human Evaluation",
-      "summary": "The admin AI Lab — author prompt Skills with variables, execute Runs against Anthropic/OpenAI, and collect structured human evaluations of the outputs.",
+      "summary": "The admin AI Lab — author prompt Skills with variables, execute Runs against OpenAI or Anthropic models, and collect structured human and LLM-judge evaluations of the outputs.",
       "tags": [
         "platform",
         "ai-lab",
@@ -184,8 +184,8 @@
         "human-eval",
         "admin"
       ],
-      "last_reconciled": "2026-07-17",
-      "words": 693,
+      "last_reconciled": "2026-10-21",
+      "words": 1160,
       "url": "https://tech.helloally.ai/#/wiki/platform/ai-lab.md",
       "skip_reason": ""
     },
@@ -219,8 +219,8 @@
         "queues",
         "storage"
       ],
-      "last_reconciled": "2026-07-11",
-      "words": 685,
+      "last_reconciled": "2026-10-21",
+      "words": 1459,
       "url": "https://tech.helloally.ai/#/wiki/platform/architecture.md",
       "skip_reason": ""
     },
@@ -274,8 +274,8 @@
         "llm-judge",
         "rca"
       ],
-      "last_reconciled": "2026-07-21",
-      "words": 1621,
+      "last_reconciled": "2026-10-21",
+      "words": 2403,
       "url": "https://tech.helloally.ai/#/wiki/platform/language-quality-eval.md",
       "skip_reason": ""
     },
@@ -350,8 +350,8 @@
         "tech-stack",
         "tooling"
       ],
-      "last_reconciled": "2026-07-11",
-      "words": 482,
+      "last_reconciled": "2026-10-21",
+      "words": 660,
       "url": "https://tech.helloally.ai/#/wiki/platform/tech-stack.md",
       "skip_reason": ""
     },
