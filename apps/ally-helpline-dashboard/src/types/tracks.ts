@@ -379,6 +379,7 @@ export interface SanitizedQuizQuestion {
   id: string;
   type: QuizQuestionType;
   prompt: string;
+  promptHtml?: string;
   /** 0 for an ungraded question. */
   points: number;
   /**
@@ -589,6 +590,7 @@ export interface AnnotationAttemptResult extends TrackItemCompletionResult {
 export interface JournalPrompt {
   id: string;
   prompt: string;
+  promptHtml?: string;
   required: boolean;
   placeholder: string | null;
 }
