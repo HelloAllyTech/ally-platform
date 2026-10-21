@@ -46,9 +46,23 @@ const asDisplayed = (iso: string) => new Date(iso).toLocaleDateString();
 // Labels deliberately differ from their section names ("Analytics" /
 // "Platform Config") so assertions on one can't accidentally match the other.
 const toggles = [
-  { key: "analytics", label: "View Analytics", description: "View analytics dashboards", enabled: true },
-  { key: "settings", label: "Manage Settings", description: "Manage platform settings", enabled: false },
+  {
+    key: "analytics",
+    label: "View Analytics",
+    description: "View analytics dashboards",
+    enabled: true,
+    platformOnly: true,
+  },
+  {
+    key: "settings",
+    label: "Manage Settings",
+    description: "Manage platform settings",
+    enabled: false,
+  },
 ];
+
+// The organizations the opened admin is restricted to; none = unrestricted.
+let adminTenantCount = 0;
 
 // Mocking @components (with cellTypes) sidesteps the @constants ↔ @components
 // circular import that breaks under vitest, same as UserManagement.test.tsx.
@@ -96,7 +110,12 @@ vi.mock("@components", () => ({
   // not visible text — visible text lives in the row's own <p>, and rendering
   // it twice would make text queries ambiguous.
   ToggleSwitch: ({ enabled, onChange, label }: any) => (
-    <button role="switch" aria-checked={enabled} aria-label={label} onClick={() => onChange(!enabled)} />
+    <button
+      role="switch"
+      aria-checked={enabled}
+      aria-label={label}
+      onClick={() => onChange(!enabled)}
+    />
   ),
   AssignedOrganizations: () => (
     <div data-testid="assigned-organizations">Assigned Organizations</div>
@@ -109,7 +128,10 @@ vi.mock("@assets", () => ({
 }));
 
 vi.mock("@api", () => ({
-  useListPlatformAdminsQuery: () => ({ data: { data: platformAdmins, count: 2 }, isLoading: false }),
+  useListPlatformAdminsQuery: () => ({
+    data: { data: platformAdmins, count: 2 },
+    isLoading: false,
+  }),
   useListEligiblePlatformAdminsQuery: () => ({
     data: { data: candidates, count: 1 },
     isFetching: false,
@@ -119,6 +141,7 @@ vi.mock("@api", () => ({
   useGetUserFeatureTogglesQuery: () => ({ data: toggles, isLoading: false }),
   useSetUserFeatureTogglesMutation: () => [mockSetUserFeatureToggles],
   useGetTenantsQuery: () => ({ data: { data: [], count: 0 } }),
+  useGetAdminTenantsQuery: () => ({ data: { data: [], count: adminTenantCount } }),
 }));
 
 vi.mock("react-redux", () => ({
@@ -211,6 +234,23 @@ describe("SuperAdmins", () => {
       userId: 1,
       toggles: [{ featureKey: "settings", enabled: true }],
     });
+  });
+
+  it("says a platform-only toggle is off while the admin is restricted to organizations", () => {
+    adminTenantCount = 1;
+    render(<SuperAdmins />);
+    fireEvent.click(screen.getByText("Current Admin"));
+
+    // Once, on the platform-only "View Analytics" row — not on "Manage Settings".
+    expect(screen.getAllByText(/Off while this admin is restricted/)).toHaveLength(1);
+  });
+
+  it("shows no such note for an unrestricted admin", () => {
+    adminTenantCount = 0;
+    render(<SuperAdmins />);
+    fireEvent.click(screen.getByText("Current Admin"));
+
+    expect(screen.queryByText(/Off while this admin is restricted/)).not.toBeInTheDocument();
   });
 
   it("returns to the list view from the detail view", () => {

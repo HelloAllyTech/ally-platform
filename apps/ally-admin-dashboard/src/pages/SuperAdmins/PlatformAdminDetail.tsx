@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import {
+  useGetAdminTenantsQuery,
   useGetTenantsQuery,
   useGetUserFeatureTogglesQuery,
   useSetUserFeatureTogglesMutation,
@@ -55,6 +56,13 @@ export const PlatformAdminDetail: React.FC<PlatformAdminDetailProps> = ({ admin,
     sortOrder: SORT_ORDER.DESC,
   });
   const allTenants = tenantsResponse?.data ?? [];
+
+  // Any assigned organization restricts this admin, and the backend then
+  // withholds every platform-only toggle from them — so say so on those rows
+  // rather than show a switch that is on but does nothing. Same query the
+  // allowlist control below makes, so RTK serves both from one request.
+  const { data: adminTenantsData } = useGetAdminTenantsQuery(admin.id);
+  const isRestricted = (adminTenantsData?.count ?? 0) > 0;
 
   const handleToggle = async (key: string, enabled: boolean) => {
     setToggles(prev => prev.map(t => (t.key === key ? { ...t, enabled } : t)));
@@ -114,6 +122,11 @@ export const PlatformAdminDetail: React.FC<PlatformAdminDetailProps> = ({ admin,
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-typography-900">{item.label}</p>
                       <p className="text-sm text-typography-600">{item.description}</p>
+                      {isRestricted && item.platformOnly && (
+                        <p className="text-sm text-typography-800 mt-1">
+                          {strings.platformOnlyWhileRestricted}
+                        </p>
+                      )}
                     </div>
                     <ToggleSwitch
                       enabled={item.enabled}

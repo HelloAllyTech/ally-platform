@@ -3,6 +3,11 @@ export interface FeatureToggleRegistryEntry {
   key: string;
   label: string;
   description: string;
+  /**
+   * Spans every organization, so the backend withholds it from an admin who is
+   * restricted to some — even with the toggle on.
+   */
+  platformOnly?: boolean;
 }
 
 /** One platform admin's state for a single toggle. */
