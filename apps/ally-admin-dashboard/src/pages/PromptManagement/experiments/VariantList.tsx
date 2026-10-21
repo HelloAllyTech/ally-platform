@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 
-import { en } from "@constants";
 import { ThumbsDown, ThumbsUp } from "@icons";
+
+import { en } from "@constants";
 import { RubricCriterion, SkillExperimentVariant } from "@types";
 
 import { VariantStatusBadge } from "./ExperimentStatusBadge";
