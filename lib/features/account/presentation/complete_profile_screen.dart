@@ -3,16 +3,23 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/localization/translate_ref.dart';
-import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_text_field.dart';
-import '../../../core/widgets/tab_screen_header.dart';
 import '../data/account_repository.dart';
 
 /// Port of ally-mobile (React Native)'s `CompleteProfileScreen` — the
 /// first-login gate for bulk-created accounts (`user.profileCompleted ==
-/// false`, per `src/types/user.ts`'s comment). Same PATCH
-/// /users/me/complete-profile contract: name required, phone optional.
+/// false`). Same PATCH /users/me/complete-profile contract: name only —
+/// RN's real screen has no phone field at all (a prior version of this
+/// screen invented one). No header chrome bar either: RN renders the
+/// title/subtitle as plain in-content text, not a shared app header.
+///
+/// Not ported: on success RN does `navigation.reset` back to the Splash
+/// screen to re-run its full auth-routing effect, which (among other
+/// things) checks for an active counsellor chat session to resume —
+/// this just navigates to `/home` directly, skipping that active-session
+/// check. Replicating it needs Splash's whole routing effect ported
+/// first, out of scope for this screen alone.
 class CompleteProfileScreen extends ConsumerStatefulWidget {
   const CompleteProfileScreen({super.key});
 
@@ -23,36 +30,46 @@ class CompleteProfileScreen extends ConsumerStatefulWidget {
 
 class _CompleteProfileScreenState
     extends ConsumerState<CompleteProfileScreen> {
-  final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  final _phoneController = TextEditingController();
   bool _isSubmitting = false;
-  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController.addListener(_onNameChanged);
+  }
 
   @override
   void dispose() {
+    _nameController.removeListener(_onNameChanged);
     _nameController.dispose();
-    _phoneController.dispose();
     super.dispose();
   }
 
+  void _onNameChanged() => setState(() {});
+
+  bool get _isNameValid => _nameController.text.trim().isNotEmpty;
+
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
-    setState(() {
-      _isSubmitting = true;
-      _error = null;
-    });
+    if (!_isNameValid || _isSubmitting) return;
+    setState(() => _isSubmitting = true);
     try {
-      await ref.read(accountRepositoryProvider).completeProfile(
-            name: _nameController.text.trim(),
-            phone: _phoneController.text.trim().isEmpty
-                ? null
-                : _phoneController.text.trim(),
-          );
+      await ref.read(accountRepositoryProvider).completeProfile(name: _nameController.text.trim());
       ref.invalidate(currentUserProvider);
       if (mounted) context.go('/home');
     } catch (e) {
-      setState(() => _error = '${ref.tr('completeProfile.errorDescription')}: $e');
+      if (mounted) {
+        await showDialog<void>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text(ref.tr('completeProfile.errorTitle')),
+            content: Text('${ref.tr('completeProfile.errorDescription')}: $e'),
+            actions: [
+              TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(ref.tr('common.ok'))),
+            ],
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -61,54 +78,41 @@ class _CompleteProfileScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Column(
-        children: [
-          TabScreenHeader(title: ref.t('completeProfile.title')),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    TextFormField(
-                      controller: _nameController,
-                      style: AppTextField.textStyleFor(context),
-                      decoration: AppTextField.decorationFor(
-                        context,
-                        placeholder: ref.t('completeProfile.nameLabel'),
-                      ),
-                      validator: (value) => (value == null || value.trim().isEmpty)
-                          ? ref.t('completeProfile.required')
-                          : null,
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _phoneController,
-                      style: AppTextField.textStyleFor(context),
-                      decoration: AppTextField.decorationFor(
-                        context,
-                        placeholder: ref.t('completeProfile.phoneLabel'),
-                      ),
-                      keyboardType: TextInputType.phone,
-                    ),
-                    if (_error != null) ...[
-                      const SizedBox(height: 16),
-                      Text(_error!, style: const TextStyle(color: AppColors.red400)),
-                    ],
-                    const SizedBox(height: 24),
-                    AppButton(
-                      label: ref.t('completeProfile.submit'),
-                      isLoading: _isSubmitting,
-                      onPressed: _submit,
-                    ),
-                  ],
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(ref.t('completeProfile.title'), style: Theme.of(context).textTheme.headlineSmall),
+                const SizedBox(height: 8),
+                Text(ref.t('completeProfile.subtitle'), style: Theme.of(context).textTheme.bodyMedium),
+                const SizedBox(height: 24),
+                Text(ref.t('completeProfile.nameLabel'), style: Theme.of(context).textTheme.bodyMedium),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _nameController,
+                  style: AppTextField.textStyleFor(context),
+                  decoration: AppTextField.decorationFor(
+                    context,
+                    placeholder: ref.t('completeProfile.namePlaceholder'),
+                  ),
+                  textCapitalization: TextCapitalization.words,
+                  textInputAction: TextInputAction.go,
+                  onSubmitted: (_) => _submit(),
                 ),
-              ),
+                const SizedBox(height: 16),
+                AppButton(
+                  label: ref.t('completeProfile.submit'),
+                  isLoading: _isSubmitting,
+                  isDisabled: !_isNameValid,
+                  onPressed: _submit,
+                ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
