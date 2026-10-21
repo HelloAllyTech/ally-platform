@@ -28,8 +28,26 @@ class HtmlRichText extends StatelessWidget {
     final blocks = _renderBlocks(_parseHtml(source).children, dark);
     if (blocks.isEmpty) return const SizedBox.shrink();
 
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: blocks);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: blocks,
+    );
   }
+}
+
+/// Mirrors ally-mobile (React Native)'s `utils/html.ts`'s `htmlToPlainText`
+/// — strips tags/decodes entities for a one-line card preview, as opposed
+/// to [HtmlRichText]'s full structural rendering used on detail screens.
+String htmlToPlainText(String? html) {
+  if (html == null || html.trim().isEmpty) return '';
+  final stripped = html
+      .replaceAll(
+        RegExp(r'<script[\s\S]*?</script>', caseSensitive: false),
+        ' ',
+      )
+      .replaceAll(RegExp(r'<style[\s\S]*?</style>', caseSensitive: false), ' ')
+      .replaceAll(RegExp('<[^>]*>'), ' ');
+  return _decodeHtmlEntities(stripped).replaceAll(RegExp(r'\s+'), ' ').trim();
 }
 
 class _HtmlTextNode {
@@ -43,7 +61,18 @@ class _HtmlElementNode {
   final List<Object> children = [];
 }
 
-const _inlineTags = {'strong', 'b', 'em', 'i', 'u', 's', 'strike', 'br', 'span', 'a'};
+const _inlineTags = {
+  'strong',
+  'b',
+  'em',
+  'i',
+  'u',
+  's',
+  'strike',
+  'br',
+  'span',
+  'a',
+};
 const _skipTags = {'script', 'style'};
 const _voidTags = {'br', 'hr', 'img'};
 
@@ -85,29 +114,48 @@ _HtmlElementNode _parseHtml(String html) {
 }
 
 bool _isBlockChild(Object node) =>
-    node is _HtmlElementNode && !_inlineTags.contains(node.tag) && !_skipTags.contains(node.tag);
+    node is _HtmlElementNode &&
+    !_inlineTags.contains(node.tag) &&
+    !_skipTags.contains(node.tag);
 
 /// Decodes the common named/numeric/hex HTML entities the backend emits.
 /// Unknown entities are left untouched. Mirrors `utils/html.ts`'s
 /// `decodeHtmlEntities`.
 String _decodeHtmlEntities(String input) {
-  const named = {'amp': '&', 'lt': '<', 'gt': '>', 'quot': '"', 'apos': "'", 'nbsp': ' '};
-  return input.replaceAllMapped(RegExp(r'&(#x?[0-9a-f]+|[a-z]+);', caseSensitive: false), (match) {
-    final body = match.group(1)!;
-    if (body.startsWith('#')) {
-      final isHex = body.length > 1 && (body[1] == 'x' || body[1] == 'X');
-      final code = int.tryParse(body.substring(isHex ? 2 : 1), radix: isHex ? 16 : 10);
-      return code != null ? String.fromCharCode(code) : match.group(0)!;
-    }
-    return named[body.toLowerCase()] ?? match.group(0)!;
-  });
+  const named = {
+    'amp': '&',
+    'lt': '<',
+    'gt': '>',
+    'quot': '"',
+    'apos': "'",
+    'nbsp': ' ',
+  };
+  return input.replaceAllMapped(
+    RegExp(r'&(#x?[0-9a-f]+|[a-z]+);', caseSensitive: false),
+    (match) {
+      final body = match.group(1)!;
+      if (body.startsWith('#')) {
+        final isHex = body.length > 1 && (body[1] == 'x' || body[1] == 'X');
+        final code = int.tryParse(
+          body.substring(isHex ? 2 : 1),
+          radix: isHex ? 16 : 10,
+        );
+        return code != null ? String.fromCharCode(code) : match.group(0)!;
+      }
+      return named[body.toLowerCase()] ?? match.group(0)!;
+    },
+  );
 }
 
 List<InlineSpan> _renderInline(List<Object> nodes, TextStyle baseStyle) {
   final spans = <InlineSpan>[];
   for (final node in nodes) {
     if (node is _HtmlTextNode) {
-      spans.add(TextSpan(text: _decodeHtmlEntities(node.value).replaceAll(RegExp(r'\s+'), ' ')));
+      spans.add(
+        TextSpan(
+          text: _decodeHtmlEntities(node.value).replaceAll(RegExp(r'\s+'), ' '),
+        ),
+      );
       continue;
     }
     final element = node as _HtmlElementNode;
@@ -148,18 +196,33 @@ Widget _paragraph(List<Object> inlineNodes, bool dark, {TextStyle? style}) {
   final baseStyle = style ?? _paragraphStyle(dark);
   return Padding(
     padding: const EdgeInsets.only(bottom: 8),
-    child: RichText(text: TextSpan(style: baseStyle, children: _renderInline(inlineNodes, baseStyle))),
+    child: RichText(
+      text: TextSpan(
+        style: baseStyle,
+        children: _renderInline(inlineNodes, baseStyle),
+      ),
+    ),
   );
 }
 
-TextStyle _paragraphStyle(bool dark) =>
-    TextStyle(fontSize: 14, height: 22 / 14, color: dark ? const Color(0xFFD9D9DC) : Colors.black87);
+TextStyle _paragraphStyle(bool dark) => TextStyle(
+  fontSize: 14,
+  height: 22 / 14,
+  color: dark ? const Color(0xFFD9D9DC) : Colors.black87,
+);
 
 Widget _listItem(_HtmlElementNode item, bool ordered, int index, bool dark) {
   final hasBlockChild = item.children.any(_isBlockChild);
   final body = hasBlockChild
-      ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: _renderBlocks(item.children, dark))
-      : _paragraph(item.children, dark, style: _paragraphStyle(dark).copyWith(height: null));
+      ? Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: _renderBlocks(item.children, dark),
+        )
+      : _paragraph(
+          item.children,
+          dark,
+          style: _paragraphStyle(dark).copyWith(height: null),
+        );
 
   return Padding(
     padding: const EdgeInsets.only(bottom: 4, right: 8),
@@ -170,7 +233,10 @@ Widget _listItem(_HtmlElementNode item, bool ordered, int index, bool dark) {
           width: 20,
           child: Text(
             ordered ? '${index + 1}.' : '•',
-            style: TextStyle(color: dark ? const Color(0xFFD9D9DC) : Colors.black87, fontSize: 14),
+            style: TextStyle(
+              color: dark ? const Color(0xFFD9D9DC) : Colors.black87,
+              fontSize: 14,
+            ),
           ),
         ),
         Expanded(child: body),
@@ -246,13 +312,17 @@ Widget _renderBlockElement(_HtmlElementNode node, bool dark) {
     case 'ul':
     case 'ol':
       final ordered = node.tag == 'ol';
-      final items = node.children.whereType<_HtmlElementNode>().where((c) => c.tag == 'li').toList();
+      final items = node.children
+          .whereType<_HtmlElementNode>()
+          .where((c) => c.tag == 'li')
+          .toList();
       return Padding(
         padding: const EdgeInsets.only(bottom: 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            for (var i = 0; i < items.length; i++) _listItem(items[i], ordered, i, dark),
+            for (var i = 0; i < items.length; i++)
+              _listItem(items[i], ordered, i, dark),
           ],
         ),
       );
@@ -268,7 +338,11 @@ Widget _renderBlockElement(_HtmlElementNode node, bool dark) {
 }
 
 String _plainInline(List<Object> nodes) => nodes
-    .map((n) => n is _HtmlTextNode ? _decodeHtmlEntities(n.value) : _plainInline((n as _HtmlElementNode).children))
+    .map(
+      (n) => n is _HtmlTextNode
+          ? _decodeHtmlEntities(n.value)
+          : _plainInline((n as _HtmlElementNode).children),
+    )
     .join()
     .replaceAll(RegExp(r'\s+'), ' ')
     .trim();
@@ -279,7 +353,9 @@ List<Widget> _renderBlocks(List<Object> nodes, bool dark) {
 
   void flushInline() {
     final hasContent = inlineBuffer.any(
-      (n) => n is _HtmlElementNode || (n is _HtmlTextNode && n.value.trim().isNotEmpty),
+      (n) =>
+          n is _HtmlElementNode ||
+          (n is _HtmlTextNode && n.value.trim().isNotEmpty),
     );
     if (hasContent) blocks.add(_paragraph(inlineBuffer, dark));
     inlineBuffer = [];

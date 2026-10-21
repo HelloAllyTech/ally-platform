@@ -44,7 +44,9 @@ class Scenario {
         .map((e) => ScenarioLanguageOption.fromJson(e as Map<String, dynamic>))
         .toList(),
     completedAttemptCount:
-        (json['completion'] as Map<String, dynamic>?)?['attemptCount'] as int? ?? 0,
+        (json['completion'] as Map<String, dynamic>?)?['attemptCount']
+            as int? ??
+        0,
   );
 
   final int id;
@@ -126,6 +128,7 @@ class SimulationPath {
     required this.description,
     required this.totalScenarios,
     required this.completedScenarios,
+    this.coverImageUrl,
   });
 
   factory SimulationPath.fromJson(Map<String, dynamic> json) => SimulationPath(
@@ -134,6 +137,7 @@ class SimulationPath {
     description: json['description'] as String?,
     totalScenarios: (json['totalScenarios'] as num?)?.toInt() ?? 0,
     completedScenarios: (json['completedScenarios'] as num?)?.toInt() ?? 0,
+    coverImageUrl: json['coverImageUrl'] as String?,
   );
 
   final String id;
@@ -141,6 +145,7 @@ class SimulationPath {
   final String? description;
   final int totalScenarios;
   final int completedScenarios;
+  final String? coverImageUrl;
 }
 
 /// Mirrors ally-mobile (React Native)'s `SessionItemStatus` — a path/case
