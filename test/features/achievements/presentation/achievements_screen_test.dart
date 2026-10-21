@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -16,19 +17,19 @@ void main() {
       when(() => repository.getBadges()).thenAnswer(
         (_) async => [
           BadgeCategoryGroup(
-            category: 'Momentum',
+            category: 'ACTIVE_DAY_STREAK',
             badges: [
               AchievementBadge(
                 id: 'b1',
                 name: 'Streak 7',
-                description: '',
+                description: 'Earned by practicing 7 days in a row.',
                 imageUrl: '',
                 lockStatus: BadgeLockStatus.unlocked,
               ),
               AchievementBadge(
                 id: 'b2',
                 name: 'Streak 30',
-                description: '',
+                description: 'Earned by practicing 30 days in a row.',
                 imageUrl: '',
                 lockStatus: BadgeLockStatus.locked,
               ),
@@ -37,7 +38,7 @@ void main() {
           // A category with nothing unlocked yet — should vanish entirely
           // from the Unlocked tab (not render as an empty section header).
           BadgeCategoryGroup(
-            category: 'Contribution',
+            category: 'COMMENTS_REACTIONS_GIVEN',
             badges: [
               AchievementBadge(
                 id: 'b3',
@@ -58,12 +59,22 @@ void main() {
         overrides: [achievementsRepositoryProvider.overrideWithValue(repository)],
       );
 
-      // --- All tab (default): every badge from every category shows. ---
+      // --- All tab (default): every badge from every category shows, ---
+      // --- each with its RN-real translated category label (mapped   ---
+      // --- from the raw backend category via BADGE_CATEGORY_MAP) and ---
+      // --- its description text (not just an icon+name grid tile).   ---
       expect(find.text('Momentum'), findsOneWidget);
       expect(find.text('Contribution'), findsOneWidget);
       expect(find.text('Streak 7'), findsOneWidget);
+      expect(find.text('Earned by practicing 7 days in a row.'), findsOneWidget);
       expect(find.text('Streak 30'), findsOneWidget);
       expect(find.text('Helper'), findsOneWidget);
+
+      // --- The top "Badges" label and each category both expose an   ---
+      // --- info tooltip (one for the label, one per category shown). ---
+      expect(find.text('Badges'), findsOneWidget);
+      expect(find.byTooltip('Badges are earned based on your activity across simulations and community participation. Some badges may be removed if qualifying actions are undone.'), findsOneWidget);
+      expect(find.byIcon(Icons.info_outline), findsNWidgets(3), reason: 'the Badges label + one per category');
 
       // --- Switch to Unlocked: locked badges disappear, and a category ---
       // --- left with nothing unlocked disappears entirely.             ---
