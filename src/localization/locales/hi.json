@@ -1697,7 +1697,8 @@
       "roleplay": "रोल-प्ले",
       "minScore": "न्यूनतम स्कोर {{score}}%",
       "case": "केस",
-      "game": "गेम · बस मनोरंजन के लिए"
+      "game": "गेम · बस मनोरंजन के लिए",
+      "branchingScenario": "परिदृश्य प्रश्नोत्तरी"
     },
     "player": {
       "exit": "बाहर जाएं",
@@ -1856,6 +1857,29 @@
         "SCENARIO_NOT_TRANSLATED": "यह रोल प्ले अंग्रेज़ी में चलेगा",
         "CASE_NOT_TRANSLATED": "यह केस अंग्रेज़ी में है"
       }
+    },
+    "branching": {
+      "endingsSeen": "{{total}} में से {{seen}} अंत देखे गए",
+      "bestScore": "सर्वश्रेष्ठ स्कोर: {{score}}",
+      "choicePrompt": "आप क्या करेंगे?",
+      "youChose": "आप: {{text}}",
+      "trailLabel": "अब तक के आपके चुनाव",
+      "outcome": {
+        "POSITIVE": "सकारात्मक परिणाम",
+        "MIXED": "मिला-जुला परिणाम",
+        "NEGATIVE": "नकारात्मक परिणाम"
+      },
+      "score": "स्कोर {{score}} / 100",
+      "passMark": "पास अंक {{score}}",
+      "attemptsLeft_one": "{{count}} प्रयास बाकी",
+      "attemptsLeft_other": "{{count}} प्रयास बाकी",
+      "passed": "पास हो गए. यह आइटम पूरा हुआ.",
+      "notPassed": "अभी पास नहीं हुए. जब तक आप पास नहीं होते, यह आइटम खुला रहेगा.",
+      "continue": "आगे बढ़ें",
+      "tryAgain": "फिर से कोशिश करें",
+      "attemptsUsedUp": "आप इस परिदृश्य के सभी प्रयास इस्तेमाल कर चुके हैं. मदद के लिए अपने ट्रेनर से पूछें.",
+      "saveFailed": "आपका नतीजा सहेजा नहीं जा सका. कनेक्शन जाँचकर फिर कोशिश करें.",
+      "retrySave": "दोबारा भेजें"
     },
     "game": {
       "controlsTouch": {

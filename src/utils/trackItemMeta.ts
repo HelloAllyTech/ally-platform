@@ -65,6 +65,8 @@ export const getTrackItemMeta = (
       // No score or threshold in the meta line — there isn't one, and hinting
       // at one would make an optional break look like another hurdle.
       return t('courses.meta.game');
+    case TrackItemType.BRANCHING_SCENARIO:
+      return t('courses.meta.branchingScenario');
     default:
       return '';
   }

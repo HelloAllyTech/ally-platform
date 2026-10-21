@@ -11,6 +11,7 @@ export enum TrackItemType {
   VIDEO = 'VIDEO',
   JOURNAL = 'JOURNAL',
   GAME = 'GAME',
+  BRANCHING_SCENARIO = 'BRANCHING_SCENARIO',
 }
 
 /** Games the app can render; each maps to a bundle under `players/games/`. */
@@ -572,6 +573,60 @@ export interface StartGameItemPayload extends StartTrackItemBase {
   breathingExercise?: BreathingExerciseContent;
 }
 
+export type BranchingOutcome = 'POSITIVE' | 'MIXED' | 'NEGATIVE';
+
+export interface BranchingChoice {
+  id: string;
+  text: string;
+  nextNodeId: string;
+}
+
+/** A scene. No choices means it is an ending. */
+export interface BranchingNode {
+  id: string;
+  title?: string;
+  text: string;
+  image?: {url: string; alt?: string};
+  choices?: BranchingChoice[];
+  /** Endings only. */
+  outcome?: BranchingOutcome;
+  score?: number;
+  takeaway?: string;
+}
+
+/**
+ * The whole scenario ships to the learner and is played locally; the server
+ * scores the finished path (see `BranchingResult`) and is the only truth.
+ */
+export interface StartBranchingScenarioItemPayload extends StartTrackItemBase {
+  type: TrackItemType.BRANCHING_SCENARIO;
+  intro: string | null;
+  startNodeId: string;
+  nodes: BranchingNode[];
+  passScore: number | null;
+  maxAttempts: number | null;
+  attemptsUsed: number;
+  bestScore: number | null;
+  completed: boolean;
+  endingsReached: string[];
+}
+
+/** Response to `POST .../branching-result`. */
+export interface BranchingResult {
+  endingNodeId: string;
+  score: number;
+  passScore: number | null;
+  passed: boolean;
+  attemptsUsed: number;
+  maxAttempts: number | null;
+  /** Null when attempts are unlimited. */
+  attemptsLeft: number | null;
+  bestScore: number | null;
+  endingsReached: string[];
+  itemCompleted: boolean;
+  completion: TrackItemCompletionResult | null;
+}
+
 export type StartTrackItemResponse =
   | StartRoleplayItemPayload
   | StartCaseItemPayload
@@ -579,7 +634,8 @@ export type StartTrackItemResponse =
   | StartArticleItemPayload
   | StartVideoItemPayload
   | StartJournalItemPayload
-  | StartGameItemPayload;
+  | StartGameItemPayload
+  | StartBranchingScenarioItemPayload;
 
 // ---------------------------------------------------------------------------
 // Completion results

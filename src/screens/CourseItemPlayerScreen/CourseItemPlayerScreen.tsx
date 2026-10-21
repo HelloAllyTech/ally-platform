@@ -29,6 +29,7 @@ import {
 import {CelebrationKind, CelebrationModal} from './components/CelebrationModal';
 import {PlayerBottomNav} from './components/PlayerBottomNav';
 import {ArticlePlayer} from './components/players/ArticlePlayer';
+import {BranchingScenarioPlayer} from './components/players/BranchingScenarioPlayer';
 import {GamePlayer} from './components/players/GamePlayer';
 import {JournalPlayer} from './components/players/JournalPlayer';
 import {NativeGamePlayer} from './components/players/NativeGamePlayer';
@@ -241,6 +242,17 @@ export const CourseItemPlayerScreen: React.FC<
             payload={payload}
             itemId={nav.currentItemId}
             onCompleted={handleCompletion}
+          />
+        );
+      case TrackItemType.BRANCHING_SCENARIO:
+        return (
+          <BranchingScenarioPlayer
+            // Two scenarios back to back must not share a run.
+            key={nav.currentItemId}
+            payload={payload}
+            itemId={nav.currentItemId}
+            onCompleted={handleCompletion}
+            onRequestNext={goNextOrOverview}
           />
         );
       case TrackItemType.ROLEPLAY:

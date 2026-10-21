@@ -747,7 +747,8 @@
       "roleplay": "Role play",
       "minScore": "min score {{score}}%",
       "case": "Case",
-      "game": "Game · just for fun"
+      "game": "Game · just for fun",
+      "branchingScenario": "Scenario quiz"
     },
     "player": {
       "exit": "Exit",
@@ -906,6 +907,29 @@
         "SCENARIO_NOT_TRANSLATED": "This role play runs in English",
         "CASE_NOT_TRANSLATED": "This case is in English"
       }
+    },
+    "branching": {
+      "endingsSeen": "{{seen}} of {{total}} endings seen",
+      "bestScore": "Best score: {{score}}",
+      "choicePrompt": "What do you do?",
+      "youChose": "You: {{text}}",
+      "trailLabel": "Your choices so far",
+      "outcome": {
+        "POSITIVE": "Positive outcome",
+        "MIXED": "Mixed outcome",
+        "NEGATIVE": "Negative outcome"
+      },
+      "score": "Score {{score}} / 100",
+      "passMark": "Pass mark {{score}}",
+      "attemptsLeft_one": "{{count}} attempt left",
+      "attemptsLeft_other": "{{count}} attempts left",
+      "passed": "Passed. This item is complete.",
+      "notPassed": "Not passed yet. This item stays open until you do.",
+      "continue": "Continue",
+      "tryAgain": "Try again",
+      "attemptsUsedUp": "You've used all attempts for this scenario. Ask your trainer for help.",
+      "saveFailed": "We couldn't save your result. Check your connection and try again.",
+      "retrySave": "Retry"
     },
     "game": {
       "controlsTouch": {

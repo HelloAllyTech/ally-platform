@@ -1,5 +1,6 @@
 import {API_METHODS, API_ROUTES} from '@/constants';
 import {
+  BranchingResult,
   EnrollTrackResponse,
   GetLearnTracksResponse,
   GetNextTrackItemResponse,
@@ -229,6 +230,22 @@ export const coursesApi = api.injectEndpoints({
       }),
     }),
 
+    /**
+     * Finished run of a branching scenario. The server walks the path and
+     * decides the score; the response is what the player shows.
+     */
+    recordBranchingResult: builder.mutation<
+      BranchingResult,
+      {itemId: string; path: string[]}
+    >({
+      query: ({itemId, path}) => ({
+        url: API_ROUTES.TRACKS.BRANCHING_RESULT(itemId),
+        method: API_METHODS.POST,
+        body: {path},
+      }),
+      invalidatesTags: ALL_TRACK_TAGS,
+    }),
+
     saveJournalDraft: builder.mutation<
       {success: boolean},
       {itemId: string; responses: {promptId: string; response: string}[]}
@@ -298,6 +315,7 @@ export const {
   useSaveJournalDraftMutation,
   useSubmitJournalMutation,
   useRecordGameResultMutation,
+  useRecordBranchingResultMutation,
   useGetTrackLanguagesQuery,
   useSetTrackLanguageMutation,
 } = coursesApi;
