@@ -14,6 +14,7 @@ export enum TrackItemType {
   JOURNAL = "JOURNAL",
   ANNOTATED_ARTIFACT = "ANNOTATED_ARTIFACT",
   GAME = "GAME",
+  BRANCHING_SCENARIO = "BRANCHING_SCENARIO",
 }
 
 /** Games the app can serve; each maps to `public/games/<key>/index.html`. */
@@ -735,6 +736,55 @@ export interface StartGameItemPayload extends StartTrackItemBase {
   completion: TrackItemCompletionResult;
 }
 
+export type BranchingOutcomeTone = "POSITIVE" | "MIXED" | "NEGATIVE";
+
+export interface BranchingChoice {
+  id: string;
+  text: string;
+  nextNodeId: string;
+}
+
+export interface BranchingNode {
+  id: string;
+  title?: string;
+  text: string;
+  image?: { url: string; alt?: string };
+  /** Absent or empty means this scene is an ending. */
+  choices?: BranchingChoice[];
+  outcome?: BranchingOutcomeTone;
+  score?: number;
+  takeaway?: string;
+}
+
+/** The whole story ships to the learner; the server scores the path walked. */
+export interface StartBranchingScenarioItemPayload extends StartTrackItemBase {
+  type: TrackItemType.BRANCHING_SCENARIO;
+  intro: string | null;
+  startNodeId: string;
+  nodes: BranchingNode[];
+  passScore: number | null;
+  maxAttempts: number | null;
+  attemptsUsed: number;
+  bestScore: number | null;
+  completed: boolean;
+  endingsReached: string[];
+}
+
+export interface BranchingResult {
+  endingNodeId: string;
+  score: number;
+  passScore: number | null;
+  passed: boolean;
+  attemptsUsed: number;
+  maxAttempts: number | null;
+  /** null = unlimited. */
+  attemptsLeft: number | null;
+  bestScore: number | null;
+  endingsReached: string[];
+  itemCompleted: boolean;
+  completion: TrackItemCompletionResult;
+}
+
 export type StartTrackItemResponse =
   | StartRoleplayItemPayload
   | StartCaseItemPayload
@@ -743,7 +793,8 @@ export type StartTrackItemResponse =
   | StartVideoItemPayload
   | StartJournalItemPayload
   | StartAnnotationItemPayload
-  | StartGameItemPayload;
+  | StartGameItemPayload
+  | StartBranchingScenarioItemPayload;
 
 // ---------------------------------------------------------------------------
 // Completion results

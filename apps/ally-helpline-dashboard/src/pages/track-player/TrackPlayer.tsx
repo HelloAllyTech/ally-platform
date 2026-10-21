@@ -20,6 +20,7 @@ import { CelebrationKind, CelebrationOverlay } from "./components/CelebrationOve
 import { PlayerBottomNav } from "./components/PlayerBottomNav";
 import { AnnotationItemPlayer } from "./components/players/annotation/AnnotationItemPlayer";
 import { ArticleItemPlayer } from "./components/players/ArticleItemPlayer";
+import { BranchingScenarioPlayer } from "./components/players/BranchingScenarioPlayer";
 import { GameItemPlayer } from "./components/players/GameItemPlayer";
 import { JournalItemPlayer } from "./components/players/JournalItemPlayer";
 import { QuizItemPlayer } from "./components/players/quiz/QuizItemPlayer";
@@ -226,6 +227,15 @@ export const TrackPlayer: FC = () => {
         );
       case TrackItemType.GAME:
         return <GameItemPlayer payload={payload} itemId={itemId} onCompleted={handleCompletion} />;
+      case TrackItemType.BRANCHING_SCENARIO:
+        return (
+          <BranchingScenarioPlayer
+            payload={payload}
+            itemId={itemId}
+            onCompleted={handleCompletion}
+            onRequestNext={goNextOrOverview}
+          />
+        );
       case TrackItemType.ROLEPLAY:
       case TrackItemType.CASE:
         return (

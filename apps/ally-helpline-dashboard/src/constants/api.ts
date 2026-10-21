@@ -137,6 +137,7 @@ export const ApiEndpoints = {
     INTERJECTION_ANSWER: (itemId: string, interjectionId: string) =>
       `/v1/learn/tracks/items/${itemId}/interjections/${interjectionId}/answer`,
     GAME_RESULT: (itemId: string) => `/v1/learn/tracks/items/${itemId}/game-result`,
+    BRANCHING_RESULT: (itemId: string) => `/v1/learn/tracks/items/${itemId}/branching-result`,
     JOURNAL_DRAFT: (itemId: string) => `/v1/learn/tracks/items/${itemId}/journal`,
     JOURNAL_SUBMIT: (itemId: string) => `/v1/learn/tracks/items/${itemId}/journal/submit`,
     ANNOTATION_ATTEMPTS: (itemId: string) => `/v1/learn/tracks/items/${itemId}/annotation-attempts`,

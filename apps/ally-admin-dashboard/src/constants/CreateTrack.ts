@@ -74,6 +74,7 @@ export const TRACK_ITEM_TYPE_LABELS: Record<TrackItemType, string> = {
   [TrackItemType.JOURNAL]: "Journal",
   [TrackItemType.ANNOTATED_ARTIFACT]: "Annotation",
   [TrackItemType.GAME]: "Game",
+  [TrackItemType.BRANCHING_SCENARIO]: "Scenario quiz (SJT)",
 };
 
 export const TRACK_ITEM_TYPE_DESCRIPTIONS: Record<TrackItemType, string> = {
@@ -85,6 +86,8 @@ export const TRACK_ITEM_TYPE_DESCRIPTIONS: Record<TrackItemType, string> = {
   [TrackItemType.JOURNAL]: "Reflection prompts for the learner",
   [TrackItemType.ANNOTATED_ARTIFACT]: "Mark up a real transcript or note",
   [TrackItemType.GAME]: "A short arcade break between heavier components",
+  [TrackItemType.BRANCHING_SCENARIO]:
+    "Situational judgement: learners choose, then live the consequence",
 };
 
 /**
@@ -198,6 +201,8 @@ export const DEFAULT_COMPLETION_CRITERIA: Record<TrackItemType, CompletionCriter
   [TrackItemType.ANNOTATED_ARTIFACT]: {},
   // Games never gate progression, so there is nothing to configure.
   [TrackItemType.GAME]: {},
+  // The pass mark lives in the scenario settings; the server mirrors it here.
+  [TrackItemType.BRANCHING_SCENARIO]: {},
 };
 
 /* ---- Games (GAME) ---- */
@@ -273,6 +278,16 @@ export const DEFAULT_BREATHING_EXERCISE_CONTENT: BreathingExerciseContent = {
   exhaleText: "Exhale",
   holdOutText: "Hold",
 };
+
+/* ---- Branching scenario (BRANCHING_SCENARIO) — limits mirror ally-be ---- */
+
+export const MAX_BRANCHING_NODES = 100;
+export const MIN_BRANCHING_CHOICES = 2;
+export const MAX_BRANCHING_CHOICES = 6;
+export const MAX_BRANCHING_NODE_TEXT = 1500;
+export const MAX_BRANCHING_CHOICE_TEXT = 250;
+export const MAX_BRANCHING_TITLE = 120;
+export const MAX_BRANCHING_TAKEAWAY = 800;
 
 /* ---- Annotation (ANNOTATED_ARTIFACT) ---- */
 

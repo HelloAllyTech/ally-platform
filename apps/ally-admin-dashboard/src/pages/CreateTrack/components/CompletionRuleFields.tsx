@@ -43,7 +43,9 @@ export const CompletionRuleFields: FC<CompletionRuleFieldsProps> = ({
     type === TrackItemType.CASE ||
     type === TrackItemType.QUIZ ||
     type === TrackItemType.ANNOTATED_ARTIFACT ||
-    type === TrackItemType.GAME
+    type === TrackItemType.GAME ||
+    // Its pass mark and attempts live in the scenario editor strip.
+    type === TrackItemType.BRANCHING_SCENARIO
   ) {
     return null;
   }

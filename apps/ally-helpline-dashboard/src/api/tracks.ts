@@ -11,6 +11,7 @@ import { ApiEndpoints, HttpMethod, TAG_TYPES } from "@constants";
 import {
   AnnotationAttemptResult,
   AnnotationMarkInput,
+  BranchingResult,
   ArticleResourceEmbeddabilityResponse,
   EnrollTrackResponse,
   GetLearnTracksResponse,
@@ -380,6 +381,19 @@ const tracksAPI = baseAPI.injectEndpoints({
         body: { score },
       }),
     }),
+
+    /**
+     * The path a learner walked through a branching scenario. The server
+     * scores it and the response is the truth for pass/fail and attempts.
+     */
+    recordBranchingResult: builder.mutation<BranchingResult, { itemId: string; path: string[] }>({
+      query: ({ itemId, path }) => ({
+        url: ApiEndpoints.TRACKS.BRANCHING_RESULT(itemId),
+        method: HttpMethod.POST,
+        body: { path },
+      }),
+      invalidatesTags: ALL_TRACK_TAGS,
+    }),
   }),
 });
 
@@ -406,6 +420,7 @@ export const {
   useSubmitJournalMutation,
   useSubmitAnnotationAttemptMutation,
   useRecordGameResultMutation,
+  useRecordBranchingResultMutation,
 } = tracksAPI;
 
 export { tracksAPI };

@@ -96,6 +96,15 @@ export const TrackTypeIcon: FC<TrackTypeIconProps> = ({ type, className = "w-5 h
           <path d="M17 7H7a5 5 0 0 0-5 5v1a4 4 0 0 0 7 2.6h6A4 4 0 0 0 22 13v-1a5 5 0 0 0-5-5z" />
         </svg>
       );
+    case TrackItemType.BRANCHING_SCENARIO:
+      // Fork
+      return (
+        <svg {...common}>
+          <path d="M12 21v-8" />
+          <path d="M12 13c0-4-6-3-6-8M12 13c0-4 6-3 6-8" />
+          <path d="M4 7l2-2 2 2M16 7l2-2 2 2" />
+        </svg>
+      );
     default:
       return null;
   }
