@@ -726,7 +726,9 @@ export const en = {
     toggleUpdateError: "Failed to update access",
     tenantAllowlistTitle: "Tenant allowlist",
     tenantAllowlistSubtitle:
-      "Restrict this admin to specific organizations. No organizations listed means unrestricted — they see every tenant.",
+      "Restrict this admin to specific organizations. No organizations listed means unrestricted — they see every tenant. While restricted, features that span every organization are off for them.",
+    platformOnlyWhileRestricted:
+      "Off while this admin is restricted to organizations — it spans every organization. The setting is kept for when the restriction is lifted.",
     loadingToggles: "Loading feature access...",
   },
   userManagement: {
