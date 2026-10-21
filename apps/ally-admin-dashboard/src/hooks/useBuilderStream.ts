@@ -4,6 +4,7 @@ import { toast } from "sonner";
 
 import { ApiEndpoints, en, HttpMethod, LOCAL_STORAGE_KEYS } from "@constants";
 import {
+  BuilderBriefResponse,
   BuilderChatMessage,
   BuilderDoneEvent,
   BuilderPrdDocument,
@@ -16,6 +17,7 @@ import {
 } from "@types";
 import { logger } from "@utils";
 
+import { normalizeBriefResponse, normalizeSituationBrief } from "../utils/builderBrief";
 import { normalizeTurnReceipt } from "../utils/builderReceipt";
 import { userTurnText } from "../utils/userTurnText";
 
@@ -80,6 +82,10 @@ export const mapServerMessagesToFeed = (
   /** Questions that will be rendered as their own card further down the feed. */
   const questionIds = new Set<string>();
 
+  /** Briefs rendered as their own card, and the answer each one got. */
+  const briefIds = new Set<string>();
+  const briefAnswers = new Map<string, BuilderBriefResponse>();
+
   for (const message of serverMessages) {
     const questionId = message.metadata?.questionId;
     if (message.role === "user" && questionId) {
@@ -91,6 +97,11 @@ export const mapServerMessagesToFeed = (
     for (const question of message.metadata?.questions ?? []) {
       questionIds.add(question.id);
     }
+    const brief = normalizeSituationBrief(message.metadata?.situationBrief);
+    if (brief) briefIds.add(brief.id);
+    const response =
+      message.role === "user" ? normalizeBriefResponse(message.metadata?.briefResponse) : null;
+    if (response) briefAnswers.set(response.briefId, response);
   }
 
   for (const message of serverMessages) {
@@ -110,7 +121,8 @@ export const mapServerMessagesToFeed = (
       // question is not here has nothing to render the text, and dropping it
       // would lose what the admin said.
       const answersARenderedCard =
-        Boolean(message.metadata?.questionId) && questionIds.has(message.metadata!.questionId!);
+        (Boolean(message.metadata?.questionId) && questionIds.has(message.metadata!.questionId!)) ||
+        briefIds.has(normalizeBriefResponse(message.metadata?.briefResponse)?.briefId ?? "");
       if (content && !answersARenderedCard) {
         feed.push({ id: `srv_${message.id}`, role: "user", content });
       }
@@ -145,6 +157,18 @@ export const mapServerMessagesToFeed = (
       });
     }
 
+    const brief = normalizeSituationBrief(message.metadata?.situationBrief);
+    if (brief) {
+      const answeredBrief = briefAnswers.get(brief.id);
+      feed.push({
+        id: `srv_${message.id}_brief_${brief.id}`,
+        role: "assistant",
+        content: "",
+        brief,
+        ...(answeredBrief ? { answeredBrief } : {}),
+      });
+    }
+
     for (const question of message.metadata?.questions ?? []) {
       const answered = answersByQuestionId.get(question.id);
       feed.push({
@@ -173,6 +197,8 @@ const cancelFrame = (handle: number): void => {
 export interface BuilderSendOptions {
   questionId?: string;
   answer?: BuilderStructuredAnswer;
+  /** An answer to the situation brief, line by line. */
+  briefResponse?: BuilderBriefResponse;
 }
 
 interface UseBuilderStreamOptions {
@@ -304,6 +330,24 @@ export const useBuilderStream = ({
           break;
         }
 
+        case "situation_brief": {
+          // The brief is its own card, after the message above it — like a question card.
+          flushTokens();
+          const brief = normalizeSituationBrief(event.data);
+          if (brief) {
+            setMessages(prev => [
+              ...prev,
+              {
+                id: `${assistantId}_brief_${brief.id}`,
+                role: "assistant",
+                content: "",
+                brief,
+              },
+            ]);
+          }
+          break;
+        }
+
         case "question": {
           flushTokens();
           const question = event.data;
@@ -406,6 +450,7 @@ export const useBuilderStream = ({
             message: text,
             ...(options?.questionId ? { questionId: options.questionId } : {}),
             ...(options?.answer ? { answer: options.answer } : {}),
+            ...(options?.briefResponse ? { briefResponse: options.briefResponse } : {}),
           },
           controller.signal,
         );
@@ -494,6 +539,20 @@ export const useBuilderStream = ({
             ...prev.map(message =>
               message === card
                 ? { ...message, answeredWith: trimmed, answeredAnswer: options?.answer }
+                : message,
+            ),
+            { id: assistantId, role: "assistant" as const, content: "", isStreaming: true },
+          ];
+        }
+        // A brief's answer is drawn on the brief, the same way.
+        const briefCard = options?.briefResponse
+          ? prev.find(message => message.brief?.id === options.briefResponse?.briefId)
+          : undefined;
+        if (briefCard) {
+          return [
+            ...prev.map(message =>
+              message === briefCard
+                ? { ...message, answeredBrief: options?.briefResponse }
                 : message,
             ),
             { id: assistantId, role: "assistant" as const, content: "", isStreaming: true },

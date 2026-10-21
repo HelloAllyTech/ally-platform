@@ -31,13 +31,14 @@ vi.mock("@ally-ui-mono/ui-shared", () => ({
       {children}
     </button>
   ),
-  CarbonToggle: ({ id, labelText, toggled, onToggle }: any) => (
+  CarbonToggle: ({ id, labelText, toggled, onToggle, disabled }: any) => (
     <label>
       {labelText}
       <input
         type="checkbox"
         aria-label={labelText}
         checked={toggled}
+        disabled={disabled}
         onChange={event => onToggle(event.target.checked)}
       />
     </label>
@@ -222,6 +223,57 @@ describe("BuilderSettings", () => {
 
       await vi.waitFor(() => expect(updateSettings).toHaveBeenCalled());
       expect(updateSettings.mock.calls[0][0]).not.toHaveProperty("validatedTurns");
+    });
+  });
+
+  describe("situation brief", () => {
+    const label = "Situation brief before the first question";
+
+    it("sits under validated turns, and saves its own switch", async () => {
+      settingsResult = {
+        data: { ...baseSettings, validatedTurns: true, situationBrief: true },
+        isLoading: false,
+        isError: false,
+      };
+      render(<BuilderSettings />);
+
+      expect(screen.getByLabelText(label)).toBeChecked();
+      expect(
+        screen.getByText(/shows you what already exists to confirm or correct/),
+      ).toBeInTheDocument();
+      fireEvent.click(screen.getByLabelText(label));
+      fireEvent.click(screen.getByText("Save"));
+
+      await vi.waitFor(() =>
+        expect(updateSettings).toHaveBeenCalledWith(
+          expect.objectContaining({ situationBrief: false, validatedTurns: true }),
+        ),
+      );
+    });
+
+    it("cannot be changed while validated turns are off — it needs them", () => {
+      settingsResult = {
+        data: { ...baseSettings, validatedTurns: false, situationBrief: true },
+        isLoading: false,
+        isError: false,
+      };
+      render(<BuilderSettings />);
+
+      expect(screen.getByLabelText(label)).toBeDisabled();
+    });
+
+    it("is neither shown nor sent by a server that predates it", async () => {
+      settingsResult = {
+        data: { ...baseSettings, validatedTurns: true },
+        isLoading: false,
+        isError: false,
+      };
+      render(<BuilderSettings />);
+
+      expect(screen.queryByLabelText(label)).not.toBeInTheDocument();
+      fireEvent.click(screen.getByText("Save"));
+      await vi.waitFor(() => expect(updateSettings).toHaveBeenCalled());
+      expect(updateSettings.mock.calls[0][0]).not.toHaveProperty("situationBrief");
     });
   });
 

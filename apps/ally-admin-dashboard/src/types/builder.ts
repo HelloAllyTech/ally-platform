@@ -271,6 +271,45 @@ export interface BuilderQuestionEvent {
   maxSelections?: number;
   /** Why this is being asked; rendered as a subtitle on the card. */
   rationale?: string;
+  /**
+   * Under the interview protocol: the kind of decision this asks for (scope, behaviour,
+   * priority, taste, contradiction). Its basis and why it is the admin's call are in `rationale`.
+   */
+  questionType?: string;
+}
+
+/**
+ * The situation brief: the opening turn of an interview under the protocol
+ * (builder_settings.situationBrief) — what already exists, what is already met, a proposal per
+ * part and the repos, each line confirmed or corrected by the admin. Mirrors ally-be's
+ * `BuilderSituationBrief`. Agent-adjacent JSON: read it through `normalizeSituationBrief`.
+ */
+export type BuilderBriefLineKind = "exists" | "alreadyMet" | "proposal" | "repo";
+
+export interface BuilderBriefLine {
+  /** X1… exists, M1… already met, P1… proposals, R1… repos. */
+  id: string;
+  kind: BuilderBriefLineKind;
+  text: string;
+  /** What the line rests on, ready to display: `capability_lookup "debrief" — …`. */
+  cites: { ref: string; label: string }[];
+  part?: string;
+  approach?: "reuse" | "extend" | "new";
+  repo?: string;
+}
+
+export interface BuilderSituationBrief {
+  id: string;
+  message: string;
+  lines: BuilderBriefLine[];
+  createdAt?: string;
+}
+
+/** The admin's answer to a brief, line by line. */
+export interface BuilderBriefResponse {
+  briefId: string;
+  lines: { id: string; verdict: "confirm" | "correct"; correction?: string }[];
+  note?: string;
 }
 
 /** Structured answer payload posted back with the next turn. */
@@ -320,6 +359,8 @@ export type BuilderStreamEvent =
   | { type: "readiness"; data: BuilderPrdReadiness }
   /** Once per turn, just before `done`. */
   | { type: "receipt"; data: BuilderTurnReceipt }
+  /** The opening turn's situation brief, under the interview protocol. */
+  | { type: "situation_brief"; data: BuilderSituationBrief }
   | { type: "error"; data: { code: string; message: string } }
   | { type: "done"; data: BuilderDoneEvent }
   | { type: "ping"; data: { at: number } };
@@ -329,6 +370,10 @@ export interface BuilderChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
+  /** A situation brief card. */
+  brief?: BuilderSituationBrief;
+  /** Set once the brief has been answered, so the card renders locked with the verdicts. */
+  answeredBrief?: BuilderBriefResponse;
   /**
    * Tool activity for this turn, shown as chips above the bubble. Live progress only: once the
    * turn's `receipt` lands the chips are cleared, and a reloaded row that has a receipt never gets
@@ -635,6 +680,11 @@ export interface BuilderSettings {
    * Absent from servers that predate it.
    */
   validatedTurns?: boolean;
+  /**
+   * The interview protocol: a discovery sweep and a situation brief before the first question,
+   * then the question gate. Needs `validatedTurns`. Absent from servers that predate it.
+   */
+  situationBrief?: boolean;
 }
 
 export type BuilderAutonomyLevel = "off" | "assist" | "auto_merge" | "auto" | "custom";

@@ -1,7 +1,8 @@
 import React from "react";
 
-import { BuilderChatMessage } from "@types";
+import { BuilderBriefResponse, BuilderChatMessage } from "@types";
 
+import { SituationBriefCard } from "./SituationBriefCard";
 import { TurnReceipt } from "./TurnReceipt";
 import {
   builderTransition,
@@ -51,6 +52,8 @@ interface ChatMessageProps {
   message: BuilderChatMessage;
   index: number;
   onAnswer: (payload: AgentAnswerPayload) => void;
+  /** The situation brief's answer, and the one line the feed shows for it. */
+  onAnswerBrief?: (response: BuilderBriefResponse, summary: string) => void;
   disabled?: boolean;
 }
 
@@ -63,7 +66,13 @@ interface ChatMessageProps {
  * than in the shared row because only Builder has receipts; a question card and the admin's own
  * messages never show one.
  */
-export const ChatMessage: React.FC<ChatMessageProps> = ({ message, index, onAnswer, disabled }) => {
+export const ChatMessage: React.FC<ChatMessageProps> = ({
+  message,
+  index,
+  onAnswer,
+  onAnswerBrief,
+  disabled,
+}) => {
   const entrance = prefersReducedMotion()
     ? undefined
     : {
@@ -71,6 +80,19 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, index, onAnsw
         animationDelay: `${staggerDelayMs(index)}ms`,
         transition: builderTransition(["opacity"]),
       };
+
+  if (message.brief) {
+    return (
+      <div style={entrance}>
+        <SituationBriefCard
+          brief={message.brief}
+          answered={message.answeredBrief}
+          onSubmit={(response, summary) => onAnswerBrief?.(response, summary)}
+          disabled={disabled || !onAnswerBrief}
+        />
+      </div>
+    );
+  }
 
   const showReceipt = message.role === "assistant" && !message.question && Boolean(message.receipt);
 

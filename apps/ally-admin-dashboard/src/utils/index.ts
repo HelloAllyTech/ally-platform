@@ -20,3 +20,4 @@ export * from "./agentReceipt";
 export * from "./characterData";
 export * from "./userTurnText";
 export * from "./builderReceipt";
+export * from "./builderBrief";

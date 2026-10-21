@@ -40,7 +40,12 @@ import {
 import { ErrorBoundary } from "@components/error-boundary";
 import { en, ROUTES } from "@constants";
 import { useBuilderStream } from "@hooks";
-import { BuilderPrdDocument, BuilderPrdReadiness, BuilderSessionStatus } from "@types";
+import {
+  BuilderBriefResponse,
+  BuilderPrdDocument,
+  BuilderPrdReadiness,
+  BuilderSessionStatus,
+} from "@types";
 import { asAgentText } from "@utils";
 
 import { BUILDER_STATUS_TAG_TYPE } from "./builderMotion";
@@ -265,6 +270,13 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
         questionId: payload.questionId,
         answer: payload.answer,
       });
+    },
+    [sendMessage],
+  );
+
+  const handleAnswerBrief = useCallback(
+    (response: BuilderBriefResponse, summary: string) => {
+      void sendMessage(summary, { briefResponse: response });
     },
     [sendMessage],
   );
@@ -595,6 +607,7 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
                         message={message}
                         index={index}
                         onAnswer={handleAnswer}
+                        onAnswerBrief={handleAnswerBrief}
                         disabled={isStreaming || isTerminal}
                       />
                     ))}
