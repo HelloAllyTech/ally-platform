@@ -55,10 +55,11 @@ class ReactionsRepository {
     String reviewId, {
     int offset = 0,
     int limit = 50,
+    String? reaction,
   }) async {
     final response = await _dio.get<Map<String, dynamic>>(
       '/scenario-session-reviews/$reviewId/reactions',
-      queryParameters: {'offset': offset, 'limit': limit},
+      queryParameters: {'offset': offset, 'limit': limit, 'reaction': ?reaction},
     );
     final data = response.data?['data'] as List<dynamic>? ?? [];
     return data
@@ -102,11 +103,9 @@ final reactionsRepositoryProvider = Provider<ReactionsRepository>((ref) {
   return ReactionsRepository(ref.watch(apiClientProvider));
 });
 
-final reactionsListProvider = FutureProvider.family<List<Reaction>, String>((
-  ref,
-  reviewId,
-) {
-  return ref.watch(reactionsRepositoryProvider).getReactions(reviewId);
+final reactionsListProvider =
+    FutureProvider.family<List<Reaction>, ({String reviewId, String? reaction})>((ref, args) {
+  return ref.watch(reactionsRepositoryProvider).getReactions(args.reviewId, reaction: args.reaction);
 });
 
 final reactionsCountProvider = FutureProvider.family<Map<String, int>, String>((
@@ -130,10 +129,11 @@ class ScribeReactionsRepository {
     String reviewId, {
     int offset = 0,
     int limit = 50,
+    String? reaction,
   }) async {
     final response = await _dio.get<Map<String, dynamic>>(
       '/scribe-session-reviews/$reviewId/reactions',
-      queryParameters: {'offset': offset, 'limit': limit},
+      queryParameters: {'offset': offset, 'limit': limit, 'reaction': ?reaction},
     );
     final data = response.data?['data'] as List<dynamic>? ?? [];
     return data
@@ -179,11 +179,11 @@ final scribeReactionsRepositoryProvider = Provider<ScribeReactionsRepository>((
   return ScribeReactionsRepository(ref.watch(apiClientProvider));
 });
 
-final scribeReactionsListProvider = FutureProvider.family<List<Reaction>, String>((
-  ref,
-  reviewId,
-) {
-  return ref.watch(scribeReactionsRepositoryProvider).getReactions(reviewId);
+final scribeReactionsListProvider =
+    FutureProvider.family<List<Reaction>, ({String reviewId, String? reaction})>((ref, args) {
+  return ref
+      .watch(scribeReactionsRepositoryProvider)
+      .getReactions(args.reviewId, reaction: args.reaction);
 });
 
 final scribeReactionsCountProvider =

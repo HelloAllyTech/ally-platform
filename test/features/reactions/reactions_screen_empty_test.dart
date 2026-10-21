@@ -13,7 +13,7 @@ void main() {
   testWidgets('shows an empty state and hides the counts row when there are no reactions yet',
       (tester) async {
     final repository = MockReactionsRepository();
-    when(() => repository.getReactions('rev-1')).thenAnswer((_) async => []);
+    when(() => repository.getReactions('rev-1', reaction: null)).thenAnswer((_) async => []);
     when(() => repository.getReactionsCount('rev-1')).thenAnswer((_) async => {});
 
     await pumpApp(

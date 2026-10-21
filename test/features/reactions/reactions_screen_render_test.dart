@@ -11,32 +11,48 @@ class MockReactionsRepository extends Mock implements ReactionsRepository {}
 // One test per file, same as the review-feature widget tests in this
 // directory — see `_review_details_test_fixtures.dart` for why.
 void main() {
-  testWidgets('renders the who-reacted list and the aggregate reaction counts', (tester) async {
-    final repository = MockReactionsRepository();
-    when(() => repository.getReactions('rev-1')).thenAnswer(
-      (_) async => [
-        Reaction(
-          reaction: '👍',
-          createdBy: ReactionUser(id: '1', name: 'Alex', profileImage: null),
-        ),
-        Reaction(
-          reaction: '❤️',
-          createdBy: ReactionUser(id: '2', name: 'Sam', profileImage: null),
-        ),
-      ],
-    );
-    when(() => repository.getReactionsCount('rev-1'))
-        .thenAnswer((_) async => {'👍': 1, '❤️': 1});
+  testWidgets(
+    'renders the who-reacted list with avatars, filter tabs, and re-fetches filtered when a tab is tapped',
+    (tester) async {
+      final repository = MockReactionsRepository();
+      when(() => repository.getReactions('rev-1', reaction: null)).thenAnswer(
+        (_) async => [
+          // Backend data is keyed by the unicode-codepoint reaction id —
+          // same contract as the thread-comment reaction picker.
+          Reaction(reaction: '1f44d', createdBy: ReactionUser(id: '1', name: 'Alex', profileImage: null)),
+          Reaction(reaction: '2764-fe0f', createdBy: ReactionUser(id: '2', name: 'Sam', profileImage: null)),
+        ],
+      );
+      when(() => repository.getReactions('rev-1', reaction: '1f44d')).thenAnswer(
+        (_) async => [
+          Reaction(reaction: '1f44d', createdBy: ReactionUser(id: '1', name: 'Alex', profileImage: null)),
+        ],
+      );
+      when(() => repository.getReactionsCount('rev-1')).thenAnswer((_) async => {'1f44d': 1, '2764-fe0f': 1});
 
-    await pumpApp(
-      tester,
-      const ReactionsScreen(reviewId: 'rev-1'),
-      overrides: [reactionsRepositoryProvider.overrideWithValue(repository)],
-    );
+      await pumpApp(
+        tester,
+        const ReactionsScreen(reviewId: 'rev-1'),
+        overrides: [reactionsRepositoryProvider.overrideWithValue(repository)],
+      );
 
-    expect(find.text('Alex'), findsOneWidget);
-    expect(find.text('Sam'), findsOneWidget);
-    expect(find.text('👍 1'), findsOneWidget);
-    expect(find.text('❤️ 1'), findsOneWidget);
-  });
+      // The "All" tab plus one tab per reaction, each showing its real
+      // glyph (mapped from the id) and count — not the invented
+      // add-reaction row a prior version of this screen had.
+      expect(find.text('All 2'), findsOneWidget);
+      expect(find.textContaining('👍'), findsWidgets);
+      expect(find.textContaining('❤️'), findsWidgets);
+      expect(find.text('Alex'), findsOneWidget);
+      expect(find.text('Sam'), findsOneWidget);
+
+      // Tapping the 👍 filter tab re-fetches the list scoped to that
+      // reaction id.
+      await tester.tap(find.text('1').first);
+      await tester.pumpAndSettle();
+
+      verify(() => repository.getReactions('rev-1', reaction: '1f44d')).called(1);
+      expect(find.text('Alex'), findsOneWidget);
+      expect(find.text('Sam'), findsNothing);
+    },
+  );
 }
