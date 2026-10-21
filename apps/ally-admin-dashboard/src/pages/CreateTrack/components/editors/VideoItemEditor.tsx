@@ -85,9 +85,14 @@ export const VideoItemEditor: FC<VideoItemEditorProps> = ({
 
   const handleLoadedMetadata = (event: React.SyntheticEvent<HTMLVideoElement>) => {
     const duration = event.currentTarget.duration;
-    if (Number.isFinite(duration) && duration > 0) {
-      setValue(`${base}.video.durationSeconds`, duration, { shouldDirty: true });
-    }
+    if (!Number.isFinite(duration) || duration <= 0) return;
+    // Opening a video item loads its metadata, which lands here on every visit.
+    // Re-saving the duration it already has is not an edit — and shouldDirty
+    // re-runs the whole-form dirty check, which flags the course as unsaved over
+    // unrelated, pre-existing differences. Only record a duration that is new
+    // or really changed (the player reports it to more precision than we store).
+    if (durationSeconds != null && Math.abs(durationSeconds - duration) < 0.01) return;
+    setValue(`${base}.video.durationSeconds`, duration, { shouldDirty: true });
   };
 
   const {
