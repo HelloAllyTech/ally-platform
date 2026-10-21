@@ -15,6 +15,7 @@ import {
 } from "@types";
 import { logger } from "@utils";
 
+import { normalizeAgentReceipt } from "../utils/agentReceipt";
 import { userTurnText } from "../utils/userTurnText";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
@@ -126,12 +127,14 @@ export const mapServerMessagesToFeed = (
     const errorText = errored
       ? (metadata.errorMessage ?? en.characterInterview.streamFailed)
       : undefined;
-    if (content || errored) {
+    const receipt = normalizeAgentReceipt(metadata.receipt);
+    if (content || errored || receipt) {
       feed.push({
         id: baseId,
         role: "assistant",
         content,
         ...(errorText ? { error: errorText } : {}),
+        ...(receipt ? { receipt } : {}),
       });
     }
     for (const question of Array.isArray(metadata.questions) ? metadata.questions : []) {
@@ -305,6 +308,15 @@ export const useCharacterInterviewStream = ({
           flushTokens();
           onCharacterDraft?.((event.data as CharacterDraftEvent).draft);
           break;
+        case "receipt": {
+          // What the turn did, built by the server; it replaces the notes the turn showed while
+          // it ran, as a reload of the row would.
+          flushTokens();
+          const receipt = normalizeAgentReceipt(event.data);
+          const id = currentAssistantIdRef.current;
+          if (receipt && id) patchAssistantMessage(id, { receipt, toolNotes: undefined });
+          break;
+        }
         case "error": {
           flushTokens();
           const id = currentAssistantIdRef.current;

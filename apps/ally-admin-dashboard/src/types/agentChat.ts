@@ -41,6 +41,34 @@ export interface AgentStructuredAnswer {
   none?: boolean;
 }
 
+/**
+ * What one agent turn read, searched, changed and failed at — composed by the server from what
+ * actually happened, so every string is ready to display. Mirrors ally-be's `AgentTurnReceipt`
+ * (`src/llm-agent/runtime`), which Course Copilot and the character interview send; Builder's own
+ * `BuilderTurnReceipt` adds the PRD version. Agent-adjacent JSON: read it through
+ * `normalizeAgentReceipt`.
+ */
+export interface AgentTurnReceipt {
+  /** Things read by name: `Guidance: Progressive Disclosure…`, `Item "Warm-up quiz"`. */
+  read: string[];
+  /** Lookups with what came back: `Library search "listening" (roleplay) — 3 matches`. */
+  searched: string[];
+  /** What the turn changed: `Brief: audience, outcomes`, `Course: Renamed section 2`. */
+  changed: string[];
+  /** Lookups and changes that failed: `Publish the course — Not ready to publish yet`. */
+  failed: string[];
+  /** Problems the reply was delivered with anyway. */
+  warnings: string[];
+  /** The agent's stated reason the person's own words changed nothing. */
+  unchangedBecause?: string;
+}
+
+/** Course Copilot's and the character interview's validated-turn switches (Settings → AI models). */
+export interface ValidatedAgentTurnsSettings {
+  courseCopilot: boolean;
+  characterInterview: boolean;
+}
+
 /** One rendered row in an agent chat feed. */
 export interface AgentChatMessage {
   id: string;

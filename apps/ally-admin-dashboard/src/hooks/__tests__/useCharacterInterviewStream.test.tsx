@@ -84,6 +84,31 @@ describe("mapServerMessagesToFeed", () => {
     expect(feed.filter(entry => entry.role === "user")).toHaveLength(0);
   });
 
+  it("rebuilds a turn's receipt", () => {
+    const feed = mapServerMessagesToFeed([
+      {
+        id: "a1",
+        seq: 1,
+        role: "assistant",
+        content: "Asha's draft is ready for your review.",
+        metadata: {
+          receipt: {
+            read: [],
+            searched: [],
+            changed: ["Character draft saved: Asha"],
+            failed: [],
+            warnings: [],
+          },
+        },
+      },
+      // Not a receipt: dropped rather than half-drawn.
+      { id: "a2", seq: 2, role: "assistant", content: "Hi", metadata: { receipt: "nope" } },
+    ] as never);
+
+    expect(feed[0].receipt?.changed).toEqual(["Character draft saved: Asha"]);
+    expect(feed[1].receipt).toBeUndefined();
+  });
+
   it("keeps an answer whose question is not in the feed", () => {
     // "The card could not be drawn" must never read as "the admin said nothing".
     const feed = mapServerMessagesToFeed([
@@ -173,6 +198,31 @@ describe("useCharacterInterviewStream — a refused turn", () => {
 
     expect(delivered).toBe(true);
     await waitFor(() => expect(result.current.messages).toHaveLength(2));
+  });
+
+  it("puts the turn's receipt on its bubble and drops the live tool notes", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          sseResponse([
+            'event: tool_call\ndata: {"name":"get_voices","input":{}}\n\n',
+            'event: token\ndata: {"delta":"Here are her voices."}\n\n',
+            'event: receipt\ndata: {"read":[],"searched":["Voices — 6 voices"],"changed":[],"failed":[],"warnings":[]}\n\n',
+            'event: done\ndata: {"messageSeq":2}\n\n',
+          ]),
+        ),
+    );
+    const { result } = renderHook(() => useCharacterInterviewStream({ sessionId: "sess-1" }));
+
+    await act(async () => {
+      await result.current.sendMessage("Pick a voice");
+    });
+
+    const assistant = result.current.messages.find(m => m.role === "assistant");
+    await waitFor(() => expect(assistant?.receipt?.searched).toEqual(["Voices — 6 voices"]));
+    expect(assistant?.toolNotes).toBeUndefined();
   });
 });
 

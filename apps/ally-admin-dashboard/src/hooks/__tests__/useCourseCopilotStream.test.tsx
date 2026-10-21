@@ -174,6 +174,30 @@ describe("mapServerMessagesToFeed", () => {
   });
 
   // Builder lesson: agent-authored arrays can be anything.
+  it("rebuilds a turn's receipt, and shows it instead of the tool notes", () => {
+    const feed = mapServerMessagesToFeed([
+      {
+        id: "a1",
+        seq: 1,
+        role: "assistant",
+        content: "I've noted the audience.",
+        toolResults: [{ toolUseId: "t1", name: "search_library", result: { summary: "Found 4" } }],
+        metadata: {
+          receipt: {
+            read: [],
+            searched: ['Library search "listening" (roleplay) — 4 matches'],
+            changed: ["Brief: audience"],
+            failed: [],
+            warnings: [],
+          },
+        },
+      },
+    ] as never);
+
+    expect(feed[0].receipt?.changed).toEqual(["Brief: audience"]);
+    expect(feed[0].toolNotes).toBeUndefined();
+  });
+
   it("survives agent-authored fields that are not arrays", () => {
     const feed = mapServerMessagesToFeed([
       {
@@ -359,6 +383,42 @@ describe("useCourseCopilotStream — frames", () => {
       "Added a quiz to section 2",
     ]);
     expect(assistant?.content).toBe("Done.");
+  });
+
+  it("puts the turn's receipt on its bubble and drops the live tool notes", async () => {
+    mockFetchOnce(
+      sseResponse([
+        frame("tool_call", { name: "search_library", input: {} }),
+        frame("tool_result", { name: "search_library", summary: "Found 4 matching roleplays" }),
+        frame("token", { delta: "Four roleplays match." }),
+        frame("receipt", {
+          read: [],
+          searched: ['Library search "listening" — 4 matches'],
+          changed: [],
+          failed: [],
+          warnings: [],
+          unchangedBecause: "they asked a question",
+        }),
+        DONE,
+      ]),
+    );
+    const { result } = renderHook(() => useCourseCopilotStream({ sessionId: "sess-1" }));
+
+    await act(async () => {
+      await result.current.sendMessage("Anything on listening?");
+    });
+
+    const assistant = result.current.messages.find(m => m.role === "assistant");
+    expect(assistant?.content).toBe("Four roleplays match.");
+    expect(assistant?.toolNotes).toBeUndefined();
+    expect(assistant?.receipt).toEqual({
+      read: [],
+      searched: ['Library search "listening" — 4 matches'],
+      changed: [],
+      failed: [],
+      warnings: [],
+      unchangedBecause: "they asked a question",
+    });
   });
 
   it("renders a question as its own card row", async () => {
