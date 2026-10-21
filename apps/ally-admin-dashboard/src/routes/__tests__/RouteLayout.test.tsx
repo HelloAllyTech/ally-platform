@@ -72,6 +72,7 @@ vi.mock("@pages", () => ({
   BuilderPipeline: () => <div>BuilderPipelinePage</div>,
   BuilderScoreboard: () => <div>BuilderScoreboardPage</div>,
   BuilderKnowledge: () => <div>BuilderKnowledgePage</div>,
+  BuilderEval: () => <div>BuilderEvalPage</div>,
   CourseCopilotSessions: () => <div>CourseCopilotSessionsPage</div>,
   CourseCopilotNew: () => <div>CourseCopilotNewPage</div>,
   CourseCopilotSession: () => <div>CourseCopilotSessionPage</div>,
@@ -137,6 +138,12 @@ describe("RouteLayout", () => {
     window.history.pushState({}, "", ROUTES.BUILDER_KNOWLEDGE);
     render(<RouteLayout />);
     expect(screen.getByText("BuilderKnowledgePage")).toBeInTheDocument();
+  });
+
+  it("renders Builder eval route", () => {
+    window.history.pushState({}, "", ROUTES.BUILDER_EVAL);
+    render(<RouteLayout />);
+    expect(screen.getByText("BuilderEvalPage")).toBeInTheDocument();
   });
 
   it("renders Course Copilot sessions route", () => {

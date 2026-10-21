@@ -27,6 +27,7 @@ import {
   AnnotationContent,
   AnnotationFormValue,
   ArticleContent,
+  BranchingScenarioContent,
   CompletionCriteria,
   FillBlankQuestion,
   GameContent,
@@ -63,6 +64,11 @@ import {
 } from "@types";
 
 import { unitsToSourceText } from "./annotationSegmentation";
+import {
+  createBranchingTemplate,
+  serializeBranching,
+  validateBranching,
+} from "./branchingScenario";
 
 const newId = () => crypto.randomUUID();
 
@@ -126,6 +132,8 @@ export const createItemOfType = (type: TrackItemType): TrackItemFormValue => {
       };
     case TrackItemType.GAME:
       return { ...base, game: { ...DEFAULT_GAME_CONTENT } };
+    case TrackItemType.BRANCHING_SCENARIO:
+      return { ...base, branching: createBranchingTemplate() };
     case TrackItemType.ROLEPLAY:
       return { ...base, scenarioId: null };
     case TrackItemType.CASE:
@@ -760,6 +768,13 @@ const validateItem = (item: TrackItemFormValue): string[] => {
       }
       break;
     }
+    case TrackItemType.BRANCHING_SCENARIO: {
+      // Same graph rules the server enforces, worded for the editor's own list.
+      validateBranching(item.branching).forEach(problem => {
+        errors.push(`Branching scenario: ${problem.message}`);
+      });
+      break;
+    }
   }
   return errors;
 };
@@ -989,6 +1004,9 @@ export const serializeItem = (item: TrackItemFormValue, order: number): TrackStr
       break;
     case TrackItemType.ANNOTATED_ARTIFACT:
       payload.content = item.annotation ? serializeAnnotation(item.annotation) : undefined;
+      break;
+    case TrackItemType.BRANCHING_SCENARIO:
+      payload.content = item.branching ? serializeBranching(item.branching) : undefined;
       break;
     case TrackItemType.GAME:
       payload.content = item.game
@@ -1321,6 +1339,20 @@ export const deserializeTrack = (detail: TrackDetail): TrackFormValues => ({
                     }
                   : {}),
               };
+              break;
+            }
+            case TrackItemType.BRANCHING_SCENARIO: {
+              const branching = item.content as BranchingScenarioContent | undefined;
+              formItem.branching = branching
+                ? {
+                    ...branching,
+                    intro: branching.intro ?? "",
+                    settings: {
+                      passScore: branching.settings?.passScore ?? 0,
+                      maxAttempts: branching.settings?.maxAttempts ?? null,
+                    },
+                  }
+                : createBranchingTemplate();
               break;
             }
             case TrackItemType.ANNOTATED_ARTIFACT: {

@@ -11,6 +11,7 @@ import {
   useGetBuilderRunsQuery,
   useGetBuilderSessionQuery,
   usePatchBuilderPrdMutation,
+  useDismissBuilderReviewFindingMutation,
   useStartBuilderBuildMutation,
 } from "@api";
 import type { AgentAnswerPayload } from "@components/agent-chat";
@@ -178,6 +179,7 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
   }, [sessionStatus, sessionId, refetchRuns, refetchMilestones]);
   const [startBuild, { isLoading: isContinuing }] = useStartBuilderBuildMutation();
   const [patchPrd] = usePatchBuilderPrdMutation();
+  const [dismissReviewFinding] = useDismissBuilderReviewFindingMutation();
   const [cancelSession, { isLoading: isCancelling }] = useCancelBuilderSessionMutation();
 
   const [prd, setPrd] = useState<BuilderPrdDocument | null>(null);
@@ -284,6 +286,18 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
       }
     },
     [patchPrd, sessionId, strings.prd.saveFailed],
+  );
+
+  // A dismissal can be the last thing between the PRD and ready, so the
+  // status moves with the readiness rather than waiting for the next turn.
+  // Failures are surfaced by the findings list, which keeps the reason typed.
+  const handleDismissFinding = useCallback(
+    async (findingId: string, reason: string) => {
+      const result = await dismissReviewFinding({ id: sessionId, findingId, reason }).unwrap();
+      setReadiness(result.readiness);
+      setStatus(result.status);
+    },
+    [dismissReviewFinding, sessionId],
   );
 
   const handleCancel = useCallback(async () => {
@@ -552,6 +566,7 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
                   editable={prdEditable}
                   lockedReason={prdLockedReason}
                   onSaveSection={handleSaveSection}
+                  onDismissFinding={handleDismissFinding}
                   sessionTitle={session.title}
                   repos={session.repos ?? []}
                   createdByName={session.createdByName}
@@ -639,6 +654,7 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
                   editable={prdEditable}
                   lockedReason={prdLockedReason}
                   onSaveSection={handleSaveSection}
+                  onDismissFinding={handleDismissFinding}
                   sessionTitle={session.title}
                   repos={session.repos ?? []}
                   createdByName={session.createdByName}
@@ -694,6 +710,7 @@ export const BuilderSession: React.FC<BuilderSessionProps> = ({
               editable={prdEditable}
               lockedReason={prdLockedReason}
               onSaveSection={handleSaveSection}
+              onDismissFinding={handleDismissFinding}
               sessionTitle={session.title}
               repos={session.repos ?? []}
               createdByName={session.createdByName}

@@ -59,6 +59,7 @@ const KIND_TITLE_KEY: Record<TrackItemType, string> = {
   [TrackItemType.JOURNAL]: "courseLanding.story.howItPlays.kinds.journal",
   [TrackItemType.ANNOTATED_ARTIFACT]: "courseLanding.story.howItPlays.kinds.annotation",
   [TrackItemType.GAME]: "courseLanding.story.howItPlays.kinds.game",
+  [TrackItemType.BRANCHING_SCENARIO]: "courseLanding.story.howItPlays.kinds.scenario",
 };
 
 /**

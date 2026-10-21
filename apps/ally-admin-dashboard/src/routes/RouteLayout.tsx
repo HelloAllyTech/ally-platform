@@ -38,6 +38,7 @@ import {
   MobileReleases,
   BugHunter,
   Builder,
+  BuilderEval,
   BuilderKnowledge,
   BuilderPipeline,
   BuilderScoreboard,
@@ -494,6 +495,14 @@ export const RouteLayout: React.FC = () => {
           element={
             <PrivateLayout requiredFeature={FeatureToggleKey.BUILDER}>
               <BuilderKnowledge />
+            </PrivateLayout>
+          }
+        />
+        <Route
+          path={ROUTES.BUILDER_EVAL}
+          element={
+            <PrivateLayout requiredFeature={FeatureToggleKey.BUILDER}>
+              <BuilderEval />
             </PrivateLayout>
           }
         />

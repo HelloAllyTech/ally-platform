@@ -181,12 +181,62 @@ export interface BuilderPrdReadinessSection {
   detail?: string;
 }
 
+export type BuilderPrdReviewCategory =
+  | "contradiction"
+  | "unsupported_claim"
+  | "unapplied_correction"
+  | "missed_reuse"
+  | "missing_success_metric";
+
+/** One thing the cold PRD reviewer objected to. Mirrors ally-be's BuilderPrdReviewFinding. */
+export interface BuilderPrdReviewFinding {
+  /** "F1", "F2"… */
+  id: string;
+  category: BuilderPrdReviewCategory;
+  /** The PRD key it is about — a key of `en.builder.prd.sections`. */
+  section: string;
+  detail: string;
+  fix: string;
+  quote?: string;
+  status: "open" | "fixed" | "dismissed";
+  raisedInVersion: number;
+  fixedInVersion?: number;
+  /** The recheck's one line on why it reads resolved, or still open. */
+  checkNote?: string;
+  dismissal?: {
+    reason: string;
+    by: number;
+    at: string;
+    /** `interview` when the agent recorded the admin's own words. */
+    via: "admin" | "interview";
+  };
+}
+
+/**
+ * The cold reviewer's record on the PRD. It runs once, the first time every
+ * other readiness row passes; each open finding then blocks until a recheck
+ * finds it fixed or someone dismisses it with a reason.
+ */
+export interface BuilderPrdReview {
+  /** `failed`: the reviewer itself could not run. That does not block. */
+  status: "done" | "failed";
+  versionNumber: number;
+  checkedVersion: number;
+  model: string | null;
+  reviewedAt: string;
+  checkedAt: string;
+  findings: BuilderPrdReviewFinding[];
+  error?: string | null;
+}
+
 export interface BuilderPrdReadiness {
   score: number;
   ready: boolean;
   sections: BuilderPrdReadinessSection[];
   /** `hint` + `detail` per blocked section. Counted here, not read. */
   blockers: string[];
+  /** Null before the first review; absent from servers that predate it. */
+  review?: BuilderPrdReview | null;
 }
 
 export interface BuilderPrdVersion {
@@ -597,6 +647,18 @@ export interface PatchBuilderPrdRequest {
   changeSummary?: string;
 }
 
+export interface DismissBuilderReviewFindingRequest {
+  id: string;
+  findingId: string;
+  reason: string;
+}
+
+export interface DismissBuilderReviewFindingResponse {
+  readiness: BuilderPrdReadiness;
+  /** The session status after re-scoring — a dismissal can make the PRD ready. */
+  status: BuilderSessionStatus;
+}
+
 export interface PatchBuilderPrdResponse {
   prd: BuilderPrdDocument;
   readiness: BuilderPrdReadiness;
@@ -766,4 +828,237 @@ export interface BuilderExemplar {
   failureTags: string[];
   summaryMd: string;
   createdAt: string;
+}
+
+/* ── Replay eval ────────────────────────────────────────────────────────────
+ * Shapes of ally-be's `src/builder/eval`. A fixture is a recorded interview
+ * (or one PRD) the eval plays again; a suite is fixtures run a few times; a
+ * run is one fixture played once. Fixtures hold what a production admin typed,
+ * so they live in the database of the environment they were made in. */
+
+export type BuilderEvalFixtureKind = "interview" | "prd_review";
+
+export type BuilderEvalChecklistKind = "must" | "must_not";
+
+/** One line of ground truth a correct PRD must (or must not) satisfy. */
+export interface BuilderEvalChecklistItem {
+  /** "C1", "C2"… — what the simulated admin and the judge cite. */
+  id: string;
+  text: string;
+  kind: BuilderEvalChecklistKind;
+}
+
+export interface BuilderEvalInterviewPayload {
+  openingMessage: string;
+  adminScript: string[];
+  checklist: BuilderEvalChecklistItem[];
+  handoffContext?: string | null;
+  recordedPrd?: BuilderPrdDocument | null;
+  pins?: Record<string, string>;
+  maxTurns?: number;
+}
+
+export interface BuilderEvalPrdReviewPayload {
+  prd: BuilderPrdDocument;
+  evidence?: { readOk: string[]; readFailed: string[] };
+  transcript?: { role: "admin" | "builder"; text: string }[];
+  /** `blocking: true` is a seeded defect; `false` is a clean control. */
+  expect: { blocking: boolean; via?: string };
+}
+
+export type BuilderEvalPayload = BuilderEvalInterviewPayload | BuilderEvalPrdReviewPayload;
+
+export interface BuilderEvalFixture {
+  id: string;
+  name: string;
+  kind: BuilderEvalFixtureKind;
+  sourceSessionId: string | null;
+  payload: BuilderEvalPayload;
+  notes: string | null;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** What `GET fixtures/export` returns and `POST fixtures/import` takes (its `fixtures`). */
+export interface BuilderEvalFixtureExport {
+  version: number;
+  fixtures: Partial<BuilderEvalFixture>[];
+}
+
+export interface BuilderEvalImportResult {
+  created: number;
+  updated: number;
+}
+
+/** The deterministic checks. A passing run has every count at zero and both booleans true. */
+export interface BuilderEvalGates {
+  unseenFailures: number;
+  askedBeforeReading: number;
+  unrepairedEditFailures: number;
+  falseUpdateClaims: number;
+  consistent: boolean;
+  evidenceCited: boolean;
+}
+
+export interface BuilderEvalMetrics {
+  turns: number;
+  questions: number;
+  corrections: number;
+  correctedItems: string[];
+  readyReached: boolean;
+  readinessScore: number;
+  toolCalls: number;
+  toolFailures: number;
+  costUsd: number;
+  durationMs: number;
+}
+
+export interface BuilderEvalJudgement {
+  met: number;
+  total: number;
+  /** met / total, 0..1; 1 when the checklist is empty. */
+  score: number;
+  items: { id: string; met: boolean; evidence: string }[];
+  model?: string | null;
+  error?: string | null;
+}
+
+/** For a `prd_review` fixture: what the critic did with the PRD. */
+export interface BuilderEvalCriticOutcome {
+  blockingRows: string[];
+  findings: { id: string; category: string; detail: string }[];
+  asExpected: boolean;
+}
+
+/** One turn of a replay. `correction` marks a turn where the simulated admin corrected Builder. */
+export interface BuilderEvalTurnRecord {
+  turn: number;
+  admin: string;
+  correction?: boolean;
+  builder: string;
+  question?: string | null;
+  toolCalls: { name: string; ok: boolean; summary?: string }[];
+}
+
+export type BuilderEvalRunStatus = "queued" | "running" | "passed" | "failed" | "errored";
+
+export interface BuilderEvalRun {
+  id: string;
+  suiteId?: string;
+  fixtureId: string;
+  /** 1-based. */
+  repetition: number;
+  status: BuilderEvalRunStatus;
+  gates: BuilderEvalGates | null;
+  metrics: BuilderEvalMetrics | null;
+  judge: BuilderEvalJudgement | null;
+  critic: BuilderEvalCriticOutcome | null;
+  transcript: BuilderEvalTurnRecord[] | null;
+  finalPrd: BuilderPrdDocument | null;
+  error: string | null;
+  startedAt?: string | null;
+  completedAt?: string | null;
+}
+
+export type BuilderEvalSuiteStatus = "running" | "completed" | "errored";
+
+export type BuilderEvalSuiteTrigger = "manual" | "baseline" | "prompt_gate";
+
+export interface BuilderEvalSuiteFixtureSummary {
+  fixtureId: string;
+  name: string;
+  kind: BuilderEvalFixtureKind;
+  runs: number;
+  passed: number;
+  gateViolations: number;
+  corrections: number;
+  judgeScore: number | null;
+}
+
+export interface BuilderEvalSuiteSummary {
+  fixtures: BuilderEvalSuiteFixtureSummary[];
+  runs: number;
+  passed: number;
+  errored: number;
+  gateViolations: number;
+  corrections: number;
+  judgeScore: number | null;
+  costUsd: number;
+}
+
+/** What a prompt-gate suite decided, and against what. */
+export interface BuilderEvalVerdict {
+  pass: boolean;
+  reasons: string[];
+  baselineSuiteId: string | null;
+}
+
+/** What a prompt-gate suite publishes if it passes. */
+export interface BuilderEvalPromptCandidate {
+  promptCode: string;
+  content?: string | null;
+  provider?: string | null;
+  model?: string | null;
+  temperature?: number | null;
+}
+
+export interface BuilderEvalSuite {
+  id: string;
+  trigger: BuilderEvalSuiteTrigger;
+  status: BuilderEvalSuiteStatus;
+  fixtureIds: string[];
+  repetitions: number;
+  candidate: BuilderEvalPromptCandidate | null;
+  summary: BuilderEvalSuiteSummary | null;
+  verdict: BuilderEvalVerdict | null;
+  publishedAt: string | null;
+  error: string | null;
+  createdAt: string;
+  completedAt: string | null;
+}
+
+export interface BuilderEvalSuiteDetail extends BuilderEvalSuite {
+  runs: BuilderEvalRun[];
+}
+
+export interface StartBuilderEvalSuiteRequest {
+  fixtureIds?: string[];
+  /** 1–10; the backend defaults to 3. */
+  repetitions?: number;
+}
+
+export interface SubmitBuilderEvalPromptCandidateRequest extends StartBuilderEvalSuiteRequest {
+  promptCode: string;
+  /** The new prompt text. Absent when only the model settings change. */
+  content?: string;
+  /** Empty string clears the override. */
+  provider?: string;
+  /** Empty string clears the override. */
+  model?: string;
+  /** `null` clears the override; a number sets it (0–2). */
+  temperature?: number | null;
+}
+
+export interface CreateBuilderEvalFixtureFromSessionRequest {
+  sessionId: string;
+  name: string;
+  checklist?: Pick<BuilderEvalChecklistItem, "text" | "kind">[];
+  notes?: string;
+}
+
+export interface CreateBuilderEvalFixtureFromExportRequest {
+  name: string;
+  /** The body of `GET /v1/builder/sessions/:id` from another environment. */
+  session: Record<string, unknown>;
+  checklist?: Pick<BuilderEvalChecklistItem, "text" | "kind">[];
+  notes?: string;
+}
+
+export interface UpdateBuilderEvalFixtureRequest {
+  id: string;
+  name?: string;
+  notes?: string;
+  active?: boolean;
+  checklist?: BuilderEvalChecklistItem[];
 }

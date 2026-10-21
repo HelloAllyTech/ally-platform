@@ -31,6 +31,7 @@ export * from "./blog";
 export * from "./productUpdates";
 export * from "./aiLab";
 export * from "./builder";
+export * from "./builderEval";
 export * from "./evaluatorPortal";
 export * from "./productRoadmap";
 export * from "./whatsappBot";

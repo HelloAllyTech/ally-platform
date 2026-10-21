@@ -17,6 +17,7 @@ export enum TrackItemType {
   JOURNAL = "JOURNAL",
   ANNOTATED_ARTIFACT = "ANNOTATED_ARTIFACT",
   GAME = "GAME",
+  BRANCHING_SCENARIO = "BRANCHING_SCENARIO",
 }
 
 /**
@@ -88,6 +89,7 @@ export interface VideoInterjection {
 export interface JournalPromptDef {
   id: string; // uuid
   prompt: string;
+  promptHtml?: string;
   required?: boolean;
   placeholder?: string;
 }
@@ -138,6 +140,7 @@ export interface QuestionMedia {
 interface QuizQuestionBase {
   id: string; // uuid
   prompt: string;
+  promptHtml?: string;
   explanation?: string;
   points?: number; // default 1
   /** Optional picture or clip shown above the answer controls. */
@@ -329,13 +332,58 @@ export interface BreathingExerciseContent {
   holdOutText: string;
 }
 
+/* ---- Branching scenario (BRANCHING_SCENARIO) ---- */
+
+export type BranchingOutcomeTone = "POSITIVE" | "MIXED" | "NEGATIVE";
+
+export interface BranchingImage {
+  /** An uploaded file (https). */
+  url: string;
+  alt?: string;
+}
+
+export interface BranchingChoice {
+  id: string;
+  text: string;
+  /** The scene this choice leads to; "" while the trainer has not picked one yet. */
+  nextNodeId: string;
+}
+
+/** A scene with no choices is an ending; only endings carry outcome/score/takeaway. */
+export interface BranchingNode {
+  id: string;
+  title?: string;
+  text: string;
+  image?: BranchingImage;
+  choices?: BranchingChoice[];
+  outcome?: BranchingOutcomeTone;
+  /** 0-100; defaults from `outcome` (100 / 50 / 0) when absent. */
+  score?: number;
+  takeaway?: string;
+}
+
+export interface BranchingScenarioSettings {
+  /** 0-100; 0 or absent = ungated. Server mirrors it into completionCriteria.passScore. */
+  passScore?: number;
+  /** null = unlimited. */
+  maxAttempts?: number | null;
+}
+
+export interface BranchingScenarioContent {
+  intro?: string;
+  settings?: BranchingScenarioSettings;
+  startNodeId: string;
+  nodes: BranchingNode[];
+}
+
 export type TrackItemContent =
   | ArticleContent
   | VideoContent
   | JournalContent
   | QuizContent
   | AnnotationContent
-  | GameContent;
+  | GameContent
+  | BranchingScenarioContent;
 
 export interface CompletionCriteria {
   /** Roleplay, 0 or above (score depends on configured behaviours and can exceed 100). */
@@ -714,6 +762,7 @@ export interface TrackItemFormValue {
   quiz?: QuizContent;
   annotation?: AnnotationFormValue;
   game?: GameContent;
+  branching?: BranchingScenarioContent;
   completionCriteria: CompletionCriteria;
   /** Per-item "Enable discussion" switch; defaults off. */
   hasDiscussion?: boolean;

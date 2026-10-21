@@ -1702,6 +1702,11 @@
             "title_one": "Game",
             "title_other": "Games",
             "hint": "Just for fun"
+          },
+          "scenario": {
+            "title_one": "Scenario",
+            "title_other": "Scenarios",
+            "hint": "Choose, then see what happens"
           }
         }
       },
@@ -1797,7 +1802,8 @@
       "lines_other": "{{count}} lines",
       "labels": "{{count}} label",
       "labels_other": "{{count}} labels",
-      "game": "Game · just for fun"
+      "game": "Game · just for fun",
+      "branching": "Scenario quiz"
     },
     "continueLearning": {
       "label": "Continue learning"
@@ -1962,6 +1968,28 @@
         "missed_other": "{{count}} missed",
         "notHere": "{{count}} marked in error",
         "notHere_other": "{{count}} marked in error"
+      }
+    },
+    "branching": {
+      "sceneHeading": "Scene",
+      "choicesLabel": "Your choices",
+      "youChose": "You chose: {{choice}}",
+      "endingsSeen": "{{seen}} of {{total}} endings seen",
+      "takeaway": "Takeaway",
+      "scoreVsPass": "Your score: {{score}}% (pass mark {{pass}}%)",
+      "passed": "You passed.",
+      "notPassed": "Not quite there yet.",
+      "attemptsLeft": "{{count}} attempt left",
+      "attemptsLeft_other": "{{count}} attempts left",
+      "attemptsExhausted": "You've used all attempts for this scenario. Ask your trainer for help.",
+      "saving": "Saving your result…",
+      "continueCourse": "Continue course",
+      "tryAgain": "Try again",
+      "playAgain": "Play again",
+      "outcome": {
+        "POSITIVE": "Good outcome",
+        "MIXED": "Mixed outcome",
+        "NEGATIVE": "Difficult outcome"
       }
     },
     "game": {

@@ -3,6 +3,7 @@ import { FC, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
+import { RichTextRenderer, htmlToPlainText } from "@ally-ui-mono/ui-shared";
 import { useSubmitArticleQuestionAnswerMutation } from "@api";
 import { ArticleQuestion, SubmitArticleQuestionAnswerResponse } from "@types";
 
@@ -101,7 +102,16 @@ export const ArticleQuestionCard: FC<ArticleQuestionCardProps> = ({
       <p className="mb-2 text-xs font-medium uppercase tracking-wide text-typography-600">
         {t("tracks2.article.question.title")}
       </p>
-      <h3 className="mb-4 text-[1em] font-semibold text-typography-900">{question.prompt}</h3>
+      <div className="mb-4 text-[1em] font-semibold text-typography-900">
+        {question.promptHtml && htmlToPlainText(question.promptHtml).trim().length > 0 ? (
+          <RichTextRenderer
+            content={question.promptHtml}
+            className="!text-[1em] !font-semibold !text-typography-900"
+          />
+        ) : (
+          question.prompt
+        )}
+      </div>
       <QuestionMedia media={question.media} />
 
       <div className="flex flex-col gap-2" role="radiogroup">

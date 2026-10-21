@@ -3569,6 +3569,7 @@ export const en = {
     pipelineLink: "Pipeline",
     scoreboardLink: "Scoreboard",
     knowledgeLink: "Knowledge",
+    evalLink: "Replay eval",
     noMatchingSessions: "Nothing matches this filter.",
 
     // Session states, as a person would say them
@@ -3642,6 +3643,34 @@ export const en = {
       noRequirements: "No requirements captured yet.",
       noAssumptions: "Nothing assumed so far.",
       noOpenQuestions: "Nothing outstanding.",
+      // The cold reviewer: a second model that reads the PRD the first time it
+      // reads ready. Its findings block "Start build" until fixed or dismissed.
+      review: {
+        heading: "Review findings",
+        tooltip:
+          "A second AI reads the PRD the first time everything else passes, against what the interview actually read and heard. Each finding blocks the build until the PRD is fixed (it rechecks after each change) or you dismiss it with a reason. Your reasons are kept — they're how the reviewer gets corrected.",
+        categories: {
+          contradiction: "Contradiction",
+          unsupported_claim: "Unsupported claim",
+          unapplied_correction: "Correction not applied",
+          missed_reuse: "Missed reuse",
+          missing_success_metric: "No success metric",
+        } as Record<string, string>,
+        fixLabel: "Fix:",
+        sectionLabel: (section: string) => `In ${section}`,
+        dismiss: "Dismiss",
+        dismissPlaceholder: "Why is this finding wrong?",
+        dismissHint: (min: number) => `At least ${min} characters — the reason is kept.`,
+        confirmDismiss: "Dismiss finding",
+        dismissFailed: "Couldn't dismiss that finding.",
+        resolvedHeading: (count: number) => `Resolved (${count})`,
+        fixed: "Fixed",
+        dismissed: "Dismissed",
+        dismissedBecause: (reason: string) => `Dismissed: "${reason}"`,
+        failed:
+          "The review couldn't run this time. It tries again on the next change — until then it doesn't block.",
+        clean: "Reviewed — nothing to fix.",
+      },
       export: {
         // "Download" rather than "Export": the file lands in the browser's
         // downloads folder, and nothing is sent anywhere.
@@ -4402,6 +4431,388 @@ export const en = {
         loadFailed: "Couldn't load Builder's exemplars.",
         empty: "No exemplars recorded yet.",
         noFailureTags: "No failure tags recorded.",
+      },
+    },
+
+    // Replay eval — the recorded interviews Builder is judged on, the suites that
+    // play them, and the gate that lets a Builder prompt change go live only if it
+    // passes. Voice: the app speaking about itself, plain and specific; the cost is
+    // named before it is spent.
+    eval: {
+      title: "Builder replay eval",
+      subtitle:
+        "Replays recorded interviews through Builder's real interview loop and scores what happens. Changes to Builder's interviewer prompts go live only when they pass here.",
+      backToBuilder: "Back to Builder",
+      tabSuites: "Suites",
+      tabFixtures: "Fixtures",
+      retry: "Retry",
+      cancel: "Cancel",
+
+      kind: {
+        interview: "Interview",
+        prd_review: "PRD review",
+      } as Record<string, string>,
+      trigger: {
+        manual: "Manual",
+        baseline: "Baseline",
+        prompt_gate: "Prompt gate",
+      } as Record<string, string>,
+      suiteStatus: {
+        running: "Running",
+        completed: "Completed",
+        errored: "Errored",
+      } as Record<string, string>,
+
+      // Said in the open, on the page and in the dialogs that create fixtures: a
+      // fixture is a person's words, and the repos are public.
+      privacy: {
+        title: "Fixtures hold production admin text",
+        body: "A fixture is what a real admin typed to Builder. Fixtures live in this environment's database and are never committed to a repo. They leave it only when you export them.",
+        short: "A fixture holds what a real admin typed. It stays in this environment's database.",
+      },
+
+      gates: {
+        unseenFailures: {
+          label: "Unseen tool failures",
+          hint: "Tool calls that failed in the same batch as the question that ended the turn, so the reply was written without seeing them.",
+        },
+        askedBeforeReading: {
+          label: "Asked before reading",
+          hint: "Batches that asked the admin a question while research results were still unread.",
+        },
+        unrepairedEditFailures: {
+          label: "Unrepaired edit failures",
+          hint: "PRD edits that failed with no successful edit after them in the same turn.",
+        },
+        falseUpdateClaims: {
+          label: "False update claims",
+          hint: "Turns whose reply says the PRD changed while no edit succeeded.",
+        },
+        consistent: {
+          label: "PRD consistent",
+          hint: "The final PRD's test plan, requirement homes and mobile twins agree with each other.",
+        },
+        evidenceCited: {
+          label: "Evidence cited",
+          hint: "What already exists rests on files the replay actually read.",
+        },
+      },
+
+      checklist: {
+        heading: "Checklist",
+        hint: "What a correct PRD contains. Must: the final PRD says this. Must not: the PRD must not say or plan this. The simulated admin corrects Builder wherever the checklist contradicts it, and the judge scores the PRD against it.",
+        empty:
+          "No checklist yet. Without one the fixture still runs and its gates still count, but the judge has nothing to score.",
+        kindLabel: (id: string) => `Kind of item ${id}`,
+        kindMust: "Must say",
+        kindMustNot: "Must not say",
+        textLabel: (id: string) => `Checklist item ${id}`,
+        placeholderMust: "e.g. Reuses Auto-improve rather than a new challenger job",
+        placeholderMustNot: "e.g. Plans a new table when an existing one already holds this",
+        remove: (id: string) => `Remove item ${id}`,
+        add: "Add item",
+        limit: (max: number) => `A fixture holds at most ${max} items.`,
+      },
+
+      fixtures: {
+        caption:
+          "The recorded interviews a suite plays. Inactive fixtures are kept but left out of a suite that names none.",
+        fromSession: "From a session",
+        paste: "Paste an export",
+        export: "Export",
+        columnName: "Name",
+        columnKind: "Kind",
+        columnChecklist: "Checklist",
+        columnActive: "Active",
+        columnNote: "Note",
+        checklistNotApplicable: "—",
+        checklistEmpty: "None yet",
+        activeLabel: (name: string) => `Include "${name}" in suites`,
+        noNote: "No note",
+        edit: "Edit",
+        emptyTitle: "No fixtures yet",
+        emptyBody:
+          "Save a Builder session as a fixture, or paste an export from another environment. Then write its checklist.",
+        loadFailed: "Couldn't load the fixtures.",
+        toggleFailed: "Couldn't change that fixture.",
+        exportFailed: "Couldn't export the fixtures.",
+        exportFilename: (date: Date) =>
+          `builder-eval-fixtures-${date.toISOString().slice(0, 10)}.json`,
+      },
+
+      fixturePanel: {
+        title: "Fixture",
+        close: "Close",
+        sourceSession: (shortId: string) => `Cut from session ${shortId}`,
+        openSession: "Open session",
+        nameLabel: "Name",
+        notesLabel: "Note",
+        notesHelper: 'Why it is in the set: the failure it reproduces, or "clean control".',
+        recordedHeading: "What the admin said",
+        recordedHint: "Read-only. The opening message the simulated admin starts from.",
+        noOpeningMessage: "No opening message recorded.",
+        scriptSummary: (count: number) =>
+          count === 1 ? "1 reply after the opening" : `${count} replies after the opening`,
+        expectHeading: "What the critic should do",
+        expectUnknown: "This fixture does not say what the critic should do.",
+        expectBlocking: (via: string | null) =>
+          via
+            ? `Block on this PRD, through "${via}". It is a seeded defect.`
+            : "Block on this PRD. It is a seeded defect.",
+        expectClean: "Not block on this PRD. It is a clean control.",
+        expectReadOnly:
+          "A PRD-review fixture has no checklist; its expectation is set when it is created.",
+        save: "Save changes",
+        saving: "Saving…",
+        saved: "Fixture saved.",
+        saveFailed: "Couldn't save that fixture.",
+        delete: "Delete fixture",
+        deleteConfirmTitle: "Delete this fixture and its runs?",
+        deleteConfirmBody:
+          "Past suites keep their totals, but the runs of this fixture are removed. This can't be undone.",
+        deleteConfirm: "Delete",
+        cancel: "Cancel",
+        deleted: "Fixture deleted.",
+        deleteFailed: "Couldn't delete that fixture.",
+      },
+
+      fromSession: {
+        title: "Save a session as a fixture",
+        intro:
+          "Cuts a Builder session in this environment into a fixture: the admin's opening message and everything they said after it. Write its checklist next.",
+        sessionLabel: "Session",
+        loading: "Loading sessions…",
+        choose: "Choose a session…",
+        none: "No sessions to choose from",
+        option: (title: string, status: string, createdAt: string) => {
+          const date = new Date(createdAt);
+          const when = Number.isNaN(date.getTime())
+            ? ""
+            : ` · ${date.toLocaleDateString(undefined, { day: "numeric", month: "short" })}`;
+          return `${title} (${status})${when}`;
+        },
+        loadFailed: "Couldn't load your sessions.",
+        nameLabel: "Fixture name",
+        nameHelper: "Unique. Say which failure it reproduces.",
+        notesLabel: "Note (optional)",
+        notesHelper: "Why it is in the set.",
+        submit: "Save as fixture",
+        saving: "Saving…",
+        created: "Fixture saved. Write its checklist next.",
+        failed: "Couldn't save that session as a fixture.",
+      },
+
+      paste: {
+        title: "Paste an export",
+        intro:
+          "Paste a fixtures export from another environment, or a session copied from its Builder session endpoint.",
+        jsonLabel: "Export JSON",
+        jsonPlaceholder: '{ "version": 1, "fixtures": [ … ] }',
+        invalid: {
+          notJson: "That isn't valid JSON.",
+          unrecognised:
+            'Not a fixtures export (an object with a "fixtures" list) or a session (an object with "messages").',
+          noFixtures: "That export has no fixtures in it.",
+        },
+        foundFixtures: (count: number) =>
+          count === 1 ? "1 fixture found." : `${count} fixtures found.`,
+        unnamed: "(unnamed)",
+        andMore: (count: number) => `and ${count} more`,
+        matchedByName:
+          "Fixtures are matched by name: one that already has the same name here is overwritten, checklist included.",
+        foundSession: "This is a session. It becomes one fixture; give it a name.",
+        nameLabel: "Fixture name",
+        nameHelper: "Unique. Say which failure it reproduces.",
+        submit: "Import",
+        saveSession: "Save as fixture",
+        importCount: (count: number) =>
+          count === 1 ? "Import 1 fixture" : `Import ${count} fixtures`,
+        working: "Working…",
+        imported: (created: number, updated: number) =>
+          `Imported: ${created} new, ${updated} updated.`,
+        failed: "Couldn't import that.",
+      },
+
+      run: {
+        title: "Run a suite",
+        started: "Suite started. It runs in the background; the list below updates as it goes.",
+        failed: "Couldn't start the suite.",
+        starting: "Starting…",
+        submit: (runs: number) => (runs === 1 ? "Run 1 time" : `Run ${runs} times`),
+        costTitle: "This costs real money",
+        costBody:
+          "Each run plays a full Builder interview, with a simulated-admin call every turn and a judge call at the end. Eval spend is recorded on its own and never shows up in real interview cost. At most two suites run at once.",
+        costEstimate: (runs: number, estimate: string | null, perRun: string | null) =>
+          estimate && perRun
+            ? `${runs} ${runs === 1 ? "run" : "runs"}: ${estimate} at ${perRun} a run on recent suites.`
+            : `${runs} ${runs === 1 ? "run" : "runs"}, roughly one full interview each. No finished suite yet to put a price on it.`,
+        fixturesLegend: "Fixtures",
+        selectActive: "All active",
+        selectNone: "None",
+        fixtureOption: (name: string, kind: string, active: boolean) =>
+          `${name} (${kind.toLowerCase()}${active ? "" : ", inactive"})`,
+        repetitionsLabel: "Runs per fixture",
+        repetitionsHelper:
+          "The model isn't deterministic, so each fixture is played several times. Three is the default.",
+      },
+
+      suites: {
+        caption: "Newest first. Open one to read its runs.",
+        polling: (seconds: number) =>
+          `A suite is running. This list refreshes every ${seconds} seconds.`,
+        runSuite: "Run suite",
+        loadFailed: "Couldn't load the suites.",
+        emptyTitle: "No suites yet",
+        emptyNoFixtures: "Add a fixture first, on the Fixtures tab. Then run a suite on it.",
+        emptyBody:
+          "Run a suite to see how Builder's interviewer does on your fixtures. Prompt changes appear here too, as prompt gates.",
+        columnStarted: "Started",
+        columnTrigger: "Trigger",
+        columnStatus: "Status",
+        columnPassed: "Passed",
+        columnGateViolations: "Gate violations",
+        columnCorrections: "Corrections",
+        columnJudge: "Judge score",
+        columnCost: "~Cost",
+        columnVerdict: "Verdict",
+        workingThrough: (runs: number) => (runs === 1 ? "1 run" : `${runs} runs`),
+        verdictPending: "Waiting for the eval",
+        verdictNone: "No verdict",
+        verdictPass: "Passed",
+        verdictFail: "Failed",
+        published: "Published",
+        passedNotPublished: "Passed, not published",
+        notPublished: "Not published",
+        details: "Details",
+      },
+
+      suiteDetail: {
+        title: "Suite",
+        close: "Close",
+        loadFailed: "Couldn't load this suite.",
+        retry: "Retry",
+        startedAt: (when: string) => `Started ${when}`,
+        shape: (fixtures: number, repetitions: number) =>
+          `${fixtures} ${fixtures === 1 ? "fixture" : "fixtures"} × ${repetitions}`,
+        running: (done: number, planned: number) =>
+          `Running: ${done} of ${planned} runs finished. This refreshes on its own.`,
+        errored: "This suite errored",
+        stat: {
+          passed: "Passed",
+          gateViolations: "Gate violations",
+          corrections: "Corrections",
+          judge: "Judge score",
+          cost: "~Cost",
+        },
+        candidateHeading: "Proposed change",
+        candidateText: (chars: number) => `New prompt text (${chars.toLocaleString()} characters)`,
+        candidateModel: (model: string | null, provider: string | null) =>
+          model
+            ? `Model: ${provider ? `${provider} / ` : ""}${model}`
+            : "Model: back to the default",
+        candidateTemperature: (value: number) => `Temperature: ${value}`,
+        verdictHeading: "Verdict",
+        verdictPass: "Passed",
+        verdictFail: "Failed",
+        published: (when: string) => `Published ${when}`,
+        passedNotPublished: "Passed, but not published",
+        notPublished: "Nothing was published",
+        openBaseline: "Open the baseline it was compared with",
+        verdictPending: "The change is judged when every run has finished.",
+        verdictNone: "This suite settled without a verdict.",
+        gatesLegend: "What the gates count",
+        passRule:
+          "A run passes when every gate is clean, the simulated admin never corrected Builder, the PRD reached ready, and every checklist item is met.",
+        noRuns: "No runs yet.",
+        deletedFixture: "Deleted fixture",
+        fixturePassed: (passed: number, total: number) => `${passed} of ${total} passed`,
+      },
+
+      runCard: {
+        run: (repetition: number) => `Run ${repetition}`,
+        status: {
+          queued: "Queued",
+          running: "Running",
+          passed: "Passed",
+          failed: "Failed",
+          errored: "Errored",
+        } as Record<string, string>,
+        turns: (count: number) => (count === 1 ? "1 turn" : `${count} turns`),
+        corrections: (count: number) => (count === 1 ? "1 correction" : `${count} corrections`),
+        judge: (met: number, total: number) => `${met} of ${total} checklist items met`,
+        showDetails: "Details",
+        hideDetails: "Hide details",
+        gatesClean: "Every gate clean",
+        gateFailing: (label: string, count: number | null) =>
+          count === null ? label : `${label}: ${count}`,
+        error: (text: string) => `Error: ${text}`,
+        gatesHeading: (violations: number) =>
+          violations === 0 ? "Gates" : `Gates (${violations} failing)`,
+        yes: "Yes",
+        no: "No",
+        metricsHeading: "Metrics",
+        metric: {
+          turns: "Turns",
+          questions: "Questions asked",
+          corrections: "Corrections",
+          ready: "PRD ready",
+          toolCalls: "Tool calls",
+          cost: "~Cost",
+        },
+        readyYes: (score: number) => `Yes (readiness ${score})`,
+        readyNo: (score: number) => `No (readiness ${score})`,
+        toolCalls: (calls: number, failures: number) =>
+          failures > 0 ? `${calls} (${failures} failed)` : String(calls),
+        correctedItems: (items: string) => `The simulated admin corrected Builder on: ${items}.`,
+        judgeHeading: (met: number, total: number, score: string) =>
+          `Judge: ${met} of ${total} met (${score})`,
+        judgeError: (text: string) => `The judge reported: ${text}`,
+        judgeNone: "No checklist items were scored.",
+        met: "Met",
+        unmet: "Unmet",
+        criticHeading: "Critic",
+        criticShortAsExpected: "Critic as expected",
+        criticShortNotAsExpected: "Critic not as expected",
+        criticAsExpected: "The critic did what the fixture expects.",
+        criticNotAsExpected: "The critic did not do what the fixture expects.",
+        criticBlockedOn: (rows: string) => `Blocked on: ${rows}.`,
+        criticDidNotBlock: "Nothing blocked.",
+        transcriptHeading: "Transcript",
+      },
+
+      transcript: {
+        none: "No transcript was recorded for this run.",
+        show: (turns: number) =>
+          turns === 1 ? "Show transcript (1 turn)" : `Show transcript (${turns} turns)`,
+        hide: "Hide transcript",
+        turn: (n: number) => `Turn ${n}`,
+        correctionTag: "Admin corrects Builder",
+        admin: "Admin",
+        adminCorrects: "Admin (correcting)",
+        builder: "Builder",
+        question: "Question",
+        tool: "tool call",
+        failed: "Failed",
+        empty: "(nothing)",
+      },
+
+      // The prompt editor, for the prompts this eval gates.
+      promptGate: {
+        noticeTitle: "Changes to this prompt go live only after Builder's replay eval passes",
+        noticeBody:
+          "Edits to the text or the model are not saved as you type. Run the eval with your changes: they are published automatically if nothing gets measurably worse, and not at all if it does.",
+        stagedBadge: "Not live",
+        stagedHint: "You have changes that have not been through the eval.",
+        submit: "Run eval and publish",
+        submitting: "Submitting…",
+        nothingChanged: "Change the text or the model first.",
+        costHint:
+          "Runs the fixtures twice over (your change, and a baseline if none is recent). That is real spend.",
+        submitted: "Eval started. The change publishes if it passes.",
+        openEval: "Open Eval",
+        failed: "Couldn't start the eval for this change.",
+        blocked:
+          "This is a Builder prompt: its text and model change only through the replay eval.",
       },
     },
   },

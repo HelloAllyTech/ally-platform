@@ -6,11 +6,21 @@ import { PromptSidePanel } from "../PromptSidePanel";
 import { Prompt } from "@types";
 
 // Mock sonner toast
+const { mockToastError, mockToastSuccess } = vi.hoisted(() => ({
+  mockToastError: vi.fn(),
+  mockToastSuccess: vi.fn(),
+}));
 vi.mock("sonner", () => ({
   toast: {
-    error: vi.fn(),
-    success: vi.fn(),
+    error: mockToastError,
+    success: mockToastSuccess,
   },
+}));
+
+// The gate's toast links to the Eval page, so the panel navigates.
+const mockNavigate = vi.fn();
+vi.mock("react-router-dom", () => ({
+  useNavigate: () => mockNavigate,
 }));
 
 // Mock UI component
@@ -80,7 +90,13 @@ const mockRevertPrompt = vi.fn().mockResolvedValue({ unwrap: () => Promise.resol
 const mockDeletePrompt = vi.fn().mockResolvedValue({ unwrap: () => Promise.resolve(true) });
 /** How many scenarios the mocked usage query reports; reset in beforeEach. */
 let mockUsageCount = 0;
+/** The prompt codes Builder's eval gates; reset in beforeEach. */
+let mockGatedCodes: string[] = [];
+const mockSubmitCandidate = vi.fn();
 vi.mock("@api", () => ({
+  // Which prompts go live only through Builder's replay eval, and the call that proposes a change.
+  useGetBuilderEvalGatedPromptsQuery: () => ({ data: mockGatedCodes }),
+  useSubmitBuilderEvalPromptCandidateMutation: () => [mockSubmitCandidate, { isLoading: false }],
   useRevertPromptMutation: () => [mockRevertPrompt, { isLoading: false }],
   useDeletePromptMutation: () => [mockDeletePrompt, { isLoading: false }],
   // Side panel queries an in-use count to gate the "Delete variant" button and
@@ -146,9 +162,29 @@ vi.mock("@constants", () => ({
   ],
   PROMPT_TEMPERATURE_DEFAULT: 0.7,
   providerForModel: (model?: string) => (model === "gpt-4o" ? "openai" : undefined),
+  ROUTES: { BUILDER_EVAL: "/builder/eval" },
   en: {
+    builder: {
+      eval: {
+        promptGate: {
+          noticeTitle: "Changes to this prompt go live only after the eval passes",
+          noticeBody: "Edits are not saved as you type.",
+          stagedBadge: "Not live",
+          stagedHint: "You have changes that have not been through the eval.",
+          submit: "Run eval and publish",
+          submitting: "Submitting…",
+          nothingChanged: "Change the text or the model first.",
+          costHint: "Runs the fixtures twice over.",
+          submitted: "Eval started. The change publishes if it passes.",
+          openEval: "Open Eval",
+          failed: "Couldn't start the eval for this change.",
+          blocked: "This is a Builder prompt: its text and model change only through the eval.",
+        },
+      },
+    },
     simulation: {
       editPrompt: "Edit Prompt",
+      restoreDefault: "Restore default",
       createPrompt: "Create new prompt",
       promptName: "Prompt Name",
       enterPromptName: "Enter prompt name",
@@ -196,7 +232,9 @@ describe("PromptSidePanel Component", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockOnAutoSave.mockResolvedValue(undefined);
+    mockSubmitCandidate.mockReturnValue({ unwrap: () => Promise.resolve({ id: "suite-1" }) });
     mockUsageCount = 0;
+    mockGatedCodes = [];
   });
 
   /** Panel with auto-save wired up (the shape PromptManagement renders). */
@@ -901,6 +939,273 @@ describe("PromptSidePanel Component", () => {
       expect(
         screen.getByText("Hidden from the picker — no new simulation can be pointed at it."),
       ).toBeInTheDocument();
+    });
+  });
+  describe("Builder eval gate", () => {
+    /** A prompt Builder's replay eval gates: edits go live only after the eval passes. */
+    const gatedPrompt: Prompt = {
+      ...mockPrompt,
+      promptCode: "builder_interviewer_system",
+      model: "gpt-4o",
+      useDashboardOverride: true,
+    };
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      mockGatedCodes = ["builder_interviewer_system"];
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    const textarea = () => screen.getByTestId("auto-expandable-textarea");
+    const submitButton = () => screen.getByRole("button", { name: "Run eval and publish" });
+
+    it("says edits go live only after the eval, and offers the button", () => {
+      renderAutoSavePanel(gatedPrompt);
+
+      expect(screen.getByTestId("prompt-gate-notice")).toHaveTextContent(
+        "Changes to this prompt go live only after the eval passes",
+      );
+      expect(submitButton()).toBeDisabled();
+      expect(screen.getByText("Change the text or the model first.")).toBeInTheDocument();
+    });
+
+    it("does not autosave an edit to the text", async () => {
+      renderAutoSavePanel(gatedPrompt);
+
+      fireEvent.change(textarea(), { target: { value: "A rewritten interviewer" } });
+      await advancePastDebounce();
+
+      expect(mockOnAutoSave).not.toHaveBeenCalled();
+      // Staged, not saved: the editor says so, and the button comes alive.
+      expect(screen.getByText("Not live")).toBeInTheDocument();
+      expect(submitButton()).toBeEnabled();
+    });
+
+    it("does not autosave a model or temperature change", async () => {
+      renderAutoSavePanel(gatedPrompt);
+
+      fireEvent.click(screen.getByRole("button", { name: /GPT-4o/ }));
+      fireEvent.click(screen.getByRole("option", { name: "Gemini 2.5 Flash" }));
+      fireEvent.click(screen.getByRole("checkbox", { name: /Override temperature/i }));
+      await advancePastDebounce();
+
+      expect(mockOnAutoSave).not.toHaveBeenCalled();
+      expect(submitButton()).toBeEnabled();
+    });
+
+    it("still autosaves the name, without the text, the model or the override flag", async () => {
+      renderAutoSavePanel(gatedPrompt);
+
+      // A staged text edit beside a rename must not ride along on the save.
+      fireEvent.change(textarea(), { target: { value: "A rewritten interviewer" } });
+      fireEvent.change(screen.getByPlaceholderText("Enter prompt name"), {
+        target: { value: "Renamed" },
+      });
+      await advancePastDebounce();
+
+      expect(mockOnAutoSave).toHaveBeenCalledTimes(1);
+      const payload = mockOnAutoSave.mock.calls[0][0];
+      expect(payload).toEqual(expect.objectContaining({ id: "1", name: "Renamed" }));
+      for (const field of ["prompt", "model", "provider", "temperature", "useDashboardOverride"]) {
+        expect(payload).not.toHaveProperty(field);
+      }
+    });
+
+    it("does not offer Restore default, which the server refuses for a gated prompt", () => {
+      renderAutoSavePanel(gatedPrompt);
+      expect(screen.queryByText("Restore default")).not.toBeInTheDocument();
+    });
+
+    it("posts the editor text as a candidate and toasts a link to the Eval page", async () => {
+      renderAutoSavePanel(gatedPrompt);
+
+      fireEvent.change(textarea(), { target: { value: "A rewritten interviewer" } });
+      await act(async () => {
+        fireEvent.click(submitButton());
+      });
+
+      expect(mockSubmitCandidate).toHaveBeenCalledTimes(1);
+      // Only the text changed, so only the text is sent.
+      expect(mockSubmitCandidate).toHaveBeenCalledWith({
+        promptCode: "builder_interviewer_system",
+        content: "A rewritten interviewer",
+      });
+      expect(mockOnAutoSave).not.toHaveBeenCalled();
+
+      expect(mockToastSuccess).toHaveBeenCalledTimes(1);
+      const [message, options] = mockToastSuccess.mock.calls[0];
+      expect(message).toBe("Eval started. The change publishes if it passes.");
+      expect(options.action.label).toBe("Open Eval");
+      options.action.onClick();
+      expect(mockNavigate).toHaveBeenCalledWith("/builder/eval");
+    });
+
+    it("sends the changed model settings, and no text when the text did not change", async () => {
+      renderAutoSavePanel(gatedPrompt);
+
+      fireEvent.click(screen.getByRole("button", { name: /GPT-4o/ }));
+      fireEvent.click(screen.getByRole("option", { name: "Gemini 2.5 Flash" }));
+      fireEvent.click(screen.getByRole("checkbox", { name: /Override temperature/i }));
+      await act(async () => {
+        fireEvent.click(submitButton());
+      });
+
+      expect(mockSubmitCandidate).toHaveBeenCalledWith({
+        promptCode: "builder_interviewer_system",
+        provider: "gemini",
+        model: "gemini-2.5-flash",
+        temperature: 0.7,
+      });
+    });
+
+    it("sends the text and the model together when both changed", async () => {
+      renderAutoSavePanel(gatedPrompt);
+
+      fireEvent.change(textarea(), { target: { value: "A rewritten interviewer" } });
+      fireEvent.click(screen.getByRole("button", { name: /GPT-4o/ }));
+      fireEvent.click(screen.getByRole("option", { name: "GPT-5" }));
+      await act(async () => {
+        fireEvent.click(submitButton());
+      });
+
+      expect(mockSubmitCandidate).toHaveBeenCalledWith({
+        promptCode: "builder_interviewer_system",
+        content: "A rewritten interviewer",
+        provider: "openai",
+        model: "gpt-5",
+      });
+    });
+
+    it("will not submit an emptied editor as a candidate", () => {
+      renderAutoSavePanel(gatedPrompt);
+      fireEvent.change(textarea(), { target: { value: "" } });
+      expect(submitButton()).toBeDisabled();
+    });
+
+    it("shows the server's message when the candidate is refused", async () => {
+      mockSubmitCandidate.mockReturnValue({
+        unwrap: () =>
+          Promise.reject({
+            status: 409,
+            data: { message: "A change to builder_interviewer_system is already being evaluated." },
+          }),
+      });
+      renderAutoSavePanel(gatedPrompt);
+
+      fireEvent.change(textarea(), { target: { value: "A rewritten interviewer" } });
+      await act(async () => {
+        fireEvent.click(submitButton());
+      });
+
+      expect(mockToastError).toHaveBeenCalledWith(
+        "A change to builder_interviewer_system is already being evaluated.",
+      );
+      expect(mockToastSuccess).not.toHaveBeenCalled();
+    });
+
+    it("adds no second toast to a 403, which the base query already raised", async () => {
+      mockSubmitCandidate.mockReturnValue({
+        unwrap: () => Promise.reject({ status: 403, data: { message: "Forbidden resource" } }),
+      });
+      renderAutoSavePanel(gatedPrompt);
+
+      fireEvent.change(textarea(), { target: { value: "A rewritten interviewer" } });
+      await act(async () => {
+        fireEvent.click(submitButton());
+      });
+
+      expect(mockToastError).not.toHaveBeenCalled();
+    });
+
+    it("leaves every other prompt exactly as it was", async () => {
+      // Not in the gated list: no notice, no button, and the text autosaves.
+      renderAutoSavePanel({ ...mockPrompt, useDashboardOverride: true });
+
+      expect(screen.queryByTestId("prompt-gate-notice")).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Run eval and publish" }),
+      ).not.toBeInTheDocument();
+      expect(screen.getByText("Restore default")).toBeInTheDocument();
+
+      fireEvent.change(textarea(), { target: { value: "New text" } });
+      await advancePastDebounce();
+
+      expect(mockOnAutoSave).toHaveBeenCalledWith(
+        expect.objectContaining({ prompt: "New text", useDashboardOverride: true }),
+      );
+      expect(mockSubmitCandidate).not.toHaveBeenCalled();
+    });
+
+    describe("a save the server refuses (409)", () => {
+      const refusal = {
+        status: 409,
+        data: { message: "This is a Builder prompt: changes go live only after the eval." },
+      };
+
+      beforeEach(() => {
+        // The gate list has not named this prompt (not loaded yet, or the request failed).
+        mockGatedCodes = [];
+      });
+
+      it("toasts once, however many edits follow, and stops sending the text", async () => {
+        mockOnAutoSave.mockRejectedValueOnce(refusal);
+        renderAutoSavePanel(gatedPrompt);
+
+        const input = textarea();
+        fireEvent.change(input, { target: { value: "A" } });
+        await advancePastDebounce();
+
+        expect(mockOnAutoSave).toHaveBeenCalledTimes(1);
+        expect(mockToastError).toHaveBeenCalledTimes(1);
+        expect(mockToastError).toHaveBeenCalledWith(refusal.data.message, expect.any(Object));
+
+        // More keystrokes: no more saves, no more toasts.
+        for (const value of ["AB", "ABC", "ABCD"]) {
+          fireEvent.change(input, { target: { value } });
+          await advancePastDebounce();
+        }
+        expect(mockOnAutoSave).toHaveBeenCalledTimes(1);
+        expect(mockToastError).toHaveBeenCalledTimes(1);
+      });
+
+      it("moves the panel into gated mode, with the staged edit ready to submit", async () => {
+        mockOnAutoSave.mockRejectedValueOnce(refusal);
+        renderAutoSavePanel(gatedPrompt);
+
+        fireEvent.change(textarea(), { target: { value: "A rewritten interviewer" } });
+        await advancePastDebounce();
+
+        expect(screen.getByTestId("prompt-gate-notice")).toBeInTheDocument();
+        expect(submitButton()).toBeEnabled();
+        // Not the "couldn't save, retry" state: retrying a refusal would only be refused again.
+        expect(screen.queryByText(/Couldn’t save — retry/)).not.toBeInTheDocument();
+      });
+
+      it("gives every toast the same id so a burst replaces rather than stacks", async () => {
+        mockOnAutoSave.mockRejectedValue(refusal);
+        renderAutoSavePanel(gatedPrompt);
+
+        fireEvent.change(textarea(), { target: { value: "A" } });
+        await advancePastDebounce();
+
+        expect(mockToastError.mock.calls[0][1]).toEqual({ id: "prompt-eval-gate-refusal" });
+      });
+
+      it("still treats any other failure as a retryable save error", async () => {
+        mockOnAutoSave.mockRejectedValueOnce({ status: 500 });
+        renderAutoSavePanel(mockPrompt);
+
+        fireEvent.change(screen.getByPlaceholderText("Enter prompt name"), {
+          target: { value: "New Name" },
+        });
+        await advancePastDebounce();
+
+        expect(screen.getByText(/Couldn’t save — retry/)).toBeInTheDocument();
+        expect(mockToastError).not.toHaveBeenCalled();
+      });
     });
   });
 });
