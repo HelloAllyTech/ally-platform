@@ -52,4 +52,56 @@ void main() {
     await tester.pump(const Duration(seconds: 4, milliseconds: 50));
     expect(find.text('Inhale'), findsOneWidget);
   });
+
+  testWidgets('counts 1 to 4 once per second within a phase, resetting on the next one', (tester) async {
+    await _pumpBoxBreathing(tester);
+    expect(find.text('1'), findsOneWidget);
+
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.text('2'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.text('3'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.text('4'), findsOneWidget);
+
+    // Phase changes at 4s total — the countdown resets to 1 for the new phase.
+    await tester.pump(const Duration(milliseconds: 1050));
+    expect(find.text('Hold'), findsOneWidget);
+    expect(find.text('1'), findsOneWidget);
+  });
+
+  testWidgets('pausing stops both the phase animation and the countdown, resuming restarts them', (
+    tester,
+  ) async {
+    await _pumpBoxBreathing(tester);
+
+    await tester.tap(find.byIcon(Icons.pause));
+    await tester.pump();
+    expect(find.byIcon(Icons.play_arrow), findsOneWidget, reason: 'icon flips to show the resume action');
+
+    // Neither the phase nor the countdown advance while paused.
+    await tester.pump(const Duration(seconds: 4, milliseconds: 50));
+    expect(find.text('Inhale'), findsOneWidget);
+    expect(find.text('1'), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.play_arrow));
+    await tester.pump();
+    expect(find.byIcon(Icons.pause), findsOneWidget);
+
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.text('2'), findsOneWidget, reason: 'countdown resumes ticking');
+  });
+
+  testWidgets('tapping the volume button toggles its own icon', (tester) async {
+    await _pumpBoxBreathing(tester);
+
+    expect(find.byIcon(Icons.volume_up), findsOneWidget);
+    expect(find.byIcon(Icons.volume_off), findsNothing);
+
+    await tester.tap(find.byIcon(Icons.volume_up));
+    await tester.pump();
+
+    expect(find.byIcon(Icons.volume_off), findsOneWidget);
+    expect(find.byIcon(Icons.volume_up), findsNothing);
+  });
 }
