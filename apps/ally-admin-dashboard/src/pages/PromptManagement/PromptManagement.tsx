@@ -11,6 +11,7 @@ import {
 import { FilterDropdown, NotionTable, ListToolbar, PromptSidePanel } from "@components";
 import { en, PROMPT_COLUMNS, SORT_BY, SORT_ORDER } from "@constants";
 import { Prompt } from "@types";
+import { getErrorMessage } from "@utils/errorMessage";
 
 type PromptManagementFilters = {
   categories: string[];
@@ -250,8 +251,16 @@ export const PromptManagement: React.FC<PromptManagementProps> = ({ header }) =>
       if (promptData.id === selectedPrompt?.id) {
         handleSidePanelClose();
       }
-    } catch {
-      toast.error(en.simulation.failedToUpdatePrompt);
+    } catch (error) {
+      // A 409 is the server refusing a change that has to go through Builder's replay
+      // eval instead (a gated Builder prompt): its message says where. Any other
+      // failure keeps the generic toast.
+      const isConflict = (error as { status?: unknown } | null)?.status === 409;
+      toast.error(
+        isConflict
+          ? getErrorMessage(error, en.simulation.failedToUpdatePrompt)
+          : en.simulation.failedToUpdatePrompt,
+      );
     }
   };
 

@@ -31,6 +31,7 @@ const KIND_KEY: Record<TrackItemType, string> = {
   [TrackItemType.JOURNAL]: "tracks2.meta.journal",
   [TrackItemType.ANNOTATED_ARTIFACT]: "tracks2.meta.annotationTranscript",
   [TrackItemType.GAME]: "courseLanding.story.kinds.game",
+  [TrackItemType.BRANCHING_SCENARIO]: "tracks2.meta.branching",
 };
 
 interface StoryArcProps {

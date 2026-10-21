@@ -10,6 +10,7 @@ vi.mock("@icons", () => ({
   BarChart3: () => <svg />,
   Book: () => <svg />,
   Timer: () => <svg />,
+  Chemistry: () => <svg />,
   Notification: () => <svg />,
 }));
 

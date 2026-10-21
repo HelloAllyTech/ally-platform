@@ -15,9 +15,39 @@ import { RichTextToolbar } from "./RichTextToolbar";
 // Comparing the two forms directly would read "still empty" as a change.
 const EMPTY_DOC_HTML = new Set(["", "<p></p>", "<p><br></p>"]);
 
+/**
+ * ProseMirror collapses runs of whitespace and trims each block when it loads
+ * content, so legacy plain text such as "Is this right? " or "a  b" comes back
+ * from the editor as "Is this right?" / "a b". Compared literally, that reads
+ * as an edit: onChange fires on mount and the form is marked dirty for a
+ * question nobody touched. Compare the way the editor normalizes instead.
+ */
+const collapseWhitespace = (html: string) =>
+  html
+    .replace(/\s+/g, " ")
+    .replace(/\s+(<\/(?:p|h[1-6]|li|blockquote)>)/g, "$1")
+    .replace(/(<(?:p|h[1-6]|li|blockquote)(?:\s[^>]*)?>)\s+/g, "$1");
+
 const normalizeForCompare = (html: string) => {
   const trimmed = (html ?? "").trim();
-  return EMPTY_DOC_HTML.has(trimmed) ? "" : trimmed;
+  if (EMPTY_DOC_HTML.has(trimmed)) return "";
+
+  let normalized = trimmed;
+  // If it doesn't look like HTML, it's legacy plain text; wrap it in <p>
+  // to match Tiptap's default normalization.
+  if (trimmed && !trimmed.startsWith("<")) {
+    normalized = `<p>${trimmed}</p>`;
+  }
+
+  // Use DOM-based normalization to handle HTML entities (like & vs &amp;)
+  // and other Tiptap normalization artifacts during comparison.
+  if (typeof document !== "undefined") {
+    const div = document.createElement("div");
+    div.innerHTML = normalized;
+    normalized = div.innerHTML;
+  }
+
+  return collapseWhitespace(normalized);
 };
 
 interface RichTextEditorProps {

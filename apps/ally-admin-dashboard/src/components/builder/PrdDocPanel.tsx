@@ -18,6 +18,7 @@ import { BuilderChatMessage, BuilderPrdDocument, BuilderPrdReadiness } from "@ty
 import { asAgentText, asAgentTextList } from "@utils";
 
 import { downloadPrdMarkdown, downloadPrdPdf, PrdExportMeta } from "./prdExport";
+import { PrdReviewFindings } from "./PrdReviewFindings";
 import { ReadinessRing } from "./ReadinessRing";
 import {
   BUILDER_DURATION,
@@ -83,6 +84,8 @@ interface PrdDocPanelProps {
   designSection?: React.ReactNode;
   /** Why the PRD cannot be edited, shown when `editable` is false. */
   lockedReason?: string;
+  /** Dismiss one of the cold reviewer's findings, with the reason it is wrong. */
+  onDismissFinding?: (findingId: string, reason: string) => Promise<void>;
 }
 
 /**
@@ -108,6 +111,7 @@ export const PrdDocPanel: React.FC<PrdDocPanelProps> = ({
   transcript,
   designSection,
   lockedReason,
+  onDismissFinding,
 }) => {
   const strings = en.builder.prd;
   const [editingKey, setEditingKey] = useState<string | null>(null);
@@ -342,6 +346,12 @@ export const PrdDocPanel: React.FC<PrdDocPanelProps> = ({
       )}
 
       <div className="flex-1 overflow-y-auto px-4 py-3">
+        <PrdReviewFindings
+          review={readiness.review}
+          editable={editable}
+          onDismiss={onDismissFinding}
+        />
+
         {PROSE_SECTIONS.map(key => {
           const stringKey = String(key);
           const value = asAgentText(prd[key]);

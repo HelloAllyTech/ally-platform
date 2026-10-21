@@ -62,6 +62,12 @@ export const getTrackItemMeta = (item: TrackDetailItem, t: TFunction): string =>
       if (meta?.labelCount) parts.push(t("tracks2.meta.labels", { count: meta.labelCount }));
       return parts.join(" · ");
     }
+    case TrackItemType.BRANCHING_SCENARIO: {
+      const passScore = criteria?.passScore;
+      return passScore
+        ? `${t("tracks2.meta.branching")} · ${t("tracks2.meta.passScore", { score: passScore })}`
+        : t("tracks2.meta.branching");
+    }
     default:
       return "";
   }

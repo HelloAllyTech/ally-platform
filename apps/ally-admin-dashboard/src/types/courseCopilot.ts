@@ -57,7 +57,8 @@ export type CourseItemType =
   | "VIDEO"
   | "JOURNAL"
   | "ANNOTATED_ARTIFACT"
-  | "GAME";
+  | "GAME"
+  | "BRANCHING_SCENARIO";
 
 /* ── Brief ─────────────────────────────────────────────────────────────── */
 

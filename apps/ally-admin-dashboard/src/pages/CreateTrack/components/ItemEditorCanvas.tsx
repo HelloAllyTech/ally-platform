@@ -7,6 +7,7 @@ import { TrackFormValues, TrackGameKey, TrackItemType } from "@types";
 import { AnnotationItemEditor } from "./editors/annotation/AnnotationItemEditor";
 import { ArticleItemEditor } from "./editors/ArticleItemEditor";
 import { BreathingExerciseEditor } from "./editors/BreathingExerciseEditor";
+import { BranchingScenarioItemEditor } from "./editors/branching/BranchingScenarioItemEditor";
 import { CaseItemEditor } from "./editors/CaseItemEditor";
 import { GameItemEditor } from "./editors/GameItemEditor";
 import { JournalItemEditor } from "./editors/JournalItemEditor";
@@ -53,6 +54,8 @@ export const ItemEditorCanvas: FC<ItemEditorCanvasProps> = ({
       }
       return <GameItemEditor {...props} />;
     }
+    case TrackItemType.BRANCHING_SCENARIO:
+      return <BranchingScenarioItemEditor {...props} />;
     default:
       return null;
   }

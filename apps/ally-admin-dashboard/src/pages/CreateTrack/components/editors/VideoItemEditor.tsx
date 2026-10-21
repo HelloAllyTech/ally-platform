@@ -3,10 +3,10 @@ import { FC, useRef, useState } from "react";
 import { Controller, useFieldArray, useFormContext, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 
-import { TextArea, Tooltip } from "@ally-ui-mono/ui-shared";
+import { TextArea, Tooltip, htmlToPlainText, escapeHtml } from "@ally-ui-mono/ui-shared";
 import { Plus, TooltipIcon, Trash } from "@assets";
-import { SegmentedToggle } from "@components";
-import { Button } from "@components";
+import { SegmentedToggle, Button } from "@components";
+import { RichTextEditor } from "@components/rich-text-editor";
 import { ButtonVariant } from "@components/types";
 import { QUIZ_QUESTION_TYPE_LABELS } from "@constants";
 import {
@@ -85,9 +85,14 @@ export const VideoItemEditor: FC<VideoItemEditorProps> = ({
 
   const handleLoadedMetadata = (event: React.SyntheticEvent<HTMLVideoElement>) => {
     const duration = event.currentTarget.duration;
-    if (Number.isFinite(duration) && duration > 0) {
-      setValue(`${base}.video.durationSeconds`, duration, { shouldDirty: true });
-    }
+    if (!Number.isFinite(duration) || duration <= 0) return;
+    // Opening a video item loads its metadata, which lands here on every visit.
+    // Re-saving the duration it already has is not an edit — and shouldDirty
+    // re-runs the whole-form dirty check, which flags the course as unsaved over
+    // unrelated, pre-existing differences. Only record a duration that is new
+    // or really changed (the player reports it to more precision than we store).
+    if (durationSeconds != null && Math.abs(durationSeconds - duration) < 0.01) return;
+    setValue(`${base}.video.durationSeconds`, duration, { shouldDirty: true });
   };
 
   const {
@@ -317,15 +322,23 @@ export const VideoItemEditor: FC<VideoItemEditorProps> = ({
                           </label>
                           <Controller
                             control={control}
-                            name={`${questionPath}.prompt`}
+                            name={`${questionPath}.promptHtml`}
                             render={({ field: promptField }) => (
-                              <TextArea
-                                id={`${questionPath}.prompt`}
-                                labelText="Question"
-                                hideLabel
-                                {...promptField}
-                                value={promptField.value ?? ""}
-                                rows={2}
+                              <RichTextEditor
+                                value={
+                                  promptField.value && promptField.value.length > 0
+                                    ? promptField.value
+                                    : (question.prompt ?? "")
+                                        .split("\n")
+                                        .map(line => `<p>${escapeHtml(line)}</p>`)
+                                        .join("")
+                                }
+                                onChange={html => {
+                                  promptField.onChange(html);
+                                  setValue(`${questionPath}.prompt`, htmlToPlainText(html), {
+                                    shouldDirty: true,
+                                  });
+                                }}
                                 placeholder="Question text"
                                 className="w-full"
                               />

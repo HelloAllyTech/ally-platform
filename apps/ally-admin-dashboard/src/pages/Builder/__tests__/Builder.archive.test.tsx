@@ -10,6 +10,7 @@ vi.mock("@icons", () => ({
   BarChart3: () => <svg />,
   Book: () => <svg />,
   Timer: () => <svg />,
+  Chemistry: () => <svg />,
   Notification: () => <svg />,
 }));
 
@@ -340,6 +341,15 @@ describe("Builder mission control — archive", () => {
         { status: undefined, mine: false },
         expect.objectContaining({ skip: true }),
       );
+    });
+  });
+  describe("header links", () => {
+    it("opens the replay eval from its header button", () => {
+      render(<Builder />, { wrapper: MemoryRouter });
+
+      fireEvent.click(screen.getByLabelText("Replay eval"));
+
+      expect(navigateMock).toHaveBeenCalledWith("/builder/eval");
     });
   });
 });
