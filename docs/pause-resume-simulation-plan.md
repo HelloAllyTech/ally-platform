@@ -112,7 +112,7 @@ Introduce a shared `SessionClock` holding `agent_joined_at` + cumulative `paused
 ## Phase 2 — `ally-be` (clock / billing freeze)
 
 ### 2a. Migration + entity
-- Add to `scenario_sessions` (`src/learn/entity/scenario-sessions.entity.ts`):
+- Add to `scenario_sessions` (`ally-be/src/learn/entity/scenario-sessions.entity.ts`):
   - `pausedAt` (timestamptz, nullable) — start of the currently-open pause.
   - `totalPausedMs` (int, default 0) — cumulative paused time.
 - **Server-stamped only** — there is no client-supplied `pausedDurationMs`.
@@ -184,7 +184,7 @@ Introduce a shared `SessionClock` holding `agent_joined_at` + cumulative `paused
 | agent | `app/core/queue/utils.py` | `session-paused` / `session-resumed` messages |
 | agent | (new) `SessionClock` + pause-gate util | shared clock + interruptible sleep |
 | be | `src/database/migrations/*-addPauseToScenarioSessions.ts` | add `pausedAt`, `totalPausedMs` |
-| be | `src/learn/entity/scenario-sessions.entity.ts` | new columns |
-| be | `src/learn/service/scenario-session.service.ts` | SQS pause/resume handling, billing + leaderboard subtraction, end-while-paused |
+| be | `ally-be/src/learn/entity/scenario-sessions.entity.ts` | new columns |
+| be | `ally-be/src/learn/service/scenario-session.service.ts` | SQS pause/resume handling, billing + leaderboard subtraction, end-while-paused |
 | mobile | `SimulationControls.tsx`, `SimulationAssistantScreen.tsx`, `SimulationTimer.tsx` | pause button, data publish, timer freeze, cap banner |
 | web | `libs/ui-shared/src/lib/simulation/{SimulationControls,SimulationTimer,SimulationPage}.tsx` + page | same |

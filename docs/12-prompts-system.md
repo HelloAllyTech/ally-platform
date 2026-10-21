@@ -53,7 +53,7 @@ app/prompts/
 
 ## Prompt Codes (Prefixed, Path-Based)
 
-Prompt codes use `ally_ai_learn_` prefix: `subdir/filename.txt` → `ally_ai_learn_subdir_filename`. ally-be fetches dynamically via `WHERE promptCode LIKE 'ally_ai_learn_%'`.
+Prompt codes use `ally_ai_learn_` prefix: `subdir/filename.txt` → `ally_ai_learn_subdir_filename`. ally-be fetches dynamically via `WHERE promptCode LIKE 'ally_ai_learn_%'`. <!-- docs-path-lint: ignore -->
 
 | Prompt Code | Local Template | Used By |
 |-------------|----------------|---------|

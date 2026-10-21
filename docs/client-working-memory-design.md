@@ -592,7 +592,7 @@ whether that is why register guidance fails to land is untested. §9.2 has the a
 `withheld` follows `roleplay_v2`'s ledger contract verbatim. A withheld item renders
 its **topic and its deflection, never its content** — so the actor knows a subject exists and how to move away from it
 without having the material in context to leak. `_render_ledger_section` in
-`app/roleplay_v2/actor/prompt_compiler.py` was the reference implementation, removed
+`app/roleplay_v2/actor/prompt_compiler.py` was the reference implementation, removed <!-- docs-path-lint: ignore -->
 with Roleplay Studio v2 on 2026-08-31; see git history.
 
 **Framing.** The block is introduced as a *"directors' note for your next reply
@@ -1316,7 +1316,7 @@ than being handed it.
 
 #### Take wholesale
 
-**`spec/runtime_state.py` — `RuntimeStateStore` / `RuntimeSessionState`.** The store §5
+**`spec/runtime_state.py` — `RuntimeStateStore` / `RuntimeSessionState`.** The store §5 <!-- docs-path-lint: ignore -->
 argues for, with the concurrency problem already solved and solved better than proposed
 here. Mutation serialises under an `asyncio.Lock`; readers get deep-copied snapshots so they
 never see a torn write; and commits are **monotonic on turn index** — a verdict for a turn
@@ -1328,7 +1328,7 @@ QM's `replaceIfRevision`, which is the right tool when writes have no natural or
 do: the turn index *is* the ordering key, monotonic commits express the same guarantee
 without hashing content, and `test_runtime_state.py` already pins the behaviour.
 
-**`actor/prompt_compiler.py`.** *(Reconsidered 2026-08-21 and deliberately not taken — see
+**`actor/prompt_compiler.py`.** *(Reconsidered 2026-08-21 and deliberately not taken — see <!-- docs-path-lint: ignore -->
 phase 2. Its static/volatile discipline is already in `prompt.py`, and its two-message shape
 would deliver the block as a suffix, forfeiting the movable position phase 4 tests. Kept here
 because the reasoning for wanting it was sound and the reasoning against it is specific.)*
@@ -1339,7 +1339,7 @@ every turn, and a per-turn card. It already reuses the v1 helpers, resolves thro
 so braces in authored text can never break formatting. That last detail is a trap this
 design would have walked into, since the block carries client-authored speech verbatim.
 
-**`actor/retrieval/persona_bible.py`.** `salient_backstory` selection, built, with a
+**`actor/retrieval/persona_bible.py`.** `salient_backstory` selection, built, with a <!-- docs-path-lint: ignore -->
 three-tier fallback: Director-nominated topics first, then keyword match against the
 learner's last utterance, then spec order so the actor always has *some* grounding. A
 cumulative character cap bounds the budget, and `_DIRECTOR_TOPIC_BOOST = 0.5` is an additive
@@ -1376,7 +1376,7 @@ nominating next turn's retrieval cues. `direction_staleness_turns` with
 
 | | Why |
 |---|---|
-| `spec/models.py`, the `roleplay_specs` authoring surface | Zero authored states or secrets across 66 spec versions. Deriving instead is this design's premise |
+| `spec/models.py`, the `roleplay_specs` authoring surface | Zero authored states or secrets across 66 spec versions. Deriving instead is this design's premise | <!-- docs-path-lint: ignore -->
 | `worker_v2.py`, `session/` | Alternative worker entry point; v1 stays the runtime (the evidence in §1 is all v1) |
 | `rehearsal/` (~2,000 lines with its own trainee bot and judge) | Overlaps the v2v tester. Probably duplicate — worth one comparison pass before discarding, not assumed |
 

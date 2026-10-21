@@ -157,7 +157,7 @@ No behaviour change. This is the yardstick every later phase is judged by.
   distinct phrases played / fillers played, identical-waveform replays, time to first
   usable clip.
 - **Offline judge.** Reuse ally-ai's language-quality judge machinery
-  (`app/core/language_quality/judge.py`) with a small filler rubric run on sampled
+  (`ally-ai/app/core/language_quality/judge.py`) with a small filler rubric run on sampled
   sessions: for each played filler, given the persona, the preceding learner turn and the
   reply that followed — *register fit* (1–5), *context fit* (1–5), *non-committal* (pass /
   fail: presupposes or contradicts the real reply), *repetitive* (flag). This is how M7
@@ -349,10 +349,10 @@ does not show M7/M8 movement, on English and at least one Indic language.
 ## 10. Files this touches
 
 `app/worker.py` (filler handlers, pool + tiers, continuation, in-turn trigger, predictive
-loop, interim chain, deferred setup) · `app/core/livekit/filler_audio.py` (in-memory
+loop, interim chain, deferred setup) · `app/core/livekit/filler_clips.py` (in-memory
 clips, cache, variants) · `app/core/livekit/predictive_filler.py` (typed output, persona
 block, in-turn call, post-check) · `app/prompts/filler/predictive_filler.txt` +
 `_meta` · `app/core/config.py` (new settings) · `app/core/metrics/turn_metrics.py`
 (filler record) · `app/v2v_tester/` (bench) · ally-ai `language_quality` (filler rubric)
-· `tests/unit/test_filler_audio.py`, `test_interim_reply.py`, `test_worker.py` ·
+· `tests/unit/test_filler_clips.py`, `test_interim_reply.py`, `test_worker.py` ·
 `docs/05-tts-providers.md`, `docs/architecture.md` · ally-be/ally-web analytics.

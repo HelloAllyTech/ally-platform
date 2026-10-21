@@ -86,7 +86,7 @@ Every message shares the envelope above (`message_type`, `data`, `room_id`, `tim
 `message_type` and the one populated key under `data` differ. The other `data` keys are `null`.
 
 `message_type` is a **contract with ally-be**: the consumer
-(`src/learn/consumer/learn-message-and-event.consumer.ts`) reads the string and dispatches through
+(`ally-be/src/learn/consumer/learn-message-and-event.consumer.ts`) reads the string and dispatches through
 `ProcessorRegistry` to the processor registered under that name. An unrecognized value falls through
 to `UnknownEventProcessor` and is dropped -- adding a type here means adding a processor there.
 
@@ -242,7 +242,7 @@ When running inside Docker Compose, the app reaches LocalStack at `http://locals
 
 Consuming side in ally-be:
 
-- `src/learn/interface/learn-message.interface.ts` -- the envelope and per-type payload interfaces
-- `src/ai/constants/processor.constants.ts` -- `PROCESSOR_EVENT_TYPES`, which must match `CoreMessageType`
-- `src/ai/processors/processor-registry.ts` -- dispatch by `message_type`
-- `src/learn/processor/*.processor.ts` -- one processor per type
+- `ally-be/src/learn/interface/learn-message.interface.ts` -- the envelope and per-type payload interfaces
+- `ally-be/src/ai/constants/processor.constants.ts` -- `PROCESSOR_EVENT_TYPES`, which must match `CoreMessageType`
+- `ally-be/src/ai/processors/processor-registry.ts` -- dispatch by `message_type`
+- `ally-be/src/learn/processor/*.processor.ts` -- one processor per type

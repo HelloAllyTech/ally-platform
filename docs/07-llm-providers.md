@@ -142,6 +142,4 @@ The system uses LLMs in several roles, each potentially with a different provide
 - `app/llms/factory.py` -- `create_llm_client()`
 - `app/llms/openai.py` -- `OpenAILLMClient`
 - `app/llms/gemini.py` -- `GeminiLLMClient`
-- `app/llms/ollama.py` -- Ollama-specific utilities (if any)
-- `app/llms/vllm.py` -- vLLM-specific utilities (if any)
 - `app/core/constants.py` -- `LLMProvider` enum
