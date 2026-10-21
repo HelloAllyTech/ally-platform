@@ -67,6 +67,8 @@ export const getTrackItemMeta = (
       return t('courses.meta.game');
     case TrackItemType.BRANCHING_SCENARIO:
       return t('courses.meta.branchingScenario');
+    case TrackItemType.BUCKET_SORT:
+      return t('courses.meta.bucketSort');
     default:
       return '';
   }

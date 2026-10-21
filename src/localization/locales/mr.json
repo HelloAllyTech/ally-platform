@@ -1698,7 +1698,8 @@
       "minScore": "किमान स्कोर {{score}}%",
       "case": "केस",
       "game": "गेम · फक्त मौजेसाठी",
-      "branchingScenario": "प्रसंग प्रश्नमंजुषा"
+      "branchingScenario": "प्रसंग प्रश्नमंजुषा",
+      "bucketSort": "बकेट सॉर्ट"
     },
     "player": {
       "exit": "बाहेर पडा",
@@ -1857,6 +1858,26 @@
         "SCENARIO_NOT_TRANSLATED": "हा रोल प्ले इंग्रजीत चालेल",
         "CASE_NOT_TRANSLATED": "हे केस इंग्रजीत आहे"
       }
+    },
+    "bucketSort": {
+      "whereDoesItGo": "हे कोणत्या गटात येते?",
+      "progress": "{{total}} पैकी {{placed}} वर्गीकृत",
+      "tapHint": "हे ज्या बकेटमध्ये येते त्यावर टॅप करा.",
+      "bucketA11y": "\"{{item}}\" {{bucket}} मध्ये ठेवा",
+      "correct": "बरोबर!",
+      "notQuite": "अगदी बरोबर नाही",
+      "belongsIn": "हे {{bucket}} मध्ये येते.",
+      "youChose": "तुम्ही {{bucket}} निवडले.",
+      "next": "पुढील आयटम",
+      "seeResults": "निकाल पहा",
+      "resultsHeading": "सर्व वर्गीकरण झाले",
+      "firstTry": "पहिल्या प्रयत्नात {{pct}}% बरोबर",
+      "best": "आतापर्यंतचा सर्वोत्तम: {{pct}}%",
+      "reviewHeading": "हे पुन्हा एकदा पहा",
+      "allRight": "प्रत्येक आयटम पहिल्याच प्रयत्नात योग्य बकेटमध्ये गेला.",
+      "practiceAgain": "पुन्हा वर्गीकरण करा",
+      "continue": "पुढे जा",
+      "placeFailed": "काहीतरी चुकले. कृपया पुन्हा प्रयत्न करा."
     },
     "branching": {
       "endingsSeen": "{{total}} पैकी {{seen}} शेवट पाहिले",

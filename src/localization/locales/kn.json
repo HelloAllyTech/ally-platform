@@ -1698,7 +1698,8 @@
       "minScore": "ಕನಿಷ್ಠ ಸ್ಕೋರ್ {{score}}%",
       "case": "ಕೇಸ್",
       "game": "ಆಟ · ಕೇವಲ ಮೋಜಿಗಾಗಿ",
-      "branchingScenario": "ಸನ್ನಿವೇಶ ರಸಪ್ರಶ್ನೆ"
+      "branchingScenario": "ಸನ್ನಿವೇಶ ರಸಪ್ರಶ್ನೆ",
+      "bucketSort": "ಬಕೆಟ್ ವಿಂಗಡಣೆ"
     },
     "player": {
       "exit": "ನಿರ್ಗಮಿಸಿ",
@@ -1857,6 +1858,26 @@
         "SCENARIO_NOT_TRANSLATED": "ಈ ರೋಲ್ ಪ್ಲೇ ಇಂಗ್ಲಿಷ್‌ನಲ್ಲಿ ನಡೆಯುತ್ತದೆ",
         "CASE_NOT_TRANSLATED": "ಈ ಕೇಸ್ ಇಂಗ್ಲಿಷ್‌ನಲ್ಲಿದೆ"
       }
+    },
+    "bucketSort": {
+      "whereDoesItGo": "ಇದು ಯಾವ ವರ್ಗಕ್ಕೆ ಸೇರುತ್ತದೆ?",
+      "progress": "{{total}} ರಲ್ಲಿ {{placed}} ವಿಂಗಡಿಸಲಾಗಿದೆ",
+      "tapHint": "ಇದು ಸೇರುವ ಬಕೆಟ್ ಅನ್ನು ಟ್ಯಾಪ್ ಮಾಡಿ.",
+      "bucketA11y": "\"{{item}}\" ಅನ್ನು {{bucket}} ನಲ್ಲಿ ಇರಿಸಿ",
+      "correct": "ಸರಿ!",
+      "notQuite": "ಸರಿಯಾಗಿಲ್ಲ",
+      "belongsIn": "ಇದು {{bucket}} ಗೆ ಸೇರುತ್ತದೆ.",
+      "youChose": "ನೀವು {{bucket}} ಆಯ್ಕೆ ಮಾಡಿದ್ದೀರಿ.",
+      "next": "ಮುಂದಿನ ಐಟಂ",
+      "seeResults": "ಫಲಿತಾಂಶ ನೋಡಿ",
+      "resultsHeading": "ಎಲ್ಲವೂ ವಿಂಗಡಣೆಯಾಗಿದೆ",
+      "firstTry": "ಮೊದಲ ಪ್ರಯತ್ನದಲ್ಲಿ {{pct}}% ಸರಿ",
+      "best": "ಇಲ್ಲಿಯವರೆಗಿನ ಉತ್ತಮ: {{pct}}%",
+      "reviewHeading": "ಇನ್ನೊಮ್ಮೆ ನೋಡಿ",
+      "allRight": "ಪ್ರತಿ ಐಟಂ ಮೊದಲ ಬಾರಿಗೇ ಸರಿಯಾದ ಬಕೆಟ್‌ಗೆ ಹೋಯಿತು.",
+      "practiceAgain": "ಮತ್ತೆ ವಿಂಗಡಿಸಿ",
+      "continue": "ಮುಂದುವರಿಸಿ",
+      "placeFailed": "ಏನೋ ತಪ್ಪಾಯಿತು. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
     },
     "branching": {
       "endingsSeen": "{{total}} ರಲ್ಲಿ {{seen}} ಅಂತ್ಯಗಳನ್ನು ನೋಡಿದ್ದೀರಿ",

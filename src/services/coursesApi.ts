@@ -1,6 +1,7 @@
 import {API_METHODS, API_ROUTES} from '@/constants';
 import {
   BranchingResult,
+  BucketSortPlacementResult,
   EnrollTrackResponse,
   GetLearnTracksResponse,
   GetNextTrackItemResponse,
@@ -246,6 +247,30 @@ export const coursesApi = api.injectEndpoints({
       invalidatesTags: ALL_TRACK_TAGS,
     }),
 
+    /**
+     * One placement in a bucket sort. The server holds the key; the response
+     * is that item's verdict, the right bucket and the author's explanation.
+     */
+    placeBucketSortItem: builder.mutation<
+      BucketSortPlacementResult,
+      {itemId: string; sortItemId: string; bucketId: string}
+    >({
+      query: ({itemId, sortItemId, bucketId}) => ({
+        url: API_ROUTES.TRACKS.BUCKET_SORT_PLACE(itemId),
+        method: API_METHODS.POST,
+        body: {sortItemId, bucketId},
+      }),
+      invalidatesTags: ALL_TRACK_TAGS,
+    }),
+
+    /** Another round of a finished bucket sort. */
+    restartBucketSort: builder.mutation<{success: boolean}, {itemId: string}>({
+      query: ({itemId}) => ({
+        url: API_ROUTES.TRACKS.BUCKET_SORT_RESTART(itemId),
+        method: API_METHODS.POST,
+      }),
+    }),
+
     saveJournalDraft: builder.mutation<
       {success: boolean},
       {itemId: string; responses: {promptId: string; response: string}[]}
@@ -316,6 +341,8 @@ export const {
   useSubmitJournalMutation,
   useRecordGameResultMutation,
   useRecordBranchingResultMutation,
+  usePlaceBucketSortItemMutation,
+  useRestartBucketSortMutation,
   useGetTrackLanguagesQuery,
   useSetTrackLanguageMutation,
 } = coursesApi;

@@ -748,7 +748,8 @@
       "minScore": "min score {{score}}%",
       "case": "Case",
       "game": "Game · just for fun",
-      "branchingScenario": "Scenario quiz"
+      "branchingScenario": "Scenario quiz",
+      "bucketSort": "Bucket sort"
     },
     "player": {
       "exit": "Exit",
@@ -907,6 +908,26 @@
         "SCENARIO_NOT_TRANSLATED": "This role play runs in English",
         "CASE_NOT_TRANSLATED": "This case is in English"
       }
+    },
+    "bucketSort": {
+      "whereDoesItGo": "Where does this belong?",
+      "progress": "{{placed}} of {{total}} sorted",
+      "tapHint": "Tap the bucket it belongs in.",
+      "bucketA11y": "Put \"{{item}}\" in {{bucket}}",
+      "correct": "Right!",
+      "notQuite": "Not quite",
+      "belongsIn": "It belongs in {{bucket}}.",
+      "youChose": "You chose {{bucket}}.",
+      "next": "Next item",
+      "seeResults": "See results",
+      "resultsHeading": "All sorted",
+      "firstTry": "{{pct}}% right on the first try",
+      "best": "Best so far: {{pct}}%",
+      "reviewHeading": "Worth another look",
+      "allRight": "Every item went in the right bucket first time.",
+      "practiceAgain": "Sort again",
+      "continue": "Continue",
+      "placeFailed": "Something went wrong. Please try again."
     },
     "branching": {
       "endingsSeen": "{{seen}} of {{total}} endings seen",

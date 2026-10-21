@@ -234,6 +234,10 @@ export const API_ROUTES = {
       `/learn/tracks/items/${itemId}/quiz-attempts/${attemptId}/regrade`,
     GAME_RESULT: (itemId: string) =>
       `/learn/tracks/items/${itemId}/game-result`,
+    BUCKET_SORT_PLACE: (itemId: string) =>
+      `/learn/tracks/items/${itemId}/bucket-sort/place`,
+    BUCKET_SORT_RESTART: (itemId: string) =>
+      `/learn/tracks/items/${itemId}/bucket-sort/restart`,
     BRANCHING_RESULT: (itemId: string) =>
       `/learn/tracks/items/${itemId}/branching-result`,
     JOURNAL_DRAFT: (itemId: string) => `/learn/tracks/items/${itemId}/journal`,

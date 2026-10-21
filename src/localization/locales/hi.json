@@ -1698,7 +1698,8 @@
       "minScore": "न्यूनतम स्कोर {{score}}%",
       "case": "केस",
       "game": "गेम · बस मनोरंजन के लिए",
-      "branchingScenario": "परिदृश्य प्रश्नोत्तरी"
+      "branchingScenario": "परिदृश्य प्रश्नोत्तरी",
+      "bucketSort": "बकेट सॉर्ट"
     },
     "player": {
       "exit": "बाहर जाएं",
@@ -1857,6 +1858,26 @@
         "SCENARIO_NOT_TRANSLATED": "यह रोल प्ले अंग्रेज़ी में चलेगा",
         "CASE_NOT_TRANSLATED": "यह केस अंग्रेज़ी में है"
       }
+    },
+    "bucketSort": {
+      "whereDoesItGo": "यह किस श्रेणी में आता है?",
+      "progress": "{{total}} में से {{placed}} छाँटे गए",
+      "tapHint": "जिस बकेट में यह आता है उस पर टैप करें।",
+      "bucketA11y": "\"{{item}}\" को {{bucket}} में रखें",
+      "correct": "सही!",
+      "notQuite": "बिल्कुल सही नहीं",
+      "belongsIn": "यह {{bucket}} में आता है।",
+      "youChose": "आपने {{bucket}} चुना।",
+      "next": "अगला आइटम",
+      "seeResults": "नतीजे देखें",
+      "resultsHeading": "सब छँट गया",
+      "firstTry": "पहली कोशिश में {{pct}}% सही",
+      "best": "अब तक का सर्वश्रेष्ठ: {{pct}}%",
+      "reviewHeading": "इन्हें एक बार फिर देखें",
+      "allRight": "हर आइटम पहली बार में सही बकेट में गया।",
+      "practiceAgain": "फिर से छाँटें",
+      "continue": "आगे बढ़ें",
+      "placeFailed": "कुछ गलत हो गया। कृपया फिर कोशिश करें।"
     },
     "branching": {
       "endingsSeen": "{{total}} में से {{seen}} अंत देखे गए",
