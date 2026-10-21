@@ -856,7 +856,8 @@
       "feedback": {
         "question": "Was this helpful?",
         "thankYou": "Thank you for your feedback!",
-        "commentPlaceholder": "What did you like or dislike? (Optional)"
+        "commentPlaceholder": "What did you like or dislike? (Optional)",
+        "saveFailed": "Sorry, we couldn't save your feedback."
       }
     }
   },

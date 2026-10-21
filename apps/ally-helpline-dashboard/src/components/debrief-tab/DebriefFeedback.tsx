@@ -10,32 +10,50 @@ interface DebriefFeedbackProps {
 }
 
 type FeedbackState = "initial" | "voted" | "thankyou";
+type Rating = "positive" | "negative";
 
 export const DebriefFeedback: FC<DebriefFeedbackProps> = ({ sessionId }) => {
   const { t } = useTranslation();
   const [submitFeedback, { isLoading }] = useSubmitDebriefFeedbackMutation();
-  const [rating, setRating] = useState<"positive" | "negative" | null>(null);
+  const [rating, setRating] = useState<Rating | null>(null);
   const [comment, setComment] = useState("");
   const [state, setState] = useState<FeedbackState>("initial");
+  // Which post failed, so Retry resends it. The typed comment stays put.
+  const [failed, setFailed] = useState<"vote" | "comment" | null>(null);
 
-  const handleVote = async (vote: "positive" | "negative") => {
-    setRating(vote);
-    setState("voted");
+  const sendVote = async (vote: Rating) => {
+    setFailed(null);
     try {
       await submitFeedback({ sessionId, rating: vote }).unwrap();
     } catch {
-      // Error is handled by the API slice or we could show a toast
+      setFailed("vote");
     }
   };
 
+  const handleVote = (vote: Rating) => {
+    setRating(vote);
+    setState("voted");
+    void sendVote(vote);
+  };
+
+  // Carries the rating too, so it also saves a vote whose own post failed.
   const handleSubmitComment = async () => {
     if (!rating) return;
+    setFailed(null);
+    const trimmed = comment.trim();
     try {
-      await submitFeedback({ sessionId, rating, comment }).unwrap();
+      await submitFeedback(
+        trimmed ? { sessionId, rating, comment: trimmed } : { sessionId, rating },
+      ).unwrap();
       setState("thankyou");
     } catch {
-      // Error handled
+      setFailed("comment");
     }
+  };
+
+  const handleRetry = () => {
+    if (failed === "vote" && rating) void sendVote(rating);
+    else void handleSubmitComment();
   };
 
   if (state === "thankyou") {
@@ -52,7 +70,7 @@ export const DebriefFeedback: FC<DebriefFeedbackProps> = ({ sessionId }) => {
     <div className="mt-4 flex flex-col gap-4 border-t border-gray-100 pt-4">
       <div className="flex items-center gap-4">
         <span className="font-primary text-sm font-medium text-typography-700">
-          {state === "initial"
+          {state === "initial" || failed === "vote"
             ? t("postSim.debrief.feedback.question")
             : t("postSim.debrief.feedback.thankYou")}
         </span>
@@ -101,6 +119,20 @@ export const DebriefFeedback: FC<DebriefFeedbackProps> = ({ sessionId }) => {
             className="w-full rounded-md border border-gray-200 p-3 font-primary text-sm text-typography-800 placeholder:text-typography-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
             rows={3}
           />
+          {failed && (
+            <div className="flex items-center gap-3">
+              <p role="alert" className="font-primary text-sm text-destructive-700">
+                {t("postSim.debrief.feedback.saveFailed")}
+              </p>
+              <button
+                onClick={handleRetry}
+                disabled={isLoading}
+                className="font-primary text-sm font-medium text-primary-600 underline hover:text-primary-700 disabled:opacity-50"
+              >
+                {t("common.retry")}
+              </button>
+            </div>
+          )}
           <div className="flex justify-end">
             <button
               onClick={handleSubmitComment}
