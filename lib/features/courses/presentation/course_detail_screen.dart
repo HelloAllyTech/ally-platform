@@ -33,27 +33,6 @@ IconData _iconForType(TrackItemType type) {
   }
 }
 
-bool _isPlayableType(TrackItemType type) =>
-    type == TrackItemType.article ||
-    type == TrackItemType.video ||
-    type == TrackItemType.quiz ||
-    type == TrackItemType.journal ||
-    type == TrackItemType.game;
-
-/// First unlocked (startable) item across all sections, in order — matches
-/// RN's `handleStartOrContinue`, which resumes `useLazyGetNextTrackItemQuery`'s
-/// `nextItem`. No such endpoint exists in this app's backend client yet, so
-/// this is computed client-side from the already-fetched track detail
-/// instead of adding a new repository call for it.
-TrackDetailItem? _nextItem(TrackDetail detail) {
-  for (final section in detail.sections) {
-    for (final item in section.items) {
-      if (item.status == TrackItemStatus.unlocked) return item;
-    }
-  }
-  return null;
-}
-
 /// Track detail — sections + items, with entry into each item. ARTICLE,
 /// VIDEO, QUIZ, JOURNAL, and GAME items open the real ported player;
 /// ROLEPLAY/CASE route through the existing Simulations/Cases screens
@@ -73,7 +52,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen> {
   String? _error;
 
   void _openItem(TrackDetailItem item) {
-    if (_isPlayableType(item.type)) {
+    if (isPlayableTrackItemType(item.type)) {
       context.push('/courses/item/${item.id}', extra: item);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -92,7 +71,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen> {
         await ref.read(coursesRepositoryProvider).enrollTrack(detail.id);
         ref.invalidate(trackDetailProvider(detail.id));
       }
-      final next = _nextItem(detail);
+      final next = nextUnlockedItem(detail);
       if (next != null && mounted) _openItem(next);
     } catch (e) {
       setState(() => _error = '${ref.tr('errors.startSimulation')}: $e');

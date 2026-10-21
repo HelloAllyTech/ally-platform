@@ -205,6 +205,106 @@ class TrackDetail {
   final List<TrackSection> sections;
 }
 
+/// Mirrors RN's `SkillFeedbackClassification` — how one skill category's
+/// averaged score across every evaluated roleplay session in the course
+/// nets out.
+enum SkillFeedbackClassification { demonstrated, needsPractice, insufficientData }
+
+SkillFeedbackClassification skillFeedbackClassificationFromString(String? value) {
+  switch (value) {
+    case 'demonstrated':
+      return SkillFeedbackClassification.demonstrated;
+    case 'needs_practice':
+      return SkillFeedbackClassification.needsPractice;
+    default:
+      return SkillFeedbackClassification.insufficientData;
+  }
+}
+
+/// Mirrors RN's `TrackProgressSectionSummary`.
+class TrackProgressSectionSummary {
+  TrackProgressSectionSummary({
+    required this.id,
+    required this.title,
+    required this.order,
+    required this.completedItems,
+    required this.totalItems,
+  });
+
+  factory TrackProgressSectionSummary.fromJson(Map<String, dynamic> json) =>
+      TrackProgressSectionSummary(
+        id: json['id'] as String,
+        title: json['title'] as String,
+        order: (json['order'] as num?)?.toInt() ?? 0,
+        completedItems: (json['completedItems'] as num?)?.toInt() ?? 0,
+        totalItems: (json['totalItems'] as num?)?.toInt() ?? 0,
+      );
+
+  final String id;
+  final String title;
+  final int order;
+  final int completedItems;
+  final int totalItems;
+}
+
+/// Mirrors RN's `TrackSkillCategoryFeedback` — one skillCoverage category,
+/// pre-averaged server-side across every evaluated roleplay session in the
+/// course. `category` is a raw pass-through label, not a translation key.
+class TrackSkillCategoryFeedback {
+  TrackSkillCategoryFeedback({
+    required this.category,
+    required this.averagePercentage,
+    required this.sampleSize,
+    required this.classification,
+  });
+
+  factory TrackSkillCategoryFeedback.fromJson(Map<String, dynamic> json) =>
+      TrackSkillCategoryFeedback(
+        category: json['category'] as String,
+        averagePercentage: (json['averagePercentage'] as num?)?.toDouble(),
+        sampleSize: (json['sampleSize'] as num?)?.toInt() ?? 0,
+        classification: skillFeedbackClassificationFromString(
+          json['classification'] as String?,
+        ),
+      );
+
+  final String category;
+  final double? averagePercentage;
+  final int sampleSize;
+  final SkillFeedbackClassification classification;
+}
+
+/// Mirrors RN's `TrackRoleplaySessionFeedback` — one evaluated (or still
+/// pending) roleplay attempt within this course, oldest-first in the
+/// dashboard response.
+class TrackRoleplaySessionFeedback {
+  TrackRoleplaySessionFeedback({
+    required this.trackItemId,
+    required this.trackItemTitle,
+    required this.scenarioSessionId,
+    required this.compositeScore,
+    required this.occurredAt,
+    required this.evaluationMarkdown,
+  });
+
+  factory TrackRoleplaySessionFeedback.fromJson(Map<String, dynamic> json) =>
+      TrackRoleplaySessionFeedback(
+        trackItemId: json['trackItemId'] as String,
+        trackItemTitle: json['trackItemTitle'] as String?,
+        scenarioSessionId: json['scenarioSessionId'] as String,
+        compositeScore: (json['compositeScore'] as num?)?.toDouble(),
+        occurredAt: json['occurredAt'] as String?,
+        evaluationMarkdown: json['evaluationMarkdown'] as String?,
+      );
+
+  final String trackItemId;
+  final String? trackItemTitle;
+  final String scenarioSessionId;
+  final double? compositeScore;
+  final String? occurredAt;
+  final String? evaluationMarkdown;
+}
+
 class TrackProgressDashboard {
   TrackProgressDashboard({
     required this.trackId,
@@ -212,6 +312,11 @@ class TrackProgressDashboard {
     required this.totalItems,
     required this.completedItems,
     required this.completionPct,
+    this.sections = const [],
+    this.evaluatedRoleplaySessionCount = 0,
+    this.averageCompositeScore,
+    this.skillCategories = const [],
+    this.roleplaySessions = const [],
   });
 
   factory TrackProgressDashboard.fromJson(Map<String, dynamic> json) =>
@@ -221,6 +326,18 @@ class TrackProgressDashboard {
         totalItems: (json['totalItems'] as num?)?.toInt() ?? 0,
         completedItems: (json['completedItems'] as num?)?.toInt() ?? 0,
         completionPct: (json['completionPct'] as num?)?.toDouble() ?? 0,
+        sections: (json['sections'] as List<dynamic>? ?? [])
+            .map((e) => TrackProgressSectionSummary.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        evaluatedRoleplaySessionCount:
+            (json['evaluatedRoleplaySessionCount'] as num?)?.toInt() ?? 0,
+        averageCompositeScore: (json['averageCompositeScore'] as num?)?.toDouble(),
+        skillCategories: (json['skillCategories'] as List<dynamic>? ?? [])
+            .map((e) => TrackSkillCategoryFeedback.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        roleplaySessions: (json['roleplaySessions'] as List<dynamic>? ?? [])
+            .map((e) => TrackRoleplaySessionFeedback.fromJson(e as Map<String, dynamic>))
+            .toList(),
       );
 
   final String trackId;
@@ -228,4 +345,36 @@ class TrackProgressDashboard {
   final int totalItems;
   final int completedItems;
   final double completionPct;
+  final List<TrackProgressSectionSummary> sections;
+  final int evaluatedRoleplaySessionCount;
+  final double? averageCompositeScore;
+  final List<TrackSkillCategoryFeedback> skillCategories;
+  final List<TrackRoleplaySessionFeedback> roleplaySessions;
 }
+
+/// Mirrors RN's `handleStartOrContinue`/`useLazyGetNextTrackItemQuery`'s
+/// `nextItem`: the first unlocked (startable) item across all sections, in
+/// order. No such endpoint exists in this app's backend client yet, so this
+/// is computed client-side from an already-fetched `TrackDetail` instead of
+/// adding a new repository call for it — shared by `CourseDetailScreen`'s
+/// Start/Continue button and `CourseProgressScreen`'s Continue/PracticeNudge
+/// actions, which both need the exact same "what's next" answer.
+TrackDetailItem? nextUnlockedItem(TrackDetail detail) {
+  for (final section in detail.sections) {
+    for (final item in section.items) {
+      if (item.status == TrackItemStatus.unlocked) return item;
+    }
+  }
+  return null;
+}
+
+/// ROLEPLAY/CASE items route through the existing Simulations/Cases screens
+/// instead of `CourseItemPlayerScreen` (not wired from the course-player
+/// entry points yet) — shared by `CourseDetailScreen`'s item taps and
+/// `CourseProgressScreen`'s Continue/PracticeNudge actions.
+bool isPlayableTrackItemType(TrackItemType type) =>
+    type == TrackItemType.article ||
+    type == TrackItemType.video ||
+    type == TrackItemType.quiz ||
+    type == TrackItemType.journal ||
+    type == TrackItemType.game;
