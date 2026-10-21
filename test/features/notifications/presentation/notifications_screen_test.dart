@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -11,6 +12,7 @@ import 'package:ally_mobile_flutter/features/notifications/data/notifications_re
 import 'package:ally_mobile_flutter/features/notifications/presentation/notifications_screen.dart';
 
 import '../../../support/pump_app.dart';
+import '../../../support/pump_router_app.dart';
 import '../../../support/prewarm_translations.dart';
 
 class MockNotificationsRepository extends Mock implements NotificationsRepository {}
@@ -158,5 +160,58 @@ void main() {
     await tester.pumpAndSettle();
 
     verify(() => repository.markAllRead()).called(1);
+  });
+
+  testWidgets('hides "Mark all read" entirely when nothing is unread', (tester) async {
+    when(() => repository.list()).thenAnswer((_) async => [
+          _item(id: 'n1', title: 'Read title', body: 'Read body', readAt: '2026-10-02T00:00:00.000Z'),
+        ]);
+
+    await preWarmTranslations(tester);
+    await pumpApp(
+      tester,
+      const NotificationsScreen(),
+      overrides: [notificationsRepositoryProvider.overrideWithValue(repository)],
+    );
+
+    expect(find.text('Mark all read'), findsNothing);
+  });
+
+  testWidgets('shows a relative "time ago" timestamp per item', (tester) async {
+    when(() => repository.list()).thenAnswer(
+      (_) async => [_item(id: 'n1', title: 'Unread title', body: 'Unread body')],
+    );
+
+    await preWarmTranslations(tester);
+    await pumpApp(
+      tester,
+      const NotificationsScreen(),
+      overrides: [notificationsRepositoryProvider.overrideWithValue(repository)],
+    );
+
+    // createdAt is 2026-10-01, well over a week before "today" in these
+    // tests — RN's own `timeAgo` falls back to a plain date past 7 days.
+    expect(find.textContaining('10/1/2026'), findsOneWidget);
+  });
+
+  testWidgets('has a real back button that pops the route', (tester) async {
+    when(() => repository.list()).thenAnswer((_) async => []);
+
+    final router = await pumpRouterApp(
+      tester,
+      initialLocation: '/home',
+      routes: [
+        GoRoute(path: '/home', builder: (context, state) => const Scaffold(body: Text('HOME'))),
+        GoRoute(path: '/notifications', builder: (context, state) => const NotificationsScreen()),
+      ],
+      overrides: [notificationsRepositoryProvider.overrideWithValue(repository)],
+    );
+    router.push('/notifications');
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.arrow_back));
+    await tester.pumpAndSettle();
+
+    expect(find.text('HOME'), findsOneWidget);
   });
 }
