@@ -3,6 +3,9 @@ export enum Permissions {
   // Tenant-admin native Organization Metrics dashboard (not Metabase)
   VIEW_ORGANIZATION_METRICS = "view:organization-metrics",
 
+  // Org-admin learner management (e.g. reopening a learner's scenario-quiz attempts)
+  EDIT_USER = "edit:user",
+
   // Call related permissions
   START_MICROPHONE_CHAT = "start:microphone-chat",
   START_CLOUD_TELEPHONY_CHAT = "start:cloud-telephony-chat",

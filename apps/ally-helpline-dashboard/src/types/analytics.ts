@@ -176,6 +176,27 @@ export interface LearnerUsageRow {
   reflectionCompleted: number;
 }
 
+/** One scenario quiz a learner has started but not passed (trainer view). */
+export interface LearnerScenarioAttempt {
+  trackId: string;
+  trackTitle: string;
+  trackItemId: string;
+  title: string;
+  attemptsUsed: number;
+  /** Null when the quiz has no attempt cap. */
+  maxAttempts: number | null;
+  /** Every attempt used without passing — the learner is paused. */
+  exhausted: boolean;
+  /** When the paused round reopens by itself. */
+  nextRoundAt: string | null;
+  bestScore: number | null;
+}
+
+export interface ResetBranchingAttemptsRequest {
+  trackItemId: string;
+  userId: number;
+}
+
 export interface GetLearnerUsageTableResponse {
   range: OrganizationMetricsRange;
   data: LearnerUsageRow[];

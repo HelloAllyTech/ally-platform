@@ -23,6 +23,11 @@ export const ApiEndpoints = {
     GET_ORGANIZATION_METRICS: "/v1/tenant-analytics/organization-metrics",
     GET_LEARNER_USAGE_TABLE: "/v1/tenant-analytics/learner-usage",
     GET_COURSE_USAGE_TABLE: "/v1/tenant-analytics/course-usage",
+    // Template functions for dynamic endpoints
+    LEARNER_SCENARIO_ATTEMPTS: (userId: number) =>
+      `/v1/learn/admin/learners/${userId}/scenario-attempts`,
+    RESET_BRANCHING_ATTEMPTS: (trackItemId: string) =>
+      `/v1/learn/admin/tracks/items/${trackItemId}/branching-reset`,
   },
   AUDIO_CALL: {
     GET_WAITING_CLIENTS: "/v1/users/waiting-list",

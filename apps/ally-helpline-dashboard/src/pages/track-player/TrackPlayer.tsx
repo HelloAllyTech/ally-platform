@@ -234,6 +234,7 @@ export const TrackPlayer: FC = () => {
             itemId={itemId}
             onCompleted={handleCompletion}
             onRequestNext={goNextOrOverview}
+            onBackToCourse={nav.exitToOverview}
           />
         );
       case TrackItemType.ROLEPLAY:

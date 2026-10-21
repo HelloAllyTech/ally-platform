@@ -7,9 +7,16 @@ import { LearnerUsageRow } from "@types";
 const mockUseGetLearnerUsageTableQuery = vi.fn();
 
 vi.mock("@api", () => ({
-  useGetLearnerUsageTableQuery: (...args: unknown[]) =>
-    mockUseGetLearnerUsageTableQuery(...args),
+  useGetLearnerUsageTableQuery: (...args: unknown[]) => mockUseGetLearnerUsageTableQuery(...args),
 }));
+
+// No `edit:user` here: these tests cover the table itself; the reopen action
+// is covered in ScenarioAttemptsDrawer.test.tsx.
+vi.mock("@constants", () => ({ Permissions: { EDIT_USER: "edit:user" } }));
+vi.mock("@utils", () => ({
+  hasPermissions: (perms: string[], p: string) => perms.includes(p),
+}));
+vi.mock("@hooks", () => ({ useUser: () => ({ permissions: [] }) }));
 
 /**
  * The real GenericTable is left in place — the point of these tests is what

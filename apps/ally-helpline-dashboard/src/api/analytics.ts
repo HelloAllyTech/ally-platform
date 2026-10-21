@@ -5,7 +5,7 @@
  * - Analytics data retrieval and processing
  */
 
-import { ApiEndpoints, HttpMethod } from "@constants";
+import { ApiEndpoints, HttpMethod, TAG_TYPES } from "@constants";
 import {
   GetCounsellorStatsRequest,
   GetCounsellorStatsResponse,
@@ -15,8 +15,10 @@ import {
   GetDashboardsResponse,
   GetLearnerUsageTableRequest,
   GetLearnerUsageTableResponse,
+  LearnerScenarioAttempt,
   GetOrganizationMetricsRequest,
   GetOrganizationMetricsResponse,
+  ResetBranchingAttemptsRequest,
 } from "@types";
 
 import { baseAPI } from "./baseAPI";
@@ -103,6 +105,36 @@ const analyticsAPI = baseAPI.injectEndpoints({
         params,
       }),
     }),
+
+    /**
+     * Scenario quizzes a learner has started but not passed (trainer view).
+     * Tenant-scoped on the backend; needs `edit:user`.
+     * @param {number} userId - The learner
+     */
+    getLearnerScenarioAttempts: builder.query<LearnerScenarioAttempt[], number>({
+      query: userId => ({
+        url: ApiEndpoints.ANALYTICS.LEARNER_SCENARIO_ATTEMPTS(userId),
+        method: HttpMethod.GET,
+      }),
+      providesTags: (_result, _error, userId) => [
+        { type: TAG_TYPES.LEARNER_SCENARIO_ATTEMPTS, id: userId },
+      ],
+    }),
+
+    /**
+     * Reopen a learner's attempts on one scenario quiz now, instead of waiting
+     * out the 24-hour pause. Invalidates that learner's list so the row updates.
+     */
+    resetBranchingAttempts: builder.mutation<{ success: true }, ResetBranchingAttemptsRequest>({
+      query: ({ trackItemId, userId }) => ({
+        url: ApiEndpoints.ANALYTICS.RESET_BRANCHING_ATTEMPTS(trackItemId),
+        method: HttpMethod.POST,
+        body: { userId },
+      }),
+      invalidatesTags: (_result, _error, { userId }) => [
+        { type: TAG_TYPES.LEARNER_SCENARIO_ATTEMPTS, id: userId },
+      ],
+    }),
   }),
 });
 
@@ -114,4 +146,6 @@ export const {
   useGetOrganizationMetricsQuery,
   useGetLearnerUsageTableQuery,
   useGetCourseUsageTableQuery,
+  useGetLearnerScenarioAttemptsQuery,
+  useResetBranchingAttemptsMutation,
 } = analyticsAPI;

@@ -2,11 +2,13 @@ import { FunctionComponent, useEffect, useMemo, useState } from "react";
 
 import { useTranslation } from "react-i18next";
 
-import { ActionableNotification, GenericTable, Loading } from "@ally-ui-mono/ui-shared";
+import { ActionableNotification, GenericTable, Loading, Tooltip } from "@ally-ui-mono/ui-shared";
 import { Column, FilterType } from "@ally-ui-mono/ui-shared/lib/generic-table/types";
 import { useGetLearnerUsageTableQuery } from "@api";
 import { Download, NoResults } from "@assets";
 import { Button, Chip, ChipConfig, FallbackUI } from "@components";
+import { Permissions } from "@constants";
+import { useUser } from "@hooks";
 import {
   GetLearnerUsageTableRequest,
   LEARNER_USAGE_STATUSES,
@@ -15,6 +17,9 @@ import {
   LearnerUsageStatus,
   OrganizationMetricsRange,
 } from "@types";
+import { hasPermissions } from "@utils";
+
+import { ScenarioAttemptsDrawer } from "./ScenarioAttemptsDrawer";
 
 const PAGE_SIZE = 25;
 
@@ -106,6 +111,11 @@ interface LearnerUsageTableProps {
  */
 export const LearnerUsageTable: FunctionComponent<LearnerUsageTableProps> = ({ range }) => {
   const { t } = useTranslation();
+  const { permissions } = useUser();
+  // Reopening attempts edits another user's progress, so it follows the same
+  // `edit:user` the backend enforces — hidden rather than shown-and-403.
+  const canEditUsers = hasPermissions(permissions, Permissions.EDIT_USER);
+  const [attemptsLearner, setAttemptsLearner] = useState<{ id: number; name: string } | null>(null);
   const [rows, setRows] = useState<LearnerUsageRow[]>([]);
   const [offset, setOffset] = useState(0);
   const [search, setSearch] = useState<string | undefined>(undefined);
@@ -380,6 +390,24 @@ export const LearnerUsageTable: FunctionComponent<LearnerUsageTableProps> = ({ r
     },
   ];
 
+  if (canEditUsers) {
+    columns.push({
+      key: "scenarioAttempts",
+      header: "",
+      render: (_value, row) => (
+        <Tooltip label={t("organizationMetrics.scenarioAttempts.actionTooltip")} align="top">
+          <Button
+            variant="text"
+            onClick={() => setAttemptsLearner({ id: row.id, name: row.name })}
+            data-testid={`scenario-attempts-action-${row.id}`}
+          >
+            {t("organizationMetrics.scenarioAttempts.action")}
+          </Button>
+        </Tooltip>
+      ),
+    });
+  }
+
   if (isError) {
     return (
       <ActionableNotification
@@ -442,6 +470,15 @@ export const LearnerUsageTable: FunctionComponent<LearnerUsageTableProps> = ({ r
           handleLoadMore={hasMore ? handleLoadMore : undefined}
           loadMoreLabel={t("common.loadMore", "Load more")}
           className="min-w-full font-secondary text-sm text-typography-800"
+        />
+      )}
+
+      {attemptsLearner && (
+        <ScenarioAttemptsDrawer
+          open
+          onClose={() => setAttemptsLearner(null)}
+          userId={attemptsLearner.id}
+          learnerName={attemptsLearner.name}
         />
       )}
     </div>

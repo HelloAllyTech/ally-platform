@@ -138,6 +138,9 @@ export const TAG_TYPES = {
   // Course discussions (per-item thread). Also registered in baseAPI.ts's
   // `tagTypes` — an unregistered tag makes invalidatesTags a silent no-op.
   COURSE_DISCUSSION: "CourseDiscussion",
+  // A learner's open scenario-quiz attempts (trainer view). Also registered in
+  // baseAPI.ts's `tagTypes` — an unregistered tag makes invalidatesTags a silent no-op.
+  LEARNER_SCENARIO_ATTEMPTS: "LearnerScenarioAttempts",
   // Character Library (own-tenant list)
   CHARACTER_LIBRARY: "CharacterLibrary",
   // The per-user preferences blob (default language, org-metrics layout, ...)
