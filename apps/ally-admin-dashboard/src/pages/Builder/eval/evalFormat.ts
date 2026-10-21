@@ -272,6 +272,7 @@ export const SUITE_STATUS_TAG_TYPE: Record<BuilderEvalSuite["status"], BuilderTa
   running: "purple",
   completed: "green",
   errored: "red",
+  cancelled: "cool-gray",
 };
 
 export const RUN_STATUS_TAG_TYPE: Record<BuilderEvalRun["status"], BuilderTagType> = {
@@ -280,6 +281,7 @@ export const RUN_STATUS_TAG_TYPE: Record<BuilderEvalRun["status"], BuilderTagTyp
   passed: "green",
   failed: "red",
   errored: "red",
+  cancelled: "cool-gray",
 };
 
 /* ── Formatting ─────────────────────────────────────────────────────────── */

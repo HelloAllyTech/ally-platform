@@ -981,7 +981,14 @@ export interface BuilderEvalTurnRecord {
   toolCalls: { name: string; ok: boolean; summary?: string }[];
 }
 
-export type BuilderEvalRunStatus = "queued" | "running" | "passed" | "failed" | "errored";
+export type BuilderEvalRunStatus =
+  | "queued"
+  | "running"
+  | "passed"
+  | "failed"
+  | "errored"
+  /** Never ran: its suite was cancelled first. */
+  | "cancelled";
 
 export interface BuilderEvalRun {
   id: string;
@@ -1001,7 +1008,7 @@ export interface BuilderEvalRun {
   completedAt?: string | null;
 }
 
-export type BuilderEvalSuiteStatus = "running" | "completed" | "errored";
+export type BuilderEvalSuiteStatus = "running" | "completed" | "errored" | "cancelled";
 
 export type BuilderEvalSuiteTrigger = "manual" | "baseline" | "prompt_gate";
 

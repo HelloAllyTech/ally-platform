@@ -60,6 +60,7 @@ vi.mock("@api", () => ({
   useUpdateBuilderEvalFixtureMutation: () => [updateFixture, { isLoading: false }],
   useDeleteBuilderEvalFixtureMutation: () => [vi.fn(), { isLoading: false }],
   useStartBuilderEvalSuiteMutation: () => [startSuite, { isLoading: false }],
+  useCancelBuilderEvalSuiteMutation: () => [vi.fn(), { isLoading: false }],
   useGetBuilderSessionsQuery: () => ({ data: [], isLoading: false, isError: false }),
   useCreateBuilderEvalFixtureFromSessionMutation: () => [vi.fn(), { isLoading: false }],
   useCreateBuilderEvalFixtureFromExportMutation: () => [vi.fn(), { isLoading: false }],

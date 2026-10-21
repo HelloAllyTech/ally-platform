@@ -673,6 +673,7 @@ export const ApiEndpoints = {
     EVAL_FIXTURE_BY_ID: (id: string) => `/v1/builder/eval/fixtures/${id}`,
     EVAL_SUITES: "/v1/builder/eval/suites",
     EVAL_SUITE_BY_ID: (id: string) => `/v1/builder/eval/suites/${id}`,
+    EVAL_SUITE_CANCEL: (id: string) => `/v1/builder/eval/suites/${id}/cancel`,
     EVAL_RUN_BY_ID: (id: string) => `/v1/builder/eval/runs/${id}`,
     EVAL_PROMPT_CANDIDATES: "/v1/builder/eval/prompt-candidates",
   },

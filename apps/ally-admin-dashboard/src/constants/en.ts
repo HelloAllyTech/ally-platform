@@ -4497,6 +4497,7 @@ export const en = {
         running: "Running",
         completed: "Completed",
         errored: "Errored",
+        cancelled: "Cancelled",
       } as Record<string, string>,
 
       // Said in the open, on the page and in the dialogs that create fixtures: a
@@ -4733,6 +4734,13 @@ export const en = {
         running: (done: number, planned: number) =>
           `Running: ${done} of ${planned} runs finished. This refreshes on its own.`,
         errored: "This suite errored",
+        cancelledTitle: "This suite was cancelled",
+        cancel: "Cancel suite",
+        cancelConfirm: "Stop it",
+        cancelKeep: "Keep running",
+        cancelAsk:
+          "Stop this suite? Runs that haven't started are cancelled; the ones in progress finish and keep their results. A cancelled prompt check publishes nothing.",
+        cancelFailed: "Couldn't cancel this suite.",
         stat: {
           passed: "Passed",
           gateViolations: "Gate violations",
@@ -4772,6 +4780,7 @@ export const en = {
           passed: "Passed",
           failed: "Failed",
           errored: "Errored",
+          cancelled: "Cancelled",
         } as Record<string, string>,
         turns: (count: number) => (count === 1 ? "1 turn" : `${count} turns`),
         corrections: (count: number) => (count === 1 ? "1 correction" : `${count} corrections`),

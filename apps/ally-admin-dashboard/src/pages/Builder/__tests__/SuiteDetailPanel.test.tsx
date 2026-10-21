@@ -23,11 +23,13 @@ let suiteResult: {
 let lastArgs: { id: unknown; options: any };
 const refetch = vi.fn();
 
+const cancelSuite = vi.fn();
 vi.mock("@api", () => ({
   useGetBuilderEvalSuiteQuery: (id: unknown, options: unknown) => {
     lastArgs = { id, options };
     return suiteResult;
   },
+  useCancelBuilderEvalSuiteMutation: () => [cancelSuite],
 }));
 
 // eslint-disable-next-line import/first
@@ -431,5 +433,49 @@ describe("SuiteDetailPanel", () => {
     expect(screen.getByText(strings.suiteDetail.loadFailed)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: strings.suiteDetail.retry }));
     expect(refetch).toHaveBeenCalled();
+  });
+
+  describe("cancelling", () => {
+    it("asks before stopping a running suite, then cancels it", async () => {
+      cancelSuite.mockReturnValue({ unwrap: () => Promise.resolve({}) });
+      suiteResult = {
+        ...suiteResult,
+        data: evalSuiteDetail({ status: "running" } as Partial<BuilderEvalSuiteDetail>),
+      };
+      renderPanel();
+
+      fireEvent.click(screen.getByRole("button", { name: strings.suiteDetail.cancel }));
+      expect(screen.getByText(strings.suiteDetail.cancelAsk)).toBeInTheDocument();
+      expect(cancelSuite).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByRole("button", { name: strings.suiteDetail.cancelConfirm }));
+      await vi.waitFor(() => expect(cancelSuite).toHaveBeenCalledWith("suite-1"));
+    });
+
+    it("offers no cancel for a suite that has finished", () => {
+      suiteResult = {
+        ...suiteResult,
+        data: evalSuiteDetail({ status: "completed" } as Partial<BuilderEvalSuiteDetail>),
+      };
+      renderPanel();
+
+      expect(
+        screen.queryByRole("button", { name: strings.suiteDetail.cancel }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("says a cancelled suite was cancelled, not that it errored", () => {
+      suiteResult = {
+        ...suiteResult,
+        data: evalSuiteDetail({
+          status: "cancelled",
+          error: "Cancelled by admin 7.",
+        } as Partial<BuilderEvalSuiteDetail>),
+      };
+      renderPanel();
+
+      expect(screen.getByText(strings.suiteDetail.cancelledTitle)).toBeInTheDocument();
+      expect(screen.queryByText(strings.suiteDetail.errored)).not.toBeInTheDocument();
+    });
   });
 });
