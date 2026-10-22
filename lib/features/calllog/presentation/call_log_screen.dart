@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/localization/translate_ref.dart';
 import '../../../core/permissions/permissions_repository.dart';
@@ -10,6 +11,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_tab_view.dart';
 import '../../../core/widgets/confirmation_modal.dart';
+import '../../../core/widgets/illustrated_modal.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../../../core/widgets/tab_screen_header.dart';
 import '../data/call_log_repository.dart';
@@ -28,9 +30,18 @@ enum _LogTab { real, simulation }
 /// dedicated "Archives" view (real calls only, `archive: true`), not a
 /// third tab. The floating action button for starting a new Scribe
 /// recording is gated on `START_MICROPHONE_CHAT`/`START_CLOUD_TELEPHONY_CHAT`.
+/// Tapping it shows the real `StartSessionModal` consent copy (reusing the
+/// shared `IllustratedModal` shell, since this port has only the one
+/// action it needs); confirming requests the microphone permission — with
+/// RN's own 30s bound so a native permission call that never settles can't
+/// silently freeze the tap forever — and only then pushes into Scribe
+/// recording. A denial opens the same microphone-settings alert the
+/// simulation screens already use.
 ///
 /// Not ported: the real `StartSessionModal`'s "Create Note" manual-note
-/// path (no note-creation flow exists yet in this app). The filter sheet
+/// path (no note-creation flow — the `createNote` mutation, and a
+/// CallSummaryScreen mode for a session with no existing call-log entry
+/// yet — exists in this app). The filter sheet
 /// (`CallLogFilterSheet`) is ported for the built-in filters only — RN's
 /// dynamic, tenant-configured custom-field filters need a
 /// `CustomFieldDefinition` catalog client this app doesn't have yet.
@@ -44,6 +55,74 @@ class CallLogScreen extends ConsumerStatefulWidget {
 class _CallLogScreenState extends ConsumerState<CallLogScreen> {
   _LogTab? _activeTab;
   bool _isViewingArchive = false;
+  bool _isStartingScribe = false;
+
+  void _showStartSessionModal() {
+    IllustratedModal.show(
+      context,
+      titleMain: ref.t('calls.dialog.startSession.titleNormal'),
+      titleItalic: ref.t('calls.dialog.startSession.titleItalic'),
+      description: ref.t('calls.dialog.startSession.footer'),
+      actionButtonText: ref.t('calls.dialog.startSession.startScribeMode'),
+      actionButtonVariant: AppButtonVariant.primary,
+      onActionPressed: _startScribeSession,
+    );
+  }
+
+  /// A second tap while the first is still resolving must not start a
+  /// parallel flow — matches RN's own `isStartingScribe` guard, which was
+  /// added after a real incident where two sessions got created seconds
+  /// apart. The microphone request is bounded to 30s (RN's own
+  /// `PERMISSION_TIMEOUT_MS`) so a native permission call that never
+  /// settles can't leave a counsellor staring at a screen that looks frozen
+  /// with no recourse but force-quitting the app.
+  Future<void> _startScribeSession() async {
+    if (_isStartingScribe) return;
+    setState(() => _isStartingScribe = true);
+    try {
+      var status = await Permission.microphone.status.timeout(const Duration(seconds: 30));
+      if (!status.isGranted) {
+        status = await Permission.microphone.request().timeout(const Duration(seconds: 30));
+      }
+      if (!mounted) return;
+      if (status.isGranted) {
+        context.push('/scribe');
+        return;
+      }
+      await _showMicrophoneSettingsAlert();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(ref.t('common.somethingWentWrong'))),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isStartingScribe = false);
+    }
+  }
+
+  Future<void> _showMicrophoneSettingsAlert() {
+    return showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(ref.t('simulationPage.allowMicrophone')),
+        content: Text(ref.t('simulationPage.microphonePrompt')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(ref.t('common.cancel')),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              openAppSettings();
+            },
+            child: Text(ref.t('common.openSettings')),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -153,7 +232,7 @@ class _CallLogScreenState extends ConsumerState<CallLogScreen> {
             Positioned(
               right: 20,
               bottom: 30,
-              child: _StartSessionFab(onPressed: () => context.push('/scribe')),
+              child: _StartSessionFab(onPressed: _showStartSessionModal),
             ),
         ],
       ),

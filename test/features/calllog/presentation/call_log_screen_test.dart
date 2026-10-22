@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:permission_handler_platform_interface/permission_handler_platform_interface.dart';
 
 import 'package:ally_mobile_flutter/core/permissions/permissions_repository.dart';
 import 'package:ally_mobile_flutter/core/permissions/user_permissions.dart';
@@ -9,6 +10,7 @@ import 'package:ally_mobile_flutter/core/widgets/app_button.dart';
 import 'package:ally_mobile_flutter/features/calllog/data/call_log_repository.dart';
 import 'package:ally_mobile_flutter/features/calllog/presentation/call_log_screen.dart';
 
+import '../../../support/fake_permission_platform.dart';
 import '../../../support/pump_router_app.dart';
 
 class MockCallLogRepository extends Mock implements CallLogRepository {}
@@ -191,11 +193,78 @@ void main() {
       await tester.tap(find.widgetWithText(AppButton, 'Archive'));
       await tester.pumpAndSettle();
       verify(() => repository.archiveCallLog(42)).called(1);
+    },
+  );
+
+  testWidgets(
+    'tapping the FAB shows the consent sheet, and confirming with mic permission granted pushes into Scribe recording',
+    (tester) async {
+      PermissionHandlerPlatform.instance = FakePermissionHandlerPlatform({
+        Permission.microphone: PermissionStatus.granted,
+      });
+      final repository = _repository(realLogs: [_log()]);
+
+      await pumpRouterApp(
+        tester,
+        initialLocation: '/call-log',
+        routes: _routes(),
+        overrides: [
+          callLogRepositoryProvider.overrideWithValue(repository),
+          userPermissionsProvider.overrideWith(
+            (ref) async => [
+              UserPermissions.viewCallLogs,
+              UserPermissions.startMicrophoneChat,
+            ],
+          ),
+        ],
+      );
 
       expect(find.byKey(const Key('start-session-fab')), findsOneWidget);
       await tester.tap(find.byKey(const Key('start-session-fab')));
       await tester.pumpAndSettle();
+      expect(find.textContaining('By starting, you confirm'), findsOneWidget);
+
+      await tester.tap(find.text('Start Scribe Mode'));
+      await tester.pumpAndSettle();
       expect(find.text('Scribe recording'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'denied mic permission closes the sheet and shows the microphone-settings alert instead',
+    (tester) async {
+      final fakePlatform = FakePermissionHandlerPlatform({
+        Permission.microphone: PermissionStatus.denied,
+      });
+      PermissionHandlerPlatform.instance = fakePlatform;
+      final repository = _repository(realLogs: [_log()]);
+
+      await pumpRouterApp(
+        tester,
+        initialLocation: '/call-log',
+        routes: _routes(),
+        overrides: [
+          callLogRepositoryProvider.overrideWithValue(repository),
+          userPermissionsProvider.overrideWith(
+            (ref) async => [
+              UserPermissions.viewCallLogs,
+              UserPermissions.startMicrophoneChat,
+            ],
+          ),
+        ],
+      );
+
+      await tester.tap(find.byKey(const Key('start-session-fab')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Start Scribe Mode'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Scribe recording'), findsNothing);
+      expect(find.text('Allow microphone permission'), findsOneWidget);
+
+      await tester.tap(find.text('Open Settings'));
+      await tester.pumpAndSettle();
+      expect(fakePlatform.openedSettings, isTrue);
     },
   );
 

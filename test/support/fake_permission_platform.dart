@@ -40,4 +40,15 @@ class FakePermissionHandlerPlatform extends PermissionHandlerPlatform {
   Future<PermissionStatus> checkPermissionStatus(Permission permission) async {
     return statuses[permission] ?? PermissionStatus.granted;
   }
+
+  /// Not a real settings-app launch — just records that it was asked for,
+  /// so a "denied -> tap Open Settings" test can assert on [openedSettings]
+  /// without the base platform interface's `UnimplementedError`.
+  bool openedSettings = false;
+
+  @override
+  Future<bool> openAppSettings() async {
+    openedSettings = true;
+    return true;
+  }
 }
