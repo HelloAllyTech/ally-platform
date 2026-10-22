@@ -25,6 +25,17 @@ class AuthInterceptor extends Interceptor {
   final Dio _refreshDio;
   final TokenStorage _tokenStorage;
 
+  // When several requests' access tokens expire at the same moment (e.g.
+  // Profile Settings' first-ever `/users/me` call landing right as some
+  // other screen's own request also 401s), each used to kick off its own
+  // independent refresh call. The backend's refresh token is single-use, so
+  // the loser of that race retried with an already-rotated token and fell
+  // through to `onUnrecoverable` — confirmed live as exactly why Profile
+  // Settings intermittently showed "session expired" while the rest of the
+  // app, whose requests had won their own races, kept working fine. All
+  // concurrent 401s now await this one shared attempt instead.
+  Future<String?>? _refreshFuture;
+
   /// Clears the session and returns the (already-translated) message to
   /// show — see [_replace]'s doc comment for why the caller's own message
   /// is what ends up on screen, not the original technical failure.
@@ -68,6 +79,35 @@ class AuthInterceptor extends Interceptor {
       return;
     }
 
+    // `??=`'s check-and-set has no `await` in it, so however the two awaits
+    // above interleaved across concurrent `onError` calls, only the first
+    // caller to reach this line actually starts `_refresh`; every other
+    // caller (here or arriving later while it's still running) piggybacks
+    // on the same `Future` and gets the exact token it resolved to — not a
+    // re-read of storage, which a concurrent caller could otherwise observe
+    // mid-write or (in the no-op case this interceptor is tested against) a
+    // stub that never reflects the write at all.
+    final newAccessToken = await (_refreshFuture ??= _refresh(refreshToken));
+
+    if (newAccessToken == null) {
+      handler.next(await _replace(err));
+      return;
+    }
+
+    try {
+      final retryOptions = err.requestOptions;
+      retryOptions.headers['authorization'] = 'Bearer $newAccessToken';
+      final retryResponse = await _refreshDio.fetch(retryOptions);
+      handler.resolve(retryResponse);
+    } catch (_) {
+      handler.next(await _replace(err));
+    }
+  }
+
+  /// Performs the actual refresh call, exactly once per shared attempt (see
+  /// `_refreshFuture`'s doc comment). Returns the new access token, or null
+  /// on any failure; never throws.
+  Future<String?> _refresh(String refreshToken) async {
     try {
       // _refreshDio carries no interceptor (deliberately, to avoid recursing
       // back into this one on a 401 from the refresh call itself), so unlike
@@ -80,22 +120,17 @@ class AuthInterceptor extends Interceptor {
 
       final newAccessToken = refreshResponse.data?['accessToken'] as String?;
       final newRefreshToken = refreshResponse.data?['refreshToken'] as String?;
-      if (newAccessToken == null || newRefreshToken == null) {
-        throw DioException(requestOptions: err.requestOptions);
-      }
+      if (newAccessToken == null || newRefreshToken == null) return null;
 
       await _tokenStorage.storeTokens(
         accessToken: newAccessToken,
         refreshToken: newRefreshToken,
       );
-
-      // Retry the original request with the refreshed token.
-      final retryOptions = err.requestOptions;
-      retryOptions.headers['authorization'] = 'Bearer $newAccessToken';
-      final retryResponse = await _refreshDio.fetch(retryOptions);
-      handler.resolve(retryResponse);
+      return newAccessToken;
     } catch (_) {
-      handler.next(await _replace(err));
+      return null;
+    } finally {
+      _refreshFuture = null;
     }
   }
 

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -260,6 +262,73 @@ void main() {
             refreshToken: any(named: 'refreshToken'),
           ),
         );
+      },
+    );
+
+    test(
+      'two concurrent 401s share one refresh call and both retry with the '
+      'same new access token (previously each raced its own refresh call '
+      'against a single-use refresh token, and the loser fell through to '
+      'onUnrecoverable even though the session itself was fine)',
+      () async {
+        final requestOptionsA = RequestOptions(path: '/v1/users/me');
+        final requestOptionsB = RequestOptions(path: '/v1/users/tenant');
+        final errA = DioException(
+          requestOptions: requestOptionsA,
+          response: _response<void>(null, statusCode: 401, requestOptions: requestOptionsA),
+        );
+        final errB = DioException(
+          requestOptions: requestOptionsB,
+          response: _response<void>(null, statusCode: 401, requestOptions: requestOptionsB),
+        );
+        when(() => tokenStorage.refreshToken).thenAnswer((_) async => 'old-refresh-token');
+        when(() => tokenStorage.accessToken).thenAnswer((_) async => 'old-access-token');
+
+        // A `Completer` stands in for the refresh call actually being
+        // in-flight when the second 401 arrives, rather than resolved
+        // instantly — the exact window the race happens in.
+        final refreshCompleter = Completer<Response<Map<String, dynamic>>>();
+        when(
+          () => refreshDio.post<Map<String, dynamic>>(
+            '/v1${ApiRoutes.authRefresh}',
+            data: {'refreshToken': 'old-refresh-token'},
+          ),
+        ).thenAnswer((_) => refreshCompleter.future);
+        when(
+          () => tokenStorage.storeTokens(
+            accessToken: 'new-access-token',
+            refreshToken: 'new-refresh-token',
+          ),
+        ).thenAnswer((_) async {});
+        final retryResponseA = _response<void>(null, requestOptions: requestOptionsA);
+        final retryResponseB = _response<void>(null, requestOptions: requestOptionsB);
+        when(() => refreshDio.fetch<dynamic>(requestOptionsA)).thenAnswer((_) async => retryResponseA);
+        when(() => refreshDio.fetch<dynamic>(requestOptionsB)).thenAnswer((_) async => retryResponseB);
+
+        final handlerA = _RecordingErrorHandler();
+        final handlerB = _RecordingErrorHandler();
+        final futureA = interceptor.onError(errA, handlerA);
+        final futureB = interceptor.onError(errB, handlerB);
+
+        // Let both onError calls run up to (and block on) the refresh call.
+        await Future<void>.delayed(Duration.zero);
+        refreshCompleter.complete(
+          _response({'accessToken': 'new-access-token', 'refreshToken': 'new-refresh-token'}),
+        );
+        await Future.wait([futureA, futureB]);
+
+        expect(handlerA.resolvedWith, same(retryResponseA));
+        expect(handlerB.resolvedWith, same(retryResponseB));
+        expect(requestOptionsA.headers['authorization'], 'Bearer new-access-token');
+        expect(requestOptionsB.headers['authorization'], 'Bearer new-access-token');
+        expect(unrecoverableCalls, 0);
+        // The one and only refresh call — not one per 401.
+        verify(
+          () => refreshDio.post<Map<String, dynamic>>(
+            '/v1${ApiRoutes.authRefresh}',
+            data: {'refreshToken': 'old-refresh-token'},
+          ),
+        ).called(1);
       },
     );
 
