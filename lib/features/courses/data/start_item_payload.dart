@@ -97,6 +97,46 @@ class VideoInterjection {
   final bool? answeredPassed;
 }
 
+/// Mirrors ally-mobile (React Native)'s `BreathingExerciseContent` — the
+/// one `TrackGameKey.BREATHING_EXERCISE` game carries this instead of
+/// loading an HTML5 bundle like every other game key.
+class BreathingExerciseContent {
+  BreathingExerciseContent({
+    required this.inhaleSeconds,
+    required this.holdInSeconds,
+    required this.exhaleSeconds,
+    required this.holdOutSeconds,
+    required this.cycles,
+    required this.inhaleText,
+    required this.holdInText,
+    required this.exhaleText,
+    required this.holdOutText,
+  });
+
+  factory BreathingExerciseContent.fromJson(Map<String, dynamic> json) =>
+      BreathingExerciseContent(
+        inhaleSeconds: (json['inhale'] as num).toDouble(),
+        holdInSeconds: (json['holdIn'] as num).toDouble(),
+        exhaleSeconds: (json['exhale'] as num).toDouble(),
+        holdOutSeconds: (json['holdOut'] as num).toDouble(),
+        cycles: (json['cycles'] as num).toInt(),
+        inhaleText: json['inhaleText'] as String,
+        holdInText: json['holdInText'] as String,
+        exhaleText: json['exhaleText'] as String,
+        holdOutText: json['holdOutText'] as String,
+      );
+
+  final double inhaleSeconds;
+  final double holdInSeconds;
+  final double exhaleSeconds;
+  final double holdOutSeconds;
+  final int cycles;
+  final String inhaleText;
+  final String holdInText;
+  final String exhaleText;
+  final String holdOutText;
+}
+
 class StartItemPayload {
   StartItemPayload({
     required this.trackItemProgressId,
@@ -119,6 +159,7 @@ class StartItemPayload {
     this.gameIntro,
     this.gameBestScore,
     this.gameCompletion,
+    this.breathingExercise,
   });
 
   factory StartItemPayload.fromJson(Map<String, dynamic> json) {
@@ -174,6 +215,11 @@ class StartItemPayload {
               json['completion'] as Map<String, dynamic>,
             )
           : null,
+      breathingExercise: type == 'GAME' && json['breathingExercise'] != null
+          ? BreathingExerciseContent.fromJson(
+              json['breathingExercise'] as Map<String, dynamic>,
+            )
+          : null,
     );
   }
 
@@ -210,4 +256,5 @@ class StartItemPayload {
   final String? gameIntro;
   final int? gameBestScore;
   final TrackItemCompletionResult? gameCompletion;
+  final BreathingExerciseContent? breathingExercise;
 }

@@ -15,6 +15,8 @@ import '../../features/calllog/presentation/call_summary_screen.dart';
 import '../../features/community/presentation/community_screen.dart';
 import '../../features/courses/data/course_models.dart';
 import '../../features/courses/presentation/course_detail_screen.dart';
+import '../../features/courses/data/start_item_payload.dart';
+import '../../features/courses/presentation/breathing_exercise_screen.dart';
 import '../../features/courses/presentation/course_item_player_screen.dart';
 import '../../features/courses/presentation/course_progress_screen.dart';
 import '../../features/leaderboard/presentation/leaderboard_screen.dart';
@@ -147,6 +149,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           final item = state.extra as TrackDetailItem;
           return CourseItemPlayerScreen(item: item);
         },
+      ),
+      GoRoute(
+        path: '/breathing-exercise',
+        builder: (context, state) =>
+            BreathingExerciseScreen(config: state.extra as BreathingExerciseContent),
       ),
       GoRoute(
         path: '/roleplay',

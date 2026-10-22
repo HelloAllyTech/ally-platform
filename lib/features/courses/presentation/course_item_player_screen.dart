@@ -164,6 +164,15 @@ class _CourseItemPlayerScreenState
           onCompleted: _handleCompletion,
         );
       case 'GAME':
+        // RN's `NativeGamePlayer` replaces the usual HTML5 `GamePlayer` for
+        // this one game key — it carries a config object instead of
+        // loading a bundle.
+        if (payload.gameKey == 'BREATHING_EXERCISE' && payload.breathingExercise != null) {
+          return _BreathingExerciseIntro(
+            payload: payload,
+            onCompleted: _handleCompletion,
+          );
+        }
         return GamePlayer(
           payload: payload,
           itemId: widget.item.id,
@@ -172,6 +181,81 @@ class _CourseItemPlayerScreenState
       default:
         return Center(child: Text(ref.t('courses.player.unsupportedTitle')));
     }
+  }
+}
+
+/// Port of ally-mobile (React Native)'s `NativeGamePlayer` for the
+/// `BREATHING_EXERCISE` game key — an intro card (title + intro text +
+/// Start button) shown inline in the player; tapping Start pushes the
+/// full-screen `BreathingExerciseScreen`. The item is already complete
+/// server-side the moment this card is shown (same as every other game
+/// key — see `GamePlayer`'s own doc comment), so completion is reported
+/// on mount regardless of whether the learner ever taps Start.
+class _BreathingExerciseIntro extends ConsumerStatefulWidget {
+  const _BreathingExerciseIntro({required this.payload, required this.onCompleted});
+
+  final StartItemPayload payload;
+  final void Function(TrackItemCompletionResult result) onCompleted;
+
+  @override
+  ConsumerState<_BreathingExerciseIntro> createState() => _BreathingExerciseIntroState();
+}
+
+class _BreathingExerciseIntroState extends ConsumerState<_BreathingExerciseIntro> {
+  @override
+  void initState() {
+    super.initState();
+    // Deferred to a post-frame callback — calling the parent's setState
+    // synchronously here throws "setState() or markNeedsBuild() called
+    // during build" (same gotcha GamePlayer's own doc comment documents).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        widget.onCompleted(
+          widget.payload.gameCompletion ??
+              TrackItemCompletionResult(
+                completed: true,
+                sectionCompleted: false,
+                trackCompleted: false,
+              ),
+        );
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final config = widget.payload.breathingExercise!;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              ref.t('courses.breathing.title'),
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              widget.payload.gameIntro?.isNotEmpty ?? false
+                  ? widget.payload.gameIntro!
+                  : ref.t('courses.breathing.defaultIntro'),
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: AppColors.mediumEmphasis),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: AppButton(
+                label: ref.t('courses.breathing.start'),
+                onPressed: () => context.push('/breathing-exercise', extra: config),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

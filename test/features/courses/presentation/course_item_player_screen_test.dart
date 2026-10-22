@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 
+import 'package:ally_mobile_flutter/core/widgets/app_button.dart';
 import 'package:ally_mobile_flutter/core/widgets/html_rich_text.dart';
 import 'package:ally_mobile_flutter/features/courses/data/course_models.dart';
 import 'package:ally_mobile_flutter/features/courses/data/courses_repository.dart';
@@ -178,6 +179,111 @@ void main() {
     await pump(tester);
 
     expect(find.byType(GamePlayer), findsOneWidget);
+  });
+
+  testWidgets(
+    'a GAME payload with gameKey BREATHING_EXERCISE renders the intro card instead of '
+    'GamePlayer, and reports a section completion immediately without ever tapping Start',
+    (tester) async {
+      when(() => repository.startTrackItem('item1')).thenAnswer(
+        (_) async => StartItemPayload(
+          trackItemProgressId: 'p1',
+          type: 'GAME',
+          gameKey: 'BREATHING_EXERCISE',
+          gameIntro: 'Settle in before we begin.',
+          gameCompletion: TrackItemCompletionResult(
+            completed: true,
+            sectionCompleted: true,
+            trackCompleted: false,
+          ),
+          breathingExercise: BreathingExerciseContent(
+            inhaleSeconds: 4,
+            holdInSeconds: 1,
+            exhaleSeconds: 4,
+            holdOutSeconds: 1,
+            cycles: 3,
+            inhaleText: 'Breathe in',
+            holdInText: 'Hold',
+            exhaleText: 'Breathe out',
+            holdOutText: 'Hold',
+          ),
+        ),
+      );
+
+      // Not the shared `pump()` helper (it calls `pumpApp`, which ends in an
+      // unbounded `pumpAndSettle()`): this payload's section-complete
+      // celebration shows immediately on mount rather than after a later
+      // action, and its confetti burst never quiesces on its own — same
+      // "bounded pumps instead" gotcha the other celebration tests in this
+      // file already document, just triggered a step earlier here.
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [coursesRepositoryProvider.overrideWithValue(repository)],
+          child: MaterialApp(home: CourseItemPlayerScreen(item: _item())),
+        ),
+      );
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      // This file's `pump()`/this manual pumpWidget both skip the
+      // translations fix other test files use — real text falls back to
+      // its raw key here (see `_ArticleView`'s own test for the same
+      // convention), except server-provided content like `gameIntro`,
+      // which bypasses `ref.t()` entirely and renders literally.
+      expect(find.byType(GamePlayer), findsNothing);
+      expect(find.text('courses.breathing.title'), findsOneWidget);
+      expect(find.text('Settle in before we begin.'), findsOneWidget);
+      expect(find.widgetWithText(AppButton, 'courses.breathing.start'), findsOneWidget);
+      // The section-complete celebration fired from gameCompletion alone —
+      // the real signal that completion was reported without the learner
+      // ever starting the exercise.
+      expect(find.byType(CelebrationModal), findsOneWidget);
+    },
+  );
+
+  testWidgets('tapping Start on the breathing intro pushes the full-screen breathing exercise', (
+    tester,
+  ) async {
+    when(() => repository.startTrackItem('item1')).thenAnswer(
+      (_) async => StartItemPayload(
+        trackItemProgressId: 'p1',
+        type: 'GAME',
+        gameKey: 'BREATHING_EXERCISE',
+        breathingExercise: BreathingExerciseContent(
+          inhaleSeconds: 4,
+          holdInSeconds: 1,
+          exhaleSeconds: 4,
+          holdOutSeconds: 1,
+          cycles: 3,
+          inhaleText: 'Breathe in',
+          holdInText: 'Hold',
+          exhaleText: 'Breathe out',
+          holdOutText: 'Hold',
+        ),
+      ),
+    );
+
+    await pumpRouterApp(
+      tester,
+      initialLocation: '/courses/item/item1',
+      routes: [
+        GoRoute(
+          path: '/courses/item/item1',
+          builder: (context, state) => CourseItemPlayerScreen(item: _item()),
+        ),
+        GoRoute(
+          path: '/breathing-exercise',
+          builder: (context, state) => const Text('BREATHING SCREEN'),
+        ),
+      ],
+      overrides: [coursesRepositoryProvider.overrideWithValue(repository)],
+    );
+
+    await tester.tap(find.text('Start'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('BREATHING SCREEN'), findsOneWidget);
   });
 
   testWidgets(

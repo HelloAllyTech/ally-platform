@@ -921,6 +921,12 @@
         "CASE_NOT_TRANSLATED": "This case is in English"
       }
     },
+    "breathing": {
+      "title": "Breathing Exercise",
+      "defaultIntro": "Take a moment to pause and regulate your breathing.",
+      "start": "Start",
+      "cycleProgress": "Cycle {{current}} of {{total}}"
+    },
     "game": {
       "controlsTouch": {
         "TREX_RUNNER": "Tap to jump. Nothing here is scored.",
