@@ -12,6 +12,7 @@ import '../localization/translate_ref.dart';
 import '../permissions/user_permissions.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_fonts.dart';
+import '../widgets/illustrated_modal.dart';
 
 /// Port of ally-mobile (React Native)'s `CustomDrawerContent.tsx` (exported
 /// there as `DrawerContent`) — org logo, user profile block, simulation
@@ -150,31 +151,23 @@ class AppDrawer extends ConsumerWidget {
     );
   }
 
-  Future<void> _confirmLogout(BuildContext context, WidgetRef ref) async {
-    // `ref.tr`, not `ref.t` — this runs inside `showDialog`'s own builder,
-    // a separate element from this widget's `build()`, where `ref.watch`
-    // would throw.
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(ref.tr('user.logout')),
-        content: Text(ref.tr('nav.logout.content')),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(ref.tr('common.cancel')),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text(ref.tr('nav.logout.button')),
-          ),
-        ],
-      ),
+  // `ref.tr`, not `ref.t` — the modal's builder is a separate element from
+  // this widget's `build()`, where `ref.watch` would throw.
+  void _confirmLogout(BuildContext context, WidgetRef ref) {
+    IllustratedModal.show(
+      context,
+      titleMain: ref.tr('nav.logout.title.normal'),
+      titleItalic: ref.tr('nav.logout.title.italic'),
+      description: ref.tr('nav.logout.content'),
+      illustrationAsset: 'assets/images/logOut.png',
+      actionButtonText: ref.tr('nav.logout.button'),
+      // The X icon dismisses without ever invoking this — matches RN's
+      // "X-only cancel, no separate Cancel button" exactly.
+      onActionPressed: () {
+        Navigator.of(context).pop(); // closes the drawer itself
+        ref.read(authControllerProvider.notifier).logout();
+      },
     );
-    if (confirmed == true) {
-      if (context.mounted) Navigator.of(context).pop();
-      await ref.read(authControllerProvider.notifier).logout();
-    }
   }
 }
 
