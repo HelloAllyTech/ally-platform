@@ -56,6 +56,7 @@ def convert_language_code(cls, language_code: str) -> str:
 | Deepgram | `DeepgramSTTClient` | `STTProvider.DEEPGRAM` | `bcp47` | `nova-3` |
 | Google Cloud | `GoogleSTTClient` | `STTProvider.GOOGLE` | `bcp47` | `chirp` |
 | Sarvam | `SarvamSTTClient` | `STTProvider.SARVAM` | `iso6391` | -- |
+| ElevenLabs | `ElevenLabsSTTClient` | `STTProvider.ELEVENLABS` | `iso6391` | `scribe_v2_realtime` |
 
 ### Provider Details
 
@@ -64,6 +65,10 @@ def convert_language_code(cls, language_code: str) -> str:
 **Google Cloud** -- Uses the Chirp model by default. Requires `GOOGLE_APPLICATION_CREDENTIALS` environment variable. Supports model mapping for backward compatibility (`default` -> `chirp`, `command_and_search` -> `latest_short`, `phone_call` -> `latest_long`).
 
 **Sarvam** -- Specialized for Indian languages. Requires `SARVAM_API_KEY`. Uses ISO 639-1 codes (2-letter).
+
+**ElevenLabs** -- Scribe v2 realtime. Requires `ELEVEN_API_KEY`. Commits a final after 0.5 s of silence (`COMMIT_SILENCE_S`; the plugin default of 1.5 s delayed every final by ~1.9 s). The turn cannot end before the final arrives, so this is the learner-to-reply latency floor.
+
+**The final-transcript delay is the latency floor, so it should decide the provider.** Prod 2026-10-18 → 22, `sttFinalizeMs` p50: Google chirp_2 en-IN 2.4 s vs Sarvam hi-IN 0.85 s (Hindi and Marathi point their `sttConfigId` at Sarvam). Google v2 has no setting for how long its English endpointer waits. Deepgram en-IN was 0.4 s before it was retired. Local streaming benchmark (2026-10-22): Sarvam en-IN 0.7–0.95 s, ElevenLabs 0.8–0.9 s with the 0.5 s commit.
 
 ## Factory
 

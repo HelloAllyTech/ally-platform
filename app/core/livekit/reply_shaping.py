@@ -94,12 +94,21 @@ _WORD_EDGES = "-\"'“”‘’«»"
 _MAX_HOLD_CHARS = 64
 
 
+def _norm_word(word: str) -> str:
+    """A word as compared: edges stripped, lower-cased, one apostrophe.
+
+    "it's" and "it’s" are the same word; prod replies mixed the two with the
+    interim they restated (2026-10-22).
+    """
+    return word.strip(_WORD_EDGES).lower().replace("’", "'").replace("‘", "'")
+
+
 def _phrase_words(phrase: str) -> List[str]:
     """Lower-cased words of an opener phrase, punctuation dropped."""
     return [
-        w.strip(_WORD_EDGES).lower()
+        _norm_word(w)
         for w in re.findall(r"[^\s,.!?…।\[\]]+", phrase or "")
-        if w.strip(_WORD_EDGES)
+        if _norm_word(w)
     ]
 
 
@@ -232,7 +241,7 @@ class LeadingHesitationTrimmer:
             match = _NEXT_WORD_RE.match(buf, pos)
             if match is None:
                 break
-            words.append(match.group(1).strip(_WORD_EDGES).lower())
+            words.append(_norm_word(match.group(1)))
             pos = match.end()
         return words, pos, pos < len(buf)
 
@@ -242,15 +251,31 @@ class LeadingHesitationTrimmer:
             got, end, complete = self._leading_words(buf, len(words))
             if got == words and (complete or final):
                 return buf[end:], False
-            if (
-                not final
-                and got == words[: len(got)]
-                and (len(got) < len(words) or not complete)
-            ):
+            if not final and self._could_still_match(got, words, complete):
                 # Still a possible match; wait for more text (bounded below).
                 if len(buf.strip()) <= _MAX_HOLD_CHARS:
                     return buf, True
         return buf, False
+
+    @staticmethod
+    def _could_still_match(got: List[str], words: List[str], complete: bool) -> bool:
+        """Whether more text could still make ``got`` read as ``words``.
+
+        The reply streams token by token, so its last word may be unfinished:
+        "that" on the way to "that’s". Comparing it whole released every reply
+        that restated the interim mid-word (prod 2026-10-22: "Yeah, that’s
+        what he says…" -> "Yeah, that’s what he says… but…"), so the last word
+        only has to be a prefix while it can still grow.
+        """
+        if len(got) > len(words):
+            return False
+        if complete:
+            return got == words[: len(got)] and len(got) < len(words)
+        if not got:
+            return True
+        return got[:-1] == words[: len(got) - 1] and words[len(got) - 1].startswith(
+            got[-1]
+        )
 
     def _drain(self, final: bool) -> str:
         while True:
@@ -293,7 +318,7 @@ class LeadingHesitationTrimmer:
                 if len(stripped) > _MAX_HOLD_CHARS or final:
                     return self._release()
                 return ""
-            word = match.group(1).strip(_WORD_EDGES).lower()
+            word = _norm_word(match.group(1))
             if word in _HESITATION_WORDS:
                 self._buffer = buf[match.end() :]
                 continue

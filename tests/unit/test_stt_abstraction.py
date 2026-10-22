@@ -149,6 +149,9 @@ class TestDeepgramSTTClient:
         )
 
 
+_FAST_COMMIT = {"vad_silence_threshold_secs": 0.5, "min_silence_duration_ms": 500}
+
+
 class TestElevenLabsSTTClient:
     """Test cases for ElevenLabs (Scribe) STT client."""
 
@@ -169,6 +172,7 @@ class TestElevenLabsSTTClient:
             model_id="scribe_v2_realtime",
             language_code="en",
             api_key="test-api-key",
+            server_vad=_FAST_COMMIT,
         )
         assert client.stt_instance == mock_stt_instance
         assert isinstance(client, BaseSTTClient)
@@ -188,6 +192,7 @@ class TestElevenLabsSTTClient:
             model_id="scribe_v2_realtime",
             language_code="hi",
             api_key="test-api-key",
+            server_vad=_FAST_COMMIT,
         )
         assert client.stt_instance == mock_stt_instance
 
@@ -208,6 +213,7 @@ class TestElevenLabsSTTClient:
             model_id="scribe_v2_realtime",
             language_code="ml",  # Converted from "ml-IN"
             api_key="custom-api-key",
+            server_vad=_FAST_COMMIT,
         )
         assert client.stt_instance == mock_stt_instance
 
@@ -269,6 +275,7 @@ class TestElevenLabsSTTClient:
             model_id=DEFAULT_ELEVENLABS_STT_MODEL,
             language_code="en",
             api_key="test-api-key",
+            server_vad=_FAST_COMMIT,
         )
 
     @pytest.mark.unit
@@ -290,6 +297,7 @@ class TestElevenLabsSTTClient:
             model_id="scribe_v2_realtime",
             language_code="hi",
             api_key="test-api-key",
+            server_vad=_FAST_COMMIT,
         )
 
 

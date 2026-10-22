@@ -747,6 +747,39 @@ class TestLeadingHesitationTrimmer:
             )
             assert _stream(trimmer, chunks) == expected, opener
 
+    def test_a_restatement_streamed_mid_word_is_still_trimmed(self):
+        """Prod 2026-10-22: the model streams "that" then "’s", and the unfinished
+        word read as a mismatch, so ~10% of interims were restated."""
+        cases = [
+            (
+                "Yeah, that’s what he says…",
+                ["Yeah", ",", " that", "’s", " what", " he", " says", "…", " but"],
+                "But",
+            ),
+            (
+                "Haan, it's like…",
+                ["Haan", ",", " it", "’s", " like", " I", " feel"],
+                "I feel",
+            ),
+            (
+                "ಅದು ಹೇಗಾದ್ರೂ…",
+                ["“", "ಅ", "ದು", " ಹೇ", "ಗಾ", "ದ್ರೂ", ",", " ನಾನು"],
+                "ನಾನು",
+            ),
+        ]
+        for phrase, chunks, expected in cases:
+            trimmer = LeadingHesitationTrimmer(
+                is_active=lambda: True, phrases=lambda p=phrase: [p]
+            )
+            assert _stream(trimmer, chunks) == expected, phrase
+
+    def test_a_reply_that_only_starts_like_the_interim_is_released(self):
+        trimmer = LeadingHesitationTrimmer(
+            is_active=lambda: True, phrases=lambda: ["I just feel…"]
+        )
+        chunks = ["I", " just", " fin", "ished", " the", " test"]
+        assert _stream(trimmer, chunks) == "I just finished the test"
+
     def test_a_partial_phrase_match_is_released(self):
         trimmer = LeadingHesitationTrimmer(
             is_active=lambda: True, phrases=lambda: ["I mean…"]
