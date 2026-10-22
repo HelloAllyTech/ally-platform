@@ -179,4 +179,105 @@ void main() {
 
     expect(find.text('No results found for "anxiety"'), findsOneWidget);
   });
+
+  testWidgets(
+    'shows the logo header, real placeholder, and the "Try now" suggestions before any search',
+    (tester) async {
+      await preWarmTranslations(tester);
+      await pumpApp(
+        tester,
+        const SearchScreen(),
+        overrides: [searchRepositoryProvider.overrideWithValue(repository)],
+      );
+
+      expect(
+        find.text('Guidance, safety, and support — whenever you need it.'),
+        findsOneWidget,
+      );
+      // RN's actual placeholder is nav.tabs.search ("Search"), not the
+      // unused search.placeholder key a prior version of this screen used.
+      expect(find.text('Search'), findsWidgets);
+      expect(find.text('Try now:'), findsOneWidget);
+      expect(find.text('Violence safety plan'), findsOneWidget);
+      expect(find.text('Suicide assessment'), findsOneWidget);
+      expect(find.text('Survivors of abuse'), findsOneWidget);
+      expect(find.text("Client's resistance"), findsOneWidget);
+
+      verifyNever(() => repository.search(any()));
+    },
+  );
+
+  testWidgets('tapping a "Try now" suggestion searches for its exact text', (tester) async {
+    when(() => repository.search('Suicide assessment')).thenAnswer(
+      (_) async => SearchResult(
+        documents: [_article('d1')],
+        categoryCounts: {'Anxiety': 1},
+        total: 1,
+      ),
+    );
+
+    await preWarmTranslations(tester);
+    await pumpApp(
+      tester,
+      const SearchScreen(),
+      overrides: [searchRepositoryProvider.overrideWithValue(repository)],
+    );
+
+    await tester.tap(find.text('Suicide assessment'));
+    await tester.pumpAndSettle();
+
+    verify(() => repository.search('Suicide assessment')).called(1);
+    expect(find.text('Heading d1'), findsOneWidget);
+  });
+
+  testWidgets(
+    'typing shows a live autocomplete dropdown filtered from the same suggestion list, and '
+    'the launch suggestions/header hide once focused',
+    (tester) async {
+      await preWarmTranslations(tester);
+      await pumpApp(
+        tester,
+        const SearchScreen(),
+        overrides: [searchRepositoryProvider.overrideWithValue(repository)],
+      );
+
+      await tester.enterText(find.byType(TextField), 'survivors');
+      await tester.pump(const Duration(milliseconds: 300)); // past the 250ms debounce
+
+      expect(
+        find.text('Survivors of abuse'),
+        findsOneWidget,
+        reason: 'the one matching suggestion, in the dropdown',
+      );
+      expect(find.text('Violence safety plan'), findsNothing, reason: 'non-matching, filtered out');
+      expect(
+        find.text('Guidance, safety, and support — whenever you need it.'),
+        findsNothing,
+        reason: 'header description collapses once focused',
+      );
+    },
+  );
+
+  testWidgets('the no-results empty state also shows the "Try now" suggestions below it', (
+    tester,
+  ) async {
+    when(() => repository.search('anxiety')).thenAnswer(
+      (_) async => SearchResult(documents: [], categoryCounts: {}, total: 0),
+    );
+
+    await preWarmTranslations(tester);
+    await pumpApp(
+      tester,
+      const SearchScreen(),
+      overrides: [searchRepositoryProvider.overrideWithValue(repository)],
+    );
+
+    await tester.enterText(find.byType(TextField), 'anxiety');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+
+    expect(find.text('No results found for "anxiety"'), findsOneWidget);
+    expect(find.text('Try now:'), findsOneWidget);
+    expect(find.text('Violence safety plan'), findsOneWidget);
+  });
 }
