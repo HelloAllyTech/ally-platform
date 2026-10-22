@@ -52,8 +52,15 @@ String? computeRedirect({
 }) {
   final isLoggingIn = matchedLocation == '/login';
   final isCompletingProfile = matchedLocation == '/complete-profile';
+  // RN keeps SuspendedAccountScreen as a sibling of the login screen inside
+  // the same "not authenticated" stack branch (RootNavigator.tsx's `else`
+  // arm) — no redirect logic to fight there. go_router's redirect gate needs
+  // this spelled out explicitly, or a suspended user pushed here while still
+  // unauthenticated gets immediately bounced back to /login by the branch
+  // below before ever seeing the screen.
+  final isSuspended = matchedLocation == '/suspended';
 
-  if (!isAuthenticated && !isLoggingIn) return '/login';
+  if (!isAuthenticated && !isLoggingIn && !isSuspended) return '/login';
   if (!isAuthenticated) return null;
 
   // `profileCompleted == null` means "not yet known" (the very first

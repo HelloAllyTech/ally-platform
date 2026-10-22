@@ -139,5 +139,22 @@ void main() {
         );
       },
     );
+
+    test(
+      'unauthenticated and already on /suspended does not redirect',
+      () {
+        // A suspended user is never signed in (login/verify fails before
+        // tokens are stored), so this screen must be reachable the same way
+        // /login is, or the gate above bounces it straight back.
+        expect(
+          computeRedirect(
+            isAuthenticated: false,
+            matchedLocation: '/suspended',
+            profileCompleted: null,
+          ),
+          isNull,
+        );
+      },
+    );
   });
 }

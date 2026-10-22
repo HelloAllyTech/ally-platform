@@ -1,8 +1,10 @@
 import 'dart:io';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 
 import 'package:ally_mobile_flutter/core/auth/auth_state.dart';
@@ -12,6 +14,7 @@ import 'package:ally_mobile_flutter/features/auth/data/auth_repository.dart';
 import 'package:ally_mobile_flutter/features/auth/presentation/login_screen.dart';
 
 import '../../../support/pump_app.dart';
+import '../../../support/pump_router_app.dart';
 import '../../../support/prewarm_translations.dart';
 
 class MockAuthRepository extends Mock implements AuthRepository {}
@@ -289,6 +292,49 @@ void main() {
       );
       expect(authController.signInCalls, 0);
     });
+
+    testWidgets(
+      'a 403 USER_SUSPENDED response routes to /suspended instead of showing a generic error',
+      (tester) async {
+        when(() => authRepository.verifyOtp(email: any(named: 'email'), otp: any(named: 'otp')))
+            .thenThrow(
+          DioException(
+            requestOptions: RequestOptions(path: '/v1/auth/verify-otp'),
+            response: Response(
+              requestOptions: RequestOptions(path: '/v1/auth/verify-otp'),
+              statusCode: 403,
+              data: {'error': 'USER_SUSPENDED', 'message': 'User suspended'},
+            ),
+          ),
+        );
+        when(() => authRepository.generateOtp('learner@example.com')).thenAnswer((_) async => null);
+
+        await preWarmTranslations(tester);
+        await pumpRouterApp(
+          tester,
+          initialLocation: '/login',
+          routes: [
+            GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+            GoRoute(path: '/suspended', builder: (context, state) => const Text('Suspended Screen')),
+          ],
+          overrides: [
+            authRepositoryProvider.overrideWithValue(authRepository),
+            authControllerProvider.overrideWith(() => authController),
+          ],
+        );
+
+        await tester.enterText(find.byType(TextField), 'learner@example.com');
+        await tester.pump();
+        await tester.tap(find.text('Next'));
+        await tester.pumpAndSettle();
+        await enterOtp(tester, '1234');
+        await tester.tap(find.text('Verify'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Suspended Screen'), findsOneWidget);
+        expect(authController.signInCalls, 0);
+      },
+    );
 
     testWidgets("'use a different email' goes back to the email step", (tester) async {
       await advanceToOtpStep(tester);

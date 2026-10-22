@@ -1,11 +1,13 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -26,6 +28,20 @@ const _privacyPolicyUrl = 'https://app.helloally.ai/privacy';
 const _otpLength = 4;
 const _resendCountdownSeconds = 60;
 const _defaultOtpExpiryMinutes = 10;
+
+/// RN's `isSuspendedUserError` (`src/utils/error.ts`) — a 403 whose body
+/// carries `error: 'USER_SUSPENDED'` or the literal message `'User
+/// suspended'`. Checked after every sign-in method (OTP, Google, Apple) so a
+/// suspended account reaches SuspendedAccountScreen instead of a generic
+/// "failed to verify OTP" error, same as RN's OtpVerification/useGoogleLogin/
+/// useAppleLogin hooks.
+bool _isSuspendedUserError(Object error) {
+  if (error is! DioException) return false;
+  if (error.response?.statusCode != 403) return false;
+  final data = error.response?.data;
+  if (data is! Map) return false;
+  return data['error'] == 'USER_SUSPENDED' || data['message'] == 'User suspended';
+}
 
 /// Real email+OTP, Google, and Apple sign-in, matching ally-mobile (React
 /// Native)'s `generateOtp`/`verifyOtp`/`loginWithGoogle`/`loginWithApple`
@@ -149,7 +165,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         setState(() => _error = '${ref.tr('auth.login.google.error')}: ${e.description ?? e.code}');
       }
     } catch (e) {
-      setState(() => _error = '${ref.tr('auth.login.google.error')}: $e');
+      if (_isSuspendedUserError(e)) {
+        if (mounted) context.push('/suspended');
+      } else {
+        setState(() => _error = '${ref.tr('auth.login.google.error')}: $e');
+      }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -185,7 +205,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         setState(() => _error = '${ref.tr('auth.login.apple.error')}: ${e.message}');
       }
     } catch (e) {
-      setState(() => _error = '${ref.tr('auth.login.apple.error')}: $e');
+      if (_isSuspendedUserError(e)) {
+        if (mounted) context.push('/suspended');
+      } else {
+        setState(() => _error = '${ref.tr('auth.login.apple.error')}: $e');
+      }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -258,7 +282,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             refreshToken: refreshToken,
           );
     } catch (e) {
-      setState(() => _error = '${ref.tr('auth.login.errors.verifyOtp')}: $e');
+      if (_isSuspendedUserError(e)) {
+        if (mounted) context.push('/suspended');
+      } else {
+        setState(() => _error = '${ref.tr('auth.login.errors.verifyOtp')}: $e');
+      }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
