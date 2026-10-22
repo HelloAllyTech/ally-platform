@@ -55,7 +55,7 @@ class _AppShellScreenState extends ConsumerState<AppShellScreen> {
             );
 
         return Scaffold(
-          drawer: AppDrawer(permissions: permissions),
+          drawer: AppDrawer(permissions: permissions, activeTabName: _selectedTabName),
           body: Builder(
             builder: (context) => Stack(
               children: [

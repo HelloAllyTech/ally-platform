@@ -190,7 +190,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/bug-report',
-        builder: (context, state) => const BugReportScreen(),
+        builder: (context, state) => BugReportScreen(screenName: state.extra as String?),
       ),
       GoRoute(
         path: '/search',

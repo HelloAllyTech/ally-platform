@@ -31,6 +31,7 @@ class AppTextField extends StatelessWidget {
     this.keyboardType,
     this.onChanged,
     this.onSubmitted,
+    this.enabled = true,
   });
 
   final TextEditingController? controller;
@@ -38,6 +39,7 @@ class AppTextField extends StatelessWidget {
   final AppTextFieldShape shape;
   final bool isError;
   final int? maxLines;
+  final bool enabled;
 
   /// When set, Flutter's own built-in counter is hidden (`counterText: ''`)
   /// — callers that want a visible count build their own `Text`, matching
@@ -109,6 +111,7 @@ class AppTextField extends StatelessWidget {
       keyboardType: keyboardType,
       onChanged: onChanged,
       onSubmitted: onSubmitted,
+      enabled: enabled,
       style: textStyleFor(context),
       decoration: maxLength != null ? decoration.copyWith(counterText: '') : decoration,
     );

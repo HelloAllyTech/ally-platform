@@ -19,13 +19,14 @@ const _httpTooManyRequests = 429;
 /// wiring — there's no separate "please describe the issue" message to
 /// show, since the button simply can't be tapped empty.
 ///
-/// Not ported: capturing which screen the report was opened from (RN
-/// walks the nested Drawer/BottomTabs navigation state for this — a
-/// fairly deep RN-navigation-specific mechanism with no direct go_router
-/// equivalent); `BugReportRepository.createBugReport`'s `screen` param
-/// exists for this but isn't supplied yet.
 class BugReportScreen extends ConsumerStatefulWidget {
-  const BugReportScreen({super.key});
+  const BugReportScreen({super.key, this.screenName});
+
+  /// The active tab's name when the drawer was opened — this app's
+  /// equivalent of RN's "screen the user was on right before opening this
+  /// one" (see `AppDrawer.activeTabName`'s doc comment for why that's
+  /// exactly equivalent here, not an approximation).
+  final String? screenName;
 
   @override
   ConsumerState<BugReportScreen> createState() => _BugReportScreenState();
@@ -57,7 +58,9 @@ class _BugReportScreenState extends ConsumerState<BugReportScreen> {
     if (!_canSubmit || _isSubmitting) return;
     setState(() => _isSubmitting = true);
     try {
-      await ref.read(bugReportRepositoryProvider).createBugReport(_controller.text.trim());
+      await ref
+          .read(bugReportRepositoryProvider)
+          .createBugReport(_controller.text.trim(), screen: widget.screenName);
       if (!mounted) return;
       // Shown via the root key, not this screen's own `ScaffoldMessenger` —
       // `context.pop()` right after removes this Scaffold before an
@@ -103,6 +106,7 @@ class _BugReportScreenState extends ConsumerState<BugReportScreen> {
               maxLines: 6,
               maxLength: _maxDescriptionLength,
               placeholder: ref.t('bugReport.placeholder'),
+              enabled: !_isSubmitting,
             ),
             Align(
               alignment: Alignment.centerRight,

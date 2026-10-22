@@ -16,7 +16,9 @@ class MockBugReportRepository extends Mock implements BugReportRepository {}
 void main() {
   // Driven as sequential steps in one `testWidgets` — `pumpRouterApp`
   // (like `pumpApp`/`pumpRoutedApp`) stalls `localizationControllerProvider`
-  // on a second call within the same test file; see those helpers' own doc
+  // on a second call within the same test file (see
+  // `bug_report_screen_context_test.dart` for coverage that needed its own
+  // file for exactly this reason); see those helpers' own doc
   // comments.
   testWidgets(
     'BugReportScreen: disables Submit until non-empty, pops with a success '

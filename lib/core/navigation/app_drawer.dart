@@ -17,9 +17,18 @@ import '../theme/app_fonts.dart';
 /// there as `DrawerContent`) — org logo, user profile block, simulation
 /// credits bar, 3 menu items, version footer, Ally logo badge.
 class AppDrawer extends ConsumerWidget {
-  const AppDrawer({super.key, required this.permissions});
+  const AppDrawer({super.key, required this.permissions, this.activeTabName});
 
   final List<String> permissions;
+
+  /// RN's `BugReportScreen` silently captures "the screen the user was on
+  /// right before opening this one" by walking React Navigation's nested
+  /// Drawer/BottomTabs state — this app has no equivalent navigation-state
+  /// introspection, but the hamburger icon (and so this drawer) is only
+  /// ever reachable from the first visible tab anyway (same gate RN's own
+  /// `showHamburger: isFirstTab` applies), so the shell's own active tab
+  /// name is already exactly that "previous screen".
+  final String? activeTabName;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -113,7 +122,7 @@ class AppDrawer extends ConsumerWidget {
                 label: ref.t('bugReport.menuLabel'),
                 onTap: () {
                   Navigator.of(context).pop();
-                  context.push('/bug-report');
+                  context.push('/bug-report', extra: activeTabName);
                 },
               ),
               _MenuOption(
