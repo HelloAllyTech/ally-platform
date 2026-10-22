@@ -1,8 +1,14 @@
 import 'package:ally_mobile_flutter/core/widgets/tab_screen_header.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-Widget _wrap(Widget child) => MaterialApp(home: Scaffold(body: child));
+// `TabScreenHeader` renders `ProgressHeaderWidget` itself now (RN's
+// always-on level indicator) — a `ConsumerWidget` that needs a
+// `ProviderScope` ancestor even when, as here, every provider it reads is
+// left unmocked and simply resolves to "don't show anything yet".
+Widget _wrap(Widget child) =>
+    ProviderScope(child: MaterialApp(home: Scaffold(body: child)));
 
 void main() {
   testWidgets('renders the title and subtitle together as one text block', (tester) async {

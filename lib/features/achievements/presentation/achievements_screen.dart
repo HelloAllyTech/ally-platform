@@ -7,6 +7,7 @@ import '../../../core/localization/translate_ref.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
 import '../../../core/widgets/app_tab_view.dart';
+import '../../../core/widgets/info_tooltip_icon.dart';
 import '../../../core/widgets/tab_screen_header.dart';
 import '../data/achievements_repository.dart';
 
@@ -81,7 +82,7 @@ class _AchievementsScreenState extends ConsumerState<AchievementsScreen> {
             style: Theme.of(context).textTheme.labelLarge,
           ),
           const SizedBox(width: 4),
-          _InfoTooltipIcon(message: ref.t('achievements.badgesTooltip')),
+          InfoTooltipIcon(message: ref.t('achievements.badgesTooltip')),
           const SizedBox(width: 12),
           Expanded(
             child: AppTabView<_AchievementsFilter>(
@@ -168,7 +169,7 @@ class _CategorySection extends ConsumerWidget {
               ),
               const SizedBox(width: 4),
               if (slug != null)
-                _InfoTooltipIcon(
+                InfoTooltipIcon(
                   message: ref.t('achievements.badgeTypes.tooltip.$slug'),
                 ),
               const SizedBox(width: 8),
@@ -279,24 +280,3 @@ class _AchievementCard extends ConsumerWidget {
   }
 }
 
-/// RN's `InfoTooltip` — a tap-to-show info bubble. Ported via Flutter's own
-/// `Tooltip` in tap-trigger mode rather than a custom popover, since that
-/// already covers the same "tap the (i) icon, see explanatory text" need.
-class _InfoTooltipIcon extends StatelessWidget {
-  const _InfoTooltipIcon({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: message,
-      triggerMode: TooltipTriggerMode.tap,
-      child: const Icon(
-        Icons.info_outline,
-        size: 16,
-        color: AppColors.mediumEmphasis,
-      ),
-    );
-  }
-}

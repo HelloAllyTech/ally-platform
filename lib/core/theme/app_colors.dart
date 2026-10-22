@@ -14,6 +14,8 @@ class AppColors {
   static const primaryLight = Color(0xFF5F99FC);
   static const primaryDark = Color(0xFF0143A8);
   static const onPrimary = Colors.white;
+  // ds.blue[50] — LeaderboardScreen's highlighted-row background.
+  static const blue50 = Color(0xFFE2F2FF);
   static const primaryAccent = Color(0xFF536DFE);
   static const primaryAccentLight = Color(0xFF8C9EFF);
   static const primaryAccentDark = Color(0xFF3D5AFE);

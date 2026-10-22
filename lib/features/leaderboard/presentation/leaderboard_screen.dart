@@ -106,10 +106,17 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
     required bool showRankColumn,
     required bool isHighlighted,
   }) {
-    final highlightColor = Theme.of(context).colorScheme.primaryContainer;
     return Container(
-      color: isHighlighted ? highlightColor : null,
       height: _kRowHeight,
+      margin: isHighlighted ? const EdgeInsets.symmetric(horizontal: 8) : null,
+      padding: isHighlighted ? const EdgeInsets.only(left: 5) : null,
+      decoration: isHighlighted
+          ? BoxDecoration(
+              color: AppColors.blue50,
+              border: Border.all(color: AppColors.primary, width: 0.5),
+              borderRadius: BorderRadius.circular(8),
+            )
+          : null,
       child: ListTile(
         leading: Row(
           mainAxisSize: MainAxisSize.min,
@@ -167,6 +174,8 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
           children: [
             TabScreenHeader(
               title: ref.t('community.title'),
+              tooltip:
+                  '${ref.t('community.title')}\n${ref.t('achievements.badgeTooltipDescription')}',
               trailing: TextButton.icon(
                 onPressed: () => context.push('/achievements'),
                 icon: SvgPicture.asset(
@@ -201,6 +210,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
                 ),
               ),
             ),
+            _TableHeaderRow(showRankColumn: showRankColumn),
             Expanded(
               child: pageAsync.when(
                 loading: () => const Center(child: CircularProgressIndicator()),
@@ -316,6 +326,38 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Port of ally-mobile (React Native)'s `renderTableHeader` — column labels
+/// above the ranked list, shown unconditionally (even while loading/empty),
+/// same as RN.
+class _TableHeaderRow extends ConsumerWidget {
+  const _TableHeaderRow({required this.showRankColumn});
+
+  final bool showRankColumn;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final style = Theme.of(context).textTheme.labelMedium?.copyWith(
+      fontFamily: AppFonts.ibmPlexSerifMedium,
+      color: AppColors.mediumEmphasis,
+    );
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          if (showRankColumn) ...[
+            SizedBox(width: 32, child: Text(ref.t('community.table.rank'), style: style)),
+            const SizedBox(width: 8),
+          ],
+          Expanded(child: Text(ref.t('community.table.user'), style: style)),
+          Text(ref.t('community.table.totalDuration'), style: style),
+          const SizedBox(width: 16),
+          Text(ref.t('community.table.badges'), style: style),
+        ],
       ),
     );
   }

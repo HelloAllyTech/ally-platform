@@ -20,6 +20,7 @@ import '../../features/courses/presentation/course_progress_screen.dart';
 import '../../features/leaderboard/presentation/leaderboard_screen.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
 import '../../features/preferences/presentation/preferences_screen.dart';
+import '../../features/progress/presentation/progress_screen.dart';
 import '../../features/reactions/presentation/reactions_screen.dart';
 import '../../features/reviews/presentation/review_details_screen.dart';
 import '../../features/reviews/presentation/review_screen.dart';
@@ -187,6 +188,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/achievements',
         builder: (context, state) => const AchievementsScreen(),
+      ),
+      GoRoute(
+        path: '/progress',
+        builder: (context, state) => const ProgressScreen(),
       ),
       GoRoute(
         path: '/bug-report',

@@ -246,4 +246,43 @@ void main() {
 
     expect(find.byType(CircleAvatar), findsOneWidget, reason: 'only the user avatar, no rank badge/circle');
   });
+
+  testWidgets(
+    'shows the table column headers (Rank/User/Total duration/Badges), matching RN\'s renderTableHeader',
+    (tester) async {
+      final repository = MockLeaderboardRepository();
+      when(() => repository.getLeaderboard(LeaderboardWindow.lastWeek)).thenAnswer(
+        (_) async => (items: [_entry(userId: 1, name: 'Alice', rank: 1)], totalCount: 1),
+      );
+      when(() => repository.getMyRank(LeaderboardWindow.lastWeek)).thenAnswer((_) async => null);
+
+      await _pumpLeaderboard(tester, repository: repository);
+
+      expect(find.text('Rank'), findsOneWidget);
+      expect(find.text('User'), findsOneWidget);
+      expect(find.text('Total duration'), findsOneWidget);
+      expect(find.text('Badges'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'tapping the info icon shows RN\'s badge-earning tooltip (isTooltipRequired/tooltipContent)',
+    (tester) async {
+      final repository = MockLeaderboardRepository();
+      when(() => repository.getLeaderboard(LeaderboardWindow.lastWeek)).thenAnswer(
+        (_) async => (items: [_entry(userId: 1, name: 'Alice', rank: 1)], totalCount: 1),
+      );
+      when(() => repository.getMyRank(LeaderboardWindow.lastWeek)).thenAnswer((_) async => null);
+
+      await _pumpLeaderboard(tester, repository: repository);
+
+      await tester.tap(find.byIcon(Icons.info_outline));
+      await tester.pump();
+
+      expect(
+        find.textContaining('This view reflects overall activity in the selected time period'),
+        findsOneWidget,
+      );
+    },
+  );
 }
