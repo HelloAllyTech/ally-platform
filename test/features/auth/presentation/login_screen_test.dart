@@ -66,15 +66,29 @@ void main() {
   }
 
   group('email step', () {
-    testWidgets('shows a validation error and does not call generateOtp when empty', (tester) async {
-      await pumpLogin(tester);
+    testWidgets(
+      'disables Next for an empty or invalid-shaped email, enables it once valid '
+      '(RN\'s isValidEmail gate — Flutter previously had no gate at all, so "abc" '
+      'could reach the backend unvalidated)',
+      (tester) async {
+        await pumpLogin(tester);
 
-      await tester.tap(find.text('Next'));
-      await tester.pumpAndSettle();
+        var nextButton = tester.widget<AppButton>(find.widgetWithText(AppButton, 'Next'));
+        expect(nextButton.isDisabled, isTrue, reason: 'empty');
 
-      expect(find.text('Please enter a valid email address'), findsOneWidget);
-      verifyNever(() => authRepository.generateOtp(any()));
-    });
+        await tester.enterText(find.byType(TextField), 'not-an-email');
+        await tester.pump();
+        nextButton = tester.widget<AppButton>(find.widgetWithText(AppButton, 'Next'));
+        expect(nextButton.isDisabled, isTrue, reason: 'no @ or domain');
+
+        await tester.enterText(find.byType(TextField), 'learner@example.com');
+        await tester.pump();
+        nextButton = tester.widget<AppButton>(find.widgetWithText(AppButton, 'Next'));
+        expect(nextButton.isDisabled, isFalse);
+
+        verifyNever(() => authRepository.generateOtp(any()));
+      },
+    );
 
     testWidgets('calls generateOtp and advances to the OTP step on success', (tester) async {
       when(() => authRepository.generateOtp('learner@example.com')).thenAnswer((_) async => null);

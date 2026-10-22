@@ -35,6 +35,13 @@ const _defaultOtpExpiryMinutes = 10;
 /// suspended account reaches SuspendedAccountScreen instead of a generic
 /// "failed to verify OTP" error, same as RN's OtpVerification/useGoogleLogin/
 /// useAppleLogin hooks.
+/// RN's `isValidEmail` (`src/utils/common.ts`) — same regex, gates the
+/// "Next" button there (`isDisabled={!isValidEmail(email)}`). Flutter's
+/// button had no such gate at all, only an empty-string check, so anything
+/// vaguely email-shaped like "abc" could reach the backend unvalidated.
+final _emailRegex = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
+bool _isValidEmail(String email) => _emailRegex.hasMatch(email);
+
 bool _isSuspendedUserError(Object error) {
   if (error is! DioException) return false;
   if (error.response?.statusCode != 403) return false;
@@ -91,8 +98,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
     // Rebuilds the Verify button's enabled state as digits fill in.
     for (final controller in _otpControllers) {
-      controller.addListener(_onOtpDigitsChanged);
+      controller.addListener(_rebuild);
     }
+    // Rebuilds the Next button's enabled state as the email is typed.
+    _emailController.addListener(_rebuild);
   }
 
   @override
@@ -108,7 +117,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     super.dispose();
   }
 
-  void _onOtpDigitsChanged() => setState(() {});
+  void _rebuild() => setState(() {});
 
   bool get _isOtpComplete => _otpControllers.every((c) => c.text.isNotEmpty);
 
@@ -217,7 +226,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Future<void> _sendCode() async {
     final email = _emailController.text.trim();
-    if (email.isEmpty) {
+    if (!_isValidEmail(email)) {
       setState(() => _error = ref.tr('auth.login.email.error'));
       return;
     }
@@ -333,6 +342,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   label: ref.t('common.next'),
                   onPressed: _sendCode,
                   isLoading: _isSubmitting,
+                  isDisabled: !_isValidEmail(_emailController.text.trim()),
                 ),
                 const SizedBox(height: 24),
                 Row(
