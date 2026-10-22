@@ -2,6 +2,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../../core/permissions/permissions_repository.dart';
+import '../../../core/permissions/user_permissions.dart';
 
 /// Mirrors ally-mobile (React Native)'s `src/constants/badges.ts` enums.
 enum BadgeLockStatus { locked, unlocked }
@@ -79,6 +81,13 @@ final achievementsRepositoryProvider = Provider<AchievementsRepository>((ref) {
   return AchievementsRepository(ref.watch(apiClientProvider));
 });
 
-final badgesProvider = FutureProvider<List<BadgeCategoryGroup>>((ref) {
+/// RN's `useGetAvailableBadgesQuery(undefined, {skip: !hasViewBadgesPermission})`
+/// — this screen is also reachable via a direct push from outside the
+/// Achievements tab itself (e.g. Leaderboard's Badges button), so the tab
+/// bar's own permission gate alone isn't enough to guarantee this never
+/// fires for a user who lacks the permission.
+final badgesProvider = FutureProvider<List<BadgeCategoryGroup>>((ref) async {
+  final permissions = await ref.watch(userPermissionsProvider.future);
+  if (!permissions.contains(UserPermissions.viewUserBadges)) return [];
   return ref.watch(achievementsRepositoryProvider).getBadges();
 });

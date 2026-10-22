@@ -3,10 +3,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 
+import 'package:ally_mobile_flutter/core/permissions/permissions_repository.dart';
+import 'package:ally_mobile_flutter/core/permissions/user_permissions.dart';
 import 'package:ally_mobile_flutter/features/achievements/data/achievements_repository.dart';
 import 'package:ally_mobile_flutter/features/achievements/presentation/achievements_screen.dart';
 
 import '../../../support/pump_router_app.dart';
+
+final _hasBadgesPermission = userPermissionsProvider.overrideWith(
+  (ref) async => [UserPermissions.viewUserBadges],
+);
 
 class MockAchievementsRepository extends Mock implements AchievementsRepository {}
 
@@ -62,7 +68,7 @@ void main() {
         tester,
         initialLocation: '/achievements',
         routes: _routes(),
-        overrides: [achievementsRepositoryProvider.overrideWithValue(repository)],
+        overrides: [achievementsRepositoryProvider.overrideWithValue(repository), _hasBadgesPermission],
       );
 
       // No back arrow when this is the root route (nothing to pop to) —
@@ -123,7 +129,7 @@ void main() {
         tester,
         initialLocation: '/achievements',
         routes: _routes(),
-        overrides: [achievementsRepositoryProvider.overrideWithValue(failingRepository)],
+        overrides: [achievementsRepositoryProvider.overrideWithValue(failingRepository), _hasBadgesPermission],
       );
 
       expect(find.textContaining('Unable to Load Achievements'), findsOneWidget);
@@ -141,7 +147,7 @@ void main() {
         GoRoute(path: '/leaderboard', builder: (context, state) => const Scaffold(body: Text('LEADERBOARD'))),
         ..._routes(),
       ],
-      overrides: [achievementsRepositoryProvider.overrideWithValue(repository)],
+      overrides: [achievementsRepositoryProvider.overrideWithValue(repository), _hasBadgesPermission],
     );
     router.push('/achievements');
     await tester.pumpAndSettle();
@@ -151,4 +157,41 @@ void main() {
 
     expect(find.text('LEADERBOARD'), findsOneWidget);
   });
+
+  testWidgets(
+    'without the view:user:badges permission, never calls getBadges and shows no badges '
+    '(RN: useGetAvailableBadgesQuery(undefined, {skip: !hasViewBadgesPermission}))',
+    (tester) async {
+      final repository = MockAchievementsRepository();
+      when(() => repository.getBadges()).thenAnswer(
+        (_) async => [
+          BadgeCategoryGroup(
+            category: 'ACTIVE_DAY_STREAK',
+            badges: [
+              AchievementBadge(
+                id: 'b1',
+                name: 'Streak 7',
+                description: '',
+                imageUrl: '',
+                lockStatus: BadgeLockStatus.unlocked,
+              ),
+            ],
+          ),
+        ],
+      );
+
+      await pumpRouterApp(
+        tester,
+        initialLocation: '/achievements',
+        routes: _routes(),
+        overrides: [
+          achievementsRepositoryProvider.overrideWithValue(repository),
+          userPermissionsProvider.overrideWith((ref) async => <String>[]),
+        ],
+      );
+
+      expect(find.text('Streak 7'), findsNothing);
+      verifyNever(() => repository.getBadges());
+    },
+  );
 }
