@@ -183,6 +183,18 @@ describe('BranchingScenarioPlayer', () => {
     expect(getByText('Priya sits down.')).toBeTruthy();
   });
 
+  it('does not say the item stays open when a low-scoring replay follows an earlier pass', async () => {
+    mockRecord.mockResolvedValue(result({itemCompleted: true}));
+    const {getByTestId, getByText, queryByText} = setup();
+    fireEvent.press(getByTestId('branching-choice-c1'));
+
+    await waitFor(() => expect(getByTestId('branching-score')).toBeTruthy());
+    expect(getByText('courses.branching.score:{"score":50}')).toBeTruthy();
+    expect(queryByText('courses.branching.notPassed')).toBeNull();
+    expect(queryByText('courses.branching.passed')).toBeNull();
+    expect(getByTestId('branching-continue')).toBeTruthy();
+  });
+
   it('passing reports completion and offers Continue', async () => {
     mockRecord.mockResolvedValue(
       result({
