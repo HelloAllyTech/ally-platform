@@ -15,6 +15,7 @@ import '../data/review_models.dart';
 import '../data/reviews_repository.dart';
 import '../data/scribe_reviews_repository.dart';
 import 'review_note_callout.dart';
+import 'simulation_audio_player.dart';
 import 'thread_detail_screen.dart';
 
 /// Mirrors ally-mobile (React Native)'s `isMinutesPassed` — the edit-note
@@ -39,10 +40,17 @@ bool _isMinutesPassed(String dateString, {int minutes = 10}) {
 /// RN splits this into `SimulationReviewDetailsScreen`/
 /// `ScribeReviewDetailsScreen`, but both are thin wrappers around one
 /// shared `ReviewDetailsLayout`, switching only the data source
-/// (`ReviewApiProvider`) and a couple of layout props neither of which
-/// this scoped port renders yet (audio player, privacy toggle). [reviewType]
-/// plays that same "which data source" role here, so this one widget
-/// serves both instead of duplicating the UI.
+/// (`ReviewApiProvider`) and a couple of layout props. [reviewType] plays
+/// that same "which data source" role here, so this one widget serves both
+/// instead of duplicating the UI.
+///
+/// [SimulationAudioPlayer] (simulation reviews only — confirmed scribe
+/// reviews never carry an `audioUrl` at all, matching the real app) is
+/// rendered as a header element above the discussion, same placement as
+/// RN's own `ReviewDetailsLayout`. It is deliberately NOT synced to the
+/// transcript: RN's reviewer screen wires its own `onProgress` to a no-op,
+/// so there's no "currently playing" highlight to port — that sync only
+/// exists on the unrelated self-debrief `SimulationFeedbackScreen`.
 class ReviewDetailsScreen extends ConsumerStatefulWidget {
   const ReviewDetailsScreen({
     super.key,
@@ -226,6 +234,8 @@ class _ReviewDetailsScreenState extends ConsumerState<ReviewDetailsScreen> {
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ),
+                if (!widget._isScribe && review.scenarioSession?.audioUrl != null)
+                  SimulationAudioPlayer(audioUrl: review.scenarioSession!.audioUrl!),
                 // RN renders ReviewNote as a bare list-header element (no
                 // padded wrapper of its own) — edge-to-edge, not inset to
                 // match the avatar/name block above it.

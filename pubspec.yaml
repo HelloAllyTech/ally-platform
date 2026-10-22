@@ -53,6 +53,7 @@ dependencies:
   livekit_client: ^2.13.1
   socket_io_client: ^3.1.6
   record: ^7.1.2
+  audioplayers: ^6.5.1
   flutter_foreground_task: ^11.0.3
   url_launcher: ^6.3.3
   image_picker: ^1.2.4

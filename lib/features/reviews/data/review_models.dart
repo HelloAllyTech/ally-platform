@@ -20,6 +20,19 @@ class ReviewAuthor {
   final String profileImage;
 }
 
+/// Mirrors RN's `ScenarioSessionData` — only the field the audio player
+/// needs. Only ever present on the simulation review *detail* response
+/// (`GetReviewByIdResponse`); the list endpoint and scribe reviews don't
+/// carry it, so it's nullable throughout.
+class ReviewScenarioSession {
+  ReviewScenarioSession({this.audioUrl});
+
+  factory ReviewScenarioSession.fromJson(Map<String, dynamic> json) =>
+      ReviewScenarioSession(audioUrl: json['audioUrl'] as String?);
+
+  final String? audioUrl;
+}
+
 class ReviewItem {
   ReviewItem({
     required this.id,
@@ -29,6 +42,7 @@ class ReviewItem {
     required this.commentsCount,
     required this.summaryName,
     this.reviewStatus,
+    this.scenarioSession,
   });
 
   factory ReviewItem.fromJson(Map<String, dynamic> json) => ReviewItem(
@@ -39,6 +53,9 @@ class ReviewItem {
     commentsCount: (json['commentsCount'] as num?)?.toInt() ?? 0,
     summaryName: json['summaryName'] as String?,
     reviewStatus: json['reviewStatus'] as String?,
+    scenarioSession: json['scenarioSession'] != null
+        ? ReviewScenarioSession.fromJson(json['scenarioSession'] as Map<String, dynamic>)
+        : null,
   );
 
   final String id;
@@ -51,6 +68,8 @@ class ReviewItem {
   /// Mirrors RN's `ReviewStatus` enum ('HIDDEN' | 'IN_REVIEW'). A review is
   /// private exactly when this is 'HIDDEN' — see `isPrivate` getter below.
   final String? reviewStatus;
+
+  final ReviewScenarioSession? scenarioSession;
 
   bool get isPrivate => reviewStatus == 'HIDDEN';
 }
