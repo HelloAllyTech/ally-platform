@@ -46,7 +46,7 @@ void main() {
   Future<void> pump(WidgetTester tester) async {
     await pumpApp(
       tester,
-      CourseItemPlayerScreen(item: _item()),
+      CourseItemPlayerScreen(trackId: 'track-1', item: _item()),
       overrides: [coursesRepositoryProvider.overrideWithValue(repository)],
     );
   }
@@ -60,7 +60,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [coursesRepositoryProvider.overrideWithValue(repository)],
-        child: MaterialApp(home: CourseItemPlayerScreen(item: _item())),
+        child: MaterialApp(home: CourseItemPlayerScreen(trackId: 'track-1', item: _item())),
       ),
     );
 
@@ -219,7 +219,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [coursesRepositoryProvider.overrideWithValue(repository)],
-          child: MaterialApp(home: CourseItemPlayerScreen(item: _item())),
+          child: MaterialApp(home: CourseItemPlayerScreen(trackId: 'track-1', item: _item())),
         ),
       );
       await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
@@ -270,7 +270,7 @@ void main() {
       routes: [
         GoRoute(
           path: '/courses/item/item1',
-          builder: (context, state) => CourseItemPlayerScreen(item: _item()),
+          builder: (context, state) => CourseItemPlayerScreen(trackId: 'track-1', item: _item()),
         ),
         GoRoute(
           path: '/breathing-exercise',
@@ -311,7 +311,7 @@ void main() {
         routes: [
           GoRoute(
             path: '/courses/item/item1',
-            builder: (context, state) => CourseItemPlayerScreen(item: _item()),
+            builder: (context, state) => CourseItemPlayerScreen(trackId: 'track-1', item: _item()),
           ),
           GoRoute(
             path: '/home',
@@ -370,7 +370,7 @@ void main() {
         routes: [
           GoRoute(
             path: '/courses/item/item1',
-            builder: (context, state) => CourseItemPlayerScreen(item: _item()),
+            builder: (context, state) => CourseItemPlayerScreen(trackId: 'track-1', item: _item()),
           ),
           GoRoute(
             path: '/home',

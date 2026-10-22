@@ -45,7 +45,10 @@ class _CourseProgressScreenState extends ConsumerState<CourseProgressScreen> {
       final next = nextUnlockedItem(detail);
       if (next == null || !mounted) return;
       if (isPlayableTrackItemType(next.type)) {
-        context.push('/courses/item/${next.id}', extra: next);
+        context.push(
+          '/courses/item/${next.id}',
+          extra: (trackId: widget.trackId, item: next),
+        );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(ref.tr('courses.player.unsupportedBody'))),

@@ -146,8 +146,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/courses/item/:itemId',
         builder: (context, state) {
-          final item = state.extra as TrackDetailItem;
-          return CourseItemPlayerScreen(item: item);
+          final args = state.extra as ({String trackId, TrackDetailItem item});
+          return CourseItemPlayerScreen(trackId: args.trackId, item: args.item);
         },
       ),
       GoRoute(

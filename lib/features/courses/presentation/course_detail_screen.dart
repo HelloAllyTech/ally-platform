@@ -53,7 +53,10 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen> {
 
   void _openItem(TrackDetailItem item) {
     if (isPlayableTrackItemType(item.type)) {
-      context.push('/courses/item/${item.id}', extra: item);
+      context.push(
+        '/courses/item/${item.id}',
+        extra: (trackId: widget.trackId, item: item),
+      );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(ref.tr('courses.player.unsupportedBody'))),
