@@ -2,7 +2,12 @@ import React from 'react';
 import {fireEvent, render, waitFor} from '@testing-library/react-native';
 
 import {SCREEN_NAMES} from '@/constants';
-import {TrackDetail, TrackItemStatus, TrackItemType} from '@/types';
+import {
+  TrackDetail,
+  TrackGameKey,
+  TrackItemStatus,
+  TrackItemType,
+} from '@/types';
 
 import {CourseItemPlayerScreen} from '../CourseItemPlayerScreen';
 
@@ -260,6 +265,27 @@ describe('CourseItemPlayerScreen', () => {
       unwrap: jest.fn().mockResolvedValue({
         type: 'SOME_FUTURE_TYPE',
         trackItemProgressId: 'progress-1',
+      }),
+    } as any);
+
+    const {getByTestId} = renderScreen('item-1');
+    await waitFor(() =>
+      expect(getByTestId('unsupported-item-card')).toBeTruthy(),
+    );
+  });
+
+  it('shows the unsupported card for a breathing exercise that arrives without its configuration', async () => {
+    // The server sends the exercise's timings with the payload. Without them
+    // there is nothing to run, and this used to leave the body empty.
+    mockStartTrackItem.mockReturnValue({
+      unwrap: jest.fn().mockResolvedValue({
+        type: TrackItemType.GAME,
+        gameKey: TrackGameKey.BREATHING_EXERCISE,
+        intro: null,
+        bestScore: null,
+        playCount: 0,
+        trackItemProgressId: 'progress-1',
+        completion: {completed: true},
       }),
     } as any);
 

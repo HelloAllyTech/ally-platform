@@ -234,9 +234,10 @@ export const CourseItemPlayerScreen: React.FC<
           );
         }
         if (payload.gameKey === TrackGameKey.BREATHING_EXERCISE) {
-          // If the breathingExercise object is missing, fall back to the
-          // unsupported card below.
-          break;
+          // The server sent a breathing exercise with no configuration, so
+          // there is nothing to run. Say so rather than rendering an empty
+          // screen (a `break` here would leave the switch with no element).
+          return <UnsupportedItemCard onBackToCourse={handleBackToOverview} />;
         }
         return (
           <GamePlayer
