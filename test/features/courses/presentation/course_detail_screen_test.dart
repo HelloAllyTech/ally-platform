@@ -183,33 +183,44 @@ void main() {
     expect(find.text('courses.player.unsupportedBody'), findsOneWidget);
   });
 
-  testWidgets('the progress icon button navigates to the progress route', (tester) async {
-    when(() => repository.getLearnTrackDetail('t1')).thenAnswer((_) async => _detail(items: []));
-
-    final router = GoRouter(
-      routes: [
-        GoRoute(path: '/', builder: (context, state) => const CourseDetailScreen(trackId: 't1')),
-        GoRoute(
-          path: '/courses/:id/progress',
-          builder: (context, state) => Text('progress:${state.pathParameters['id']}'),
+  testWidgets(
+    'tapping the progress section navigates to the progress route (RN has no separate '
+    'header icon for this — the progress bar itself is the only entry point)',
+    (tester) async {
+      when(() => repository.getLearnTrackDetail('t1')).thenAnswer(
+        (_) async => _detail(
+          items: [_item(id: 'i1', type: TrackItemType.article, status: TrackItemStatus.completed)],
+          completedItems: 1,
         ),
-      ],
-    );
+      );
 
-    SharedPreferences.setMockInitialValues({});
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [coursesRepositoryProvider.overrideWithValue(repository)],
-        child: MaterialApp.router(routerConfig: router),
-      ),
-    );
-    await tester.pumpAndSettle();
+      final router = GoRouter(
+        routes: [
+          GoRoute(path: '/', builder: (context, state) => const CourseDetailScreen(trackId: 't1')),
+          GoRoute(
+            path: '/courses/:id/progress',
+            builder: (context, state) => Text('progress:${state.pathParameters['id']}'),
+          ),
+        ],
+      );
 
-    await tester.tap(find.byIcon(Icons.bar_chart));
-    await tester.pumpAndSettle();
+      SharedPreferences.setMockInitialValues({});
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [coursesRepositoryProvider.overrideWithValue(repository)],
+          child: MaterialApp.router(routerConfig: router),
+        ),
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.text('progress:t1'), findsOneWidget);
-  });
+      expect(find.byIcon(Icons.bar_chart), findsNothing, reason: 'no separate header icon');
+
+      await tester.tap(find.byIcon(Icons.chevron_right));
+      await tester.pumpAndSettle();
+
+      expect(find.text('progress:t1'), findsOneWidget);
+    },
+  );
 
   testWidgets('header title is the static "Course" label, not the track\'s own title', (tester) async {
     when(() => repository.getLearnTrackDetail('t1')).thenAnswer((_) async => _detail(items: []));
@@ -326,5 +337,21 @@ void main() {
 
       expect(find.byType(Image), findsOneWidget);
     });
+  });
+
+  testWidgets('pull-to-refresh re-fetches the track detail (RN uses RefreshControl here)', (tester) async {
+    when(() => repository.getLearnTrackDetail('t1')).thenAnswer((_) async => _detail(items: []));
+
+    await pump(tester);
+    verify(() => repository.getLearnTrackDetail('t1')).called(1);
+
+    // Don't await `show()` directly — its returned future only resolves once
+    // the indicator's dismiss animation plays out, which needs pumped frames
+    // to advance; awaiting it inline stalls forever under fake async.
+    unawaited(tester.state<RefreshIndicatorState>(find.byType(RefreshIndicator)).show());
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    verify(() => repository.getLearnTrackDetail('t1')).called(1);
   });
 }

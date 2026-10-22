@@ -92,11 +92,6 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen> {
             // "Course" label (`learn.choose.course`) — the track's own
             // title renders in the body banner below, not here.
             title: ref.t('learn.choose.course'),
-            trailing: IconButton(
-              icon: const Icon(Icons.bar_chart),
-              tooltip: ref.t('courses.viewProgress'),
-              onPressed: () => context.push('/courses/${widget.trackId}/progress'),
-            ),
           ),
           Expanded(
             child: detailAsync.when(
@@ -112,119 +107,123 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen> {
   }
 
   Widget _buildBody(BuildContext context, TrackDetail detail) {
-    final isCompleted = detail.totalItems > 0 && detail.completedItems >= detail.totalItems;
+    final isCompleted =
+        detail.totalItems > 0 && detail.completedItems >= detail.totalItems;
     final showProgress = detail.completedItems > 0 && detail.totalItems > 0;
 
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        if (detail.coverImageUrl != null)
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Image.network(
-              detail.coverImageUrl!,
-              height: 177,
-              width: double.infinity,
-              fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => Container(height: 177, color: AppColors.lightGray2),
-            ),
-          )
-        else
-          Container(
-            height: 177,
-            decoration: BoxDecoration(
-              color: AppColors.lightGray2,
+    return RefreshIndicator(
+      onRefresh: () => ref.refresh(trackDetailProvider(widget.trackId).future),
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          if (detail.coverImageUrl != null)
+            ClipRRect(
               borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        const SizedBox(height: 12),
-        // RN's LearningPathListHeader styles.pathTitle: display.small size,
-        // but IBM_PLEX_SERIF.MEDIUM family — not displaySmall's
-        // ReplayPro-Headline (that's a different, larger element).
-        Text(
-          detail.title,
-          style: Theme.of(context)
-              .textTheme
-              .displaySmall
-              ?.copyWith(fontFamily: AppFonts.ibmPlexSerifMedium),
-        ),
-        if (detail.description != null) ...[
-          const SizedBox(height: 4),
-          Text(detail.description!),
-        ],
-        if (showProgress) ...[
-          const SizedBox(height: 12),
-          _ProgressSection(
-            detail: detail,
-            onTap: detail.enrolled
-                ? () => context.push('/courses/${widget.trackId}/progress')
-                : null,
-          ),
-        ],
-        if (!isCompleted) ...[
-          const SizedBox(height: 12),
-          AppButton(
-            label: (!detail.enrolled || detail.completedItems == 0)
-                ? ref.t('common.start')
-                : ref.t('common.continue'),
-            isLoading: _isStarting,
-            onPressed: () => _startOrContinue(detail),
-          ),
-        ],
-        if (_error != null) ...[
-          const SizedBox(height: 8),
-          Text(_error!, style: const TextStyle(color: AppColors.red400)),
-        ],
-        const SizedBox(height: 16),
-        for (final section in detail.sections) ...[
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            // RN's CourseSectionBlock styles.sectionTitle:
-            // IBM_PLEX_SERIF.MEDIUM at body.large size (16/24/0.5)
-            // — bodyLarge already matches that size exactly.
-            child: Text(
-              section.title,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyLarge
-                  ?.copyWith(fontFamily: AppFonts.ibmPlexSerifMedium),
-            ),
-          ),
-          for (final item in section.items)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: AppCard(
-                variant: AppCardVariant.flat,
-                child: ListTile(
-                  leading: Icon(_iconForType(item.type)),
-                  title: Text(item.title),
-                  trailing: item.status == TrackItemStatus.completed
-                      ? SvgPicture.asset(
-                          'assets/icons/checkCircle.svg',
-                          key: const ValueKey('trailing-completed'),
-                          width: 24,
-                          height: 24,
-                        )
-                      : item.status == TrackItemStatus.locked
-                          ? SvgPicture.asset(
-                              'assets/icons/lock.svg',
-                              key: const ValueKey('trailing-locked'),
-                              width: 20,
-                              height: 20,
-                            )
-                          : SvgPicture.asset(
-                              'assets/icons/arrowRight.svg',
-                              key: const ValueKey('trailing-unlocked'),
-                              width: 16,
-                              height: 16,
-                            ),
-                  enabled: item.status != TrackItemStatus.locked,
-                  onTap: item.status == TrackItemStatus.locked ? null : () => _openItem(item),
-                ),
+              child: Image.network(
+                detail.coverImageUrl!,
+                height: 177,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) =>
+                    Container(height: 177, color: AppColors.lightGray2),
+              ),
+            )
+          else
+            Container(
+              height: 177,
+              decoration: BoxDecoration(
+                color: AppColors.lightGray2,
+                borderRadius: BorderRadius.circular(12),
               ),
             ),
+          const SizedBox(height: 12),
+          // RN's LearningPathListHeader styles.pathTitle: display.small size,
+          // but IBM_PLEX_SERIF.MEDIUM family — not displaySmall's
+          // ReplayPro-Headline (that's a different, larger element).
+          Text(
+            detail.title,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.displaySmall
+                ?.copyWith(fontFamily: AppFonts.ibmPlexSerifMedium),
+          ),
+          if (detail.description != null) ...[
+            const SizedBox(height: 4),
+            Text(detail.description!),
+          ],
+          if (showProgress) ...[
+            const SizedBox(height: 12),
+            _ProgressSection(
+              detail: detail,
+              onTap: detail.enrolled
+                  ? () => context.push('/courses/${widget.trackId}/progress')
+                  : null,
+            ),
+          ],
+          if (!isCompleted) ...[
+            const SizedBox(height: 12),
+            AppButton(
+              label: (!detail.enrolled || detail.completedItems == 0)
+                  ? ref.t('common.start')
+                  : ref.t('common.continue'),
+              isLoading: _isStarting,
+              onPressed: () => _startOrContinue(detail),
+            ),
+          ],
+          if (_error != null) ...[
+            const SizedBox(height: 8),
+            Text(_error!, style: const TextStyle(color: AppColors.red400)),
+          ],
+          const SizedBox(height: 16),
+          for (final section in detail.sections) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              // RN's CourseSectionBlock styles.sectionTitle:
+              // IBM_PLEX_SERIF.MEDIUM at body.large size (16/24/0.5)
+              // — bodyLarge already matches that size exactly.
+              child: Text(
+                section.title,
+                style: Theme.of(context).textTheme.bodyLarge
+                    ?.copyWith(fontFamily: AppFonts.ibmPlexSerifMedium),
+              ),
+            ),
+            for (final item in section.items)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: AppCard(
+                  variant: AppCardVariant.flat,
+                  child: ListTile(
+                    leading: Icon(_iconForType(item.type)),
+                    title: Text(item.title),
+                    trailing: item.status == TrackItemStatus.completed
+                        ? SvgPicture.asset(
+                            'assets/icons/checkCircle.svg',
+                            key: const ValueKey('trailing-completed'),
+                            width: 24,
+                            height: 24,
+                          )
+                        : item.status == TrackItemStatus.locked
+                        ? SvgPicture.asset(
+                            'assets/icons/lock.svg',
+                            key: const ValueKey('trailing-locked'),
+                            width: 20,
+                            height: 20,
+                          )
+                        : SvgPicture.asset(
+                            'assets/icons/arrowRight.svg',
+                            key: const ValueKey('trailing-unlocked'),
+                            width: 16,
+                            height: 16,
+                          ),
+                    enabled: item.status != TrackItemStatus.locked,
+                    onTap: item.status == TrackItemStatus.locked
+                        ? null
+                        : () => _openItem(item),
+                  ),
+                ),
+              ),
+          ],
         ],
-      ],
+      ),
     );
   }
 }
@@ -259,17 +258,25 @@ class _ProgressSection extends ConsumerWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(ref.t('simulations.progressCompleted', {
-              'current': detail.completedItems,
-              'total': detail.totalItems,
-            })),
-            if (onTap != null) const Icon(Icons.chevron_right, size: 18, color: AppColors.mediumEmphasis),
+            Text(
+              ref.t('simulations.progressCompleted', {
+                'current': detail.completedItems,
+                'total': detail.totalItems,
+              }),
+            ),
+            if (onTap != null)
+              const Icon(
+                Icons.chevron_right,
+                size: 18,
+                color: AppColors.mediumEmphasis,
+              ),
           ],
         ),
         if (onTap != null)
           Text(
             ref.t('courses.progressDashboard.tapHint'),
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.mediumEmphasis),
+            style: Theme.of(context).textTheme.bodySmall
+                ?.copyWith(color: AppColors.mediumEmphasis),
           ),
       ],
     );
