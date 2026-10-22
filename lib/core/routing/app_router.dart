@@ -171,6 +171,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/simulations/:scenarioId',
         builder: (context, state) => SimulationDetailsScreen(
           scenarioId: int.parse(state.pathParameters['scenarioId']!),
+          initialScenario: state.extra as Scenario?,
         ),
       ),
       GoRoute(

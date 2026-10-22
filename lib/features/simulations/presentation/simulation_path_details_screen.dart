@@ -36,12 +36,13 @@ class SimulationPathDetailsScreen extends ConsumerWidget {
                 .createPathSession(pathId);
             ref.invalidate(simulationPathDetailsProvider(pathId));
           },
-          onStartScenario: (scenario) async {
+          onStartScenario: (scenario, {languageId}) async {
             final session = await ref
                 .read(simulationsRepositoryProvider)
                 .startScenarioSession(
                   scenarioId: scenario.scenarioId,
                   scenarioPathSessionItemId: scenario.sessionId,
+                  languageId: languageId,
                 );
             if (context.mounted) {
               context.push(

@@ -39,12 +39,13 @@ class CaseDetailsScreen extends ConsumerWidget {
                 .createCaseSession(caseId);
             ref.invalidate(caseDetailsProvider(caseId));
           },
-          onStartScenario: (scenario) async {
+          onStartScenario: (scenario, {languageId}) async {
             final session = await ref
                 .read(simulationsRepositoryProvider)
                 .startScenarioSession(
                   scenarioId: scenario.scenarioId,
                   caseSessionItemId: scenario.sessionId,
+                  languageId: languageId,
                 );
             if (context.mounted) {
               context.push(

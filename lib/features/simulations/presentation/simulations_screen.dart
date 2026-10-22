@@ -252,7 +252,17 @@ class _SimulationsScreenState extends ConsumerState<SimulationsScreen> {
                       description: scenario.description,
                       coverImageUrl: scenario.coverImageUrl,
                       triggerWarnings: scenario.triggerWarnings,
-                      onTap: () => context.push('/simulations/${scenario.id}'),
+                      // RN's SimulationDetailsScreen never fetches by id at
+                      // all — it just reads `route.params.scenario`, trusting
+                      // this already-fetched list item completely. Passing
+                      // it through here instead of re-fetching via a
+                      // `scenarios/:id` call RN's own UI never exercises
+                      // matches that exactly, and was the prime suspect for
+                      // why no scenario ever showed a language dropdown on a
+                      // real device (reported live) even though the by-id
+                      // endpoint looks logically equivalent on paper.
+                      onTap: () =>
+                          context.push('/simulations/${scenario.id}', extra: scenario),
                       trailing: scenario.completedAttemptCount > 0
                           ? _CompletedBadge(
                               count: scenario.completedAttemptCount,

@@ -31,9 +31,15 @@ const _allyWebUrl = 'https://app.helloally.ai/';
 /// 429-rate-limit retry modal — same scope line `LearningPathDetailView`
 /// already draws for the equivalent path/case flows.
 class SimulationDetailsScreen extends ConsumerStatefulWidget {
-  const SimulationDetailsScreen({super.key, required this.scenarioId});
+  const SimulationDetailsScreen({super.key, required this.scenarioId, this.initialScenario});
 
   final int scenarioId;
+
+  /// The already-fetched `Scenario` from the catalog list, when reached that
+  /// way — matches RN, which never fetches this screen's data separately at
+  /// all (`route.params.scenario`). Falls back to a fresh by-id fetch only
+  /// when absent (e.g. a future deep link with no list context to reuse).
+  final Scenario? initialScenario;
 
   @override
   ConsumerState<SimulationDetailsScreen> createState() =>
@@ -97,7 +103,10 @@ class _SimulationDetailsScreenState
 
   @override
   Widget build(BuildContext context) {
-    final scenarioAsync = ref.watch(scenarioByIdProvider(widget.scenarioId));
+    final initialScenario = widget.initialScenario;
+    final AsyncValue<Scenario> scenarioAsync = initialScenario != null
+        ? AsyncValue.data(initialScenario)
+        : ref.watch(scenarioByIdProvider(widget.scenarioId));
 
     return Scaffold(
       body: Column(

@@ -26,8 +26,10 @@ List<GoRoute> _routes() => [
   ),
   GoRoute(
     path: '/simulations/:scenarioId',
-    builder: (context, state) =>
-        Text('SCENARIO_DETAILS:${state.pathParameters['scenarioId']}'),
+    builder: (context, state) => Text(
+      'SCENARIO_DETAILS:${state.pathParameters['scenarioId']}:'
+      'extraTitle=${(state.extra as Scenario?)?.title}',
+    ),
   ),
   GoRoute(
     path: '/courses/:trackId',
@@ -118,23 +120,28 @@ void main() {
     expect(find.textContaining('Failed to load scenarios'), findsOneWidget);
   });
 
-  testWidgets('tapping a scenario navigates to its details route', (tester) async {
-    when(() => repository.getScenarios()).thenAnswer(
-      (_) async => [_scenario(id: 7, title: 'First scenario')],
-    );
+  testWidgets(
+    'tapping a scenario navigates to its details route, passing the already-fetched '
+    'Scenario as extra (RN never fetches this screen separately — reusing it is what '
+    'actually fixed the language dropdown never appearing)',
+    (tester) async {
+      when(() => repository.getScenarios()).thenAnswer(
+        (_) async => [_scenario(id: 7, title: 'First scenario')],
+      );
 
-    await pumpRouterApp(
-      tester,
-      initialLocation: '/simulations',
-      routes: _routes(),
-      overrides: overrides(),
-    );
+      await pumpRouterApp(
+        tester,
+        initialLocation: '/simulations',
+        routes: _routes(),
+        overrides: overrides(),
+      );
 
-    await tester.tap(find.text('First scenario'));
-    await tester.pumpAndSettle();
+      await tester.tap(find.text('First scenario'));
+      await tester.pumpAndSettle();
 
-    expect(find.text('SCENARIO_DETAILS:7'), findsOneWidget);
-  });
+      expect(find.text('SCENARIO_DETAILS:7:extraTitle=First scenario'), findsOneWidget);
+    },
+  );
 
   testWidgets('renders the intro copy with its two blue-highlighted spans', (tester) async {
     when(() => repository.getScenarios()).thenAnswer((_) async => []);

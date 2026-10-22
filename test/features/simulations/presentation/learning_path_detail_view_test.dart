@@ -15,6 +15,7 @@ PathScenario _scenario({
   SessionItemStatus status = SessionItemStatus.unlocked,
   String? sessionId,
   String? title,
+  List<Map<String, Object?>>? availableLanguages,
 }) => PathScenario.fromJson({
   'id': id,
   'scenarioId': scenarioId,
@@ -22,6 +23,7 @@ PathScenario _scenario({
   'title': title ?? 'Scenario $scenarioId',
   'status': status.name.toUpperCase(),
   'sessionId': sessionId,
+  'availableLanguages': availableLanguages,
 });
 
 SimulationPathDetails _details({
@@ -59,7 +61,7 @@ void main() {
         LearningPathDetailView(
           details: details,
           onEnsureSession: () async {},
-          onStartScenario: (_) async {},
+          onStartScenario: (_, {languageId}) async {},
           onViewFeedback: (_) async {},
         ),
       );
@@ -90,7 +92,7 @@ void main() {
         LearningPathDetailView(
           details: details,
           onEnsureSession: () async {},
-          onStartScenario: (_) async {},
+          onStartScenario: (_, {languageId}) async {},
           onViewFeedback: (_) async {},
         ),
       );
@@ -119,7 +121,7 @@ void main() {
         LearningPathDetailView(
           details: details,
           onEnsureSession: () async {},
-          onStartScenario: (_) async {},
+          onStartScenario: (_, {languageId}) async {},
           onViewFeedback: (_) async {},
         ),
       );
@@ -146,7 +148,7 @@ void main() {
           onEnsureSession: () async {
             calls.add('ensure');
           },
-          onStartScenario: (scenario) async {
+          onStartScenario: (scenario, {languageId}) async {
             calls.add('start:${scenario.id}');
           },
           onViewFeedback: (_) async {},
@@ -158,6 +160,90 @@ void main() {
 
       expect(calls, ['ensure', 'start:s1']);
     });
+
+    testWidgets(
+      'when the next scenario has availableLanguages, prompts for one before starting, '
+      'and passes the chosen languageId through',
+      (tester) async {
+        int? capturedLanguageId;
+        final details = _details(
+          scenarios: [
+            _scenario(
+              id: 's1',
+              scenarioId: 1,
+              order: 1,
+              availableLanguages: [
+                {'language_id': 1, 'label': 'English', 'active': true},
+                {'language_id': 2, 'label': 'Hindi', 'active': true},
+              ],
+            ),
+          ],
+        );
+
+        await _pump(
+          tester,
+          LearningPathDetailView(
+            details: details,
+            onEnsureSession: () async {},
+            onStartScenario: (scenario, {languageId}) async {
+              capturedLanguageId = languageId;
+            },
+            onViewFeedback: (_) async {},
+          ),
+        );
+
+        await tester.tap(find.widgetWithText(AppButton, 'Start'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('English'), findsOneWidget, reason: 'the picker dialog is showing');
+        expect(find.text('Hindi'), findsOneWidget);
+        expect(capturedLanguageId, isNull, reason: 'not started until a language is chosen');
+
+        await tester.tap(find.text('Hindi'));
+        await tester.pumpAndSettle();
+
+        expect(capturedLanguageId, 2);
+      },
+    );
+
+    testWidgets(
+      'cancelling the language picker (tapping outside the dialog) does not start the scenario',
+      (tester) async {
+        var startCalls = 0;
+        final details = _details(
+          scenarios: [
+            _scenario(
+              id: 's1',
+              scenarioId: 1,
+              order: 1,
+              availableLanguages: [
+                {'language_id': 1, 'label': 'English', 'active': true},
+              ],
+            ),
+          ],
+        );
+
+        await _pump(
+          tester,
+          LearningPathDetailView(
+            details: details,
+            onEnsureSession: () async {},
+            onStartScenario: (scenario, {languageId}) async => startCalls++,
+            onViewFeedback: (_) async {},
+          ),
+        );
+
+        await tester.tap(find.widgetWithText(AppButton, 'Start'));
+        await tester.pumpAndSettle();
+        expect(find.text('English'), findsOneWidget);
+
+        // Dismiss by tapping the scrim, same as a hardware-back/outside-tap.
+        await tester.tapAt(const Offset(10, 10));
+        await tester.pumpAndSettle();
+
+        expect(startCalls, 0);
+      },
+    );
   });
 
   group('per-row status rendering', () {
@@ -174,7 +260,7 @@ void main() {
         LearningPathDetailView(
           details: details,
           onEnsureSession: () async {},
-          onStartScenario: (scenario) async => calls.add(scenario.id),
+          onStartScenario: (scenario, {languageId}) async => calls.add(scenario.id),
           onViewFeedback: (_) async {},
         ),
       );
@@ -213,7 +299,7 @@ void main() {
         LearningPathDetailView(
           details: details,
           onEnsureSession: () async {},
-          onStartScenario: (_) async {},
+          onStartScenario: (_, {languageId}) async {},
           onViewFeedback: (scenario) async => calls.add(scenario.id),
         ),
       );
@@ -241,7 +327,7 @@ void main() {
         LearningPathDetailView(
           details: details,
           onEnsureSession: () async {},
-          onStartScenario: (scenario) async => calls.add(scenario.id),
+          onStartScenario: (scenario, {languageId}) async => calls.add(scenario.id),
           onViewFeedback: (_) async {},
         ),
       );
@@ -275,7 +361,7 @@ void main() {
         LearningPathDetailView(
           details: details,
           onEnsureSession: () async {},
-          onStartScenario: (_) async {},
+          onStartScenario: (_, {languageId}) async {},
           onViewFeedback: (_) async {},
         ),
       );

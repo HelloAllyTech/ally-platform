@@ -26,6 +26,7 @@ List<GoRoute> _routes() => [
     path: '/simulations/:scenarioId',
     builder: (context, state) => SimulationDetailsScreen(
       scenarioId: int.parse(state.pathParameters['scenarioId']!),
+      initialScenario: state.extra as Scenario?,
     ),
   ),
   GoRoute(
@@ -66,6 +67,45 @@ void main() {
     expect(find.text('Difficult conversation'), findsOneWidget);
     expect(_allText(tester), contains('Practice de-escalation'));
   });
+
+  testWidgets(
+    'when reached with an already-fetched Scenario (as the catalog list always passes), '
+    'renders it directly without ever calling getScenarioById',
+    (tester) async {
+      final scenario = Scenario.fromJson({
+        'id': 42,
+        'title': 'Reused scenario',
+        'description': 'From the list, not re-fetched',
+        'availableLanguages': [
+          {'language_id': 1, 'label': 'English', 'active': true},
+        ],
+      });
+
+      await pumpRouterApp(
+        tester,
+        initialLocation: '/from-list',
+        routes: [
+          GoRoute(
+            path: '/from-list',
+            builder: (context, state) => TextButton(
+              onPressed: () => context.push('/simulations/42', extra: scenario),
+              child: const Text('open'),
+            ),
+          ),
+          ..._routes(),
+        ],
+        overrides: [simulationsRepositoryProvider.overrideWithValue(repository)],
+      );
+
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Reused scenario'), findsOneWidget);
+      expect(_allText(tester), contains('From the list, not re-fetched'));
+      expect(find.text('English'), findsOneWidget, reason: 'availableLanguages carried through too');
+      verifyNever(() => repository.getScenarioById(any()));
+    },
+  );
 
   testWidgets('tapping start calls startScenarioSession and navigates to /roleplay with the session extras', (
     tester,
