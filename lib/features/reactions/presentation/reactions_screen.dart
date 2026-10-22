@@ -87,7 +87,12 @@ class _ReactionsScreenState extends ConsumerState<ReactionsScreen> {
 
   Widget _buildFilterTabs(Map<String, int> counts) {
     final totalCount = counts.values.fold(0, (sum, count) => sum + count);
-    final sortedEntries = counts.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    // RN's `useReactions.ts` excludes any reaction type with a 0 count
+    // before building tabs — a backend response that includes a now-empty
+    // type (every reaction of it removed) would otherwise show a stray
+    // "0" tab RN never shows.
+    final sortedEntries = counts.entries.where((e) => e.value > 0).toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,

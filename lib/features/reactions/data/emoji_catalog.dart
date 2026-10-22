@@ -24,5 +24,9 @@ const kEmojiUnicodeMap = {
 const kPlatformEmojiIds = ['1f44d', '2764-fe0f', '1f604', '1f44f', '1f4a1', '1f44e'];
 
 /// The glyph for a reaction id, falling back to the raw id itself for any
-/// future/unrecognized id rather than showing nothing.
-String emojiGlyphFor(String id) => kEmojiUnicodeMap[id] ?? id;
+/// future/unrecognized id rather than showing nothing. RN lowercases the id
+/// before this lookup (`ReactionListItem.tsx`/`ReactionFilterTabs.tsx`) —
+/// without it, a differently-cased id that's otherwise a known reaction
+/// (e.g. from a future client that doesn't normalize casing before storing
+/// it) would wrongly fall back to showing its raw id instead of the emoji.
+String emojiGlyphFor(String id) => kEmojiUnicodeMap[id.toLowerCase()] ?? id;
