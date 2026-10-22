@@ -42,17 +42,27 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
     final permissionsAsync = ref.watch(userPermissionsProvider);
 
     return permissionsAsync.when(
-      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (error, _) => Scaffold(body: Center(child: Text('$error'))),
+      loading: () => const Scaffold(
+        body: SafeArea(child: Center(child: CircularProgressIndicator())),
+      ),
+      error: (error, _) => Scaffold(
+        body: SafeArea(child: Center(child: Text('$error'))),
+      ),
       data: (permissions) => _buildScreen(permissions),
     );
   }
 
   Widget _buildScreen(List<String> permissions) {
-    final hasSimulation = permissions.contains(UserPermissions.viewSimulationReviews);
+    final hasSimulation = permissions.contains(
+      UserPermissions.viewSimulationReviews,
+    );
     final hasScribe = permissions.contains(UserPermissions.viewScribeReviews);
-    final canViewSimulationDetail = permissions.contains(UserPermissions.viewSimulationReview);
-    final canViewScribeDetail = permissions.contains(UserPermissions.viewScribeReview);
+    final canViewSimulationDetail = permissions.contains(
+      UserPermissions.viewSimulationReview,
+    );
+    final canViewScribeDetail = permissions.contains(
+      UserPermissions.viewScribeReview,
+    );
 
     // Scribe listed first, matching the real REVIEW_TYPE_TABS order.
     if (hasScribe && hasSimulation) {
@@ -68,50 +78,68 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
     final showTabs = hasScribe && hasSimulation;
 
     return Scaffold(
-      body: Column(
-        children: [
-          TabScreenHeader(title: ref.t('review.title'), subtitle: ref.t('nav.tabs.review')),
-          if (showTabs)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-              child: AppTabView<_ReviewTab>(
-                tabs: [
-                  AppTabViewItem(key: _ReviewTab.scribe, label: ref.t('review.tabs.scribe')),
-                  AppTabViewItem(
-                    key: _ReviewTab.simulation,
-                    label: ref.t('review.tabs.simulation'),
-                  ),
-                ],
-                activeTab: _activeTab!,
-                onTabChange: (tab) => setState(() => _activeTab = tab),
-              ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            TabScreenHeader(
+              title: ref.t('review.title'),
+              subtitle: ref.t('nav.tabs.review'),
             ),
-          Expanded(
-            child: _activeTab == null
-                ? Center(child: Text(ref.t('review.empty.title')))
-                : _activeTab == _ReviewTab.simulation
-                    ? _ReviewList(
-                        provider: reviewsListProvider,
-                        reviewType: ReviewType.simulation,
-                        canViewDetails: canViewSimulationDetail,
-                        onReviewTapped: (review) async {
-                          await ref.read(reviewsRepositoryProvider).markAsRead(review.id);
-                          if (mounted) context.push('/reviews/${review.id}');
-                        },
-                      )
-                    : _ReviewList(
-                        provider: scribeReviewsListProvider,
-                        reviewType: ReviewType.scribe,
-                        canViewDetails: canViewScribeDetail,
-                        onReviewTapped: (review) async {
-                          await ref.read(scribeReviewsRepositoryProvider).markAsRead(review.id);
-                          if (mounted) {
-                            context.push('/reviews/${review.id}', extra: ReviewType.scribe);
-                          }
-                        },
-                      ),
-          ),
-        ],
+            if (showTabs)
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 16,
+                ),
+                child: AppTabView<_ReviewTab>(
+                  tabs: [
+                    AppTabViewItem(
+                      key: _ReviewTab.scribe,
+                      label: ref.t('review.tabs.scribe'),
+                    ),
+                    AppTabViewItem(
+                      key: _ReviewTab.simulation,
+                      label: ref.t('review.tabs.simulation'),
+                    ),
+                  ],
+                  activeTab: _activeTab!,
+                  onTabChange: (tab) => setState(() => _activeTab = tab),
+                ),
+              ),
+            Expanded(
+              child: _activeTab == null
+                  ? Center(child: Text(ref.t('review.empty.title')))
+                  : _activeTab == _ReviewTab.simulation
+                  ? _ReviewList(
+                      provider: reviewsListProvider,
+                      reviewType: ReviewType.simulation,
+                      canViewDetails: canViewSimulationDetail,
+                      onReviewTapped: (review) async {
+                        await ref
+                            .read(reviewsRepositoryProvider)
+                            .markAsRead(review.id);
+                        if (mounted) context.push('/reviews/${review.id}');
+                      },
+                    )
+                  : _ReviewList(
+                      provider: scribeReviewsListProvider,
+                      reviewType: ReviewType.scribe,
+                      canViewDetails: canViewScribeDetail,
+                      onReviewTapped: (review) async {
+                        await ref
+                            .read(scribeReviewsRepositoryProvider)
+                            .markAsRead(review.id);
+                        if (mounted) {
+                          context.push(
+                            '/reviews/${review.id}',
+                            extra: ReviewType.scribe,
+                          );
+                        }
+                      },
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -136,15 +164,17 @@ class _ReviewList extends ConsumerWidget {
 
     return reviewsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, _) => Center(child: Text('${ref.t('review.error.title')}: $error')),
+      error: (error, _) =>
+          Center(child: Text('${ref.t('review.error.title')}: $error')),
       data: (reviews) {
         if (reviews.isEmpty) {
           return Center(child: Text(ref.t('review.empty.title')));
         }
-        final label = ref.t(
-          'review.feedCard.reviewType',
-          {'reviewType': reviewType == ReviewType.scribe ? 'Scribe' : 'Simulation'},
-        );
+        final label = ref.t('review.feedCard.reviewType', {
+          'reviewType': reviewType == ReviewType.scribe
+              ? 'Scribe'
+              : 'Simulation',
+        });
         return ListView.separated(
           itemCount: reviews.length,
           separatorBuilder: (_, _) => const Divider(height: 1),
@@ -171,11 +201,17 @@ class _ReviewList extends ConsumerWidget {
                     padding: const EdgeInsets.only(bottom: 4),
                     child: ReviewTypeChip(reviewType: reviewType, label: label),
                   ),
-                  Text(review.note, maxLines: 2, overflow: TextOverflow.ellipsis),
+                  Text(
+                    review.note,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ],
               ),
               isThreeLine: true,
-              trailing: review.commentsCount > 0 ? Chip(label: Text('${review.commentsCount}')) : null,
+              trailing: review.commentsCount > 0
+                  ? Chip(label: Text('${review.commentsCount}'))
+                  : null,
               enabled: canViewDetails,
               onTap: canViewDetails ? () => onReviewTapped(review) : null,
             );

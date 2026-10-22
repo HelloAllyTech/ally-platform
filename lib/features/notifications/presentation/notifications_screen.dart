@@ -24,7 +24,8 @@ class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
 
   @override
-  ConsumerState<NotificationsScreen> createState() => _NotificationsScreenState();
+  ConsumerState<NotificationsScreen> createState() =>
+      _NotificationsScreenState();
 }
 
 class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
@@ -54,7 +55,10 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   /// (including its un-translated "just now"/"Xm ago" literals — that
   /// screen doesn't use `useTranslate` at all, so neither does this).
   static String _timeAgo(String iso) {
-    final seconds = DateTime.now().toUtc().difference(DateTime.parse(iso).toUtc()).inSeconds;
+    final seconds = DateTime.now()
+        .toUtc()
+        .difference(DateTime.parse(iso).toUtc())
+        .inSeconds;
     if (seconds < 60) return 'just now';
     final minutes = seconds ~/ 60;
     if (minutes < 60) return '${minutes}m ago';
@@ -86,82 +90,93 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     );
 
     return Scaffold(
-      body: Column(
-        children: [
-          TabScreenHeader(
-            title: ref.t('notifications.title'),
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: () => context.pop(),
+      body: SafeArea(
+        child: Column(
+          children: [
+            TabScreenHeader(
+              title: ref.t('notifications.title'),
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => context.pop(),
+              ),
+              // RN only shows "Mark all read" when there's something unread,
+              // else a blank spacer — not unconditionally.
+              trailing: hasUnread
+                  ? TextButton(
+                      onPressed: () async {
+                        await ref
+                            .read(notificationsRepositoryProvider)
+                            .markAllRead();
+                        ref.invalidate(notificationsControllerProvider);
+                      },
+                      child: Text(ref.t('notifications.markAllRead')),
+                    )
+                  : null,
             ),
-            // RN only shows "Mark all read" when there's something unread,
-            // else a blank spacer — not unconditionally.
-            trailing: hasUnread
-                ? TextButton(
-                    onPressed: () async {
-                      await ref.read(notificationsRepositoryProvider).markAllRead();
-                      ref.invalidate(notificationsControllerProvider);
-                    },
-                    child: Text(ref.t('notifications.markAllRead')),
-                  )
-                : null,
-          ),
-          Expanded(
-            child: pageAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, _) =>
-                  Center(child: Text('${ref.t('notifications.loadError')}: $error')),
-              data: (page) {
-                if (page.items.isEmpty) {
-                  return Center(child: Text(ref.t('notifications.empty')));
-                }
-                return RefreshIndicator(
-                  onRefresh: () => ref.refresh(notificationsControllerProvider.future),
-                  child: ListView.separated(
-                    controller: _scrollController,
-                    itemCount: page.items.length + (page.isLoadingMore ? 1 : 0),
-                    separatorBuilder: (_, _) => const Divider(height: 1),
-                    itemBuilder: (context, index) {
-                      if (index >= page.items.length) {
-                        return const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 16),
-                          child: Center(child: CircularProgressIndicator()),
-                        );
-                      }
-                      final item = page.items[index];
-                      return ListTile(
-                        leading: Icon(
-                          item.isRead
-                              ? Icons.notifications_none
-                              : Icons.notifications_active,
-                          color: item.isRead ? null : Theme.of(context).colorScheme.primary,
-                        ),
-                        title: Text(
-                          item.title,
-                          style: TextStyle(
-                            fontWeight: item.isRead ? FontWeight.normal : FontWeight.bold,
+            Expanded(
+              child: pageAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (error, _) => Center(
+                  child: Text('${ref.t('notifications.loadError')}: $error'),
+                ),
+                data: (page) {
+                  if (page.items.isEmpty) {
+                    return Center(child: Text(ref.t('notifications.empty')));
+                  }
+                  return RefreshIndicator(
+                    onRefresh: () =>
+                        ref.refresh(notificationsControllerProvider.future),
+                    child: ListView.separated(
+                      controller: _scrollController,
+                      itemCount:
+                          page.items.length + (page.isLoadingMore ? 1 : 0),
+                      separatorBuilder: (_, _) => const Divider(height: 1),
+                      itemBuilder: (context, index) {
+                        if (index >= page.items.length) {
+                          return const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 16),
+                            child: Center(child: CircularProgressIndicator()),
+                          );
+                        }
+                        final item = page.items[index];
+                        return ListTile(
+                          leading: Icon(
+                            item.isRead
+                                ? Icons.notifications_none
+                                : Icons.notifications_active,
+                            color: item.isRead
+                                ? null
+                                : Theme.of(context).colorScheme.primary,
                           ),
-                        ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(item.body),
-                            Text(
-                              _timeAgo(item.createdAt),
-                              style: Theme.of(context).textTheme.bodySmall,
+                          title: Text(
+                            item.title,
+                            style: TextStyle(
+                              fontWeight: item.isRead
+                                  ? FontWeight.normal
+                                  : FontWeight.bold,
                             ),
-                          ],
-                        ),
-                        isThreeLine: true,
-                        onTap: () => _onItemTap(item),
-                      );
-                    },
-                  ),
-                );
-              },
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(item.body),
+                              Text(
+                                _timeAgo(item.createdAt),
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ],
+                          ),
+                          isThreeLine: true,
+                          onTap: () => _onItemTap(item),
+                        );
+                      },
+                    ),
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

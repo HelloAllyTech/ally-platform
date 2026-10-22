@@ -97,34 +97,36 @@ class _CourseItemPlayerScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        children: [
-          Column(
-            children: [
-              TabScreenHeader(title: widget.item.title),
-              Expanded(
-                child: _isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : _error != null
-                    ? Center(
-                        child: Text(
-                          _error!,
-                          style: const TextStyle(color: AppColors.red400),
-                        ),
-                      )
-                    : _buildBody(),
-              ),
-            ],
-          ),
-          if (_celebration != null)
-            Positioned.fill(
-              child: CelebrationModal(
-                kind: _celebration!,
-                onContinue: () => setState(() => _celebration = null),
-                onBackToLearn: () => context.go('/home'),
-              ),
+      body: SafeArea(
+        child: Stack(
+          children: [
+            Column(
+              children: [
+                TabScreenHeader(title: widget.item.title),
+                Expanded(
+                  child: _isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : _error != null
+                      ? Center(
+                          child: Text(
+                            _error!,
+                            style: const TextStyle(color: AppColors.red400),
+                          ),
+                        )
+                      : _buildBody(),
+                ),
+              ],
             ),
-        ],
+            if (_celebration != null)
+              Positioned.fill(
+                child: CelebrationModal(
+                  kind: _celebration!,
+                  onContinue: () => setState(() => _celebration = null),
+                  onBackToLearn: () => context.go('/home'),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

@@ -47,7 +47,9 @@ class ShareForReviewScreen extends ConsumerStatefulWidget {
 }
 
 class _ShareForReviewScreenState extends ConsumerState<ShareForReviewScreen> {
-  late final _noteController = TextEditingController(text: widget.initialNote ?? '');
+  late final _noteController = TextEditingController(
+    text: widget.initialNote ?? '',
+  );
   bool _isSubmitting = false;
   String? _error;
 
@@ -77,13 +79,17 @@ class _ShareForReviewScreenState extends ConsumerState<ShareForReviewScreen> {
       // updates the existing review's status+note instead of creating a
       // new one — `onCreateReview` only ever fires with neither.
       if (widget.reviewId != null) {
-        await ref.read(reviewsRepositoryProvider).updateReviewStatus(
+        await ref
+            .read(reviewsRepositoryProvider)
+            .updateReviewStatus(
               reviewId: widget.reviewId!,
               status: 'IN_REVIEW',
               note: note,
             );
       } else {
-        await ref.read(reviewsRepositoryProvider).createReview(
+        await ref
+            .read(reviewsRepositoryProvider)
+            .createReview(
               scenarioSessionId: widget.scenarioSessionId,
               note: note,
             );
@@ -101,48 +107,56 @@ class _ShareForReviewScreenState extends ConsumerState<ShareForReviewScreen> {
     final screenTitle = widget.isEditNote
         ? ref.t('review.details.editNote')
         : ref.t('simulationPage.shareScreenTitle');
-    final buttonLabel = widget.isEditNote ? ref.t('common.save') : ref.t('common.share');
+    final buttonLabel = widget.isEditNote
+        ? ref.t('common.save')
+        : ref.t('common.share');
     final length = _noteController.text.length;
 
     return Scaffold(
-      body: Column(
-        children: [
-          TabScreenHeader(title: screenTitle),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(ref.t('review.addNoteCaption')),
-                  const SizedBox(height: 12),
-                  AppTextField(
-                    controller: _noteController,
-                    maxLines: 5,
-                    maxLength: _maxNoteLength,
-                  ),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: Text(
-                      '$length/$_maxNoteLength',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.mediumEmphasis),
-                    ),
-                  ),
-                  if (_error != null) ...[
+      body: SafeArea(
+        child: Column(
+          children: [
+            TabScreenHeader(title: screenTitle),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(ref.t('review.addNoteCaption')),
                     const SizedBox(height: 12),
-                    Text(_error!, style: const TextStyle(color: AppColors.red400)),
+                    AppTextField(
+                      controller: _noteController,
+                      maxLines: 5,
+                      maxLength: _maxNoteLength,
+                    ),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Text(
+                        '$length/$_maxNoteLength',
+                        style: Theme.of(context).textTheme.bodySmall
+                            ?.copyWith(color: AppColors.mediumEmphasis),
+                      ),
+                    ),
+                    if (_error != null) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        _error!,
+                        style: const TextStyle(color: AppColors.red400),
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    AppButton(
+                      label: buttonLabel,
+                      isLoading: _isSubmitting,
+                      onPressed: _submit,
+                    ),
                   ],
-                  const SizedBox(height: 16),
-                  AppButton(
-                    label: buttonLabel,
-                    isLoading: _isSubmitting,
-                    onPressed: _submit,
-                  ),
-                ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
