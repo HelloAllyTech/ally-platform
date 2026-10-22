@@ -61,6 +61,20 @@ target 'ally' do
       end
     end
 
+    # Xcode 27 only supports deployment targets 15.0 and up, but several pods
+    # (the privacy-manifest resource bundles above all) still declare 9.0-14.x
+    # and fail the build with "deployment target ... is set to 12.0, but the
+    # range of supported deployment target versions is 15.0 to 27.1.x". Raise
+    # anything below the app's own floor; leave higher ones alone.
+    min_target = Gem::Version.new('15.0')
+    installer.pods_project.targets.each do |t|
+      t.build_configurations.each do |c|
+        current = c.build_settings['IPHONEOS_DEPLOYMENT_TARGET']
+        next if current.nil? || Gem::Version.new(current) >= min_target
+        c.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = min_target.to_s
+      end
+    end
+
     # fmt 11.0.2's consteval-checked format strings fail to compile under
     # Xcode 26's stricter clang ("call to consteval function ... is not a
     # constant expression"), which breaks the whole build. Two halves are
