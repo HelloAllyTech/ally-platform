@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../account/data/account_repository.dart';
 
 /// Mirrors ally-mobile (React Native)'s `src/constants/analytics.ts`.
 enum AnalyticsType { callLogAnalytics, simulationAnalytics, unknown }
@@ -53,7 +54,13 @@ final analyticsRepositoryProvider = Provider<AnalyticsRepository>((ref) {
   return AnalyticsRepository(ref.watch(apiClientProvider));
 });
 
-final dashboardsProvider = FutureProvider<List<Dashboard>>((ref) {
+/// RN's `useGetDashboardsQuery(undefined, {skip: !userData?.id})` — don't
+/// fire this request until the signed-in user's identity has actually
+/// resolved (relevant on a cold app start, when several providers
+/// initialize concurrently). `currentUserProvider` throwing propagates as
+/// this provider's own error, same as RN's query would surface one.
+final dashboardsProvider = FutureProvider<List<Dashboard>>((ref) async {
+  await ref.watch(currentUserProvider.future);
   return ref.watch(analyticsRepositoryProvider).getDashboards();
 });
 

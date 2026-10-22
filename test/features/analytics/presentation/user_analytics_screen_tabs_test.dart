@@ -3,12 +3,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
 import 'package:ally_mobile_flutter/core/widgets/app_tab_view.dart';
+import 'package:ally_mobile_flutter/features/account/data/account_repository.dart';
+import 'package:ally_mobile_flutter/features/account/data/user_profile.dart';
 import 'package:ally_mobile_flutter/features/analytics/data/analytics_repository.dart';
 import 'package:ally_mobile_flutter/features/analytics/presentation/user_analytics_screen.dart';
 
 import '../../../support/pump_app.dart';
 
 class MockAnalyticsRepository extends Mock implements AnalyticsRepository {}
+
+class MockAccountRepository extends Mock implements AccountRepository {}
 
 Dashboard _dashboard(String id, AnalyticsType type) =>
     Dashboard(externalId: id, name: id, analyticsType: type);
@@ -49,11 +53,25 @@ void main() {
       // plain text — never constructing a real `WebViewController`, which
       // has no platform implementation under `flutter test` (see
       // game_player_test.dart's doc comment for the same gotcha).
+      final accountRepository = MockAccountRepository();
+      when(() => accountRepository.getUser()).thenAnswer(
+        (_) async => UserProfile(
+          id: 1,
+          email: 'a@b.com',
+          name: 'A',
+          phone: '',
+          profileImageUrl: null,
+          profileCompleted: true,
+        ),
+      );
 
       await pumpApp(
         tester,
         const UserAnalyticsScreen(),
-        overrides: [analyticsRepositoryProvider.overrideWithValue(repository)],
+        overrides: [
+          analyticsRepositoryProvider.overrideWithValue(repository),
+          accountRepositoryProvider.overrideWithValue(accountRepository),
+        ],
       );
 
       expect(find.byType(AppTabView<AnalyticsType>), findsOneWidget);
