@@ -5,6 +5,7 @@ import 'package:mocktail/mocktail.dart';
 
 import 'package:ally_mobile_flutter/core/permissions/permissions_repository.dart';
 import 'package:ally_mobile_flutter/core/permissions/user_permissions.dart';
+import 'package:ally_mobile_flutter/core/widgets/app_button.dart';
 import 'package:ally_mobile_flutter/features/calllog/data/call_log_repository.dart';
 import 'package:ally_mobile_flutter/features/calllog/presentation/call_log_screen.dart';
 
@@ -131,7 +132,8 @@ void main() {
   });
 
   testWidgets(
-    'archive action switches into the Archives view with a back button, and swipe-to-archive works',
+    'archive action switches into the Archives view with a back button, and swipe-to-archive '
+    'requires confirming before it actually archives',
     (tester) async {
       final repository = _repository(realLogs: [_log()], archivedLogs: [_log(id: 99)]);
       when(() => repository.archiveCallLog(42)).thenAnswer((_) async {});
@@ -172,7 +174,21 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byIcon(Icons.arrow_back), findsNothing);
 
+      // Swiping alone no longer archives immediately — RN has no such
+      // instant gesture at all (archiving only happens via CallSummaryScreen's
+      // own confirmation modal), and a bare swipe used to archive silently
+      // and irreversibly on an accidental touch. The swipe now only opens
+      // that same real confirmation copy; archiveCallLog fires only once
+      // its own Archive button is tapped.
       await tester.drag(find.byKey(const ValueKey(42)), const Offset(-500, 0));
+      await tester.pumpAndSettle();
+      verifyNever(() => repository.archiveCallLog(42));
+      expect(
+        find.textContaining('This will hide it from session logs'),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.widgetWithText(AppButton, 'Archive'));
       await tester.pumpAndSettle();
       verify(() => repository.archiveCallLog(42)).called(1);
 
@@ -201,4 +217,35 @@ void main() {
     expect(find.byKey(const Key('start-session-fab')), findsNothing);
     expect(find.text('No call logs found'), findsOneWidget);
   });
+
+  testWidgets(
+    'cancelling the swipe-to-archive confirmation leaves the row in place and never archives',
+    (tester) async {
+      final repository = _repository(realLogs: [_log()]);
+
+      await pumpRouterApp(
+        tester,
+        initialLocation: '/call-log',
+        routes: _routes(),
+        overrides: [
+          callLogRepositoryProvider.overrideWithValue(repository),
+          userPermissionsProvider.overrideWith(
+            (ref) async => [
+              UserPermissions.viewCallLogs,
+              UserPermissions.archiveCallLog,
+            ],
+          ),
+        ],
+      );
+
+      await tester.drag(find.byKey(const ValueKey(42)), const Offset(-500, 0));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(AppButton, 'Cancel'));
+      await tester.pumpAndSettle();
+
+      verifyNever(() => repository.archiveCallLog(any()));
+      expect(find.text('Walk-in #1'), findsOneWidget, reason: 'row is still there, not dismissed');
+    },
+  );
 }

@@ -7,7 +7,9 @@ import '../../../core/localization/translate_ref.dart';
 import '../../../core/permissions/permissions_repository.dart';
 import '../../../core/permissions/user_permissions.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_tab_view.dart';
+import '../../../core/widgets/confirmation_modal.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../../../core/widgets/tab_screen_header.dart';
 import '../data/call_log_repository.dart';
@@ -293,6 +295,25 @@ class _RealLogsList extends ConsumerWidget {
                   colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
                 ),
               ),
+              // RN has no swipe-to-archive gesture at all here — archiving
+              // only happens deliberately from inside CallSummaryScreen's
+              // own ArchiveActionModal (not yet ported). A bare swipe
+              // reaching the dismiss threshold used to archive immediately
+              // and irreversibly with no confirmation — a real accidental-
+              // data-loss risk (a stray diagonal scroll touch silently
+              // archives a call log). Reusing that real modal's own copy
+              // keeps this swipe entry point working without the silent
+              // part, until the full menu this normally lives behind is
+              // built.
+              confirmDismiss: (_) => ConfirmationModal.show(
+                context,
+                title: ref.t('callSummary.archiveActionModal.archive.header.title'),
+                subtitle: ref.t('callSummary.archiveActionModal.archive.header.subtitle'),
+                description: ref.t('callSummary.archiveActionModal.archive.description'),
+                confirmLabel: ref.t('callSummary.archiveActionModal.archive.confirm'),
+                cancelLabel: ref.t('callSummary.archiveActionModal.archive.cancel'),
+                confirmVariant: AppButtonVariant.destructive,
+              ).then((confirmed) => confirmed ?? false),
               onDismissed: (_) => ref.read(callLogRepositoryProvider).archiveCallLog(log.id),
               child: row,
             );
