@@ -1,26 +1,46 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/localization/translate_ref.dart';
+import 'flower_petal_painter.dart';
 
-/// Scoped port of ally-mobile (React Native)'s `BreathingScreen`/
-/// `BoxBreathingAnimation` — a 4-phase breathing guide animation with
-/// play/pause/mute controls and a per-phase 1-4 numeric countdown. Each
-/// phase lasts a fixed 4 seconds (RN's `animationDuration` prop, always
-/// 4000ms regardless of the `phases` array's own per-phase `time` field —
-/// confirmed by reading the real component: that field isn't wired to any
-/// actual timing, so the uniform 4-4-4-4 cadence this already used was
-/// correct, not a bug).
+/// Direct port of ally-mobile (React Native)'s `BreathingScreen`/
+/// `BoxBreathingAnimation` — a dot travels to each of the 4 corners of a
+/// square (one per phase, in order: Hold "one" top-left, Inhale "two"
+/// top-right, Hold "three" bottom-right, Exhale "four" bottom-left, then
+/// back to "one"), with a 5-petal flower blooming open in the center during
+/// Inhale/the Hold that follows it and closing during Exhale/the Hold that
+/// follows that. Every phase lasts the same fixed 4 seconds (RN's
+/// `animationDuration` prop, always 4000ms regardless of the `phases`
+/// array's own per-phase `time` field — confirmed by reading the real
+/// component: that field isn't wired to any actual timing).
+///
+/// RN's own first-render effect advances the phase index immediately on
+/// mount (before the user ever perceives the initial "one"/Hold state), so
+/// the cycle is effectively always first observed starting on Inhale —
+/// matched here by simply starting `_phase` there directly.
 ///
 /// Not ported: the call-flow integration (a 3s `CallEndOverlay` shown
 /// first, a "View Call Summary" button, hardware-back resetting to
 /// CallLog) — this screen has no real entry point yet in this app (no
 /// screen currently pushes `/box-breathing`), so there's no live call
-/// context to integrate with. Mute has no actual audio effect in RN
-/// either (its own comment: "Mute doesn't affect Lottie") — ported as the
-/// same decorative icon toggle, not a functional no-op gap.
+/// context to integrate with. The breathing sound effect (RN loops an audio
+/// asset via `SoundPlayer`, restarting it every time Inhale begins) is also
+/// not ported — this app has no audio-playback package yet, same blocker as
+/// the Review screens' missing audio player. Mute has no actual audio
+/// effect in RN either when there's no sound playing to mute, so it's kept
+/// as the same decorative icon toggle it already was.
+///
+/// Also a deliberate, pre-existing choice kept as-is: RN's own pause effect
+/// resets the phase/dot/flower all the way back to the very first "one"
+/// phase the instant playback pauses, rather than freezing mid-animation —
+/// this reads as an artifact of how that effect was written (nothing in the
+/// PRD calls for losing progress on pause) rather than an intentional
+/// product decision, so this keeps the already-tested freeze-in-place pause
+/// behavior instead of reproducing it.
 class BoxBreathingScreen extends ConsumerStatefulWidget {
   const BoxBreathingScreen({super.key});
 
@@ -28,7 +48,7 @@ class BoxBreathingScreen extends ConsumerStatefulWidget {
   ConsumerState<BoxBreathingScreen> createState() => _BoxBreathingScreenState();
 }
 
-enum _Phase { inhale, holdIn, exhale, holdOut }
+enum _Phase { holdA, inhale, holdB, exhale }
 
 class _BoxBreathingScreenState extends ConsumerState<BoxBreathingScreen>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
@@ -40,6 +60,7 @@ class _BoxBreathingScreenState extends ConsumerState<BoxBreathingScreen>
   Timer? _countdownTimer;
 
   static const _phaseDuration = Duration(seconds: 4);
+  static const _dotSize = 14.0;
 
   @override
   void initState() {
@@ -100,38 +121,30 @@ class _BoxBreathingScreenState extends ConsumerState<BoxBreathingScreen>
     }
   }
 
-  double get _targetScale {
-    switch (_phase) {
-      case _Phase.inhale:
-        return 1.0;
-      case _Phase.holdIn:
-        return 1.0;
-      case _Phase.exhale:
-        return 0.5;
-      case _Phase.holdOut:
-        return 0.5;
-    }
-  }
+  _Phase _predecessor(_Phase phase) => _Phase.values[(phase.index - 1 + 4) % 4];
 
-  double get _startScale {
-    switch (_phase) {
-      case _Phase.inhale:
-        return 0.5;
-      case _Phase.holdIn:
-        return 1.0;
-      case _Phase.exhale:
-        return 1.0;
-      case _Phase.holdOut:
-        return 0.5;
-    }
-  }
+  /// The dot's corner, as a 0..1-normalized (left, top) pair over the
+  /// square — matches RN's `position: {top, left}` per phase exactly.
+  Offset _cornerFor(_Phase phase) => switch (phase) {
+    _Phase.holdA => const Offset(0, 0),
+    _Phase.inhale => const Offset(1, 0),
+    _Phase.holdB => const Offset(1, 1),
+    _Phase.exhale => const Offset(0, 1),
+  };
+
+  double _bloomTargetFor(_Phase phase) => switch (phase) {
+    _Phase.holdA => 0,
+    _Phase.inhale => 1,
+    _Phase.holdB => 1,
+    _Phase.exhale => 0,
+  };
 
   String _phaseLabel(_Phase phase) {
     switch (phase) {
       case _Phase.inhale:
         return ref.t('boxBreathing.phaseInhale');
-      case _Phase.holdIn:
-      case _Phase.holdOut:
+      case _Phase.holdA:
+      case _Phase.holdB:
         return ref.t('boxBreathing.phaseHold');
       case _Phase.exhale:
         return ref.t('boxBreathing.phaseExhale');
@@ -140,42 +153,88 @@ class _BoxBreathingScreenState extends ConsumerState<BoxBreathingScreen>
 
   @override
   Widget build(BuildContext context) {
+    final startCorner = _cornerFor(_predecessor(_phase));
+    final endCorner = _cornerFor(_phase);
+    final startBloom = _bloomTargetFor(_predecessor(_phase));
+    final endBloom = _bloomTargetFor(_phase);
+
     return Scaffold(
       appBar: AppBar(title: Text(ref.t('boxBreathing.title'))),
       body: Column(
         children: [
           Expanded(
-            child: Center(
-              child: AnimatedBuilder(
-                animation: _controller,
-                builder: (context, child) {
-                  final scale = _startScale + (_targetScale - _startScale) * _controller.value;
-                  return Column(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                // RN's own `min(SCREEN_WIDTH * 0.8, 350)` is purely
+                // width-based and assumes a tall portrait phone screen —
+                // also bounded by the actually available height here so a
+                // short viewport (a small/landscape device, or this
+                // screen's own label + countdown text above/below it)
+                // never overflows the column.
+                final widthBudget = (MediaQuery.of(context).size.width * 0.8).clamp(0, 350).toDouble();
+                final heightBudget = (constraints.maxHeight - 160).clamp(80, 350).toDouble();
+                final squareSize = math.min(widthBudget, heightBudget);
+                final flowerSize = squareSize * 0.8 < 280 ? squareSize * 0.8 : 280.0;
+                return Center(
+                  child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          Transform.scale(
-                            scale: scale,
-                            child: Container(
-                              width: 180,
-                              height: 180,
-                              decoration: BoxDecoration(
-                                color: Theme.of(context).colorScheme.primaryContainer,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
+                      Text(_phaseLabel(_phase), style: Theme.of(context).textTheme.headlineSmall),
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        width: squareSize,
+                        height: squareSize,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            border: Border.all(color: const Color(0xFF555555), width: 2),
+                            borderRadius: BorderRadius.circular(16),
                           ),
-                          Text('$_seconds', style: Theme.of(context).textTheme.displayMedium),
-                        ],
+                          child: AnimatedBuilder(
+                            animation: _controller,
+                            builder: (context, child) {
+                              final progress = Curves.linear.transform(_controller.value);
+                              final position = Offset.lerp(startCorner, endCorner, progress)!;
+                              final bloom = startBloom + (endBloom - startBloom) * progress;
+                              return Stack(
+                                clipBehavior: Clip.none,
+                                alignment: Alignment.center,
+                                children: [
+                                  SizedBox(
+                                    width: flowerSize,
+                                    height: flowerSize,
+                                    child: CustomPaint(painter: FlowerPetalPainter(bloomProgress: bloom)),
+                                  ),
+                                  Positioned(
+                                    left: position.dx * squareSize - _dotSize / 2,
+                                    top: position.dy * squareSize - _dotSize / 2,
+                                    child: Container(
+                                      key: const ValueKey('box-breathing-dot'),
+                                      width: _dotSize,
+                                      height: _dotSize,
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        shape: BoxShape.circle,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.white.withValues(alpha: 0.5),
+                                            blurRadius: 8,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 32),
-                      Text(_phaseLabel(_phase), style: Theme.of(context).textTheme.headlineSmall),
+                      Text('$_seconds', style: Theme.of(context).textTheme.displayMedium),
                     ],
-                  );
-                },
-              ),
+                  ),
+                );
+              },
             ),
           ),
           Padding(

@@ -92,6 +92,32 @@ void main() {
     expect(find.text('2'), findsOneWidget, reason: 'countdown resumes ticking');
   });
 
+  testWidgets('renders the dot and a flower painter inside the square, moving the dot within a phase', (
+    tester,
+  ) async {
+    await _pumpBoxBreathing(tester);
+
+    expect(find.byKey(const ValueKey('box-breathing-dot')), findsOneWidget);
+    expect(find.byType(CustomPaint), findsWidgets);
+
+    Offset dotPositionNow() =>
+        tester.getTopLeft(find.byKey(const ValueKey('box-breathing-dot')));
+
+    // Right after mount, Inhale has barely started travelling from its
+    // predecessor corner — captured well inside this same phase (no 4s
+    // boundary crossing involved, sidestepping the exact-boundary pumping
+    // gotcha documented elsewhere in this codebase) to avoid any ambiguity
+    // about which phase is active.
+    final start = dotPositionNow();
+    await tester.pump(const Duration(seconds: 2));
+    final halfway = dotPositionNow();
+
+    // Inhale travels corner-to-corner along the top edge (left -> right) —
+    // by the halfway point the dot should have moved a clearly measurable
+    // distance, not a sub-pixel jitter.
+    expect((halfway.dx - start.dx).abs(), greaterThan(20));
+  });
+
   testWidgets('tapping the volume button toggles its own icon', (tester) async {
     await _pumpBoxBreathing(tester);
 
