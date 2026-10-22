@@ -6,6 +6,7 @@ import '../../../core/localization/translate_ref.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_fonts.dart';
 import '../../../core/widgets/app_card.dart';
+import '../../../core/widgets/app_tab_view.dart';
 import '../../../core/widgets/html_rich_text.dart';
 import '../../../core/widgets/tab_screen_header.dart';
 import '../../courses/data/course_models.dart';
@@ -85,10 +86,13 @@ class _SimulationsScreenState extends ConsumerState<SimulationsScreen> {
                 _LearnIntro(ref: ref),
                 const SizedBox(height: 16),
                 if (visibleTabs.length > 1)
-                  _LearnTabBar(
-                    tabs: visibleTabs,
+                  AppTabView<_LearnTab>(
+                    tabs: [
+                      for (final tab in visibleTabs)
+                        AppTabViewItem(key: tab, label: ref.t(_tabLabelKey(tab))),
+                    ],
                     activeTab: activeTab,
-                    onChanged: (tab) => setState(() => _requestedTab = tab),
+                    onTabChange: (tab) => setState(() => _requestedTab = tab),
                   ),
               ],
             ),
@@ -148,6 +152,13 @@ class _SimulationsScreenState extends ConsumerState<SimulationsScreen> {
     _LearnTab.cases => 'simulations.case',
     _LearnTab.simulations => 'simulations.simulation',
     _LearnTab.paths => 'simulations.track',
+  };
+
+  String _tabLabelKey(_LearnTab tab) => switch (tab) {
+    _LearnTab.courses => 'simulations.courses',
+    _LearnTab.cases => 'simulations.cases',
+    _LearnTab.simulations => 'simulations.simulation',
+    _LearnTab.paths => 'simulations.tracks',
   };
 
   Widget _buildTabContent(
@@ -325,64 +336,6 @@ class _LearnIntro extends StatelessWidget {
     return Text.rich(
       TextSpan(style: baseStyle, children: spans),
       textAlign: TextAlign.center,
-    );
-  }
-}
-
-/// A pill-row tab switcher — RN's `TabView` with `tabWidthMode: "content"`.
-class _LearnTabBar extends StatelessWidget {
-  const _LearnTabBar({
-    required this.tabs,
-    required this.activeTab,
-    required this.onChanged,
-  });
-
-  final List<_LearnTab> tabs;
-  final _LearnTab activeTab;
-  final ValueChanged<_LearnTab> onChanged;
-
-  String _label(WidgetRef ref, _LearnTab tab) => switch (tab) {
-    _LearnTab.courses => ref.t('simulations.courses'),
-    _LearnTab.cases => ref.t('simulations.cases'),
-    _LearnTab.simulations => ref.t('simulations.simulation'),
-    _LearnTab.paths => ref.t('simulations.tracks'),
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    return Consumer(
-      builder: (context, ref, _) => Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        alignment: WrapAlignment.center,
-        children: [
-          for (final tab in tabs)
-            GestureDetector(
-              onTap: () => onChanged(tab),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: tab == activeTab ? AppColors.primary : Colors.white,
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: AppColors.lightGray2, width: 0.5),
-                ),
-                child: Text(
-                  _label(ref, tab),
-                  style: TextStyle(
-                    fontFamily: AppFonts.ibmPlexSerifMedium,
-                    fontSize: 14,
-                    color: tab == activeTab
-                        ? Colors.white
-                        : AppColors.highEmphasis,
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
     );
   }
 }

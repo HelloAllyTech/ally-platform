@@ -62,9 +62,19 @@ class _AppShellScreenState extends ConsumerState<AppShellScreen> {
                 if (visibleTabs.isEmpty)
                   const Center(child: Text('No accessible tabs for this account'))
                 else
-                  IndexedStack(
-                    index: currentIndex,
-                    children: [for (final tab in visibleTabs) tab.screenBuilder(context)],
+                  // Each tab body (`TabScreenHeader` et al.) assumes RN's
+                  // per-screen `paddingTop: insets.top`, which nothing here
+                  // replicated — this `Stack` paints full-bleed behind the
+                  // status bar, so the header text sat under/behind it.
+                  // Bottom stays unsafed: the floating `AppBottomTabBar`
+                  // handles its own inset, and screens already reserve
+                  // scroll padding to clear it.
+                  SafeArea(
+                    bottom: false,
+                    child: IndexedStack(
+                      index: currentIndex,
+                      children: [for (final tab in visibleTabs) tab.screenBuilder(context)],
+                    ),
                   ),
                 // RN's `useTabScreenHeader`: `showHamburger: isFirstTab` —
                 // the drawer-menu icon only ever appears on the first

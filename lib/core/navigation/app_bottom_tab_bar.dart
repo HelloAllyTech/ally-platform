@@ -24,6 +24,14 @@ class AppBottomTabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // This bar sits in a `Positioned` inside the shell's full-bleed `Stack`,
+    // which paints behind the Android system nav bar (3-button or gesture
+    // pill) — `bottom: 30` alone measures from the absolute screen edge, so
+    // the pill ends up partly or fully hidden behind it. Shifting the whole
+    // pill up by the bottom inset (not padding its *inside*, which only grew
+    // the box downward into the unsafe zone while squeezing the icons) is
+    // what actually clears it, matching RN's `CustomTabBar`'s own
+    // `marginTop: insets.bottom` nudge on top of its fixed `marginBottom: 30`.
     final bottomInset = MediaQuery.of(context).padding.bottom;
     // RN's `< 3` narrows the pill with wider side margins when there are
     // only 1-2 visible tabs, so it doesn't stretch edge-to-edge.
@@ -32,10 +40,9 @@ class AppBottomTabBar extends StatelessWidget {
     return Positioned(
       left: horizontalMargin,
       right: horizontalMargin,
-      bottom: 30,
+      bottom: 30 + bottomInset,
       child: Container(
         height: 60,
-        padding: EdgeInsets.only(bottom: bottomInset),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(40),
@@ -51,14 +58,11 @@ class AppBottomTabBar extends StatelessWidget {
               Expanded(
                 child: InkWell(
                   onTap: () => onTap(i),
-                  child: Padding(
-                    padding: EdgeInsets.only(top: bottomInset),
-                    child: Center(
-                      child: _TabIcon(
-                        tab: visibleTabs[i],
-                        focused: i == currentIndex,
-                        showUnreadDot: visibleTabs[i].name == kTabReview && hasUnreadReviews,
-                      ),
+                  child: Center(
+                    child: _TabIcon(
+                      tab: visibleTabs[i],
+                      focused: i == currentIndex,
+                      showUnreadDot: visibleTabs[i].name == kTabReview && hasUnreadReviews,
                     ),
                   ),
                 ),

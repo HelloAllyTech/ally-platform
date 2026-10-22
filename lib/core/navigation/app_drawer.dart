@@ -108,20 +108,6 @@ class AppDrawer extends ConsumerWidget {
                   context.push('/profile');
                 },
               ),
-              // Default simulation language — RN has no standalone settings
-              // screen for this at all (it's an inline dropdown on the
-              // simulation-start screen instead, not yet ported here); kept
-              // reachable from the drawer rather than removed outright now
-              // that ProfileSettingsScreen's restructure to match the real
-              // screen no longer has a slot for it.
-              _MenuOption(
-                iconAsset: 'assets/icons/profileSettings.svg',
-                label: ref.t('preferences.title'),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  context.push('/preferences');
-                },
-              ),
               _MenuOption(
                 iconAsset: 'assets/icons/help.svg',
                 label: ref.t('bugReport.menuLabel'),
