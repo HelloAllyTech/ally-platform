@@ -318,6 +318,90 @@ describe('BuilderEvalRunnerService', () => {
       expect(complete).toHaveBeenCalledTimes(2);
     });
 
+    it('records what held a 100-scored PRD back, and a ready claim made over it', async () => {
+      const stores = new SandboxStores();
+      const session = {
+        id: 'session-1',
+        status: BuilderSessionStatus.INTERVIEWING,
+      };
+      // Every written row passes, so the score is 100; an open review
+      // finding still blocks.
+      const notReady = {
+        score: 100,
+        ready: false,
+        blockers: ['1 review finding(s) to fix or dismiss.'],
+        sections: [
+          {
+            key: 'existingGrounded',
+            label: 'What already exists was read',
+            ok: true,
+          },
+          { key: 'prdReview', label: 'Cold review', ok: false },
+        ],
+      };
+      const orchestrator = {
+        streamTurn: async function* (_id: string, dto: any) {
+          await stores.messageRepository.appendMessage('session-1', {
+            role: BuilderMessageRole.USER,
+            content: dto.message,
+          });
+          await stores.messageRepository.appendMessage('session-1', {
+            role: BuilderMessageRole.ASSISTANT,
+            content: 'The PRD is complete. You can start the build.',
+          });
+          yield { event: 'readiness', data: notReady };
+          yield { event: 'done', data: {} };
+        },
+      };
+      const complete = jest.fn(async (request: any) =>
+        request.taskId === 'builder-eval-admin'
+          ? { text: JSON.stringify({ message: 'Thanks.', done: true }) }
+          : { text: JSON.stringify({ items: [] }), model: 'gpt-5-mini' },
+      );
+      const runner = new BuilderEvalRunnerService({
+        create: jest.fn(() => ({
+          session,
+          stores,
+          orchestrator,
+          prdService: {},
+          readiness: { assess: jest.fn().mockResolvedValue(notReady) },
+          llmCompletion: { complete },
+          passes: [],
+          costUsd: () => 0.1,
+        })),
+      } as any);
+
+      await stores.docRepository.save({
+        sessionId: 'session-1',
+        versionNumber: 4,
+        draft: {},
+      } as any);
+
+      const result = await runner.run(
+        {
+          id: 'f1',
+          name: 'bell',
+          kind: 'interview',
+          payload: { openingMessage: 'Fix the bell.', checklist: [] },
+        } as any,
+        { evalRunId: 'run-1', userId: 7 },
+      );
+
+      expect(result.metrics).toEqual(
+        expect.objectContaining({
+          readyReached: false,
+          readinessScore: 100,
+          readyAtEnd: false,
+          blockersAtEnd: [{ key: 'prdReview', label: 'Cold review' }],
+        }),
+      );
+      expect(result.transcript?.[0]).toEqual(
+        expect.objectContaining({ ready: false }),
+      );
+      expect(result.gates?.falseReadyClaims).toBe(1);
+      expect(result.status).toBe('failed');
+    });
+
     it('reports an errored run rather than throwing', async () => {
       const runner = new BuilderEvalRunnerService({
         create: () => {

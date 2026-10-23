@@ -57,13 +57,20 @@ The **gates** are deterministic counts of failures the interview has really ship
 | `askedBeforeReading` | batches that ended the turn while research results were unread |
 | `unrepairedEditFailures` | PRD edits (`update_prd` or an edit-by-id tool) that failed with no successful edit after them in the turn |
 | `falseUpdateClaims` | turns whose reply claims a PRD change while no edit succeeded |
+| `falseReadyClaims` | replies that told the admin the PRD was ready, or to start the build, while that turn settled not ready — unless the server added what is left beneath them. Absent on runs scored before it existed |
+| `consistent` | the final PRD's test-plan, requirement-home and mobile-twin readiness rows |
+| `evidenceCited` | What already exists rests on files the replay read |
 
 Only a reply that reached the admin counts. With validated turns on, a reply batched with an
 unread lookup or a failed call is sent back to the model instead of shown (its result says
 `delivered: false`), so that batch hid nothing from anyone. `questions` counts questions
 delivered, not `ask_admin` calls made.
-| `consistent` | the final PRD's test-plan, requirement-home and mobile-twin readiness rows |
-| `evidenceCited` | What already exists rests on files the replay read |
+
+`readinessScore` is the share of the final PRD's "is this written" rows that pass, so 100 does
+not mean ready: open questions, unconfirmed assumptions, review findings and the cross-section
+checks only ever block. `readyAtEnd` and `blockersAtEnd` (row key and label) say what held a
+run back. Each transcript turn records `ready`, the readiness that turn settled on, and
+`readyClaimCorrected` when the server had to say what was left under a reply.
 
 A run **passes** when every gate is clean, the simulated admin never corrected Builder, the
 PRD reached ready, and every checklist item is met.
