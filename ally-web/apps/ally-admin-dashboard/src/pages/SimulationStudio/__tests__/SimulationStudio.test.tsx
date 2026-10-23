@@ -961,6 +961,18 @@ describe("SimulationStudio", () => {
       expect(screen.queryByTestId("create-pathway-button")).not.toBeInTheDocument();
     });
 
+    it("opens a published case straight into the read-only editor, with no move-to-draft prompt", () => {
+      authoring({ canAuthorCases: false });
+      const published = { id: "case-1", title: "Case", status: SimulationStatus.ACTIVE };
+      mockUseSimulationCases.mockReturnValue({ ...defaultCasesHookReturn, cases: [published] });
+      renderComponent(["/?tab=cases"]);
+
+      fireEvent.click(screen.getByTestId("edit-case-1"));
+
+      expect(defaultCasesHookReturn.handleEditCase).toHaveBeenCalledWith(published);
+      expect(defaultCasesHookReturn.onEditCase).not.toHaveBeenCalled();
+    });
+
     it("keeps the roleplay list writable for an admin who may author it", () => {
       renderComponent();
 

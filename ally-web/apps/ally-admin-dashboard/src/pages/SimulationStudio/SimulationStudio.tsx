@@ -470,7 +470,8 @@ export const SimulationStudio: React.FC = () => {
             pathways={cases}
             isLoading={isCasesLoading}
             hasFilters={selectedFilters.length > 0}
-            onEdit={onEditCase}
+            // View-only skips the "this moves it to draft" confirmation: nothing will be saved.
+            onEdit={canAuthorCases ? onEditCase : handleEditCase}
             onDelete={handleDeleteCase}
             onDuplicate={handleDuplicateCase}
             onUnpublishPathway={handleUnpublishCase}
@@ -506,7 +507,7 @@ export const SimulationStudio: React.FC = () => {
             pathways={tracks}
             isLoading={isTracksLoading}
             hasFilters={selectedFilters.length > 0}
-            onEdit={onEditTrack}
+            onEdit={canAuthorCourses ? onEditTrack : handleEditTrack}
             onDelete={handleDeleteTrack}
             onDuplicate={handleDuplicateTrack}
             onUnpublishPathway={handleUnpublishTrack}

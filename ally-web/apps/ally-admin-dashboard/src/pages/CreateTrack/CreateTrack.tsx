@@ -280,7 +280,9 @@ export const CreateTrack: FC = () => {
 
   /* -------------------------------- Render ------------------------------- */
 
-  const title = id ? `Edit ${TRACK_ENTITY_LABEL}` : `Create ${TRACK_ENTITY_LABEL}`;
+  const title = id
+    ? `${isViewOnly ? "View" : "Edit"} ${TRACK_ENTITY_LABEL}`
+    : `Create ${TRACK_ENTITY_LABEL}`;
   const sections = watchedValues.sections ?? [];
 
   const renderCanvas = () => {

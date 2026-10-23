@@ -67,12 +67,12 @@ export const CreateCase: FC = () => {
 
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const title = id ? "Edit Case" : "Create Case";
   // Create Cases off: an existing case opens read-only — every step renders,
   // nothing saves (ally-be refuses the write anyway). New cases are blocked
   // at the route.
   const { canAuthorCases } = useContentAuthoring();
   const isViewOnly = Boolean(id) && !canAuthorCases;
+  const title = id ? (isViewOnly ? "View Case" : "Edit Case") : "Create Case";
 
   const [getScenarioCaseByIdQuery, { data: individualCase }] = useLazyGetScenarioCaseByIdQuery();
   const [createSimulationCaseMutation] = useCreateSimulationCaseMutation();

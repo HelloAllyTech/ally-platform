@@ -120,7 +120,7 @@ export class UserController {
   @ApiOperation({
     summary: "Get a platform admin's full feature toggle state",
     description:
-      'Every registered key, defaulting to disabled for keys with no row yet. ' +
+      'Every registered key; a key with no row yet reads as its default (off, or on for a defaultEnabled key). ' +
       'Requires the admin_user_management toggle.',
   })
   @Get(':userId/feature-toggles')
