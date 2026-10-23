@@ -1,0 +1,246 @@
+# templates/pipeline.yml.tpl
+
+name: Deploy ally-ai-learn
+defaults:
+  run:
+    working-directory: ally-ai-learn
+
+on:
+  workflow_dispatch:
+    inputs:
+      Environment:
+        required: true
+        type: choice
+        description: Choose env
+        options:
+          - dev
+          - prd
+  # push:
+  #   branches:
+  #     - master
+
+env:
+  ENABLE_DB_MIGRATION: "false"
+  ENABLE_TESTS: "true"
+  S3_ENV_FILES: |
+    learn-core/.env
+    learn-core/google-credentials.json
+  BUILD_PLATFORM: linux/amd64
+  # GCP Workload Identity Federation configuration (set as GitHub secrets)
+  GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  GCP_WIF_PROVIDER: ${{ secrets.GCP_WIF_PROVIDER }}
+  GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+  BUILD_PATH: ally-ai-learn/dockerfile
+  SUBNETS: '["subnet-0f845d1ddc4b6f471","subnet-054f2c036aed7aef4","subnet-0b837159d4f98a0b9"]'
+  SECURITY_GROUPS: '["sg-05f0c1b5ae75e1320"]'
+  SERVICE_NAME: learn-core
+  TEST_RUNTIME: python
+  TEST_RUNTIME_VERSION: 3.12
+  TEST_PACKAGE_MANAGER: poetry
+  TEST_INSTALL_COMMAND: poetry install --no-interaction && poetry run pip install pytest
+  TEST_RUN_COMMAND: if [ -d tests ]; then poetry run python -m pytest tests/ -v; else echo 'No tests directory found, skipping tests'; fi
+  TEST_CACHE_PATHS: ally-ai-learn/.venv
+  TEST_TIMEOUT_MINUTES: 15
+
+jobs:
+  prepare-env:
+    name: Prepare Env
+    runs-on: ubuntu-22.04
+    outputs:
+      AWS_ROLE: ${{ steps.vars.outputs.AWS_ROLE }}
+      AWS_REGION: ${{ steps.vars.outputs.AWS_REGION }}
+      ENV: ${{ steps.vars.outputs.ENV }}
+      PROJECT_PREFIX: ${{ steps.vars.outputs.PROJECT_PREFIX }}
+      PROJECT_REGION: ${{ steps.vars.outputs.PROJECT_REGION }}
+      ECS_CLUSTER: ${{ steps.set_env.outputs.ECS_CLUSTER }}
+      ECS_SERVICE: ${{ steps.set_env.outputs.ECS_SERVICE }}
+      ECR_REPOSITORY: ${{ steps.set_env.outputs.ECR_REPOSITORY }}
+      TASK_DEFINITION: ${{ steps.set_env.outputs.TASK_DEFINITION }}
+      CONTAINER_NAME: ${{ steps.set_env.outputs.CONTAINER_NAME }}
+      ENVIRONMENT_BUCKET: ${{ steps.set_env.outputs.ENVIRONMENT_BUCKET }}
+      SUBNETS: ${{ env.SUBNETS }}
+      SECURITY_GROUPS: ${{ env.SECURITY_GROUPS }}
+
+    steps:
+      - id: vars
+        name: Determine vars
+        shell: bash
+        run: |
+          BRANCH="${GITHUB_REF#refs/heads/}"
+          ENV=${{ github.event.inputs.Environment }}
+
+          if [ -z "$ENV" ]; then
+            case "$BRANCH" in
+              "master")  ENV="dev" ;;
+              "main")
+                echo "Production deployment must be manual via workflow_dispatch"
+                exit 1
+                ;;
+              *) echo "ENV not configured" && exit 1 ;;
+            esac
+          fi
+
+          if [[ "$ENV" == "prd" ]]; then
+            echo "AWS_ROLE=${{ vars.PRD_AWS_ROLE }}"      >> $GITHUB_OUTPUT
+            echo "AWS_REGION=${{ vars.PRD_AWS_REGION }}"  >> $GITHUB_OUTPUT
+            echo "ECR_REPOSITORY=${{ vars.PRD_ECR_REPOSITORY }}" >> $GITHUB_OUTPUT
+            echo "PROJECT_PREFIX=ally-prd"                >> $GITHUB_OUTPUT
+            echo "PROJECT_REGION=mb"                      >> $GITHUB_OUTPUT
+          elif [[ "$ENV" == "dev" ]]; then
+            echo "AWS_ROLE=${{ vars.DEV_AWS_ROLE }}"      >> $GITHUB_OUTPUT
+            echo "AWS_REGION=${{ vars.DEV_AWS_REGION }}"  >> $GITHUB_OUTPUT
+            echo "ECR_REPOSITORY=${{ vars.DEV_ECR_REPOSITORY }}" >> $GITHUB_OUTPUT
+            echo "PROJECT_PREFIX=ally-dev"                >> $GITHUB_OUTPUT
+            echo "PROJECT_REGION=sg"                      >> $GITHUB_OUTPUT
+          else
+            echo "Branch not configured!" && exit 1
+          fi
+
+          echo "ENV=$ENV"            >> $GITHUB_OUTPUT
+          echo ":rocket: Env is $ENV" >> $GITHUB_STEP_SUMMARY
+
+      - name: Set derived variables
+        id: set_env
+        run: |
+          PREFIX=${{ steps.vars.outputs.PROJECT_PREFIX }}
+          REGION=${{ steps.vars.outputs.PROJECT_REGION }}
+          ECR=${{ steps.vars.outputs.ECR_REPOSITORY }}
+          echo "ECS_CLUSTER=$PREFIX-$REGION-ecs-cluster"                  >> $GITHUB_OUTPUT
+          echo "ECS_SERVICE=$PREFIX-svc-${{ env.SERVICE_NAME }}"         >> $GITHUB_OUTPUT
+          echo "TASK_DEFINITION=$PREFIX-td-${{ env.SERVICE_NAME }}"      >> $GITHUB_OUTPUT
+          echo "CONTAINER_NAME=$PREFIX-cntr-${{ env.SERVICE_NAME }}"     >> $GITHUB_OUTPUT
+          echo "ECR_REPOSITORY=$PREFIX-ecr-${{ env.SERVICE_NAME }}" >> $GITHUB_OUTPUT
+          echo "ENVIRONMENT_BUCKET=$PREFIX-s3-environment"                >> $GITHUB_OUTPUT
+          echo ":seedling: Branch is ${GITHUB_REF#refs/heads/}"          >> $GITHUB_STEP_SUMMARY
+
+  test:
+    name: Run Tests
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    needs: [prepare-env]
+    if: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        if: ${{ env.TEST_RUNTIME == 'python' }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.TEST_RUNTIME_VERSION }}
+
+      - name: Set up Node.js
+        if: ${{ env.TEST_RUNTIME == 'node' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.TEST_RUNTIME_VERSION }}
+
+      - name: Set up Java
+        if: ${{ env.TEST_RUNTIME == 'java' }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.TEST_RUNTIME_VERSION }}
+
+      - name: Setup Poetry
+        if: ${{ env.TEST_PACKAGE_MANAGER == 'poetry' }}
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Load cached dependencies
+        id: cached-dependencies
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.TEST_CACHE_PATHS }}
+          key: venv-${{ runner.os }}-py${{ env.TEST_RUNTIME_VERSION }}-${{ hashFiles('**/poetry.lock') }}
+
+      - name: Install dependencies
+        run: ${{ env.TEST_INSTALL_COMMAND }}
+
+      - name: Run tests
+        run: ${{ env.TEST_RUN_COMMAND }}
+
+  build-push-image:
+    name: Build and Push Image
+    runs-on: ubuntu-22.04
+    permissions:
+      id-token: write
+      pull-requests: write
+      contents: read
+    needs: [prepare-env, test]
+    if: always() && needs.prepare-env.result == 'success' && (needs.test.result == 'success' || needs.test.result == 'skipped')
+    outputs:
+      APP_IMAGE: ${{ steps.build_and_push.outputs.APP_IMAGE }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build & Push
+        id: build_and_push
+        uses: ./.github/actions/ally-ai-learn/build-push
+        with:
+          aws-region: ${{ needs.prepare-env.outputs.AWS_REGION }}
+          aws-role: ${{ needs.prepare-env.outputs.AWS_ROLE }}
+          ecr-repository: ${{ needs.prepare-env.outputs.ECR_REPOSITORY }}
+          release-tag: ${{ github.sha }}
+          environment-bucket: ${{ needs.prepare-env.outputs.ENVIRONMENT_BUCKET }}
+          s3-env-files: ${{ env.S3_ENV_FILES }}
+          build-platform: ${{ env.BUILD_PLATFORM }}
+          build-path: ${{ env.BUILD_PATH }}
+          context-path: ally-ai-learn
+          gcp-project-id: ${{ env.GCP_PROJECT_ID }}
+          gcp-wif-provider: ${{ env.GCP_WIF_PROVIDER }}
+          gcp-service-account: ${{ env.GCP_SERVICE_ACCOUNT }}
+
+  run-db-migration:
+    name: Run the DB migration
+    runs-on: ubuntu-22.04
+    permissions:
+      id-token: write
+      pull-requests: write
+      contents: read
+    needs: [prepare-env, build-push-image]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Notify migration skipped
+        if: ${{ env.ENABLE_DB_MIGRATION != 'true' }}
+        run: echo "DB migration not enabled, skipping." >> $GITHUB_STEP_SUMMARY
+      - name: Run migration
+        if: ${{ env.ENABLE_DB_MIGRATION == 'true' }}
+        id: run_db_migration
+        uses: ./.github/actions/ally-ai-learn/run-migration
+        with:
+          aws-region: ${{ needs.prepare-env.outputs.AWS_REGION }}
+          aws-role: ${{ needs.prepare-env.outputs.AWS_ROLE }}
+          task-definition: "${{ needs.prepare-env.outputs.TASK_DEFINITION }}-dbmigrate"
+          container-name: "${{ needs.prepare-env.outputs.CONTAINER_NAME }}-dbmigrate"
+          ecs-cluster: ${{ needs.prepare-env.outputs.ECS_CLUSTER }}
+          image: ${{ needs.build-push-image.outputs.APP_IMAGE }}
+          subnets: '["subnet-0f845d1ddc4b6f471","subnet-054f2c036aed7aef4","subnet-0b837159d4f98a0b9"]'
+          security-groups: '["sg-05f0c1b5ae75e1320"]'
+
+  deploy-to-ecs-service:
+    name: Deploy to ECS service
+    runs-on: ubuntu-22.04
+    # Keep above deploy-ecs's wait-for-minutes (25) — same reasoning as the
+    # production release workflow, which shares this action.
+    timeout-minutes: 35
+    permissions:
+      id-token: write
+      pull-requests: write
+      contents: read
+    needs: [prepare-env, build-push-image, run-db-migration]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy backend
+        id: deploy_backend
+        uses: ./.github/actions/ally-ai-learn/deploy-ecs
+        with:
+          aws-region: ${{ needs.prepare-env.outputs.AWS_REGION }}
+          aws-role: ${{ needs.prepare-env.outputs.AWS_ROLE }}
+          task-definition: ${{ needs.prepare-env.outputs.TASK_DEFINITION }}
+          container-name: ${{ needs.prepare-env.outputs.CONTAINER_NAME }}
+          ecs-service: ${{ needs.prepare-env.outputs.ECS_SERVICE }}
+          ecs-cluster: ${{ needs.prepare-env.outputs.ECS_CLUSTER }}
+          image: ${{ needs.build-push-image.outputs.APP_IMAGE }}
+          release-tag: ${{ github.sha }}

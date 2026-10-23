@@ -36,20 +36,20 @@ export interface ReleaseTarget {
 export const RELEASE_TARGETS: Record<string, ReleaseTarget> = {
   'ally-be': {
     repo: 'ally-be',
-    workflow: 'production-release.yaml',
-    tagPrefix: 'v',
+    workflow: 'production-release-ally-be.yaml',
+    tagPrefix: 'be-v',
     label: 'Ally backend (ECS)',
   },
   'ally-ai': {
     repo: 'ally-ai',
-    workflow: 'production-release.yaml',
-    tagPrefix: 'v',
+    workflow: 'production-release-ally-ai.yaml',
+    tagPrefix: 'ai-v',
     label: 'Ally AI (ECS)',
   },
   'ally-ai-learn': {
     repo: 'ally-ai-learn',
-    workflow: 'production-release.yaml',
-    tagPrefix: 'v',
+    workflow: 'production-release-ally-ai-learn.yaml',
+    tagPrefix: 'learn-v',
     label: 'Ally AI Learn (ECS)',
   },
   'ally-web:admin': {

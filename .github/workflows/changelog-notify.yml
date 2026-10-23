@@ -1,0 +1,33 @@
+name: Changelog notify
+
+on:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch the shared notifier
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 3 \
+            https://raw.githubusercontent.com/HelloAllyTech/.github/main/scripts/changelog-notify.sh \
+            -o changelog-notify.sh
+          chmod +x changelog-notify.sh
+
+      - name: Notify ally-changelog
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.sha }}
+          GITHUB_TOKEN: ${{ github.token }}
+          CHANGELOG_DISPATCH_TOKEN: ${{ secrets.CHANGELOG_DISPATCH_TOKEN }}
+        run: ./changelog-notify.sh

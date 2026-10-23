@@ -1,0 +1,211 @@
+# Which documentation covers which code across the ally-platform monorepo.
+#
+# Read by the shared docs-guard workflow on every PR, and by the weekly wiki reconciler.
+# Because helloallytech.github.io/ lives inside this monorepo, `wiki:<page>` rules can now
+# also be satisfied by directly touching `helloallytech.github.io/wiki/<page>` in the same PR!
+#
+# Escape hatch: add the `docs:skip` label, or a `Wiki-PR: none — <reason>` / `Docs-Skip:` trailer.
+
+version: 1
+repo: ally-platform
+
+rules:
+  # ── Root & Sub-project Agent Entrypoints ────────────────────────────────
+  - id: root-agent-entrypoints-in-sync
+    watch:
+      - "AGENTS.md"
+      - "CLAUDE.md"
+    requires: mirror
+    why: >
+      Root AGENTS.md and CLAUDE.md must stay byte-identical.
+
+  - id: ally-be-agent-entrypoints-in-sync
+    watch:
+      - "ally-be/AGENTS.md"
+      - "ally-be/CLAUDE.md"
+    requires: mirror
+    why: >
+      ally-be/AGENTS.md and ally-be/CLAUDE.md must stay byte-identical.
+
+  - id: ally-web-agent-entrypoints-in-sync
+    watch:
+      - "ally-web/AGENTS.md"
+      - "ally-web/CLAUDE.md"
+    requires: mirror
+    why: >
+      ally-web/AGENTS.md and ally-web/CLAUDE.md must stay byte-identical.
+
+  - id: ally-ai-agent-entrypoints-in-sync
+    watch:
+      - "ally-ai/AGENTS.md"
+      - "ally-ai/CLAUDE.md"
+    requires: mirror
+    why: >
+      ally-ai/AGENTS.md and ally-ai/CLAUDE.md must stay byte-identical.
+
+  - id: ally-ai-learn-agent-entrypoints-in-sync
+    watch:
+      - "ally-ai-learn/AGENTS.md"
+      - "ally-ai-learn/CLAUDE.md"
+    requires: mirror
+    why: >
+      ally-ai-learn/AGENTS.md and ally-ai-learn/CLAUDE.md must stay byte-identical.
+
+  - id: ally-mobile-agent-entrypoints-in-sync
+    watch:
+      - "ally-mobile/AGENTS.md"
+      - "ally-mobile/CLAUDE.md"
+    requires: mirror
+    why: >
+      ally-mobile/AGENTS.md and ally-mobile/CLAUDE.md must stay byte-identical.
+
+  # ── ally-be ─────────────────────────────────────────────────────────────
+  - id: ally-be-data-schema
+    watch:
+      - "ally-be/src/**/entity/*.entity.ts"
+    requires: ally-be/DATA_SCHEMA.md
+    why: >
+      DATA_SCHEMA.md is the platform-wide map of what data exists and where. An entity
+      change that skips it makes the map wrong for every service that reads it.
+
+  - id: ally-be-repo-page-architecture
+    watch:
+      - "ally-be/src/app.module.ts"
+      - "ally-be/src/**/*.gateway.ts"
+      - "ally-be/src/main.ts"
+    requires: helloallytech.github.io/wiki/repos/ally-be.md
+    why: >
+      Module wiring and WebSocket gateways are the service's public shape; the repo page
+      describes it to every other service and to agents.
+
+  - id: ally-be-prompt-conventions
+    watch:
+      - "ally-be/src/prompts/**"
+    requires: ally-be/docs/prompts-folder.md
+    why: Prompt folder layout and .meta.json conventions are documented, not discoverable.
+
+  - id: ally-be-weak-metrics-definitions
+    watch:
+      - "ally-be/src/analytics/repository/weak-metrics-analytics.repository.ts"
+    requires: ally-be/docs/weak-metrics-queries.md
+    why: >
+      That repository holds both the metric definitions and the deterministic thresholds
+      the dashboard reads.
+
+  - id: ally-be-ai-task-registry
+    watch:
+      - "ally-be/src/**/service/*-ai.service.ts"
+      - "ally-be/src/**/service/*autofill*.service.ts"
+      - "ally-be/src/**/service/*-orchestrator.service.ts"
+      - "ally-be/src/**/provider/*.ts"
+      - "ally-be/src/**/providers/*.ts"
+      - "ally-be/src/learn/enum/llm-task.enum.ts"
+    requires: ally-be/src/llm/constants/ai-task-registry.constants.ts
+    why: >
+      The AI task registry is the one place that says which platform actions call a model
+      and which model each one uses.
+
+  - id: ally-be-language-glossary-architecture
+    watch:
+      - "ally-be/src/language/**"
+    requires: ally-be/docs/LANGUAGE_GLOSSARY_DESIGN.md
+    why: >
+      The glossary is an unattended loop; the architecture doc is the only place
+      the cadences, gates and irreversibility rules are written down.
+
+  # ── ally-web ────────────────────────────────────────────────────────────
+  - id: ally-web-posthog-events
+    watch:
+      - "ally-web/apps/**/analytics/**"
+      - "ally-web/apps/**/*posthog*"
+    requires: ally-web/docs/current-posthog-events-traking-list.md
+    why: >
+      The tracked-event list is the only inventory of what analytics the product emits.
+
+  - id: ally-web-repo-page-apps
+    watch:
+      - "ally-web/apps/*/project.json"
+      - "ally-web/nx.json"
+      - "ally-web/libs/ui-shared/src/index.ts"
+    requires: helloallytech.github.io/wiki/repos/ally-web.md
+    why: >
+      App inventory, ports and the shared-library surface are what the platform docs rely on.
+
+  # ── ally-ai ─────────────────────────────────────────────────────────────
+  - id: ally-ai-vector-collections
+    watch:
+      - "ally-ai/app/core/vector_db/constants.py"
+      - "ally-ai/app/migrations/**"
+    requires: helloallytech.github.io/wiki/repos/ally-ai.md
+    why: >
+      Weaviate collections are cross-service state — ally-be's DATA_SCHEMA.md points at this
+      file as the source of truth for the vector side of the platform.
+
+  - id: ally-ai-repo-page-architecture
+    watch:
+      - "ally-ai/app/main.py"
+      - "ally-ai/app/api/v1/endpoints/**"
+    requires: helloallytech.github.io/wiki/repos/ally-ai.md
+    why: The HTTP surface is what ally-be integrates against; the repo page documents it.
+
+  - id: ally-ai-filler-eval-schema
+    watch:
+      - "ally-ai/app/core/filler_quality/**"
+    requires: ally-ai/docs/filler-eval-judge-schema.md
+    why: >
+      The finding typology is a contract with ally-be, which persists these rows and
+      computes the rates from them.
+
+  # ── ally-ai-learn ───────────────────────────────────────────────────────
+  - id: ally-ai-learn-event-types
+    watch:
+      - "ally-ai-learn/app/core/events/event_types/**"
+      - "ally-ai-learn/app/core/events/factory.py"
+    requires: ally-ai-learn/docs/04-event-types-reference.md
+    why: >
+      The event-type reference enumerates every detection type.
+
+  - id: ally-ai-learn-providers
+    watch:
+      - "ally-ai-learn/app/tts/**"
+      - "ally-ai-learn/app/stt/**"
+      - "ally-ai-learn/app/llms/**"
+    requires:
+      any_of:
+        - ally-ai-learn/docs/05-tts-providers.md
+        - ally-ai-learn/docs/06-stt-providers.md
+        - ally-ai-learn/docs/07-llm-providers.md
+    why: Each provider family has a doc listing the supported providers and their config.
+
+  - id: ally-ai-learn-graph-pipeline
+    watch:
+      - "ally-ai-learn/app/core/graph/**"
+    requires: ally-ai-learn/docs/02-graph-pipeline.md
+    why: The LangGraph node order and state shape are documented, not inferable at a glance.
+
+  - id: ally-ai-learn-repo-page-architecture
+    watch:
+      - "ally-ai-learn/app/worker.py"
+      - "ally-ai-learn/app/main.py"
+    requires: helloallytech.github.io/wiki/repos/ally-ai-learn.md
+    why: Worker lifecycle and entry points are what the platform-level docs describe.
+
+  # ── ally-mobile ─────────────────────────────────────────────────────────
+  - id: ally-mobile-repo-page-shape
+    watch:
+      - "ally-mobile/src/navigation/**"
+      - "ally-mobile/src/services/**"
+    requires: helloallytech.github.io/wiki/repos/ally-mobile.md
+    why: >
+      Navigation structure and the service layer are what the repo page describes.
+
+  - id: ally-mobile-release-process
+    watch:
+      - "ally-mobile/android/app/build.gradle"
+      - "ally-mobile/ios/**/Info.plist"
+    requires:
+      any_of:
+        - ally-mobile/README.md
+        - ally-mobile/CONTRIBUTING.md
+    why: >
+      Version and build-number handling is the step people get wrong at release time.

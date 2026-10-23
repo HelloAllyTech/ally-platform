@@ -1,0 +1,482 @@
+# Production Release Pipeline
+#
+# This workflow handles production releases with semantic versioning (major.minor.patch)
+#
+# Required GitHub Action Repository Variables:
+# PRD_AWS_ROLE
+# PRD_AWS_REGION
+# PRD_ECR_REPOSITORY
+#
+# Usage:
+# - Manually trigger this workflow from GitHub Actions
+# - Specify the version tag in format: learn-v{major}.{minor}.{patch} (e.g., v1.0.0, v1.2.3, v2.0.0)
+# - The workflow will create the tag and release draft automatically
+
+name: Production Release - Ally AI Learn
+defaults:
+  run:
+    working-directory: ally-ai-learn
+
+permissions:
+  id-token: write
+  contents: write  # Required for creating releases and tags
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_tag:
+        required: true
+        type: string
+        description: 'Version tag (e.g., v1.0.0, v1.2.3, v2.0.0)'
+
+env:
+  ENABLE_DB_MIGRATION: "false"
+  ENABLE_TESTS: "true"
+  S3_ENV_FILES: |
+    learn-core/.env
+    learn-core/google-credentials.json
+  BUILD_PLATFORM: linux/amd64
+  # GCP Workload Identity Federation configuration (set as GitHub secrets)
+  GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  GCP_WIF_PROVIDER: ${{ secrets.GCP_WIF_PROVIDER }}
+  GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+  BUILD_PATH: ally-ai-learn/dockerfile
+  SUBNETS: '["subnet-0803b15022d8454d1","subnet-0a9aebefcd504a6eb"]'
+  SECURITY_GROUPS: '["sg-0802e74f0bf59122d"]'
+  SERVICE_NAME: learn-core
+  TEST_RUNTIME: python
+  TEST_RUNTIME_VERSION: 3.12
+  TEST_PACKAGE_MANAGER: poetry
+  TEST_INSTALL_COMMAND: poetry install --no-interaction && poetry run pip install pytest
+  TEST_RUN_COMMAND: if [ -d tests ]; then poetry run python -m pytest tests/ -v; else echo 'No tests directory found, skipping tests'; fi
+  TEST_CACHE_PATHS: ally-ai-learn/.venv
+  TEST_TIMEOUT_MINUTES: 15
+
+jobs:
+  validate-and-tag:
+    name: Validate Version and Create Tag
+    runs-on: ubuntu-22.04
+    timeout-minutes: 2
+    outputs:
+      VERSION: ${{ steps.parse-version.outputs.VERSION }}
+      MAJOR: ${{ steps.parse-version.outputs.MAJOR }}
+      MINOR: ${{ steps.parse-version.outputs.MINOR }}
+      PATCH: ${{ steps.parse-version.outputs.PATCH }}
+      TAG: ${{ steps.parse-version.outputs.TAG }}
+
+    steps:
+      - name: Checkout master branch
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+
+      - name: Parse and validate version
+        id: parse-version
+        run: |
+          TAG="${{ github.event.inputs.version_tag }}"
+          echo "Processing tag: $TAG"
+
+          # Validate tag format (learn-v{major}.{minor}.{patch})
+          if [[ ! $TAG =~ ^learn-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "❌ Error: Tag must be in format learn-v{major}.{minor}.{patch} (e.g., v1.0.0)"
+            exit 1
+          fi
+
+          # Check if tag already exists
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "❌ Error: Tag $TAG already exists"
+            exit 1
+          fi
+
+          # Check if tag is newer than latest existing tag
+          LATEST_TAG=$(git tag --sort=-v:refname | grep -E '^learn-v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1)
+
+          if [ -n "$LATEST_TAG" ]; then
+            echo "Latest existing tag: $LATEST_TAG"
+            echo "New tag: $TAG"
+
+            # Compare versions using sort -V (version sort)
+            HIGHER=$(printf "%s\n%s" "$LATEST_TAG" "$TAG" | sort -V | tail -n 1)
+
+            if [ "$HIGHER" != "$TAG" ]; then
+              echo "❌ Error: Tag $TAG is not newer than the latest tag $LATEST_TAG"
+              echo "Please use a version higher than $LATEST_TAG"
+              echo ""
+              echo "Current latest: $LATEST_TAG"
+              echo "You tried:      $TAG"
+              exit 1
+            fi
+
+            echo "✅ Version validation passed: $TAG is newer than $LATEST_TAG"
+          else
+            echo "ℹ️  No previous tags found. This will be the first release."
+          fi
+
+          # Remove 'v' prefix and parse version components
+          VERSION=${TAG#learn-v}
+          MAJOR=$(echo $VERSION | cut -d. -f1)
+          MINOR=$(echo $VERSION | cut -d. -f2)
+          PATCH=$(echo $VERSION | cut -d. -f3)
+
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "MAJOR=$MAJOR" >> $GITHUB_OUTPUT
+          echo "MINOR=$MINOR" >> $GITHUB_OUTPUT
+          echo "PATCH=$PATCH" >> $GITHUB_OUTPUT
+          echo "TAG=$TAG" >> $GITHUB_OUTPUT
+
+          echo "## :rocket: Release Version" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag**: $TAG" >> $GITHUB_STEP_SUMMARY
+          if [ -n "$LATEST_TAG" ]; then
+            echo "- **Previous Tag**: $LATEST_TAG" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- **First Release**: Yes ✨" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "- **Full Version**: $VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "- **Major**: $MAJOR" >> $GITHUB_STEP_SUMMARY
+          echo "- **Minor**: $MINOR" >> $GITHUB_STEP_SUMMARY
+          echo "- **Patch**: $PATCH" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: master" >> $GITHUB_STEP_SUMMARY
+
+      - name: Create and push tag
+        run: |
+          TAG="${{ steps.parse-version.outputs.TAG }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Release version ${{ steps.parse-version.outputs.VERSION }}"
+          git push origin "$TAG"
+          echo "✅ Tag $TAG created and pushed" >> $GITHUB_STEP_SUMMARY
+
+  prepare-env:
+    name: Prepare Production Environment
+    needs: validate-and-tag
+    runs-on: ubuntu-22.04
+    timeout-minutes: 2
+    outputs:
+      AWS_ROLE: ${{ steps.vars.outputs.AWS_ROLE }}
+      AWS_REGION: ${{ steps.vars.outputs.AWS_REGION }}
+      ENV: ${{ steps.vars.outputs.ENV }}
+      PROJECT_PREFIX: ${{ steps.vars.outputs.PROJECT_PREFIX }}
+      PROJECT_REGION: ${{ steps.vars.outputs.PROJECT_REGION }}
+      ECS_CLUSTER: ${{ steps.set_env.outputs.ECS_CLUSTER }}
+      ECS_SERVICE: ${{ steps.set_env.outputs.ECS_SERVICE }}
+      ECR_REPOSITORY: ${{ steps.set_env.outputs.ECR_REPOSITORY }}
+      TASK_DEFINITION: ${{ steps.set_env.outputs.TASK_DEFINITION }}
+      CONTAINER_NAME: ${{ steps.set_env.outputs.CONTAINER_NAME }}
+      ENVIRONMENT_BUCKET: ${{ steps.set_env.outputs.ENVIRONMENT_BUCKET }}
+      SUBNETS: ${{ env.SUBNETS }}
+      SECURITY_GROUPS: ${{ env.SECURITY_GROUPS }}
+
+    steps:
+      - id: vars
+        name: Determine vars
+        shell: bash
+        run: |
+          # Production release always uses prd environment
+          ENV="prd"
+          echo "AWS_ROLE=${{ vars.PRD_AWS_ROLE }}" >> $GITHUB_OUTPUT
+          echo "AWS_REGION=${{ vars.PRD_AWS_REGION }}" >> $GITHUB_OUTPUT
+          echo "ECR_REPOSITORY=${{ vars.PRD_ECR_REPOSITORY }}" >> $GITHUB_OUTPUT
+          echo "PROJECT_PREFIX=ally-prd" >> $GITHUB_OUTPUT
+          echo "PROJECT_REGION=mb" >> $GITHUB_OUTPUT
+          echo "ENV=$ENV" >> $GITHUB_OUTPUT
+          echo ":rocket: Environment - $ENV" >> $GITHUB_STEP_SUMMARY
+
+      - name: Set derived variables
+        id: set_env
+        run: |
+          PREFIX=${{ steps.vars.outputs.PROJECT_PREFIX }}
+          REGION=${{ steps.vars.outputs.PROJECT_REGION }}
+          echo "ECS_CLUSTER=$PREFIX-$REGION-ecs-cluster" >> $GITHUB_OUTPUT
+          echo "ECS_SERVICE=$PREFIX-svc-${{ env.SERVICE_NAME }}" >> $GITHUB_OUTPUT
+          echo "TASK_DEFINITION=$PREFIX-td-${{ env.SERVICE_NAME }}" >> $GITHUB_OUTPUT
+          echo "CONTAINER_NAME=$PREFIX-cntr-${{ env.SERVICE_NAME }}" >> $GITHUB_OUTPUT
+          echo "ECR_REPOSITORY=$PREFIX-ecr-${{ env.SERVICE_NAME }}" >> $GITHUB_OUTPUT
+          echo "ENVIRONMENT_BUCKET=$PREFIX-s3-environment" >> $GITHUB_OUTPUT
+          echo ":label: Tag: ${{ needs.validate-and-tag.outputs.TAG }}" >> $GITHUB_STEP_SUMMARY
+
+  test:
+    name: Run Tests
+    needs:
+      - validate-and-tag
+      - prepare-env
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    if: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: master
+
+      - name: Set up Python
+        if: ${{ env.TEST_RUNTIME == 'python' }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.TEST_RUNTIME_VERSION }}
+
+      - name: Set up Node.js
+        if: ${{ env.TEST_RUNTIME == 'node' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.TEST_RUNTIME_VERSION }}
+
+      - name: Set up Java
+        if: ${{ env.TEST_RUNTIME == 'java' }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.TEST_RUNTIME_VERSION }}
+
+      - name: Setup Poetry
+        if: ${{ env.TEST_PACKAGE_MANAGER == 'poetry' }}
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Load cached dependencies
+        id: cached-dependencies
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.TEST_CACHE_PATHS }}
+          key: venv-${{ runner.os }}-py${{ env.TEST_RUNTIME_VERSION }}-${{ hashFiles('**/poetry.lock') }}
+
+      - name: Install dependencies
+        run: ${{ env.TEST_INSTALL_COMMAND }}
+
+      - name: Run tests
+        run: ${{ env.TEST_RUN_COMMAND }}
+
+  build-push-image:
+    name: Build and Push Image
+    runs-on: ubuntu-22.04
+    permissions:
+      id-token: write
+      pull-requests: write
+      contents: read
+    needs:
+      - validate-and-tag
+      - prepare-env
+      - test
+    if: always() && needs.prepare-env.result == 'success' && (needs.test.result == 'success' || needs.test.result == 'skipped')
+    outputs:
+      APP_IMAGE: ${{ steps.build_and_push.outputs.APP_IMAGE }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+
+      - name: Build & Push with version tags
+        id: build_and_push
+        uses: ./.github/actions/ally-ai-learn/build-push
+        with:
+          aws-region: ${{ needs.prepare-env.outputs.AWS_REGION }}
+          aws-role: ${{ needs.prepare-env.outputs.AWS_ROLE }}
+          ecr-repository: ${{ needs.prepare-env.outputs.ECR_REPOSITORY }}
+          release-tag: ${{ needs.validate-and-tag.outputs.VERSION }}
+          environment-bucket: ${{ needs.prepare-env.outputs.ENVIRONMENT_BUCKET }}
+          s3-env-files: ${{ env.S3_ENV_FILES }}
+          build-platform: ${{ env.BUILD_PLATFORM }}
+          build-path: ${{ env.BUILD_PATH }}
+          context-path: ally-ai-learn
+          gcp-project-id: ${{ env.GCP_PROJECT_ID }}
+          gcp-wif-provider: ${{ env.GCP_WIF_PROVIDER }}
+          gcp-service-account: ${{ env.GCP_SERVICE_ACCOUNT }}
+
+      - name: Tag additional version images
+        run: |
+          VERSION=${{ needs.validate-and-tag.outputs.VERSION }}
+          MAJOR=${{ needs.validate-and-tag.outputs.MAJOR }}
+          MINOR=${{ needs.validate-and-tag.outputs.MINOR }}
+
+          # Get the image that was just built (full path with registry)
+          SOURCE_IMAGE="${{ steps.build_and_push.outputs.APP_IMAGE }}"
+
+          # Extract registry URL from the source image (e.g., 123456.dkr.ecr.region.amazonaws.com)
+          ECR_REGISTRY=$(echo $SOURCE_IMAGE | cut -d'/' -f1)
+
+          # Extract repository name from source image
+          ECR_REPO=$(echo $SOURCE_IMAGE | cut -d'/' -f2 | cut -d':' -f1)
+
+          echo "ECR Registry: $ECR_REGISTRY"
+          echo "ECR Repository: $ECR_REPO"
+          echo "Source Image: $SOURCE_IMAGE"
+
+          # Login to ECR using the registry URL
+          aws ecr get-login-password --region ${{ needs.prepare-env.outputs.AWS_REGION }} | docker login --username AWS --password-stdin $ECR_REGISTRY
+
+          # Pull the versioned image
+          docker pull $SOURCE_IMAGE
+
+          # Tag with additional versions (using full registry path)
+          docker tag $SOURCE_IMAGE ${ECR_REGISTRY}/${ECR_REPO}:${MAJOR}.${MINOR}
+          docker tag $SOURCE_IMAGE ${ECR_REGISTRY}/${ECR_REPO}:${MAJOR}
+          docker tag $SOURCE_IMAGE ${ECR_REGISTRY}/${ECR_REPO}:latest
+
+          # Push additional tags
+          docker push ${ECR_REGISTRY}/${ECR_REPO}:${MAJOR}.${MINOR}
+          docker push ${ECR_REGISTRY}/${ECR_REPO}:${MAJOR}
+          docker push ${ECR_REGISTRY}/${ECR_REPO}:latest
+
+          echo "## :package: Docker Images Created" >> $GITHUB_STEP_SUMMARY
+          echo "- \`$SOURCE_IMAGE\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${ECR_REGISTRY}/${ECR_REPO}:${MAJOR}.${MINOR}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${ECR_REGISTRY}/${ECR_REPO}:${MAJOR}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${ECR_REGISTRY}/${ECR_REPO}:latest\`" >> $GITHUB_STEP_SUMMARY
+
+  run-db-migration:
+    name: Run DB Migration
+    runs-on: ubuntu-22.04
+    permissions:
+      id-token: write
+      pull-requests: write
+      contents: read
+    needs:
+      - prepare-env
+      - build-push-image
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+
+      - name: Notify migration skipped
+        if: ${{ env.ENABLE_DB_MIGRATION != 'true' }}
+        run: echo "DB migration not enabled, skipping." >> $GITHUB_STEP_SUMMARY
+
+      - name: Run migration
+        if: ${{ env.ENABLE_DB_MIGRATION == 'true' }}
+        id: run_db_migration
+        uses: ./.github/actions/ally-ai-learn/run-migration
+        with:
+          aws-region: ${{ needs.prepare-env.outputs.AWS_REGION }}
+          aws-role: ${{ needs.prepare-env.outputs.AWS_ROLE }}
+          task-definition: "${{ needs.prepare-env.outputs.TASK_DEFINITION }}-dbmigrate"
+          container-name: "${{ needs.prepare-env.outputs.CONTAINER_NAME }}-dbmigrate"
+          ecs-cluster: ${{ needs.prepare-env.outputs.ECS_CLUSTER }}
+          image: ${{ needs.build-push-image.outputs.APP_IMAGE }}
+          subnets: ${{ env.SUBNETS }}
+          security-groups: ${{ env.SECURITY_GROUPS }}
+
+  deploy-to-ecs-service:
+    name: Deploy to ECS Service
+    runs-on: ubuntu-22.04
+    # Must stay above deploy-ecs's wait-for-minutes (25) so the ECS waiter is
+    # what times out, not the runner. At 20 this job cancelled itself while the
+    # rollout was still being watched: v1.29.0 reached COMPLETED (12/12) at
+    # 11:00:02Z and the job was cancelled at 11:05:20Z, reporting `cancelled`
+    # for a deploy that had already succeeded. Four of the five releases before
+    # it reported the same thing.
+    timeout-minutes: 35
+    permissions:
+      id-token: write
+      pull-requests: write
+      contents: read
+    needs:
+      - prepare-env
+      - build-push-image
+      - run-db-migration
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+
+      - name: Deploy to production
+        id: deploy_backend
+        uses: ./.github/actions/ally-ai-learn/deploy-ecs
+        with:
+          aws-region: ${{ needs.prepare-env.outputs.AWS_REGION }}
+          aws-role: ${{ needs.prepare-env.outputs.AWS_ROLE }}
+          task-definition: ${{ needs.prepare-env.outputs.TASK_DEFINITION }}
+          container-name: ${{ needs.prepare-env.outputs.CONTAINER_NAME }}
+          ecs-service: ${{ needs.prepare-env.outputs.ECS_SERVICE }}
+          ecs-cluster: ${{ needs.prepare-env.outputs.ECS_CLUSTER }}
+          image: ${{ needs.build-push-image.outputs.APP_IMAGE }}
+          release-tag: ${{ needs.validate-and-tag.outputs.VERSION }}
+
+  create-release:
+    name: Create Release Draft
+    needs:
+      - validate-and-tag
+      - prepare-env
+      - build-push-image
+      - deploy-to-ecs-service
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0  # Fetch all history for changelog generation
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          VERSION=${{ needs.validate-and-tag.outputs.VERSION }}
+          TAG=${{ needs.validate-and-tag.outputs.TAG }}
+
+          # Fetch the newly created tag
+          git fetch origin tag "$TAG"
+
+          # Get previous tag
+          PREVIOUS_TAG=$(git tag --sort=-v:refname | grep -E '^learn-v[0-9]+\.[0-9]+\.[0-9]+$' | grep -v "^$TAG$" | head -n 1)
+
+          if [ -z "$PREVIOUS_TAG" ]; then
+            echo "No previous tag found, using first commit"
+            PREVIOUS_TAG=$(git rev-list --max-parents=0 HEAD)
+          fi
+
+          echo "Generating changelog from $PREVIOUS_TAG to $TAG"
+
+          # Generate changelog with proper formatting
+          echo "## What's Changed" > CHANGELOG.md
+          echo "" >> CHANGELOG.md
+
+          # Get commits since last tag (limit to 100 to avoid issues)
+          git log $PREVIOUS_TAG..master --pretty=format:"- %s (%h) @%an" --no-merges -- . | head -100 >> CHANGELOG.md
+
+          # Use a unique delimiter that won't appear in commit messages
+          DELIMITER="CHANGELOG_END_$(date +%s)"
+          echo "CHANGELOG<<${DELIMITER}" >> $GITHUB_OUTPUT
+          cat CHANGELOG.md >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "${DELIMITER}" >> $GITHUB_OUTPUT
+
+      - name: Create Release Draft
+        uses: softprops/action-gh-release@v1
+        with:
+          draft: true
+          name: Release v${{ needs.validate-and-tag.outputs.VERSION }}
+          tag_name: ${{ needs.validate-and-tag.outputs.TAG }}
+          body: |
+            ## Release v${{ needs.validate-and-tag.outputs.VERSION }}
+
+            ### Version Information
+            - **Version**: ${{ needs.validate-and-tag.outputs.VERSION }}
+            - **Major**: ${{ needs.validate-and-tag.outputs.MAJOR }}
+            - **Minor**: ${{ needs.validate-and-tag.outputs.MINOR }}
+            - **Patch**: ${{ needs.validate-and-tag.outputs.PATCH }}
+
+            ### Deployment Information
+            - **Service**: learn-core
+            - **Environment**: Production
+            - **Branch**: master
+            - **ECS Cluster**: ${{ needs.prepare-env.outputs.ECS_CLUSTER }}
+            - **ECS Service**: ${{ needs.prepare-env.outputs.ECS_SERVICE }}
+            - **Docker Image**: ${{ needs.build-push-image.outputs.APP_IMAGE }}
+
+            ${{ steps.changelog.outputs.CHANGELOG }}
+
+            ---
+
+            **Note**: This is a draft release. Please review and publish when ready.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
