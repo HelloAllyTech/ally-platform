@@ -1,15 +1,17 @@
 # Builder, GitHub-native: opencode works a Builder issue into a pull request.
 #
-# Called from a small `builder.yml` stub in each repo Builder builds in
-# (ally-be, ally-web, ally-mobile, ally-ai, ally-ai-learn), so the logic lives
-# here once. `runtime: python` sets the repo up with Poetry instead of npm;
-# opencode itself is a Node CLI, so Node is installed either way.
+# Called from `builder.yml`. Since the 2026-10-23 cutover every service Builder
+# builds in (ally-be, ally-web, ally-mobile, ally-ai, ally-ai-learn) is a folder
+# of this monorepo, and this one workflow builds all of them: it works out the
+# service first, then sets up that service's runtime (Node, or Python with
+# Poetry — opencode itself is a Node CLI, so Node is installed either way),
+# installs its dependencies in its folder, and tells opencode to work there.
 #
-# Flow: Builder raises an issue in the repo, labelled `builder`, whose body
-# carries only the run id (`<!-- builder-run: <uuid> -->`). ally-be, ally-web
-# and ally-ai are public repos and the PRD and design are not, so this
-# workflow fetches the spec — platform rules, PRD, and the repo's slice of the
-# approved design — from Builder (GET /builder/pipeline/runs/:id/spec, API key)
+# Flow: Builder raises an issue labelled `builder`, whose body carries only the
+# run id (`<!-- builder-run: <uuid> -->`) and the service
+# (`<!-- builder-service: <name> -->`). The repo is public and the PRD and
+# design are not, so this workflow fetches the spec — platform rules, PRD, and
+# the service's slice of the approved design — from Builder (GET /builder/pipeline/runs/:id/spec, API key)
 # and hands it to `opencode github run`, which works on a branch and opens a
 # PR that closes the issue. The repo's own CI checks the PR. A `/oc ...`
 # comment on that PR — from Builder when CI fails, or from a person — runs
@@ -28,27 +30,6 @@ name: Builder (opencode)
 
 on:
   workflow_call:
-    inputs:
-      runtime:
-        description: node or python — what the repo builds with.
-        type: string
-        default: node
-      node-version:
-        description: Node version the repo builds on (and opencode runs on).
-        type: string
-        default: '24'
-      python-version:
-        description: Python version, for runtime python.
-        type: string
-        default: '3.12'
-      install-command:
-        description: How the repo installs its dependencies. Defaults per runtime.
-        type: string
-        default: ''
-      node-options:
-        description: NODE_OPTIONS for the run (heap size for large builds and lints).
-        type: string
-        default: ''
     secrets:
       GEMINI_API_KEY:
         required: true
@@ -70,7 +51,6 @@ jobs:
       NX_NO_CLOUD: 'true'
       NX_DAEMON: 'false'
       HUSKY: '0'
-      NODE_OPTIONS: ${{ inputs.node-options }}
     steps:
       # Scoped to this repository. It expires after an hour, so a run must
       # push within that: the job timeout below matches it, as does Builder's
@@ -87,36 +67,67 @@ jobs:
           fetch-depth: 0
           token: ${{ steps.app.outputs.token }}
 
+      # Which service this is for. An issue says so itself (Builder writes the
+      # marker next to the run id); a `/oc` comment on a pull request is for
+      # the service whose folder holds most of that pull request's files.
+      - name: Which service
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          IS_PR: ${{ github.event.issue.pull_request && 'true' || 'false' }}
+          NUMBER: ${{ github.event.issue.number }}
+        run: |
+          set -euo pipefail
+          service="$(printf '%s' "$ISSUE_BODY" | grep -oE 'builder-service: [a-z-]+' | head -1 | cut -d' ' -f2 || true)"
+          if [ -z "$service" ] && [ "$IS_PR" = 'true' ]; then
+            for folder in $(gh pr view "$NUMBER" --repo "$GITHUB_REPOSITORY" --json files \
+                --jq '[.files[].path | split("/")[0]] | group_by(.) | sort_by(length) | reverse | .[][0]'); do
+              case "$folder" in ally-be|ally-web|ally-ai|ally-ai-learn|ally-mobile) service="$folder"; break ;; esac
+            done
+          fi
+          case "$service" in
+            ally-be|ally-web|ally-ai|ally-ai-learn|ally-mobile) ;;
+            *) echo "::error::Could not tell which service this is for: no builder-service marker on the issue, and no service folder in the pull request's files."; exit 1 ;;
+          esac
+          {
+            echo "SERVICE=${service}"
+            case "$service" in
+              ally-be|ally-web) echo "NODE_OPTIONS=--max-old-space-size=6144" ;;
+            esac
+          } >> "$GITHUB_ENV"
+          echo "Building in ${service}/."
+
+      # The service's own runtime — the same as its CI (test-<service>.yml),
+      # so what opencode runs here is what the pull request's checks will run.
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ inputs.node-version }}
-          cache: ${{ inputs.runtime == 'node' && 'npm' || '' }}
+          node-version: ${{ (env.SERVICE == 'ally-web' || env.SERVICE == 'ally-mobile') && '22' || '24' }}
+          cache: ${{ (env.SERVICE == 'ally-be' || env.SERVICE == 'ally-web' || env.SERVICE == 'ally-mobile') && 'npm' || '' }}
+          cache-dependency-path: ${{ env.SERVICE }}/package-lock.json
 
-      # The same setup as the Python repos' own CI (test.yml), so what opencode
-      # runs here is what the pull request's checks will run.
       - uses: actions/setup-python@v5
-        if: inputs.runtime == 'python'
+        if: env.SERVICE == 'ally-ai' || env.SERVICE == 'ally-ai-learn'
         with:
-          python-version: ${{ inputs.python-version }}
+          python-version: '3.12'
 
       - name: Install Poetry
-        if: inputs.runtime == 'python'
+        if: env.SERVICE == 'ally-ai' || env.SERVICE == 'ally-ai-learn'
         uses: snok/install-poetry@v1
         with:
           virtualenvs-create: true
           virtualenvs-in-project: true
 
       - name: Install dependencies
-        env:
-          INSTALL: ${{ inputs.install-command || (inputs.runtime == 'python' && 'poetry install --no-interaction --with dev' || 'npm ci') }}
-        run: eval "$INSTALL"
+        working-directory: ${{ env.SERVICE }}
+        run: |
+          if [ -f package-lock.json ]; then npm ci; elif [ -f poetry.lock ]; then poetry install --no-interaction --with dev; fi
 
-      # The project's virtualenv first on PATH, so `pytest`, `flake8` and
-      # `python` are the repo's own whether or not opencode says `poetry run`.
-      # .venv is gitignored in both Python repos, so it is never committed.
+      # The service's virtualenv first on PATH, so `pytest`, `flake8` and
+      # `python` are its own whether or not opencode says `poetry run`.
+      # .venv is gitignored in both Python services, so it is never committed.
       - name: Put the virtualenv on PATH
-        if: inputs.runtime == 'python'
-        run: echo "${GITHUB_WORKSPACE}/.venv/bin" >> "$GITHUB_PATH"
+        if: env.SERVICE == 'ally-ai' || env.SERVICE == 'ally-ai-learn'
+        run: echo "${GITHUB_WORKSPACE}/${SERVICE}/.venv/bin" >> "$GITHUB_PATH"
 
       # The app's bot user, with its noreply address, so commits show the bot
       # and its avatar rather than an unlinked name.
@@ -157,14 +168,15 @@ jobs:
           # first production run (ally-be#629), and env values have size limits
           # a large design can reach.
           {
-            echo 'Build the change specified below in this repository. It is the part of an approved'
-            echo 'design that belongs to this repository; other repositories it mentions are separate'
-            echo 'builds. Follow AGENTS.md / CLAUDE.md. Plan with your todo list first. Keep every'
-            echo 'change additive and inside the files the design scopes for this repository. Run the'
-            echo "repository's typecheck, lint and tests and fix what they report; add a test for"
-            echo 'every requirement as the design maps them. Do not push or open a pull request'
-            echo 'yourself; that happens when you finish. End with a short summary of what you changed'
-            echo 'and how you tested it.'
+            echo "Build the change specified below in the \`${SERVICE}/\` folder of this monorepo. It is the"
+            echo "part of an approved design that belongs to ${SERVICE}; other services it mentions are"
+            echo "separate builds. Every path in the specification is relative to \`${SERVICE}/\`, and every"
+            echo "command in it runs from that folder: \`cd ${SERVICE}\` first. Follow ${SERVICE}/AGENTS.md /"
+            echo "${SERVICE}/CLAUDE.md. Plan with your todo list first. Keep every change additive and"
+            echo "inside the files the design scopes for ${SERVICE}. Run its typecheck, lint and tests and"
+            echo 'fix what they report; add a test for every requirement as the design maps them. Do not'
+            echo 'push or open a pull request yourself; that happens when you finish. End with a short'
+            echo 'summary of what you changed and how you tested it.'
             echo
             cat "${RUNNER_TEMP}/builder-spec.md"
           } > "${RUNNER_TEMP}/builder-prompt.md"
@@ -206,7 +218,7 @@ jobs:
           # (ally-mobile#114).
           PROMPT="${PROMPT}
 
-          Rules for this run: stay on the branch you are on. Do not create, switch or check out branches, do not commit, and do not push: your changes in the working tree are committed and pushed for you when you finish. If you made no change, say so plainly."
+          Rules for this run: this is the ${SERVICE} service, in the ${SERVICE}/ folder of a monorepo; change files only under ${SERVICE}/ and run its commands from there. Stay on the branch you are on. Do not create, switch or check out branches, do not commit, and do not push: your changes in the working tree are committed and pushed for you when you finish. If you made no change, say so plainly."
           export PROMPT
           opencode github run
         env:
@@ -227,8 +239,9 @@ jobs:
       # Best-effort: a repo without Prettier or ESLint installed is skipped,
       # and a failure here never fails the run.
       - name: Format what this branch changed
-        if: success() && inputs.runtime == 'node'
+        if: success() && (env.SERVICE == 'ally-be' || env.SERVICE == 'ally-web' || env.SERVICE == 'ally-mobile')
         continue-on-error: true
+        working-directory: ${{ env.SERVICE }}
         env:
           BASE: ${{ github.event.repository.default_branch }}
         run: |
@@ -237,9 +250,11 @@ jobs:
           case "$branch" in opencode/*) ;; *) echo "On ${branch}; nothing of opencode's to format."; exit 0 ;; esac
           git fetch --quiet origin "$BASE" "$branch" || true
           git merge --ff-only --quiet "origin/${branch}" 2>/dev/null || true
+          # --relative: this service's files only, as paths from its folder,
+          # where its own Prettier and ESLint configs apply.
           files=()
           while IFS= read -r file; do [ -f "$file" ] && files+=("$file"); done \
-            < <(git diff --name-only --diff-filter=d "origin/${BASE}...HEAD")
+            < <(git diff --name-only --relative --diff-filter=d "origin/${BASE}...HEAD")
           if [ "${#files[@]}" -eq 0 ]; then echo "No changed files."; exit 0; fi
           if [ -x node_modules/.bin/prettier ]; then
             node_modules/.bin/prettier --write --ignore-unknown "${files[@]}" > /dev/null || true
@@ -265,10 +280,10 @@ jobs:
         if: always()
         uses: actions/checkout@v4
         with:
-          repository: HelloAllyTech/ally-be
-          ref: master
+          # From the default branch rather than the branch opencode worked on.
+          ref: ${{ github.event.repository.default_branch }}
           path: .builder-usage
-          sparse-checkout: scripts/builder/opencode-usage.py
+          sparse-checkout: ally-be/scripts/builder/opencode-usage.py
           sparse-checkout-cone-mode: false
       - name: Report usage to Builder
         if: always()
@@ -279,7 +294,7 @@ jobs:
           PR_NUMBER: ${{ github.event.issue.pull_request && github.event.issue.number || '' }}
           KIND: ${{ github.event_name == 'issues' && 'build' || 'fix' }}
         run: |
-          python3 .builder-usage/scripts/builder/opencode-usage.py > "${RUNNER_TEMP}/usage.json" || echo '{}' > "${RUNNER_TEMP}/usage.json"
+          python3 .builder-usage/ally-be/scripts/builder/opencode-usage.py > "${RUNNER_TEMP}/usage.json" || echo '{}' > "${RUNNER_TEMP}/usage.json"
           rm -rf .builder-usage
           cat "${RUNNER_TEMP}/usage.json"; echo
           python3 - > "${RUNNER_TEMP}/usage-post.json" <<'PY'

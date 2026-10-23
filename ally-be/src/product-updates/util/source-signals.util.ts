@@ -1,3 +1,8 @@
+import {
+  pathWithinService,
+  serviceForPath,
+} from 'src/github/constants/github-repos.constants';
+
 /**
  * Deterministic signals about one merged change — everything this module can
  * decide without a model.
@@ -75,9 +80,10 @@ const BOT_AUTHOR = /bughunter|bug-hunter|buider|builder|\[bot\]|docs-bot/i;
 
 const CONVENTIONAL = /^\s*(\w+)(?:\(([^)]*)\))?!?:\s*/;
 const TICKET = /\b(OPP-\d{3,5}|AAQ-\d{3})\b/g;
-const CROSS_LINK_SHORT = /\b(ally-(?:be|web|ai-learn|ai|mobile))\s*#(\d+)\b/g;
+const CROSS_LINK_SHORT =
+  /\b(ally-(?:platform|be|web|ai-learn|ai|mobile))\s*#(\d+)\b/g;
 const CROSS_LINK_URL =
-  /github\.com\/HelloAllyTech\/(ally-(?:be|web|ai-learn|ai|mobile))\/pull\/(\d+)/g;
+  /github\.com\/HelloAllyTech\/(ally-(?:platform|be|web|ai-learn|ai|mobile))\/pull\/(\d+)/g;
 
 /**
  * Files whose change alters nothing a person using Ally could notice. A change
@@ -193,7 +199,12 @@ export function isNoise(source: SourceSignalsInput): boolean {
 }
 
 export function isNonBehaviouralFile(path: string): boolean {
-  return NON_BEHAVIOURAL.some((pattern) => pattern.test(path));
+  // Tested as-is and as its service sees it, so `ally-be/.husky/x` in the
+  // monorepo is the same noise `.husky/x` was in ally-be's own repo.
+  const inService = pathWithinService(path);
+  return NON_BEHAVIOURAL.some(
+    (pattern) => pattern.test(path) || pattern.test(inService),
+  );
 }
 
 /**
@@ -361,7 +372,8 @@ export function looksStaffOnly(source: SourceSignalsInput): boolean {
         !isNonBehaviouralFile(path) &&
         CUSTOMER_SURFACE_PATHS.some(
           ([repo, pattern]) =>
-            (repo === null || repo === source.repo) && pattern.test(path),
+            (repo === null || repo === (serviceForPath(path) ?? source.repo)) &&
+            pattern.test(pathWithinService(path)),
         ),
     )
   ) {
@@ -389,12 +401,12 @@ export function looksStaffOnly(source: SourceSignalsInput): boolean {
   const telling = source.files.filter(
     (path) =>
       !isNonBehaviouralFile(path) &&
-      !NEUTRAL_PATHS.some((pattern) => pattern.test(path)),
+      !NEUTRAL_PATHS.some((pattern) => pattern.test(pathWithinService(path))),
   );
   return (
     telling.length > 0 &&
     telling.every((path) =>
-      STAFF_ONLY_PATHS.some((pattern) => pattern.test(path)),
+      STAFF_ONLY_PATHS.some((pattern) => pattern.test(pathWithinService(path))),
     )
   );
 }
