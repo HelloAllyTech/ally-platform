@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { LlmUsageModule } from 'src/analytics/llm-usage.module';
 import { AgentHarnessModule } from 'src/llm-agent/harness/agent-harness.module';
+import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
 import { GlobalSettingsRepository } from 'src/settings/repository/global-settings.repository';
 import { TrackModule } from 'src/track/track.module';
 import { GuideAdminController } from './controller/guide-admin.controller';
@@ -22,8 +24,10 @@ import { GuideTurnFeedback } from './entity/guide-turn-feedback.entity';
 import { GuideVisitor } from './entity/guide-visitor.entity';
 import { GuideBootstrapService } from './runtime/guide-bootstrap.service';
 import { GuideEventBusService } from './runtime/guide-event-bus.service';
+import { GuideModelService } from './runtime/guide-model.service';
 import { GuideThreadService } from './runtime/guide-thread.service';
 import { GuideTurnService } from './runtime/guide-turn.service';
+import { GuideSentinelService } from './safety/guide-sentinel.service';
 import { GuideSettingsService } from './settings/guide-settings.service';
 
 /**
@@ -51,6 +55,8 @@ import { GuideSettingsService } from './settings/guide-settings.service';
       GuideTurnFeedback,
     ]),
     AgentHarnessModule,
+    LlmAgentModule,
+    LlmUsageModule,
     TrackModule,
   ],
   controllers: [
@@ -65,6 +71,8 @@ import { GuideSettingsService } from './settings/guide-settings.service';
     GuideThreadService,
     GuideTurnService,
     GuideBootstrapService,
+    GuideModelService,
+    GuideSentinelService,
   ],
 })
 export class GuideModule {}

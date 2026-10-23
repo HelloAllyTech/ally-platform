@@ -126,6 +126,135 @@ export class AgentReleaseService {
     }
   }
 
+  /**
+   * Bring an agent's releases in line with the bundle in code, at boot.
+   *
+   * - No releases yet: version 1, GA (what `ensureSeed` does).
+   * - GA already holds this bundle: nothing to do.
+   * - The code's bundle changed and only seeds have ever touched releases:
+   *   the new bundle becomes the next version and goes GA. This is the
+   *   pre-launch path — every deploy that changes a prompt or a policy value
+   *   ships it, with an audit row saying so.
+   * - The code's bundle changed after a person (or the curator) authored,
+   *   promoted or rolled back a release: it is created as a DRAFT and the GA
+   *   stays. A deploy must never undo a deliberate rollback.
+   *
+   * Serialised across instances with a transaction-scoped advisory lock.
+   */
+  async syncSeed(
+    agentKey: string,
+    bundle: Record<string, unknown>,
+  ): Promise<AgentRelease | null> {
+    const hash = canonicalHash(bundle);
+    const result = await this.dataSource.transaction(async (manager) => {
+      await manager.query?.('SELECT pg_advisory_xact_lock(hashtext($1))', [
+        `agent-release-seed:${agentKey}`,
+      ]);
+      const repo = manager.getRepository(AgentRelease);
+      const auditRepo = manager.getRepository(AgentReleaseAudit);
+      const all = await repo.find({
+        where: { agentKey },
+        order: { version: 'DESC' },
+      });
+      const ga = all.find((r) => r.status === AgentReleaseStatus.GA) ?? null;
+      if (ga?.contentHash === hash) return { release: ga, changed: false };
+
+      const nextVersion = (all[0]?.version ?? 0) + 1;
+      const createSeed = async (status: AgentReleaseStatus, notes: string) => {
+        const release = await repo.save(
+          repo.create({
+            agentKey,
+            version: nextVersion,
+            status,
+            bundle,
+            contentHash: hash,
+            parentReleaseId: ga?.id ?? null,
+            authorKind: AgentReleaseAuthorKind.SEED,
+            notes,
+            promotedAt: status === AgentReleaseStatus.GA ? new Date() : null,
+          }),
+        );
+        await auditRepo.save({
+          agentKey,
+          releaseId: release.id,
+          action: AgentReleaseAuditAction.CREATED,
+          actorKind: AgentReleaseAuthorKind.SEED,
+          detail: { version: release.version, status, contentHash: hash },
+        });
+        return release;
+      };
+
+      if (all.length === 0) {
+        const release = await createSeed(
+          AgentReleaseStatus.GA,
+          'Seeded from the bundle in code on first boot.',
+        );
+        return { release, changed: true };
+      }
+
+      const audit = await auditRepo.find({ where: { agentKey } });
+      const peopleInvolved =
+        all.some((r) => r.authorKind !== AgentReleaseAuthorKind.SEED) ||
+        audit.some((a) => a.actorKind !== AgentReleaseAuthorKind.SEED);
+      const existing = all.find((r) => r.contentHash === hash) ?? null;
+
+      if (peopleInvolved || !ga) {
+        if (!existing) {
+          await createSeed(
+            AgentReleaseStatus.DRAFT,
+            'The defaults in code changed. Review this draft and promote it ' +
+              'to ship them; the current GA is unchanged.',
+          );
+          this.logger.warn(
+            `${agentKey}: code defaults changed; created a draft, GA unchanged`,
+          );
+        }
+        return { release: ga, changed: false };
+      }
+
+      // Only seeds so far: ship the code's bundle.
+      const target =
+        existing ??
+        (await createSeed(
+          AgentReleaseStatus.DRAFT,
+          'The defaults in code changed; promoted at boot while no release ' +
+            'had been authored or promoted by a person.',
+        ));
+      await repo.update(ga.id, {
+        status: AgentReleaseStatus.RETIRED,
+        retiredAt: new Date(),
+      });
+      await repo.update(target.id, {
+        status: AgentReleaseStatus.GA,
+        promotedAt: new Date(),
+        retiredAt: null,
+      });
+      await auditRepo.save({
+        agentKey,
+        releaseId: target.id,
+        action: AgentReleaseAuditAction.PROMOTED,
+        actorKind: AgentReleaseAuthorKind.SEED,
+        detail: {
+          fromReleaseId: ga.id,
+          fromVersion: ga.version,
+          toVersion: target.version,
+          reason: 'code defaults changed',
+        },
+      });
+      return {
+        release: { ...target, status: AgentReleaseStatus.GA } as AgentRelease,
+        changed: true,
+      };
+    });
+    this.gaCache.delete(agentKey);
+    if (result.changed && result.release) {
+      this.logger.info(
+        `${agentKey} release v${result.release.version} is GA (seeded from code)`,
+      );
+    }
+    return result.release;
+  }
+
   /** A new DRAFT version. Its bundle is fixed from here on. */
   async createDraft(
     agentKey: string,

@@ -7,13 +7,14 @@ import { AgentReleaseAudit } from '../entity/agent-release-audit.entity';
 import { AgentRelease } from '../entity/agent-release.entity';
 import { AgentTurnTrace } from '../entity/agent-turn-trace.entity';
 import { AgentTurn } from '../entity/agent-turn.entity';
+import { AgentCostLedgerService } from './budget/agent-cost-ledger.service';
 import { AgentReleaseService } from './release/agent-release.service';
 import { AgentTraceService } from './trace/agent-trace.service';
 import { AgentTurnStoreService } from './turn/agent-turn-store.service';
 
 /**
  * The reusable agent harness (plans/ally-guide/plan.md §7): releases, the
- * turn state machine and product traces. Generic across agents; the Ally
+ * turn state machine, product traces and the cost ledger. Generic across agents; the Ally
  * guide is its first consumer. The stage runner (`runHarnessStages`) is a
  * plain function and needs no provider.
  */
@@ -29,7 +30,17 @@ import { AgentTurnStoreService } from './turn/agent-turn-store.service';
     ]),
     AwsModule,
   ],
-  providers: [AgentReleaseService, AgentTurnStoreService, AgentTraceService],
-  exports: [AgentReleaseService, AgentTurnStoreService, AgentTraceService],
+  providers: [
+    AgentReleaseService,
+    AgentTurnStoreService,
+    AgentTraceService,
+    AgentCostLedgerService,
+  ],
+  exports: [
+    AgentReleaseService,
+    AgentTurnStoreService,
+    AgentTraceService,
+    AgentCostLedgerService,
+  ],
 })
 export class AgentHarnessModule {}

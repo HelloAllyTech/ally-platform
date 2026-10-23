@@ -1,7 +1,20 @@
+import {
+  SENTINEL_PROMPT_CODE,
+  SENTINEL_PROMPT_VERSION,
+  SENTINEL_SYSTEM_PROMPT,
+} from '../prompts/sentinel.prompt';
+
 /**
  * The Ally guide's release bundle (plans/ally-guide/plan.md §7.4) and the
- * version-1 defaults it is seeded with. Policy values are Appendix A of the
- * plan; changing any of them is a new release, never an edit in place.
+ * defaults it is seeded with. Policy values are Appendix A of the plan;
+ * changing any of them is a new release, never an edit in place.
+ *
+ * Prompts travel INSIDE the bundle as text, not as references to the
+ * `prompts` table: a release is then self-contained — its content hash covers
+ * every word the models are given, and a rollback restores them exactly.
+ * They are deliberately not in `src/prompts/`, which syncs to Prompt
+ * Management, where an edit would either do nothing or fork a release out of
+ * band.
  */
 
 export const ALLY_GUIDE_AGENT_KEY = 'ally_guide';
@@ -84,11 +97,18 @@ export interface GuidePolicy {
   };
 }
 
+/** One role's prompt, frozen into the release. */
+export interface GuidePromptRef {
+  code: string;
+  version: number;
+  text: string;
+}
+
 export interface GuideReleaseBundle {
   /** Bumped when this bundle's SHAPE changes, so old releases stay readable. */
   schemaVersion: 1;
-  /** Prompt codes (in the prompts table / src/prompts/ally_guide) and the version each pins. */
-  prompts: Partial<Record<GuideRole, { code: string; version: number | null }>>;
+  /** Each role's prompt, as text (see the module comment). */
+  prompts: Partial<Record<GuideRole, GuidePromptRef>>;
   /** role → channel → budget tier → model. Missing entries fall back to `text.premium`. */
   modelRouting: Partial<
     Record<
@@ -170,12 +190,19 @@ const HAIKU: GuideModelRoute = {
 };
 
 /**
- * Version 1. Prompts and capabilities are filled in as step 1.1 lands them;
- * until then the guide only answers with the step-1.0 stub reply.
+ * The code's current defaults. Prompts and capabilities are added as step 1.1
+ * lands them; a change here becomes a new seed release at boot (see
+ * AgentReleaseService.syncSeed), never an edit to an existing one.
  */
 export const GUIDE_DEFAULT_BUNDLE: GuideReleaseBundle = {
   schemaVersion: 1,
-  prompts: {},
+  prompts: {
+    sentinel: {
+      code: SENTINEL_PROMPT_CODE,
+      version: SENTINEL_PROMPT_VERSION,
+      text: SENTINEL_SYSTEM_PROMPT,
+    },
+  },
   modelRouting: {
     orchestrator: {
       text: {
@@ -189,7 +216,7 @@ export const GUIDE_DEFAULT_BUNDLE: GuideReleaseBundle = {
         lite: { ...HAIKU, effort: 'low' },
       },
     },
-    sentinel: { text: { premium: HAIKU } },
+    sentinel: { text: { premium: { ...HAIKU, effort: 'low' } } },
     tutor: { text: { premium: OPUS, degraded: SONNET, lite: HAIKU } },
     coach: { text: { premium: OPUS, degraded: SONNET, lite: HAIKU } },
     assessor: { text: { premium: OPUS, degraded: SONNET, lite: HAIKU } },

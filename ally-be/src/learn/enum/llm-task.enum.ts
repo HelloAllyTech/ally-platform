@@ -313,6 +313,11 @@ export enum LlmTask {
   // builder's Landing page tab. Tagged with metadata.trackId, not a session id.
   COURSE_COPILOT_LANDING_PAGE = 'course_copilot_landing_page',
 
+  // The Ally guide (src/guide): the learner-facing course companion. One label
+  // per role; every row carries metadata.guideThreadId and guideTurnId, and
+  // the model comes from the thread's release (modelRouting), not from env.
+  GUIDE_SENTINEL = 'guide_sentinel',
+
   // Fallback for an un-mapped sender task (never drop a usage row).
   UNKNOWN = 'unknown',
 }

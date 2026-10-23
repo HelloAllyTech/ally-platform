@@ -9,8 +9,9 @@ import {
 } from '../release/guide-release.bundle';
 
 /**
- * On boot: make sure Ally has a GA release (version 1 from the bundle in
- * code), and mark turns a previous process left open as interrupted so their
+ * On boot: bring Ally's releases in line with the bundle in code (see
+ * AgentReleaseService.syncSeed — a new seed goes GA only while no person has
+ * managed releases), and mark turns a previous process left open as interrupted so their
  * threads are not blocked (plan §7.10). Never fails the boot — the guide is
  * off by default and the rest of the API must start regardless.
  */
@@ -27,7 +28,7 @@ export class GuideBootstrapService implements OnApplicationBootstrap {
 
   async onApplicationBootstrap(): Promise<void> {
     try {
-      const release = await this.releases.ensureSeed(
+      const release = await this.releases.syncSeed(
         ALLY_GUIDE_AGENT_KEY,
         GUIDE_DEFAULT_BUNDLE as unknown as Record<string, unknown>,
       );

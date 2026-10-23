@@ -56,7 +56,8 @@ function fakeDataSource() {
     audit,
     dataSource: {
       getRepository,
-      transaction: async (fn: any) => fn({ getRepository }),
+      transaction: async (fn: any) =>
+        fn({ getRepository, query: jest.fn(async () => []) }),
     },
   };
 }
@@ -135,5 +136,69 @@ describe('AgentReleaseService', () => {
     await service.ensureSeed('ally_guide', { a: 1, b: 2 });
     const draft = await service.createDraft('ally_guide', { b: 2, a: 1 }, 1);
     expect(draft.contentHash).toBe(fake.releases[0].contentHash);
+  });
+
+  describe('syncSeed', () => {
+    const v1 = { policy: { a: 1 } };
+    const v2 = { policy: { a: 2 } };
+
+    it('seeds version 1 as GA on first boot and is a no-op after', async () => {
+      const fake = fakeDataSource();
+      const service = new AgentReleaseService(fake.dataSource as never);
+      const first = await service.syncSeed('ally_guide', v1);
+      const again = await service.syncSeed('ally_guide', v1);
+      expect(first).toMatchObject({
+        version: 1,
+        status: AgentReleaseStatus.GA,
+      });
+      expect(again?.id).toBe(first?.id);
+      expect(fake.releases).toHaveLength(1);
+    });
+
+    it('ships changed code defaults as the next GA while only seeds have acted', async () => {
+      const fake = fakeDataSource();
+      const service = new AgentReleaseService(fake.dataSource as never);
+      await service.syncSeed('ally_guide', v1);
+      const next = await service.syncSeed('ally_guide', v2);
+      expect(next).toMatchObject({ version: 2, status: AgentReleaseStatus.GA });
+      expect(fake.releases.map((r) => r.status)).toEqual([
+        AgentReleaseStatus.RETIRED,
+        AgentReleaseStatus.GA,
+      ]);
+      expect(fake.audit[fake.audit.length - 1]).toMatchObject({
+        action: AgentReleaseAuditAction.PROMOTED,
+        actorKind: 'seed',
+      });
+    });
+
+    it('never undoes a person’s rollback: changed defaults become a draft', async () => {
+      const fake = fakeDataSource();
+      const service = new AgentReleaseService(fake.dataSource as never);
+      await service.syncSeed('ally_guide', v1);
+      const two = await service.syncSeed('ally_guide', v2);
+      await service.rollback('ally_guide', 7, false, 'bad tone');
+      const afterBoot = await service.syncSeed('ally_guide', {
+        policy: { a: 3 },
+      });
+      expect(afterBoot?.version).toBe(1);
+      expect(fake.releases.find((r) => r.id === two?.id)?.status).toBe(
+        AgentReleaseStatus.RETIRED,
+      );
+      expect(fake.releases[fake.releases.length - 1]).toMatchObject({
+        version: 3,
+        status: AgentReleaseStatus.DRAFT,
+      });
+    });
+
+    it('does not pile up duplicate drafts across restarts', async () => {
+      const fake = fakeDataSource();
+      const service = new AgentReleaseService(fake.dataSource as never);
+      await service.syncSeed('ally_guide', v1);
+      await service.syncSeed('ally_guide', v2);
+      await service.rollback('ally_guide', 7, false);
+      await service.syncSeed('ally_guide', v2);
+      await service.syncSeed('ally_guide', v2);
+      expect(fake.releases).toHaveLength(2);
+    });
   });
 });

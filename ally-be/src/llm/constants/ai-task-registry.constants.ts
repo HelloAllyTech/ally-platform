@@ -2254,6 +2254,36 @@ const COURSE_COPILOT_TASKS: AiTaskEntry[] = [
   },
 ];
 
+/* ─────────────────────────────────────────────────────────────────────────────
+ * The Ally guide (src/guide) — the learner-facing course companion on the
+ * agent harness. Models are NOT configured by env or prompt rows: each role's
+ * model comes from the thread's release (`modelRouting`: role → channel →
+ * budget tier), so `defaultModel` is the seeded release's premium route and a
+ * change ships as a new release. Every row's usage carries
+ * metadata.guideThreadId / guideTurnId / releaseId, and the same calls are
+ * priced into `agent_cost_ledger`, which the guide reads for its budget tiers.
+ * ──────────────────────────────────────────────────────────────────────────── */
+const GUIDE_TASKS: AiTaskEntry[] = [
+  {
+    id: 'guide-sentinel',
+    task: LlmTask.GUIDE_SENTINEL,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger: 'A learner sends Ally a message',
+    detail:
+      'The safety classifier: one call per learner message, run concurrently with the ' +
+      'reply and held to a deadline (release policy safety.sentinelDeadlineMs, 1.2 s), so it ' +
+      'adds latency only when it is slower than the reply. Sees the message, the last six ' +
+      'turns and the current item, and returns a closed structured verdict (risk, whose ' +
+      'state it is about, real-case and identifying-detail overlays). Skipped when the ' +
+      'first-person keyword layer has already matched. Effort low; Haiku because latency ' +
+      'gates safety here.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'anthropic',
+    defaultModel: 'claude-haiku-5-5',
+    configuredBy: 'ally_guide release modelRouting.sentinel',
+  },
+];
+
 export const AI_TASK_REGISTRY: AiTaskEntry[] = [
   ...AI_LEARN_TASKS,
   ...ALLY_AI_TASKS,
@@ -2261,6 +2291,7 @@ export const AI_TASK_REGISTRY: AiTaskEntry[] = [
   ...BUILDER_TASKS,
   ...BUG_HUNTER_TASKS,
   ...COURSE_COPILOT_TASKS,
+  ...GUIDE_TASKS,
 ];
 
 /**
