@@ -11,6 +11,9 @@
 # Subrepo .git backups (kept locally during migration cutover window)
 .git-subrepo-backups/
 
+# Keep infra as an independent standalone repository outside ally-platform
+/infra/
+
 # Local environment files (never commit)
 .env
 *.env.local

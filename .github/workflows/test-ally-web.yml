@@ -1,0 +1,90 @@
+name: Tests (ally-web)
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - "ally-web/**"
+  push:
+    branches: [master]
+    paths:
+      - "ally-web/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-ally-web-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: ally-web
+
+jobs:
+  test:
+    name: Vitest
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: ally-web/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+        env:
+          NX_NO_CLOUD: "true"
+      - name: Run tests
+        run: npm test
+        env:
+          NX_NO_CLOUD: "true"
+          NX_DAEMON: "false"
+
+  lint:
+    name: Lint & format (ally-web)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: ally-web/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+        env:
+          NX_NO_CLOUD: "true"
+      - name: Lint
+        continue-on-error: true
+        run: npm run lint
+      - name: Check formatting
+        continue-on-error: true
+        run: npm run format:check
+      - name: Colour literals
+        run: npm run lint:colors
+
+  typecheck:
+    name: Typecheck (ally-web)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: ally-web/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+        env:
+          NX_NO_CLOUD: "true"
+      - name: Typecheck admin dashboard
+        run: npx tsc --noEmit -p apps/ally-admin-dashboard/tsconfig.app.json
+      - name: Typecheck helpline dashboard
+        run: npx tsc --noEmit -p apps/ally-helpline-dashboard/tsconfig.app.json
+      - name: Typecheck ui-shared
+        run: npx tsc --noEmit -p libs/ui-shared/tsconfig.lib.json

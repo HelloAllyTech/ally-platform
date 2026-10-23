@@ -1,0 +1,61 @@
+name: Docs guard
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited, labeled, unlabeled]
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  docs-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install --quiet pyyaml
+
+      - name: Fetch the shared checker
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 3 \
+            https://raw.githubusercontent.com/HelloAllyTech/.github/main/scripts/docs_guard.py \
+            -o docs_guard.py
+
+      - name: Check documentation rules
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: python3 docs_guard.py
+
+  docs-paths:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Check documented file paths across monorepo
+        run: |
+          for dir in ally-be ally-web ally-ai ally-ai-learn ally-mobile helloallytech.github.io; do
+            echo "=== Checking $dir ==="
+            (cd "$dir" && node ../scripts/docs-path-lint.mjs --siblings "$GITHUB_WORKSPACE")
+          done

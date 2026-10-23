@@ -633,11 +633,11 @@ describe('BugFixSessionService', () => {
 
       await service.release('finding-1', 7);
 
-      expect(github.nextPatchTag).toHaveBeenCalledWith('ally-be', 'v');
+      expect(github.nextPatchTag).toHaveBeenCalledWith('ally-be', 'be-v');
       expect(github.dispatchWorkflow).toHaveBeenCalledWith(
         expect.objectContaining({
           repo: 'ally-be',
-          workflow: 'production-release.yaml',
+          workflow: 'production-release-ally-be.yaml',
           inputs: { version_tag: 'v1.4.2' },
         }),
       );
@@ -1418,7 +1418,7 @@ describe('BugFixSessionService', () => {
 
         expect(github.findSuccessfulRunSince).toHaveBeenCalledWith({
           repo: 'ally-be',
-          workflow: 'production-release.yaml',
+          workflow: 'production-release-ally-be.yaml',
           since: mergedAt,
         });
         expect(findingRepository.update).toHaveBeenCalledWith('finding-1', {
@@ -1706,7 +1706,7 @@ describe('BugFixSessionService', () => {
 
 describe('resolveReleaseTarget', () => {
   it.each([
-    ['ally-be', 'src/app.ts', 'production-release.yaml', 'v'],
+    ['ally-be', 'src/app.ts', 'production-release-ally-be.yaml', 'be-v'],
     [
       'ally-web',
       'apps/ally-admin-dashboard/src/pages/BugHunter/BugHunter.tsx',

@@ -1,0 +1,113 @@
+name: Tests (ally-be)
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - "ally-be/**"
+      - ".github/workflows/**"
+  push:
+    branches: [master]
+    paths:
+      - "ally-be/**"
+      - ".github/workflows/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-ally-be-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: ally-be
+
+jobs:
+  test:
+    name: Jest
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+          cache-dependency-path: ally-be/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Run tests
+        run: npm run test -- --forceExit --detectOpenHandles
+
+  builder-runner:
+    name: Builder runner harnesses
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Shell lint the runner scripts
+        run: shellcheck -S warning scripts/builder/*.sh scripts/builder/test/*.sh
+      - name: Engine output normalisers
+        run: node scripts/builder/test/forward-events.test.mjs
+      - name: Capability catalog extractor
+        run: node scripts/builder/test/extract-catalog.test.mjs
+      - name: Outcome gate
+        run: bash scripts/builder/test/outcome-gate.test.sh
+      - name: Repo map size floor
+        run: bash scripts/builder/test/refresh-repo-map.test.sh
+      - name: MCP reporting server
+        run: node scripts/builder/test/builder-mcp.test.mjs
+      - name: Design run dry run
+        run: bash scripts/builder/test/design-dryrun.sh
+
+  lint:
+    name: Lint & format
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+          cache-dependency-path: ally-be/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+          cache-dependency-path: ally-be/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+
+  actionlint:
+    name: Workflow lint
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install actionlint
+        working-directory: .
+        run: |
+          curl -sSL https://github.com/rhysd/actionlint/releases/download/v1.7.7/actionlint_1.7.7_linux_amd64.tar.gz \
+            | tar -xz -C /usr/local/bin actionlint
+          actionlint -version
+      - name: Lint workflows
+        working-directory: .
+        run: actionlint -shellcheck=

@@ -1,0 +1,224 @@
+name: Builder session
+
+# One technical-design run for a Builder session: two read-only agent passes
+# (designer, then a cold critic) over every repo the session touches. Builds do
+# not run here any more — they go through GitHub issues (builder.yml →
+# builder-opencode.yml) — so the coding loop, the test gate and the pull
+# request machinery this file used to host are gone.
+#
+# Hosted here, in ally-be, as the ONLY copy. A multi-repo build belongs to no
+# single target repo, and one copy cannot drift from five others. Target repos
+# are cloned at run time rather than checked out by `actions/checkout`, which
+# cannot loop over a variable list.
+#
+# This file is deliberately thin. Everything about *how* a build works — the
+# protocol, the ordering, the reporting contract — is fetched from ally-be at
+# run time, so changing it takes effect on the next dispatch instead of after
+# a PR merges here.
+#
+# Required secrets on this repo:
+#   GEMINI_API_KEY     — Google models for the engine (opencode).
+#                        Exported under TWO names below; opencode's google
+#                        provider reads only GOOGLE_GENERATIVE_AI_API_KEY.
+#   ALLY_BE_API_KEY    — equals ally-be's API_KEY, for the pipeline callbacks
+#   BUILDER_APP_PRIVATE_KEY (+ variable BUILDER_APP_ID) — the Ally Builder
+#                        GitHub App, whose token clones the target repos (the
+#                        default GITHUB_TOKEN cannot read the sibling repos).
+# Required variable:
+#   ALLY_BE_API_URL    — base URL a runner can reach ally-be on.
+
+on:
+  workflow_dispatch:
+    inputs:
+      session_id:
+        description: Builder session id
+        required: true
+      run_id:
+        description: Builder run id (created before dispatch)
+        required: true
+      mode:
+        description: design — the only mode this runner runs; anything else is refused
+        required: true
+        default: design
+      repos:
+        description: JSON array of repo names to clone
+        required: true
+      engine:
+        description: Ignored — opencode is the only engine. Remove once ally-be no longer sends it.
+        required: false
+        default: opencode
+      # One input for every role: workflow_dispatch accepts at most 10 inputs.
+      # The designer runs on `planner`, the critic on `verifier`.
+      models:
+        description: 'JSON {planner, coder, verifier} model ids'
+        required: false
+        default: '{}'
+      # Still declared because ally-be still sends them, and GitHub refuses a
+      # dispatch carrying an undeclared input. A design run pushes nothing.
+      branch_slug:
+        description: Ignored — a design run creates no branch. Remove once ally-be no longer sends it.
+        required: false
+      branches:
+        description: Ignored — a design run creates no branch. Remove once ally-be no longer sends it.
+        required: false
+        default: '{}'
+      api_base_url:
+        description: Base URL for ally-be callbacks
+        required: false
+
+# Serialised per session, so two drafts of one design never overlap.
+# Different sessions run concurrently — that is the point of the grouping key.
+concurrency:
+  group: builder-session-${{ inputs.session_id }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      ALLY_BE_API_URL: ${{ inputs.api_base_url || vars.ALLY_BE_API_URL }}
+      ALLY_BE_API_KEY: ${{ secrets.ALLY_BE_API_KEY }}
+      # A plain Google AI Studio key, not the Workspace/Vertex OAuth path —
+      # that path additionally needs GOOGLE_CLOUD_PROJECT and a per-org license
+      # this workflow does not attempt to set up. Also exported under its
+      # conventional name, for anything the agent runs that reads that one.
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      # The same key, under the name opencode's google provider reads.
+      #
+      # It ignores GEMINI_API_KEY: with only that set it answers "Google
+      # Generative AI API key is missing. Pass it using the 'apiKey' parameter
+      # or the GOOGLE_GENERATIVE_AI_API_KEY environment variable". Its binary
+      # contains all three plausible names, which is why reading strings out of
+      # it looked like an answer and was not.
+      GOOGLE_GENERATIVE_AI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      # BUILDER_GH_TOKEN and GH_TOKEN are exported by the first steps.
+      # Tier 1 of `.claude/stacks-bridge.mjs`. Without it the bridge falls
+      # through to `gh auth token`, and BUILDER_GH_TOKEN (the app's token) has no
+      # `read:org`, so the exchange 403s and every phase runs with no
+      # product guidance at all — which is what the first real build reported.
+      STACKS_API_KEY: ${{ secrets.STACKS_API_KEY }}
+      BUILDER_SESSION_ID: ${{ inputs.session_id }}
+      BUILDER_RUN_ID: ${{ inputs.run_id }}
+      BUILDER_MODE: ${{ inputs.mode }}
+      BUILDER_MODELS: ${{ inputs.models }}
+      BUILDER_REPOS: ${{ inputs.repos }}
+
+    steps:
+      # The Ally Builder GitHub App, over every repo it is installed on, for
+      # cloning the target repos. The token lasts an hour, which only the
+      # clone needs.
+      - name: Builder app token
+        id: app
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.BUILDER_APP_ID }}
+          private-key: ${{ secrets.BUILDER_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+
+      # Through GITHUB_ENV, not job env: job env cannot read a step's output.
+      - name: Export the Builder token
+        env:
+          TOKEN: ${{ steps.app.outputs.token }}
+        run: |
+          echo "::add-mask::${TOKEN}"
+          { echo "BUILDER_GH_TOKEN=${TOKEN}"; echo "GH_TOKEN=${TOKEN}"; } >> "$GITHUB_ENV"
+
+      - name: Check out the protocol (ally-be)
+        uses: actions/checkout@v4
+        with:
+          path: protocol
+          token: ${{ steps.app.outputs.token }}
+
+      # Moved out of the workspace, because the agent must not be able to see
+      # it. This is a COMPLETE second copy of ally-be, with paths identical to
+      # `repos/ally-be` — `src/builder/service/builder-metrics.service.ts`
+      # exists in both. An agent looking for a file by path finds two, and one
+      # of them is a decoy: a design that cites `protocol/` paths describes a
+      # checkout nothing builds from. (A build run once edited, tested and
+      # reported success entirely inside `protocol/`.)
+      #
+      # Warning the agent about it in the prompt would be one more instruction
+      # to follow correctly. `$RUNNER_TEMP` is outside `$GITHUB_WORKSPACE`, so
+      # the agent's file tools cannot reach it at all. `actions/checkout`
+      # refuses a path outside the workspace, hence checking out first and
+      # moving after.
+      - name: Put the protocol out of the agent's reach
+        run: |
+          set -euo pipefail
+          rm -rf "${RUNNER_TEMP}/protocol"
+          mv protocol "${RUNNER_TEMP}/protocol"
+          echo "PROTOCOL=${RUNNER_TEMP}/protocol" >> "$GITHUB_ENV"
+
+      - name: Clone target repos
+        run: |
+          set -euo pipefail
+          mkdir -p repos
+          for repo in $(echo "$BUILDER_REPOS" | jq -r '.[]'); do
+            echo "::group::clone $repo"
+            # Blobless: history for `git log`/`blame` while reading, but file
+            # contents fetched on demand. A full clone of ally-web is minutes
+            # of runner time for blobs nothing reads.
+            git clone --filter=blob:none \
+              "https://x-access-token:${BUILDER_GH_TOKEN}@github.com/${GITHUB_REPOSITORY_OWNER}/${repo}.git" \
+              "repos/${repo}"
+            echo "::endgroup::"
+          done
+
+      # forward-events.mjs, builder-mcp.mjs and the engine itself.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install the engine
+        run: $PROTOCOL/ally-be/scripts/builder/install-engine.sh
+
+      - name: Fetch the design prompt
+        run: |
+          set -euo pipefail
+          curl -fsS \
+            "${ALLY_BE_API_URL}/api/v1/builder/pipeline/runs/${BUILDER_RUN_ID}/prompt" \
+            -H "x-api-key: ${ALLY_BE_API_KEY}" \
+            -o /tmp/build-prompt.txt
+          wc -c /tmp/build-prompt.txt
+
+      # DESIGN → DESIGN REVIEW, both read-only. See run-engine.sh.
+      - name: Draft the design
+        run: $PROTOCOL/ally-be/scripts/builder/run-engine.sh /tmp/build-prompt.txt
+
+      # `if: always()` so a run that failed still reports what it spent, and
+      # the session budget knows.
+      - name: Report cost
+        if: always()
+        run: $PROTOCOL/ally-be/scripts/builder/report-cost.sh
+
+      # A green job is not a finished run: this fails the job when the run is
+      # still unsettled after the engine exited, and says why.
+      - name: Fail if the run ended without reporting an outcome
+        if: always()
+        run: $PROTOCOL/ally-be/scripts/builder/outcome-gate.sh
+
+      # The runner-level net. Covers what the engine itself cannot report:
+      # the runner dying, a bad clone, a wrong API key.
+      - name: Report failure
+        if: failure()
+        run: |
+          if [ -f /tmp/builder-already-reported ]; then
+            echo "The outcome gate already reported precisely why this run failed."
+            exit 0
+          fi
+          curl -sS -X POST \
+            "${ALLY_BE_API_URL}/api/v1/builder/pipeline/runs/${BUILDER_RUN_ID}/complete" \
+            -H "x-api-key: ${ALLY_BE_API_KEY}" \
+            -H 'Content-Type: application/json' \
+            -d '{"outcome":"failed","error":"The build runner failed. See the workflow log."}' \
+            || true
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: builder-evidence-${{ inputs.run_id }}
+          path: /tmp/builder-results/*.json
+          if-no-files-found: ignore
+          retention-days: 14
