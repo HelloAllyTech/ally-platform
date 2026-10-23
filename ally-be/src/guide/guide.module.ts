@@ -47,6 +47,10 @@ import { GuideSettingsService } from './settings/guide-settings.service';
 import { GuideVisitorService } from './visitor/guide-visitor.service';
 import { GuideBaselineService } from './measure/guide-baseline.service';
 import { GuideAlertService } from './measure/guide-alert.service';
+import { GuideOutreachService } from './outreach/guide-outreach.service';
+import { GuideOutreach } from './entity/guide-outreach.entity';
+import { AwsModule } from 'src/aws/aws.module';
+import { NotificationModule } from 'src/notification/notification.module';
 import { GuideAlert } from './entity/guide-alert.entity';
 import { GuidePlaygroundService } from './admin/guide-playground.service';
 import { GuideBaselineSnapshot } from './entity/guide-baseline-snapshot.entity';
@@ -60,6 +64,7 @@ import { GuideBaselineSnapshot } from './entity/guide-baseline-snapshot.entity';
 @Module({
   imports: [
     TypeOrmModule.forFeature([
+      GuideOutreach,
       GuideAlert,
       GuideBaselineSnapshot,
       GuideVisitor,
@@ -84,6 +89,8 @@ import { GuideBaselineSnapshot } from './entity/guide-baseline-snapshot.entity';
     LlmUsageModule,
     TrackModule,
     LiveKitModule,
+    AwsModule,
+    NotificationModule,
   ],
   controllers: [
     GuideLearnerController,
@@ -92,6 +99,7 @@ import { GuideBaselineSnapshot } from './entity/guide-baseline-snapshot.entity';
     GuideVoiceController,
   ],
   providers: [
+    GuideOutreachService,
     GuideAlertService,
     GuideBaselineService,
     GuidePlaygroundService,

@@ -29,6 +29,7 @@ import { GuideAdminService } from '../admin/guide-admin.service';
 import { GuideBaselineService } from '../measure/guide-baseline.service';
 import { GuidePlaygroundService } from '../admin/guide-playground.service';
 import { GuideAlertService } from '../measure/guide-alert.service';
+import { GuideOutreachService } from '../outreach/guide-outreach.service';
 import { GuideMode } from '../enum/guide.enum';
 import {
   GuideBaselineCaptureDto,
@@ -65,6 +66,7 @@ export class GuideAdminController {
     private readonly baseline: GuideBaselineService,
     private readonly playgroundService: GuidePlaygroundService,
     private readonly alerts: GuideAlertService,
+    private readonly outreach: GuideOutreachService,
   ) {}
 
   @Get('overview')
@@ -326,6 +328,18 @@ export class GuideAdminController {
     @CurrentUser() user: TokenUser,
   ) {
     return this.alerts.acknowledge(alertId, user.id);
+  }
+
+  @Post('outreach/run')
+  @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE, EDIT)
+  @ApiOperation({
+    summary:
+      'Run outreach now: due appointments, then idle nudges (they also run every 5 min / hourly)',
+  })
+  async runOutreach() {
+    const appointments = await this.outreach.runAppointments();
+    const idle = await this.outreach.runIdle();
+    return { appointments, idle };
   }
 
   @Post('baseline')

@@ -1,4 +1,9 @@
 import {
+  OUTREACH_PROMPT_CODE,
+  OUTREACH_PROMPT_VERSION,
+  OUTREACH_SYSTEM_PROMPT,
+} from '../prompts/outreach.prompt';
+import {
   ORCHESTRATOR_PROMPT_CODE,
   ORCHESTRATOR_PROMPT_VERSION,
   ORCHESTRATOR_SYSTEM_PROMPT,
@@ -221,6 +226,11 @@ export const GUIDE_DEFAULT_BUNDLE: GuideReleaseBundle = {
       code: TUTOR_PROMPT_CODE,
       version: TUTOR_PROMPT_VERSION,
       text: TUTOR_SYSTEM_PROMPT,
+    },
+    outreach_writer: {
+      code: OUTREACH_PROMPT_CODE,
+      version: OUTREACH_PROMPT_VERSION,
+      text: OUTREACH_SYSTEM_PROMPT,
     },
   },
   modelRouting: {

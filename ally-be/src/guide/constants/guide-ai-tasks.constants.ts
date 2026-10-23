@@ -8,4 +8,5 @@ export const GUIDE_AI_TASKS = {
   ORCHESTRATOR: 'guide-orchestrator',
   SENTINEL: 'guide-sentinel',
   TUTOR: 'guide-tutor',
+  OUTREACH: 'guide-outreach',
 } as const;

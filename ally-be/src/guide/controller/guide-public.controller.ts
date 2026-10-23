@@ -25,6 +25,7 @@ import { GuideEventBusService } from '../runtime/guide-event-bus.service';
 import { pipeThreadEvents, resumeSeq } from '../runtime/guide-sse';
 import { GuideTurnService } from '../runtime/guide-turn.service';
 import { GuideViewService } from '../runtime/guide-view.service';
+import { GuideOutreachService } from '../outreach/guide-outreach.service';
 import {
   GUIDE_VISITOR_HEADER,
   GuideVisitorService,
@@ -52,6 +53,7 @@ export class GuidePublicController {
     private readonly turns: GuideTurnService,
     private readonly bus: GuideEventBusService,
     private readonly cards: GuideCardService,
+    private readonly outreach: GuideOutreachService,
   ) {}
 
   @Get('availability/:trackId')
@@ -62,6 +64,29 @@ export class GuidePublicController {
   })
   availability(@Param('trackId', ParseUUIDPipe) trackId: string) {
     return this.view.availability(trackId);
+  }
+
+  @Get('outreach/unsubscribe')
+  @Public()
+  @ApiOperation({
+    summary:
+      "Stop Ally's reminder emails from the signed link in one (plan §11 I-2)",
+  })
+  async unsubscribe(
+    @Query('u') u: string,
+    @Query('t') t: string,
+    @Query('s') s: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    const done = await this.outreach.unsubscribe({ u, t, s });
+    res
+      .status(done ? 200 : 400)
+      .type('text/plain')
+      .send(
+        done
+          ? "Done. Ally won't send you reminders any more. You can turn them back on in Ally's settings."
+          : 'This link is not valid. You can turn reminders off in Ally’s settings.',
+      );
   }
 
   @Post('visitors')

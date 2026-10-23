@@ -319,6 +319,7 @@ export enum LlmTask {
   GUIDE_ORCHESTRATOR = 'guide_orchestrator',
   GUIDE_SENTINEL = 'guide_sentinel',
   GUIDE_TUTOR = 'guide_tutor',
+  GUIDE_OUTREACH = 'guide_outreach',
   // The guide's voice worker (ally-ai-learn app/guide_worker.py).
   GUIDE_VOICE_STT = 'guide_voice_stt',
   GUIDE_VOICE_TTS = 'guide_voice_tts',

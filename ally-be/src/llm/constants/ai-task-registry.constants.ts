@@ -2326,6 +2326,24 @@ const GUIDE_TASKS: AiTaskEntry[] = [
     configuredBy: 'ally_guide release modelRouting.tutor',
   },
   {
+    id: 'guide-outreach',
+    task: LlmTask.GUIDE_OUTREACH,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      "At the time a learner chose in Ally's closing ritual, or once per idle stretch (4–21 days away, at most weekly)",
+    detail:
+      "Writes Ally's one reminder (title ≤50 characters, body ≤220) from course facts only — " +
+      'progress, the last item finished, the next step and its minutes — never the ' +
+      'conversation or anything the learner shared, since it may be emailed. Low effort. ' +
+      'The text is linted for loss, guilt, urgency and neediness words; on a failed lint or ' +
+      'call a fixed template is sent instead. Skipped after a crisis (30 days) or CARE (14), ' +
+      'for visitors, finished courses, opted-out learners and organisations with outreach off.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'anthropic',
+    defaultModel: 'claude-opus-5-5',
+    configuredBy: 'ally_guide release modelRouting.outreach_writer',
+  },
+  {
     id: 'guide-voice-stt',
     task: LlmTask.GUIDE_VOICE_STT,
     runtime: LlmRuntime.AI_LEARN,
