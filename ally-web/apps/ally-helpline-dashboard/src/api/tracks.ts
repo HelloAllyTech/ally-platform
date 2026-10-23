@@ -184,12 +184,26 @@ const tracksAPI = baseAPI.injectEndpoints({
      * `languageCode` seeds the enrollment's course language (the language every
      * lesson is served and marked in), when the course is published in it.
      */
-    enrollTrack: builder.mutation<EnrollTrackResponse, { trackId: string; languageCode?: string }>({
-      query: ({ trackId, languageCode }) => ({
-        url: ApiEndpoints.TRACKS.ENROLL(trackId),
-        method: HttpMethod.POST,
-        body: languageCode ? { languageCode } : undefined,
-      }),
+    /**
+     * `entrySource` says how the learner reached the course: `public_link` from
+     * the public course landing. Measurement only; the server reads anything
+     * else (or nothing) as `in_app`.
+     */
+    enrollTrack: builder.mutation<
+      EnrollTrackResponse,
+      { trackId: string; languageCode?: string; entrySource?: "public_link" }
+    >({
+      query: ({ trackId, languageCode, entrySource }) => {
+        const body = {
+          ...(languageCode ? { languageCode } : {}),
+          ...(entrySource ? { entrySource } : {}),
+        };
+        return {
+          url: ApiEndpoints.TRACKS.ENROLL(trackId),
+          method: HttpMethod.POST,
+          body: Object.keys(body).length ? body : undefined,
+        };
+      },
       invalidatesTags: ALL_TRACK_TAGS,
     }),
 
