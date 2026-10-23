@@ -12,6 +12,9 @@
 # - Specify the version tag in format: be-v{major}.{minor}.{patch} (e.g., v1.0.0, v1.2.3, v2.0.0)
 # - The workflow will create the tag and release draft automatically
 
+# Touched on 2026-10-23 so GitHub registers this workflow in ally-platform: the files
+# imported with the monorepo were never pushed on their own, and a workflow_dispatch-only
+# workflow is not listed (nor dispatchable) until one is.
 name: Production Release - Ally Backend
 defaults:
   run:
