@@ -34,6 +34,7 @@ export const GUIDE_TOOL_NAMES = {
   RECORD_NOTICING: 'record_noticing',
   CLOSE_SESSION: 'close_session',
   SUGGEST_SIGN_IN: 'suggest_sign_in',
+  PRESENT_MICRO_ACTIVITY: 'present_micro_activity',
 } as const;
 
 export const GUIDE_TOOLS: AgentToolDefinition[] = [
@@ -213,6 +214,42 @@ export const GUIDE_TOOLS: AgentToolDefinition[] = [
         teaser: { type: 'string' },
       },
       required: ['noticing', 'watch_for', 'teaser'],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    name: GUIDE_TOOL_NAMES.PRESENT_MICRO_ACTIVITY,
+    description:
+      'Offer a short, ungraded practice as a card: it earns nothing, never counts toward the course, and the learner can skip it. Use it when the situation report says a side quest slot is open (reason "slot", with the kind it suggests unless another fits better), or when the learner asks to practise (reason "learner_asked"). Kinds: quick_check (1–2 questions on what they read), micro_dilemma (what would you say here?), rehearse_line (write your opening line before a practice call), teach_back (explain an idea to Ally), predict_beat (what happens next?), reflection (one question about their own response), spaced_recall (3 questions from earlier chapters). ' +
+      'Example: {"kind":"rehearse_line","focus_item_id":null,"reason":"slot","framing":"Before the call: how would you open with Meera?"}',
+    input_schema: {
+      type: 'object',
+      properties: {
+        kind: {
+          type: 'string',
+          enum: [
+            'quick_check',
+            'micro_dilemma',
+            'rehearse_line',
+            'teach_back',
+            'predict_beat',
+            'reflection',
+            'spaced_recall',
+          ],
+        },
+        focus_item_id: {
+          type: ['string', 'null'],
+          description:
+            'An item the learner has reached to practise on, or null to let the course decide.',
+        },
+        reason: { type: 'string', enum: ['slot', 'learner_asked'] },
+        framing: {
+          type: 'string',
+          description: 'One line, in your voice, on why this practice now.',
+        },
+      },
+      required: ['kind', 'focus_item_id', 'reason', 'framing'],
       additionalProperties: false,
     },
     strict: true,

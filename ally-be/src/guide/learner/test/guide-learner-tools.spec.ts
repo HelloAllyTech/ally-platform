@@ -270,6 +270,7 @@ describe('learner tools', () => {
       {} as never,
       { consult: jest.fn() } as never,
       learnerData as never,
+      {} as never,
     );
     const emitted: string[] = [];
     const ctx: any = {

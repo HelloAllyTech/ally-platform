@@ -9,4 +9,6 @@ export const GUIDE_AI_TASKS = {
   SENTINEL: 'guide-sentinel',
   TUTOR: 'guide-tutor',
   OUTREACH: 'guide-outreach',
+  ASSESSOR: 'guide-assessor',
+  COACH: 'guide-coach',
 } as const;

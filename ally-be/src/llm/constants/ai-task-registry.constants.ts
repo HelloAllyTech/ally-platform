@@ -2344,6 +2344,41 @@ const GUIDE_TASKS: AiTaskEntry[] = [
     configuredBy: 'ally_guide release modelRouting.outreach_writer',
   },
   {
+    id: 'guide-assessor',
+    task: LlmTask.GUIDE_ASSESSOR,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      'Ally offers a side quest with answers (quick check, story dilemma, spaced recall, predict the beat)',
+    detail:
+      'The Assessor specialist: one structured call writes 1–3 three-option questions from ' +
+      'the learner-safe text of items the learner has reached, at a hidden difficulty ' +
+      '(gentle / standard / stretch from their side-quest record, or stretch when they ask ' +
+      'for more challenge). It is shown the course quiz prompts only to avoid them; any ' +
+      'question sharing 60% of a graded prompt’s words is dropped. The key stays on the ' +
+      'server and answers are marked without a model. Ungraded: no XP, never gates.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'anthropic',
+    defaultModel: 'claude-opus-5-5',
+    configuredBy: 'ally_guide release modelRouting.assessor',
+  },
+  {
+    id: 'guide-coach',
+    task: LlmTask.GUIDE_COACH,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      'Ally offers an open side quest (rehearse a line, teach back, reflection), and again when the learner answers it',
+    detail:
+      'The Coach specialist: one structured call writes the practice prompt around the item ' +
+      'it is about (the practice conversation ahead, or what was just done); a second gives ' +
+      'one specific note on what the learner wrote — what it does, what it would lead to, ' +
+      'one thing to try. Never a score, never about a real client. Same budget tiers as the ' +
+      'orchestrator.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'anthropic',
+    defaultModel: 'claude-opus-5-5',
+    configuredBy: 'ally_guide release modelRouting.coach',
+  },
+  {
     id: 'guide-voice-stt',
     task: LlmTask.GUIDE_VOICE_STT,
     runtime: LlmRuntime.AI_LEARN,

@@ -46,6 +46,12 @@ export interface SituationInput {
   platformTurn?: boolean;
   /** The learner pressed Start or Continue: they asked for the next step. */
   continuePressed?: boolean;
+  /** The Conductor's side-quest slot (plan §4.6). */
+  sideQuest?: {
+    open: boolean;
+    suggested: string | null;
+    reason: string;
+  } | null;
   /** An anonymous visitor (plan §3 stages 1–2): messages left today. */
   visitor?: { remaining: number; limit: number } | null;
 }
@@ -200,6 +206,14 @@ export function renderSituationReport(input: SituationInput): string {
     lines.push(
       'They pressed Continue: present the next step now with present_course_item, ' +
         'then frame it in a sentence.',
+    );
+  }
+
+  if (input.sideQuest?.open && input.sideQuest.suggested) {
+    lines.push(
+      `side quest: a slot is open (${input.sideQuest.reason}) — you may offer one ` +
+        `with present_micro_activity, suggested kind ${input.sideQuest.suggested}. ` +
+        'Optional for the learner; skip it if the moment is wrong.',
     );
   }
 

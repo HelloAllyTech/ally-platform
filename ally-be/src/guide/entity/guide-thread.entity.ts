@@ -34,6 +34,13 @@ export interface GuideThreadPacing {
   possibleSelfOfferedAtTurn?: number | null;
   /** A visitor's last sign-in suggestion, by their turn count. */
   signInOfferedAtTurn?: number | null;
+  /** Side quests: when the last was offered, and how they have gone (plan §4.6). */
+  sideQuest?: {
+    atCompleted?: number;
+    atTurn?: number;
+    answered?: number;
+    correct?: number;
+  } | null;
 }
 
 /** What the current epoch's frozen context prefix was built from (plan §7.6). */

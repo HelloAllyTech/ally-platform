@@ -48,6 +48,9 @@ import { GuideVisitorService } from './visitor/guide-visitor.service';
 import { GuideBaselineService } from './measure/guide-baseline.service';
 import { GuideAlertService } from './measure/guide-alert.service';
 import { GuideOutreachService } from './outreach/guide-outreach.service';
+import { GuideAssessorService } from './capabilities/specialists/guide-assessor.service';
+import { GuideCoachService } from './capabilities/specialists/guide-coach.service';
+import { GuideSideQuestService } from './runtime/guide-side-quest.service';
 import { GuideOutreach } from './entity/guide-outreach.entity';
 import { AwsModule } from 'src/aws/aws.module';
 import { NotificationModule } from 'src/notification/notification.module';
@@ -99,6 +102,9 @@ import { GuideBaselineSnapshot } from './entity/guide-baseline-snapshot.entity';
     GuideVoiceController,
   ],
   providers: [
+    GuideAssessorService,
+    GuideCoachService,
+    GuideSideQuestService,
     GuideOutreachService,
     GuideAlertService,
     GuideBaselineService,

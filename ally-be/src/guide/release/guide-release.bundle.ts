@@ -1,4 +1,14 @@
 import {
+  ASSESSOR_PROMPT_CODE,
+  ASSESSOR_PROMPT_VERSION,
+  ASSESSOR_SYSTEM_PROMPT,
+} from '../prompts/assessor.prompt';
+import {
+  COACH_PROMPT_CODE,
+  COACH_PROMPT_VERSION,
+  COACH_SYSTEM_PROMPT,
+} from '../prompts/coach.prompt';
+import {
   OUTREACH_PROMPT_CODE,
   OUTREACH_PROMPT_VERSION,
   OUTREACH_SYSTEM_PROMPT,
@@ -231,6 +241,16 @@ export const GUIDE_DEFAULT_BUNDLE: GuideReleaseBundle = {
       code: OUTREACH_PROMPT_CODE,
       version: OUTREACH_PROMPT_VERSION,
       text: OUTREACH_SYSTEM_PROMPT,
+    },
+    assessor: {
+      code: ASSESSOR_PROMPT_CODE,
+      version: ASSESSOR_PROMPT_VERSION,
+      text: ASSESSOR_SYSTEM_PROMPT,
+    },
+    coach: {
+      code: COACH_PROMPT_CODE,
+      version: COACH_PROMPT_VERSION,
+      text: COACH_SYSTEM_PROMPT,
     },
   },
   modelRouting: {

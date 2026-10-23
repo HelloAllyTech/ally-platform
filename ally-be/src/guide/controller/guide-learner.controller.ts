@@ -30,6 +30,7 @@ import {
   GuideVoiceSessionDto,
   GuideAppointmentDto,
   GuideCardEventDto,
+  GuideMicroActivityResponseDto,
   GuidePrefsUpdateDto,
   GuideTurnRequestDto,
 } from '../dto/guide.dto';
@@ -40,6 +41,13 @@ import { GuideVoiceService } from '../voice/guide-voice.service';
 import { GuideThreadOpened } from '../contract/generated/guide-contract';
 import { GuideThread } from '../entity/guide-thread.entity';
 import { TrackEntrySource } from '../enum/guide.enum';
+import { GuideSideQuestService } from '../runtime/guide-side-quest.service';
+import { AgentReleaseService } from 'src/llm-agent/harness/release/agent-release.service';
+import {
+  ALLY_GUIDE_AGENT_KEY,
+  GuideReleaseBundle,
+} from '../release/guide-release.bundle';
+import { guideDisabled } from '../guide-errors';
 import {
   GUIDE_VISITOR_HEADER,
   GuideVisitorService,
@@ -72,6 +80,8 @@ export class GuideLearnerController {
     private readonly learnerData: GuideLearnerDataService,
     private readonly voice: GuideVoiceService,
     private readonly visitors: GuideVisitorService,
+    private readonly sideQuests: GuideSideQuestService,
+    private readonly releases: AgentReleaseService,
   ) {}
 
   @Post('threads/:threadId/voice-session')
@@ -345,6 +355,37 @@ export class GuideLearnerController {
   ) {
     const thread = await this.threads.getOwned(threadId, user);
     return this.turns.accept(thread, user, dto, { traceparent, tracestate });
+  }
+
+  @Post('threads/:threadId/micro-activities/:cardId/responses')
+  @AuthPermissions([PERMISSIONS.EDIT_TRACK])
+  @ApiOperation({
+    summary:
+      'Answer a side quest: marked against its key or given one Coach note. Ungraded — never affects progress or XP',
+  })
+  async answerMicroActivity(
+    @Param('threadId', ParseUUIDPipe) threadId: string,
+    @Param('cardId', ParseUUIDPipe) cardId: string,
+    @Body() dto: GuideMicroActivityResponseDto,
+    @CurrentUser() user: TokenUser,
+  ) {
+    const thread = await this.threads.getOwned(threadId, user);
+    const ga = await this.releases.getGa(ALLY_GUIDE_AGENT_KEY);
+    if (!ga) throw guideDisabled();
+    return this.sideQuests.respond({
+      thread,
+      cardId,
+      answers: dto.answers,
+      text: dto.text,
+      languageCode: thread.languageCode ?? 'en',
+      bundle: ga.bundle as unknown as GuideReleaseBundle,
+      attribution: {
+        threadId: thread.id,
+        userId: user.id,
+        tenantId: user.tenantId,
+        releaseId: ga.id,
+      },
+    });
   }
 
   @Get('threads/:threadId/messages')

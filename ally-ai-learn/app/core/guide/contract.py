@@ -525,6 +525,44 @@ class GuideThreadOpened(_GuideModel):
     claim: Optional[Literal["claimed", "merged", "none"]] = None
 
 
+class GuideMicroActivityQuestions(_GuideModel):
+    pass
+
+
+class GuideMicroActivity(_GuideModel):
+    """A side quest's content on its card (`card.payload.activity`, plan §4.6). Learner-safe: options carry no key and no feedback until answered."""
+
+    kind: Literal["quick_check", "micro_dilemma", "rehearse_line", "teach_back", "predict_beat", "reflection", "spaced_recall"]
+    intro: Optional[str] = None
+    questions: Optional[list[GuideMicroActivityQuestions]] = None
+    prompt: Optional[str] = None
+    placeholder: Optional[str] = None
+
+
+class GuideMicroActivityRequestAnswers(_GuideModel):
+    pass
+
+
+class GuideMicroActivityRequest(_GuideModel):
+    """POST threads/:id/micro-activities/:cardId/responses: `answers` for questions with options, `text` for a written answer."""
+
+    answers: Optional[list[GuideMicroActivityRequestAnswers]] = None
+    text: Optional[str] = None
+
+
+class GuideMicroActivityResultResults(_GuideModel):
+    pass
+
+
+class GuideMicroActivityResult(_GuideModel):
+    """The answer, marked (questions) or noted (written). Ungraded: it never affects progress or XP."""
+
+    card_id: str = Field(alias="cardId")
+    kind: str
+    results: Optional[list[GuideMicroActivityResultResults]] = None
+    note: Optional[str] = None
+
+
 class GuideThreadView(_GuideModel):
     id_: str = Field(alias="id")
     track_id: str = Field(alias="trackId")

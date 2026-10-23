@@ -56,6 +56,11 @@ import {
   SituationInput,
   renderSituationReport,
 } from '../conductor/situation-report';
+import {
+  SideQuestSlot,
+  planSideQuest,
+  sideQuestDifficulty,
+} from '../conductor/side-quests';
 import { GUIDE_AI_TASKS } from '../constants/guide-ai-tasks.constants';
 import {
   GuideAtmosphere,
@@ -272,6 +277,10 @@ export interface GuideTurnContext extends HarnessTurnContext {
   visitorIpHash?: string | null;
   /** Messages the visitor has left today, this message counted. */
   visitorAllowance?: { remaining: number; limit: number } | null;
+  /** Side quests: the learner's switch, their challenge setting, this turn's slot. */
+  sideQuestsOn?: boolean;
+  challenge?: 'normal' | 'more';
+  sideQuest?: SideQuestSlot | null;
   /** GA or canary: the release arm this turn's epoch was assigned (plan §7.4). */
   arm?: 'ga' | 'canary' | null;
   /** This turn moved CRISIS to CARE on "I'm safe right now". */
@@ -847,6 +856,8 @@ export class GuideTurnService {
     ctx.orgProfile = orgRow?.profile ?? null;
     ctx.guidance = prefsRow?.prefs?.guidance ?? 'walk';
     ctx.memoryEnabled = !visitor && prefsRow?.prefs?.memoryEnabled !== false;
+    ctx.sideQuestsOn = !visitor && prefsRow?.prefs?.sideQuests !== false;
+    ctx.challenge = prefsRow?.prefs?.challenge ?? 'normal';
 
     // The release this epoch is pinned to, if the epoch can continue.
     const snapshot = thread.epochSnapshot ?? null;
@@ -1102,6 +1113,29 @@ export class GuideTurnService {
       );
     }
 
+    // A side-quest slot (plan §4.6): never for visitors, never in a hard
+    // moment; a return after days away invites spaced recall.
+    const awayDays =
+      ctx.epoch?.isNew && ctx.epoch.snapshot.reason === 'return after a break'
+        ? (now.getTime() -
+            new Date(thread.lastLearnerActivityAt ?? now).getTime()) /
+          86_400_000
+        : null;
+    ctx.sideQuest = visitor
+      ? null
+      : planSideQuest({
+          spine,
+          pacing,
+          guidance: ctx.guidance,
+          sideQuestsOn: ctx.sideQuestsOn !== false,
+          mode: ctx.mode,
+          releaseWindowOpen: windowOpen,
+          quizOpen: openItem?.type === 'QUIZ' && openItem.state !== 'completed',
+          firstWin: ctx.firstWin,
+          policy,
+          returnedAfterDays: awayDays,
+        });
+
     // A card for the next step still in view from this sitting: say so, so
     // "continue" points at it instead of stacking a duplicate.
     const epochStartedAt = ctx.epoch?.snapshot?.startedAt ?? null;
@@ -1137,6 +1171,7 @@ export class GuideTurnService {
       platformTurn: Boolean(ctx.platformEvent) && !ctx.text.trim(),
       continuePressed: ctx.intent === 'start' || ctx.intent === 'continue',
       visitor: ctx.visitorAllowance ?? null,
+      sideQuest: ctx.sideQuest ?? null,
     };
     ctx.situation = renderSituationReport(ctx.situationInput);
     ctx.learnerMessage = buildLearnerMessage({
@@ -1566,6 +1601,9 @@ export class GuideTurnService {
       tier: ctx.tier,
       attribution: attributionOf(ctx),
       anonymous: Boolean(ctx.visitorId),
+      sideQuest: ctx.sideQuest ?? null,
+      sideQuestsOn: ctx.sideQuestsOn,
+      sideQuestDifficulty: sideQuestDifficulty(ctx.pacing, ctx.challenge),
       onCost: (usd) => {
         ctx.usd += usd;
       },

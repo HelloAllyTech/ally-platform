@@ -124,4 +124,66 @@ export class GuideCourseContentService {
     }
     return sources;
   }
+
+  /**
+   * Passages for practice (plan §4.6): only items the learner can already
+   * open, learner-safe text, the focus items first, within `budget`
+   * characters. A locked item is never practised.
+   */
+  async practiceSources(
+    trackId: string,
+    spine: CourseSpine,
+    languageCode: string,
+    focusItemIds: string[] = [],
+    budget = 12_000,
+  ): Promise<TutorSource[]> {
+    const all = await this.tutorSources(trackId, spine, languageCode);
+    const open = all.filter((source) => !source.type.includes('not reached'));
+    const focus = new Set(focusItemIds);
+    const ordered = [
+      ...open.filter((source) => focus.has(source.itemId)),
+      ...open.filter((source) => !focus.has(source.itemId)),
+    ];
+    const picked: TutorSource[] = [];
+    let used = 0;
+    for (const source of ordered) {
+      if (used + source.text.length > budget) continue;
+      used += source.text.length;
+      picked.push(source);
+    }
+    return picked;
+  }
+
+  /**
+   * Every quiz question's prompt in the course — for the Assessor to steer
+   * clear of, never to show (plan §6.4). Prompts only: no options or keys.
+   */
+  async quizPrompts(trackId: string): Promise<string[]> {
+    const structure = await this.shared.getTrackWithStructure(trackId);
+    const prompts: string[] = [];
+    for (const section of structure.sections) {
+      for (const item of section.items) {
+        if (item.type !== TrackItemType.QUIZ) continue;
+        const questions = ((item.content as any)?.questions ?? []) as Array<{
+          prompt?: string;
+        }>;
+        for (const question of questions) {
+          const prompt = plainText(String(question?.prompt ?? '')).trim();
+          if (prompt) prompts.push(prompt.slice(0, 300));
+        }
+      }
+    }
+    return prompts;
+  }
+
+  /** One reached item's learner-safe text, for the Coach's focus. */
+  async focusText(
+    trackId: string,
+    spine: CourseSpine,
+    languageCode: string,
+    itemId: string,
+  ): Promise<string> {
+    const sources = await this.tutorSources(trackId, spine, languageCode);
+    return sources.find((source) => source.itemId === itemId)?.text ?? '';
+  }
 }

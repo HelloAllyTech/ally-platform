@@ -1457,6 +1457,124 @@
         }
       }
     },
+    "GuideMicroActivity": {
+      "description": "A side quest's content on its card (`card.payload.activity`, plan §4.6). Learner-safe: options carry no key and no feedback until answered.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["quick_check", "micro_dilemma", "rehearse_line", "teach_back", "predict_beat", "reflection", "spaced_recall"]
+        },
+        "intro": {
+          "type": "string"
+        },
+        "questions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "prompt", "options"],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "prompt": {
+                "type": "string"
+              },
+              "options": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["id", "text"],
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "text": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "prompt": {
+          "type": "string"
+        },
+        "placeholder": {
+          "type": "string"
+        }
+      }
+    },
+    "GuideMicroActivityRequest": {
+      "description": "POST threads/:id/micro-activities/:cardId/responses: `answers` for questions with options, `text` for a written answer.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "answers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["questionId", "optionId"],
+            "properties": {
+              "questionId": {
+                "type": "string"
+              },
+              "optionId": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "text": {
+          "type": "string"
+        }
+      }
+    },
+    "GuideMicroActivityResult": {
+      "description": "The answer, marked (questions) or noted (written). Ungraded: it never affects progress or XP.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cardId", "kind"],
+      "properties": {
+        "cardId": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "results": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["questionId", "correct", "correctOptionId", "feedback"],
+            "properties": {
+              "questionId": {
+                "type": "string"
+              },
+              "correct": {
+                "type": "boolean"
+              },
+              "correctOptionId": {
+                "type": "string"
+              },
+              "feedback": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "note": {
+          "type": ["string", "null"]
+        }
+      }
+    },
     "GuideThreadView": {
       "type": "object",
       "additionalProperties": false,

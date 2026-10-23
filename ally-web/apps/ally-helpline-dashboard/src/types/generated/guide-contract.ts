@@ -502,6 +502,44 @@ export interface GuideThreadOpened {
   claim?: 'claimed' | 'merged' | 'none';
 }
 
+/** A side quest's content on its card (`card.payload.activity`, plan §4.6). Learner-safe: options carry no key and no feedback until answered. */
+export interface GuideMicroActivity {
+  kind: 'quick_check' | 'micro_dilemma' | 'rehearse_line' | 'teach_back' | 'predict_beat' | 'reflection' | 'spaced_recall';
+  intro?: string;
+  questions?: Array<{
+    id: string;
+    prompt: string;
+    options: Array<{
+      id: string;
+      text: string;
+    }>;
+  }>;
+  prompt?: string;
+  placeholder?: string;
+}
+
+/** POST threads/:id/micro-activities/:cardId/responses: `answers` for questions with options, `text` for a written answer. */
+export interface GuideMicroActivityRequest {
+  answers?: Array<{
+    questionId: string;
+    optionId: string;
+  }>;
+  text?: string;
+}
+
+/** The answer, marked (questions) or noted (written). Ungraded: it never affects progress or XP. */
+export interface GuideMicroActivityResult {
+  cardId: string;
+  kind: string;
+  results?: Array<{
+    questionId: string;
+    correct: boolean;
+    correctOptionId: string;
+    feedback: string;
+  }>;
+  note?: string | null;
+}
+
 export interface GuideThreadView {
   id: string;
   trackId: string;

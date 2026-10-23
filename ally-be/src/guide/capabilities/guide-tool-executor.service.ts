@@ -13,6 +13,12 @@ import { LIVE_ITEM_CARD_SQL } from '../runtime/guide-thread.service';
 import { SentinelOverlay } from '../safety/sentinel';
 import { GuideTutorService } from './specialists/guide-tutor.service';
 import { SteerDecision, afterReflection } from '../conductor/pacing';
+import {
+  SIDE_QUEST_KINDS,
+  SideQuestKind,
+  SideQuestSlot,
+} from '../conductor/side-quests';
+import { GuideSideQuestService } from '../runtime/guide-side-quest.service';
 import { GuideCard as GuideCardEvent } from '../contract/generated/guide-contract';
 import { itemTypeLabel } from '../context/guide-context';
 import { GuideCard } from '../entity/guide-card.entity';
@@ -69,6 +75,11 @@ export interface GuideToolContext {
   epochNumber: number;
   /** An anonymous visitor's turn: only the visitor tools may run. */
   anonymous?: boolean;
+  /** The Conductor's side-quest slot this turn (plan §4.6). */
+  sideQuest?: SideQuestSlot | null;
+  sideQuestDifficulty?: 'gentle' | 'standard' | 'stretch';
+  /** The learner switched side quests off (they can still ask for one). */
+  sideQuestsOn?: boolean;
   /** The platform started this turn (a completion, a grade): the learner said nothing new. */
   platformTurn?: boolean;
   /** When the current epoch began (ISO): cards from before it have scrolled away. */
@@ -217,6 +228,7 @@ export class GuideToolExecutorService {
     private readonly prefs: Repository<GuideLearnerPrefs>,
     private readonly tutor: GuideTutorService,
     private readonly learnerData: GuideLearnerDataService,
+    private readonly sideQuests: GuideSideQuestService,
   ) {}
 
   async execute(
@@ -236,6 +248,8 @@ export class GuideToolExecutorService {
       switch (name) {
         case GUIDE_TOOL_NAMES.SUGGEST_SIGN_IN:
           return await this.suggestSignIn(input, ctx);
+        case GUIDE_TOOL_NAMES.PRESENT_MICRO_ACTIVITY:
+          return await this.presentMicroActivity(input, ctx);
         case GUIDE_TOOL_NAMES.PRESENT_COURSE_ITEM:
           return await this.presentCourseItem(input, ctx);
         case GUIDE_TOOL_NAMES.SHOW_COURSE_INFO:
@@ -419,6 +433,78 @@ export class GuideToolExecutorService {
     return ok({
       shown: true,
       next: 'The card is on screen. Say in a sentence what signing in lets them do; do not repeat its text.',
+    });
+  }
+
+  /**
+   * A side quest (plan §4.6): only in an open slot or when the learner asked,
+   * never in a hard moment, one a turn, on an item they have reached.
+   */
+  private async presentMicroActivity(
+    input: Record<string, any>,
+    ctx: GuideToolContext,
+  ): Promise<GuideToolResult> {
+    const kind = String(input.kind ?? '') as SideQuestKind;
+    if (!SIDE_QUEST_KINDS.includes(kind)) return fail('Unknown kind.');
+    if (QUIET_MODES.has(ctx.mode)) return fail('Not in this moment.');
+    const asked = input.reason === 'learner_asked';
+    if (!asked && !ctx.sideQuest?.open) {
+      return fail(
+        `No practice slot now (${ctx.sideQuest?.reason ?? 'not open'}). Offer one only if the learner asks.`,
+      );
+    }
+    if (!asked && ctx.sideQuestsOn === false) {
+      return fail('The learner switched practice off. Only if they ask.');
+    }
+    if (
+      ctx.presented.some((card) => card.kind === GuideCardKind.MICRO_ACTIVITY)
+    ) {
+      return fail('One practice per turn.');
+    }
+    const focusId = input.focus_item_id ? String(input.focus_item_id) : null;
+    if (focusId) {
+      const focus = ctx.spine.items.find((item) => item.id === focusId);
+      if (!focus) return fail('No such item in this course.');
+      if (focus.state === 'locked' && kind !== 'rehearse_line') {
+        return fail(
+          'That item is not reached yet; practise on one they have done.',
+        );
+      }
+    }
+    const card = await this.sideQuests.present({
+      threadId: ctx.threadId,
+      tenantId: ctx.tenantId || null,
+      trackId: ctx.trackId,
+      kind,
+      focusItemId: focusId,
+      framing: String(input.framing ?? '').slice(0, 160) || null,
+      spine: ctx.spine,
+      languageCode: ctx.language,
+      difficulty: ctx.sideQuestDifficulty ?? 'standard',
+      bundle: ctx.bundle,
+      tier: ctx.tier,
+      attribution: ctx.attribution,
+      onCost: ctx.onCost,
+      emitDurable: ctx.emitDurable,
+    });
+    if (!card) {
+      return fail(
+        'Could not make that practice from what they have reached. Carry on without it.',
+      );
+    }
+    ctx.presented.push(card);
+    ctx.pacing = {
+      ...ctx.pacing,
+      sideQuest: {
+        ...(ctx.pacing.sideQuest ?? {}),
+        atCompleted: ctx.spine.completed,
+        atTurn: ctx.pacing.learnerTurns ?? 0,
+      },
+    };
+    return ok({
+      presented: true,
+      card: `practice "${card.title}"`,
+      next: 'The card is on screen. Frame it in a sentence as optional; do not reveal answers.',
     });
   }
 

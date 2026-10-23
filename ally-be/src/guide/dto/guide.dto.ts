@@ -338,3 +338,29 @@ export class GuidePlaygroundRunDto {
   @IsIn(['start', 'continue', 'locked_peek', 'not_now', 'safe_now'])
   intent?: 'start' | 'continue' | 'locked_peek' | 'not_now' | 'safe_now';
 }
+
+class GuideMicroActivityAnswerDto {
+  @IsString()
+  @MaxLength(16)
+  questionId!: string;
+
+  @IsString()
+  @MaxLength(16)
+  optionId!: string;
+}
+
+/** POST /v1/guide/threads/:id/micro-activities/:cardId/responses (plan §9.1). */
+export class GuideMicroActivityResponseDto {
+  @ApiPropertyOptional({ description: 'For questions with options' })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => GuideMicroActivityAnswerDto)
+  answers?: GuideMicroActivityAnswerDto[];
+
+  @ApiPropertyOptional({ description: 'For a written answer' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  text?: string;
+}
