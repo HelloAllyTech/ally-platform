@@ -125,6 +125,12 @@ export interface BuilderEvalGates {
   unrepairedEditFailures: number;
   /** Turns whose prose claims a PRD change while no edit succeeded. */
   falseUpdateClaims: number;
+  /**
+   * Replies that told the admin the PRD was ready, or to start the build,
+   * while the turn ended not ready — and reached them as said, without the
+   * server's note of what is left. Absent on runs scored before it existed.
+   */
+  falseReadyClaims?: number;
   /** The final PRD's cross-section checks (test plan, requirement homes, mobile). */
   consistent: boolean;
   /** What already exists rests on files the replay actually read. */
@@ -155,8 +161,17 @@ export interface BuilderEvalMetrics {
   /** Which checklist items each correction was about. */
   correctedItems: string[];
   readyReached: boolean;
-  /** The readiness score of the final PRD. */
+  /**
+   * The readiness score of the final PRD: the share of its "is this written"
+   * rows that pass. 100 is not ready — open questions, assumptions, review
+   * findings and the cross-section checks only ever block, so they are in
+   * `blockersAtEnd`, not here.
+   */
   readinessScore: number;
+  /** Readiness of the final PRD; absent on runs from before it was recorded. */
+  readyAtEnd?: boolean;
+  /** The readiness rows the final PRD failed, by key and label. */
+  blockersAtEnd?: { key: string; label: string }[];
   toolCalls: number;
   toolFailures: number;
   /** Estimated from token counts and the pricing table. */
@@ -196,6 +211,10 @@ export interface BuilderEvalTurnRecord {
   /** The situation brief this turn showed, one line each: `X1 exists: …`. */
   brief?: string[];
   toolCalls: { name: string; ok: boolean; summary?: string }[];
+  /** Readiness as the turn settled it; absent when the turn never got there. */
+  ready?: boolean;
+  /** The reply claimed ready while it was not, and the server said what is left. */
+  readyClaimCorrected?: boolean;
 }
 
 export type BuilderEvalRunStatus =

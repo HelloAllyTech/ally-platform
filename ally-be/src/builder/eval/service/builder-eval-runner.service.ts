@@ -313,9 +313,13 @@ export class BuilderEvalRunnerService {
     let briefLines: number | null = null;
     let briefBeforeFirstQuestion = false;
     let briefCorrections = 0;
+    // What each turn's readiness settled on, by its reply: "it's ready" is
+    // only false against the readiness of the turn that said it.
+    const readyAfter = new Map<string, boolean>();
 
     while (turns < maxTurns) {
       turns += 1;
+      let turnReady: boolean | null = null;
       for await (const frame of sandbox.orchestrator.streamTurn(
         sessionId,
         message,
@@ -324,7 +328,7 @@ export class BuilderEvalRunnerService {
         // The interview reports a failed turn as a frame and settles the row;
         // the transcript records it, and the next admin message carries on,
         // the way a person would retry.
-        void frame;
+        if (frame.event === 'readiness') turnReady = frame.data?.ready === true;
       }
       messages =
         await sandbox.stores.messageRepository.listBySession(sessionId);
@@ -340,8 +344,16 @@ export class BuilderEvalRunnerService {
       questionsSoFar += Array.isArray(reply?.metadata?.questions)
         ? reply!.metadata!.questions.length
         : 0;
+      if (reply && turnReady !== null) readyAfter.set(reply.id, turnReady);
       transcript.push(
-        this.turnRecord(turns, adminSaid, adminCorrected, reply, question),
+        this.turnRecord(
+          turns,
+          adminSaid,
+          adminCorrected,
+          reply,
+          question,
+          turnReady,
+        ),
       );
 
       if (sandbox.session.status === BuilderSessionStatus.PRD_READY) break;
@@ -376,7 +388,12 @@ export class BuilderEvalRunnerService {
     const readiness: BuilderPrdReadiness = doc
       ? await sandbox.readiness.assess(sessionId, doc)
       : { score: 0, ready: false, sections: [], blockers: [] };
-    const gates = computeEvalGates(sandbox.passes, messages, readiness);
+    const gates = computeEvalGates(
+      sandbox.passes,
+      messages,
+      readiness,
+      readyAfter,
+    );
     const judge = await this.judge(sandbox, payload.checklist ?? [], draft);
 
     // A turn-ending call the validated loop sent back is neither a question
@@ -406,6 +423,13 @@ export class BuilderEvalRunnerService {
       correctedItems: [...correctedItems],
       readyReached: sandbox.session.status === BuilderSessionStatus.PRD_READY,
       readinessScore: readiness.score,
+      // Beside the score, because the score alone reads 100 on a PRD that
+      // review findings or the admin's unapplied words still hold back — 9
+      // of suite 5d24dd95's 14 not-ready runs looked like that.
+      readyAtEnd: readiness.ready,
+      blockersAtEnd: readiness.sections
+        .filter((section) => !section.ok)
+        .map((section) => ({ key: section.key, label: section.label })),
       toolCalls: toolResults.length,
       toolFailures: toolResults.filter((result) => result?.result?.ok === false)
         .length,
@@ -662,6 +686,7 @@ export class BuilderEvalRunnerService {
     correction: boolean,
     reply: BuilderMessage | undefined,
     question: Record<string, any> | null,
+    ready: boolean | null = null,
   ): BuilderEvalTurnRecord {
     const results = new Map<string, Record<string, any>>(
       (reply?.toolResults ?? []).map((result) => [
@@ -699,6 +724,10 @@ export class BuilderEvalRunnerService {
             : {}),
         };
       }),
+      ...(ready !== null ? { ready } : {}),
+      ...(reply?.metadata?.readyClaimCorrected
+        ? { readyClaimCorrected: true }
+        : {}),
     };
   }
 }

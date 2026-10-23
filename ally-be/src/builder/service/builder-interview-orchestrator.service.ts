@@ -23,6 +23,7 @@ import { LlmUsageService } from 'src/analytics/service/llm-usage.service';
 import { LlmTask } from 'src/learn/enum/llm-task.enum';
 import { LlmCompletionService } from 'src/llm-agent/service/llm-completion.service';
 import { BuilderMessage } from '../entity/builder-message.entity';
+import { BuilderPrdDoc } from '../entity/builder-prd-doc.entity';
 import { BuilderSession } from '../entity/builder-session.entity';
 import { BuilderMessageRepository } from '../repository/builder-message.repository';
 import { BuilderSessionRepository } from '../repository/builder-session.repository';
@@ -48,6 +49,7 @@ import { isAcknowledgement } from '../util/builder-readiness-checks.util';
 import {
   claimsPrdEdit,
   claimsPrdReady,
+  notReadyNote,
 } from '../util/builder-turn-claims.util';
 import {
   BUILDER_PRD_EDIT_TOOLS,
@@ -184,6 +186,9 @@ const BUILDER_NO_REPLY_ERROR =
  * waiting than a reply with a warning under it.
  */
 const BUILDER_MAX_TURN_REJECTIONS = 2;
+/** On the receipt of a reply that said ready while readiness said not. */
+const BUILDER_FALSE_READY_WARNING =
+  'Builder said the PRD is ready; the readiness check disagrees.';
 
 /** A validated pass that ended in prose instead of a turn-ending call. */
 const BUILDER_END_TURN_NUDGE =
@@ -230,6 +235,11 @@ interface InterviewTurnState {
   raised: Set<string>;
   /** What the reply was delivered with anyway, for the receipt. */
   warnings: string[];
+  /**
+   * The reply still said the PRD was ready when it was not, so the server
+   * added what is left beneath it.
+   */
+  readyClaimCorrected: boolean;
   prdUnchangedBecause: string | null;
   receipt: BuilderTurnReceipt | null;
   /** The discovery sweep this turn ran, if it ran one. */
@@ -264,6 +274,7 @@ function createTurnState(): InterviewTurnState {
     rejections: 0,
     raised: new Set(),
     warnings: [],
+    readyClaimCorrected: false,
     prdUnchangedBecause: null,
     receipt: null,
     discovery: null,
@@ -301,6 +312,13 @@ interface ReplyProblem {
   key: string;
   toModel: string;
   toAdmin: string;
+  /**
+   * Holds the reply back every time it is raised, not only the first. For a
+   * claim with an honest rewording always to hand — "it's ready" has "here is
+   * what's left" — where letting the repeat through tells the admin to act on
+   * something untrue.
+   */
+  persistent?: boolean;
 }
 
 const clipText = (text: string, max: number): string => {
@@ -645,6 +663,7 @@ export class BuilderInterviewOrchestratorService {
               ? { workingNotes: [...turn.workingNotes] }
               : {}),
             ...(turn.rejections > 0 ? { rejections: turn.rejections } : {}),
+            ...(turn.readyClaimCorrected ? { readyClaimCorrected: true } : {}),
             ...(turn.receipt ? { receipt: turn.receipt } : {}),
             // The sweep and the brief live on the row, not the session: the
             // transcript is what a later turn, a reload and a replay all read.
@@ -847,37 +866,7 @@ export class BuilderInterviewOrchestratorService {
     // has gone quiet.
     let readiness: BuilderPrdReadiness;
     try {
-      const plan = await this.readiness.plan(
-        sessionId,
-        context.doc,
-        'turn_end',
-      );
-      readiness = plan.readiness;
-      if (plan.review) {
-        const name = plan.review === 'review' ? 'prd_review' : 'prd_recheck';
-        yield { event: 'tool_call', data: { name, input: {} } };
-        readiness = await this.readiness.runReview(
-          sessionId,
-          context.doc,
-          plan.review,
-          'turn_end',
-        );
-        const open = (readiness.review?.findings ?? []).filter(
-          (finding) => finding.status === 'open',
-        ).length;
-        yield {
-          event: 'tool_result',
-          data: {
-            name,
-            summary:
-              readiness.review?.status === 'failed'
-                ? 'PRD review could not run; it will retry'
-                : open
-                  ? `PRD review: ${open} finding(s) to fix or dismiss`
-                  : 'PRD review: nothing to fix',
-          },
-        };
-      }
+      readiness = yield* this.settledReadiness(sessionId, context.doc);
     } catch (error) {
       // The rubric's own inputs failed to load. Fall back to the draft-only
       // rubric rather than leave the turn without a status.
@@ -911,6 +900,67 @@ export class BuilderInterviewOrchestratorService {
         readinessScore: readiness.score,
       },
     };
+  }
+
+  /**
+   * Readiness once the cold reviewer has done what is due: a first review the
+   * turn's edits did not trigger, a retry of a failed one, or a recheck of
+   * open findings against what changed since. Shown as a chip while it runs,
+   * so the admin is not left looking at a turn that has gone quiet.
+   */
+  private async *settledReadiness(
+    sessionId: string,
+    doc: BuilderPrdDoc,
+  ): AsyncGenerator<BuilderSseFrame, BuilderPrdReadiness> {
+    const plan = await this.readiness.plan(sessionId, doc, 'turn_end');
+    if (!plan.review) return plan.readiness;
+    const name = plan.review === 'review' ? 'prd_review' : 'prd_recheck';
+    yield { event: 'tool_call', data: { name, input: {} } };
+    const readiness = await this.readiness.runReview(
+      sessionId,
+      doc,
+      plan.review,
+      'turn_end',
+    );
+    const open = (readiness.review?.findings ?? []).filter(
+      (finding) => finding.status === 'open',
+    ).length;
+    yield {
+      event: 'tool_result',
+      data: {
+        name,
+        summary:
+          readiness.review?.status === 'failed'
+            ? 'PRD review could not run; it will retry'
+            : open
+              ? `PRD review: ${open} finding(s) to fix or dismiss`
+              : 'PRD review: nothing to fix',
+      },
+    };
+    return readiness;
+  }
+
+  /**
+   * Readiness to judge a reply's "it's ready" against — settled first, so a
+   * reply is not held back over findings this turn's edits already fixed.
+   * Suite 5d24dd95 had the opposite: findings fixed in the turn were only
+   * rechecked at its end, the claim was sent back as untrue, and the model,
+   * with nothing left to change, sent the same words again. A reviewer that
+   * cannot run falls back to the draft-only rubric, as the turn's end does.
+   */
+  private async *readinessForReadyClaim(
+    loop: InterviewLoopContext,
+  ): AsyncGenerator<BuilderSseFrame, BuilderPrdReadiness> {
+    try {
+      return yield* this.settledReadiness(loop.sessionId, loop.context.doc);
+    } catch (error) {
+      this.logger.warn(
+        `Builder session ${loop.sessionId}: readiness for a ready claim failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return this.prdService.computeReadiness(loop.context.doc.draft);
+    }
   }
 
   /**
@@ -1326,9 +1376,12 @@ export class BuilderInterviewOrchestratorService {
    * it did not, or says it is ready and it is not; or when the admin's own
    * words this turn changed nothing and the model did not say why. Each
    * problem is held against the reply once: raised again, it goes through as
-   * a warning on the receipt rather than looping. After two rejections the
-   * next step can only edit and end the turn, and whatever it sends is
-   * delivered with what it still gets wrong listed under it.
+   * a warning on the receipt rather than looping — except "it's ready" while
+   * it is not, which is held back every time (judged against readiness with
+   * the reviewer's due pass run first). After two rejections the next step
+   * can only edit and end the turn, and whatever it sends is delivered with
+   * what it still gets wrong listed under it; a ready claim among those gets
+   * the server's note of what is left added to the message itself.
    *
    * Nothing the model writes outside the turn-ending call is shown — it is
    * kept as working notes. The opportunity copilot's `submit_turn` is the
@@ -1469,9 +1522,21 @@ export class BuilderInterviewOrchestratorService {
         const fallback =
           passText || turn.workingNotes[turn.workingNotes.length - 1] || '';
         if (fallback) {
-          yield* this.deliverReply(loop, turn, null, fallback, [
-            BUILDER_PROSE_FALLBACK_WARNING,
-          ]);
+          // Unchecked prose, so the one claim the admin acts on is checked here.
+          const readinessNow = claimsPrdReady(fallback)
+            ? yield* this.readinessForReadyClaim(loop)
+            : null;
+          const falseReady = readinessNow !== null && !readinessNow.ready;
+          yield* this.deliverReply(
+            loop,
+            turn,
+            null,
+            fallback,
+            falseReady
+              ? [BUILDER_PROSE_FALLBACK_WARNING, BUILDER_FALSE_READY_WARNING]
+              : [BUILDER_PROSE_FALLBACK_WARNING],
+            falseReady ? notReadyNote(readinessNow) : null,
+          );
         }
         return;
       }
@@ -1532,6 +1597,13 @@ export class BuilderInterviewOrchestratorService {
 
       const input = (ending.input ?? {}) as Record<string, any>;
       const message = String(input.message ?? '').trim() || passText;
+      // A question card is read as part of the reply.
+      const readyClaim = claimsPrdReady(
+        [message, String(input.prompt ?? '')].join('\n'),
+      );
+      const readinessNow = readyClaim
+        ? yield* this.readinessForReadyClaim(loop)
+        : null;
       const problems = await this.replyProblems(
         loop,
         turn,
@@ -1541,9 +1613,10 @@ export class BuilderInterviewOrchestratorService {
         others,
         results,
         offeredNames.has(String(ending.name)),
+        readinessNow,
       );
       const blocking = problems.filter(
-        (problem) => !turn.raised.has(problem.key),
+        (problem) => problem.persistent || !turn.raised.has(problem.key),
       );
 
       if (blocking.length && !lenient && !lastPass) {
@@ -1577,12 +1650,18 @@ export class BuilderInterviewOrchestratorService {
         continue;
       }
 
+      // Out of chances and still saying "ready": the admin reads what is
+      // left from the server, under the model's words.
+      const stillClaimsReady =
+        readinessNow !== null &&
+        problems.some((problem) => problem.key === 'claims_ready');
       yield* this.deliverReply(
         loop,
         turn,
         ending,
         message,
         problems.map((problem) => problem.toAdmin),
+        stillClaimsReady ? notReadyNote(readinessNow) : null,
       );
       return;
     }
@@ -1698,8 +1777,9 @@ export class BuilderInterviewOrchestratorService {
     others: any[],
     results: Map<string, Record<string, any>>,
     offered = true,
+    readinessNow: BuilderPrdReadiness | null = null,
   ): Promise<ReplyProblem[]> {
-    const { sessionId, context, versionBefore, adminFreeText } = loop;
+    const { context, versionBefore, adminFreeText } = loop;
     const problems: ReplyProblem[] = [];
     const isBrief = endingName === 'submit_situation_brief';
 
@@ -1814,19 +1894,24 @@ export class BuilderInterviewOrchestratorService {
       });
     }
 
-    if (claimsPrdReady(message)) {
-      const readiness = await this.readiness.assess(sessionId, context.doc);
-      if (!readiness.ready) {
-        problems.push({
-          key: 'claims_ready',
-          toModel:
-            'Your message says the PRD is ready, and readiness says it is not: ' +
-            readiness.blockers.slice(0, 4).join(' | ') +
-            '. Fix those, or say what is left instead.',
-          toAdmin:
-            'Builder said the PRD is ready; the readiness check disagrees.',
-        });
-      }
+    // Settled by the caller, reviewer included, whenever the reply claims
+    // ready; null when it does not.
+    if (readinessNow && !readinessNow.ready) {
+      problems.push({
+        key: 'claims_ready',
+        persistent: true,
+        toModel:
+          'Your message tells the admin the PRD is ready, or to start the build, and ' +
+          'readiness says it is not: ' +
+          readinessNow.blockers
+            .slice(0, 4)
+            .map((blocker) => blocker.replace(/\.$/, ''))
+            .join(' | ') +
+          '. Fix what you can now. What only the admin can settle — a review finding ' +
+          'they may want dismissed, an assumption to confirm — ask them with ask_admin. ' +
+          'Until readiness says ready, say what is left instead.',
+        toAdmin: BUILDER_FALSE_READY_WARNING,
+      });
     }
 
     // The brief is what the admin's words become before the PRD does: it is
@@ -1877,6 +1962,7 @@ export class BuilderInterviewOrchestratorService {
     ending: any | null,
     message: string,
     warnings: string[],
+    note: string | null = null,
   ): AsyncGenerator<BuilderSseFrame> {
     const { sessionId, context, checkpoint } = loop;
     const questionFrames: BuilderSseFrame[] = [];
@@ -1917,10 +2003,12 @@ export class BuilderInterviewOrchestratorService {
     const notes = turn.workingNotes;
     if (message && notes[notes.length - 1] === message) notes.pop();
 
-    turn.reply = message || null;
+    const shown = note ? [message, note].filter(Boolean).join('\n\n') : message;
+    turn.reply = shown || null;
+    turn.readyClaimCorrected = turn.readyClaimCorrected || !!note;
     turn.warnings.push(...warnings);
     turn.stopReason = 'end_turn';
-    if (message) yield { event: 'token', data: { delta: message } };
+    if (shown) yield { event: 'token', data: { delta: shown } };
     for (const frame of questionFrames) yield frame;
     await checkpoint(false);
   }

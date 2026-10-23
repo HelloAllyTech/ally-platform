@@ -3,7 +3,10 @@ import { BuilderMessageRole } from '../../enum/builder.enum';
 import { BuilderPrdReadiness } from '../../type/builder-prd.type';
 import { BUILDER_EVIDENCE_TOOLS } from '../../service/builder-evidence-log.service';
 import { BuilderEvalGates } from '../type/builder-eval.type';
-import { claimsPrdEdit } from '../../util/builder-turn-claims.util';
+import {
+  claimsPrdEdit,
+  claimsPrdReady,
+} from '../../util/builder-turn-claims.util';
 import {
   BUILDER_PRD_EDIT_TOOLS,
   BUILDER_TERMINAL_TOOLS,
@@ -52,6 +55,8 @@ export function computeEvalGates(
   passes: ScoredPass[],
   messages: BuilderMessage[],
   finalReadiness: BuilderPrdReadiness,
+  /** Readiness each turn settled on, by the id of its reply. */
+  readyAfter: ReadonlyMap<string, boolean> = new Map(),
 ): BuilderEvalGates {
   const outcomes = outcomesById(messages);
 
@@ -86,8 +91,24 @@ export function computeEvalGates(
 
   let unrepairedEditFailures = 0;
   let falseUpdateClaims = 0;
+  let falseReadyClaims = 0;
   for (const message of messages) {
     if (message.role !== BuilderMessageRole.ASSISTANT) continue;
+    // What the admin read: the reply and any question card under it. A reply
+    // the server already corrected told them what is left, so misled no one.
+    const shown = [
+      message.content,
+      ...(message.metadata?.questions ?? []).map((q: any) => q?.prompt),
+    ]
+      .filter(Boolean)
+      .join('\n');
+    if (
+      readyAfter.get(message.id) === false &&
+      !message.metadata?.readyClaimCorrected &&
+      claimsPrdReady(shown)
+    ) {
+      falseReadyClaims += 1;
+    }
     const edits = (message.toolResults ?? []).filter((result) =>
       BUILDER_PRD_EDIT_TOOLS.has(String(result?.name)),
     );
@@ -120,6 +141,7 @@ export function computeEvalGates(
     askedBeforeReading,
     unrepairedEditFailures,
     falseUpdateClaims,
+    falseReadyClaims,
     consistent,
     // Absent means the replay never read anything to cite — not a pass.
     evidenceCited: row('existingGrounded')?.ok === true,
@@ -136,6 +158,7 @@ export function gateViolations(
     gates.askedBeforeReading +
     gates.unrepairedEditFailures +
     gates.falseUpdateClaims +
+    (gates.falseReadyClaims ?? 0) +
     (gates.consistent ? 0 : 1) +
     (gates.evidenceCited ? 0 : 1)
   );
