@@ -7,6 +7,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Put,
   Query,
   Req,
   Res,
@@ -27,7 +28,15 @@ import {
   atmosphereFor,
   GUIDE_SSE_PING_INTERVAL_MS,
 } from '../constants/guide.constants';
-import { GuideTurnRequestDto } from '../dto/guide.dto';
+import {
+  GuideCardEventDto,
+  GuidePrefsUpdateDto,
+  GuideTurnRequestDto,
+} from '../dto/guide.dto';
+import { GuideCardService } from '../runtime/guide-card.service';
+import { GuideViewService } from '../runtime/guide-view.service';
+import { TrackEnrollmentService } from 'src/track/service/track-enrollment.service';
+import { DataSource } from 'typeorm';
 import {
   GuideEventBusService,
   GuideReplayGate,
@@ -49,7 +58,90 @@ export class GuideLearnerController {
     private readonly threads: GuideThreadService,
     private readonly turns: GuideTurnService,
     private readonly bus: GuideEventBusService,
+    private readonly view: GuideViewService,
+    private readonly cards: GuideCardService,
+    private readonly trackEnrollment: TrackEnrollmentService,
+    private readonly dataSource: DataSource,
   ) {}
+
+  @Get('tracks/:trackId/bootstrap')
+  @AuthPermissions([PERMISSIONS.VIEW_TRACK])
+  @ApiOperation({
+    summary:
+      'Everything the journey needs to draw itself: availability, access, thread, Spine, recent messages, cards, prefs, next step',
+  })
+  bootstrap(
+    @Param('trackId', ParseUUIDPipe) trackId: string,
+    @CurrentUser() user: TokenUser,
+  ) {
+    return this.view.bootstrap(trackId, user);
+  }
+
+  @Post('threads/:threadId/enroll')
+  @AuthPermissions([PERMISSIONS.EDIT_TRACK])
+  @ApiOperation({
+    summary:
+      'Enroll from the guided view (idempotent); same enrollment and progress as classic',
+  })
+  async enroll(
+    @Param('threadId', ParseUUIDPipe) threadId: string,
+    @CurrentUser() user: TokenUser,
+  ) {
+    const thread = await this.threads.getOwned(threadId, user);
+    const result = await this.trackEnrollment.enroll(thread.trackId);
+    // Remember how the learner arrived, without overwriting an earlier answer.
+    await this.dataSource.query(
+      `UPDATE "track_enrollments" SET "entrySource" = 'guided'
+        WHERE "id" = $1 AND "entrySource" IS NULL`,
+      [result.trackEnrollmentId],
+    );
+    const bootstrap = await this.view.bootstrap(thread.trackId, user);
+    if (bootstrap.spine) {
+      await this.bus.appendDurable(thread.id, 'spine.updated', {
+        currentItemId: bootstrap.spine.currentItemId,
+        completedItems: bootstrap.spine.completed,
+        totalItems: bootstrap.spine.total,
+      });
+    }
+    return {
+      ...result,
+      spine: bootstrap.spine ?? null,
+      nextStep: bootstrap.nextStep ?? null,
+    };
+  }
+
+  @Post('threads/:threadId/cards/:cardId/events')
+  @AuthPermissions([PERMISSIONS.EDIT_TRACK])
+  @ApiOperation({
+    summary:
+      'What the learner did with a card; a completion claim is checked against classic progress',
+  })
+  async cardEvent(
+    @Param('threadId', ParseUUIDPipe) threadId: string,
+    @Param('cardId', ParseUUIDPipe) cardId: string,
+    @Body() dto: GuideCardEventDto,
+    @CurrentUser() user: TokenUser,
+  ) {
+    const thread = await this.threads.getOwned(threadId, user);
+    return this.cards.handle(thread, cardId, dto);
+  }
+
+  @Get('prefs')
+  @AuthPermissions([PERMISSIONS.VIEW_TRACK])
+  @ApiOperation({ summary: "The learner's own settings for Ally" })
+  prefs(@CurrentUser() user: TokenUser) {
+    return this.view.prefsFor(user);
+  }
+
+  @Put('prefs')
+  @AuthPermissions([PERMISSIONS.EDIT_TRACK])
+  @ApiOperation({ summary: 'Change any of the learner’s settings for Ally' })
+  updatePrefs(
+    @Body() dto: GuidePrefsUpdateDto,
+    @CurrentUser() user: TokenUser,
+  ) {
+    return this.view.updatePrefs(user, dto);
+  }
 
   @Post('tracks/:trackId/threads')
   @AuthPermissions([PERMISSIONS.VIEW_TRACK])
@@ -158,7 +250,11 @@ export class GuideLearnerController {
     const unsubscribe = this.bus.subscribe(threadId, (event) =>
       live ? write(event) : buffered.push(event),
     );
+    // While the stream is open the learner counts as present, so a
+    // completion can start a turn instead of waiting for their next message.
+    void this.cards.markPresent(threadId);
     const heartbeat = setInterval(() => {
+      void this.cards.markPresent(threadId);
       void this.bus
         .emitEphemeral(threadId, 'ping', {}, gate.lastSeq)
         .catch(() => undefined);
@@ -167,6 +263,7 @@ export class GuideLearnerController {
       closed = true;
       clearInterval(heartbeat);
       unsubscribe();
+      void this.cards.markAbsent(threadId);
     });
 
     try {

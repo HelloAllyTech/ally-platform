@@ -410,3 +410,133 @@ GuideVoiceFrame = Annotated[
     Union[GuideVoiceFrameDelta, GuideVoiceFrameCardHint, GuideVoiceFrameDone, GuideVoiceFrameError],
     Field(discriminator="type"),
 ]
+
+
+class GuideAvailability(_GuideModel):
+    """Whether the guided experience is available for a course, for this caller (plan §9.1)."""
+
+    guided: bool
+    anonymous_chat: bool = Field(alias="anonymousChat")
+    voice: bool
+    languages: list[str]
+    reason: Optional[Literal["switched_off", "tenant_disabled", "course_disabled", "not_found"]]
+
+
+class GuideAccess(_GuideModel):
+    """The same access answer classic gives (`GET /v1/learn/tracks/:id/access`)."""
+
+    has_access: bool = Field(alias="hasAccess")
+    enrolled: bool
+    reason: Optional[str]
+
+
+class GuideSpineItem(_GuideModel):
+    """One item on the Spine (plan §5.2). State mirrors classic progression exactly."""
+
+    id_: str = Field(alias="id")
+    type: GuideItemType
+    title: str
+    state: Literal["locked", "available", "completed"]
+    minutes: int
+    boss: bool
+    tension: Literal["low", "medium", "high"]
+    has_warnings: bool = Field(alias="hasWarnings")
+    completed_at: Optional[str] = Field(default=None, alias="completedAt")
+
+
+class GuideSpineSection(_GuideModel):
+    id_: str = Field(alias="id")
+    index: int
+    title: str
+    items: list[GuideSpineItem]
+
+
+class GuideSpine(_GuideModel):
+    """The whole course as the Spine draws it."""
+
+    sections: list[GuideSpineSection]
+    completed: int
+    total: int
+    current_item_id: Optional[str] = Field(alias="currentItemId")
+    finished: bool
+
+
+class GuideMessageView(_GuideModel):
+    """A transcript message as the learner sees it (no model internals)."""
+
+    id_: str = Field(alias="id")
+    seq: int
+    role: Literal["learner", "ally"]
+    kind: Literal["chat", "crisis_fixed", "fixed", "recap", "nudge"]
+    text: Optional[str]
+    created_at: str = Field(alias="createdAt")
+    turn_id: Optional[str] = Field(default=None, alias="turnId")
+    interrupted: Optional[bool] = None
+
+
+class GuidePrefs(_GuideModel):
+    """The learner's own settings for Ally (plan §8.1 guide_learner_prefs)."""
+
+    guidance: Literal["lead", "walk", "drive"]
+    voice_enabled: bool = Field(alias="voiceEnabled")
+    side_quests: bool = Field(alias="sideQuests")
+    memory_enabled: bool = Field(alias="memoryEnabled")
+    outreach: Literal["off", "in_app", "in_app_email"]
+    prefer_classic: bool = Field(alias="preferClassic")
+
+
+class GuidePrefsUpdate(_GuideModel):
+    """PUT /v1/guide/prefs — any subset."""
+
+    guidance: Optional[Literal["lead", "walk", "drive"]] = None
+    voice_enabled: Optional[bool] = Field(default=None, alias="voiceEnabled")
+    side_quests: Optional[bool] = Field(default=None, alias="sideQuests")
+    memory_enabled: Optional[bool] = Field(default=None, alias="memoryEnabled")
+    outreach: Optional[Literal["off", "in_app", "in_app_email"]] = None
+    prefer_classic: Optional[bool] = Field(default=None, alias="preferClassic")
+
+
+class GuideThreadView(_GuideModel):
+    id_: str = Field(alias="id")
+    track_id: str = Field(alias="trackId")
+    mode: GuideMode
+    atmosphere: GuideAtmosphere
+    last_event_seq: int = Field(alias="lastEventSeq")
+    language_code: Optional[str] = Field(default=None, alias="languageCode")
+
+
+class GuideCourseView(_GuideModel):
+    id_: str = Field(alias="id")
+    title: str
+    description: Optional[str] = None
+    language_code: str = Field(alias="languageCode")
+    estimated_minutes: int = Field(alias="estimatedMinutes")
+    cover_image_url: Optional[str] = Field(default=None, alias="coverImageUrl")
+
+
+class GuideNextStep(_GuideModel):
+    """The next-step dock (plan §5.7)."""
+
+    hidden: bool
+    item_id: Optional[str] = Field(default=None, alias="itemId")
+    title: Optional[str] = None
+    minutes: Optional[int] = None
+
+
+class GuidePresentedCard(_GuideModel):
+    seq: int
+    card: GuideCard
+
+
+class GuideBootstrap(_GuideModel):
+    """GET /v1/guide/tracks/:trackId/bootstrap — everything the journey needs to draw itself. Absent keys mean not applicable (no thread yet, no access)."""
+
+    availability: GuideAvailability
+    access: Optional[GuideAccess] = None
+    thread: Optional[GuideThreadView] = None
+    course: Optional[GuideCourseView] = None
+    spine: Optional[GuideSpine] = None
+    messages: list[GuideMessageView]
+    cards: list[GuidePresentedCard]
+    prefs: GuidePrefs
+    next_step: Optional[GuideNextStep] = Field(default=None, alias="nextStep")

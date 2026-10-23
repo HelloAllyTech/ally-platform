@@ -40,11 +40,12 @@ export function replayHistory(rows: HistoryRow[]): AgentMessage[] {
   }
   const out: AgentMessage[] = [];
   for (const row of ordered) {
-    if (
-      row.role !== GuideMessageRole.LEARNER ||
-      !row.turnId ||
-      !row.renderedContent?.length
-    ) {
+    // The input side of an exchange: the learner's message, or the note a
+    // platform event left for a turn it started.
+    const isInput =
+      row.role === GuideMessageRole.LEARNER ||
+      row.role === GuideMessageRole.SYSTEM_NOTE;
+    if (!isInput || !row.turnId || !row.renderedContent?.length) {
       continue;
     }
     const reply = replyByTurn.get(row.turnId);

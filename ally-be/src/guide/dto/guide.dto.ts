@@ -83,3 +83,78 @@ export class GuideRollbackDto {
   @MaxLength(500)
   reason?: string;
 }
+
+/** POST /v1/guide/threads/:id/cards/:cardId/events (contract GuideCardEventRequest). */
+export class GuideCardEventDto {
+  @ApiProperty({
+    enum: [
+      'opened',
+      'closed',
+      'completed_claim',
+      'dismissed',
+      'launched',
+      'returned',
+      'reopened',
+    ],
+  })
+  @IsIn([
+    'opened',
+    'closed',
+    'completed_claim',
+    'dismissed',
+    'launched',
+    'returned',
+    'reopened',
+  ])
+  type!:
+    | 'opened'
+    | 'closed'
+    | 'completed_claim'
+    | 'dismissed'
+    | 'launched'
+    | 'returned'
+    | 'reopened';
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  scenarioSessionId?: string | null;
+
+  @ApiPropertyOptional({ enum: ['completed', 'aborted'] })
+  @IsOptional()
+  @IsIn(['completed', 'aborted'])
+  outcome?: 'completed' | 'aborted' | null;
+}
+
+/** PUT /v1/guide/prefs (contract GuidePrefsUpdate). */
+export class GuidePrefsUpdateDto {
+  @ApiPropertyOptional({ enum: ['lead', 'walk', 'drive'] })
+  @IsOptional()
+  @IsIn(['lead', 'walk', 'drive'])
+  guidance?: 'lead' | 'walk' | 'drive';
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  voiceEnabled?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  sideQuests?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  memoryEnabled?: boolean;
+
+  @ApiPropertyOptional({ enum: ['off', 'in_app', 'in_app_email'] })
+  @IsOptional()
+  @IsIn(['off', 'in_app', 'in_app_email'])
+  outreach?: 'off' | 'in_app' | 'in_app_email';
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  preferClassic?: boolean;
+}

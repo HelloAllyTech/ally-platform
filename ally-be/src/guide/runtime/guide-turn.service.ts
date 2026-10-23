@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { randomUUID } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { Repository } from 'typeorm';
 import { TokenUser } from 'src/auth/type/auth.types';
 import { ExecutionManager } from 'src/common/execution/execution-manager';
@@ -68,6 +68,7 @@ import {
 } from '../context/guide-context';
 import { recentConversation, replayHistory } from '../context/guide-history';
 import { GuideLearnerPrefs } from '../entity/guide-learner-prefs.entity';
+import { GuideTrigger } from '../entity/guide-trigger.entity';
 import {
   GuideOrgProfile,
   GuideOrgProfileValue,
@@ -82,6 +83,7 @@ import {
   GuideMessageKind,
   GuideMessageRole,
   GuideMode,
+  GuideTriggerStatus,
 } from '../enum/guide.enum';
 import { guideMessageTooLong } from '../guide-errors';
 import {
@@ -203,6 +205,12 @@ export interface GuideTurnContext extends HarnessTurnContext {
   };
   overlay: SentinelOverlay;
   restarted: boolean;
+  /** Set for a turn a platform event started (no learner words). */
+  platformEvent: string | null;
+  /** Platform events folded into this turn; consumed if it succeeds. */
+  pendingTriggers: GuideTrigger[];
+  /** An item was completed since the last turn (steer may present next). */
+  justCompleted: boolean;
 }
 
 /**
@@ -244,6 +252,8 @@ export class GuideTurnService {
     private readonly orgProfiles: Repository<GuideOrgProfile>,
     @InjectRepository(User)
     private readonly users: Repository<User>,
+    @InjectRepository(GuideTrigger)
+    private readonly triggers: Repository<GuideTrigger>,
   ) {}
 
   /**
@@ -324,7 +334,50 @@ export class GuideTurnService {
       presented: [],
       overlay: 'none',
       restarted: false,
+      platformEvent: null,
+      pendingTriggers: [],
+      justCompleted: false,
     };
+  }
+
+  /**
+   * Start a turn for a platform event while the learner is present
+   * (plan §7.8): Ally reacts to a completion as it happens. Idempotent on the
+   * trigger's dedupe key. The event is also folded into whichever turn runs
+   * next, so if this one loses the lock to a learner message, nothing is lost.
+   */
+  async acceptTrigger(
+    thread: GuideThread,
+    user: Pick<TokenUser, 'id' | 'tenantId'>,
+    trigger: { dedupeKey: string; description: string },
+  ): Promise<{ turnId: string; created: boolean }> {
+    const clientTurnId = `trg:${createHash('sha256')
+      .update(trigger.dedupeKey)
+      .digest('hex')
+      .slice(0, 40)}`;
+    const { turn, created } = await this.turnStore.createOrGet({
+      agentKey: ALLY_GUIDE_AGENT_KEY,
+      threadId: thread.id,
+      clientTurnId,
+      trigger: AgentTurnTrigger.PLATFORM_EVENT,
+      channel: AgentChannel.EVENT,
+      tenantId: thread.tenantId ?? null,
+    });
+    if (created) {
+      const ctx = this.createContext(
+        thread,
+        { ...user, username: '' },
+        { clientTurnId, text: '' },
+        turn.id,
+      );
+      ctx.platformEvent = trigger.description;
+      setImmediate(() => {
+        this.run(ctx).catch((error) =>
+          this.logger.error(`Guide trigger turn ${turn.id} crashed`, error),
+        );
+      });
+    }
+    return { turnId: turn.id, created };
   }
 
   /**
@@ -396,6 +449,29 @@ export class GuideTurnService {
   // ── persist.learner ────────────────────────────────────────────────────
 
   private async persistLearner(ctx: GuideTurnContext): Promise<void> {
+    if (ctx.platformEvent) {
+      // Not the learner's words: a note the model sees, the learner does not.
+      const note = await this.threads.appendMessage(
+        ctx.threadId,
+        ctx.tenantId,
+        {
+          role: GuideMessageRole.SYSTEM_NOTE,
+          content: ctx.platformEvent,
+          turnId: ctx.turnId,
+          clientTurnId: ctx.clientTurnId,
+        },
+      );
+      ctx.learnerMessageId = note.id;
+      ctx.learnerSeq = note.seq;
+      await this.bus.emitEphemeral(
+        ctx.threadId,
+        'turn.started',
+        { turnId: ctx.turnId, trigger: 'platform_event' },
+        ctx.lastSeq,
+      );
+      await this.presence(ctx, 'thinking', null);
+      return;
+    }
     const message = await this.threads.appendMessage(
       ctx.threadId,
       ctx.tenantId,
@@ -440,7 +516,7 @@ export class GuideTurnService {
 
   // ── prepare (the Conductor) ────────────────────────────────────────────
 
-  private async prepare(ctx: GuideTurnContext): Promise<void> {
+  private async prepare(ctx: GuideTurnContext): Promise<void | 'stop'> {
     const thread = ctx.thread!;
     const now = new Date();
 
@@ -568,6 +644,21 @@ export class GuideTurnService {
     ctx.system = spans;
     const policy = bundle.policy;
 
+    // Platform events since the last turn (completions here or in classic)
+    // are folded into this one as data the model can see.
+    ctx.pendingTriggers = await this.triggers.find({
+      where: { threadId: ctx.threadId, status: GuideTriggerStatus.PENDING },
+      order: { createdAt: 'ASC' },
+      take: 10,
+    });
+    if (ctx.platformEvent && ctx.pendingTriggers.length === 0) {
+      // Another turn already folded this event in: nothing left to say.
+      return 'stop';
+    }
+    ctx.justCompleted = ctx.pendingTriggers.some(
+      (trigger) => trigger.kind === 'item_completed',
+    );
+
     // The learner's turn moves the pacing state before anything is decided.
     let pacing: GuideThreadPacing = { ...ctx.pacing };
     if (pacing.fadeLevel == null) pacing.fadeLevel = policy.fade.start.lay;
@@ -576,7 +667,7 @@ export class GuideTurnService {
       ctx.intent === 'start' ||
       ctx.intent === 'continue' ||
       ctx.intent === 'locked_peek';
-    pacing = afterLearnerTurn(pacing, onSpine);
+    if (!ctx.platformEvent) pacing = afterLearnerTurn(pacing, onSpine);
     if (ctx.intent === 'not_now') pacing = afterDecline(pacing);
     ctx.pacing = pacing;
 
@@ -588,6 +679,7 @@ export class GuideTurnService {
       policy,
       now: Date.now(),
       learnerReady: ctx.intent === 'start' || ctx.intent === 'continue',
+      justCompleted: ctx.justCompleted,
     });
     const windowOpen = releaseWindowOpen(pacing, policy.releaseWindowMaxTurns);
     ctx.steer = steer;
@@ -626,6 +718,9 @@ export class GuideTurnService {
       intent: ctx.intent,
       anchor: ctx.anchor,
       epochOpener,
+      platformEvents: ctx.pendingTriggers.map((trigger) =>
+        String(trigger.payload?.description ?? trigger.kind),
+      ),
     });
     const recent = await this.threads.recentRows(
       ctx.threadId,
@@ -895,6 +990,7 @@ export class GuideTurnService {
       policy,
       now: Date.now(),
       learnerReady: ctx.intent === 'start' || ctx.intent === 'continue',
+      justCompleted: ctx.justCompleted,
     });
     const atmosphere = atmosphereOf({
       mode: ctx.mode,
@@ -1104,6 +1200,12 @@ export class GuideTurnService {
       ctx.learnerRendered as Record<string, any>[],
       flags,
     );
+    if (ctx.pendingTriggers.length) {
+      await this.triggers.update(
+        ctx.pendingTriggers.map((trigger) => trigger.id),
+        { status: GuideTriggerStatus.CONSUMED, consumedByTurnId: ctx.turnId },
+      );
+    }
 
     if (ctx.replyKind === 'crisis') {
       const event = await this.bus.appendDurable(

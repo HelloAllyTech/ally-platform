@@ -387,3 +387,133 @@ export type GuideVoiceFrame =
   | GuideVoiceFrameDone
   | GuideVoiceFrameError;
 export const GUIDE_VOICE_FRAME_TYPES = ['delta', 'card_hint', 'done', 'error'] as const;
+
+/** Whether the guided experience is available for a course, for this caller (plan §9.1). */
+export interface GuideAvailability {
+  guided: boolean;
+  anonymousChat: boolean;
+  voice: boolean;
+  /** Language codes the course is published in. */
+  languages: Array<string>;
+  /** Why guided is false; null when it is available. */
+  reason: 'switched_off' | 'tenant_disabled' | 'course_disabled' | 'not_found' | null;
+}
+
+/** The same access answer classic gives (`GET /v1/learn/tracks/:id/access`). */
+export interface GuideAccess {
+  hasAccess: boolean;
+  enrolled: boolean;
+  /** A TrackAccessDenialReason when access is refused. */
+  reason: string | null;
+}
+
+/** One item on the Spine (plan §5.2). State mirrors classic progression exactly. */
+export interface GuideSpineItem {
+  id: string;
+  type: GuideItemType;
+  title: string;
+  state: 'locked' | 'available' | 'completed';
+  /** Novice-adjusted estimate, whole minutes. */
+  minutes: number;
+  /** A chapter's roleplay or case. */
+  boss: boolean;
+  tension: 'low' | 'medium' | 'high';
+  /** The item carries content warnings; the UI may hush around it. */
+  hasWarnings: boolean;
+  completedAt?: string | null;
+}
+
+export interface GuideSpineSection {
+  id: string;
+  /** 0-based chapter index. */
+  index: number;
+  title: string;
+  items: Array<GuideSpineItem>;
+}
+
+/** The whole course as the Spine draws it. */
+export interface GuideSpine {
+  sections: Array<GuideSpineSection>;
+  completed: number;
+  total: number;
+  currentItemId: string | null;
+  finished: boolean;
+}
+
+/** A transcript message as the learner sees it (no model internals). */
+export interface GuideMessageView {
+  id: string;
+  seq: number;
+  role: 'learner' | 'ally';
+  kind: 'chat' | 'crisis_fixed' | 'fixed' | 'recap' | 'nudge';
+  text: string | null;
+  createdAt: string;
+  turnId?: string | null;
+  interrupted?: boolean;
+}
+
+/** The learner's own settings for Ally (plan §8.1 guide_learner_prefs). */
+export interface GuidePrefs {
+  guidance: 'lead' | 'walk' | 'drive';
+  voiceEnabled: boolean;
+  sideQuests: boolean;
+  memoryEnabled: boolean;
+  outreach: 'off' | 'in_app' | 'in_app_email';
+  preferClassic: boolean;
+}
+
+/** PUT /v1/guide/prefs — any subset. */
+export interface GuidePrefsUpdate {
+  guidance?: 'lead' | 'walk' | 'drive';
+  voiceEnabled?: boolean;
+  sideQuests?: boolean;
+  memoryEnabled?: boolean;
+  outreach?: 'off' | 'in_app' | 'in_app_email';
+  preferClassic?: boolean;
+}
+
+export interface GuideThreadView {
+  id: string;
+  trackId: string;
+  mode: GuideMode;
+  atmosphere: GuideAtmosphere;
+  /** Resume the event stream after this seq. */
+  lastEventSeq: number;
+  languageCode?: string | null;
+}
+
+export interface GuideCourseView {
+  id: string;
+  title: string;
+  description?: string | null;
+  languageCode: string;
+  estimatedMinutes: number;
+  coverImageUrl?: string | null;
+}
+
+/** The next-step dock (plan §5.7). */
+export interface GuideNextStep {
+  hidden: boolean;
+  itemId?: string | null;
+  title?: string | null;
+  minutes?: number | null;
+}
+
+export interface GuidePresentedCard {
+  /** Event seq it was presented at, for ordering in the feed. */
+  seq: number;
+  card: GuideCard;
+}
+
+/** GET /v1/guide/tracks/:trackId/bootstrap — everything the journey needs to draw itself. Absent keys mean not applicable (no thread yet, no access). */
+export interface GuideBootstrap {
+  availability: GuideAvailability;
+  access?: GuideAccess;
+  thread?: GuideThreadView;
+  course?: GuideCourseView;
+  spine?: GuideSpine;
+  messages: Array<GuideMessageView>;
+  cards: Array<GuidePresentedCard>;
+  prefs: GuidePrefs;
+  nextStep?: GuideNextStep;
+}

@@ -110,11 +110,21 @@ export class GuideSettingsService {
     trackId: string,
     tenantId?: string | null,
   ): Promise<boolean> {
+    return (await this.unavailableReason(trackId, tenantId)) === null;
+  }
+
+  /** Why the guide is off here, or null when it is on (most general first). */
+  async unavailableReason(
+    trackId: string,
+    tenantId?: string | null,
+  ): Promise<'switched_off' | 'tenant_disabled' | 'course_disabled' | null> {
     const s = await this.switches();
-    if (!s.enabled) return false;
-    if (s.disabledCourses.includes(trackId)) return false;
-    if (tenantId && s.disabledTenants.includes(tenantId)) return false;
-    return true;
+    if (!s.enabled) return 'switched_off';
+    if (tenantId && s.disabledTenants.includes(tenantId)) {
+      return 'tenant_disabled';
+    }
+    if (s.disabledCourses.includes(trackId)) return 'course_disabled';
+    return null;
   }
 
   async isCapabilityEnabled(capabilityId: string): Promise<boolean> {

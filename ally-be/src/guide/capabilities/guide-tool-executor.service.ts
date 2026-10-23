@@ -180,7 +180,11 @@ export class GuideToolExecutorService {
       },
     };
     const seq = await ctx.emitDurable('card.presented', { card });
-    await this.cards.update(saved.id, { presentedSeq: seq });
+    // The event as sent is what a reload restores (bootstrap's cards[]).
+    await this.cards.update(saved.id, {
+      presentedSeq: seq,
+      payload: { ...(saved.payload ?? {}), card } as Record<string, any>,
+    });
     ctx.presented.push(card);
     return ok({
       presented: true,
@@ -226,7 +230,11 @@ export class GuideToolExecutorService {
       },
     };
     const seq = await ctx.emitDurable('card.presented', { card });
-    await this.cards.update(saved.id, { presentedSeq: seq });
+    // The event as sent is what a reload restores (bootstrap's cards[]).
+    await this.cards.update(saved.id, {
+      presentedSeq: seq,
+      payload: { ...(saved.payload ?? {}), card } as Record<string, any>,
+    });
     ctx.presented.push(card);
     return ok({ shown: true, totalMinutes, items: ctx.spine.total });
   }
@@ -278,7 +286,11 @@ export class GuideToolExecutorService {
       payload: { lines },
     };
     const seq = await ctx.emitDurable('card.presented', { card });
-    await this.cards.update(saved.id, { presentedSeq: seq });
+    // The event as sent is what a reload restores (bootstrap's cards[]).
+    await this.cards.update(saved.id, {
+      presentedSeq: seq,
+      payload: { ...(saved.payload ?? {}), card } as Record<string, any>,
+    });
     ctx.presented.push(card);
     return ok({ shown: true, lines: lines.length });
   }

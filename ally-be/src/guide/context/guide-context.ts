@@ -244,12 +244,20 @@ export interface LearnerTurnInput {
     timestampSec?: number | null;
   } | null;
   epochOpener?: string | null;
+  /** Things that happened on the platform since the last turn. */
+  platformEvents?: string[];
 }
 
 /** The newest user message: everything the learner contributed, as data. */
 export function buildLearnerMessage(input: LearnerTurnInput): AgentMessage {
   const blocks: AgentContentBlock[] = [];
   if (input.epochOpener) blocks.push({ type: 'text', text: input.epochOpener });
+  for (const event of input.platformEvents ?? []) {
+    blocks.push({
+      type: 'text',
+      text: `<platform_event>${asData(event)}</platform_event>`,
+    });
+  }
   if (input.intent && INTENT_TEXT[input.intent]) {
     blocks.push({
       type: 'text',

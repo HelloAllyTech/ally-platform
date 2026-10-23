@@ -1,0 +1,163 @@
+{
+  "def": "GuideBootstrap",
+  "valid": [
+    {
+      "availability": {
+        "guided": true,
+        "anonymousChat": false,
+        "voice": false,
+        "languages": ["en", "hi"],
+        "reason": null
+      },
+      "access": {
+        "hasAccess": true,
+        "enrolled": true,
+        "reason": null
+      },
+      "thread": {
+        "id": "th-1",
+        "trackId": "tr-1",
+        "mode": "NORMAL",
+        "atmosphere": "bright",
+        "lastEventSeq": 12,
+        "languageCode": "en"
+      },
+      "course": {
+        "id": "tr-1",
+        "title": "First calls",
+        "description": null,
+        "languageCode": "en",
+        "estimatedMinutes": 48,
+        "coverImageUrl": null
+      },
+      "spine": {
+        "sections": [
+          {
+            "id": "s1",
+            "index": 0,
+            "title": "Starting well",
+            "items": [
+              {
+                "id": "i1",
+                "type": "ARTICLE",
+                "title": "Listening",
+                "state": "completed",
+                "minutes": 6,
+                "boss": false,
+                "tension": "low",
+                "hasWarnings": false,
+                "completedAt": "2026-10-23T10:00:00.000Z"
+              },
+              {
+                "id": "i2",
+                "type": "ROLEPLAY",
+                "title": "Meera calls",
+                "state": "available",
+                "minutes": 12,
+                "boss": true,
+                "tension": "high",
+                "hasWarnings": true,
+                "completedAt": null
+              }
+            ]
+          }
+        ],
+        "completed": 1,
+        "total": 2,
+        "currentItemId": "i2",
+        "finished": false
+      },
+      "messages": [
+        {
+          "id": "m1",
+          "seq": 1,
+          "role": "learner",
+          "kind": "chat",
+          "text": "Hi",
+          "createdAt": "2026-10-23T10:00:00.000Z",
+          "turnId": "t1"
+        },
+        {
+          "id": "m2",
+          "seq": 2,
+          "role": "ally",
+          "kind": "chat",
+          "text": "Hello.",
+          "createdAt": "2026-10-23T10:00:02.000Z",
+          "turnId": "t1"
+        }
+      ],
+      "cards": [
+        {
+          "seq": 4,
+          "card": {
+            "cardId": "c1",
+            "kind": "course_item",
+            "presentation": "theatre",
+            "state": "ready",
+            "title": "Meera calls",
+            "framing": "Your first call.",
+            "meta": {
+              "minutes": 12,
+              "format": "roleplay"
+            },
+            "cta": {
+              "label": "Start practice",
+              "action": "open"
+            },
+            "trackItem": {
+              "id": "i2",
+              "type": "ROLEPLAY",
+              "title": "Meera calls",
+              "sectionId": "s1",
+              "sectionTitle": "Starting well"
+            }
+          }
+        }
+      ],
+      "prefs": {
+        "guidance": "walk",
+        "voiceEnabled": false,
+        "sideQuests": true,
+        "memoryEnabled": true,
+        "outreach": "in_app",
+        "preferClassic": false
+      },
+      "nextStep": {
+        "hidden": false,
+        "itemId": "i2",
+        "title": "Meera calls",
+        "minutes": 12
+      }
+    },
+    {
+      "availability": {
+        "guided": false,
+        "anonymousChat": false,
+        "voice": false,
+        "languages": ["en"],
+        "reason": "switched_off"
+      },
+      "messages": [],
+      "cards": [],
+      "prefs": {
+        "guidance": "walk",
+        "voiceEnabled": false,
+        "sideQuests": true,
+        "memoryEnabled": true,
+        "outreach": "in_app",
+        "preferClassic": false
+      }
+    }
+  ],
+  "invalid": [
+    {
+      "availability": {
+        "guided": true
+      },
+      "messages": [],
+      "cards": [],
+      "prefs": {}
+    }
+  ]
+}

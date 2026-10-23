@@ -5,6 +5,7 @@ import { AgentHarnessModule } from 'src/llm-agent/harness/agent-harness.module';
 import { LlmAgentModule } from 'src/llm-agent/llm-agent.module';
 import { GlobalSettingsRepository } from 'src/settings/repository/global-settings.repository';
 import { TrackModule } from 'src/track/track.module';
+import { Track } from 'src/track/entity/track.entity';
 import { User } from 'src/user/entity/user.entity';
 import { GuideToolExecutorService } from './capabilities/guide-tool-executor.service';
 import { GuideConductorService } from './conductor/guide-conductor.service';
@@ -26,7 +27,10 @@ import { GuideTrigger } from './entity/guide-trigger.entity';
 import { GuideTurnFeedback } from './entity/guide-turn-feedback.entity';
 import { GuideVisitor } from './entity/guide-visitor.entity';
 import { GuideBootstrapService } from './runtime/guide-bootstrap.service';
+import { GuideCardService } from './runtime/guide-card.service';
 import { GuideEventBusService } from './runtime/guide-event-bus.service';
+import { GuideProgressListener } from './runtime/guide-progress.listener';
+import { GuideViewService } from './runtime/guide-view.service';
 import { GuideModelService } from './runtime/guide-model.service';
 import { GuideThreadService } from './runtime/guide-thread.service';
 import { GuideTurnService } from './runtime/guide-turn.service';
@@ -58,6 +62,7 @@ import { GuideSettingsService } from './settings/guide-settings.service';
       GuideSignal,
       GuideTurnFeedback,
       User,
+      Track,
     ]),
     AgentHarnessModule,
     LlmAgentModule,
@@ -81,6 +86,9 @@ import { GuideSettingsService } from './settings/guide-settings.service';
     GuideCrisisService,
     GuideConductorService,
     GuideToolExecutorService,
+    GuideViewService,
+    GuideCardService,
+    GuideProgressListener,
   ],
 })
 export class GuideModule {}

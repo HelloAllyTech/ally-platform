@@ -79,6 +79,7 @@ function setup(
     verdict?: SentinelVerdict | null;
     thread?: Record<string, any>;
     historyRows?: any[];
+    triggers?: any[];
   } = {},
 ) {
   const events: Array<{ type: string; durable: boolean; data: any }> = [];
@@ -204,6 +205,10 @@ function setup(
     execute: jest.fn(async () => ({ content: '{"ok":true}', isError: false })),
   };
   const repo = (value: any) => ({ findOne: jest.fn(async () => value) });
+  const triggers = {
+    find: jest.fn(async () => options.triggers ?? []),
+    update: jest.fn(async () => undefined),
+  };
   const service = new GuideTurnService(
     threads as never,
     bus as never,
@@ -221,6 +226,7 @@ function setup(
     repo(null) as never,
     repo(null) as never,
     repo({ id: 1, name: 'Asha Rao' }) as never,
+    triggers as never,
   );
   const run = async (input: Partial<GuideTurnInput> = {}) => {
     const ctx = service.createContext(
@@ -236,6 +242,7 @@ function setup(
     service,
     run,
     bus,
+    triggers,
     events,
     threads,
     appended,
@@ -445,6 +452,55 @@ describe('GuideTurnService', () => {
     });
     await t.run();
     expect(order).toEqual(['unlock', 'completed']);
+  });
+
+  it('folds a completion into the next turn and may present the next step', async () => {
+    const t = setup({
+      triggers: [
+        {
+          id: 'trg-1',
+          kind: 'item_completed',
+          payload: {
+            description: 'The learner completed "Listening" (article).',
+          },
+        },
+      ],
+    });
+    const ctx = await t.run({ text: 'done!' });
+    expect(ctx.justCompleted).toBe(true);
+    expect(ctx.steer?.level).toBe(3);
+    const blocks = t.requests[0].request.messages[0].content.map(
+      (b: any) => b.text,
+    );
+    expect(blocks).toContain(
+      '<platform_event>The learner completed "Listening" (article).</platform_event>',
+    );
+    expect(t.triggers.update).toHaveBeenCalledWith(['trg-1'], {
+      status: 'consumed',
+      consumedByTurnId: 'turn-1',
+    });
+  });
+
+  it('a trigger turn whose event was already folded in stops quietly', async () => {
+    const t = setup();
+    const ctx = t.service.createContext(
+      {
+        id: 'th1',
+        trackId: 'tr1',
+        lastEventSeq: 0,
+        mode: GuideMode.NORMAL,
+        pacing: {},
+        epoch: 0,
+      } as never,
+      { id: 1, tenantId: 'org', username: '' },
+      { clientTurnId: 'trg:x', text: '' },
+      'turn-1',
+    );
+    ctx.platformEvent = 'The learner completed "Listening".';
+    await t.service.run(ctx);
+    expect(ctx.stoppedAt).toBe('prepare');
+    expect(t.models.stream).not.toHaveBeenCalled();
+    expect(t.events.map((e) => e.type)).not.toContain('learner.message');
   });
 
   it('replaces a refusal with kind fixed copy', async () => {
