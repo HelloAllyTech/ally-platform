@@ -13,19 +13,21 @@ export enum PromptTranslationStatus {
 }
 
 /**
- * The current translated body of a `main_agent`/`branching` prompt template for
- * one language. One live row per (promptId, languageId), overwritten on
- * re-translation — runtime only ever needs the *current* body's translation.
+ * The translated body of one English version of a `main_agent`/`branching`
+ * prompt template, for one language. One row per (promptId, languageId,
+ * sourceHash): a candidate version is translated beside the live one, so it can
+ * go live together with its translations.
  *
  * `sourceHash` is the correctness key: a translation is served at runtime only
- * when its `sourceHash` still matches the hash of the current English body,
- * which is what keeps translations aligned to the (read-only-to-users) English
- * source across both the override-on and file-backed paths.
+ * when its `sourceHash` matches the hash of the live English body.
  */
 @Entity('prompt_translations')
-@Index('uq_prompt_translations_prompt_language', ['promptId', 'languageId'], {
-  unique: true,
-})
+@Index(
+  'uq_prompt_translations_prompt_language_source',
+  ['promptId', 'languageId', 'sourceHash'],
+  { unique: true },
+)
+@Index('idx_prompt_translations_prompt_language', ['promptId', 'languageId'])
 @Index('idx_prompt_translations_language', ['languageId'])
 @Index('idx_prompt_translations_status', ['status'])
 export class PromptTranslation extends BaseWithoutTenantEntity {

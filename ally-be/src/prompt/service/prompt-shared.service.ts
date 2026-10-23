@@ -5,7 +5,9 @@ import { PromptsRepository } from '../repository/prompt.repository';
 import {
   PromptSearchOptions,
   PromptsWithPromptCode,
+  ResolvedPrompt,
 } from '../type/prompt-response.type';
+import { hashPromptBody } from '../util/prompt-contract.util';
 
 const PROMPTS_DIR = 'src/prompts';
 
@@ -14,34 +16,22 @@ export class PromptSharedService {
   constructor(private readonly promptsRepository: PromptsRepository) {}
 
   /**
-   * Get the current prompt content by standardized prompt code.
-   * - When useDashboardOverride is false: read from folder (src/prompts/{promptCode}.txt)
-   * - When useDashboardOverride is true: read from DB (prompts_versions)
-   * Returns null if not found.
+   * The live text of a prompt, by code: its live version in the store. The
+   * default text (Git, synced to `defaultPrompt`) is used only when the row has
+   * no live version, and the file on disk only when there is no row at all —
+   * a prompt that has never been synced. Returns null if none of them exists.
    */
   async getPromptByCode(promptCode: string): Promise<string | null> {
-    const promptRow = await this.promptsRepository.findOne({
-      where: { promptCode },
-      select: ['id', 'useDashboardOverride'],
-    });
+    return (await this.resolvePrompt(promptCode))?.prompt ?? null;
+  }
 
-    if (!promptRow) {
-      return await this.readFromFolder(promptCode);
-    }
-
-    if (!promptRow.useDashboardOverride) {
-      const fromFolder = await this.readFromFolder(promptCode);
-      if (fromFolder !== null) {
-        return fromFolder;
-      }
-      // Fallback: check if DB prompt row has defaultPrompt
-      const fullRow = await this.promptsRepository.findOne({
-        where: { promptCode },
-        select: ['defaultPrompt'],
-      });
-      return fullRow?.defaultPrompt || null;
-    }
-
+  /**
+   * The live text AND model settings of a prompt in one lookup, plus what
+   * identifies the text that ran (version + content hash). Callers that need
+   * both text and settings use this so a publish between two separate lookups
+   * can't pair text and settings from different versions.
+   */
+  async resolvePrompt(promptCode: string): Promise<ResolvedPrompt | null> {
     const row = (await this.promptsRepository
       .createQueryBuilder('prompt')
       .leftJoin(
@@ -49,11 +39,64 @@ export class PromptSharedService {
         'pv',
         '"prompt"."id" = "pv"."promptId" AND "pv"."version" = "prompt"."currentVersion"',
       )
-      .addSelect('pv.prompt', 'prompt')
+      .select('pv.prompt', 'prompt')
+      .addSelect('pv.version', 'version')
+      .addSelect('pv.provider', 'provider')
+      .addSelect('pv.model', 'model')
+      .addSelect('CAST(pv.temperature AS double precision)', 'temperature')
+      .addSelect('prompt.defaultPrompt', 'defaultPrompt')
+      .addSelect('prompt.provider', 'rowProvider')
+      .addSelect('prompt.model', 'rowModel')
+      .addSelect(
+        'CAST(prompt.temperature AS double precision)',
+        'rowTemperature',
+      )
       .where('prompt.promptCode = :promptCode', { promptCode })
-      .getRawOne()) as { prompt?: string } | undefined;
+      .getRawOne()) as
+      | {
+          prompt?: string | null;
+          version?: number | null;
+          provider?: string | null;
+          model?: string | null;
+          temperature?: number | null;
+          defaultPrompt?: string | null;
+          rowProvider?: string | null;
+          rowModel?: string | null;
+          rowTemperature?: number | null;
+        }
+      | undefined;
 
-    return row?.prompt ?? null;
+    const settings = (r: NonNullable<typeof row>) => ({
+      provider: r.provider ?? r.rowProvider ?? undefined,
+      model: r.model ?? r.rowModel ?? undefined,
+      temperature:
+        typeof (r.temperature ?? r.rowTemperature) === 'number'
+          ? ((r.temperature ?? r.rowTemperature) as number)
+          : undefined,
+    });
+
+    if (row?.prompt?.trim()) {
+      return {
+        promptCode,
+        prompt: row.prompt,
+        version: row.version ?? null,
+        contentHash: hashPromptBody(row.prompt),
+        source: 'store',
+        ...settings(row),
+      };
+    }
+    const fallback = row?.defaultPrompt?.trim()
+      ? row.defaultPrompt
+      : await this.readFromFolder(promptCode);
+    if (!fallback) return null;
+    return {
+      promptCode,
+      prompt: fallback,
+      version: null,
+      contentHash: hashPromptBody(fallback),
+      source: 'default',
+      ...(row ? settings(row) : {}),
+    };
   }
 
   /**
@@ -118,17 +161,20 @@ export class PromptSharedService {
    * read from the prompts row. Both undefined when unset or the prompt has no
    * row. Used by ally-be's own LLM call sites (coaching chat, tooltip
    * translation, autofill, copilot) to honor a per-prompt model/temperature.
+   * A caller that also needs the text should use `resolvePrompt`, which returns
+   * both from one lookup.
    */
   async getPromptLlmConfig(
     promptCode: string,
   ): Promise<{ provider?: string; model?: string; temperature?: number }> {
-    const rows = await this.getPromptsByOptions({ promptCode: [promptCode] });
-    const row = rows?.[0];
+    const resolved = await this.resolvePrompt(promptCode);
     return {
-      provider: row?.provider || undefined,
-      model: row?.model || undefined,
+      provider: resolved?.provider || undefined,
+      model: resolved?.model || undefined,
       temperature:
-        typeof row?.temperature === 'number' ? row.temperature : undefined,
+        typeof resolved?.temperature === 'number'
+          ? resolved.temperature
+          : undefined,
     };
   }
 
@@ -151,6 +197,8 @@ export class PromptSharedService {
       .addSelect('prompt.temperature', 'temperature')
       .addSelect('prompt.defaultPrompt', 'defaultPrompt')
       .addSelect('prompt.currentVersion', 'currentVersion');
+    // Model settings come from the live version, which the row mirrors on
+    // every promotion; the row's values cover rows with no version yet.
 
     if (options.promptCode && options.promptCode.length > 0) {
       query.andWhere('prompt.promptCode IN (:...promptCodes)', {
@@ -161,9 +209,6 @@ export class PromptSharedService {
       query.andWhere('prompt.promptCode LIKE :prefix', {
         prefix: `${options.promptCodePrefix}%`,
       });
-    }
-    if (options.useDashboardOverrideOnly === true) {
-      query.andWhere('prompt.useDashboardOverride = true');
     }
 
     const rows = await query.getRawMany<
@@ -187,17 +232,14 @@ export class PromptSharedService {
         rawTemp === null || rawTemp === undefined || rawTemp === ''
           ? undefined
           : parseFloat(rawTemp as string);
-      if (!row.useDashboardOverride) {
-        const fromFolder = await this.readFromFolder(row.promptCode);
-        if (fromFolder !== null) {
-          row.prompt = fromFolder;
-        } else if (row.defaultPrompt) {
-          row.prompt = row.defaultPrompt;
-        }
-      } else if (!row.prompt?.trim() && row.defaultPrompt?.trim()) {
-        // Dashboard override enabled but version join returned null (e.g. currentVersion not set); use default
+      if (!row.prompt?.trim() && row.defaultPrompt?.trim()) {
+        // No live version yet: serve the default text from Git.
         row.prompt = row.defaultPrompt;
+        row.version = null;
+      } else {
+        row.version = row.currentVersion ?? null;
       }
+      row.contentHash = row.prompt ? hashPromptBody(row.prompt) : undefined;
     }
 
     return rows;

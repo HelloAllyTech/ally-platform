@@ -758,11 +758,9 @@ export class WhatsAppInboundService {
    * Scoped by prompt-code prefix so this sends only the knowledge prompts, not every ally-ai prompt
    * in the database — the payload rides on every single question.
    *
-   * `useDashboardOverrideOnly` is deliberately NOT set, unlike the scenario-session loader. There the
-   * flag means "only send prompts an admin has explicitly taken over"; here the model and temperature
-   * are the point, and an admin who picks Claude without rewriting the prompt text must still have
-   * that choice reach ally-ai. Rows with empty text are dropped below so ally-ai falls back to its
-   * own file default for the wording while still honouring the selected model.
+   * The live text and its model settings are both sent: the Skills Store is the source of truth.
+   * Rows with empty text are dropped below so ally-ai falls back to its own file default for the
+   * wording while still honouring the selected model.
    */
   private async loadPromptOverrides(): Promise<Record<string, unknown>> {
     try {

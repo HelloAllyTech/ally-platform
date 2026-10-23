@@ -3,11 +3,13 @@ import {
   IsArray,
   IsBoolean,
   IsNotEmpty,
+  IsObject,
   IsOptional,
   IsString,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { PromptContract } from '../entity/prompt.entity';
 
 export class SyncPromptItemDto {
   @ApiProperty({
@@ -115,6 +117,16 @@ export class SyncPromptItemDto {
   @IsOptional()
   @IsString()
   defaultModel?: string;
+
+  @ApiPropertyOptional({
+    description:
+      "The code's contract with this prompt, from its `.meta.json`: " +
+      '`{ variables, required, fragments, contractVersion }`. The store refuses ' +
+      'a version that breaks it.',
+  })
+  @IsOptional()
+  @IsObject()
+  contract?: PromptContract | null;
 }
 
 export class SyncPromptsDto {

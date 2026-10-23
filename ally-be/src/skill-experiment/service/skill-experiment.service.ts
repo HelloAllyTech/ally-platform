@@ -10,7 +10,8 @@ import { ExecutionManager } from 'src/common/execution/execution-manager';
 import { computeCostUsd } from 'src/analytics/constants/llm-pricing.constants';
 import { LlmTask } from 'src/learn/enum/llm-task.enum';
 import { Prompt } from 'src/prompt/entity/prompt.entity';
-import { PromptsService } from 'src/prompt/service/prompt.service';
+import { PromptVersioningService } from 'src/prompt/service/prompt-versioning.service';
+import { PromptVersionSource } from 'src/prompt/entity/prompt-version.entity';
 import { SkillExperiment } from '../entity/skill-experiment.entity';
 import { SkillExperimentVariant } from '../entity/skill-experiment-variant.entity';
 import { SkillExperimentObservation } from '../entity/skill-experiment-observation.entity';
@@ -30,7 +31,10 @@ import {
   ConfigureSkillExperimentDto,
   SkillExperimentObservationsQueryDto,
 } from '../dto/skill-experiment.dto';
-import { extractPlaceholderTokens } from '../util/placeholder-lock.util';
+import {
+  contentHash,
+  extractPlaceholderTokens,
+} from '../util/placeholder-lock.util';
 import { SkillExperimentStateService } from './skill-experiment-state.service';
 import { SkillExperimentRouterService } from './skill-experiment-router.service';
 
@@ -75,7 +79,7 @@ export class SkillExperimentService {
   constructor(
     private readonly state: SkillExperimentStateService,
     private readonly router: SkillExperimentRouterService,
-    private readonly promptsService: PromptsService,
+    private readonly versioning: PromptVersioningService,
     @InjectRepository(Prompt)
     private readonly prompts: Repository<Prompt>,
   ) {}
@@ -388,9 +392,26 @@ export class SkillExperimentService {
       );
     }
     try {
-      await this.promptsService.updatePrompt(promptId, {
-        prompt: champion.content,
-        useDashboardOverride: true,
+      // Through the one write path, from the text the experiment started on:
+      // if someone changed the skill since, Apply refuses rather than
+      // overwrite an edit nobody compared against.
+      const liveText = await this.state.currentSkillText(experiment.promptCode);
+      if (liveText && contentHash(liveText) !== experiment.baseContentHash) {
+        throw new ConflictException(
+          'The skill was edited after this experiment started, so its best version was not applied. ' +
+            'Turn auto-improve on again to test against the new text.',
+        );
+      }
+      const live = await this.prompts.findOne({ where: { id: promptId } });
+      await this.versioning.createAndPromote(promptId, {
+        body: champion.content,
+        baseVersion: await this.versioning.latestVersionOf(promptId),
+        source: PromptVersionSource.EXPERIMENT,
+        note: `Auto-improve: ${champion.label} (score ${champion.meanScore ?? '—'}).`,
+        createdBy: actorId,
+        provider: live?.provider ?? null,
+        model: live?.model ?? null,
+        temperature: live?.temperature ?? null,
       });
     } catch (error) {
       // The experiment is already off, so the skill serves its own text; say

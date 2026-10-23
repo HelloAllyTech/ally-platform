@@ -27,7 +27,7 @@ describe('PromptTranslationService.translateOne', () => {
   let markStatus: jest.Mock;
   let promptFindOne: jest.Mock;
   let findTranslationSources: jest.Mock;
-  let findByPromptAndLanguage: jest.Mock;
+  let findForBody: jest.Mock;
   let getEligibleTargetLanguages: jest.Mock;
   let getRuntimeRows: jest.Mock;
 
@@ -46,7 +46,7 @@ describe('PromptTranslationService.translateOne', () => {
       translationEnabled: true,
     });
     findTranslationSources = jest.fn().mockResolvedValue([]);
-    findByPromptAndLanguage = jest.fn().mockResolvedValue(null);
+    findForBody = jest.fn().mockResolvedValue(null);
     getEligibleTargetLanguages = jest.fn().mockResolvedValue([]);
     getRuntimeRows = jest.fn().mockResolvedValue([]);
     getPromptByCode = jest.fn().mockResolvedValue(englishBody);
@@ -75,7 +75,10 @@ describe('PromptTranslationService.translateOne', () => {
         },
         {
           provide: PromptVersionRepository,
-          useValue: { getLatestPromptVersion },
+          useValue: {
+            getLatestPromptVersion,
+            findOne: jest.fn().mockResolvedValue({ id: 'v-1' }),
+          },
         },
         {
           provide: PromptTranslationRepository,
@@ -83,8 +86,9 @@ describe('PromptTranslationService.translateOne', () => {
             upsertTranslation,
             update,
             markStatus,
-            findByPromptAndLanguage,
+            findForBody,
             getRuntimeRows,
+            latestRuntimeModel: jest.fn().mockResolvedValue(null),
           },
         },
         {
@@ -129,7 +133,7 @@ describe('PromptTranslationService.translateOne', () => {
       }),
     );
     expect(update).toHaveBeenCalledWith(
-      { promptId, languageId },
+      { promptId, languageId, sourceHash: `hash:${englishBody.length}` },
       expect.objectContaining({
         status: PromptTranslationStatus.READY,
         translatedPrompt: 'आप {name} हैं, एक नर्स। [laughs]',
@@ -169,6 +173,7 @@ describe('PromptTranslationService.translateOne', () => {
     expect(markStatus).toHaveBeenCalledWith(
       promptId,
       languageId,
+      `hash:${englishBody.length}`,
       PromptTranslationStatus.FAILED,
       expect.stringContaining('{name}'),
     );
@@ -240,7 +245,7 @@ describe('PromptTranslationService.translateOne', () => {
 
     it('translates every eligible language when none are fresh', async () => {
       getEligibleTargetLanguages.mockResolvedValue(langs);
-      findByPromptAndLanguage.mockResolvedValue(null);
+      findForBody.mockResolvedValue(null);
       const spy = jest.spyOn(service, 'translateOne').mockResolvedValue({
         status: PromptTranslationStatus.READY,
         provider: 'gemini',
@@ -253,17 +258,18 @@ describe('PromptTranslationService.translateOne', () => {
       expect(result.translated).toBe(2);
       expect(result.skipped).toBe(0);
       expect(spy).toHaveBeenCalledTimes(2);
-      expect(spy).toHaveBeenCalledWith(promptId, 2);
-      expect(spy).toHaveBeenCalledWith(promptId, 6);
+      expect(spy).toHaveBeenCalledWith(promptId, 2, expect.anything());
+      expect(spy).toHaveBeenCalledWith(promptId, 6, expect.anything());
     });
 
     it('skips a language already fresh by sourceHash and translates the stale one', async () => {
       getEligibleTargetLanguages.mockResolvedValue(langs);
       getPromptByCode.mockResolvedValue('BODY'); // hashBody -> 'hash:4'
-      findByPromptAndLanguage.mockImplementation((_p: string, lid: number) =>
+      // Rows are looked up per English body now: only hi has one for 'BODY'.
+      findForBody.mockImplementation((_p: string, lid: number) =>
         lid === 2
           ? { status: PromptTranslationStatus.READY, sourceHash: 'hash:4' }
-          : { status: PromptTranslationStatus.READY, sourceHash: 'stale' },
+          : null,
       );
       const spy = jest.spyOn(service, 'translateOne').mockResolvedValue({
         status: PromptTranslationStatus.READY,
@@ -277,12 +283,12 @@ describe('PromptTranslationService.translateOne', () => {
       expect(result.skipped).toBe(1); // hi fresh
       expect(result.translated).toBe(1); // ta stale
       expect(spy).toHaveBeenCalledTimes(1);
-      expect(spy).toHaveBeenCalledWith(promptId, 6);
+      expect(spy).toHaveBeenCalledWith(promptId, 6, expect.anything());
     });
 
     it('counts a language as failed when translateOne returns FAILED', async () => {
       getEligibleTargetLanguages.mockResolvedValue([langs[0]]);
-      findByPromptAndLanguage.mockResolvedValue(null);
+      findForBody.mockResolvedValue(null);
       jest.spyOn(service, 'translateOne').mockResolvedValue({
         status: PromptTranslationStatus.FAILED,
         provider: 'gemini',

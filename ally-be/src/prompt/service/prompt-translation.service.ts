@@ -89,6 +89,46 @@ export class PromptTranslationService {
    * per-language failures are recorded on the row, not thrown.
    */
   async translatePrompt(promptId: string): Promise<TranslatePromptResult> {
+    const prompt = await this.promptsRepository.findOne({
+      where: { id: promptId },
+      select: ['id', 'promptCode', 'currentVersion'],
+    });
+    if (!prompt) {
+      return {
+        promptId,
+        eligible: false,
+        reason: 'prompt not found',
+        translated: 0,
+        skipped: 0,
+        failed: 0,
+      };
+    }
+    const body = await this.promptSharedService.getPromptByCode(
+      prompt.promptCode,
+    );
+    const live = prompt.currentVersion
+      ? await this.promptVersionRepository.findOne({
+          where: { promptId, version: prompt.currentVersion },
+          select: ['id'],
+        })
+      : null;
+    return this.translateBody(promptId, body ?? '', live?.id, {
+      retryFailed: true,
+    });
+  }
+
+  /**
+   * Translate one English body of a prompt (the live version, or a candidate
+   * before it goes live) into every eligible language. Languages already
+   * `ready` for this body are skipped; `failed` ones are skipped unless
+   * `retryFailed`, so a background trigger never re-fires a failing call.
+   */
+  async translateBody(
+    promptId: string,
+    body: string,
+    promptVersionId?: string,
+    options: { retryFailed?: boolean } = {},
+  ): Promise<TranslatePromptResult> {
     const base: TranslatePromptResult = {
       promptId,
       eligible: false,
@@ -113,10 +153,6 @@ export class PromptTranslationService {
         reason: `promptType ${prompt.promptType} not translatable`,
       };
     }
-
-    const body = await this.promptSharedService.getPromptByCode(
-      prompt.promptCode,
-    );
     if (!body?.trim()) {
       return { ...base, eligible: true, reason: 'no resolvable English body' };
     }
@@ -128,26 +164,31 @@ export class PromptTranslationService {
     // Sequential: only a handful of languages, and this keeps well under
     // provider rate limits when several prompts are enabled at once.
     for (const language of languages) {
-      const existing = await this.translationRepository.findByPromptAndLanguage(
+      const existing = await this.translationRepository.findForBody(
         promptId,
-        language.id,
+        language.id!,
+        sourceHash,
       );
       if (
-        existing?.status === PromptTranslationStatus.READY &&
-        existing.sourceHash === sourceHash
+        existing?.status === PromptTranslationStatus.READY ||
+        (existing?.status === PromptTranslationStatus.FAILED &&
+          !options.retryFailed)
       ) {
         result.skipped++;
         continue;
       }
 
       try {
-        const one = await this.translateOne(promptId, language.id);
+        const one = await this.translateOne(promptId, language.id!, {
+          body,
+          promptVersionId,
+        });
         if (one.status === PromptTranslationStatus.READY) result.translated++;
         else result.failed++;
       } catch (err) {
         result.failed++;
         this.logger.error(
-          `translatePrompt: ${prompt.promptCode} -> language ${language.id} threw: ${
+          `translateBody: ${prompt.promptCode} -> language ${language.id} threw: ${
             err instanceof Error ? err.message : String(err)
           }`,
         );
@@ -155,6 +196,10 @@ export class PromptTranslationService {
     }
 
     return result;
+  }
+
+  getEligibleTargetLanguages() {
+    return this.targetsService.getEligibleTargetLanguages();
   }
 
   /**
@@ -190,7 +235,12 @@ export class PromptTranslationService {
     }
 
     const rows = await this.translationRepository.getRuntimeRows(
-      codes,
+      Object.fromEntries(
+        Object.entries(englishByCode).map(([code, body]) => [
+          code,
+          this.targetsService.hashBody(body),
+        ]),
+      ),
       languageId,
     );
 
@@ -247,9 +297,24 @@ export class PromptTranslationService {
     return result;
   }
 
-  /** List the stored translation rows for a prompt (all languages) — read model for the UI. */
-  listTranslations(promptId: string) {
-    return this.translationRepository.findAllForPrompt(promptId);
+  /**
+   * The translation rows of one English body of a prompt (all languages) — the
+   * read model for the UI. Defaults to the live version; pass a candidate's
+   * body to see how its translations are getting on.
+   */
+  async listTranslations(promptId: string, body?: string) {
+    const source =
+      body ??
+      (await this.promptsRepository
+        .findOne({ where: { id: promptId }, select: ['id', 'promptCode'] })
+        .then((p) =>
+          p ? this.promptSharedService.getPromptByCode(p.promptCode) : null,
+        ));
+    if (!source?.trim()) return [];
+    return this.translationRepository.findAllForBody(
+      promptId,
+      this.targetsService.hashBody(source),
+    );
   }
 
   /**
@@ -301,6 +366,7 @@ export class PromptTranslationService {
   async translateOne(
     promptId: string,
     languageId: number,
+    options: { body?: string; promptVersionId?: string } = {},
   ): Promise<TranslateOneResult> {
     // 1. Source prompt + its effective English body.
     const source = await this.promptsRepository.findOne({
@@ -311,9 +377,9 @@ export class PromptTranslationService {
       throw new NotFoundException(`Prompt ${promptId} not found`);
     }
 
-    const body = await this.promptSharedService.getPromptByCode(
-      source.promptCode,
-    );
+    const body =
+      options.body ??
+      (await this.promptSharedService.getPromptByCode(source.promptCode));
     if (!body?.trim()) {
       throw new BadRequestException(
         `Prompt ${source.promptCode} has no resolvable English body to translate`,
@@ -358,9 +424,31 @@ export class PromptTranslationService {
       ? String(currentVersion)
       : undefined;
 
-    // 4. Provenance: current version row of the source (best-effort; null for file-backed).
-    const version =
-      await this.promptVersionRepository.getLatestPromptVersion(promptId);
+    // 4. Provenance: the version being translated (the live one by default).
+    const promptVersionId =
+      options.promptVersionId ??
+      (
+        await this.promptsRepository
+          .findOne({
+            where: { id: promptId },
+            select: ['id', 'currentVersion'],
+          })
+          .then((p) =>
+            p?.currentVersion
+              ? this.promptVersionRepository.findOne({
+                  where: { promptId, version: p.currentVersion },
+                  select: ['id'],
+                })
+              : null,
+          )
+      )?.id;
+
+    // A new body's row inherits the language's runtime model, which is a
+    // per-language choice rather than a per-version one.
+    const runtime = await this.translationRepository.latestRuntimeModel(
+      promptId,
+      languageId,
+    );
 
     // 5. Mark in-progress (records engine so a later failure still shows it).
     await this.translationRepository.upsertTranslation({
@@ -368,10 +456,11 @@ export class PromptTranslationService {
       languageId,
       sourceHash,
       status: PromptTranslationStatus.TRANSLATING,
-      promptVersionId: version?.id,
+      promptVersionId,
       provider: engine.provider,
       model: engine.model,
       translationPromptVersion,
+      ...(runtime ?? {}),
     });
 
     // 6. Translate with bounded retry + token guard.
@@ -386,7 +475,7 @@ export class PromptTranslationService {
         const guard = validateTranslationTokens(body, output);
         if (guard.ok) {
           await this.translationRepository.update(
-            { promptId, languageId },
+            { promptId, languageId, sourceHash },
             {
               translatedPrompt: output,
               status: PromptTranslationStatus.READY,
@@ -423,8 +512,13 @@ export class PromptTranslationService {
     await this.translationRepository.markStatus(
       promptId,
       languageId,
+      sourceHash,
       PromptTranslationStatus.FAILED,
       lastError,
+    );
+    this.logger.error(
+      `[TRANSLATION_FAILED] ${source.promptCode} -> ${language.translationCode}: ${lastError}. ` +
+        'That language keeps serving English until it is retried.',
     );
     return {
       status: PromptTranslationStatus.FAILED,

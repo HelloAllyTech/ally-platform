@@ -18,16 +18,12 @@ import { PromptResponse } from '../type/prompt-response.type';
 import { standardizePromptCode } from '../util/prompt-code.util';
 import { parseVariablesFromPrompt } from '../util/parse-variables.util';
 import { reconcileAvailableVariables } from '../util/normalize-available-variable.util';
-import {
-  PROMPT_VERSION_RETENTION_LIMIT,
-  TRANSLATABLE_PROMPT_TYPES,
-} from '../constants/prompt.constants';
+import { TRANSLATABLE_PROMPT_TYPES } from '../constants/prompt.constants';
 import { LoggerService } from 'src/logger/logger.service';
 import { PromptTranslationService } from './prompt-translation.service';
-import {
-  BUILDER_EVAL_GATE_REFUSAL,
-  isBuilderEvalGatedPrompt,
-} from 'src/builder/constants/builder-eval-gate.constants';
+import { PromptVersioningService } from './prompt-versioning.service';
+import { PromptVersionSource } from '../entity/prompt-version.entity';
+import { hashPromptBody } from '../util/prompt-contract.util';
 
 @Injectable()
 export class PromptsService {
@@ -39,6 +35,7 @@ export class PromptsService {
     private readonly promptSharedService: PromptSharedService,
     private readonly dataSource: DataSource,
     private readonly promptTranslationService: PromptTranslationService,
+    private readonly versioning: PromptVersioningService,
   ) {}
 
   async createPrompts(createPromptsDto: CreatePromptsDto): Promise<Prompt[]> {
@@ -49,51 +46,42 @@ export class PromptsService {
         name: promptDto.name,
         description: promptDto.description || '',
         category: promptDto.category,
+        useDashboardOverride: true,
       }),
     );
 
     const savedPrompts = await this.promptsRepository.save(prompts);
 
-    // Create initial versions for all prompts
-    const promptVersions = savedPrompts.map((savedPrompt) =>
-      this.promptVersionRepository.create({
-        promptId: savedPrompt.id,
-        version: 1,
-        prompt:
-          createPromptsDto.prompts.find(
-            (p) =>
-              standardizePromptCode(p.promptCode) === savedPrompt.promptCode,
-          )?.prompt || '',
+    // Each new prompt starts with its text as the live version 1.
+    for (const savedPrompt of savedPrompts) {
+      const body =
+        createPromptsDto.prompts.find(
+          (p) => standardizePromptCode(p.promptCode) === savedPrompt.promptCode,
+        )?.prompt || '';
+      if (!body.trim()) continue;
+      const result = await this.versioning.createAndPromote(savedPrompt.id, {
+        body,
+        baseVersion: null,
+        source: PromptVersionSource.DASHBOARD,
         createdBy: userId,
-        updatedBy: userId,
-      }),
-    );
-
-    await this.promptVersionRepository.save(promptVersions);
-
-    // Update all prompts with current version
-    const updatedPrompts = savedPrompts.map((prompt) => ({
-      ...prompt,
-      currentVersion: 1,
-    }));
-    await this.promptsRepository.save(updatedPrompts);
+      });
+      savedPrompt.currentVersion = result.version;
+    }
 
     return savedPrompts;
   }
 
+  /**
+   * Update a prompt's metadata: name, description, category, studio visibility,
+   * type and the translation opt-in. What the prompt does at runtime — its
+   * text and model settings — changes only through a new version
+   * (`createVersion`, then `promote`), so this refuses those fields when they
+   * differ from the live version. A form that resends unchanged values is fine.
+   */
   async updatePrompt(
     id: string,
     updatePromptDto: UpdatePromptDto,
-    options: {
-      /**
-       * Set only by Builder's replay eval when it publishes a candidate that
-       * passed. Every other caller is refused a behaviour change to a gated
-       * Builder prompt — see builder-eval-gate.constants.
-       */
-      evalApproved?: boolean;
-    } = {},
   ): Promise<boolean> {
-    const userId = Number(ExecutionManager.getUserId());
     const prompt = await this.promptsRepository.findOne({
       where: { id },
     });
@@ -102,19 +90,9 @@ export class PromptsService {
       throw new NotFoundException('Prompt not found');
     }
 
-    if (
-      !options.evalApproved &&
-      isBuilderEvalGatedPrompt(prompt.promptCode) &&
-      (await this.changesBehaviour(prompt, updatePromptDto))
-    ) {
-      throw new ConflictException(BUILDER_EVAL_GATE_REFUSAL);
-    }
+    await this.refuseBehaviourChange(prompt, updatePromptDto);
 
     const updateData: DeepPartial<Prompt> = {};
-
-    if (updatePromptDto.promptCode) {
-      updateData.promptCode = updatePromptDto.promptCode;
-    }
 
     if (updatePromptDto.name) {
       updateData.name = updatePromptDto.name;
@@ -126,28 +104,6 @@ export class PromptsService {
 
     if (updatePromptDto.category !== undefined) {
       updateData.category = updatePromptDto.category;
-    }
-
-    if (updatePromptDto.useDashboardOverride !== undefined) {
-      updateData.useDashboardOverride = updatePromptDto.useDashboardOverride;
-
-      // Restore-to-default path: when the admin flips override true → false,
-      // re-derive `availableVariables` from `defaultPrompt` so the studio's
-      // chip list immediately matches the file's authored baseline instead
-      // of lingering on whatever the dashboard-edited version had. The
-      // dashboard-edit path covers the opposite direction (auto-reconcile
-      // runs inside the transaction below when a new version is committed).
-      if (
-        updatePromptDto.useDashboardOverride === false &&
-        prompt.useDashboardOverride === true &&
-        prompt.defaultPrompt
-      ) {
-        const parsedNames = parseVariablesFromPrompt(prompt.defaultPrompt);
-        updateData.availableVariables = reconcileAvailableVariables(
-          prompt.availableVariables,
-          parsedNames,
-        );
-      }
     }
 
     if (updatePromptDto.kind !== undefined) {
@@ -173,106 +129,125 @@ export class PromptsService {
       updateData.usesBlocks = updatePromptDto.usesBlocks;
     }
 
-    if (updatePromptDto.provider !== undefined) {
-      // Empty string clears the override (back to inferred provider).
-      (updateData as Record<string, unknown>).provider =
-        updatePromptDto.provider || null;
-    }
-
-    if (updatePromptDto.model !== undefined) {
-      // Empty string clears the override (back to code/language default).
-      // Cast: the column is nullable but the entity types `model` as
-      // `string | undefined`; null is the correct SQL value to clear it.
-      (updateData as Record<string, unknown>).model =
-        updatePromptDto.model || null;
-    }
-
-    if (updatePromptDto.temperature !== undefined) {
-      updateData.temperature = updatePromptDto.temperature;
-    }
-
     if (updatePromptDto.translationEnabled !== undefined) {
       updateData.translationEnabled = updatePromptDto.translationEnabled;
     }
 
-    const updated = await this.promptsRepository.update(id, updateData);
-
-    // If prompt content is being updated and dashboard override is enabled, create a new version
-    const useDashboardOverride =
-      updatePromptDto.useDashboardOverride !== undefined
-        ? updatePromptDto.useDashboardOverride
-        : prompt.useDashboardOverride;
-
-    // Resolve content: from DTO, or when enabling override with no version yet, from default/file
-    let contentToVersion: string | null =
-      updatePromptDto.prompt?.trim() || null;
-    if (
-      !contentToVersion &&
-      useDashboardOverride &&
-      (prompt.currentVersion == null || prompt.currentVersion === undefined)
-    ) {
-      const fromDefault =
-        prompt.defaultPrompt?.trim() ||
-        (
-          await this.promptSharedService.getPromptByCode(prompt.promptCode)
-        )?.trim();
-      contentToVersion = fromDefault || null;
-    }
-
-    if (contentToVersion && useDashboardOverride) {
-      await this.dataSource.transaction(async () => {
-        const latestVersion =
-          await this.promptVersionRepository.getLatestPromptVersion(id);
-        const newVersion = (latestVersion?.version || 0) + 1;
-
-        // Create new version in transaction
-        const promptVersion = this.promptVersionRepository.create({
-          promptId: id,
-          version: newVersion,
-          prompt: contentToVersion,
-          createdBy: userId,
-          updatedBy: userId,
-        });
-
-        await this.promptVersionRepository.save(promptVersion);
-
-        // Update current version
-        await this.promptsRepository.update(id, {
-          currentVersion: newVersion,
-        });
-
-        // Apply retention policy: delete versions older than limit
-        const minVersionToKeep = Math.max(
-          1,
-          newVersion - (PROMPT_VERSION_RETENTION_LIMIT - 1),
-        );
-        await this.promptVersionRepository.deleteVersionsBefore(
-          id,
-          minVersionToKeep,
-        );
-
-        // Reconcile availableVariables against the new text so studio
-        // readers (and any required-field check) reflect what the prompt
-        // actually references after this edit. Removed placeholders drop
-        // out of the variable list; survivors keep their per-variable
-        // metadata (label / required); newly-typed `{placeholders}` are
-        // appended as bare `{ name }` entries.
-        const parsedNames = parseVariablesFromPrompt(contentToVersion);
-        const reconciled = reconcileAvailableVariables(
-          prompt.availableVariables,
-          parsedNames,
-        );
-        await this.promptsRepository.update(id, {
-          availableVariables: reconciled,
-        });
-      });
-    }
+    const updated = Object.keys(updateData).length
+      ? await this.promptsRepository.update(id, updateData)
+      : { affected: 1 };
 
     this.maybeTriggerAutoTranslation(id, prompt, updatePromptDto, {
-      versionCreated: !!(contentToVersion && useDashboardOverride),
+      versionCreated: false,
     });
 
     return updated.affected !== 0;
+  }
+
+  /**
+   * Refuse a metadata update that would change what the prompt does: its text,
+   * model settings or code. Codes are stable ids that scenarios and runtimes
+   * look prompts up by.
+   */
+  private async refuseBehaviourChange(
+    prompt: Prompt,
+    dto: UpdatePromptDto,
+  ): Promise<void> {
+    const differs = (next: unknown, current: unknown) =>
+      (next === '' ? null : (next ?? null)) !== (current ?? null);
+    const changed: string[] = [];
+    if (dto.promptCode && dto.promptCode !== prompt.promptCode) {
+      changed.push('promptCode');
+    }
+    if (dto.provider !== undefined && differs(dto.provider, prompt.provider)) {
+      changed.push('provider');
+    }
+    if (dto.model !== undefined && differs(dto.model, prompt.model)) {
+      changed.push('model');
+    }
+    if (
+      dto.temperature !== undefined &&
+      differs(dto.temperature, prompt.temperature)
+    ) {
+      changed.push('temperature');
+    }
+    const next = dto.prompt?.trim();
+    if (next) {
+      const live = (
+        await this.promptSharedService.getPromptByCode(prompt.promptCode)
+      )?.trim();
+      if (next !== live) changed.push('prompt');
+    }
+    if (changed.length) {
+      throw new BadRequestException({
+        statusCode: 400,
+        code: 'use_versions',
+        message:
+          `${changed.join(', ')} can't be changed here. ` +
+          (changed.includes('promptCode')
+            ? 'A prompt code is a stable id. '
+            : 'Save a new version and publish it instead.'),
+        fields: changed,
+      });
+    }
+  }
+
+  /** Save the editor's text and settings as a new candidate version. */
+  async createVersion(
+    id: string,
+    input: {
+      prompt: string;
+      baseVersion: number | null;
+      provider?: string | null;
+      model?: string | null;
+      temperature?: number | null;
+      note?: string | null;
+      evalSummary?: Record<string, unknown> | null;
+    },
+    source: PromptVersionSource = PromptVersionSource.DASHBOARD,
+  ) {
+    const userId = Number(ExecutionManager.getUserId()) || 0;
+    const created = await this.versioning.createVersion(id, {
+      body: input.prompt,
+      baseVersion: input.baseVersion,
+      provider: input.provider || null,
+      model: input.model || null,
+      temperature: input.temperature ?? null,
+      note: input.note ?? null,
+      evalSummary: input.evalSummary ?? null,
+      source,
+      createdBy: userId,
+    });
+    return {
+      version: created.version,
+      contentHash: created.contentHash,
+      status: 'candidate' as const,
+    };
+  }
+
+  promoteVersion(
+    id: string,
+    version: number,
+    expectedCurrentVersion: number | null,
+    options: {
+      allowRollback?: boolean;
+      confirmJudgeRubricChange?: boolean;
+    } = {},
+  ) {
+    return this.versioning.promote(
+      id,
+      version,
+      expectedCurrentVersion,
+      options,
+    );
+  }
+
+  translateVersion(id: string, version: number) {
+    return this.versioning.translateVersion(id, version);
+  }
+
+  listVersions(id: string) {
+    return this.versioning.listVersions(id);
   }
 
   /**
@@ -345,13 +320,8 @@ export class PromptsService {
       `getPrompts returned ${data.length} prompts. searchName: ${searchName}`,
     );
     for (const row of data) {
-      if (!row.useDashboardOverride && row.promptCode) {
-        const fromFolder = await this.promptSharedService.getPromptByCode(
-          row.promptCode,
-        );
-        if (fromFolder !== null) {
-          row.prompt = fromFolder;
-        }
+      if (!row.prompt?.trim() && row.defaultPrompt) {
+        row.prompt = row.defaultPrompt;
       }
     }
     return data;
@@ -369,20 +339,14 @@ export class PromptsService {
 
   /**
    * List variants for a given promptType (e.g. 'main_agent').
-   * Used by the studio prompt picker. Excludes obsolete rows. For each row,
-   * if useDashboardOverride is false the .prompt field is hydrated from the
-   * codebase default, mirroring getPrompts() semantics.
+   * Used by the studio prompt picker. Excludes obsolete rows. `.prompt` is the
+   * live version's text (the default text only when a row has no version).
    */
   async getPromptsByType(promptType: string): Promise<PromptResponse[]> {
     const data = await this.promptsRepository.getPromptsByType(promptType);
     for (const row of data) {
-      if (!row.useDashboardOverride && row.promptCode) {
-        const fromFolder = await this.promptSharedService.getPromptByCode(
-          row.promptCode,
-        );
-        if (fromFolder !== null) {
-          row.prompt = fromFolder;
-        }
+      if (!row.prompt?.trim() && row.defaultPrompt) {
+        row.prompt = row.defaultPrompt;
       }
     }
     return data;
@@ -390,10 +354,9 @@ export class PromptsService {
 
   /**
    * Duplicate a prompt into a new variant row. Copies prompt text, metadata,
-   * promptType, hasStates, availableVariables, usesBlocks. Generates a new
-   * promptCode (`<source>_copy_<short-id>`) and name. Sets useDashboardOverride
-   * true and creates an initial version, so the new variant lives in DB-backed
-   * metadata (the path that resolver_by_code looks up).
+   * promptType, hasStates, availableVariables, usesBlocks, contract and the
+   * live model settings. Generates a new promptCode (`<source>_copy_<short-id>`)
+   * and name, and publishes the copied text as the variant's live version 1.
    */
   async duplicatePrompt(sourceId: string): Promise<Prompt> {
     const userId = Number(ExecutionManager.getUserId());
@@ -480,6 +443,10 @@ export class PromptsService {
         hasStates: newHasStates,
         availableVariables: reconciledAvailableVariables,
         usesBlocks: source.usesBlocks,
+        contract: source.contract ?? null,
+        provider: source.provider,
+        model: source.model,
+        temperature: source.temperature,
       });
       try {
         saved = await this.promptsRepository.save(created);
@@ -511,6 +478,13 @@ export class PromptsService {
       prompt: sourceContent,
       createdBy: userId,
       updatedBy: userId,
+      provider: source.provider ?? null,
+      model: source.model ?? null,
+      temperature: source.temperature ?? null,
+      contentHash: hashPromptBody(sourceContent),
+      source: PromptVersionSource.DUPLICATE,
+      note: `Duplicated from ${source.promptCode}.`,
+      publishedAt: new Date(),
     });
     await this.promptVersionRepository.save(version);
     await this.promptsRepository.update(saved.id, { currentVersion: 1 });
@@ -529,9 +503,19 @@ export class PromptsService {
   }
 
   /**
-   * Sync prompts from folder/codebase to DB. Add-only for new prompts;
-   * for existing prompts, updates defaultPrompt only (preserves dashboard edits).
-   * Automatically marks missing prompts as obsolete (grouping by ally_ai_learn vs native ally-be).
+   * Sync prompts from the Git defaults to the store.
+   *
+   * - A prompt the store doesn't have yet is created, with its default text
+   *   live as version 1. That is how a new prompt reaches production.
+   * - An existing prompt's live text is never touched. Sync refreshes only what
+   *   Git owns: the default text (fallback and Revert baseline), file metadata
+   *   and the code's contract.
+   * - One bad item (say, a dashboard rename that took its name) is logged and
+   *   skipped instead of aborting the rest of the sync.
+   *
+   * Prompts missing from the sync are marked obsolete (grouped by ally_ai_learn
+   * vs native ally-be). That only labels them in the Skills Store; a live prompt
+   * keeps serving, so deleting a default never disables it.
    */
   async syncPrompts(syncPromptsDto: SyncPromptsDto): Promise<{
     added: number;
@@ -549,116 +533,16 @@ export class PromptsService {
 
     for (const item of syncPromptsDto.prompts) {
       const promptCode = standardizePromptCode(item.promptCode);
-      const existing = await this.promptsRepository.findOne({
-        where: { promptCode },
-      });
-
-      // Demoted to debug — fires once per prompt on every container
-      // boot (~30 lines). The aggregate "added/updated" line at the end
-      // of syncPrompts is the useful one for INFO.
-      this.logger.debug(
-        `[PROMPT_SYNC] processing promptCode=${promptCode} bodyChars=${item.prompt?.length ?? 0}`,
-      );
-      if (!existing) {
-        const prompt = this.promptsRepository.create({
-          promptCode,
-          name: item.name,
-          description: item.description || '',
-          category: item.category,
-          defaultPrompt: item.prompt,
-          kind: item.kind,
-          promptType: item.promptType,
-          hasStates: item.hasStates,
-          availableVariables: item.availableVariables,
-          usesBlocks: item.usesBlocks,
-          runtimes: item.runtimes,
-          // A sidecar's default model applies to the new row only. The update
-          // branch below never touches provider/model: once the row exists
-          // they are an admin's choice, and a redeploy must not revert it.
-          ...(item.defaultModel
-            ? { provider: item.defaultProvider, model: item.defaultModel }
-            : {}),
-          isObsolete: false,
-        });
-        const saved = await this.promptsRepository.save(prompt);
-
-        const version = this.promptVersionRepository.create({
-          promptId: saved.id,
-          version: 1,
-          prompt: item.prompt,
-          createdBy: 0,
-          updatedBy: 0,
-        });
-        await this.promptVersionRepository.save(version);
-        await this.promptsRepository.update(saved.id, { currentVersion: 1 });
-        added++;
-      } else {
-        // Sync updates split by `useDashboardOverride`:
-        //
-        //   - `defaultPrompt` (the file's text) is ALWAYS refreshed from
-        //     the file so the Revert-to-default button can restore the
-        //     latest authored baseline.
-        //
-        //   - `name`, `description`, `category`, `kind`, `usesBlocks`,
-        //     `runtimes` are file-driven metadata that sync owns end-to-end.
-        //
-        //   - `availableVariables` is the placeholder list the studio
-        //     reads. When `useDashboardOverride=true`, the dashboard's
-        //     auto-reconcile on save is the source of truth (it reflects
-        //     the live edited text in prompt_versions). Sync MUST NOT
-        //     overwrite it for dashboard-overridden rows, or the next
-        //     restart silently undoes the author's intentional removals.
-        //     For non-overridden rows, sync owns it.
-        //
-        //   - `promptType` / `hasStates` are only overwritten when the
-        //     payload explicitly carries them (backfilled values stay
-        //     intact when older sync sources omit them).
-        //
-        //   - `visibleInStudio` is deliberately absent and must stay absent.
-        //     It's an admin decision made in prompt management, not a file
-        //     fact; adding it here would un-hide a skill on every redeploy.
-        const updatePayload: Partial<Prompt> = {
-          defaultPrompt: item.prompt,
-          name: item.name,
-          description: item.description || '',
-          category: item.category,
-          kind: item.kind,
-          usesBlocks: item.usesBlocks,
-          // File-driven like the rest of this block: the sidecar owns which
-          // runtimes read a prompt, and an omitted value stays NULL, which the
-          // picker reads as "undeclared" and handles conservatively.
-          runtimes: item.runtimes,
-          isObsolete: false, // resurrected if it was obsolete
-        };
-        // Update `availableVariables` from the sync payload when EITHER
-        // the row isn't dashboard-overridden (sync owns the list) OR the
-        // existing row has no list yet (legacy / migration edge — without
-        // this initialization the studio's chip list stays empty for
-        // dashboard-overridden rows that were created before this column
-        // existed, even though the prompt clearly references placeholders).
-        const existingVarsCount = Array.isArray(existing.availableVariables)
-          ? existing.availableVariables.length
-          : 0;
-        if (!existing.useDashboardOverride || existingVarsCount === 0) {
-          updatePayload.availableVariables = item.availableVariables;
-        } else {
-          // Dashboard override active AND existing list non-empty: skip the
-          // sync overwrite. Logged so we can confirm dashboard edits survive
-          // restarts/redeploys (grep `[PROMPT_SYNC] preserved-vars`).
-          this.logger.info(
-            `[PROMPT_SYNC] preserved-vars promptCode=${promptCode} ` +
-              `useDashboardOverride=true existingCount=${existingVarsCount} ` +
-              `syncCount=${item.availableVariables?.length ?? 0}`,
-          );
-        }
-        if (item.promptType !== undefined) {
-          updatePayload.promptType = item.promptType;
-        }
-        if (item.hasStates !== undefined) {
-          updatePayload.hasStates = item.hasStates;
-        }
-        await this.promptsRepository.update(existing.id, updatePayload);
-        updated++;
+      try {
+        const result = await this.syncOne(promptCode, item);
+        if (result === 'added') added++;
+        else updated++;
+      } catch (err) {
+        this.logger.error(
+          `[PROMPT_SYNC] skipped promptCode=${promptCode}: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
       }
     }
 
@@ -716,6 +600,95 @@ export class PromptsService {
     }
 
     return { added, updated };
+  }
+
+  private async syncOne(
+    promptCode: string,
+    item: SyncPromptsDto['prompts'][number],
+  ): Promise<'added' | 'updated'> {
+    const existing = await this.promptsRepository.findOne({
+      where: { promptCode },
+    });
+    // Demoted to debug — fires once per prompt on every container boot.
+    this.logger.debug(
+      `[PROMPT_SYNC] processing promptCode=${promptCode} bodyChars=${item.prompt?.length ?? 0}`,
+    );
+    if (!existing) {
+      const prompt = this.promptsRepository.create({
+        promptCode,
+        name: item.name,
+        description: item.description || '',
+        category: item.category,
+        defaultPrompt: item.prompt,
+        useDashboardOverride: true,
+        kind: item.kind,
+        promptType: item.promptType,
+        hasStates: item.hasStates,
+        availableVariables: item.availableVariables,
+        usesBlocks: item.usesBlocks,
+        runtimes: item.runtimes,
+        contract: item.contract ?? null,
+        // A sidecar's default model applies to the new row only: once the row
+        // exists, model settings belong to its versions.
+        ...(item.defaultModel
+          ? { provider: item.defaultProvider, model: item.defaultModel }
+          : {}),
+        isObsolete: false,
+      });
+      const saved = await this.promptsRepository.save(prompt);
+
+      const version = this.promptVersionRepository.create({
+        promptId: saved.id,
+        version: 1,
+        prompt: item.prompt,
+        createdBy: 0,
+        updatedBy: 0,
+        provider: item.defaultModel ? (item.defaultProvider ?? null) : null,
+        model: item.defaultModel ?? null,
+        contentHash: hashPromptBody(item.prompt),
+        source: PromptVersionSource.SYNC,
+        note: 'Created from the default in Git.',
+        publishedAt: new Date(),
+      });
+      await this.promptVersionRepository.save(version);
+      await this.promptsRepository.update(saved.id, { currentVersion: 1 });
+      return 'added';
+    }
+
+    // Git owns the default text, the file metadata and the contract. The live
+    // version, model settings and studio visibility belong to the store.
+    //
+    // `availableVariables` carries the studio's labels and required flags, and
+    // is reconciled against the live text on every promotion; sync only seeds
+    // it for a row that has none.
+    // `name` is left alone too: a rename in the Skills Store is an admin's
+    // choice, and overwriting it could collide with another row's name.
+    const updatePayload: Partial<Prompt> = {
+      defaultPrompt: item.prompt,
+      description: item.description || '',
+      category: item.category,
+      kind: item.kind,
+      usesBlocks: item.usesBlocks,
+      runtimes: item.runtimes,
+      isObsolete: false, // resurrected if it was obsolete
+    };
+    if (item.contract !== undefined) {
+      updatePayload.contract = item.contract ?? null;
+    }
+    const existingVarsCount = Array.isArray(existing.availableVariables)
+      ? existing.availableVariables.length
+      : 0;
+    if (existingVarsCount === 0) {
+      updatePayload.availableVariables = item.availableVariables;
+    }
+    if (item.promptType !== undefined) {
+      updatePayload.promptType = item.promptType;
+    }
+    if (item.hasStates !== undefined) {
+      updatePayload.hasStates = item.hasStates;
+    }
+    await this.promptsRepository.update(existing.id, updatePayload);
+    return 'updated';
   }
 
   async deleteObsoletePrompt(id: string): Promise<void> {
@@ -832,47 +805,6 @@ export class PromptsService {
     return { count, scenarios };
   }
 
-  /**
-   * Whether an update would change what a prompt does at runtime: its text,
-   * which version serves (the override flag), or the model settings on the
-   * row. Renames, descriptions and studio visibility do not.
-   *
-   * The text counts only when it differs from what is live: the editor sends
-   * the whole form on every save, so an unchanged body arriving beside a new
-   * description is not an edit to the prompt.
-   */
-  private async changesBehaviour(
-    prompt: Prompt,
-    dto: UpdatePromptDto,
-  ): Promise<boolean> {
-    const differs = (next: unknown, current: unknown) =>
-      (next === '' ? null : (next ?? null)) !== (current ?? null);
-    if (
-      dto.useDashboardOverride !== undefined &&
-      dto.useDashboardOverride !== prompt.useDashboardOverride
-    ) {
-      return true;
-    }
-    if (dto.provider !== undefined && differs(dto.provider, prompt.provider)) {
-      return true;
-    }
-    if (dto.model !== undefined && differs(dto.model, prompt.model)) {
-      return true;
-    }
-    if (
-      dto.temperature !== undefined &&
-      differs(dto.temperature, prompt.temperature)
-    ) {
-      return true;
-    }
-    const next = dto.prompt?.trim();
-    if (!next) return false;
-    const live = (
-      await this.promptSharedService.getPromptByCode(prompt.promptCode)
-    )?.trim();
-    return next !== live;
-  }
-
   /** A prompt's id from its code, or null. */
   async findIdByCode(promptCode: string): Promise<string | null> {
     const prompt = await this.promptsRepository.findOne({
@@ -883,48 +815,30 @@ export class PromptsService {
   }
 
   /**
-   * Revert prompt to codebase default (copies defaultPrompt into new version).
+   * Revert a prompt to its default text from Git: a new version carrying the
+   * default, put live with the live model settings, translations included.
+   * Goes through the same write path as every other change.
    */
   async revertPrompt(id: string): Promise<boolean> {
     const prompt = await this.promptsRepository.findOne({ where: { id } });
     if (!prompt) {
       throw new NotFoundException('Prompt not found');
     }
-    // Reverting a gated Builder prompt to its file is a behaviour change like
-    // any other, and the file text has not been through the eval either.
-    if (isBuilderEvalGatedPrompt(prompt.promptCode)) {
-      throw new ConflictException(BUILDER_EVAL_GATE_REFUSAL);
-    }
-    if (!prompt.defaultPrompt) {
+    if (!prompt.defaultPrompt?.trim()) {
       throw new NotFoundException(
-        'Cannot revert: no default prompt (not synced from codebase)',
+        'Cannot revert: this prompt has no default text in Git',
       );
     }
-
-    const userId = Number(ExecutionManager.getUserId());
-    const latestVersion =
-      await this.promptVersionRepository.getLatestPromptVersion(id);
-    const newVersion = (latestVersion?.version || 0) + 1;
-
-    const promptVersion = this.promptVersionRepository.create({
-      promptId: id,
-      version: newVersion,
-      prompt: prompt.defaultPrompt,
-      createdBy: userId,
-      updatedBy: userId,
+    await this.versioning.createAndPromote(id, {
+      body: prompt.defaultPrompt,
+      baseVersion: await this.versioning.latestVersionOf(id),
+      provider: prompt.provider ?? null,
+      model: prompt.model ?? null,
+      temperature: prompt.temperature ?? null,
+      source: PromptVersionSource.REVERT,
+      note: 'Reverted to the default text in Git.',
+      createdBy: Number(ExecutionManager.getUserId()) || 0,
     });
-    await this.promptVersionRepository.save(promptVersion);
-    await this.promptsRepository.update(id, { currentVersion: newVersion });
-
-    const minVersionToKeep = Math.max(
-      1,
-      newVersion - (PROMPT_VERSION_RETENTION_LIMIT - 1),
-    );
-    await this.promptVersionRepository.deleteVersionsBefore(
-      id,
-      minVersionToKeep,
-    );
-
     return true;
   }
 }
