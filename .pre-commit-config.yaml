@@ -1,0 +1,79 @@
+# pre-commit only reads a config at the repository root, so the per-service ones
+# (ally-be, ally-web, ally-ai, ally-ai-learn) stopped applying at the move to
+# ally-platform. This merges them, each hook scoped to the services that had it.
+# .githooks/pre-commit runs it; `pre-commit install` refuses while core.hooksPath
+# is set, and is not needed.
+repos:
+  # Secret scanning, once for the whole repo (ally-be, ally-web and ally-ai had it).
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: detect-private-key
+      - id: detect-aws-credentials
+        args: [--allow-missing-credentials]
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=500]
+        files: ^(ally-be|ally-web|ally-ai)/
+      - id: check-added-large-files
+        name: check for added large files (ally-ai-learn)
+        files: ^ally-ai-learn/
+      - id: end-of-file-fixer
+        files: ^(ally-be|ally-web|ally-ai|ally-ai-learn)/
+      - id: trailing-whitespace
+        files: ^(ally-be|ally-web|ally-ai|ally-ai-learn)/
+      - id: debug-statements
+        files: ^(ally-ai|ally-ai-learn)/
+
+  # Python formatting and lint for ally-ai and ally-ai-learn, as each had it.
+  - repo: https://github.com/psf/black
+    rev: 24.2.0
+    hooks:
+      - id: black
+        language_version: python3.12
+        args: [--line-length=88, --target-version=py312]
+        files: ^(ally-ai|ally-ai-learn)/
+
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        args: [--profile=black, --line-length=88]
+        files: ^(ally-ai|ally-ai-learn)/
+
+  # flake8 reads its config only from the working directory, so each service's
+  # .flake8 (ignores, per-file ignores) is named explicitly.
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.0.0
+    hooks:
+      - id: flake8
+        name: flake8 (ally-ai)
+        args: [--config=ally-ai/.flake8]
+        files: ^ally-ai/
+      - id: flake8
+        name: flake8 (ally-ai-learn)
+        args: [--config=ally-ai-learn/.flake8]
+        files: ^ally-ai-learn/
+
+  # Each service's tests, when that service's Python changes.
+  - repo: local
+    hooks:
+      - id: pytest-ally-ai
+        name: pytest (ally-ai)
+        entry: bash -c 'cd ally-ai && poetry run pytest'
+        language: system
+        types: [python]
+        files: ^ally-ai/
+        pass_filenames: false
+      - id: pytest-ally-ai-learn
+        name: pytest (ally-ai-learn)
+        entry: bash -c 'cd ally-ai-learn && poetry run pytest -n auto'
+        language: system
+        types: [python]
+        files: ^ally-ai-learn/
+        pass_filenames: false

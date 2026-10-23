@@ -28,8 +28,7 @@
 # `--no-verify` around permanently, which loses every other check with it.
 set -u
 
-# stdin carries the ref list and can only be read once, so capture it here and
-# hand it on to the docs guard below.
+# stdin carries the ref list and can only be read once.
 REFS="$(cat)"
 
 run_build_check() {
@@ -48,7 +47,7 @@ run_build_check() {
     # All-zero remote sha means the branch is new to the remote; fall back to
     # compiling rather than guessing a range.
     case "$remote_sha" in
-      *[!0]*) changed=$(git diff --name-only "$remote_sha" "$local_sha" 2>/dev/null || echo "?") ;;
+      *[!0]*) changed=$(git diff --name-only --relative "$remote_sha" "$local_sha" 2>/dev/null || echo "?") ;;
       *) changed="?" ;;
     esac
     if [ "$changed" != "?" ] && ! printf '%s\n' "$changed" | grep -qE '\.ts$'; then
@@ -75,58 +74,9 @@ EOF
   fi
 }
 
-# ── Workflow YAML, before an unparseable one reaches master ─────────────────
-#
-# GitHub does not reject an invalid workflow file. It accepts the push, then
-# creates a failed run with no jobs for every trigger, and the workflow simply
-# stops working. `builder-session.yml` broke exactly that way on a one-character
-# mistake — `run: "$PROTOCOL/…/run-engine.sh" /tmp/build-prompt.txt`, where a
-# YAML scalar that opens with a quote may not carry anything after the closing
-# one. Nothing local caught it, and the repo's own "Workflow lint" check runs on
-# pull requests, which trunk-based development does not produce.
-#
-# Parsing is the whole check: this catches a file that cannot be read at all,
-# not a schema mistake. Skipped when Ruby is unavailable rather than guessed at.
-run_workflow_check() {
-  [ "${SKIP_WORKFLOW_CHECK:-}" = "1" ] && return 0
-  command -v ruby >/dev/null 2>&1 || return 0
-
-  local bad=0 file
-  for file in .github/workflows/*.yml .github/workflows/*.yaml; do
-    [ -e "$file" ] || continue
-    ruby -ryaml -e 'begin
-      YAML.load_file(ARGV[0])
-    rescue => e
-      warn "pre-push: INVALID WORKFLOW #{ARGV[0]}"
-      warn "  #{e.message}"
-      exit 1
-    end' "$file" || bad=1
-  done
-
-  if [ "$bad" = "1" ]; then
-    echo "" >&2
-    echo "An unparseable workflow is accepted by GitHub and then never runs," >&2
-    echo "which looks like the workflow being broken rather than the file." >&2
-    echo "Override with SKIP_WORKFLOW_CHECK=1 git push if you mean it." >&2
-    return 1
-  fi
-}
-
-run_workflow_check || exit 1
+# The workflow-YAML check moved to the monorepo root hook (.githooks/pre-push):
+# workflows live in the root .github/ now.
 
 run_build_check || exit 1
 
-# ally-docs-guard — checks .docs-map.yml before a push to the default branch.
-# Canonical source: https://raw.githubusercontent.com/HelloAllyTech/.github/main/hooks/pre-push
-# Caches into .git/docs-guard/, refreshes daily, and never blocks on its own failures.
-CACHE="$(git rev-parse --git-dir)/docs-guard/pre-push"
-if [ ! -f "$CACHE" ] || [ -n "$(find "$CACHE" -mmin +1440 2>/dev/null)" ]; then
-  mkdir -p "$(dirname "$CACHE")"
-  curl -fsSL --max-time 5 "https://raw.githubusercontent.com/HelloAllyTech/.github/main/hooks/pre-push" -o "$CACHE.tmp" 2>/dev/null \
-    && mv "$CACHE.tmp" "$CACHE" || rm -f "$CACHE.tmp"
-fi
-[ -f "$CACHE" ] || exit 0
-command -v bash >/dev/null 2>&1 || exit 0
-exec bash "$CACHE" <<EOF
-$REFS
-EOF
+# The shared docs guard runs in CI (docs.yml) on every push and pull request.

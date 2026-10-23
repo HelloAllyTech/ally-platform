@@ -16,7 +16,9 @@
 set -e
 
 # Staged TS files, excluding deletions (ACMR = added/copied/modified/renamed).
-FILES=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.ts$' || true)
+# --relative: run from ally-be/ by the monorepo's root hook, so only this
+# service's files, with paths eslint and jest resolve from here.
+FILES=$(git diff --cached --name-only --relative --diff-filter=ACMR | grep -E '\.ts$' || true)
 
 if [ -z "$FILES" ]; then
   echo "pre-commit: no staged TypeScript files, nothing to check"

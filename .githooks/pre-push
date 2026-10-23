@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# Root pre-push for the ally-platform monorepo.
+#
+#   1. Every workflow file must parse. GitHub accepts an unparseable workflow, then
+#      silently never runs it. Needs ruby; skipped without it.
+#      `SKIP_WORKFLOW_CHECK=1 git push` skips it.
+#   2. Each service's own .husky/pre-push (ally-be's build, ally-web's typecheck),
+#      from inside the service, when the push changes that service.
+#
+# The docs guard the per-service hooks used to fetch and run is not repeated here:
+# the Docs guard workflow (docs.yml) runs it on every push and pull request.
+set -u
+# HUSKY=0 turns hooks off, as it did under husky (the Builder workflows set it).
+[ "${HUSKY:-}" = "0" ] && exit 0
+cd "$(git rev-parse --show-toplevel)"
+
+# stdin carries the ref list and can only be read once.
+REFS="$(cat)"
+
+# Root-relative files the push changes, or "?" for a ref new to the remote, where
+# there is no range to compare and every service counts as changed.
+changed_files() {
+  local ref local_sha remote_sha
+  while read -r ref local_sha _ remote_sha; do
+    [ -n "${ref:-}" ] || continue
+    case "$local_sha" in *[!0]*) ;; *) continue ;; esac
+    case "$remote_sha" in
+      *[!0]*) git diff --name-only "$remote_sha" "$local_sha" 2>/dev/null || echo "?" ;;
+      *) echo "?" ;;
+    esac
+  done <<REFS_EOF
+$REFS
+REFS_EOF
+}
+CHANGED="$(changed_files)"
+
+if [ "${SKIP_WORKFLOW_CHECK:-}" != "1" ] && command -v ruby >/dev/null 2>&1; then
+  bad=0
+  for file in .github/workflows/*.yml .github/workflows/*.yaml; do
+    [ -e "$file" ] || continue
+    ruby -ryaml -e 'begin
+      YAML.load_file(ARGV[0])
+    rescue => e
+      warn "pre-push: INVALID WORKFLOW #{ARGV[0]}"
+      warn "  #{e.message}"
+      exit 1
+    end' "$file" || bad=1
+  done
+  if [ "$bad" = "1" ]; then
+    echo "An unparseable workflow is accepted by GitHub and then never runs." >&2
+    echo "Override with SKIP_WORKFLOW_CHECK=1 git push if you mean it." >&2
+    exit 1
+  fi
+fi
+
+for svc in ally-be ally-web; do
+  [ -f "$svc/.husky/pre-push" ] || continue
+  if printf '%s\n' "$CHANGED" | grep -qE "^($svc/|\?$)"; then
+    echo "── $svc"
+    (cd "$svc" && bash .husky/pre-push <<REFS_EOF
+$REFS
+REFS_EOF
+    ) || exit 1
+  fi
+done
