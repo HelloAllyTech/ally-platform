@@ -55,10 +55,17 @@ jobs:
           echo "::add-mask::${TOKEN}"
           { echo "BUILDER_GH_TOKEN=${TOKEN}"; echo "GH_TOKEN=${TOKEN}"; } >> "$GITHUB_ENV"
 
+      # The monorepo is both the protocol (ally-be/scripts/builder) and, since
+      # the 2026-10-23 cutover, every service to map: their own repos are
+      # archived, and a map of one would describe code frozen at the move.
+      # Full history but no blobs up front, so a map can still read a
+      # service's recent direction from `git log`.
       - uses: actions/checkout@v4
         with:
           path: protocol
           token: ${{ steps.app.outputs.token }}
+          fetch-depth: 0
+          filter: blob:none
 
       - uses: actions/setup-node@v4
         with:
@@ -78,7 +85,7 @@ jobs:
             # Per-repo failure is tolerated: one repo whose clone or model call
             # failed should not cost the other four their refresh. A stale map
             # is usable; no map at all sends the agent back to paging files.
-            if ! protocol/ally-be/scripts/builder/refresh-repo-map.sh "$repo"; then
+            if ! PLATFORM_DIR="${GITHUB_WORKSPACE}/protocol" protocol/ally-be/scripts/builder/refresh-repo-map.sh "$repo"; then
               echo "::warning::Could not refresh the map for ${repo}"
               failed="${failed} ${repo}"
             fi
@@ -114,10 +121,17 @@ jobs:
           for repo in $(echo "$REFRESH_REPOS" | jq -r '.[]'); do
             echo "::group::catalog $repo"
             dir="$(mktemp -d)"
-            if git clone -q --depth 1 \
+            # A service is its folder of the monorepo checkout; anything else
+            # is still a repo of its own.
+            src="protocol/${repo}"
+            if [ ! -d "$src" ]; then
+              src="${dir}/${repo}"
+              git clone -q --depth 1 \
                 "https://x-access-token:${BUILDER_GH_TOKEN}@github.com/${GITHUB_REPOSITORY_OWNER}/${repo}.git" \
-                "${dir}/${repo}" \
-              && node protocol/ally-be/scripts/builder/extract-catalog.mjs "$repo" "${dir}/${repo}" > "${dir}/catalog.json" \
+                "$src" || src=""
+            fi
+            if [ -n "$src" ] \
+              && node protocol/ally-be/scripts/builder/extract-catalog.mjs "$repo" "$src" > "${dir}/catalog.json" \
               && curl -fsS -X POST \
                 "${ALLY_BE_API_URL}/api/v1/builder/pipeline/repo-catalogs" \
                 -H "x-api-key: ${ALLY_BE_API_KEY}" \

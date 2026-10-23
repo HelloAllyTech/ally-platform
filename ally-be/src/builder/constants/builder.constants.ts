@@ -231,8 +231,41 @@ export const BUILDER_TRACK_RECORD_WINDOW = 10;
  * working day.
  */
 export const BUILDER_RELEASE_TIMEOUT_MS = 90 * 60 * 1000;
+/**
+ * Where Builder's workflows run: a service name, which `GithubActionsService`
+ * routes to the monorepo (`GITHUB_MONOREPO`) since the 2026-10-23 cutover.
+ */
 export const BUILDER_WORKFLOW_REPO = 'ally-be';
 export const BUILDER_WORKFLOW_REF = 'master';
+
+/**
+ * How Builder finds ITS run of a workflow that now serves every service.
+ *
+ * Before the cutover each service had its own `builder.yml`, so "the oldest
+ * run since we asked" was ours. In the monorepo one workflow file runs for
+ * every Builder issue, PR comment, review and design, and that rule would pick
+ * up another session's run — then cancel it, or fail a healthy build because
+ * the run it found finished without a pull request. Each workflow puts the id
+ * that identifies the work in its `run-name`, and these are the substrings
+ * ally-be matches (`findRunSince({ titleIncludes })`), as Bug Hunter does.
+ *
+ * The issue marker carries the event as a delimiter, so `#12 (` never matches
+ * `#123 (`. Kept in step with the `run-name:` lines of `builder.yml`,
+ * `builder-review.yml` and `builder-session.yml`.
+ */
+export const builderIssueRunTitle = (
+  issueNumber: number,
+  event: 'issues' | 'issue_comment',
+): string => `#${issueNumber} (${event})`;
+export const builderRunTitle = (runId: string): string => `run ${runId}`;
+
+/**
+ * The service an issue Builder raises is for, carried in its body next to the
+ * run id. `builder.yml` reads it to set up that service — its runtime, its
+ * dependencies, its folder — since one workflow now builds all five.
+ */
+export const builderServiceMarker = (service: string): string =>
+  `<!-- builder-service: ${service} -->`;
 
 /**
  * How long a dispatch may go uncorrelated before we call it lost.

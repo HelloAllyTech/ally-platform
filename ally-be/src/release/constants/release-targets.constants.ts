@@ -1,3 +1,8 @@
+import {
+  pathWithinService,
+  serviceForPath,
+} from 'src/github/constants/github-repos.constants';
+
 /**
  * What production deployables exist, and which one a change belongs to.
  *
@@ -152,6 +157,38 @@ export function resolveReleaseTargets(
     // No targets at all is ambiguous for the obvious reason. Leftover files
     // alongside real matches is the subtler one: shared code changed, and it
     // ships in apps whose own files this pull request never touched.
+    ambiguous: matched.size === 0 || unresolved.length > 0,
+  };
+}
+
+/**
+ * `resolveReleaseTargets` for a pull request opened in the monorepo since the
+ * 2026-10-23 cutover, whose files carry `ally-be/`, `ally-web/`… in front.
+ *
+ * Every file is attributed through its service folder, then judged exactly as
+ * that service's own repo would have judged it — so `ally-web/libs/` is still
+ * left over (it ships in both frontends), and a pull request touching the
+ * backend and the admin app releases both. A file outside every service
+ * folder (root CI, scripts, the wiki source) ships in no deployable and is
+ * left over too, which makes the set ambiguous: an automatic caller stops and
+ * a person decides, rather than releasing the part it understood.
+ */
+export function resolveMonorepoReleaseTargets(
+  files: readonly string[],
+): ReleaseTargetSet {
+  const matched = new Map<string, ReleaseTarget>();
+  const unresolved: string[] = [];
+  for (const file of files) {
+    const service = serviceForPath(file);
+    const target = service
+      ? resolveReleaseTarget(service, pathWithinService(file))
+      : null;
+    if (target) matched.set(target.workflow, target);
+    else unresolved.push(file);
+  }
+  return {
+    targets: [...matched.values()],
+    unresolved,
     ambiguous: matched.size === 0 || unresolved.length > 0,
   };
 }

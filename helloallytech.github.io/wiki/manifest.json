@@ -126,7 +126,7 @@
         "log"
       ],
       "last_reconciled": "",
-      "words": 11283,
+      "words": 11436,
       "url": "https://tech.helloally.ai/#/wiki/log.md",
       "skip_reason": "append-only history — read only when auditing what changed"
     },
@@ -258,7 +258,7 @@
         "llm"
       ],
       "last_reconciled": "2026-09-21",
-      "words": 3293,
+      "words": 3436,
       "url": "https://tech.helloally.ai/#/wiki/platform/builder-agent.md",
       "skip_reason": ""
     },
@@ -587,7 +587,7 @@
         "vite"
       ],
       "last_reconciled": "2026-09-22",
-      "words": 1401,
+      "words": 1417,
       "url": "https://tech.helloally.ai/#/wiki/repos/ally-web.md",
       "skip_reason": ""
     },

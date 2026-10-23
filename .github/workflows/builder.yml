@@ -1,8 +1,14 @@
 # Builder works issues labelled `builder` into pull requests with opencode.
-# The logic is shared: HelloAllyTech/ally-be/.github/workflows/builder-opencode.yml.
+# The logic is in builder-opencode.yml, which also works out which service an
+# issue or pull request is for: since the 2026-10-23 monorepo cutover this one
+# workflow builds all five.
 # Only org members can drive it: the label needs write access, and a `/oc`
 # comment is acted on only from an owner, member or collaborator.
 name: Builder
+# The issue or pull request number and the event are in the title: ally-be
+# finds a build's run by them (builderIssueRunTitle), because every Builder
+# issue and every `/oc` comment in the monorepo runs this same workflow.
+run-name: "Builder #${{ github.event.issue.number }} (${{ github.event_name }})"
 
 on:
   issues:
@@ -26,8 +32,4 @@ jobs:
       pull-requests: write
       issues: write
     uses: ./.github/workflows/builder-opencode.yml
-    with:
-      node-version: '24'
-      install-command: npm ci
-      node-options: '--max-old-space-size=6144'
     secrets: inherit
