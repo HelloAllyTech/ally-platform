@@ -535,6 +535,8 @@ export const ApiEndpoints = {
     COMPETENCY_MAP: "/v1/analytics/competency-map",
     TRACK_DROPOFF: "/v1/analytics/track-dropoff",
     COACHING_LOOP: "/v1/analytics/coaching-loop",
+    // Ratings & comments tab (AAQ-238/239): learners' own post-session words.
+    LEARNER_FEEDBACK: "/v1/analytics/learner-feedback",
     ORG_HEALTH: "/v1/analytics/org-health",
     // Helping skills → "Is the measure sound?" (AAQ-220..223), Quality &
     // sentiment confidence (AAQ-230/231) and the Orgs scorecard (AAQ-232).

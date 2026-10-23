@@ -17,6 +17,7 @@ import {
 import { AnalyticsService } from '../service/analytics.service';
 import { ActivationAnalyticsService } from '../service/activation-analytics.service';
 import { CoachingLoopAnalyticsService } from '../service/coaching-loop-analytics.service';
+import { LearnerFeedbackAnalyticsService } from '../service/learner-feedback-analytics.service';
 import { CohortAnalyticsService } from '../service/cohort-analytics.service';
 import { CompetencyMapAnalyticsService } from '../service/competency-map-analytics.service';
 import { XpGrowthAnalyticsService } from '../service/xp-growth-analytics.service';
@@ -298,6 +299,10 @@ import {
   CoachingLoopResponseDto,
 } from '../dto/coaching-loop-analytics.dto';
 import {
+  LearnerFeedbackQueryDto,
+  LearnerFeedbackResponseDto,
+} from '../dto/learner-feedback-analytics.dto';
+import {
   OrgHealthQueryDto,
   OrgHealthResponseDto,
 } from '../dto/org-health-analytics.dto';
@@ -434,6 +439,7 @@ export class AnalyticsController {
     private readonly competencyMapAnalyticsService: CompetencyMapAnalyticsService,
     private readonly trackDropoffAnalyticsService: TrackDropoffAnalyticsService,
     private readonly coachingLoopAnalyticsService: CoachingLoopAnalyticsService,
+    private readonly learnerFeedbackAnalyticsService: LearnerFeedbackAnalyticsService,
     private readonly orgHealthAnalyticsService: OrgHealthAnalyticsService,
     private readonly orgSessionDistributionAnalyticsService: OrgSessionDistributionAnalyticsService,
     private readonly learnerKpisAnalyticsService: LearnerKpisAnalyticsService,
@@ -1744,6 +1750,32 @@ export class AnalyticsController {
     @Query() query: CoachingLoopQueryDto,
   ): Promise<CoachingLoopResponseDto> {
     return this.coachingLoopAnalyticsService.getCoachingLoop(query);
+  }
+
+  @Get('learner-feedback')
+  @OrgScopedRoute()
+  @RequireFeatureToggle(FeatureToggleKey.ANALYTICS)
+  @ApiOperation({
+    summary:
+      'Post-session learner ratings and comments, as a feed (super-admin)',
+    description:
+      "Every learner's 1-5 rating of a roleplay and the comment they wrote " +
+      'with it, newest session first, latest rating per session. Includes ' +
+      'sessions that ended with no conversation, where the complaints usually ' +
+      'are, so counts can run slightly above the Average rating chart. The ' +
+      '`summary` covers the whole window and ignores `ratings`, ' +
+      '`commentsOnly` and `search`; `items` and `total` honour them. ' +
+      '`commentsOnly` defaults to true. Test organisations are excluded.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Learner ratings and comments retrieved successfully',
+    type: LearnerFeedbackResponseDto,
+  })
+  async getLearnerFeedback(
+    @Query() query: LearnerFeedbackQueryDto,
+  ): Promise<LearnerFeedbackResponseDto> {
+    return this.learnerFeedbackAnalyticsService.getLearnerFeedback(query);
   }
 
   @Get('org-health')
