@@ -1,12 +1,12 @@
 # STT Providers
 
-**Purpose.** This document describes the STT provider abstraction layer, the `BaseSTTClient` interface, the three supported providers, and language format handling.
+**Purpose.** This document describes the STT provider abstraction layer, the `BaseSTTClient` interface, the four supported providers, and language format handling.
 
 ---
 
 ## Overview
 
-STT (Speech-to-Text) transcribes the counselor's voice into text for the LangGraph pipeline. The system supports three providers, each implemented as a subclass of `BaseSTTClient`.
+STT (Speech-to-Text) transcribes the counselor's voice into text for the LangGraph pipeline. The system supports four providers, each implemented as a subclass of `BaseSTTClient`.
 
 ## BaseSTTClient Interface
 
@@ -95,4 +95,5 @@ DEFAULT_STT_CONFIG = {"provider": "google", "model": "chirp_2", "location": "asi
 - `app/stt/deepgram.py` -- `DeepgramSTTClient`
 - `app/stt/google.py` -- `GoogleSTTClient`
 - `app/stt/sarvam.py` -- `SarvamSTTClient`
+- `app/stt/elevenlabs.py` -- `ElevenLabsSTTClient`
 - `app/core/constants.py` -- `STTProvider` enum, `GoogleSTTConfig`
