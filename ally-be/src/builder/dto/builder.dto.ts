@@ -137,6 +137,35 @@ export class CreateBuilderSessionDto {
   title?: string;
 }
 
+export class BuilderSessionSummaryDto {
+  @ApiProperty({ format: 'uuid' })
+  id!: string;
+
+  @ApiProperty()
+  title!: string;
+
+  @ApiProperty({ enum: BuilderSessionStatus })
+  status!: BuilderSessionStatus;
+
+  @ApiPropertyOptional({ type: [String] })
+  repos?: string[] | null;
+
+  @ApiPropertyOptional({ description: 'Coder model for build runs' })
+  model?: string | null;
+
+  @ApiProperty({ description: 'Total cost in USD' })
+  totalCostUsd!: string;
+
+  @ApiPropertyOptional({ description: 'Name of the creator' })
+  createdByName?: string | null;
+
+  @ApiProperty({ description: 'When the session was last updated' })
+  updatedAt!: Date;
+
+  @ApiPropertyOptional({ description: 'When the session was archived' })
+  archivedAt?: Date | null;
+}
+
 export class UpdateBuilderSessionDto {
   @ApiPropertyOptional()
   @IsOptional()
