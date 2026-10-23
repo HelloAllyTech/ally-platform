@@ -1,3 +1,9 @@
+import {
+  isMonorepoService,
+  pathWithinService,
+  serviceForPath,
+} from 'src/github/constants/github-repos.constants';
+
 /**
  * When a merged change reached users — decided from release history, never by
  * a model.
@@ -122,6 +128,61 @@ export function deployablesFor(
     default:
       return [];
   }
+}
+
+const ALL_DEPLOYABLES: Deployable[] = [
+  'ally-be',
+  'ally-ai',
+  'ally-ai-learn',
+  'ally-web:admin',
+  'ally-web:helpline',
+  'ally-mobile',
+];
+
+/**
+ * `deployablesFor` for a change merged in the monorepo since the 2026-10-23
+ * cutover, whose files carry `ally-be/`, `ally-web/`… in front.
+ *
+ * Each file's first folder names its service, and the rest of the path is
+ * judged exactly as that service's own repo would have been, so a
+ * `ally-web/libs/` change still waits on both product apps. A file outside
+ * every service folder (root CI, scripts, the wiki source) ships in nothing.
+ *
+ * The one rule that differs: a change nobody can attribute — no file list and
+ * no app names — waits on EVERY deployable rather than none. A standalone
+ * repo's name said what shipped; the monorepo's says nothing, and "live the
+ * moment it merged" would publish a customer-facing update for code that has
+ * not shipped. Announcing late is a small disappointment; announcing early is
+ * a promise broken in public.
+ */
+export function monorepoDeployablesFor(
+  files: readonly string[],
+  apps: readonly string[] = [],
+): Deployable[] {
+  const filesByService = new Map<string, string[]>();
+  for (const file of files) {
+    const service = serviceForPath(file);
+    if (service) {
+      filesByService.set(service, [
+        ...(filesByService.get(service) ?? []),
+        pathWithinService(file),
+      ]);
+    }
+  }
+  const found = new Set<Deployable>();
+  for (const [service, serviceFiles] of filesByService) {
+    for (const deployable of deployablesFor(service, serviceFiles)) {
+      found.add(deployable);
+    }
+  }
+  if (files.length > 0) return [...found];
+
+  for (const app of apps) {
+    if (isMonorepoService(app) && app !== 'ally-web') found.add(app);
+    const webApp = WEB_APP_NAMES[app];
+    if (webApp) found.add(webApp);
+  }
+  return found.size > 0 ? [...found] : [...ALL_DEPLOYABLES];
 }
 
 function firstRunStartingAfter(

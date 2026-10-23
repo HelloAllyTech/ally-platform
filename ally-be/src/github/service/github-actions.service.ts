@@ -3,6 +3,12 @@ import axios, { AxiosError } from 'axios';
 
 import { LoggerService } from 'src/logger/logger.service';
 import { AppConfigService } from 'src/config/config.service';
+import { isMonorepoService } from 'src/github/constants/github-repos.constants';
+
+export {
+  MONOREPO_SERVICES,
+  isMonorepoService,
+} from 'src/github/constants/github-repos.constants';
 
 /** The subset of a GitHub Actions run this module cares about. */
 export interface WorkflowRun {
@@ -189,20 +195,6 @@ export interface PullRequestFeedback {
  * `dispatchedAt` at dispatch time and why the reconcile task, not the
  * dispatching request, is what resolves a run id.
  */
-/**
- * The services that live as folders in the monorepo since the 2026-10-23
- * cutover. A GitHub call naming one of these is addressed to the monorepo.
- */
-export const MONOREPO_SERVICES = [
-  'ally-be',
-  'ally-web',
-  'ally-ai',
-  'ally-ai-learn',
-  'ally-mobile',
-] as const;
-
-export const isMonorepoService = (repo: string): boolean =>
-  (MONOREPO_SERVICES as readonly string[]).includes(repo);
 
 @Injectable()
 export class GithubActionsService {
@@ -1547,38 +1539,48 @@ export class GithubActionsService {
   }
 
   /**
-   * The next patch version for a tag prefix — `v1.4.1` → `v1.4.2`.
+   * The next patch version for a tag prefix — `be-v1.4.1` → `be-v1.4.2`.
    *
    * Always a patch bump, never minor or major: this ships one bug fix, and
    * every one of these release workflows rejects a tag that isn't strictly
    * newer than the latest existing one, so the version must be derived from
    * what is actually on the remote rather than from anything stored here.
-   * Falls back to `{prefix}0.0.1` for a repo with no matching tag yet.
+   * Falls back to `{prefix}0.0.1` for a prefix with no tag yet.
+   *
+   * ## Why it asks for the prefix rather than reading every tag
+   *
+   * It used to page through `/tags`, ten pages of 100, looking for matches.
+   * That was already fragile in ally-web, whose first 100 tags were all
+   * `helpline-v*` (it once proposed `admin-v0.0.1` for an app on 1.88). In
+   * ally-platform it is simply wrong: the monorepo holds every service's tags,
+   * 2,267 at the move, and GitHub lists them in reverse name order — so ten
+   * pages end inside `helpline-v*` and never reach `be-v*`, `ai-v*` or
+   * `admin-v*` at all. `git/matching-refs/tags/<prefix>` returns only the tags
+   * that start with the prefix, so the answer no longer depends on how many
+   * other tags the repo carries.
    */
   async nextPatchTag(repo: string, tagPrefix: string): Promise<string> {
     this.requireConfigured();
     const pattern = new RegExp(
-      `^${tagPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\d+)\\.(\\d+)\\.(\\d+)$`,
+      `^refs/tags/${tagPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\d+)\\.(\\d+)\\.(\\d+)$`,
     );
     try {
-      // Paged, because one page is not the repo. ally-web carries three
-      // independently-released apps in one repo, and its first 100 tags are
-      // ALL `helpline-v*` — so a single-page read found no `admin-v*` at all,
-      // fell through to the "never released" branch below, and proposed
-      // `admin-v0.0.1` for an app on 1.88. The release workflow rejected it,
-      // which is the only reason this was a failed release rather than a
-      // catastrophic one.
       const versions: number[][] = [];
-      let sawEveryTag = false;
-      for (let page = 1; page <= 10; page += 1) {
-        const { data } = await axios.get(this.url(repo, 'tags'), {
+      let next: string | null = this.url(
+        repo,
+        `git/matching-refs/tags/${tagPrefix}`,
+      );
+      // One response carried all 585 `be-v*` tags when this was written, but
+      // follow a `Link: next` if GitHub ever pages it. "No tag with this
+      // prefix" and "I did not read them all" must not share an answer, so
+      // running out of pages with more to read is a refusal, never a guess.
+      for (let page = 0; next && page < 20; page += 1) {
+        const response = await axios.get(next, {
           headers: this.headers,
-          params: { per_page: 100, page },
           timeout: 15_000,
         });
-        const batch = (data ?? []) as { name?: string }[];
-        for (const tag of batch) {
-          const match = pattern.exec(tag?.name ?? '');
+        for (const ref of (response.data ?? []) as { ref?: string }[]) {
+          const match = pattern.exec(ref?.ref ?? '');
           if (match) {
             versions.push([
               Number(match[1]),
@@ -1587,25 +1589,16 @@ export class GithubActionsService {
             ]);
           }
         }
-        if (batch.length < 100) {
-          sawEveryTag = true;
-          break;
-        }
+        next = GithubActionsService.nextLink(response.headers?.link);
+      }
+      if (next) {
+        throw new Error(
+          `Read 20 pages of ${tagPrefix}* tags in ${repo} and GitHub still has more. ` +
+            'Refusing to guess a version from a partial list.',
+        );
       }
 
-      if (versions.length === 0) {
-        // "No tag with this prefix" and "I did not look far enough" produce
-        // the same empty list and mean opposite things, so they are not
-        // allowed to share an answer. Only the first — provable because the
-        // last page came back short — is a genuine first release.
-        if (!sawEveryTag) {
-          throw new Error(
-            `Found no ${tagPrefix}* tags in ${repo} within 10 pages, and there are more to read. ` +
-              'Refusing to guess a version rather than proposing a first release for something already released.',
-          );
-        }
-        return `${tagPrefix}0.0.1`;
-      }
+      if (versions.length === 0) return `${tagPrefix}0.0.1`;
 
       const [major, minor, patch] = versions.sort(
         (a: number[], b: number[]) => b[0] - a[0] || b[1] - a[1] || b[2] - a[2],
@@ -1617,6 +1610,11 @@ export class GithubActionsService {
         `Could not read existing ${tagPrefix}* tags in ${repo}`,
       );
     }
+  }
+
+  /** The `rel="next"` URL of a GitHub `Link` header, or null on the last page. */
+  private static nextLink(link: string | null | undefined): string | null {
+    return /<([^>]+)>;\s*rel="next"/.exec(link ?? '')?.[1] ?? null;
   }
 
   /**

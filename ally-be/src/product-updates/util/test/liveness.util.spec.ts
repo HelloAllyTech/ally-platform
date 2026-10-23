@@ -4,6 +4,7 @@ import {
   changeLiveAt,
   deployableLiveAt,
   deployablesFor,
+  monorepoDeployablesFor,
   pendingDeployables,
 } from '../liveness.util';
 
@@ -121,5 +122,54 @@ describe('deployablesFor after the marketing site left ally-web', () => {
       [],
     );
     expect(deployablesFor('ally-web', [], ['ally-web'])).toEqual([]);
+  });
+});
+
+/**
+ * Changes merged since the 2026-10-23 monorepo move name `ally-platform` and
+ * carry `ally-be/`, `ally-web/`… paths. Unattributed, every one of them would
+ * be "live the moment it merged" and a public update would publish for code
+ * that had not shipped.
+ */
+describe('monorepoDeployablesFor', () => {
+  it("attributes each file to its app folder, by that app's own rules", () => {
+    expect(
+      monorepoDeployablesFor([
+        'ally-be/src/a.ts',
+        'ally-web/apps/ally-admin-dashboard/src/pages/X.tsx',
+        'ally-ai-learn/app/worker.py',
+      ]).sort(),
+    ).toEqual(['ally-ai-learn', 'ally-be', 'ally-web:admin']);
+    expect(
+      monorepoDeployablesFor(['ally-web/libs/ui-shared/Button.tsx']).sort(),
+    ).toEqual(['ally-web:admin', 'ally-web:helpline']);
+  });
+
+  it('waits on nothing for files outside every service folder', () => {
+    expect(
+      monorepoDeployablesFor([
+        '.github/workflows/test-ally-be.yml',
+        'helloallytech.github.io/wiki/memory.md',
+      ]),
+    ).toEqual([]);
+    expect(monorepoDeployablesFor(['ally-web/package.json'])).toEqual([]);
+  });
+
+  it("falls back to the journal's changed apps when no files are known", () => {
+    expect(
+      monorepoDeployablesFor([], ['ally-be', 'ally-admin-dashboard']).sort(),
+    ).toEqual(['ally-be', 'ally-web:admin']);
+  });
+
+  /** Late beats early: an announcement can wait; a broken "it's live" cannot be taken back. */
+  it('waits on every deployable when nothing says what it touched', () => {
+    expect(monorepoDeployablesFor([], []).sort()).toEqual([
+      'ally-ai',
+      'ally-ai-learn',
+      'ally-be',
+      'ally-mobile',
+      'ally-web:admin',
+      'ally-web:helpline',
+    ]);
   });
 });
