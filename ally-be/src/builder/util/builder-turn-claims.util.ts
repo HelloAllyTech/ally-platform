@@ -25,35 +25,49 @@ export function claimsPrdEdit(text: string | null | undefined): boolean {
 
 /**
  * Prose that tells the admin the PRD can be built from now — said outright,
- * or as an invitation to start the build. The second form is how most of
- * suite 5d24dd95's premature endings were worded ("You can start the build
- * whenever you're ready"); the simulated admin, like a real one, stops there.
+ * as an invitation to start the build, or as the next stage beginning. The
+ * last two are how most of suite 5d24dd95's premature endings were worded
+ * ("You can start the build whenever you're ready", "The build is now ready
+ * to start", "Next, a technical design will be drafted from this PRD"); the
+ * simulated admin, like a real one, stops there.
  */
 const CLAIMS_READY = new RegExp(
   [
     String.raw`build[- ]ready`,
     String.raw`ready (?:to|for) (?:be )?(?:build|built|building|the build|a build|technical design|the technical design|design|development|implementation)`,
-    String.raw`(?:PRD|plan|it|document|spec) is (?:now )?(?:\w+ and )?(?:ready|complete)`,
+    String.raw`(?:PRD|plan|it|document|spec) is (?:now )?(?:\w+ and )?(?:ready|complete|final|finali[sz]ed)`,
     String.raw`readiness is (?:now )?(?:at )?100`,
-    String.raw`you can (?:now )?(?:start|kick off|begin|run) (?:the|your) build`,
+    String.raw`build is (?:now )?ready`,
+    String.raw`build (?:can|will) (?:now )?(?:start|begin|go ahead|proceed)`,
+    String.raw`(?:start|kick off|begin|run) (?:the|your) build`,
     String.raw`(?:press|click|hit)(?:ing)? (?:the )?["“'‘]?start`,
+    String.raw`technical design (?:can|will) (?:now )?be (?:drafted|written|started|created)`,
+    String.raw`next step is (?:for |to (?:draft|write|start) )?(?:a |the )?technical design`,
+    String.raw`(?:move|moving|go|proceed) (?:on )?to (?:a |the )?technical design`,
   ]
     .map((pattern) => String.raw`\b${pattern}\b`)
     .join('|'),
   'gi',
 );
 
-/** Words just before a match that make it something other than a claim. */
+/**
+ * Words just before a match that make it something other than a claim:
+ * a negation ("not ready to build"), a condition ("once it is build-ready"),
+ * or work towards it ("to get this ready to build").
+ */
 const NOT_A_CLAIM =
-  /(?:\b(?:not|never|almost|nearly|once|until|when|before|after|if|close to)|n['’]t)\s+(?:yet\s+)?(?:\w+\s+){0,2}$/i;
+  /(?:\b(?:not|never|almost|nearly|once|until|when|before|after|if|close to|get|getting|make|making|towards?)|n['’]t)\s+(?:yet\s+)?(?:\w+\s+){0,2}$/i;
 
 /**
  * A sentence that opens on a condition ("Once R3 has an owner, you can start
- * the build") or is a question ("Shall I mark it build-ready?") states nothing
- * about the PRD as it is. "When" and "after" are left out: "After the fixes,
- * the PRD is ready" is a claim.
+ * the build"), on a purpose ("To start the build, …"), or is a question
+ * ("Shall I mark it build-ready?") states nothing about the PRD as it is.
+ * "When you're ready" is the exception — it is how "it's ready" is usually
+ * said — and "after" is left out: "After the fixes, the PRD is ready" is a
+ * claim.
  */
-const CONDITIONAL_OPENING = /^\W*(?:once|if|unless|until|as soon as)\b/i;
+const CONDITIONAL_OPENING =
+  /^\W*(?:once|if|unless|until|as soon as|to|when(?!\s+you(?:['’]re|\s+are)\s+(?:ready|happy|satisfied|set)))\b/i;
 const QUESTION_OPENING =
   /^\W*(?:is|are|shall|should|do|does|can|could|would|will|may)\b/i;
 
