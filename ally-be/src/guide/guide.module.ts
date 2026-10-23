@@ -16,6 +16,9 @@ import { GuideAdminService } from './admin/guide-admin.service';
 import { GuideAdminController } from './controller/guide-admin.controller';
 import { GuideLearnerController } from './controller/guide-learner.controller';
 import { GuidePublicController } from './controller/guide-public.controller';
+import { GuideVoiceController } from './controller/guide-voice.controller';
+import { GuideVoiceService } from './voice/guide-voice.service';
+import { LiveKitModule } from 'src/livekit/livekit.module';
 import { GuideAppointment } from './entity/guide-appointment.entity';
 import { GuideCard } from './entity/guide-card.entity';
 import { GuideCrisisResponse } from './entity/guide-crisis-response.entity';
@@ -72,11 +75,13 @@ import { GuideSettingsService } from './settings/guide-settings.service';
     LlmAgentModule,
     LlmUsageModule,
     TrackModule,
+    LiveKitModule,
   ],
   controllers: [
     GuideLearnerController,
     GuidePublicController,
     GuideAdminController,
+    GuideVoiceController,
   ],
   providers: [
     GlobalSettingsRepository,
@@ -97,6 +102,7 @@ import { GuideSettingsService } from './settings/guide-settings.service';
     GuideTutorService,
     GuideCourseContentService,
     GuideLearnerDataService,
+    GuideVoiceService,
   ],
 })
 export class GuideModule {}

@@ -126,6 +126,7 @@ function setup(
     ),
     saveState: jest.fn<Promise<void>, [string, any]>(async () => undefined),
     openItemCard: jest.fn(async () => null),
+    markReplyInterrupted: jest.fn(async (): Promise<string | null> => null),
   };
   const turnStore = {
     createOrGet: jest.fn(async () => ({
@@ -509,6 +510,89 @@ describe('GuideTurnService', () => {
     expect(ctx.stoppedAt).toBe('prepare');
     expect(t.models.stream).not.toHaveBeenCalled();
     expect(t.events.map((e) => e.type)).not.toContain('learner.message');
+  });
+
+  it('runs a spoken turn: deltas to the speaker, voice route and budget', async () => {
+    const t = setup({ scripts: [textPass('Let us take it slowly.')] });
+    const spoken: string[] = [];
+    const result = await t.service.runVoiceTurn(
+      { threadId: 'th1', userId: 1, tenantId: 'org' },
+      { clientTurnId: 'v1', text: 'Can we start?' },
+      {
+        onDelta: (text) => spoken.push(text),
+        onCardHint: () => undefined,
+        signal: new AbortController().signal,
+      },
+    );
+    expect(result.failure).toBeUndefined();
+    expect(spoken.join('')).toBe('Let us take it slowly.');
+    expect(t.requests[0].channel).toBe('voice');
+    expect(t.requests[0].request.messages[1].content).toContain(
+      'and 2 sentences',
+    );
+  });
+
+  it('a barge-in cancels the spoken turn', async () => {
+    const t = setup({
+      scripts: [textPass('a reply that the learner talks over')],
+    });
+    const controller = new AbortController();
+    controller.abort();
+    const result = await t.service.runVoiceTurn(
+      { threadId: 'th1', userId: 1, tenantId: 'org' },
+      { clientTurnId: 'v2', text: 'wait' },
+      {
+        onDelta: () => undefined,
+        onCardHint: () => undefined,
+        signal: controller.signal,
+      },
+    );
+    expect(result.failure?.code).toBe('interrupted');
+  });
+
+  it('speaks the fixed crisis message on a voice turn', async () => {
+    const t = setup();
+    const spoken: string[] = [];
+    await t.service.runVoiceTurn(
+      { threadId: 'th1', userId: 1, tenantId: 'org' },
+      { clientTurnId: 'v3', text: 'I want to kill myself' },
+      {
+        onDelta: (text) => spoken.push(text),
+        onCardHint: () => undefined,
+        signal: new AbortController().signal,
+      },
+    );
+    expect(spoken.join('')).toBe(DEFAULT_CRISIS_TEXT);
+    expect(t.models.stream).not.toHaveBeenCalled();
+  });
+
+  it('tells the next turn what the learner heard of an interrupted reply', async () => {
+    const t = setup({ scripts: [textPass('Sure.')] });
+    t.threads.markReplyInterrupted.mockResolvedValueOnce(
+      'Silence gives the caller',
+    );
+    await t.service.runVoiceTurn(
+      { threadId: 'th1', userId: 1, tenantId: 'org' },
+      {
+        clientTurnId: 'v4',
+        text: 'sorry, go on',
+        interruptedTurnId: 'turn-0',
+        spokenChars: 24,
+      },
+      {
+        onDelta: () => undefined,
+        onCardHint: () => undefined,
+        signal: new AbortController().signal,
+      },
+    );
+    expect(t.threads.markReplyInterrupted).toHaveBeenCalledWith(
+      'th1',
+      'turn-0',
+      24,
+    );
+    expect(t.requests[0].request.messages[1].content).toContain(
+      'they heard only: "Silence gives the caller"',
+    );
   });
 
   it('replaces a refusal with kind fixed copy', async () => {

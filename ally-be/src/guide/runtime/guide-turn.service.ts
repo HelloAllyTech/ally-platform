@@ -216,6 +216,17 @@ export interface GuideTurnContext extends HarnessTurnContext {
   memoryEnabled: boolean;
   /** The course item open on screen, if any. */
   openItem?: SpineItem | null;
+  channel: 'text' | 'voice';
+  /** Voice turns: where spoken text and card hints go, and the barge-in signal. */
+  voice?: GuideVoiceSink;
+  /** The learner cut the previous voice reply short after this many characters. */
+  interrupted?: { turnId: string; spokenChars: number } | null;
+}
+
+export interface GuideVoiceSink {
+  onDelta(text: string): void;
+  onCardHint(text: string): void;
+  signal: AbortSignal;
 }
 
 /**
@@ -302,6 +313,74 @@ export class GuideTurnService {
     return { turnId: turn.id };
   }
 
+  /**
+   * A spoken turn from the voice worker (plan §7.9): the same pipeline as a
+   * typed one, run to completion while the caller streams what is spoken.
+   * Resending a clientTurnId returns the existing turn without running it.
+   */
+  async runVoiceTurn(
+    session: { threadId: string; userId: number; tenantId: string },
+    input: {
+      clientTurnId: string;
+      text: string;
+      interruptedTurnId?: string | null;
+      spokenChars?: number | null;
+    },
+    sink: GuideVoiceSink,
+  ): Promise<{
+    turnId: string;
+    messageId: string | null;
+    duplicate: boolean;
+    failure: GuideTurnContext['failure'];
+  }> {
+    const text = (input.text ?? '').trim();
+    if (!text) throw new BadRequestException('A voice turn needs text');
+    if (text.length > GUIDE_DEFAULT_POLICY.safety.messageMaxChars) {
+      throw guideMessageTooLong(GUIDE_DEFAULT_POLICY.safety.messageMaxChars);
+    }
+    const user = {
+      id: session.userId,
+      tenantId: session.tenantId,
+      username: '',
+    };
+    const thread = await this.threads.getOwned(session.threadId, user);
+    const { turn, created } = await this.turnStore.createOrGet({
+      agentKey: ALLY_GUIDE_AGENT_KEY,
+      threadId: thread.id,
+      clientTurnId: input.clientTurnId,
+      trigger: AgentTurnTrigger.LEARNER_MESSAGE,
+      channel: AgentChannel.VOICE,
+      tenantId: thread.tenantId ?? null,
+    });
+    if (!created) {
+      return {
+        turnId: turn.id,
+        messageId: null,
+        duplicate: true,
+        failure: undefined,
+      };
+    }
+    const ctx = this.createContext(
+      thread,
+      user,
+      { clientTurnId: input.clientTurnId, text },
+      turn.id,
+    );
+    ctx.channel = 'voice';
+    ctx.voice = sink;
+    ctx.interrupted =
+      input.interruptedTurnId && input.spokenChars != null
+        ? { turnId: input.interruptedTurnId, spokenChars: input.spokenChars }
+        : null;
+    await this.run(ctx);
+    return {
+      turnId: turn.id,
+      messageId: ctx.replyKind ? ctx.replyMessageId : null,
+      duplicate: false,
+      failure: ctx.failure,
+    };
+  }
+
   /** A turn's starting state. Public for tests; `accept` is the entry point. */
   createContext(
     thread: GuideThread,
@@ -344,6 +423,7 @@ export class GuideTurnService {
       pendingTriggers: [],
       justCompleted: false,
       memoryEnabled: true,
+      channel: 'text',
     };
   }
 
@@ -484,6 +564,8 @@ export class GuideTurnService {
       ctx.tenantId,
       {
         role: GuideMessageRole.LEARNER,
+        channel:
+          ctx.channel === 'voice' ? AgentChannel.VOICE : AgentChannel.TEXT,
         content: ctx.text || null,
         turnId: ctx.turnId,
         clientTurnId: ctx.clientTurnId,
@@ -504,7 +586,7 @@ export class GuideTurnService {
         turnId: ctx.turnId,
         clientTurnId: ctx.clientTurnId,
         text: ctx.text,
-        channel: 'text',
+        channel: ctx.channel,
       },
       ctx.turnId,
     );
@@ -603,7 +685,12 @@ export class GuideTurnService {
       release = ga;
       const bundle = ga.bundle as unknown as GuideReleaseBundle;
       spans = buildSystemSpans(bundle, orgSpan, courseSpan);
-      const route = this.models.route(bundle, 'orchestrator', 'text', tier);
+      const route = this.models.route(
+        bundle,
+        'orchestrator',
+        ctx.channel,
+        tier,
+      );
       ctx.history = [];
       ctx.epoch = {
         number: thread.epoch + 1,
@@ -658,7 +745,12 @@ export class GuideTurnService {
     ctx.releaseId = release.id;
     ctx.bundle = bundle;
     ctx.tier = tier;
-    ctx.model = this.models.route(bundle, 'orchestrator', 'text', tier).model;
+    ctx.model = this.models.route(
+      bundle,
+      'orchestrator',
+      ctx.channel,
+      tier,
+    ).model;
     ctx.system = spans;
     const policy = bundle.policy;
 
@@ -715,7 +807,12 @@ export class GuideTurnService {
       releaseWindowOpen: windowOpen,
       spine,
     });
-    ctx.budget = proseBudget(ctx.guidance, 'text', pacing.fadeLevel, policy);
+    ctx.budget = proseBudget(
+      ctx.guidance,
+      ctx.channel,
+      pacing.fadeLevel,
+      policy,
+    );
 
     const events: string[] = [];
     if (ctx.epoch.isNew && ctx.mode === GuideMode.CRISIS_FOLLOWUP) {
@@ -724,6 +821,20 @@ export class GuideTurnService {
           'gentle check-in on how they are today, before anything else.',
       );
     }
+    if (ctx.interrupted) {
+      const heard = await this.threads.markReplyInterrupted(
+        ctx.threadId,
+        ctx.interrupted.turnId,
+        ctx.interrupted.spokenChars,
+      );
+      if (heard !== null) {
+        events.push(
+          `The learner spoke over your last reply; they heard only: "${heard}". ` +
+            'Do not repeat the rest unless they ask.',
+        );
+      }
+    }
+
     // After the first win, once: ask what kind of helper they want to become
     // (plan §3 stage 6) — never before the win, never in a hard moment.
     const won = Boolean(pacing.firstWinAt) || spine.completed > 0;
@@ -753,7 +864,7 @@ export class GuideTurnService {
       turn: pacing.learnerTurns ?? 1,
       mode: ctx.mode,
       atmosphere: ctx.atmosphere,
-      channel: 'text',
+      channel: ctx.channel,
       guidance: ctx.guidance,
       budget: ctx.budget,
       steer,
@@ -867,6 +978,10 @@ export class GuideTurnService {
     for (let attempt = 0; attempt < 2; attempt++) {
       pending = null;
       const controller = new AbortController();
+      // A voice barge-in ends the turn; nothing more is spoken or stored.
+      const onBargeIn = () => controller.abort('barge-in');
+      ctx.voice?.signal.addEventListener('abort', onBargeIn, { once: true });
+      if (ctx.voice?.signal.aborted) controller.abort('barge-in');
       const hardTimeout = setTimeout(
         () => controller.abort('turn timeout'),
         policy.limits.turnHardTimeoutMs,
@@ -876,6 +991,7 @@ export class GuideTurnService {
           ctx.ttftMs = Date.now() - ctx.startedAt;
           await this.presence(ctx, 'speaking', null);
         }
+        ctx.voice?.onDelta(text);
         await this.bus.emitEphemeral(
           ctx.threadId,
           'assistant.delta',
@@ -947,7 +1063,7 @@ export class GuideTurnService {
             this.models.stream({
               role: 'orchestrator',
               bundle,
-              channel: 'text',
+              channel: ctx.channel,
               tier: ctx.tier,
               task: LlmTask.GUIDE_ORCHESTRATOR,
               aiTaskId: GUIDE_AI_TASKS.ORCHESTRATOR,
@@ -966,6 +1082,7 @@ export class GuideTurnService {
       } finally {
         clearTimeout(hardTimeout);
         if (deadline) clearTimeout(deadline);
+        ctx.voice?.signal.removeEventListener('abort', onBargeIn);
       }
 
       // A verdict still outstanding is awaited now: the reply may have
@@ -1081,6 +1198,8 @@ export class GuideTurnService {
       copy.text = DEFAULT_CRISIS_STAY_TEXT;
     }
     ctx.crisis = { ...copy, lines };
+    // Voice stays open and the fixed message is spoken (plan §6.3 step 4).
+    ctx.voice?.onDelta(copy.text);
     ctx.mode = GuideMode.CRISIS;
     ctx.replyKind = 'crisis';
     ctx.replyText = copy.text;
@@ -1115,6 +1234,7 @@ export class GuideTurnService {
       { role: 'assistant', content: [{ type: 'text', text }] },
     ];
     for (const chunk of chunkForStreaming(text)) {
+      ctx.voice?.onDelta(chunk);
       if (ctx.ttftMs === null) {
         ctx.ttftMs = Date.now() - ctx.startedAt;
         await this.presence(ctx, 'speaking', null);
@@ -1188,6 +1308,9 @@ export class GuideTurnService {
       epochNumber: ctx.epoch?.number ?? 0,
       learnerMessageId: ctx.learnerMessageId,
       emitDurable: async (type, data) => {
+        if (type === 'card.presented' && ctx.voice) {
+          ctx.voice.onCardHint(cardHint((data as any).card));
+        }
         const event = await this.bus.appendDurable(
           ctx.threadId,
           type as never,
@@ -1250,6 +1373,7 @@ export class GuideTurnService {
     const reply = await this.threads.appendMessage(ctx.threadId, ctx.tenantId, {
       id: ctx.replyMessageId,
       role: GuideMessageRole.ALLY,
+      channel: ctx.channel === 'voice' ? AgentChannel.VOICE : AgentChannel.TEXT,
       kind:
         ctx.replyKind === 'crisis'
           ? GuideMessageKind.CRISIS_FIXED
@@ -1312,7 +1436,7 @@ export class GuideTurnService {
           messageId: reply.id,
           turnId: ctx.turnId,
           text: ctx.replyText ?? '',
-          channel: 'text',
+          channel: ctx.channel,
         },
         ctx.turnId,
       );
@@ -1513,4 +1637,19 @@ export function chunkForStreaming(text: string, size = 24): string[] {
   }
   if (current) chunks.push(current);
   return chunks;
+}
+
+/** A speakable line for a card appearing on screen during a voice turn. */
+export function cardHint(
+  card: { kind?: string; presentation?: string; title?: string } | undefined,
+): string {
+  if (!card) return '';
+  switch (card.presentation) {
+    case 'shelf':
+      return `I've opened ${card.title ? `"${card.title}"` : 'it'} on your right.`;
+    case 'theatre':
+      return `${card.title ? `"${card.title}"` : 'It'} is ready whenever you are.`;
+    default:
+      return "It's just below.";
+  }
 }

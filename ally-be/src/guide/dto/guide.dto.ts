@@ -185,3 +185,51 @@ export class GuideAppointmentDto {
   @MaxLength(64)
   timezone!: string;
 }
+
+/** POST /v1/guide/voice/turns (contract GuideVoiceTurnRequest). */
+export class GuideVoiceTurnDto {
+  @ApiProperty({ description: 'The voice-session token from the dispatch.' })
+  @IsString()
+  @MaxLength(128)
+  token!: string;
+
+  @ApiProperty()
+  @IsString()
+  @MaxLength(64)
+  clientTurnId!: string;
+
+  @ApiProperty({ description: 'What the learner said (final transcript).' })
+  @IsString()
+  @MaxLength(2000)
+  text!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  language?: string | null;
+
+  @ApiPropertyOptional({
+    description: 'The previous turn, when the learner spoke over its reply.',
+  })
+  @IsOptional()
+  @IsString()
+  interruptedTurnId?: string | null;
+
+  @ApiPropertyOptional({ description: 'Characters of that reply they heard.' })
+  @IsOptional()
+  @IsNumber()
+  spokenChars?: number | null;
+}
+
+/** POST /v1/guide/threads/:id/voice-session. */
+export class GuideVoiceSessionDto {
+  @ApiPropertyOptional({ enum: ['hands_free', 'push_to_talk'] })
+  @IsOptional()
+  @IsIn(['hands_free', 'push_to_talk'])
+  turnMode?: 'hands_free' | 'push_to_talk';
+
+  @ApiPropertyOptional({ enum: ['en', 'hi', 'mr', 'ta', 'kn'] })
+  @IsOptional()
+  @IsIn(['en', 'hi', 'mr', 'ta', 'kn'])
+  language?: string;
+}

@@ -630,6 +630,12 @@ export class AppConfigService {
         'SIMULATED_USER_AGENT_NAME',
         'SimulatedUser',
       ),
+      // The Ally guide's voice worker: its own deployment and capacity, never
+      // the roleplay agent's (plans/ally-guide/plan.md §7.9).
+      guideAgentName: this.configService.get<string>(
+        'LIVEKIT_GUIDE_AGENT_NAME',
+        `${agentName}Guide`,
+      ),
     };
   }
 

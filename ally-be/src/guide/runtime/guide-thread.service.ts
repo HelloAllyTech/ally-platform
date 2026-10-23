@@ -221,6 +221,33 @@ export class GuideThreadService {
     await this.threads.update(threadId, patch as never);
   }
 
+  /**
+   * Record that the learner spoke over a voice reply after `spokenChars`
+   * characters. The stored reply keeps what the model said (history stays
+   * replayable); the marker tells the next turn what was actually heard.
+   * Returns what they heard, or null when there is no such reply.
+   */
+  async markReplyInterrupted(
+    threadId: string,
+    turnId: string,
+    spokenChars: number,
+  ): Promise<string | null> {
+    const repo = this.dataSource.getRepository(GuideMessage);
+    const reply = await repo.findOne({
+      where: { threadId, turnId, role: GuideMessageRole.ALLY },
+    });
+    if (!reply?.content) return null;
+    const heard = reply.content.slice(0, Math.max(0, spokenChars)).trim();
+    await repo.update(reply.id, {
+      metadata: {
+        ...(reply.metadata ?? {}),
+        interrupted: true,
+        spokenChars,
+      } as Record<string, any>,
+    });
+    return heard;
+  }
+
   /** The course item open on the learner's screen right now, if any. */
   async openItemCard(
     threadId: string,

@@ -30,6 +30,7 @@ import {
   GUIDE_SSE_PING_INTERVAL_MS,
 } from '../constants/guide.constants';
 import {
+  GuideVoiceSessionDto,
   GuideAppointmentDto,
   GuideCardEventDto,
   GuidePrefsUpdateDto,
@@ -38,6 +39,7 @@ import {
 import { GuideLearnerDataService } from '../learner/guide-learner-data.service';
 import { GuideCardService } from '../runtime/guide-card.service';
 import { GuideViewService } from '../runtime/guide-view.service';
+import { GuideVoiceService } from '../voice/guide-voice.service';
 import { TrackEnrollmentService } from 'src/track/service/track-enrollment.service';
 import { DataSource } from 'typeorm';
 import {
@@ -66,7 +68,23 @@ export class GuideLearnerController {
     private readonly trackEnrollment: TrackEnrollmentService,
     private readonly dataSource: DataSource,
     private readonly learnerData: GuideLearnerDataService,
+    private readonly voice: GuideVoiceService,
   ) {}
+
+  @Post('threads/:threadId/voice-session')
+  @AuthPermissions([PERMISSIONS.EDIT_TRACK])
+  @ApiOperation({
+    summary:
+      "Start talking to Ally: a LiveKit room with the guide's voice worker dispatched into it",
+  })
+  async voiceSession(
+    @Param('threadId', ParseUUIDPipe) threadId: string,
+    @Body() dto: GuideVoiceSessionDto,
+    @CurrentUser() user: TokenUser,
+  ) {
+    const thread = await this.threads.getOwned(threadId, user);
+    return this.voice.startSession(thread, user, dto);
+  }
 
   @Get('memory')
   @AuthPermissions([PERMISSIONS.VIEW_TRACK])
