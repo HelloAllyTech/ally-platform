@@ -1,0 +1,108 @@
+[tool.poetry]
+name = "ally-learn-core"
+version = "0.1.0"
+description = "Core service for Ally Learn POC - A learning platform designed for mental health counselors and organizations, providing training content management, professional development tracking, and therapeutic resource delivery."
+authors = ["risal-kv <119860563+risal-kv@users.noreply.github.com>"]
+license = "Proprietary"
+readme = "README.md"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = ">=3.12,<3.14"
+fastapi = "^0.121.0"
+pydantic-settings = ">=2.10.1,<3.0.0"
+uvicorn = ">=0.35.0,<0.36.0"
+livekit-api = ">=1.0.3,<2.0.0"
+livekit = "1.0.23"
+livekit-agents = {version = "1.3.12", extras = ["deepgram", "elevenlabs", "openai", "sarvam", "google", "turn-detector"]}
+livekit-plugins-noise-cancellation = "^0.2.5"
+slack-sdk = "^3.36.0"
+greenlet = "^3.2.3"
+boto3 = "^1.40.2"
+pydantic = {extras = ["email"], version = "^2.11.7"}
+langgraph = "^1.0.10"
+langgraph-checkpoint = ">=4.0.0"
+requests = ">=2.33.0"
+livekit-plugins-langchain = "^1.3.10"
+langchain-core = ">=1.2.22"
+langchain-openai = "^0.3.33"
+langchain-google-genai = "^2.0.0"
+livekit-plugins-openai = "^1.3.10"
+livekit-plugins-deepgram = "^1.3.10"
+livekit-plugins-silero = "^1.3.10"
+livekit-plugins-elevenlabs = "^1.3.10"
+livekit-plugins-google = ">=1.3.6,<1.4.0"
+livekit-plugins-hume = "^1.2.18"
+livekit-plugins-cartesia = "1.3.12"
+livekit-plugins-smallestai = "1.3.12"
+# Tavus video avatar for the video-actor feature. Pinned to the livekit-agents
+# version above: the plugin's AvatarSession signature has changed across
+# minors (replica_id/persona_id here, face_id/pal_id from 1.5), so it must not
+# float independently of the agents runtime it plugs into.
+livekit-plugins-tavus = "1.3.12"
+# Beyond Presence video avatar. Pinned to the livekit-agents version for the
+# same reason as Tavus above: these plugins' AvatarSession signatures change
+# across minors and must not float independently of the runtime.
+livekit-plugins-bey = "1.3.12"
+sarvamai = "^0.1.21"
+deepgram-sdk = "^5.2.0"
+elevenlabs = "^2.20.0"
+numpy = "^2.3.5"
+stopwordsiso = "^0.6.1"
+advertools = "^0.15.0"
+setuptools = "^78.1.1"
+starlette = ">=0.49.1"
+pyasn1 = ">=0.6.3"
+pydub = "^0.25.1"
+hume = "^0.13.6"
+httpx = "^0.28.1"
+audioop-lts = {markers = "python_version >= \"3.13\"", version = "^0.2.2"}
+
+[tool.poetry.group.dev.dependencies]
+pre-commit = "^3.6.0"
+black = "^26.3.1"
+isort = "^5.13.2"
+flake8 = "^7.0.0"
+pytest = "^8.0.0"
+pytest-asyncio = "^0.23.0"
+pytest-cov = "^4.0.0"
+pytest-mock = "^3.12.0"
+pytest-xdist = "^3.5.0"
+httpx = "^0.28.1"
+factory-boy = "^3.3.0"
+google-auth-oauthlib = "^1.2.3"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+# Black configuration
+[tool.black]
+line-length = 88
+target-version = ['py312']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+  | pretrained_models
+)/
+'''
+
+# isort configuration
+[tool.isort]
+profile = "black"
+line_length = 88
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+skip = ["pretrained_models"]

@@ -1,0 +1,8 @@
+Agent's message:
+<agent_message>{agent_message}</agent_message>
+
+Counselor's message:
+<counselor_message>{counselor_message}</counselor_message>
+
+Evaluate if the counselor's message is a paraphrase of the agent's message.
+Return true if it is a paraphrase, false otherwise.

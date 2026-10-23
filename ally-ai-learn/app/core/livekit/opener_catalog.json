@@ -1,0 +1,127 @@
+{
+  "_about": "Fixed catalog of turn openers (the first sound before the character's reply). Curated, not generated: each entry is rendered once per voice and cached, and the working-memory delivery plan only ever PICKS ids from this list. `kind` drives state fit (hesitation = reserved/guarded/anxious, reflective = considering, hum = neutral vocal burst, lexical = a discourse marker). `family` groups near-identical sounds so the no-repeat rule treats hmm/hmmm/mm-hmm as one. `texts` is keyed by the primary language subtag and must be in that language's native script; an entry with no text for the session language is simply unavailable. `asset` entries (breath, sigh) play a bundled audio file from app/assets/openers/ instead of TTS. `{gender}` in the file name is replaced by the voice's gender (female/male); the entry is skipped when the gender is unknown or the file is missing, because a sigh in the wrong voice is worse than none. The shipped files were generated with ElevenLabs sound generation and levelled to about -30 dBFS RMS, quieter than speech. Indic lexical entries should be reviewed by a native speaker before being widened.",
+  "version": 1,
+  "entries": [
+    {
+      "id": "hmm_soft",
+      "kind": "hum",
+      "family": "hmm",
+      "texts": {
+        "en": "Hmm.",
+        "hi": "हम्म।",
+        "mr": "हम्म.",
+        "ta": "ம்ம்.",
+        "kn": "ಹ್ಮ್.",
+        "te": "హ్మ్.",
+        "ml": "ഹ്മ്.",
+        "bn": "হুম।",
+        "gu": "હમ્મ.",
+        "pa": "ਹੰਮ।"
+      }
+    },
+    {
+      "id": "mm_short",
+      "kind": "hum",
+      "family": "mm",
+      "texts": {
+        "en": "Mm.",
+        "hi": "म्म।",
+        "mr": "म्म.",
+        "ta": "ம்.",
+        "kn": "ಮ್ಮ್.",
+        "te": "మ్మ్.",
+        "ml": "മ്മ്.",
+        "bn": "ম্ম।",
+        "gu": "મ્મ.",
+        "pa": "ਮੰਮ।"
+      }
+    },
+    {
+      "id": "hmm_reflective",
+      "kind": "reflective",
+      "family": "hmm",
+      "texts": {
+        "en": "Hmm…",
+        "hi": "हम्म…",
+        "mr": "हम्म…",
+        "ta": "ம்ம்ம்…",
+        "kn": "ಹ್ಮ್ಮ್…",
+        "te": "హ్మ్మ్…",
+        "ml": "ഹ്മ്മ്…",
+        "bn": "হুমম…",
+        "gu": "હમ્મ…",
+        "pa": "ਹੰਮ…"
+      }
+    },
+    {
+      "id": "let_me_think",
+      "kind": "reflective",
+      "family": "think",
+      "texts": {
+        "en": "Hmm… let me think.",
+        "hi": "हम्म… सोचने दो।",
+        "mr": "हम्म… विचार करू दे."
+      }
+    },
+    {
+      "id": "um_hesitant",
+      "kind": "hesitation",
+      "family": "um",
+      "texts": {
+        "en": "Um…",
+        "hi": "उम्म…",
+        "mr": "उम्म…",
+        "ta": "அ…",
+        "kn": "ಅ…",
+        "te": "అ…",
+        "ml": "അ…",
+        "bn": "আ…",
+        "gu": "અ…",
+        "pa": "ਅ…"
+      }
+    },
+    {
+      "id": "uh_hesitant",
+      "kind": "hesitation",
+      "family": "uh",
+      "texts": {
+        "en": "Uh…",
+        "hi": "अं…",
+        "mr": "अं…"
+      }
+    },
+    {
+      "id": "well",
+      "kind": "lexical",
+      "family": "well",
+      "texts": {
+        "en": "Well…",
+        "hi": "देखिए…",
+        "mr": "बघा…"
+      }
+    },
+    {
+      "id": "i_mean",
+      "kind": "lexical",
+      "family": "mean",
+      "texts": {
+        "en": "I mean…",
+        "hi": "मतलब…",
+        "mr": "म्हणजे…",
+        "ta": "அது வந்து…",
+        "kn": "ಅದು…",
+        "te": "అంటే…",
+        "ml": "അതായത്…",
+        "bn": "মানে…",
+        "gu": "એટલે…",
+        "pa": "ਮਤਲਬ…"
+      }
+    },
+    {
+      "id": "breath_in",
+      "kind": "breath",
+      "family": "breath",
+      "asset": "breath_in_{gender}.wav"
+    }
+  ]
+}

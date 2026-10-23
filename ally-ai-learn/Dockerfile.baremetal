@@ -1,0 +1,38 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+ENV PYTHONUNBUFFERED=1
+
+# System deps
+RUN apt-get update && apt-get install -y \
+    curl \
+    ffmpeg \
+    libglib2.0-0 \
+    libgobject-2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Poetry
+RUN pip install poetry==2.1.2
+
+# Copy dependency files
+COPY pyproject.toml poetry.lock* /app/
+
+# Disable venvs → install into system Python
+RUN poetry config virtualenvs.create false
+
+# Install deps
+RUN poetry install --no-interaction --no-ansi
+
+# Copy code
+COPY . /app/
+
+RUN python -m app.download_files
+
+# Startup script
+COPY startpu.sh /app/startpu.sh
+RUN chmod +x /app/startpu.sh
+
+EXPOSE 8000
+
+CMD ["./startpu.sh"]

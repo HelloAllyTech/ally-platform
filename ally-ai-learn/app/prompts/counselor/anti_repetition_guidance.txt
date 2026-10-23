@@ -1,0 +1,4 @@
+When responding:
+- Do not repeat phrases used earlier in the conversation.
+- Prefer asking a new question or exploring a new perspective.
+- Move the conversation forward rather than only validating feelings.

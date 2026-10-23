@@ -1,0 +1,116 @@
+# Use DEV for local dev with direct agent dispatch - worker must register agent_name=Agent
+# to receive metadata. LOCAL uses agent_name="" which can cause metadata to be dropped.
+ENV=<ENVIRONMENT>
+LOG_LEVEL="INFO"
+
+SLACK_ALERTS_ENABLED=False
+SLACK_ALERTS_API_TOKEN=<SLACK_API_TOKEN>
+SLACK_ALERTS_CHANNEL_ID=<SLACK_CHANNEL_ID>
+SLACK_ALERTS_LOG_LEVEL="WARNING"
+LIVEKIT_LOG_LEVEL=WARNING
+LIVEKIT_LOG_DEV_MODE=False
+LIVEKIT_LOG_CONSOLE=False
+
+LIVEKIT_API_KEY=<YOUR_LIVEKIT_API_KEY>
+LIVEKIT_API_SECRET=<YOUR_LIVEKIT_API_SECRET>
+LIVEKIT_URL=<YOUR_LIVEKIT_URL>
+
+# Optional — omit to fall back to Ollama automatically (see the Ollama section
+# below). Required only if you want OpenAI as the LLM provider, or want
+# semantic-similarity/paraphrase-detection events (they use OpenAI embeddings).
+# OPENAI_API_KEY=<YOUR_OPENAI_API_KEY>
+OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+
+SEMANTIC_SIMILARITY_THRESHOLD=0.6
+
+SARVAM_API_KEY=<YOUR_SARVAM_API_KEY>
+# Legacy (unfunded since 2026-10). Only needed to read old Deepgram voice rows.
+# DEEPGRAM_API_KEY=<YOUR_DEEPGRAM_API_KEY>
+
+AWS_ACCESS_KEY_ID=<YOUR_AWS_ACCESS_KEY_ID>
+AWS_SECRET_ACCESS_KEY=<YOUR_AWS_SECRET_ACCESS_KEY>
+AWS_REGION=us-east-1
+# For local dev with LocalStack: use full URL to avoid QueueDoesNotExist
+# e.g. http://host.docker.internal:4566/000000000000/sqs-learn-message-and-event-queue
+SQS_MESSAGE_EVENT_QUEUE_NAME=<YOUR_SQS_MESSAGE_EVENT_QUEUE_NAME>
+
+ELEVEN_API_KEY=<YOUR_ELEVEN_LABS_API_KEY>
+HUME_API_KEY=<YOUR_HUME_API_KEY>
+CARTESIA_API_KEY=<YOUR_CARTESIA_API_KEY>
+SMALLEST_API_KEY=<YOUR_SMALLEST_API_KEY>
+
+# Google Gemini LLM (optional - for using Gemini as conversation LLM provider)
+# Option 1 (recommended, no gcloud needed): plain API key from
+# https://aistudio.google.com. Any of these names works (aliases):
+# GEMINI_API_KEY / GOOGLE_API_KEY / GOOGLE_GENERATIVE_AI_API_KEY. When set, the
+# Gemini client uses API-key auth and does NOT require gcloud/ADC or a project.
+# GEMINI_API_KEY=<YOUR_GEMINI_API_KEY>
+# Option 2: Application Default Credentials (run: gcloud auth application-default login)
+# GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
+
+LLM_TEMPERATURE=<YOUR_LLM_TEMPERATURE>
+
+# Optional Google voice ids for the fallback voice (e.g. en-IN-Chirp3-HD-Kore).
+# Leave unset to let Google pick a voice for the session language.
+# DEFAULT_MALE_VOICE_MODEL=
+# DEFAULT_FEMALE_VOICE_MODEL=
+# DEFAULT_NON_BINARY_VOICE_MODEL=
+
+# Open-source LLM settings (Ollama / vLLM)
+#
+# Ollama setup: Install and run natively on your machine
+# Install: brew install ollama && ollama serve && ollama pull llama3.2
+#
+# If running the app in Docker, use host.docker.internal to reach host Ollama:
+# OLLAMA_BASE_URL=http://host.docker.internal:11434/v1
+#
+# If running the app without Docker (locally):
+# OLLAMA_BASE_URL=http://localhost:11434/v1
+#
+# VLLM_BASE_URL=http://your-gpu-server:8000/v1
+# LOCAL_LLM_MODEL=llama3.2
+# Core service (ally-be)
+# CORE_SERVICE_API_KEY must match ally-be's AI_SERVICE_API_KEY
+CORE_SERVICE_BASE_URL=<YOUR_CORE_SERVICE_BASE_URL>
+CORE_SERVICE_API_KEY=<YOUR_CORE_SERVICE_API_KEY>
+# Inbound API key (ally-be calls with x-api-key; must match ally-be's AI_LEARN_SERVICE_OUTBOUND_API_KEY)
+X_API_KEY=<YOUR_X_API_KEY>
+
+# CORS
+ALLOWED_ORIGINS=http://localhost:8080
+
+# Evaluation logging settings
+EVALUATION_LOG_DIR=evaluation_logs
+EVALUATION_LOGGING_ENABLED=false
+
+# Event processing feature flags
+ENABLE_EVENT_DETECTION_OPTIMIZATIONS=true
+
+REPORT_CONCURRENCY_LIMIT=CONCURRENCY_LIMIT_FOR_REPORT_GENERATION
+
+# ---- Pause / resume tuning (optional; defaults applied if unset) ----
+# Max single continuous pause before the session auto-ends (seconds; default 600 = 10 min)
+PAUSE_CAP_SECONDS=600
+# How long before a pause auto-ends to warn the client (seconds; default 30)
+PAUSE_WARNING_LEAD_SECONDS=30
+# Hard ceiling on cumulative paused time per session (seconds; default 1800 = 30 min)
+MAX_TOTAL_PAUSE_SECONDS=1800
+# Seconds past the scenario time limit before the agent authoritatively ends (default 2)
+MAX_DURATION_GRACE_SECONDS=2
+
+# ---- Live supervisor notes (optional; defaults applied if unset) ----
+# In-session coaching hints shown in the learner's "Supervisor" sidebar tab.
+# This is only the GLOBAL kill-switch: notes also need the per-simulation
+# supervisorNotesEnabled toggle (Studio, default off), so leaving this at true
+# changes nothing for existing scenarios.
+SUPERVISOR_NOTES_ENABLED=true
+# Provider/model for the supervisor LLM. Runs once per learner turn in parallel
+# with the conversation, so keep it fast and cheap.
+SUPERVISOR_NOTES_PROVIDER=openai
+SUPERVISOR_NOTES_MODEL=gpt-4o-mini
+# Give-up time for one note (seconds; default 6). A timeout is a skipped note,
+# never a delayed reply.
+SUPERVISOR_NOTES_TIMEOUT_S=6
+# Sparsity caps, enforced in code rather than left to the prompt.
+SUPERVISOR_NOTES_MAX_PER_SESSION=10
+SUPERVISOR_NOTES_MIN_TURN_GAP=2

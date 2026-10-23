@@ -1,0 +1,134 @@
+{
+    "name": "Main Agent Prompt #2",
+    "kind": "prompt",
+    "promptType": "main_agent",
+    "hasStates": true,
+    "description": "Second main-agent variant. The file body is a lean template, but the variable list below advertises every dynamic field the prompt builder can inject (persona, style, language, runtime state, RAG, behavior rules). Studio authors can reference any of these as {placeholder} when customising the prompt — unused ones are silently ignored at render time.",
+    "availableVariables": [
+        {
+            "name": "title",
+            "label": "Title",
+            "required": true
+        },
+        {
+            "name": "challenge_description",
+            "label": "Challenge Description",
+            "required": false
+        },
+        {
+            "name": "role_instructions",
+            "label": "Role Instructions",
+            "required": true
+        },
+        {
+            "name": "competency",
+            "label": "Competency",
+            "required": true
+        },
+        {
+            "name": "name",
+            "label": "Name",
+            "required": false
+        },
+        {
+            "name": "age",
+            "label": "Age",
+            "required": false
+        },
+        {
+            "name": "gender",
+            "label": "Gender",
+            "required": false
+        },
+        {
+            "name": "current_location",
+            "label": "Current Location",
+            "required": false
+        },
+        {
+            "name": "gender_identity",
+            "label": "Gender Identity",
+            "required": false
+        },
+        {
+            "name": "sexual_orientation",
+            "label": "Sexual Orientation",
+            "required": false
+        },
+        {
+            "name": "profession",
+            "label": "Profession",
+            "required": false
+        },
+        {
+            "name": "character_profile_text",
+            "label": "Character Profile",
+            "required": false
+        },
+        {
+            "name": "previous_memory",
+            "label": "Previous Memory",
+            "required": false
+        },
+        {
+            "name": "opening_statements",
+            "label": "Opening Statements",
+            "required": false
+        },
+        {
+            "name": "language_code",
+            "label": "Output Language Code",
+            "required": true
+        },
+        {
+            "name": "language_label",
+            "label": "Output Language Label",
+            "required": true
+        },
+        {
+            "name": "linguistic_samples",
+            "label": "Tone & Style Samples",
+            "required": false
+        },
+        {
+            "name": "allowed_fillers",
+            "label": "Allowed Filler Words",
+            "required": false
+        },
+        {
+            "name": "custom_fields_text",
+            "label": "Custom Fields",
+            "required": false
+        },
+        {
+            "name": "state_x_guidelines",
+            "label": "Active State Guidelines",
+            "required": false
+        },
+        {
+            "name": "retrieved_context",
+            "label": "Retrieved Knowledge Context",
+            "required": false
+        },
+        {
+            "name": "behavior_instructions_json",
+            "label": "Behavior Rules (JSON)",
+            "required": false
+        },
+        {
+            "name": "helpful_behaviours",
+            "label": "Helpful Behaviours",
+            "required": false
+        },
+        {
+            "name": "unhelpful_behaviours",
+            "label": "Unhelpful Behaviours",
+            "required": false
+        },
+        {
+            "name": "language_glossary",
+            "label": "Language Glossary (Tier 0 style card)",
+            "required": false
+        }
+    ]
+}

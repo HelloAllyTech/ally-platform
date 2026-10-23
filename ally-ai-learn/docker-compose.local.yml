@@ -1,0 +1,49 @@
+# docker-compose.local.yml - Run ally-ai-learn alongside ally-be and ally-web
+#
+# Prerequisites: Start ally-be and ally-web first.
+# This compose uses the SAME LocalStack and connects to ally-be on the host.
+#
+# Usage:
+#   1. cd ally-be && docker compose up -d    # Start ally-be (includes LocalStack, postgres, redis)
+#   2. cd ally-web && docker compose up -d   # Start ally-web
+#   3. cd ally-ai-learn && docker compose -f docker-compose.local.yml up -d
+#
+# ally-ai-learn will be at http://localhost:8002
+#
+# Required: Copy env_sample to .env and fill in all variables.
+# Key overrides for local (already set below):
+#   - AWS_ENDPOINT_URL: uses host's LocalStack (ally-be)
+#   - CORE_SERVICE_BASE_URL: ally-be API
+#   - SQS_MESSAGE_EVENT_QUEUE_NAME: must match ally-be's queue
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: dockerfile
+    container_name: ally-ai-learn-app
+    env_file:
+      - .env
+    environment:
+      # Use host's LocalStack (from ally-be) - host.docker.internal works on Mac/Win
+      AWS_ENDPOINT_URL: http://host.docker.internal:4566
+      # LocalStack partitions queues by region; ally-be + the localstack seed use
+      # us-east-1, but .env ships the prod ap-southeast-1. Without this override the
+      # worker's send_message 404s (QueueDoesNotExist) even with the full URL below,
+      # so no transcript/director/rubric event ever reaches Core.
+      AWS_REGION: us-east-1
+      # Connect to ally-be API on host
+      CORE_SERVICE_BASE_URL: http://host.docker.internal:8001
+      # Full LocalStack queue URL - avoids get_queue_url and QueueDoesNotExist
+      SQS_MESSAGE_EVENT_QUEUE_NAME: http://host.docker.internal:4566/000000000000/sqs-learn-message-and-event-queue
+      # CORS for local frontends
+      ALLOWED_ORIGINS: http://localhost:3000,http://localhost:8080,http://localhost:8081,http://localhost:8002
+    ports:
+      - '8002:8000'
+    volumes:
+      - .:/app
+      - ~/.config/gcloud:/root/.config/gcloud:ro
+    extra_hosts:
+      # Linux: host.docker.internal may not exist; this adds it
+      - 'host.docker.internal:host-gateway'
+    restart: on-failure
