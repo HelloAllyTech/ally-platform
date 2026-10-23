@@ -15,6 +15,13 @@ logger = get_logger(__name__)
 # so we must default to the realtime model here.
 DEFAULT_ELEVENLABS_STT_MODEL = "scribe_v2_realtime"
 
+# Seconds of silence before the realtime model commits a final transcript. The
+# plugin default (1.5 s) put ~1.9 s between the learner stopping and the final
+# arriving, and the turn can't end before the final does. Committing early is
+# safe: a mid-sentence pause just yields two finals, and the turn detector
+# still decides when the learner is done. Measured 2026-10-22: ~0.8-0.9 s.
+COMMIT_SILENCE_S = 0.5
+
 
 class ElevenLabsSTTClient(BaseSTTClient):
     """
@@ -83,11 +90,17 @@ class ElevenLabsSTTClient(BaseSTTClient):
 
         # Note: the LiveKit ElevenLabs plugin uses 'model_id' and
         # 'language_code' parameters (not 'model'/'language').
-        self._stt_instance = elevenlabs.STT(
-            model_id=self._model,
-            language_code=self._language_code,
-            api_key=self._api_key,
-        )
+        stt_kwargs: Dict[str, Any] = {
+            "model_id": self._model,
+            "language_code": self._language_code,
+            "api_key": self._api_key,
+        }
+        if self._model == DEFAULT_ELEVENLABS_STT_MODEL:
+            stt_kwargs["server_vad"] = {
+                "vad_silence_threshold_secs": COMMIT_SILENCE_S,
+                "min_silence_duration_ms": int(COMMIT_SILENCE_S * 1000),
+            }
+        self._stt_instance = elevenlabs.STT(**stt_kwargs)
 
     @classmethod
     def from_config(
