@@ -101,9 +101,9 @@ const SessionCard: React.FC<{
             </p>
           )}
           {session.model && (
-            <div className="mt-0.5 flex items-center gap-1 truncate text-xs text-typography-500">
+            <div className="mt-0.5 flex items-center gap-1 text-xs text-typography-500">
               <MachineLearningModel size={12} className="shrink-0" />
-              <span>{session.model}</span>
+              <span className="truncate">{session.model}</span>
             </div>
           )}
         </div>
