@@ -18,7 +18,7 @@
     "test": "jest --passWithNoTests --forceExit",
     "test:coverage": "jest --coverage --coverageReporters=text --coverageReporters=html --passWithNoTests",
     "lint-staged": "lint-staged",
-    "prepare": "husky install || true",
+    "prepare": "git config core.hooksPath .githooks 2>/dev/null || true",
     "postinstall": "patch-package",
     "format": "prettier --write .",
     "bundle:android": "react-native bundle --platform android --dev false --entry-file index.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res",

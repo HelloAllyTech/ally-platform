@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Root commit-msg: ally-mobile's commitlint, for commits that touch ally-mobile.
+# No other service ever enforced a message format, so none does now.
+set -e
+# HUSKY=0 turns hooks off, as it did under husky (the Builder workflows set it).
+[ "${HUSKY:-}" = "0" ] && exit 0
+cd "$(git rev-parse --show-toplevel)"
+if git diff --cached --name-only | grep -q '^ally-mobile/' && [ -f ally-mobile/.husky/commit-msg ]; then
+  MSG="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
+  (cd ally-mobile && sh .husky/commit-msg "$MSG")
+fi

@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# Root pre-commit for the ally-platform monorepo.
+#
+# Git runs hooks from the repository root, so the per-service hooks under
+# <service>/.husky/ stopped firing at the move: husky installs only from the git
+# root, and pre-commit reads only a root .pre-commit-config.yaml. This runs:
+#
+#   1. pre-commit on the staged files (gitleaks, file checks, and black, isort,
+#      flake8 and pytest for ally-ai and ally-ai-learn), when it is installed;
+#   2. each JS service's own .husky/pre-commit, from inside that service, when the
+#      commit touches it.
+#
+# Switched on by `npm install` in ally-be, ally-web or ally-mobile (their `prepare`
+# script), or by hand: git config core.hooksPath .githooks
+set -e
+# HUSKY=0 turns hooks off, as it did under husky (the Builder workflows set it).
+[ "${HUSKY:-}" = "0" ] && exit 0
+cd "$(git rev-parse --show-toplevel)"
+
+STAGED="$(git diff --cached --name-only --diff-filter=ACMR)"
+[ -n "$STAGED" ] || exit 0
+
+if command -v pre-commit >/dev/null 2>&1; then
+  pre-commit run --hook-stage pre-commit
+else
+  echo "pre-commit: not installed, so gitleaks and the Python checks were skipped (pip install pre-commit)" >&2
+fi
+
+for svc in ally-be ally-web ally-mobile; do
+  if printf '%s\n' "$STAGED" | grep -q "^$svc/" && [ -f "$svc/.husky/pre-commit" ]; then
+    echo "── $svc"
+    (cd "$svc" && sh .husky/pre-commit)
+  fi
+done
