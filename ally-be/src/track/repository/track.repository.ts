@@ -62,6 +62,12 @@ export class TrackRepository extends Repository<Track> {
     }
     this.applySearchFilter(query, filters);
 
+    if (filters?.createdByUserId) {
+      query.andWhere('track.createdBy = :createdByUserId', {
+        createdByUserId: filters.createdByUserId,
+      });
+    }
+
     if (filters?.sortBy) {
       const sortColumn = this.getValidatedSortColumn(filters.sortBy);
       if (sortColumn) {

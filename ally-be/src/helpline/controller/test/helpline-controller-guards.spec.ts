@@ -2,6 +2,9 @@ import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { HttpException } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { PermissionsGuard } from 'src/auth/guards/permissions.guard';
+import { FeatureToggleGuard } from 'src/auth/guards/feature-toggle.guard';
+import { FEATURE_TOGGLE_KEY } from 'src/auth/decorators/feature-toggle.decorator';
+import { FeatureToggleKey } from 'src/authorization/constants/admin-feature-toggle.constants';
 import { PERMISSIONS_KEY } from 'src/auth/decorators/permissions.decorator';
 import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
 import { ErrorCode } from 'src/exception/error-code.enum';
@@ -153,12 +156,19 @@ describe('helpline controller guards', () => {
 
   describe('HelplineAdminController', () => {
     it.each(handlers(HelplineAdminController))(
-      '%s needs EDIT_GLOBAL_SETTINGS',
+      '%s needs EDIT_GLOBAL_SETTINGS and the admin console Users toggle',
       (_, handler) => {
+        // Platform-admin only: the Users tab's organization screens are its
+        // one caller (admin-tab-toggle-gates.spec.ts).
         expect(guardsOf(handler as object)).toEqual([
           JwtGuard,
           PermissionsGuard,
+          FeatureToggleGuard,
         ]);
+        expect(
+          Reflect.getMetadata(FEATURE_TOGGLE_KEY, handler as object)
+            ?.featureKey,
+        ).toBe(FeatureToggleKey.USERS);
         expect(
           Reflect.getMetadata(PERMISSIONS_KEY, handler as object).permissions,
         ).toEqual([PERMISSIONS.EDIT_GLOBAL_SETTINGS]);

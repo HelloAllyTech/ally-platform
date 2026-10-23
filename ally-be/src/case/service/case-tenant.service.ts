@@ -8,18 +8,28 @@ import { CreateCaseTenantDto } from '../dto/create-case-tenant.dto';
 import { SuccessResponse } from 'src/common/type/common.type';
 import { CaseTenantValidationShared } from './case-tenant-validation-shared';
 import { DeleteCaseTenantDto } from '../dto/delete-case-tenant';
+import {
+  AuthoredContentType,
+  ContentAccessService,
+} from 'src/authorization/service/content-access.service';
 
 @Injectable()
 export class CaseTenantService {
   constructor(
     private readonly caseTenantRepository: CaseTenantRepository,
     private readonly caseTenantValidationShared: CaseTenantValidationShared,
+    private readonly contentAccessService: ContentAccessService,
   ) {}
 
   async assignCasesToTenant(
     tenantId: string,
     createCaseTenantDto: CreateCaseTenantDto,
   ): Promise<SuccessResponse> {
+    // An admin without See All Content moves only content they created.
+    await this.contentAccessService.assertAllInView(
+      AuthoredContentType.CASE,
+      createCaseTenantDto.caseIds,
+    );
     await this.caseTenantValidationShared.validateCaseTenant(
       createCaseTenantDto.caseIds,
       tenantId,
@@ -44,6 +54,11 @@ export class CaseTenantService {
     tenantId: string,
     deleteCaseTenantDto: DeleteCaseTenantDto,
   ): Promise<SuccessResponse> {
+    // An admin without See All Content moves only content they created.
+    await this.contentAccessService.assertAllInView(
+      AuthoredContentType.CASE,
+      deleteCaseTenantDto.caseIds,
+    );
     await this.caseTenantValidationShared.validateCaseTenant(
       deleteCaseTenantDto.caseIds,
       tenantId,

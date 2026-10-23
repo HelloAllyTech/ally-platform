@@ -37,6 +37,7 @@ import {
 } from "@constants";
 import {
   useCanUseCourseCopilot,
+  useContentAuthoring,
   useSimulations,
   useSimulationPathways,
   useSimulationCases,
@@ -94,6 +95,9 @@ export const SimulationStudio: React.FC = () => {
    * what the query `enabled` flags and create options read.
    */
   const hasContentAccess = hasFeature(features, FeatureToggleKey.CONTENT_MANAGEMENT);
+  // Per type, inside the studio: a type whose Create toggle is off is
+  // view-only — no create option, and rows offer View instead of Edit.
+  const { canAuthorRoleplays, canAuthorCases, canAuthorCourses } = useContentAuthoring();
   const isSuperDuperAdmin = isSuperDuperAdminRole(user?.role);
 
   // Get active tab from URL params, default to SIMULATIONS
@@ -298,15 +302,29 @@ export const SimulationStudio: React.FC = () => {
       if (option.id === en.simulation.newTrack) {
         return false;
       }
-      if (option.id === "New Case" || option.id === "New Course") {
-        return hasContentAccess;
+      if (option.id === en.simulation.newSimulation) {
+        return canAuthorRoleplays;
+      }
+      if (option.id === "New Case") {
+        return hasContentAccess && canAuthorCases;
+      }
+      if (option.id === "New Course") {
+        return hasContentAccess && canAuthorCourses;
       }
       if (option.id === "Course with Copilot") {
+        // Already includes Create Courses.
         return canUseCourseCopilot;
       }
       return true;
     });
-  }, [createOptions, hasContentAccess, canUseCourseCopilot]);
+  }, [
+    createOptions,
+    hasContentAccess,
+    canUseCourseCopilot,
+    canAuthorRoleplays,
+    canAuthorCases,
+    canAuthorCourses,
+  ]);
 
   const renderFooter = () => {
     const isCasesTab = activeTab === TAB_KEYS.CASES;
@@ -349,7 +367,7 @@ export const SimulationStudio: React.FC = () => {
     return (
       <div className="flex justify-between items-center">
         <h1 className="text-2xl text-typography-900 font-secondary">{en.simulation.rolePlays}</h1>
-        {!hideCreateButton && (
+        {!hideCreateButton && filteredCreateOptions.length > 0 && (
           <Button
             variant={ButtonVariant.PRIMARY}
             onClick={openCreatePopup}
@@ -452,13 +470,22 @@ export const SimulationStudio: React.FC = () => {
             pathways={cases}
             isLoading={isCasesLoading}
             hasFilters={selectedFilters.length > 0}
-            onEdit={onEditCase}
+            // View-only skips the "this moves it to draft" confirmation: nothing will be saved.
+            onEdit={canAuthorCases ? onEditCase : handleEditCase}
             onDelete={handleDeleteCase}
             onDuplicate={handleDuplicateCase}
             onUnpublishPathway={handleUnpublishCase}
-            onCreatePathway={handleNewCase}
+            onCreatePathway={canAuthorCases ? handleNewCase : undefined}
             footer={renderFooter()}
             isCases
+            readOnly={
+              canAuthorCases
+                ? undefined
+                : {
+                    plural: en.contentAccess.cases,
+                    toggleLabel: en.contentAccess.createCasesToggle,
+                  }
+            }
           />
         );
       case TAB_KEYS.TRACKS:
@@ -480,12 +507,20 @@ export const SimulationStudio: React.FC = () => {
             pathways={tracks}
             isLoading={isTracksLoading}
             hasFilters={selectedFilters.length > 0}
-            onEdit={onEditTrack}
+            onEdit={canAuthorCourses ? onEditTrack : handleEditTrack}
             onDelete={handleDeleteTrack}
             onDuplicate={handleDuplicateTrack}
             onUnpublishPathway={handleUnpublishTrack}
-            onCreatePathway={handleNewTrack}
+            onCreatePathway={canAuthorCourses ? handleNewTrack : undefined}
             footer={renderFooter()}
+            readOnly={
+              canAuthorCourses
+                ? undefined
+                : {
+                    plural: en.contentAccess.courses,
+                    toggleLabel: en.contentAccess.createCoursesToggle,
+                  }
+            }
           />
         );
       case TAB_KEYS.SIMULATIONS:
@@ -506,6 +541,7 @@ export const SimulationStudio: React.FC = () => {
             footer={renderFooter()}
             currentUser={user}
             isSuperAdmin={hasContentAccess}
+            readOnly={!canAuthorRoleplays}
           />
         );
       default:

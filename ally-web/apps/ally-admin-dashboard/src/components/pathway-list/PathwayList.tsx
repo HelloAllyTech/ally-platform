@@ -1,6 +1,6 @@
 import React from "react";
 
-import { Add, Edit, Delete, Unpublish, Copy, BookWhite } from "@assets";
+import { Add, Edit, Eye, Delete, Unpublish, Copy, BookWhite } from "@assets";
 import {
   DataList,
   ActionButton,
@@ -23,6 +23,11 @@ export interface PathwayListProps {
   onDuplicate?: (pathway: ScenarioPath) => void;
   onUnpublishPathway?: (pathway: ScenarioPath) => void;
   onCreatePathway?: () => void;
+  /**
+   * The admin may not change this type (Create Cases / Create Courses off):
+   * rows offer View — the editor, opened read-only — and nothing that writes.
+   */
+  readOnly?: { plural: string; toggleLabel: string };
 }
 
 export const PathwayList: React.FC<PathwayListProps> = ({
@@ -36,6 +41,7 @@ export const PathwayList: React.FC<PathwayListProps> = ({
   onDuplicate,
   onUnpublishPathway,
   onCreatePathway,
+  readOnly,
 }) => {
   // Handle loading state
   if (isLoading && !isNonEmptyArray(pathways)) {
@@ -48,6 +54,14 @@ export const PathwayList: React.FC<PathwayListProps> = ({
   }
 
   // Handle empty state without data
+  if (!isNonEmptyArray(pathways) && readOnly) {
+    return (
+      <EmptyState
+        title={en.contentAccess.viewOnlyEmptyTitle(readOnly.plural)}
+        subtitle={en.contentAccess.viewOnlyEmptySubtitle(readOnly.plural, readOnly.toggleLabel)}
+      />
+    );
+  }
   if (!isNonEmptyArray(pathways)) {
     return (
       <div className="flex font-primary items-center justify-center min-h-[60vh]">
@@ -121,12 +135,7 @@ export const PathwayList: React.FC<PathwayListProps> = ({
   ];
 
   // Define actions configuration
-  const actions: ActionButton<ScenarioPath>[] = [
-    {
-      icon: <Edit />,
-      tooltip: en.simulation.edit,
-      onClick: pathway => onEdit?.(pathway),
-    },
+  const writeActions: ActionButton<ScenarioPath>[] = [
     {
       icon: <Unpublish />,
       tooltip: en.simulation.unpublish,
@@ -146,6 +155,13 @@ export const PathwayList: React.FC<PathwayListProps> = ({
       onClick: pathway => onDelete?.(pathway),
     },
   ];
+  // onEdit opens the editor either way; a read-only admin gets it read-only.
+  const actions: ActionButton<ScenarioPath>[] = readOnly
+    ? [{ icon: <Eye />, tooltip: en.contentAccess.view, onClick: pathway => onEdit?.(pathway) }]
+    : [
+        { icon: <Edit />, tooltip: en.simulation.edit, onClick: pathway => onEdit?.(pathway) },
+        ...writeActions,
+      ];
   const renderThumbnailOverlay = (pathway: ScenarioPath) => (
     <div className="absolute top-0 right-0 bottom-0 w-[40%] z-10 bg-[rgba(0,0,0,0.5)] text-xs gap-1 text-white text-center flex items-center flex-col justify-center">
       {pathway.totalScenarios}

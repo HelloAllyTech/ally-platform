@@ -14,12 +14,21 @@ describe("useCanUseCourseCopilot", () => {
     userState = { permissions: [], features: [] };
   });
 
-  it("is true only with the toggle AND the edit grant", () => {
+  it("is true only with the toggle, Create Courses AND the edit grant", () => {
+    userState = {
+      permissions: [Permissions.EDIT_COURSE_COPILOT],
+      features: [FeatureToggleKey.COURSE_COPILOT, FeatureToggleKey.CREATE_COURSES],
+    };
+    expect(renderHook(() => useCanUseCourseCopilot()).result.current).toBe(true);
+  });
+
+  // Copilot builds and edits courses, so it follows the admin's Create Courses toggle.
+  it("is false when courses are view-only for the admin", () => {
     userState = {
       permissions: [Permissions.EDIT_COURSE_COPILOT],
       features: [FeatureToggleKey.COURSE_COPILOT],
     };
-    expect(renderHook(() => useCanUseCourseCopilot()).result.current).toBe(true);
+    expect(renderHook(() => useCanUseCourseCopilot()).result.current).toBe(false);
   });
 
   it("is false with the toggle alone", () => {

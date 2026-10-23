@@ -3023,6 +3023,7 @@ export class ScenarioSessionService {
     const { scenarioId, languageId, scenarioVersionId } = previewScenarioDto;
     const interactionMode =
       previewScenarioDto.interactionMode ?? ScenarioInteractionMode.VOICE;
+    await this.scenarioService.assertRoleplayInView(scenarioId, userId);
 
     const scenario = scenarioVersionId
       ? await this.scenarioSharedService.buildScenarioOverrideFromVersion(

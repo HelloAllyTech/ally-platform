@@ -50,6 +50,19 @@ const ALL_FEATURE_GATED_KEYS = [
   FeatureToggleKey.MANAGE_SCENARIO_LANGUAGES,
 ];
 
+// The per-tab toggles ally-be grants every platform admin by default
+// (`defaultEnabled`), as `/users/me/feature-toggles` returns them.
+const DEFAULT_TAB_KEYS = [
+  FeatureToggleKey.EVENTS,
+  FeatureToggleKey.SCENARIO_VOICES,
+  FeatureToggleKey.PROMPTS,
+  FeatureToggleKey.TRANSLATIONS,
+  FeatureToggleKey.BLOG,
+  FeatureToggleKey.PRODUCT_UPDATES,
+  FeatureToggleKey.PRODUCT_ROADMAP,
+  FeatureToggleKey.USERS,
+];
+
 describe("deriveNavigationItems", () => {
   it("returns no items when permissions/features are missing/empty", () => {
     expect(
@@ -66,7 +79,7 @@ describe("deriveNavigationItems", () => {
     // tab into buildSidebarItemFeatureKeyMap, this fails.
     const result = deriveNavigationItems({
       permissions: [Permissions.VIEW_PRODUCT_ROADMAP],
-      features: [],
+      features: DEFAULT_TAB_KEYS,
       savedOrder: undefined,
     });
     expect(result.map(i => i.id)).toEqual([SIDEBAR_ITEMS.PRODUCT_ROADMAP]);
@@ -86,7 +99,7 @@ describe("deriveNavigationItems", () => {
   it("shows Product updates right after Blog for a holder of EDIT_BLOG", () => {
     const result = deriveNavigationItems({
       permissions: [Permissions.EDIT_BLOG, Permissions.VIEW_BLOGS],
-      features: [],
+      features: DEFAULT_TAB_KEYS,
       savedOrder: undefined,
     });
     const ids = result.map(i => i.id);
@@ -112,7 +125,7 @@ describe("deriveNavigationItems", () => {
   it("filters permission-gated items to those the user can access", () => {
     const result = deriveNavigationItems({
       permissions: [Permissions.EDIT_EVENT],
-      features: [],
+      features: DEFAULT_TAB_KEYS,
       savedOrder: undefined,
     });
     expect(result.map(i => i.id)).toEqual([SIDEBAR_ITEMS.EVENTS]);
@@ -154,7 +167,7 @@ describe("deriveNavigationItems", () => {
     expect(
       deriveNavigationItems({
         permissions: [Permissions.VIEW_USERS],
-        features: [],
+        features: DEFAULT_TAB_KEYS,
         savedOrder: undefined,
       }).map(i => i.id),
     ).toContain(SIDEBAR_ITEMS.USERS);
@@ -264,7 +277,7 @@ describe("deriveNavigationItems", () => {
   it("applies the user's saved order so their chosen tab is first", () => {
     const result = deriveNavigationItems({
       permissions: [Permissions.EDIT_SCENARIO, Permissions.EDIT_EVENT],
-      features: [],
+      features: DEFAULT_TAB_KEYS,
       savedOrder: [SIDEBAR_ITEMS.EVENTS],
     });
     expect(result[0].id).toBe(SIDEBAR_ITEMS.EVENTS);
@@ -273,7 +286,7 @@ describe("deriveNavigationItems", () => {
   it("never surfaces feature-gated items for a non-holder, even via a stale saved order", () => {
     const result = deriveNavigationItems({
       permissions: [Permissions.EDIT_EVENT],
-      features: [],
+      features: DEFAULT_TAB_KEYS,
       savedOrder: [SIDEBAR_ITEMS.ANALYTICS, SIDEBAR_ITEMS.SETTINGS, SIDEBAR_ITEMS.EVENTS],
     });
     expect(result.map(i => i.id)).toEqual([SIDEBAR_ITEMS.EVENTS]);
@@ -297,7 +310,11 @@ describe("deriveNavigationItems", () => {
     it("shows Course Copilot right after Builder to a holder of both", () => {
       const result = deriveNavigationItems({
         permissions: [Permissions.EDIT_COURSE_COPILOT],
-        features: [FeatureToggleKey.BUILDER, FeatureToggleKey.COURSE_COPILOT],
+        features: [
+          FeatureToggleKey.BUILDER,
+          FeatureToggleKey.COURSE_COPILOT,
+          FeatureToggleKey.CREATE_COURSES,
+        ],
         savedOrder: undefined,
       });
       const ids = result.map(i => i.id);
@@ -313,6 +330,15 @@ describe("deriveNavigationItems", () => {
     it("hides it when the toggle is on but the edit grant is missing", () => {
       const result = deriveNavigationItems({
         permissions: [Permissions.VIEW_COURSE_COPILOT],
+        features: [FeatureToggleKey.COURSE_COPILOT],
+        savedOrder: undefined,
+      });
+      expect(result.map(i => i.id)).not.toContain(SIDEBAR_ITEMS.COURSE_COPILOT);
+    });
+
+    it("hides it when courses are view-only for the admin (Create Courses off)", () => {
+      const result = deriveNavigationItems({
+        permissions: [Permissions.EDIT_COURSE_COPILOT],
         features: [FeatureToggleKey.COURSE_COPILOT],
         savedOrder: undefined,
       });
@@ -339,5 +365,51 @@ describe("deriveNavigationItems", () => {
       savedOrder: undefined,
     });
     expect(result.map(i => i.id)).not.toContain(SIDEBAR_ITEMS.WHATSAPP_BOT);
+  });
+
+  // Tabs that used to be permission-only now also have a per-admin toggle: both
+  // halves are required, like Simulation Studio.
+  describe("per-tab toggles", () => {
+    const TAB_CASES = [
+      [SIDEBAR_ITEMS.EVENTS, Permissions.EDIT_EVENT, FeatureToggleKey.EVENTS],
+      [
+        SIDEBAR_ITEMS.SCENARIO_VOICES,
+        Permissions.EDIT_SCENARIO_VOICE,
+        FeatureToggleKey.SCENARIO_VOICES,
+      ],
+      [SIDEBAR_ITEMS.PROMPTS, Permissions.EDIT_PROMPT, FeatureToggleKey.PROMPTS],
+      [
+        SIDEBAR_ITEMS.TRANSLATIONS,
+        Permissions.VIEW_I18N_TRANSLATIONS,
+        FeatureToggleKey.TRANSLATIONS,
+      ],
+      [SIDEBAR_ITEMS.BLOG, Permissions.VIEW_BLOGS, FeatureToggleKey.BLOG],
+      [SIDEBAR_ITEMS.PRODUCT_UPDATES, Permissions.EDIT_BLOG, FeatureToggleKey.PRODUCT_UPDATES],
+      [
+        SIDEBAR_ITEMS.PRODUCT_ROADMAP,
+        Permissions.VIEW_PRODUCT_ROADMAP,
+        FeatureToggleKey.PRODUCT_ROADMAP,
+      ],
+      [SIDEBAR_ITEMS.USERS, Permissions.VIEW_USERS, FeatureToggleKey.USERS],
+    ] as const;
+
+    it.each(TAB_CASES)("%s needs its toggle as well as its permission", (tab, permission, key) => {
+      const ids = (features: string[]) =>
+        deriveNavigationItems({ permissions: [permission], features, savedOrder: undefined }).map(
+          i => i.id,
+        );
+      expect(ids([key])).toContain(tab);
+      expect(ids(DEFAULT_TAB_KEYS.filter(k => k !== key))).not.toContain(tab);
+    });
+
+    it("keeps Users for an Admin User Management holder with the Users toggle off", () => {
+      // Every toggle, the Users one included, is edited from the Ally admins list inside it.
+      const ids = deriveNavigationItems({
+        permissions: [Permissions.VIEW_USERS],
+        features: [FeatureToggleKey.ADMIN_USER_MANAGEMENT],
+        savedOrder: undefined,
+      }).map(i => i.id);
+      expect(ids).toContain(SIDEBAR_ITEMS.USERS);
+    });
   });
 });

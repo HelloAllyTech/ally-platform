@@ -126,7 +126,18 @@ describe("useUser", () => {
           // Simulation Studio needs this alongside EDIT_SCENARIO, and the
           // backfill migration switches it on for every platform admin — so
           // "on" is the realistic default for a nav-structure fixture.
-          features: [FeatureToggleKey.CONTENT_MANAGEMENT],
+          // The per-tab toggles are ON by default for every platform admin too.
+          features: [
+            FeatureToggleKey.CONTENT_MANAGEMENT,
+            FeatureToggleKey.EVENTS,
+            FeatureToggleKey.SCENARIO_VOICES,
+            FeatureToggleKey.PROMPTS,
+            FeatureToggleKey.TRANSLATIONS,
+            FeatureToggleKey.BLOG,
+            FeatureToggleKey.PRODUCT_UPDATES,
+            FeatureToggleKey.PRODUCT_ROADMAP,
+            FeatureToggleKey.USERS,
+          ],
           availableChatTypes: [],
           ...initialState,
         },

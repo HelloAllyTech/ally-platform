@@ -270,35 +270,64 @@ export const deriveNavigationItems = ({
             );
           // Toggle AND edit grant, like Simulation Studio, so deliberately NOT in
           // buildSidebarItemFeatureKeyMap (which would make it feature-only and drop the grant).
+          // Copilot builds courses, so it also follows Create Courses.
           case SIDEBAR_ITEMS.COURSE_COPILOT:
             return (
               permissions!.includes(Permissions.EDIT_COURSE_COPILOT) &&
-              hasFeature(features, FeatureToggleKey.COURSE_COPILOT)
+              hasFeature(features, FeatureToggleKey.COURSE_COPILOT) &&
+              hasFeature(features, FeatureToggleKey.CREATE_COURSES)
             );
+          // The tabs below each have a per-admin toggle (ON by default) AND keep
+          // their permission, so they stay out of buildSidebarItemFeatureKeyMap,
+          // which would make them toggle-only.
           case SIDEBAR_ITEMS.EVENTS:
-            return permissions!.includes(Permissions.EDIT_EVENT);
+            return (
+              permissions!.includes(Permissions.EDIT_EVENT) &&
+              hasFeature(features, FeatureToggleKey.EVENTS)
+            );
           case SIDEBAR_ITEMS.SCENARIO_VOICES:
-            return permissions!.includes(Permissions.EDIT_SCENARIO_VOICE);
+            return (
+              permissions!.includes(Permissions.EDIT_SCENARIO_VOICE) &&
+              hasFeature(features, FeatureToggleKey.SCENARIO_VOICES)
+            );
           case SIDEBAR_ITEMS.PROMPTS:
-            return permissions!.includes(Permissions.EDIT_PROMPT);
+            return (
+              permissions!.includes(Permissions.EDIT_PROMPT) &&
+              hasFeature(features, FeatureToggleKey.PROMPTS)
+            );
+          // Admin User Management also keeps the tab: its Ally admins list —
+          // where every toggle, this one included, is edited — lives inside it.
           case SIDEBAR_ITEMS.USERS:
             return (
-              permissions!.includes(Permissions.EDIT_USER) ||
-              permissions!.includes(Permissions.VIEW_USERS)
+              (permissions!.includes(Permissions.EDIT_USER) ||
+                permissions!.includes(Permissions.VIEW_USERS)) &&
+              (hasFeature(features, FeatureToggleKey.USERS) ||
+                hasFeature(features, FeatureToggleKey.ADMIN_USER_MANAGEMENT))
             );
           case SIDEBAR_ITEMS.TRANSLATIONS:
-            return permissions!.includes(Permissions.VIEW_I18N_TRANSLATIONS);
+            return (
+              permissions!.includes(Permissions.VIEW_I18N_TRANSLATIONS) &&
+              hasFeature(features, FeatureToggleKey.TRANSLATIONS)
+            );
           case SIDEBAR_ITEMS.BLOG:
-            return permissions!.includes(Permissions.VIEW_BLOGS);
-          // Permission-gated like Blog, on the edit grant: this page corrects and hides
-          // what the automation published. Not in buildSidebarItemFeatureKeyMap.
+            return (
+              permissions!.includes(Permissions.VIEW_BLOGS) &&
+              hasFeature(features, FeatureToggleKey.BLOG)
+            );
+          // On the edit grant, unlike Blog: this page corrects and hides what
+          // the automation published.
           case SIDEBAR_ITEMS.PRODUCT_UPDATES:
-            return permissions!.includes(Permissions.EDIT_BLOG);
-          // Permission-gated, deliberately NOT feature-toggle-gated: viewing and
-          // voting on the roadmap are meant to reach a wider group than the
-          // manage surface, so the tab must stay out of the feature-key map.
+            return (
+              permissions!.includes(Permissions.EDIT_BLOG) &&
+              hasFeature(features, FeatureToggleKey.PRODUCT_UPDATES)
+            );
+          // Viewing and voting reach a wider group than the manage surface
+          // (PRODUCT_ROADMAP_MANAGE); this key switches the tab itself.
           case SIDEBAR_ITEMS.PRODUCT_ROADMAP:
-            return permissions!.includes(Permissions.VIEW_PRODUCT_ROADMAP);
+            return (
+              permissions!.includes(Permissions.VIEW_PRODUCT_ROADMAP) &&
+              hasFeature(features, FeatureToggleKey.PRODUCT_ROADMAP)
+            );
           default:
             return true;
         }

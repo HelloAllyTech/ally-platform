@@ -1,3 +1,5 @@
+import { FeatureToggleKey } from 'src/authorization/constants/admin-feature-toggle.constants';
+import { RequireFeatureToggle } from 'src/auth/decorators/feature-toggle.decorator';
 import {
   Body,
   Controller,
@@ -36,13 +38,20 @@ export class DynamicI18nController {
   constructor(private readonly dynamicI18nService: DynamicI18nService) {}
 
   @ApiOperation({ summary: 'Get i18n manifest, draft languages, and versions' })
-  @AuthPermissions([PERMISSIONS.VIEW_I18N_TRANSLATIONS])
+  @RequireFeatureToggle(FeatureToggleKey.TRANSLATIONS, {
+    permissions: [PERMISSIONS.VIEW_I18N_TRANSLATIONS],
+  })
   @Get('status')
   async getStatus() {
     return this.dynamicI18nService.getStatus();
   }
 
   @ApiOperation({ summary: 'List draft translations for a language namespace' })
+  // The one route here NOT behind the Translations toggle: the Roleplay Session
+  // Logs detail page reads its transcript disclaimer through it, and an admin
+  // with that page but not the Translations tab must not get a 403 toast on
+  // every log. Every other route serves only the Translations tab; ci-sync is
+  // CI's, over an API key.
   @AuthPermissions([PERMISSIONS.VIEW_I18N_TRANSLATIONS])
   @Get('translations')
   async listTranslations(@Query() query: ListTranslationsQueryDto) {
@@ -54,7 +63,9 @@ export class DynamicI18nController {
   }
 
   @ApiOperation({ summary: 'Update draft translation keys' })
-  @AuthPermissions([PERMISSIONS.EDIT_I18N_TRANSLATIONS])
+  @RequireFeatureToggle(FeatureToggleKey.TRANSLATIONS, {
+    permissions: [PERMISSIONS.EDIT_I18N_TRANSLATIONS],
+  })
   @Put('translations')
   async updateTranslations(@Body() updateTranslationDto: UpdateTranslationDto) {
     return this.dynamicI18nService.updateTranslations(updateTranslationDto);
@@ -64,14 +75,18 @@ export class DynamicI18nController {
     summary:
       'Auto-translate a single key from a source language (default: en) to all other supported languages via OpenAI and save into drafts',
   })
-  @AuthPermissions([PERMISSIONS.EDIT_I18N_TRANSLATIONS])
+  @RequireFeatureToggle(FeatureToggleKey.TRANSLATIONS, {
+    permissions: [PERMISSIONS.EDIT_I18N_TRANSLATIONS],
+  })
   @Post('translations/auto-translate')
   async autoTranslate(@Body() autoTranslateDto: AutoTranslateDto) {
     return this.dynamicI18nService.autoTranslateAndSave(autoTranslateDto);
   }
 
   @ApiOperation({ summary: 'Get draft diff against current live version' })
-  @AuthPermissions([PERMISSIONS.VIEW_I18N_TRANSLATIONS])
+  @RequireFeatureToggle(FeatureToggleKey.TRANSLATIONS, {
+    permissions: [PERMISSIONS.VIEW_I18N_TRANSLATIONS],
+  })
   @Get('diff')
   async getDiff(@Query() query: ListTranslationsQueryDto) {
     return this.dynamicI18nService.getDiff(query.language, query.namespace);
@@ -80,7 +95,9 @@ export class DynamicI18nController {
   @ApiOperation({
     summary: 'Publish draft translations as a new static version',
   })
-  @AuthPermissions([PERMISSIONS.EDIT_I18N_TRANSLATIONS])
+  @RequireFeatureToggle(FeatureToggleKey.TRANSLATIONS, {
+    permissions: [PERMISSIONS.EDIT_I18N_TRANSLATIONS],
+  })
   @Post('publish')
   async publish(@Body() publishI18nDto: PublishI18nDto) {
     return this.dynamicI18nService.publish(publishI18nDto.note);
@@ -97,7 +114,9 @@ export class DynamicI18nController {
   }
 
   @ApiOperation({ summary: 'Rollback current manifest to a retained version' })
-  @AuthPermissions([PERMISSIONS.EDIT_I18N_TRANSLATIONS])
+  @RequireFeatureToggle(FeatureToggleKey.TRANSLATIONS, {
+    permissions: [PERMISSIONS.EDIT_I18N_TRANSLATIONS],
+  })
   @Post('rollback')
   async rollback(@Body() rollbackI18nDto: RollbackI18nDto) {
     return this.dynamicI18nService.rollback(
@@ -107,7 +126,9 @@ export class DynamicI18nController {
   }
 
   @ApiOperation({ summary: 'List dynamic i18n audit log entries' })
-  @AuthPermissions([PERMISSIONS.VIEW_I18N_TRANSLATIONS])
+  @RequireFeatureToggle(FeatureToggleKey.TRANSLATIONS, {
+    permissions: [PERMISSIONS.VIEW_I18N_TRANSLATIONS],
+  })
   @Get('audit-log')
   async getAuditLogs(@Query() query: I18nAuditLogQueryDto) {
     return this.dynamicI18nService.getAuditLogs(query.limit, query.offset);

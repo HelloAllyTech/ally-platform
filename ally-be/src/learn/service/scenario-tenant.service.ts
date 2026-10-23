@@ -15,6 +15,10 @@ import {
   AUDIT_ACTIONS,
   AUDIT_EVENTS,
 } from 'src/audit/constants/audit-event.constants';
+import {
+  AuthoredContentType,
+  ContentAccessService,
+} from 'src/authorization/service/content-access.service';
 
 @Injectable()
 export class ScenarioTenantService {
@@ -23,12 +27,18 @@ export class ScenarioTenantService {
     private readonly scenarioTenantValidationShared: ScenarioTenantValidationShared,
     private readonly auditLogService: AuditLogService,
     private permissionsService: PermissionsService,
+    private readonly contentAccessService: ContentAccessService,
   ) {}
 
   async assignScenariosToTenant(
     tenantId: string,
     addScenarioTenantDto: AddScenarioTenantDto,
   ): Promise<SuccessResponse> {
+    // An admin without See All Content moves only content they created.
+    await this.contentAccessService.assertAllInView(
+      AuthoredContentType.ROLEPLAY,
+      addScenarioTenantDto.scenarioIds,
+    );
     await this.scenarioTenantValidationShared.validateScenarioTenant(
       addScenarioTenantDto.scenarioIds,
       tenantId,
@@ -76,6 +86,11 @@ export class ScenarioTenantService {
     tenantId: string,
     deleteScenarioTenantDto: DeleteScenarioTenantDto,
   ): Promise<SuccessResponse> {
+    // An admin without See All Content moves only content they created.
+    await this.contentAccessService.assertAllInView(
+      AuthoredContentType.ROLEPLAY,
+      deleteScenarioTenantDto.scenarioIds,
+    );
     await this.scenarioTenantValidationShared.validateScenarioTenant(
       deleteScenarioTenantDto.scenarioIds,
       tenantId,

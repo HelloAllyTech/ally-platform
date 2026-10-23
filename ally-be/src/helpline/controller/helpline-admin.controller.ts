@@ -1,6 +1,7 @@
+import { FeatureToggleKey } from 'src/authorization/constants/admin-feature-toggle.constants';
+import { RequireFeatureToggle } from 'src/auth/decorators/feature-toggle.decorator';
 import { Body, Controller, Get, Put, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { AuthPermissions } from 'src/auth/decorators/auth-permissions.decorator';
 import { CurrentUser } from 'src/auth/decorators/user.decorator';
 import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
 import {
@@ -22,7 +23,9 @@ import { AdminSettingsDto, HelplineStaffUser } from '../type/helpline.types';
 export class HelplineAdminController {
   constructor(private readonly admin: HelplineAdminService) {}
 
-  @AuthPermissions([PERMISSIONS.EDIT_GLOBAL_SETTINGS])
+  @RequireFeatureToggle(FeatureToggleKey.USERS, {
+    permissions: [PERMISSIONS.EDIT_GLOBAL_SETTINGS],
+  })
   @Get('settings')
   @ApiOperation({ summary: "An organisation's helpline switch and settings" })
   getSettings(
@@ -32,7 +35,9 @@ export class HelplineAdminController {
     return this.admin.getSettings(user, query.tenantId);
   }
 
-  @AuthPermissions([PERMISSIONS.EDIT_GLOBAL_SETTINGS])
+  @RequireFeatureToggle(FeatureToggleKey.USERS, {
+    permissions: [PERMISSIONS.EDIT_GLOBAL_SETTINGS],
+  })
   @Put('settings')
   @ApiOperation({
     summary: 'Turn the helpline on/off and change settings (partial)',

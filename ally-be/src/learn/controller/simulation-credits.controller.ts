@@ -1,3 +1,5 @@
+import { FeatureToggleKey } from 'src/authorization/constants/admin-feature-toggle.constants';
+import { RequireFeatureToggle } from 'src/auth/decorators/feature-toggle.decorator';
 import { Controller, Get, Body, Query, Put } from '@nestjs/common';
 import { ApiBearerAuth, ApiSecurity, ApiTags } from '@nestjs/swagger';
 import { SimulationCreditsService } from '../service/simulation-credits.service';
@@ -36,7 +38,9 @@ export class SimulationCreditsController {
   }
 
   @UpdateSimulationCreditsDocumentation()
-  @AuthPermissions([PERMISSIONS.EDIT_SIMULATION_CREDITS])
+  @RequireFeatureToggle(FeatureToggleKey.USERS, {
+    permissions: [PERMISSIONS.EDIT_SIMULATION_CREDITS],
+  })
   @Put()
   async updateSimulationCredits(
     @Body() body: UpdateSimulationCreditsDto,

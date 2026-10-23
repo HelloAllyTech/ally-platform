@@ -16,6 +16,24 @@ export const FeatureToggleKey = {
   ROLEPLAY_SESSION_LOGS: "roleplay_session_logs",
   ORG_DETAIL_CONTENT_TABS: "org_detail_content_tabs",
   CONTENT_MANAGEMENT: "content_management",
+  // Content access inside Simulation Studio, enforced by ally-be
+  // (ContentAccessService). VIEW_ALL off: only content this admin created.
+  // CREATE_* off (they default ON): that type is view-only.
+  CONTENT_VIEW_ALL: "content_view_all",
+  CREATE_ROLEPLAYS: "create_roleplays",
+  CREATE_CASES: "create_cases",
+  CREATE_COURSES: "create_courses",
+  // One per sidebar tab that was gated on a permission alone. Default ON for
+  // every platform admin; enforced here (sidebar + route) and by ally-be on the
+  // routes only that tab uses (ally-be admin-tab-toggle-gates.spec.ts).
+  EVENTS: "events",
+  SCENARIO_VOICES: "scenario_voices",
+  PROMPTS: "prompts",
+  TRANSLATIONS: "translations",
+  BLOG: "blog",
+  PRODUCT_UPDATES: "product_updates",
+  PRODUCT_ROADMAP: "product_roadmap",
+  USERS: "users",
   ANALYTICS: "analytics",
   ANALYTICS_AGENT: "analytics_agent",
   ANALYTICS_SUGGESTIONS: "analytics_suggestions",
@@ -125,6 +143,7 @@ export const buildSidebarItemFeatureKeyMap = (
  * once so the editor doesn't need its own copy.
  */
 export const FEATURE_TOGGLE_SECTIONS = {
+  CONTENT_ACCESS: "Content Access",
   ANALYTICS: "Analytics",
   CONTENT_AND_SIMULATION_CONFIG: "Content & Simulation Config",
   PLATFORM_CONFIG: "Platform Config",
@@ -137,6 +156,13 @@ export type FeatureToggleSection =
 
 /** feature key -> section label, for grouping the toggle editor's rows. */
 export const FEATURE_TOGGLE_KEY_TO_SECTION: Record<string, FeatureToggleSection> = {
+  // The studio itself, then what the admin sees and may create inside it.
+  [FeatureToggleKey.CONTENT_MANAGEMENT]: FEATURE_TOGGLE_SECTIONS.CONTENT_ACCESS,
+  [FeatureToggleKey.CONTENT_VIEW_ALL]: FEATURE_TOGGLE_SECTIONS.CONTENT_ACCESS,
+  [FeatureToggleKey.CREATE_ROLEPLAYS]: FEATURE_TOGGLE_SECTIONS.CONTENT_ACCESS,
+  [FeatureToggleKey.CREATE_CASES]: FEATURE_TOGGLE_SECTIONS.CONTENT_ACCESS,
+  [FeatureToggleKey.CREATE_COURSES]: FEATURE_TOGGLE_SECTIONS.CONTENT_ACCESS,
+
   [FeatureToggleKey.ANALYTICS]: FEATURE_TOGGLE_SECTIONS.ANALYTICS,
   [FeatureToggleKey.ANALYTICS_AGENT]: FEATURE_TOGGLE_SECTIONS.ANALYTICS,
   [FeatureToggleKey.ANALYTICS_SUGGESTIONS]: FEATURE_TOGGLE_SECTIONS.ANALYTICS,
@@ -154,7 +180,10 @@ export const FEATURE_TOGGLE_KEY_TO_SECTION: Record<string, FeatureToggleSection>
   [FeatureToggleKey.COMPETENCIES]: FEATURE_TOGGLE_SECTIONS.CONTENT_AND_SIMULATION_CONFIG,
   [FeatureToggleKey.AI_LAB]: FEATURE_TOGGLE_SECTIONS.CONTENT_AND_SIMULATION_CONFIG,
   [FeatureToggleKey.ORG_DETAIL_CONTENT_TABS]: FEATURE_TOGGLE_SECTIONS.CONTENT_AND_SIMULATION_CONFIG,
-  [FeatureToggleKey.CONTENT_MANAGEMENT]: FEATURE_TOGGLE_SECTIONS.CONTENT_AND_SIMULATION_CONFIG,
+  [FeatureToggleKey.EVENTS]: FEATURE_TOGGLE_SECTIONS.CONTENT_AND_SIMULATION_CONFIG,
+  [FeatureToggleKey.SCENARIO_VOICES]: FEATURE_TOGGLE_SECTIONS.CONTENT_AND_SIMULATION_CONFIG,
+  [FeatureToggleKey.PROMPTS]: FEATURE_TOGGLE_SECTIONS.CONTENT_AND_SIMULATION_CONFIG,
+  [FeatureToggleKey.TRANSLATIONS]: FEATURE_TOGGLE_SECTIONS.CONTENT_AND_SIMULATION_CONFIG,
 
   [FeatureToggleKey.SETTINGS]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,
   [FeatureToggleKey.LOGS]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,
@@ -167,11 +196,15 @@ export const FEATURE_TOGGLE_KEY_TO_SECTION: Record<string, FeatureToggleSection>
   [FeatureToggleKey.COURSE_COPILOT]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,
   [FeatureToggleKey.UX_SIGNALS]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,
   [FeatureToggleKey.SIDEBAR_HOVER_EXPAND]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,
+  [FeatureToggleKey.BLOG]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,
+  [FeatureToggleKey.PRODUCT_UPDATES]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,
 
+  [FeatureToggleKey.USERS]: FEATURE_TOGGLE_SECTIONS.USER_AND_ORG_MANAGEMENT,
   [FeatureToggleKey.USER_BADGES]: FEATURE_TOGGLE_SECTIONS.USER_AND_ORG_MANAGEMENT,
   [FeatureToggleKey.ADMIN_USER_MANAGEMENT]: FEATURE_TOGGLE_SECTIONS.USER_AND_ORG_MANAGEMENT,
   [FeatureToggleKey.MULTI_TENANT_ALLOWLIST_MANAGEMENT]:
     FEATURE_TOGGLE_SECTIONS.USER_AND_ORG_MANAGEMENT,
+  [FeatureToggleKey.PRODUCT_ROADMAP]: FEATURE_TOGGLE_SECTIONS.USER_AND_ORG_MANAGEMENT,
   [FeatureToggleKey.PRODUCT_ROADMAP_MANAGE]: FEATURE_TOGGLE_SECTIONS.USER_AND_ORG_MANAGEMENT,
   [FeatureToggleKey.PRODUCT_ROADMAP_QUICK_ADD]: FEATURE_TOGGLE_SECTIONS.USER_AND_ORG_MANAGEMENT,
 
@@ -185,6 +218,7 @@ export const FEATURE_TOGGLE_KEY_TO_SECTION: Record<string, FeatureToggleSection>
 
 /** Order sections should render in the toggle editor. */
 export const FEATURE_TOGGLE_SECTION_ORDER: FeatureToggleSection[] = [
+  FEATURE_TOGGLE_SECTIONS.CONTENT_ACCESS,
   FEATURE_TOGGLE_SECTIONS.ANALYTICS,
   FEATURE_TOGGLE_SECTIONS.CONTENT_AND_SIMULATION_CONFIG,
   FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,

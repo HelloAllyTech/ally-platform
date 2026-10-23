@@ -1,3 +1,5 @@
+import { FeatureToggleKey } from 'src/authorization/constants/admin-feature-toggle.constants';
+import { RequireFeatureToggle } from 'src/auth/decorators/feature-toggle.decorator';
 import {
   Controller,
   Get,
@@ -77,7 +79,9 @@ export class AuthorizationController {
   })
   @HttpCode(HttpStatus.OK)
   @Post('change-roles')
-  @AuthPermissions([PERMISSIONS.EDIT_USER_ROLE])
+  @RequireFeatureToggle(FeatureToggleKey.USERS, {
+    permissions: [PERMISSIONS.EDIT_USER_ROLE],
+  })
   async changeUserRoles(@Body() changeUserRolesDto: ChangeUserRolesDto) {
     return this.groupService.changeUserRoles(changeUserRolesDto);
   }

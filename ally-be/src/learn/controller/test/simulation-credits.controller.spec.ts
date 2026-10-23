@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { featureToggleGuardProviders } from 'src/auth/guards/test/feature-toggle-guard.fixtures';
 import { SimulationCreditsController } from '../simulation-credits.controller';
 import { SimulationCreditsService } from '../../service/simulation-credits.service';
 import { TokenUser } from 'src/auth/type/auth.types';
@@ -34,6 +35,8 @@ describe('SimulationCreditsController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [SimulationCreditsController],
       providers: [
+        // The credit update is behind the Users tab toggle.
+        ...featureToggleGuardProviders(),
         {
           provide: SimulationCreditsService,
           useValue: mockSimulationCreditsService,

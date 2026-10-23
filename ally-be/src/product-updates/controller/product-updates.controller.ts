@@ -1,3 +1,5 @@
+import { FeatureToggleKey } from 'src/authorization/constants/admin-feature-toggle.constants';
+import { RequireFeatureToggle } from 'src/auth/decorators/feature-toggle.decorator';
 import {
   Body,
   Controller,
@@ -17,7 +19,6 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 
-import { AuthPermissions } from 'src/auth/decorators/auth-permissions.decorator';
 import { Public } from 'src/auth/decorators/auth.metadata';
 import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
 
@@ -40,8 +41,10 @@ import { ProductUpdatesService } from '../service/product-updates.service';
  *
  * Admin routes reuse `edit:blog`. Whoever may publish a blog post may correct
  * the changelog — same audience, the public page, and no permission migration.
- * Permissions are applied per route, never on the class, because the public
- * route must stay open (`AuthPermissions` ignores `@Public()`). The public
+ * They also need the admin's Product Updates toggle (ON by default), which is
+ * what tells them apart from the Blog tab now that both share the permission.
+ * Gates are applied per route, never on the class, because the public route
+ * must stay open (`AuthPermissions` ignores `@Public()`). The public
  * route and the fixed paths are declared before `:id` so neither is captured
  * as an id.
  */
@@ -66,7 +69,9 @@ export class ProductUpdatesController {
   @Get('status')
   @ApiBearerAuth()
   @ApiSecurity('access-token')
-  @AuthPermissions([PERMISSIONS.EDIT_BLOG])
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_UPDATES, {
+    permissions: [PERMISSIONS.EDIT_BLOG],
+  })
   @ApiOperation({
     summary: 'Pipeline state: merges by status, update counts, the last run',
   })
@@ -79,7 +84,9 @@ export class ProductUpdatesController {
   @HttpCode(202)
   @ApiBearerAuth()
   @ApiSecurity('access-token')
-  @AuthPermissions([PERMISSIONS.EDIT_BLOG])
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_UPDATES, {
+    permissions: [PERMISSIONS.EDIT_BLOG],
+  })
   @ApiOperation({
     summary:
       'Start a pipeline pass now, or a backfill of the whole journal, in the background',
@@ -94,7 +101,9 @@ export class ProductUpdatesController {
   @Get()
   @ApiBearerAuth()
   @ApiSecurity('access-token')
-  @AuthPermissions([PERMISSIONS.EDIT_BLOG])
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_UPDATES, {
+    permissions: [PERMISSIONS.EDIT_BLOG],
+  })
   @ApiOperation({ summary: 'List product updates, most recently merged first' })
   @ApiResponse({ status: 200, type: GetProductUpdatesResponseDto })
   async list(
@@ -106,7 +115,9 @@ export class ProductUpdatesController {
   @Get(':id')
   @ApiBearerAuth()
   @ApiSecurity('access-token')
-  @AuthPermissions([PERMISSIONS.EDIT_BLOG])
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_UPDATES, {
+    permissions: [PERMISSIONS.EDIT_BLOG],
+  })
   @ApiParam({ name: 'id', description: 'Product update UUID' })
   @ApiOperation({ summary: 'One product update with the merges behind it' })
   @ApiResponse({ status: 200, type: ProductUpdateDto })
@@ -117,7 +128,9 @@ export class ProductUpdatesController {
   @Patch(':id')
   @ApiBearerAuth()
   @ApiSecurity('access-token')
-  @AuthPermissions([PERMISSIONS.EDIT_BLOG])
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_UPDATES, {
+    permissions: [PERMISSIONS.EDIT_BLOG],
+  })
   @ApiParam({ name: 'id', description: 'Product update UUID' })
   @ApiOperation({
     summary:

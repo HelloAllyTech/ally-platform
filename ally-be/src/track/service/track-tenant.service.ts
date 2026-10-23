@@ -12,6 +12,10 @@ import {
   CreateTrackTenantDto,
   DeleteTrackTenantDto,
 } from '../dto/track-tenant.dto';
+import {
+  AuthoredContentType,
+  ContentAccessService,
+} from 'src/authorization/service/content-access.service';
 
 @Injectable()
 export class TrackTenantService {
@@ -19,12 +23,18 @@ export class TrackTenantService {
     private readonly trackRepository: TrackRepository,
     private readonly trackTenantRepository: TrackTenantRepository,
     private readonly tenantService: TenantService,
+    private readonly contentAccessService: ContentAccessService,
   ) {}
 
   async assignTracksToTenant(
     tenantId: string,
     dto: CreateTrackTenantDto,
   ): Promise<SuccessResponse> {
+    // An admin without See All Content moves only content they created.
+    await this.contentAccessService.assertAllInView(
+      AuthoredContentType.COURSE,
+      dto.trackIds,
+    );
     await this.validateTrackTenant(dto.trackIds, tenantId);
     const existing = await this.trackTenantRepository.getTrackTenants(
       dto.trackIds,
@@ -42,6 +52,11 @@ export class TrackTenantService {
     tenantId: string,
     dto: DeleteTrackTenantDto,
   ): Promise<SuccessResponse> {
+    // An admin without See All Content moves only content they created.
+    await this.contentAccessService.assertAllInView(
+      AuthoredContentType.COURSE,
+      dto.trackIds,
+    );
     await this.validateTrackTenant(dto.trackIds, tenantId);
     const existing = await this.trackTenantRepository.getTrackTenants(
       dto.trackIds,

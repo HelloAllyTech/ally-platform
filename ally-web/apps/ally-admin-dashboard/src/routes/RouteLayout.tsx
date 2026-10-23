@@ -133,7 +133,12 @@ export const RouteLayout: React.FC = () => {
         <Route
           path={ROUTES.USER_MANAGEMENT}
           element={
-            <PrivateLayout requiredPermissions={[Permissions.EDIT_USER, Permissions.VIEW_USERS]}>
+            // Any-of: Admin User Management keeps the page, since its Ally admins
+            // list is where every toggle — the Users one included — is edited.
+            <PrivateLayout
+              requiredPermissions={[Permissions.EDIT_USER, Permissions.VIEW_USERS]}
+              requiredFeature={[FeatureToggleKey.USERS, FeatureToggleKey.ADMIN_USER_MANAGEMENT]}
+            >
               <UserManagement />
             </PrivateLayout>
           }
@@ -141,7 +146,10 @@ export const RouteLayout: React.FC = () => {
         <Route
           path={ROUTES.ORGANIZATION_DETAIL(":id")}
           element={
-            <PrivateLayout requiredPermissions={[Permissions.EDIT_USER, Permissions.VIEW_USERS]}>
+            <PrivateLayout
+              requiredPermissions={[Permissions.EDIT_USER, Permissions.VIEW_USERS]}
+              requiredFeature={FeatureToggleKey.USERS}
+            >
               <OrganizationDetail />
             </PrivateLayout>
           }
@@ -152,6 +160,7 @@ export const RouteLayout: React.FC = () => {
             <PrivateLayout
               requiredPermissions={[Permissions.EDIT_SCENARIO]}
               requiredFeature={FeatureToggleKey.CONTENT_MANAGEMENT}
+              alsoRequiredFeatures={[FeatureToggleKey.CREATE_ROLEPLAYS]}
             >
               <CreateSimulation />
             </PrivateLayout>
@@ -171,6 +180,8 @@ export const RouteLayout: React.FC = () => {
             <PrivateLayout
               requiredPermissions={[Permissions.EDIT_SCENARIO]}
               requiredFeature={FeatureToggleKey.CONTENT_MANAGEMENT}
+              // Read-only admins open roleplays through VIEW_SIMULATION instead.
+              alsoRequiredFeatures={[FeatureToggleKey.CREATE_ROLEPLAYS]}
             >
               <CreateSimulation />
             </PrivateLayout>
@@ -191,7 +202,10 @@ export const RouteLayout: React.FC = () => {
         <Route
           path={ROUTES.MANAGE_EVENTS}
           element={
-            <PrivateLayout requiredPermissions={[Permissions.EDIT_EVENT]}>
+            <PrivateLayout
+              requiredPermissions={[Permissions.EDIT_EVENT]}
+              requiredFeature={FeatureToggleKey.EVENTS}
+            >
               <EventManagement />
             </PrivateLayout>
           }
@@ -234,7 +248,10 @@ export const RouteLayout: React.FC = () => {
         <Route
           path={ROUTES.MANAGE_SCENARIO_VOICES}
           element={
-            <PrivateLayout requiredPermissions={[Permissions.EDIT_SCENARIO]}>
+            <PrivateLayout
+              requiredPermissions={[Permissions.EDIT_SCENARIO]}
+              requiredFeature={FeatureToggleKey.SCENARIO_VOICES}
+            >
               <ScenarioVoices />
             </PrivateLayout>
           }
@@ -284,7 +301,10 @@ export const RouteLayout: React.FC = () => {
         <Route
           path={ROUTES.MANAGE_PROMPTS}
           element={
-            <PrivateLayout requiredPermissions={[Permissions.EDIT_PROMPT]}>
+            <PrivateLayout
+              requiredPermissions={[Permissions.EDIT_PROMPT]}
+              requiredFeature={FeatureToggleKey.PROMPTS}
+            >
               <SystemSkillsPage />
             </PrivateLayout>
           }
@@ -317,6 +337,7 @@ export const RouteLayout: React.FC = () => {
             <PrivateLayout
               requiredPermissions={[Permissions.EDIT_EVENT]}
               requiredFeature={FeatureToggleKey.CONTENT_MANAGEMENT}
+              alsoRequiredFeatures={[FeatureToggleKey.CREATE_COURSES]}
             >
               <CreateTrack />
             </PrivateLayout>
@@ -350,6 +371,7 @@ export const RouteLayout: React.FC = () => {
             <PrivateLayout
               requiredPermissions={[Permissions.EDIT_EVENT]}
               requiredFeature={FeatureToggleKey.CONTENT_MANAGEMENT}
+              alsoRequiredFeatures={[FeatureToggleKey.CREATE_CASES]}
             >
               <CreateCase />
             </PrivateLayout>
@@ -377,7 +399,10 @@ export const RouteLayout: React.FC = () => {
         <Route
           path={ROUTES.MANAGE_TRANSLATIONS}
           element={
-            <PrivateLayout requiredPermissions={[Permissions.VIEW_I18N_TRANSLATIONS]}>
+            <PrivateLayout
+              requiredPermissions={[Permissions.VIEW_I18N_TRANSLATIONS]}
+              requiredFeature={FeatureToggleKey.TRANSLATIONS}
+            >
               <TranslationManagement />
             </PrivateLayout>
           }
@@ -393,7 +418,10 @@ export const RouteLayout: React.FC = () => {
         <Route
           path={ROUTES.BLOG}
           element={
-            <PrivateLayout requiredPermissions={[Permissions.VIEW_BLOGS]}>
+            <PrivateLayout
+              requiredPermissions={[Permissions.VIEW_BLOGS]}
+              requiredFeature={FeatureToggleKey.BLOG}
+            >
               <BlogManagement />
             </PrivateLayout>
           }
@@ -401,7 +429,10 @@ export const RouteLayout: React.FC = () => {
         <Route
           path={ROUTES.PRODUCT_UPDATES}
           element={
-            <PrivateLayout requiredPermissions={[Permissions.EDIT_BLOG]}>
+            <PrivateLayout
+              requiredPermissions={[Permissions.EDIT_BLOG]}
+              requiredFeature={FeatureToggleKey.PRODUCT_UPDATES}
+            >
               <ProductUpdates />
             </PrivateLayout>
           }
@@ -411,7 +442,10 @@ export const RouteLayout: React.FC = () => {
           element={
             // Permission-gated, not role-gated: SUPER_ADMIN can view and vote, while the
             // manage surface inside the page is gated on EDIT_PRODUCT_ROADMAP.
-            <PrivateLayout requiredPermissions={[Permissions.VIEW_PRODUCT_ROADMAP]}>
+            <PrivateLayout
+              requiredPermissions={[Permissions.VIEW_PRODUCT_ROADMAP]}
+              requiredFeature={FeatureToggleKey.PRODUCT_ROADMAP}
+            >
               <ProductRoadmap />
             </PrivateLayout>
           }
@@ -515,6 +549,7 @@ export const RouteLayout: React.FC = () => {
             <PrivateLayout
               requiredFeature={FeatureToggleKey.COURSE_COPILOT}
               requiredPermissions={[Permissions.EDIT_COURSE_COPILOT]}
+              alsoRequiredFeatures={[FeatureToggleKey.CREATE_COURSES]}
             >
               <CourseCopilotSessions />
             </PrivateLayout>
@@ -526,6 +561,7 @@ export const RouteLayout: React.FC = () => {
             <PrivateLayout
               requiredFeature={FeatureToggleKey.COURSE_COPILOT}
               requiredPermissions={[Permissions.EDIT_COURSE_COPILOT]}
+              alsoRequiredFeatures={[FeatureToggleKey.CREATE_COURSES]}
             >
               <CourseCopilotNew />
             </PrivateLayout>
@@ -537,6 +573,7 @@ export const RouteLayout: React.FC = () => {
             <PrivateLayout
               requiredFeature={FeatureToggleKey.COURSE_COPILOT}
               requiredPermissions={[Permissions.EDIT_COURSE_COPILOT]}
+              alsoRequiredFeatures={[FeatureToggleKey.CREATE_COURSES]}
             >
               <CourseCopilotSession />
             </PrivateLayout>

@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import { permissiveContentAccessProvider } from 'src/authorization/service/test/content-access.fixtures';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
 import { TrackService } from '../track.service';
@@ -64,6 +65,7 @@ describe('TrackService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TrackService,
+        permissiveContentAccessProvider(),
         { provide: DataSource, useValue: mockDataSource },
         { provide: TrackRepository, useValue: mockTrackRepository },
         {
@@ -688,13 +690,17 @@ describe('TrackService', () => {
 
     it('leaves an unrestricted admin free to edit any course or make it global', async () => {
       mockTenantScopeService.isRestricted.mockResolvedValue(false);
-      mockTrackRepository.findOne.mockClear();
+      // Someone else's course. It is loaded now for every admin — the content
+      // toggles need its creator — but the organization rule lets this one by.
+      mockTrackRepository.findOne.mockResolvedValue({
+        id: 't1',
+        createdBy: 999,
+      });
 
       await expect(service.assertCallerMayEdit('t1')).resolves.toBeUndefined();
       await expect(
         service.assertCallerMayMakeGlobal(true),
       ).resolves.toBeUndefined();
-      expect(mockTrackRepository.findOne).not.toHaveBeenCalled();
       mockDataSource.query.mockClear();
       await expect(
         service.assertCallerMayDeleteMedia('https://b/track-media/e.png'),

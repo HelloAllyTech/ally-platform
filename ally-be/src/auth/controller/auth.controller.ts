@@ -1,3 +1,5 @@
+import { FeatureToggleKey } from 'src/authorization/constants/admin-feature-toggle.constants';
+import { RequireFeatureToggle } from 'src/auth/decorators/feature-toggle.decorator';
 import {
   Controller,
   Post,
@@ -28,7 +30,6 @@ import { AppleSignInDto } from '../dto/apple-token.dto';
 import { MagicLinkVerifyDto } from '../dto/magic-link.dto';
 import { PermissionsService } from 'src/authorization/service/permissions.service';
 import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
-import { AuthPermissions } from '../decorators/auth-permissions.decorator';
 import { ImpersonateDto } from '../dto/impersonate.dto';
 import { PostHog } from 'posthog-node';
 import {
@@ -197,7 +198,9 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Post('impersonate')
-  @AuthPermissions([PERMISSIONS.IMPERSONATE_USER])
+  @RequireFeatureToggle(FeatureToggleKey.USERS, {
+    permissions: [PERMISSIONS.IMPERSONATE_USER],
+  })
   @Version('1')
   @HttpCode(HttpStatus.OK)
   async impersonate(

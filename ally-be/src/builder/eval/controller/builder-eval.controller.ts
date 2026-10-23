@@ -18,7 +18,6 @@ import {
 import { CurrentUser } from 'src/auth/decorators/user.decorator';
 import { TokenUser } from 'src/auth/type/auth.types';
 import { RequireFeatureToggle } from 'src/auth/decorators/feature-toggle.decorator';
-import { AuthPermissions } from 'src/auth/decorators/auth-permissions.decorator';
 import { FeatureToggleKey } from 'src/authorization/constants/admin-feature-toggle.constants';
 import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
 import { BUILDER_EVAL_GATED_PROMPT_CODES } from '../../constants/builder-eval-gate.constants';
@@ -53,7 +52,10 @@ export class BuilderEvalController {
   ) {}
 
   @Get('gated-prompts')
-  @AuthPermissions([PERMISSIONS.EDIT_PROMPT])
+  // Read only by the System Skills tab's prompt side panel.
+  @RequireFeatureToggle(FeatureToggleKey.PROMPTS, {
+    permissions: [PERMISSIONS.EDIT_PROMPT],
+  })
   @ApiOperation({
     summary: 'Prompt codes whose edits go live only through the eval gate',
   })

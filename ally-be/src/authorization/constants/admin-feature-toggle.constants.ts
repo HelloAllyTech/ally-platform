@@ -47,6 +47,41 @@ export enum FeatureToggleKey {
   // without this key.
   CONTENT_MANAGEMENT = 'content_management',
 
+  // Content ownership and authoring, inside Simulation Studio. Enforced on the
+  // backend by ContentAccessService, for platform admins only — a tenant's own
+  // ADMIN reads the same list endpoints from the helpline dashboard and is
+  // never narrowed by these.
+  //
+  // CONTENT_VIEW_ALL off (the default for a new admin) means the admin sees,
+  // opens and picks only the roleplays, tracks, cases and courses they
+  // created. Every admin who existed when it was introduced was backfilled ON
+  // by *-AddModularContentAccessToggles, so nobody lost what they could see.
+  CONTENT_VIEW_ALL = 'content_view_all',
+  // Authoring per content type. defaultEnabled, so a missing row means ON.
+  // Off makes that type read-only for the admin: no create, duplicate, edit or
+  // delete, through Simulation Studio or Course Copilot.
+  CREATE_ROLEPLAYS = 'create_roleplays',
+  CREATE_CASES = 'create_cases',
+  CREATE_COURSES = 'create_courses',
+
+  // One key per sidebar tab that was gated on a permission alone, so every tab
+  // can be switched off per admin. All defaultEnabled: every platform admin
+  // already had these tabs, and keeps them until someone switches one off.
+  // Enforced in the admin console (sidebar + route) and on the backend routes
+  // that ONLY that tab uses. A route anything else calls — the public blog,
+  // the helpline and mobile apps, an X-API-Key service, the roleplay builder's
+  // pickers — stays ungated, because FeatureToggleGuard fails closed for
+  // everyone without admin toggles. The route-by-route map, with the reason
+  // for every exception, is pinned in test/admin-tab-toggle-gates.spec.ts.
+  EVENTS = 'events',
+  SCENARIO_VOICES = 'scenario_voices',
+  PROMPTS = 'prompts',
+  TRANSLATIONS = 'translations',
+  BLOG = 'blog',
+  PRODUCT_UPDATES = 'product_updates',
+  PRODUCT_ROADMAP = 'product_roadmap',
+  USERS = 'users',
+
   // Analytics (route itself is SUPER_ADMIN-tier; two sub-tabs are SDA-only)
   ANALYTICS = 'analytics',
   ANALYTICS_AGENT = 'analytics_agent',
@@ -154,6 +189,15 @@ export interface FeatureToggleDefinition {
    * Mutually exclusive with `platformOnly`.
    */
   orgScopedRoutesOnly?: true;
+  /**
+   * A platform admin with no row for this key has it ON. Turning it off
+   * writes an `enabled: false` row, so the default never resurrects it.
+   * Applies to platform-tier admins only (PLATFORM_TIER_ROLES): nobody else
+   * holds admin toggles, and a default must not hand one to a tenant ADMIN.
+   * For a key that switches off something every admin already had, without a
+   * backfill migration.
+   */
+  defaultEnabled?: true;
 }
 
 const SDA_ONLY: FeatureToggleLegacyGrants = {
@@ -170,9 +214,10 @@ const SUPER_ADMIN_TIER: FeatureToggleLegacyGrants = {
 
 /**
  * Every retired tier, MULTI_TENANT_ADMIN included — for a capability all three
- * had some form of before the collapse. Only CONTENT_MANAGEMENT uses it:
+ * had some form of before the collapse. CONTENT_MANAGEMENT was the first:
  * MULTI_TENANT_ADMIN authored simulations, so excluding them would take the
- * Simulations tab away from an admin who has it today.
+ * Simulations tab away from an admin who has it today. The content-access and
+ * sidebar-tab keys use it for the same reason: every tier had those surfaces.
  */
 const ALL_ADMIN_TIERS: FeatureToggleLegacyGrants = {
   superAdmin: true,
@@ -192,8 +237,42 @@ export const FEATURE_TOGGLES: FeatureToggleDefinition[] = [
     key: FeatureToggleKey.CONTENT_MANAGEMENT,
     label: 'Content Management',
     description:
-      'Create and edit library content in Simulation Studio — simulations, tracks, cases and courses.',
+      'Open Simulation Studio (the Roleplays tab). What this admin sees and may create there is set by See All Content and the Create Roleplays / Cases / Courses toggles.',
     legacyGrants: ALL_ADMIN_TIERS,
+  },
+  {
+    key: FeatureToggleKey.CONTENT_VIEW_ALL,
+    label: 'See All Content',
+    description:
+      'See and open every roleplay, track, case and course. Off: Simulation Studio, its pickers and the organization content tabs show only content this admin created.',
+    // Inert, like every key added after the role-collapse cutover. Existing
+    // admins were backfilled ON by *-AddModularContentAccessToggles; a new
+    // admin starts without it.
+    legacyGrants: ALL_ADMIN_TIERS,
+  },
+  {
+    key: FeatureToggleKey.CREATE_ROLEPLAYS,
+    label: 'Create Roleplays',
+    description:
+      'Create, duplicate, edit and delete roleplays, including through Course Copilot. Off: roleplays are view-only for this admin.',
+    legacyGrants: ALL_ADMIN_TIERS,
+    defaultEnabled: true,
+  },
+  {
+    key: FeatureToggleKey.CREATE_CASES,
+    label: 'Create Cases',
+    description:
+      'Create, duplicate, edit and delete cases, including through Course Copilot. Off: cases are view-only for this admin.',
+    legacyGrants: ALL_ADMIN_TIERS,
+    defaultEnabled: true,
+  },
+  {
+    key: FeatureToggleKey.CREATE_COURSES,
+    label: 'Create Courses',
+    description:
+      'Create, duplicate, edit and delete courses, and use Course Copilot. Off: courses are view-only for this admin.',
+    legacyGrants: ALL_ADMIN_TIERS,
+    defaultEnabled: true,
   },
   {
     key: FeatureToggleKey.AI_LAB,
@@ -430,6 +509,66 @@ export const FEATURE_TOGGLES: FeatureToggleDefinition[] = [
     legacyGrants: SUPER_ADMIN_TIER,
   },
   {
+    key: FeatureToggleKey.EVENTS,
+    label: 'Events',
+    description: 'The Events tab: the event library roleplays detect.',
+    legacyGrants: ALL_ADMIN_TIERS,
+    defaultEnabled: true,
+  },
+  {
+    key: FeatureToggleKey.SCENARIO_VOICES,
+    label: 'Voices',
+    description:
+      'The Voices tab: the voice catalog. Roleplay editors can still pick a voice without it.',
+    legacyGrants: ALL_ADMIN_TIERS,
+    defaultEnabled: true,
+  },
+  {
+    key: FeatureToggleKey.PROMPTS,
+    label: 'System Skills',
+    description: 'The System Skills tab: the platform prompts.',
+    legacyGrants: ALL_ADMIN_TIERS,
+    defaultEnabled: true,
+  },
+  {
+    key: FeatureToggleKey.TRANSLATIONS,
+    label: 'Translations',
+    description: 'The Translations tab: app copy in every language.',
+    legacyGrants: ALL_ADMIN_TIERS,
+    defaultEnabled: true,
+  },
+  {
+    key: FeatureToggleKey.BLOG,
+    label: 'Blog',
+    description: 'The Blog tab.',
+    legacyGrants: ALL_ADMIN_TIERS,
+    defaultEnabled: true,
+  },
+  {
+    key: FeatureToggleKey.PRODUCT_UPDATES,
+    label: 'Product Updates',
+    description:
+      'The Product Updates tab: correct or hide what the changelog automation published.',
+    legacyGrants: ALL_ADMIN_TIERS,
+    defaultEnabled: true,
+  },
+  {
+    key: FeatureToggleKey.PRODUCT_ROADMAP,
+    label: 'Product Roadmap',
+    description:
+      'The Product Roadmap tab: view and vote. Managing it also needs Product Roadmap — Manage.',
+    legacyGrants: ALL_ADMIN_TIERS,
+    defaultEnabled: true,
+  },
+  {
+    key: FeatureToggleKey.USERS,
+    label: 'Users',
+    description:
+      'The Users tab: organizations and their users. An admin with Admin User Management keeps the tab for its Ally admins list either way.',
+    legacyGrants: ALL_ADMIN_TIERS,
+    defaultEnabled: true,
+  },
+  {
     key: FeatureToggleKey.SIDEBAR_HOVER_EXPAND,
     label: 'Sidebar Hover Expand',
     description:
@@ -455,6 +594,12 @@ export function isPlatformOnlyToggle(key: string): boolean {
     (definition) => definition.key === key && definition.platformOnly === true,
   );
 }
+
+/** Keys a platform admin holds while they have no row — see FeatureToggleDefinition.defaultEnabled. */
+export const DEFAULT_ENABLED_FEATURE_TOGGLE_KEYS: FeatureToggleKey[] =
+  FEATURE_TOGGLES.filter(
+    (definition) => definition.defaultEnabled === true,
+  ).map((definition) => definition.key);
 
 /**
  * Whether a restricted admin keeps this toggle only for its org-scoped routes —

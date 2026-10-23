@@ -20,7 +20,6 @@ import {
   ApiSecurity,
   ApiTags,
 } from '@nestjs/swagger';
-import { AuthPermissions } from 'src/auth/decorators/auth-permissions.decorator';
 import { RequireFeatureToggle } from 'src/auth/decorators/feature-toggle.decorator';
 import { FeatureToggleKey } from 'src/authorization/constants/admin-feature-toggle.constants';
 import { CurrentUser } from 'src/auth/decorators/user.decorator';
@@ -86,7 +85,9 @@ export class RoadmapOpportunityController {
     private readonly access: RoadmapAccessService,
   ) {}
 
-  @AuthPermissions([PERMISSIONS.VIEW_PRODUCT_ROADMAP])
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
+    permissions: [PERMISSIONS.VIEW_PRODUCT_ROADMAP],
+  })
   @Get('opportunities')
   @ApiOperation({
     summary: 'List opportunities',
@@ -103,7 +104,9 @@ export class RoadmapOpportunityController {
     return this.opportunityService.list(user.id, query);
   }
 
-  @AuthPermissions([PERMISSIONS.VIEW_PRODUCT_ROADMAP])
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
+    permissions: [PERMISSIONS.VIEW_PRODUCT_ROADMAP],
+  })
   @Get('board')
   @ApiOperation({
     summary:
@@ -145,7 +148,9 @@ export class RoadmapOpportunityController {
     return this.boardService.move(user.id, dto);
   }
 
-  @AuthPermissions([PERMISSIONS.VIEW_PRODUCT_ROADMAP])
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
+    permissions: [PERMISSIONS.VIEW_PRODUCT_ROADMAP],
+  })
   @Get('facets')
   @ApiOperation({
     summary: 'Distinct filter options',
@@ -158,7 +163,9 @@ export class RoadmapOpportunityController {
     return this.opportunityService.getFacets();
   }
 
-  @AuthPermissions([PERMISSIONS.VIEW_PRODUCT_ROADMAP])
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
+    permissions: [PERMISSIONS.VIEW_PRODUCT_ROADMAP],
+  })
   @Get('me/vote-budget')
   @ApiOperation({
     summary: "The caller's remaining votes for the current period",
@@ -168,7 +175,9 @@ export class RoadmapOpportunityController {
     return this.allocationService.getBudget(user.id);
   }
 
-  @AuthPermissions([PERMISSIONS.VIEW_PRODUCT_ROADMAP])
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
+    permissions: [PERMISSIONS.VIEW_PRODUCT_ROADMAP],
+  })
   @Get('opportunities/:id')
   @ApiOperation({
     summary: 'One opportunity',
@@ -183,7 +192,9 @@ export class RoadmapOpportunityController {
     return this.opportunityService.findOne(user.id, id);
   }
 
-  @AuthPermissions([PERMISSIONS.VIEW_PRODUCT_ROADMAP])
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
+    permissions: [PERMISSIONS.VIEW_PRODUCT_ROADMAP],
+  })
   @Get('opportunities/:id/brief')
   @ApiOperation({
     summary: "The opportunity copilot's brief, as filed",
@@ -199,7 +210,9 @@ export class RoadmapOpportunityController {
     return this.opportunityService.getBrief(id);
   }
 
-  @AuthPermissions([PERMISSIONS.VIEW_PRODUCT_ROADMAP])
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
+    permissions: [PERMISSIONS.VIEW_PRODUCT_ROADMAP],
+  })
   @Get('opportunities/:id/voters')
   @ApiOperation({
     summary: "The votes behind an opportunity's priorityScore, by admin",
@@ -223,7 +236,9 @@ export class RoadmapOpportunityController {
    * (the guided interview) grades the checklist. See create()'s note for why /bug-reports opts
    * out. There is no override: a draft that fails the checklist is not filed.
    */
-  @AuthPermissions([PERMISSIONS.VOTE_PRODUCT_ROADMAP])
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
+    permissions: [PERMISSIONS.VOTE_PRODUCT_ROADMAP],
+  })
   @Post('opportunities')
   @ApiOperation({
     summary: 'File a new opportunity',
@@ -289,7 +304,9 @@ export class RoadmapOpportunityController {
    * is attached by the create or update call that follows, and until then the object is simply an
    * object nothing points at.
    */
-  @AuthPermissions([PERMISSIONS.VOTE_PRODUCT_ROADMAP])
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
+    permissions: [PERMISSIONS.VOTE_PRODUCT_ROADMAP],
+  })
   @Post('reference-images/upload-url')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -388,7 +405,9 @@ export class RoadmapOpportunityController {
     return this.opportunityService.remove(user.id, id);
   }
 
-  @AuthPermissions([PERMISSIONS.VOTE_PRODUCT_ROADMAP])
+  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
+    permissions: [PERMISSIONS.VOTE_PRODUCT_ROADMAP],
+  })
   @Put('allocations')
   @ApiOperation({
     summary: 'Set the caller’s votes on one opportunity',

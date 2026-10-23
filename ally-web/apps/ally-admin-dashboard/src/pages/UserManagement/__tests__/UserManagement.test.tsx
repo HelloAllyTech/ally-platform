@@ -8,7 +8,7 @@ import { TabType } from "@types";
 import * as useOrganizationManagementHook from "../useOrganizationManagement";
 import { UserManagement } from "../UserManagement";
 import * as useUserManagementHook from "../useUserManagement";
-import { Permissions } from "@constants";
+import { FeatureToggleKey, Permissions } from "@constants";
 
 // Mock hooks
 vi.mock("../useUserManagement");
@@ -157,6 +157,12 @@ vi.mock("@components", () => ({
   StatusBadge: () => <div data-testid="status-badge">Status Badge</div>,
 }));
 
+// Permissions as given, and the Users toggle on (its default for every platform admin).
+const mockUserState = (permissions: string[], features: string[] = [FeatureToggleKey.USERS]) =>
+  vi
+    .mocked(useSelector)
+    .mockImplementation((selector: any) => selector({ user: { permissions, features } }));
+
 describe("UserManagement", () => {
   const mockUsers = [
     { id: "user-1", name: "John Doe", email: "john@example.com", status: "ACTIVE" },
@@ -271,7 +277,7 @@ describe("UserManagement", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(useSelector).mockReturnValue([]); // Default permissions
+    mockUserState([]);
 
     vi.mocked(useUserManagementHook.useUserManagement).mockReturnValue(
       mockUserManagementHook as any,
@@ -283,9 +289,9 @@ describe("UserManagement", () => {
 
   const setPermissions = (permissions: Permissions[], user?: { role: string }) => {
     vi.mocked(useSelector).mockImplementation((selector: any) => {
-      // Mock RootState
+      // Mock RootState. The Users toggle is ON by default for every platform admin.
       const state = {
-        user: { permissions, user },
+        user: { permissions, user, features: [FeatureToggleKey.USERS] },
       };
       return selector(state);
     });
@@ -721,6 +727,30 @@ describe("UserManagement", () => {
     });
   });
 
+  // With the Users toggle off, an admin who holds Admin User Management still
+  // reaches the page — for the Ally admins list — and nothing else on it.
+  describe("with the Users toggle off", () => {
+    beforeEach(() => {
+      mockUserState(
+        [Permissions.EDIT_USER, Permissions.VIEW_USERS],
+        [FeatureToggleKey.ADMIN_USER_MANAGEMENT],
+      );
+      renderUserManagement();
+    });
+
+    it("hides the Users and Organizations sub-tabs", () => {
+      expect(screen.queryByText("Organizations")).not.toBeInTheDocument();
+    });
+
+    it("does not load the users list, which ally-be would refuse", () => {
+      expect(useUserManagementHook.useUserManagement).toHaveBeenLastCalledWith(
+        expect.anything(),
+        false,
+        false,
+      );
+    });
+  });
+
   describe("Platform accounts", () => {
     const openFilters = (role?: string) => {
       setPermissions([Permissions.EDIT_USER], role ? { role } : undefined);
@@ -749,6 +779,8 @@ describe("UserManagement", () => {
       expect(useUserManagementHook.useUserManagement).toHaveBeenLastCalledWith(
         expect.anything(),
         true,
+        // The Users toggle, on in this suite's fixtures: the users list loads.
+        true,
       );
     });
 
@@ -759,6 +791,8 @@ describe("UserManagement", () => {
       expect(useUserManagementHook.useUserManagement).toHaveBeenLastCalledWith(
         expect.anything(),
         false,
+        // The Users toggle, on in this suite's fixtures: the users list loads.
+        true,
       );
     });
 
@@ -873,7 +907,7 @@ describe("UserManagement", () => {
     });
 
     it("should show AssignedOrganizations in modal for MULTI_TENANT_ADMIN user", () => {
-      vi.mocked(useSelector).mockReturnValue([Permissions.EDIT_MULTI_TENANT_ADMINS]);
+      mockUserState([Permissions.EDIT_MULTI_TENANT_ADMINS]);
 
       vi.mocked(useUserManagementHook.useUserManagement).mockReturnValue({
         ...mockUserManagementHook,
@@ -890,7 +924,7 @@ describe("UserManagement", () => {
     });
 
     it("should show AssignedOrganizations reactively when role is changed in Change Role modal", () => {
-      vi.mocked(useSelector).mockReturnValue([Permissions.EDIT_MULTI_TENANT_ADMINS]);
+      mockUserState([Permissions.EDIT_MULTI_TENANT_ADMINS]);
 
       vi.mocked(useUserManagementHook.useUserManagement).mockReturnValue({
         ...mockUserManagementHook,
@@ -931,7 +965,7 @@ describe("UserManagement", () => {
     });
 
     it("should show AssignedOrganizations if user has MULTI_TENANT_ADMIN in role field", () => {
-      vi.mocked(useSelector).mockReturnValue([Permissions.EDIT_MULTI_TENANT_ADMINS]);
+      mockUserState([Permissions.EDIT_MULTI_TENANT_ADMINS]);
 
       vi.mocked(useUserManagementHook.useUserManagement).mockReturnValue({
         ...mockUserManagementHook,

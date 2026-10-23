@@ -90,7 +90,9 @@ export class SessionEventController {
 
   @ApiOperation({ summary: 'Update Session Event by id' })
   @ApiBody({ type: UpdateSessionEventDto })
-  @AuthPermissions([PERMISSIONS.EDIT_SESSION_EVENTS])
+  @RequireFeatureToggle(FeatureToggleKey.EVENTS, {
+    permissions: [PERMISSIONS.EDIT_SESSION_EVENTS],
+  })
   @Put('events/:id')
   async updateSessionEvents(
     @Param('id') id: string,
@@ -178,7 +180,9 @@ export class SessionEventController {
 
   @ApiOperation({ summary: 'Delete session events' })
   @ApiBody({ type: DeleteSessionEventsDto })
-  @AuthPermissions([PERMISSIONS.DELETE_SESSION_EVENTS])
+  @RequireFeatureToggle(FeatureToggleKey.EVENTS, {
+    permissions: [PERMISSIONS.DELETE_SESSION_EVENTS],
+  })
   @Delete('events')
   async deleteSessionEvents(
     @Body() deleteEventsDto: DeleteSessionEventsDto,

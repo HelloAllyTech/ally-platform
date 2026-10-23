@@ -39,13 +39,16 @@ describe('RoadmapOpportunityController — filing route gating', () => {
     };
   };
 
-  it('create (the interview) is VOTE-tier with no toggle', () => {
+  it('create (the interview) is VOTE-tier behind only the tab toggle', () => {
     const { path, permissions, toggle } = gateOf('create');
     expect(path).toBe('opportunities');
     expect(permissions?.permissions).toEqual([
       PERMISSIONS.VOTE_PRODUCT_ROADMAP,
     ]);
-    expect(toggle).toBeUndefined();
+    // The Product Roadmap tab's own toggle, ON by default for every platform
+    // admin — not a filing tier. The interview stays the door for everyone
+    // who has the tab; quick add and manage keep their own keys.
+    expect(toggle?.featureKey).toBe(FeatureToggleKey.PRODUCT_ROADMAP);
   });
 
   it('quickAdd is VOTE-tier AND behind the quick-add toggle', () => {

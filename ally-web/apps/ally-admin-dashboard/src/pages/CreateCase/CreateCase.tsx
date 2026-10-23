@@ -30,7 +30,7 @@ import {
   PathStepperList,
   getCreatePathSubSectionById,
 } from "@constants";
-import { useDebounce } from "@hooks";
+import { useContentAuthoring, useDebounce } from "@hooks";
 import { GetScenarioType } from "@types";
 import {
   extractValidData,
@@ -67,7 +67,12 @@ export const CreateCase: FC = () => {
 
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const title = id ? "Edit Case" : "Create Case";
+  // Create Cases off: an existing case opens read-only — every step renders,
+  // nothing saves (ally-be refuses the write anyway). New cases are blocked
+  // at the route.
+  const { canAuthorCases } = useContentAuthoring();
+  const isViewOnly = Boolean(id) && !canAuthorCases;
+  const title = id ? (isViewOnly ? "View Case" : "Edit Case") : "Create Case";
 
   const [getScenarioCaseByIdQuery, { data: individualCase }] = useLazyGetScenarioCaseByIdQuery();
   const [createSimulationCaseMutation] = useCreateSimulationCaseMutation();
@@ -130,7 +135,8 @@ export const CreateCase: FC = () => {
   };
 
   const handlePageBack = () => {
-    if (isNonEmptyObject(dirtyFields)) setShowDiscardPopup(true);
+    // A view-only admin has nothing to save, and the popup's "Save and exit" would fail.
+    if (!isViewOnly && isNonEmptyObject(dirtyFields)) setShowDiscardPopup(true);
     else navigate(-1);
   };
 
@@ -248,6 +254,7 @@ export const CreateCase: FC = () => {
         <div className="md:sticky flex flex-row flex-wrap gap-y-2 justify-between items-center md:items-stretch top-0 z-10 pt-3 md:mx-6 pb-4 border-b border-border-light">
           <h2 className="text-lg text-typography-900 font-semibold">{title}</h2>
           {addButton &&
+            !isViewOnly &&
             (!(individualCase?.status === SimulationStatus.ACTIVE) ? (
               <Button variant={ButtonVariant.SECONDARY} onClick={toggleSimulationModal}>
                 <Plus />
@@ -266,7 +273,9 @@ export const CreateCase: FC = () => {
           ref={containerRef}
           className="py-4 md:p-6 md:pt-4 md:overflow-y-auto md:h-full custom-scrollbar"
         >
-          {component}
+          <fieldset disabled={isViewOnly} className="m-0 min-w-0 border-0 p-0">
+            {component}
+          </fieldset>
         </div>
       </div>
     );
@@ -292,7 +301,7 @@ export const CreateCase: FC = () => {
             formMethods={formMethods}
             selectedSimulations={selectedSimulations}
             setSelectedSimulations={setSelectedSimulations}
-            isDisabled={individualCase?.status === SimulationStatus.ACTIVE}
+            isDisabled={individualCase?.status === SimulationStatus.ACTIVE || isViewOnly}
             isCase={true}
           />,
           isNonEmptyArray(formValues.scenarios),
@@ -325,6 +334,17 @@ export const CreateCase: FC = () => {
         title={title}
         showPreview={false}
         type="Case"
+        viewOnly={
+          isViewOnly
+            ? {
+                title: en.contentAccess.viewOnlyBannerTitle,
+                subtitle: en.contentAccess.viewOnlyBannerSubtitle(
+                  en.contentAccess.cases,
+                  en.contentAccess.createCasesToggle,
+                ),
+              }
+            : undefined
+        }
       />
 
       <div className="flex flex-col md:flex-row md:h-[calc(100vh-100px)]">
@@ -340,7 +360,8 @@ export const CreateCase: FC = () => {
             onPrevious={handlePrevious}
             onNext={handleNext}
             showPrevious={currentStep !== PATH_CREATOR_STEP_IDS.basicInfo}
-            showNext
+            // The last step's Next publishes, which a view-only admin cannot do.
+            showNext={!(isViewOnly && isLastStep)}
             isNextDisabled={false}
             isLastStep={isLastStep}
           />

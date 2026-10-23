@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { permissiveContentAccessProvider } from 'src/authorization/service/test/content-access.fixtures';
 import { CaseTenantService } from '../case-tenant.service';
 import { CaseTenantRepository } from '../../repository/case-tenant.repository';
 import { CaseTenantValidationShared } from '../case-tenant-validation-shared';
@@ -23,6 +24,7 @@ describe('CaseTenantService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CaseTenantService,
+        permissiveContentAccessProvider(),
         { provide: CaseTenantRepository, useValue: mockCaseTenantRepo },
         {
           provide: CaseTenantValidationShared,

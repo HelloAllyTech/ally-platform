@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { featureToggleGuardProviders } from 'src/auth/guards/test/feature-toggle-guard.fixtures';
 import { AuthorizationController } from '../authorization.controller';
 import { PermissionsService } from '../../service/permissions.service';
 import { GroupService } from '../../service/group.service';
@@ -50,6 +51,8 @@ describe('AuthorizationController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AuthorizationController],
       providers: [
+        // change-roles is behind the Users tab toggle.
+        ...featureToggleGuardProviders(),
         {
           provide: PermissionsService,
           useValue: mockPermissionsService,

@@ -67,7 +67,9 @@ export class SettingsController {
     status: 200,
     description: 'Summary fields updated successfully',
   })
-  @AuthPermissions([PERMISSIONS.EDIT_SETTINGS_SUMMARY_FIELDS])
+  @RequireFeatureToggle(FeatureToggleKey.USERS, {
+    permissions: [PERMISSIONS.EDIT_SETTINGS_SUMMARY_FIELDS],
+  })
   updateSummaryFields(@Body() body: UpdateSummaryFieldsDto) {
     return this.service.updateSummaryFields(body);
   }
@@ -110,7 +112,9 @@ export class SettingsController {
     status: 200,
     description: 'Summary sections updated successfully',
   })
-  @AuthPermissions([PERMISSIONS.EDIT_SETTINGS_SUMMARY_FIELDS])
+  @RequireFeatureToggle(FeatureToggleKey.USERS, {
+    permissions: [PERMISSIONS.EDIT_SETTINGS_SUMMARY_FIELDS],
+  })
   updateSummarySections(@Body() body: UpdateSummarySectionsDto) {
     return this.service.updateSummarySections(body);
   }
@@ -213,7 +217,9 @@ export class SettingsController {
     },
   })
   @ApiResponse({ status: 200 })
-  @AuthPermissions([PERMISSIONS.EDIT_GLOBAL_SETTINGS])
+  @RequireFeatureToggle(FeatureToggleKey.USERS, {
+    permissions: [PERMISSIONS.EDIT_GLOBAL_SETTINGS],
+  })
   updateCharacterLibraryEnabled(
     @Body() body: { tenantId: string; enabled: boolean },
   ) {
@@ -253,7 +259,9 @@ export class SettingsController {
     },
   })
   @ApiResponse({ status: 200 })
-  @AuthPermissions([PERMISSIONS.EDIT_GLOBAL_SETTINGS])
+  @RequireFeatureToggle(FeatureToggleKey.USERS, {
+    permissions: [PERMISSIONS.EDIT_GLOBAL_SETTINGS],
+  })
   updateProgressDashboardEnabled(
     @Body() body: { tenantId: string; enabled: boolean },
   ) {
@@ -294,7 +302,9 @@ export class SettingsController {
     },
   })
   @ApiResponse({ status: 200 })
-  @AuthPermissions([PERMISSIONS.EDIT_GLOBAL_SETTINGS])
+  @RequireFeatureToggle(FeatureToggleKey.USERS, {
+    permissions: [PERMISSIONS.EDIT_GLOBAL_SETTINGS],
+  })
   updateTextChatRoleplayEnabled(
     @Body() body: { tenantId: string; enabled: boolean },
   ) {
@@ -318,7 +328,9 @@ export class SettingsController {
     },
   })
   @ApiResponse({ status: 200 })
-  @AuthPermissions([PERMISSIONS.EDIT_SETTINGS_CUSTOM_FIELD_TYPES])
+  @RequireFeatureToggle(FeatureToggleKey.USERS, {
+    permissions: [PERMISSIONS.EDIT_SETTINGS_CUSTOM_FIELD_TYPES],
+  })
   updateCustomFieldsEnabled(
     @Body() body: { tenantId: string; enabled: boolean },
   ) {
@@ -350,7 +362,9 @@ export class SettingsController {
     },
   })
   @ApiResponse({ status: 200 })
-  @AuthPermissions([PERMISSIONS.EDIT_SETTINGS_CUSTOM_FIELD_TYPES])
+  @RequireFeatureToggle(FeatureToggleKey.USERS, {
+    permissions: [PERMISSIONS.EDIT_SETTINGS_CUSTOM_FIELD_TYPES],
+  })
   updateScribeNoteCreationEnabled(
     @Body() body: { tenantId: string; enabled: boolean },
   ) {
@@ -386,7 +400,9 @@ export class SettingsController {
     },
   })
   @ApiResponse({ status: 200 })
-  @AuthPermissions([PERMISSIONS.EDIT_SETTINGS_CUSTOM_FIELD_TYPES])
+  @RequireFeatureToggle(FeatureToggleKey.USERS, {
+    permissions: [PERMISSIONS.EDIT_SETTINGS_CUSTOM_FIELD_TYPES],
+  })
   updateScribeVoiceNoteEnabled(
     @Body() body: { tenantId: string; enabled: boolean },
   ) {
@@ -410,7 +426,9 @@ export class SettingsController {
     },
   })
   @ApiResponse({ status: 200 })
-  @AuthPermissions([PERMISSIONS.EDIT_SETTINGS_CUSTOM_FIELD_TYPES])
+  @RequireFeatureToggle(FeatureToggleKey.USERS, {
+    permissions: [PERMISSIONS.EDIT_SETTINGS_CUSTOM_FIELD_TYPES],
+  })
   updateEnabledCustomFieldTypes(
     @Body() body: { tenantId: string; enabledTypes: string[] },
   ) {

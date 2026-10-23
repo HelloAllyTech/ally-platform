@@ -4,6 +4,7 @@ import { AuditLoggerService } from 'src/audit/service/audit-logger.service';
 import { AUDIT_EVENTS } from 'src/audit/constants/audit-event.constants';
 import { AdminFeatureToggleRepository } from '../repository/admin-feature-toggle.repository';
 import {
+  DEFAULT_ENABLED_FEATURE_TOGGLE_KEYS,
   FEATURE_TOGGLES,
   FeatureToggleKey,
   isOrgScopedRoutesOnlyToggle,
@@ -11,6 +12,8 @@ import {
   isValidFeatureToggleKey,
 } from '../constants/admin-feature-toggle.constants';
 import { TenantScopeService } from './tenant-scope.service';
+import { PermissionsService } from './permissions.service';
+import { PLATFORM_TIER_ROLES } from 'src/common/constants/user.constants';
 
 const CACHE_TTL_SECONDS = 1800; // 30 min — matches user:roles/user:groups/group:permissions,
 // so a toggle row written outside this service (e.g. the role-collapse
@@ -25,7 +28,8 @@ const CACHE_TTL_SECONDS = 1800; // 30 min — matches user:roles/user:groups/gro
  * Fails closed by design: a missing row means disabled, never enabled. This
  * is the only thing standing between "any platform admin" and "a platform
  * admin with this specific formerly-SDA-only capability" now that role-name
- * gates are gone.
+ * gates are gone. The one exception is a `defaultEnabled` key, which a
+ * platform-tier admin holds until a row says otherwise — and only them.
  */
 @Injectable()
 export class FeatureToggleService {
@@ -35,9 +39,20 @@ export class FeatureToggleService {
     private readonly toggleRepository: AdminFeatureToggleRepository,
     private readonly cache: RedisService,
     private readonly tenantScopeService: TenantScopeService,
+    private readonly permissionsService: PermissionsService,
   ) {}
 
+  /**
+   * v2 caches the stored rows ({key: enabled}), not the enabled keys: a
+   * defaultEnabled key can only be resolved knowing which keys have a row at
+   * all. The version bump also means a deploy reads fresh rows at once rather
+   * than serving the pre-backfill cache for up to 30 minutes.
+   */
   private cacheKey(userId: number): string {
+    return `admin:feature-toggles:v2:${userId}`;
+  }
+
+  private legacyCacheKey(userId: number): string {
     return `admin:feature-toggles:${userId}`;
   }
 
@@ -85,23 +100,58 @@ export class FeatureToggleService {
     );
   }
 
+  /**
+   * Enabled rows plus, for a platform-tier admin, every defaultEnabled key
+   * they have no row for. Defaults are resolved after the cache, so a newly
+   * promoted admin gets them as soon as their role does.
+   */
   private async getStoredEnabledKeys(userId: number): Promise<string[]> {
+    const stored = await this.getStoredRows(userId);
+    const enabledKeys = Object.keys(stored).filter((key) => stored[key]);
+
+    const defaultsWithoutRow = DEFAULT_ENABLED_FEATURE_TOGGLE_KEYS.filter(
+      (key) => !(key in stored),
+    );
+    if (defaultsWithoutRow.length === 0) {
+      return enabledKeys;
+    }
+    if (!(await this.isPlatformTierAdmin(userId))) {
+      return enabledKeys;
+    }
+    return [...enabledKeys, ...defaultsWithoutRow];
+  }
+
+  private async getStoredRows(
+    userId: number,
+  ): Promise<Record<string, boolean>> {
     const cached = await this.cache.get(this.cacheKey(userId));
     if (cached) {
       return JSON.parse(cached);
     }
 
     const rows = await this.toggleRepository.findByUserId(userId);
-    const enabledKeys = rows
-      .filter((row) => row.enabled)
-      .map((row) => row.featureKey);
+    const stored: Record<string, boolean> = {};
+    for (const row of rows) {
+      stored[row.featureKey] = row.enabled;
+    }
 
     await this.cache.set(
       this.cacheKey(userId),
-      JSON.stringify(enabledKeys),
+      JSON.stringify(stored),
       CACHE_TTL_SECONDS,
     );
-    return enabledKeys;
+    return stored;
+  }
+
+  /**
+   * Whether this user is one the admin toggles apply to at all. Everyone else
+   * holds no rows and gets no defaults.
+   */
+  async isPlatformTierAdmin(userId: number): Promise<boolean> {
+    const roles = await this.permissionsService.getUserRoles(userId);
+    return roles.some((role) =>
+      (PLATFORM_TIER_ROLES as string[]).includes(role),
+    );
   }
 
   async hasToggle(userId: number, featureKey: string): Promise<boolean> {
@@ -109,7 +159,11 @@ export class FeatureToggleService {
     return enabledKeys.includes(featureKey);
   }
 
-  /** Toggle state for every registered key, defaulting missing rows to false — for the editor UI. */
+  /**
+   * Toggle state for every registered key — for the editor UI. A missing row
+   * reads as the key's default: off, or on for a defaultEnabled key (the
+   * editor only ever shows platform admins, who are the ones defaults apply to).
+   */
   async getTogglesForUser(userId: number): Promise<
     {
       key: FeatureToggleKey;
@@ -129,7 +183,8 @@ export class FeatureToggleService {
       key: definition.key,
       label: definition.label,
       description: definition.description,
-      enabled: enabledByKey.get(definition.key) ?? false,
+      enabled:
+        enabledByKey.get(definition.key) ?? definition.defaultEnabled === true,
       platformOnly: definition.platformOnly === true,
       orgScopedRoutesOnly: definition.orgScopedRoutesOnly === true,
     }));
@@ -193,6 +248,8 @@ export class FeatureToggleService {
       );
     }
     await this.cache.del(this.cacheKey(userId));
+    // A pod still on the previous release reads the old key until it rolls.
+    await this.cache.del(this.legacyCacheKey(userId));
 
     await this.auditLogger.log({
       eventType: AUDIT_EVENTS.ADMIN_FEATURE_TOGGLES_UPDATED,
