@@ -1,10 +1,13 @@
-import { FC, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { FC, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useTranslation } from "react-i18next";
 import { Navigate, useNavigate } from "react-router-dom";
 
+import { useStartGuideVoiceSessionMutation } from "@api";
 import { LoginDialog } from "@components";
 import { buildJourneyRoute, buildTrackItemRoute, buildTrackRoute, ROUTES } from "@constants";
+import { ANALYTICS_EVENTS, ANALYTICS_PROPS } from "@constants/analyticsEvents";
+import { useAnalytics } from "@hooks/useAnalytics";
 
 import { ItemPlayerHost } from "./cards/ItemPlayerHost";
 import { itemCardFor } from "./cards/registry";
@@ -36,6 +39,8 @@ import { dockVisible, ReplyVerb, replyVerbsFor } from "./state/atmosphere";
 import { failureStateFor } from "./state/failureStates";
 import { showOfflineNotice } from "./state/guidedSessionMachine";
 import { lastAllyMessage } from "./state/guideFeedReducer";
+import { useGuideVoice } from "./voice/useGuideVoice";
+import { VoiceButton, VoiceRoom } from "./voice/VoiceRoom";
 
 import type { SpineNode } from "./state/spineModel";
 import "./guided.css";
@@ -64,7 +69,10 @@ export const GuidedCourse: FC<{ trackId: string; fixture?: boolean }> = ({
 }) => {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
-  const journey = useGuideJourney(trackId, { fixture });
+  const { track } = useAnalytics();
+  // A roleplay or case leaving for the full-screen simulation lets go of voice (plan §11 F-6).
+  const suspendVoice = useRef<(() => void) | null>(null);
+  const journey = useGuideJourney(trackId, { fixture, onLaunch: () => suspendVoice.current?.() });
   const {
     feed,
     session,
@@ -77,6 +85,34 @@ export const GuidedCourse: FC<{ trackId: string; fixture?: boolean }> = ({
     helpRequested,
     minimisedCardId,
   } = journey;
+
+  // ---------------------------------------------------------------- voice
+  const [startVoiceSession] = useStartGuideVoiceSessionMutation();
+  const voiceAvailable = Boolean(bootstrap?.availability.voice);
+  const voice = useGuideVoice({
+    threadId: feed.threadId,
+    enabled: voiceAvailable,
+    language: i18n.language,
+    requestSession: body => startVoiceSession({ threadId: feed.threadId ?? "", body }).unwrap(),
+    onFallback: failure =>
+      track(ANALYTICS_EVENTS.GUIDED_VOICE_FALLBACK, {
+        [ANALYTICS_PROPS.COURSE_ID]: trackId,
+        [ANALYTICS_PROPS.GUIDED_FAILURE_CODE]: failure,
+      }),
+  });
+  suspendVoice.current = () => void voice.suspend();
+  const voicePhase = voice.state.phase;
+  const voiceTurnMode = voice.state.turnMode;
+  useEffect(() => {
+    if (voicePhase === "live") {
+      track(ANALYTICS_EVENTS.GUIDED_VOICE_STARTED, {
+        [ANALYTICS_PROPS.COURSE_ID]: trackId,
+        [ANALYTICS_PROPS.GUIDED_TURN_MODE]: voiceTurnMode,
+      });
+    }
+    // Once per session going live, not on every mode switch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [voicePhase]);
 
   const width = useViewportWidth();
   const compact = width <= PHONE_MAX;
@@ -116,14 +152,25 @@ export const GuidedCourse: FC<{ trackId: string; fixture?: boolean }> = ({
   }, [inCrisis]);
 
   // ------------------------------------------------------------------ orb
+  const voiceOrb: OrbState | null = voice.active
+    ? voice.state.agentState === "speaking"
+      ? "speaking"
+      : voice.state.agentState === "thinking"
+        ? "thinking"
+        : voice.state.learnerSpeaking || voice.state.pushing
+          ? "listening"
+          : null
+    : null;
   const orbState: OrbState = inCrisis
     ? "still"
-    : feed.presence.state === "speaking" ||
-        feed.entries.some(e => e.kind === "message" && e.status === "streaming")
-      ? "speaking"
-      : cues.thinking || feed.presence.state === "thinking"
-        ? "thinking"
-        : "idle";
+    : voiceOrb
+      ? voiceOrb
+      : feed.presence.state === "speaking" ||
+          feed.entries.some(e => e.kind === "message" && e.status === "streaming")
+        ? "speaking"
+        : cues.thinking || feed.presence.state === "thinking"
+          ? "thinking"
+          : "idle";
 
   // ----------------------------------------------------------- composer zone
   const allyJustAnswered = Boolean(lastAllyMessage(feed));
@@ -365,6 +412,7 @@ export const GuidedCourse: FC<{ trackId: string; fixture?: boolean }> = ({
               onSignIn={() => setLoginOpen(true)}
               onMyCourses={goMyCourses}
               onFocusComposer={() => setComposerFocus(n => n + 1)}
+              muteAnnouncements={voice.active}
             />
           )}
 
@@ -387,6 +435,9 @@ export const GuidedCourse: FC<{ trackId: string; fixture?: boolean }> = ({
               {nowPlaying && activeCard && !inCrisis && (
                 <NowPlayingBar label={nowPlaying} onBack={actions.restoreCard} />
               )}
+              {(voice.active || voice.state.phase === "failed") && (
+                <VoiceRoom voice={voice} compact={compact} />
+              )}
               {showDock && feed.nextStep && !inCrisis && (
                 <NextStepDock nextStep={feed.nextStep} disabled={busy} onContinue={onContinue} />
               )}
@@ -394,6 +445,7 @@ export const GuidedCourse: FC<{ trackId: string; fixture?: boolean }> = ({
               <Composer
                 sendBlocked={busy}
                 focusToken={composerFocus}
+                trailing={voiceAvailable ? <VoiceButton voice={voice} /> : null}
                 onSend={text => actions.submitTurn({ text, source: inCrisis ? "crisis" : "typed" })}
               />
             </div>

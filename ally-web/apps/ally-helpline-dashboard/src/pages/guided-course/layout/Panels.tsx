@@ -149,10 +149,10 @@ export const ShelfPanel: FC<ShelfPanelProps> = ({
           overlay
             ? sheet
               ? "fixed inset-x-0 bottom-0 top-3 z-40 flex flex-col rounded-t-2xl bg-[var(--g-card)] shadow-2xl"
-              : "fixed inset-y-0 right-0 z-40 flex w-[min(560px,92vw)] flex-col bg-[var(--g-card)] shadow-2xl"
+              : "fixed inset-y-0 right-0 z-40 flex max-w-[92vw] flex-col bg-[var(--g-card)] shadow-2xl"
             : "flex h-full shrink-0 flex-col border-l border-[var(--g-line)] bg-[var(--g-card)]"
         }
-        style={overlay ? undefined : { width: widthStyle }}
+        style={overlay && sheet ? undefined : { width: widthStyle }}
       >
         {sheet && (
           <div

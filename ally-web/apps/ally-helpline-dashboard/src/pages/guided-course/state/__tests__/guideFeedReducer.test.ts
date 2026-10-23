@@ -132,6 +132,7 @@ const bootstrap = (overrides: Partial<JourneyBootstrap> = {}): JourneyBootstrap 
     languageCode: "en",
   },
   spine: [],
+  progress: { currentItemId: "i2", completedItems: 1, totalItems: 4 },
   messages: [],
   cards: [],
   prefs: { guidance: "walk" },
@@ -300,6 +301,8 @@ describe("guideFeedReducer", () => {
     expect(state.entries.map(e => e.id)).toEqual(["m1", "k1", "m3"]);
     expect(state.cards.k1.state).toBe("done");
     expect(state.lastSeq).toBe(5);
+    // The Spine starts where the server says the learner is.
+    expect(state.progress).toEqual({ currentItemId: "i2", completedItems: 1, totalItems: 4 });
     // Anything at or below 5 is already in the bootstrap.
     expect(fold([ev.ally(4, "m4", "dup")], state).entries).toHaveLength(3);
   });

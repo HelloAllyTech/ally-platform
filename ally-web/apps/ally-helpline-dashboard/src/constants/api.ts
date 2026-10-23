@@ -164,6 +164,8 @@ export const ApiEndpoints = {
     CARD_EVENTS: (threadId: string, cardId: string) =>
       `/v1/guide/threads/${threadId}/cards/${cardId}/events`,
     APPOINTMENT: (threadId: string) => `/v1/guide/threads/${threadId}/appointment`,
+    /** A LiveKit room with the guide's voice worker: `{token, roomName, serverUrl}`. */
+    VOICE_SESSION: (threadId: string) => `/v1/guide/threads/${threadId}/voice-session`,
     PREFS: "/v1/guide/prefs",
   },
   // Course discussions — the thread beneath a Track 2.0 item.

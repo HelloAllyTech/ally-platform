@@ -24,6 +24,7 @@ import { bootJourney } from "./bootJourney";
 import { useGuideEventStream } from "./useGuideEventStream";
 import {
   DEFAULT_GUIDANCE,
+  fromBootstrapWire,
   GUIDANCE_LEVELS,
   GuidanceLevel,
   JourneyBootstrap,
@@ -49,6 +50,7 @@ import type { AppointmentSlot } from "../cards/special/appointment";
 import type { GuideAnchor, GuideCardEventRequest, GuideTurnRequest } from "../contract/wire";
 
 const GUIDANCE_KEY = "allyGuideGuidance";
+const SPINE_REFRESH_DELAY_MS = 400;
 
 const readLocalGuidance = (): GuidanceLevel | null => {
   try {
@@ -80,6 +82,8 @@ const PRIVATE_SOURCES: TurnSource[] = ["care", "crisis"];
 export interface UseGuideJourneyOptions {
   /** Dev-only fixture transport: no sign-in needed. */
   fixture?: boolean;
+  /** A roleplay or case is about to leave for the full-screen simulation (voice lets go). */
+  onLaunch?: () => void;
 }
 
 /**
@@ -89,7 +93,7 @@ export interface UseGuideJourneyOptions {
  */
 export const useGuideJourney = (
   trackId: string,
-  { fixture = false }: UseGuideJourneyOptions = {},
+  { fixture = false, onLaunch }: UseGuideJourneyOptions = {},
 ) => {
   const { i18n } = useTranslation();
   const { track } = useAnalytics();
@@ -126,6 +130,46 @@ export const useGuideJourney = (
   const [enrollGuideThread] = useEnrollGuideThreadMutation();
   const [enrollTrack] = useEnrollTrackMutation();
 
+  /** Enrols through the thread; an older backend without the route uses classic's (the same enrolment). */
+  const enrollThread = useCallback(
+    async (id: string) => {
+      try {
+        await enrollGuideThread({ threadId: id }).unwrap();
+      } catch (error) {
+        if (statusOf(error) !== 404) throw error;
+        await enrollTrack({ trackId, languageCode: i18n.language }).unwrap();
+      }
+    },
+    [enrollGuideThread, enrollTrack, trackId, i18n.language],
+  );
+
+  // After `spine.updated`, refetch bootstrap for the Spine's item states (the
+  // event carries counts only). Coalesced: a burst of updates costs one fetch.
+  const spineRefresh = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleSpineRefresh = useCallback(() => {
+    if (spineRefresh.current) clearTimeout(spineRefresh.current);
+    spineRefresh.current = setTimeout(() => {
+      spineRefresh.current = null;
+      void getBootstrap({ trackId, languageCode: i18n.language })
+        .unwrap()
+        .then(wire => {
+          const fresh = fromBootstrapWire(trackId, wire);
+          setBootstrap(prev =>
+            prev
+              ? { ...prev, spine: fresh.spine, nextStep: fresh.nextStep ?? prev.nextStep }
+              : prev,
+          );
+        })
+        .catch(() => undefined);
+    }, SPINE_REFRESH_DELAY_MS);
+  }, [getBootstrap, trackId, i18n.language]);
+  useEffect(
+    () => () => {
+      if (spineRefresh.current) clearTimeout(spineRefresh.current);
+    },
+    [],
+  );
+
   const threadId = bootstrap?.thread?.id ?? null;
   const courseProps = useMemo(() => ({ [ANALYTICS_PROPS.COURSE_ID]: trackId }), [trackId]);
 
@@ -139,6 +183,7 @@ export const useGuideJourney = (
       getAccess: id => getAccess({ trackId: id }).unwrap(),
       getDetail: id => getDetail({ trackId: id, languageCode: i18n.language }).unwrap(),
       openThread: id => openThread({ trackId: id }).unwrap(),
+      enroll: id => enrollThread(id),
       localGuidance: readLocalGuidance,
     }).then(outcome => {
       if (cancelled) return;
@@ -183,6 +228,8 @@ export const useGuideJourney = (
     onEvent: event => {
       dispatch({ type: "event", event });
       send({ type: "SERVER_EVENT", event, at: Date.now() });
+      // The event carries counts only; the Spine's item states come from bootstrap.
+      if (event.type === "spine.updated") scheduleSpineRefresh();
     },
     onStatus: status =>
       send({
@@ -310,15 +357,9 @@ export const useGuideJourney = (
 
   const enrollIfNeeded = useCallback(async () => {
     if (enrolled || !threadId) return;
-    try {
-      await enrollGuideThread({ threadId, languageCode: i18n.language }).unwrap();
-    } catch (error) {
-      // An older backend has no guide enroll route; classic's is the same enrolment.
-      if (statusOf(error) !== 404) throw error;
-      await enrollTrack({ trackId, languageCode: i18n.language }).unwrap();
-    }
+    await enrollThread(threadId);
     setEnrolled(true);
-  }, [enrolled, threadId, enrollGuideThread, enrollTrack, trackId, i18n.language]);
+  }, [enrolled, threadId, enrollThread]);
 
   const startCourse = useCallback(async () => {
     try {
@@ -417,8 +458,13 @@ export const useGuideJourney = (
     (cardId: string) => postCardEvent(cardId, { type: "completed_claim" }),
     [postCardEvent],
   );
+  const onLaunchRef = useRef(onLaunch);
+  onLaunchRef.current = onLaunch;
   const launchCard = useCallback(
-    (cardId: string) => postCardEvent(cardId, { type: "launched" }),
+    (cardId: string) => {
+      onLaunchRef.current?.();
+      postCardEvent(cardId, { type: "launched" });
+    },
     [postCardEvent],
   );
   const dismissCard = useCallback(

@@ -1,4 +1,4 @@
-import { FC, FormEvent, KeyboardEvent, useEffect, useRef, useState } from "react";
+import { FC, FormEvent, KeyboardEvent, ReactNode, useEffect, useRef, useState } from "react";
 
 import { useTranslation } from "react-i18next";
 
@@ -51,7 +51,7 @@ export const ReplyVerbs: FC<{
   if (!verbs.length) return null;
   return (
     <div
-      className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none]"
+      className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] md:flex-wrap md:overflow-visible"
       role="group"
       aria-label={t("guide.verbs.label")}
       data-testid="reply-verbs"
@@ -170,7 +170,9 @@ export const Composer: FC<{
   onSend: (text: string) => void;
   /** Bumped to pull focus into the composer ("Type or say it"). */
   focusToken?: number;
-}> = ({ disabled, sendBlocked, onSend, focusToken }) => {
+  /** Beside the send button: the microphone, when voice is on for the course. */
+  trailing?: ReactNode;
+}> = ({ disabled, sendBlocked, onSend, focusToken, trailing }) => {
   const { t } = useTranslation();
   const [text, setText] = useState("");
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -223,6 +225,7 @@ export const Composer: FC<{
           aria-describedby={remaining <= COUNTER_FROM ? "guide-composer-count" : undefined}
           className="max-h-[168px] min-h-10 flex-1 resize-none bg-transparent px-2 py-2 font-secondary text-[17px] leading-6 text-[var(--g-ink)] outline-none placeholder:text-[var(--g-ink-faint)]"
         />
+        {trailing}
         <button
           type="submit"
           disabled={!canSend}

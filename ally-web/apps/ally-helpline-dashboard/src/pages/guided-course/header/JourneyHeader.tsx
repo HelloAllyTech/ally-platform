@@ -130,7 +130,7 @@ export const JourneyHeader: FC<JourneyHeaderProps> = ({
       </button>
       <AllyPresence state={orbState} size={32} label={t(`guide.presence.label.${orbState}`)} />
       <div className="min-w-0 flex-1">
-        <p className="font-primary text-sm font-semibold text-[var(--g-ally-label)]">
+        <p className="truncate font-primary text-sm font-semibold text-[var(--g-ally-label)]">
           {t("guide.header.disclosure")}
         </p>
         <p className="truncate font-primary text-xs text-[var(--g-rail-meta)]">{courseTitle}</p>
@@ -162,10 +162,30 @@ export const JourneyHeader: FC<JourneyHeaderProps> = ({
             onClick={() => setMenuOpen(open => !open)}
             aria-expanded={menuOpen}
             aria-controls={menuId}
-            className="flex min-h-11 shrink-0 items-center gap-1 rounded-[10px] px-2 font-primary text-sm text-[var(--g-ink)] hover:bg-[var(--g-ground)]"
+            aria-label={`${t("guide.dial.label")}: ${t(`guide.dial.${guidance}`)}`}
+            className="flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1 rounded-[10px] px-2 font-primary text-sm text-[var(--g-ink)] hover:bg-[var(--g-ground)]"
           >
+            {/* On a narrow phone the dial is an icon, so the AI disclosure keeps its room. */}
+            <svg
+              viewBox="0 0 16 16"
+              width="16"
+              height="16"
+              aria-hidden="true"
+              className="sm:hidden"
+            >
+              <path
+                d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                strokeLinecap="round"
+              />
+              <circle cx="5" cy="4.5" r="1.4" fill="currentColor" />
+              <circle cx="10.5" cy="8" r="1.4" fill="currentColor" />
+              <circle cx="7" cy="11.5" r="1.4" fill="currentColor" />
+            </svg>
             <span className="hidden sm:inline">{t("guide.dial.label")}:</span>
-            <span className="font-semibold">{t(`guide.dial.${guidance}`)}</span>
+            <span className="hidden font-semibold sm:inline">{t(`guide.dial.${guidance}`)}</span>
             <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
               <path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.6" />
             </svg>

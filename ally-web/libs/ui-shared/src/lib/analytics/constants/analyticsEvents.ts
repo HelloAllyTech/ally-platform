@@ -147,6 +147,8 @@ export const ANALYTICS_EVENTS = {
   GUIDED_CLASSIC_VIEW_OPENED: "guided_classic_view_opened",
   GUIDED_FAILURE_SHOWN: "guided_failure_shown",
   GUIDED_APPOINTMENT_CHOSEN: "guided_appointment_chosen",
+  GUIDED_VOICE_STARTED: "guided_voice_started",
+  GUIDED_VOICE_FALLBACK: "guided_voice_fallback",
 
   // Admin
   SIDEBAR_INTERACTION: "sidebar_interaction",
@@ -347,6 +349,7 @@ export const ANALYTICS_PROPS = {
   GUIDED_LEVEL: "level",
   GUIDED_FAILURE_CODE: "failure_code",
   GUIDED_SLOT: "slot",
+  GUIDED_TURN_MODE: "turn_mode",
 
   // Sidebar context
   ACTION: "action",

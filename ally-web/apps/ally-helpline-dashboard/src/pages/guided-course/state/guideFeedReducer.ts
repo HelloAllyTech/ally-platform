@@ -233,6 +233,7 @@ const hydrate = (bootstrap: JourneyBootstrap): GuideFeedState => {
     mode: thread?.mode ?? "NORMAL",
     atmosphere: thread?.atmosphere ?? "bright",
     nextStep: bootstrap.nextStep,
+    progress: bootstrap.progress,
   };
   if (!bootstrap.complete) {
     // Nothing trustworthy to show yet: the stream replays from seq 0.
@@ -256,6 +257,7 @@ const hydrate = (bootstrap: JourneyBootstrap): GuideFeedState => {
         clientTurnId: null,
         seq: message.seq,
         sceneId: null,
+        interrupted: message.interrupted ?? false,
         fixed: message.kind === "fixed" || message.kind === "crisis_fixed",
       },
     });

@@ -407,9 +407,18 @@ export class GuideFixtureServer {
       this.cards.set(cardId, { ...card, state: "dismissed" });
       this.durable("card.updated", { cardId, state: "dismissed" });
     }
-    return json({ ok: true }, 201);
+    const updated = this.cards.get(cardId);
+    return json(
+      {
+        cardId,
+        state: updated?.state ?? card.state,
+        ...(body.type === "completed_claim" ? { verified: updated?.state === "done" } : {}),
+      },
+      201,
+    );
   }
 
+  /** The thread as `GET /v1/guide/tracks/:trackId/bootstrap` describes it (contract `GuideBootstrap`). */
   bootstrap(): GuideBootstrapWire {
     const messages = this.log
       .filter(e => e.type === "assistant.message" || e.type === "learner.message")
@@ -417,44 +426,73 @@ export class GuideFixtureServer {
         id: (e.data as { messageId: string }).messageId,
         seq: e.seq,
         role: e.type === "learner.message" ? ("learner" as const) : ("ally" as const),
-        kind: "chat",
+        kind: "chat" as const,
         text: (e.data as { text: string }).text,
         turnId: (e.data as { turnId?: string | null }).turnId ?? null,
         createdAt: e.at,
       }));
+    const current = this.nextItem() ?? null;
     return {
       availability: {
         guided: true,
         anonymousChat: false,
-        voice: false,
+        voice: true,
         languages: ["en"],
         reason: null,
       },
       access: { hasAccess: true, enrolled: true, reason: null },
       thread: {
         id: this.threadId,
+        trackId: this.trackId,
         mode: this.mode,
         atmosphere: this.atmosphere,
         lastEventSeq: this.seq,
       },
-      course: { id: this.trackId, title: "Answering the first call", estimatedMinutes: 33 },
+      course: {
+        id: this.trackId,
+        title: "Answering the first call",
+        languageCode: "en",
+        estimatedMinutes: 33,
+      },
       spine: {
-        sections: FIXTURE_SECTIONS.map(section => ({
+        sections: FIXTURE_SECTIONS.map((section, index) => ({
           id: section.id,
+          index,
           title: section.title,
           items: FIXTURE_ITEMS.filter(i => i.sectionId === section.id).map(item => ({
             id: item.id,
             type: item.type,
             title: item.title,
-            state: this.done.has(item.id) ? "done" : "available",
+            state: this.done.has(item.id) ? ("completed" as const) : ("available" as const),
             minutes: item.minutes,
+            boss: item.type === "ROLEPLAY" || item.type === "CASE",
+            tension:
+              item.type === "ROLEPLAY" || item.type === "CASE"
+                ? ("high" as const)
+                : item.type === "QUIZ" || item.type === "BUCKET_SORT"
+                  ? ("medium" as const)
+                  : ("low" as const),
             hasWarnings: item.hasWarnings ?? false,
           })),
         })),
+        completed: this.done.size,
+        total: FIXTURE_ITEMS.length,
+        currentItemId:
+          [...this.cards.values()].filter(c => c.kind === "course_item").at(-1)?.trackItem?.id ??
+          current?.id ??
+          null,
+        finished: this.done.size === FIXTURE_ITEMS.length,
       },
       messages,
-      cards: [...this.cards.values()],
-      prefs: { guidance: null },
+      cards: [...this.cards.values()].map(({ seq, ...card }) => ({ seq, card })),
+      prefs: {
+        guidance: "walk",
+        voiceEnabled: true,
+        sideQuests: true,
+        memoryEnabled: true,
+        outreach: "in_app",
+        preferClassic: false,
+      },
       nextStep: this.nextStepData(),
     };
   }
@@ -552,7 +590,16 @@ export class GuideFixtureServer {
     if ((match = m(/^\/v1\/guide\/threads\/[^/]+\/cards\/([^/]+)\/events$/))) {
       return this.cardEvent(decodeURIComponent(match[1]), (body ?? {}) as { type?: string });
     }
-    if (m(/^\/v1\/guide\/threads\/[^/]+\/(enroll|appointment)$/)) return json({ ok: true });
+    if (m(/^\/v1\/guide\/threads\/[^/]+\/enroll$/)) {
+      return json({ trackEnrollmentId: "fx-enrolment", alreadyEnrolled: true });
+    }
+    if (m(/^\/v1\/guide\/threads\/[^/]+\/voice-session$/)) {
+      return json(
+        { statusCode: 403, message: "Voice isn't on in the fixture", errorCode: "GUIDE_DISABLED" },
+        403,
+      );
+    }
+    if (m(/^\/v1\/guide\/threads\/[^/]+\/appointment$/)) return json({ ok: true });
     if (m(/^\/v1\/guide\/prefs$/))
       return json({ guidance: (body as { guidance?: string })?.guidance ?? "walk" });
 

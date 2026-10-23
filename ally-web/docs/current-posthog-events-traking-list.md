@@ -312,6 +312,8 @@ event for redacted review instead). All fire from `pages/guided-course/hooks/use
 | `GUIDED_CLASSIC_VIEW_OPENED` | `guided_classic_view_opened` | The learner left for the classic course. Sends `course_id` and `source` (`header`, `failure`, `card`)                               | `pages/guided-course/hooks/useGuideJourney.ts` |
 | `GUIDED_FAILURE_SHOWN`       | `guided_failure_shown`       | A designed failure state was shown. Sends `course_id` and `failure_code` (a `GuideFailureCode`)                                     | `pages/guided-course/hooks/useGuideJourney.ts` |
 | `GUIDED_APPOINTMENT_CHOSEN`  | `guided_appointment_chosen`  | A time was picked in "Before you go". Sends `course_id` and `slot` (`tomorrowMorning`, `afterShift`, `weekend`, `custom`) — no time | `pages/guided-course/hooks/useGuideJourney.ts` |
+| `GUIDED_VOICE_STARTED`       | `guided_voice_started`       | Voice with Ally went live. Sends `course_id` and `turn_mode` (`hands_free`, `push_to_talk`)                                         | `pages/guided-course/GuidedCourse.tsx`         |
+| `GUIDED_VOICE_FALLBACK`      | `guided_voice_fallback`      | Voice fell back to text. Sends `course_id` and `failure_code` (`microphone`, `network`, `disabled`)                                 | `pages/guided-course/GuidedCourse.tsx`         |
 
 ### Errors (automatic — no component code needed)
 

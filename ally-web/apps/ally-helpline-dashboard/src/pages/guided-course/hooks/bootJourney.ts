@@ -25,6 +25,8 @@ export interface BootDeps {
   getAccess: (trackId: string) => Promise<TrackAccessResponse>;
   getDetail: (trackId: string) => Promise<TrackDetail>;
   openThread: (trackId: string) => Promise<JourneyThread>;
+  /** Enrols the learner through the thread (idempotent); first open only. */
+  enroll?: (threadId: string) => Promise<unknown>;
   /** The dial setting remembered on this device, until prefs come from the server. */
   localGuidance?: () => GuidanceLevel | null;
 }
@@ -54,20 +56,39 @@ const deniedWithReason = async (trackId: string, deps: BootDeps): Promise<BootOu
   }
 };
 
+/**
+ * Opening the journey is choosing the course: the thread is created on first
+ * visit and the learner enrolled through it (plan §3 step 4). A failed
+ * enrolment doesn't stop the journey: Start (or a `not_enrolled` turn)
+ * tries again.
+ */
 const withThread = async (
   trackId: string,
   bootstrap: JourneyBootstrap,
   deps: BootDeps,
 ): Promise<BootOutcome> => {
-  if (bootstrap.thread) return { kind: "ready", bootstrap };
-  try {
-    const thread = await deps.openThread(trackId);
-    return { kind: "ready", bootstrap: { ...bootstrap, thread } };
-  } catch (error) {
-    const refused = refusal(error);
-    if (refused?.kind === "denied") return deniedWithReason(trackId, deps);
-    return refused ?? { kind: "error" };
+  let thread = bootstrap.thread;
+  if (!thread) {
+    try {
+      thread = await deps.openThread(trackId);
+    } catch (error) {
+      const refused = refusal(error);
+      if (refused?.kind === "denied") return deniedWithReason(trackId, deps);
+      return refused ?? { kind: "error" };
+    }
   }
+  let access = bootstrap.access;
+  if (!access.enrolled && deps.enroll) {
+    try {
+      await deps.enroll(thread.id);
+      access = { ...access, enrolled: true };
+    } catch (error) {
+      const refused = refusal(error);
+      if (refused?.kind === "denied") return deniedWithReason(trackId, deps);
+      if (refused) return refused;
+    }
+  }
+  return { kind: "ready", bootstrap: { ...bootstrap, thread, access } };
 };
 
 const composed = async (trackId: string, deps: BootDeps): Promise<BootOutcome> => {

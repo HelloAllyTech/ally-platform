@@ -15,6 +15,8 @@ export interface ItemCardProps extends Omit<ItemPlayerHostProps, "card"> {
   card: GuideCard;
   /** This card's player is the open one. */
   active: boolean;
+  /** Its Shelf or Theatre is on screen (not stepped back from). */
+  panelVisible?: boolean;
   /** Phone layout: the Shelf opens as a sheet, not "on the right". */
   compact: boolean;
   celebration: CelebrationTier;
@@ -56,6 +58,7 @@ const payloadString = (card: GuideCard, key: string): string | null => {
 export const ItemCard: FC<ItemCardProps> = ({
   card,
   active,
+  panelVisible = false,
   compact,
   celebration,
   onOpen,
@@ -155,7 +158,7 @@ export const ItemCard: FC<ItemCardProps> = ({
       }
       primaryRef={primaryRef}
       primary={
-        locked || isInlineActive
+        locked || isInlineActive || (openElsewhere && panelVisible)
           ? null
           : openElsewhere
             ? { label: t("guide.card.backToIt"), onClick: open }

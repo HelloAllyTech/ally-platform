@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // `baseAPI` reads the API base once, at module load (see tracks.articleQuestion.test.ts).
 vi.hoisted(() => {
-  import.meta.env.VITE_API_BASE_URL ||= "http://test.local";
+  (import.meta.env as Record<string, string | undefined>).VITE_API_BASE_URL ||= "http://test.local";
 });
 
 const { track } = vi.hoisted(() => ({ track: vi.fn() }));
@@ -188,5 +188,43 @@ describe("GuidedCourse against the fixture stream", () => {
       expect.objectContaining({ level: "drive" }),
     );
     expect(screen.getByRole("button", { name: /I'll drive/ })).toBeInTheDocument();
+  });
+  it("voice: the microphone shows when voice is on, and a refusal falls back to text in Ally's voice", async () => {
+    renderJourney();
+    await screen.findByTestId("journey-shell", {}, { timeout: 3000 });
+
+    fireEvent.click(screen.getByTestId("voice-button"));
+
+    // The fixture's voice-session answers 403 GUIDE_DISABLED.
+    const failed = await screen.findByTestId("voice-failed");
+    expect(failed).toHaveTextContent("Voice isn't available right now. Let's type.");
+    expect(track).toHaveBeenCalledWith(
+      "guided_voice_fallback",
+      expect.objectContaining({ failure_code: "disabled" }),
+    );
+    fireEvent.click(within(failed).getByRole("button", { name: "Type instead" }));
+    expect(screen.queryByTestId("voice-failed")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Message to Ally")).toBeInTheDocument();
+  });
+
+  it("refetches the Spine after spine.updated", async () => {
+    renderJourney();
+    await screen.findByTestId("journey-shell", {}, { timeout: 3000 });
+    const before = (
+      window as unknown as { __guideFixture: { requests: Array<{ path: string }> } }
+    ).__guideFixture.requests.filter(r => r.path.endsWith("/bootstrap")).length;
+
+    fireEvent.click(await screen.findByTestId("next-step-dock"));
+    await screen.findByRole("article", { name: "Opening moves" });
+
+    await waitFor(
+      () => {
+        const after = (
+          window as unknown as { __guideFixture: { requests: Array<{ path: string }> } }
+        ).__guideFixture.requests.filter(r => r.path.endsWith("/bootstrap")).length;
+        expect(after).toBeGreaterThan(before);
+      },
+      { timeout: 2000 },
+    );
   });
 });

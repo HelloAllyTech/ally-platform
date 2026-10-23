@@ -2,7 +2,7 @@ import { configureStore } from "@reduxjs/toolkit";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.hoisted(() => {
-  import.meta.env.VITE_API_BASE_URL ||= "http://test.local";
+  (import.meta.env as Record<string, string | undefined>).VITE_API_BASE_URL ||= "http://test.local";
 });
 
 import { baseAPI } from "../baseAPI";

@@ -10,14 +10,16 @@ import { ApiEndpoints, HttpMethod } from "@constants";
 
 import { baseAPI } from "./baseAPI";
 
+import type { JourneyThread } from "../pages/guided-course/contract/bootstrap";
 import type {
-  GuideBootstrapWire,
-  GuidanceLevel,
-  JourneyAvailability,
-  JourneyThread,
-} from "../pages/guided-course/contract/bootstrap";
-import type {
+  GuideAvailability,
+  GuideBootstrap,
   GuideCardEventRequest,
+  GuideCardState,
+  GuideNextStep,
+  GuidePrefs,
+  GuidePrefsUpdate,
+  GuideSpine,
   GuideTurnAccepted,
   GuideTurnRequest,
 } from "../pages/guided-course/contract/wire";
@@ -33,6 +35,31 @@ export interface GuideMessageRow {
   createdAt: string;
 }
 
+export interface GuideEnrollResult {
+  trackEnrollmentId: string;
+  alreadyEnrolled: boolean;
+  spine?: GuideSpine;
+  nextStep?: GuideNextStep;
+}
+
+export interface GuideCardEventResult {
+  cardId: string;
+  state: GuideCardState;
+  /** `completed_claim` only: false until classic progress says the item is complete. */
+  verified?: boolean;
+}
+
+export interface GuideVoiceSessionRequest {
+  turnMode?: "hands_free" | "push_to_talk";
+  language?: string;
+}
+
+export interface GuideVoiceSessionResponse {
+  token: string;
+  roomName: string;
+  serverUrl: string;
+}
+
 export interface GuideAppointmentRequest {
   /** ISO instant. */
   at: string;
@@ -42,7 +69,7 @@ export interface GuideAppointmentRequest {
 
 const guideAPI = baseAPI.injectEndpoints({
   endpoints: builder => ({
-    getGuideAvailability: builder.query<Partial<JourneyAvailability>, { trackId: string }>({
+    getGuideAvailability: builder.query<GuideAvailability, { trackId: string }>({
       query: ({ trackId }) => ({
         url: ApiEndpoints.GUIDE.AVAILABILITY(trackId),
         method: HttpMethod.GET,
@@ -50,10 +77,7 @@ const guideAPI = baseAPI.injectEndpoints({
       keepUnusedDataFor: 0,
     }),
 
-    getGuideBootstrap: builder.query<
-      GuideBootstrapWire,
-      { trackId: string; languageCode?: string }
-    >({
+    getGuideBootstrap: builder.query<GuideBootstrap, { trackId: string; languageCode?: string }>({
       query: ({ trackId, languageCode }) => ({
         url: ApiEndpoints.GUIDE.BOOTSTRAP(trackId),
         method: HttpMethod.GET,
@@ -69,11 +93,21 @@ const guideAPI = baseAPI.injectEndpoints({
       }),
     }),
 
-    enrollGuideThread: builder.mutation<unknown, { threadId: string; languageCode?: string }>({
-      query: ({ threadId, languageCode }) => ({
+    enrollGuideThread: builder.mutation<GuideEnrollResult, { threadId: string }>({
+      query: ({ threadId }) => ({
         url: ApiEndpoints.GUIDE.ENROLL(threadId),
         method: HttpMethod.POST,
-        body: languageCode ? { languageCode } : undefined,
+      }),
+    }),
+
+    startGuideVoiceSession: builder.mutation<
+      GuideVoiceSessionResponse,
+      { threadId: string; body: GuideVoiceSessionRequest }
+    >({
+      query: ({ threadId, body }) => ({
+        url: ApiEndpoints.GUIDE.VOICE_SESSION(threadId),
+        method: HttpMethod.POST,
+        body,
       }),
     }),
 
@@ -98,7 +132,7 @@ const guideAPI = baseAPI.injectEndpoints({
     }),
 
     postGuideCardEvent: builder.mutation<
-      unknown,
+      GuideCardEventResult,
       { threadId: string; cardId: string; body: GuideCardEventRequest }
     >({
       query: ({ threadId, cardId, body }) => ({
@@ -119,7 +153,7 @@ const guideAPI = baseAPI.injectEndpoints({
       }),
     }),
 
-    putGuidePrefs: builder.mutation<unknown, { guidance: GuidanceLevel }>({
+    putGuidePrefs: builder.mutation<GuidePrefs, GuidePrefsUpdate>({
       query: body => ({
         url: ApiEndpoints.GUIDE.PREFS,
         method: HttpMethod.PUT,
@@ -134,6 +168,7 @@ export const {
   useLazyGetGuideBootstrapQuery,
   useOpenGuideThreadMutation,
   useEnrollGuideThreadMutation,
+  useStartGuideVoiceSessionMutation,
   useSendGuideTurnMutation,
   usePostGuideCardEventMutation,
   usePutGuideAppointmentMutation,

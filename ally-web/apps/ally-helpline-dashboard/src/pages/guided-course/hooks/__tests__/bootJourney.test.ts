@@ -29,6 +29,7 @@ const deps = (over: Partial<BootDeps> = {}): BootDeps => ({
     .fn()
     .mockResolvedValue({ id: "c1", title: "Course", sections: [] } as unknown as TrackDetail),
   openThread: vi.fn().mockResolvedValue(thread),
+  enroll: vi.fn().mockResolvedValue({ alreadyEnrolled: false }),
   ...over,
 });
 
@@ -140,5 +141,35 @@ describe("bootJourney", () => {
   it("keeps the dial setting remembered on this device when the server has none", async () => {
     const outcome = await bootJourney("c1", deps({ localGuidance: () => "drive" }));
     expect(outcome.kind === "ready" && outcome.bootstrap.prefs.guidance).toBe("drive");
+  });
+  it("enrols through the thread on first open, and only when not already enrolled", async () => {
+    const d = deps({
+      getBootstrap: vi.fn().mockResolvedValue({
+        availability: { guided: true },
+        access: { hasAccess: true, enrolled: false, reason: null },
+        messages: [],
+        cards: [],
+      }),
+    });
+    const outcome = await bootJourney("c1", d);
+    expect(d.enroll).toHaveBeenCalledWith("t1");
+    expect(outcome.kind === "ready" && outcome.bootstrap.access.enrolled).toBe(true);
+
+    const already = deps();
+    await bootJourney("c1", already);
+    expect(already.enroll).not.toHaveBeenCalled();
+  });
+
+  it("opens anyway when enrolment fails for a passing reason (Start retries it)", async () => {
+    const d = deps({
+      getBootstrap: vi.fn().mockResolvedValue({
+        availability: { guided: true },
+        access: { hasAccess: true, enrolled: false, reason: null },
+      }),
+      enroll: vi.fn().mockRejectedValue({ status: 500 }),
+    });
+    const outcome = await bootJourney("c1", d);
+    expect(outcome.kind).toBe("ready");
+    expect(outcome.kind === "ready" && outcome.bootstrap.access.enrolled).toBe(false);
   });
 });

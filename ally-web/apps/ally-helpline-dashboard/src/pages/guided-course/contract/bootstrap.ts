@@ -5,10 +5,7 @@
  * the UI. Two sources produce it:
  *
  * 1. `fromBootstrapWire`: `GET /v1/guide/tracks/:trackId/bootstrap`, the
- *    contract's `GuideBootstrap` (plan §9.1). `GuideBootstrapWire` below is a
- *    local, deliberately permissive copy of that shape; when the generated
- *    type lands in `types/generated/guide-contract.ts`, replace the interface
- *    with an import and nothing outside this file changes.
+ *    contract's generated `GuideBootstrap` (plan §9.1).
  * 2. `composeBootstrap`: the endpoints that existed before bootstrap (public
  *    availability, the thread, the classic course detail and access check).
  *    Used when the bootstrap route 404s, so the journey also runs against an
@@ -19,7 +16,10 @@ import { TrackAccessDenialReason, TrackDetail, TrackItemStatus, TrackItemType } 
 
 import { ITEM_TYPE_FACTS, ItemTension } from "../cards/itemTypes";
 
-import type { GuideAtmosphere, GuideCard, GuideItemType, GuideMode } from "./wire";
+import type { GuideAtmosphere, GuideBootstrap, GuideCard, GuideItemType, GuideMode } from "./wire";
+
+/** The wire shape, generated from ally-be's schema. */
+export type GuideBootstrapWire = GuideBootstrap;
 
 /** The guidance dial (plan §5.7): Lead me · Walk with me · I'll drive. */
 export type GuidanceLevel = "lead" | "walk" | "drive";
@@ -55,6 +55,7 @@ export interface JourneyHistoryMessage {
   text: string;
   turnId: string | null;
   createdAt: string | null;
+  interrupted?: boolean;
 }
 
 export interface JourneyNextStep {
@@ -94,6 +95,13 @@ export interface JourneyCourse {
   languageCode: string | null;
 }
 
+/** Where the learner is, as the server last said (the Spine's starting point). */
+export interface JourneyProgress {
+  currentItemId: string | null;
+  completedItems: number;
+  totalItems: number;
+}
+
 /** A card as bootstrap returns it: the contract card plus where it sits. */
 export type JourneyCard = GuideCard & { seq?: number | null };
 
@@ -103,6 +111,7 @@ export interface JourneyBootstrap {
   thread: JourneyThread | null;
   course: JourneyCourse;
   spine: JourneySpineSection[];
+  progress: JourneyProgress | null;
   /** Oldest first. */
   messages: JourneyHistoryMessage[];
   /** Oldest first. */
@@ -121,104 +130,93 @@ export interface JourneyBootstrap {
 // Source 1: GET /v1/guide/tracks/:trackId/bootstrap
 // ---------------------------------------------------------------------------
 
-/** Local copy of the contract's `GuideBootstrap`; see the file header. */
-export interface GuideBootstrapWire {
-  availability?: Partial<JourneyAvailability> | null;
-  access?: Partial<JourneyAccess> | null;
-  thread?: Partial<JourneyThread> | null;
-  course?: Partial<JourneyCourse> & { estimatedDurationMinutes?: number | null };
-  spine?: {
-    sections?: Array<{
-      id: string;
-      title: string;
-      items?: Array<Partial<JourneySpineItem> & { id: string; type: GuideItemType }>;
-    }>;
-  } | null;
-  messages?: Array<Partial<JourneyHistoryMessage> & { id: string }> | null;
-  cards?: JourneyCard[] | null;
-  prefs?: { guidance?: GuidanceLevel | null } | null;
-  nextStep?: JourneyNextStep | null;
-}
-
-const SPINE_STATES: readonly SpineItemState[] = ["locked", "available", "done"];
-
-const asSpineState = (value: unknown): SpineItemState => {
-  const lower = typeof value === "string" ? value.toLowerCase() : "";
-  if (SPINE_STATES.includes(lower as SpineItemState)) return lower as SpineItemState;
-  // Server spellings for "can be opened now".
-  if (lower === "unlocked" || lower === "current" || lower === "in_progress") return "available";
-  if (lower === "completed") return "done";
-  return "locked";
-};
+const spineState = (state: string): SpineItemState =>
+  state === "completed" ? "done" : state === "available" ? "available" : "locked";
 
 const asGuidance = (value: unknown): GuidanceLevel =>
   GUIDANCE_LEVELS.includes(value as GuidanceLevel) ? (value as GuidanceLevel) : DEFAULT_GUIDANCE;
 
-export const fromBootstrapWire = (trackId: string, wire: GuideBootstrapWire): JourneyBootstrap => {
-  const availability = wire.availability ?? {};
-  const access = wire.access ?? {};
-  const course = wire.course ?? {};
-  const thread =
-    wire.thread && wire.thread.id
-      ? {
-          id: wire.thread.id,
-          mode: wire.thread.mode ?? "NORMAL",
-          atmosphere: wire.thread.atmosphere ?? "bright",
-          lastEventSeq: wire.thread.lastEventSeq ?? 0,
-        }
-      : null;
+const asDenial = (reason: string | null | undefined): TrackAccessDenialReason | null =>
+  reason && Object.values(TrackAccessDenialReason).includes(reason as TrackAccessDenialReason)
+    ? (reason as TrackAccessDenialReason)
+    : null;
 
+/**
+ * Reads the bootstrap defensively: a missing or malformed part reads as "no"
+ * (not guided, no access), so a bad payload fails closed to classic.
+ */
+export const fromBootstrapWire = (trackId: string, wire: GuideBootstrapWire): JourneyBootstrap => {
+  const { availability, access, thread, course, spine } = wire;
   return {
     availability: {
-      guided: availability.guided ?? false,
-      anonymousChat: availability.anonymousChat ?? false,
-      voice: availability.voice ?? false,
-      languages: availability.languages ?? [],
-      reason: availability.reason ?? null,
+      guided: availability?.guided === true,
+      anonymousChat: availability?.anonymousChat === true,
+      voice: availability?.voice === true,
+      languages: availability?.languages ?? [],
+      reason: availability?.reason ?? null,
     },
     access: {
-      hasAccess: access.hasAccess ?? false,
-      enrolled: access.enrolled ?? false,
-      reason: access.reason ?? null,
+      hasAccess: access?.hasAccess ?? false,
+      enrolled: access?.enrolled ?? false,
+      reason: asDenial(access?.reason),
     },
-    thread,
+    thread: thread
+      ? {
+          id: thread.id,
+          mode: thread.mode,
+          atmosphere: thread.atmosphere,
+          lastEventSeq: thread.lastEventSeq,
+        }
+      : null,
     course: {
-      id: course.id ?? trackId,
-      title: course.title ?? "",
-      description: course.description ?? null,
-      coverImageUrl: course.coverImageUrl ?? null,
-      estimatedMinutes: course.estimatedMinutes ?? course.estimatedDurationMinutes ?? null,
-      languageCode: course.languageCode ?? null,
+      id: course?.id ?? trackId,
+      title: course?.title ?? "",
+      description: course?.description ?? null,
+      coverImageUrl: course?.coverImageUrl ?? null,
+      estimatedMinutes: course?.estimatedMinutes ?? null,
+      languageCode: course?.languageCode ?? null,
     },
-    spine: (wire.spine?.sections ?? []).map(section => ({
+    spine: (spine?.sections ?? []).map(section => ({
       id: section.id,
       title: section.title,
-      items: (section.items ?? []).map(item => {
-        const facts = ITEM_TYPE_FACTS[item.type];
-        return {
-          id: item.id,
-          type: item.type,
-          title: item.title ?? "",
-          state: asSpineState(item.state),
-          minutes: item.minutes ?? null,
-          boss: item.boss ?? facts?.boss ?? false,
-          tension: item.tension ?? facts?.tension ?? "low",
-          hasWarnings: item.hasWarnings ?? false,
-        };
-      }),
+      items: (section.items ?? []).map(item => ({
+        id: item.id,
+        type: item.type,
+        title: item.title,
+        state: spineState(item.state),
+        minutes: item.minutes ?? null,
+        boss: item.boss ?? ITEM_TYPE_FACTS[item.type]?.boss ?? false,
+        tension: item.tension ?? ITEM_TYPE_FACTS[item.type]?.tension ?? "low",
+        hasWarnings: item.hasWarnings ?? false,
+      })),
     })),
-    messages: (wire.messages ?? []).map((message, index) => ({
+    progress: spine
+      ? {
+          currentItemId: spine.currentItemId,
+          completedItems: spine.completed,
+          totalItems: spine.total,
+        }
+      : null,
+    messages: (wire.messages ?? []).map(message => ({
       id: message.id,
-      seq: message.seq ?? index,
-      role: message.role ?? "ally",
-      kind: message.kind ?? "chat",
+      seq: message.seq,
+      role: message.role,
+      kind: message.kind,
       text: message.text ?? "",
       turnId: message.turnId ?? null,
-      createdAt: message.createdAt ?? null,
+      createdAt: message.createdAt,
+      interrupted: message.interrupted ?? false,
     })),
-    cards: wire.cards ?? [],
+    cards: (wire.cards ?? []).map(({ seq, card }) => ({ ...card, seq })),
     prefs: { guidance: asGuidance(wire.prefs?.guidance) },
-    nextStep: wire.nextStep ?? null,
+    nextStep: wire.nextStep
+      ? {
+          hidden: wire.nextStep.hidden,
+          itemId: wire.nextStep.itemId ?? null,
+          title: wire.nextStep.title ?? null,
+          minutes: wire.nextStep.minutes ?? null,
+        }
+      : null,
     complete: true,
   };
 };
@@ -302,6 +300,7 @@ export const composeBootstrap = ({
         };
       }),
     })),
+    progress: null,
     messages: [],
     cards: [],
     prefs: { guidance: asGuidance(guidance) },

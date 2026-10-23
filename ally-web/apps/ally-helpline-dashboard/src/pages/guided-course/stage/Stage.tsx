@@ -32,6 +32,8 @@ export interface StageProps {
   onSignIn: () => void;
   onMyCourses: () => void;
   onFocusComposer: () => void;
+  /** Voice is on: Ally is heard, so the screen reader shouldn't say it again (plan §5.13). */
+  muteAnnouncements?: boolean;
   /** Rendered after the last entry (the thinking line lives here). */
   footer?: ReactNode;
 }
@@ -47,6 +49,7 @@ export const Stage: FC<StageProps> = ({
   onMyCourses,
   onFocusComposer,
   footer,
+  muteAnnouncements = false,
 }) => {
   const { t } = useTranslation();
   const { feed, spine, atmosphere, cues, actions } = journey;
@@ -104,6 +107,9 @@ export const Stage: FC<StageProps> = ({
           <ItemCard
             card={card}
             active={feed.activeCardId === card.cardId}
+            panelVisible={
+              feed.activeCardId === card.cardId && journey.minimisedCardId !== card.cardId
+            }
             compact={compact}
             celebration={celebration}
             onOpen={actions.openCard}
@@ -279,7 +285,7 @@ export const Stage: FC<StageProps> = ({
           )}
         </div>
         {footer}
-        <Announcer entries={feed.entries} cards={feed.cards} />
+        <Announcer entries={feed.entries} cards={feed.cards} muted={muteAnnouncements} />
       </div>
     </div>
   );
@@ -351,10 +357,11 @@ const Welcome: FC<{ journey: GuideJourney; courseTitle: string }> = ({ journey, 
  * Screen-reader announcements (plan §5.13): Ally's messages once they are
  * complete (not every delta) and cards when they arrive.
  */
-const Announcer: FC<{ entries: FeedEntry[]; cards: Record<string, GuideCard> }> = ({
-  entries,
-  cards,
-}) => {
+const Announcer: FC<{
+  entries: FeedEntry[];
+  cards: Record<string, GuideCard>;
+  muted: boolean;
+}> = ({ entries, cards, muted }) => {
   const { t } = useTranslation();
   const [message, setMessage] = useState("");
   const seen = useRef<Set<string> | null>(null);
@@ -381,8 +388,8 @@ const Announcer: FC<{ entries: FeedEntry[]; cards: Record<string, GuideCard> }> 
       }
     }
     seen.current = next;
-    if (announce.length) setMessage(announce.join(" "));
-  }, [entries, cards, t]);
+    if (announce.length && !muted) setMessage(announce.join(" "));
+  }, [entries, cards, t, muted]);
 
   return (
     <div className="sr-only" aria-live="polite" aria-atomic="true">

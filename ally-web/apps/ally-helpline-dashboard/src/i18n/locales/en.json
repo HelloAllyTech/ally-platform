@@ -3354,6 +3354,30 @@
       "tooLong": "That's a bit long for me. Could you keep it under 2,000 characters?",
       "unavailable": "This course isn't available right now.",
       "bootFailed": "Something went wrong on my side while opening the course. Try again, or keep going in the classic view."
+    },
+    "voice": {
+      "label": "Voice with Ally",
+      "start": "Talk to Ally",
+      "resume": "Resume voice",
+      "end": "End voice",
+      "connecting": "Connecting…",
+      "reconnecting": "Reconnecting…",
+      "listening": "Listening…",
+      "thinking": "Thinking…",
+      "speaking": "Ally is speaking",
+      "holdHint": "Hold the button while you talk",
+      "hold": "Hold to talk",
+      "release": "Release to send",
+      "modeLabel": "How to talk",
+      "handsFree": "Hands-free",
+      "pushToTalk": "Push to talk",
+      "suggestPtt": "It sounds busy around you. Push to talk might work better.",
+      "usePtt": "Use push to talk",
+      "keepHandsFree": "Keep hands-free",
+      "failed": "I can't hear you right now. Let's type.",
+      "disabled": "Voice isn't available right now. Let's type.",
+      "micTitle": "I can't use your microphone. Let's type for now.",
+      "typeInstead": "Type instead"
     }
   }
 }
