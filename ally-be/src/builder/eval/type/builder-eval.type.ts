@@ -256,6 +256,8 @@ export interface BuilderEvalSuiteSummary {
   /** Mean judge score over interview runs that were judged. */
   judgeScore: number | null;
   costUsd: number;
+  /** BUILDER_EVAL_SCORING_VERSION at completion; absent before it existed. */
+  scoringVersion?: number;
 }
 
 /** What a prompt-gate suite decided, and against what. */
