@@ -100,6 +100,12 @@ const SessionCard: React.FC<{
               {strings.startedBy(session.createdByName)}
             </p>
           )}
+          {session.model && (
+            <div className="mt-0.5 flex items-center gap-1 truncate text-xs text-typography-500">
+              <MachineLearningModel size={12} className="shrink-0" />
+              <span>{session.model}</span>
+            </div>
+          )}
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
           <Tag type={BUILDER_STATUS_TAG_TYPE[session.status]} size="sm">
