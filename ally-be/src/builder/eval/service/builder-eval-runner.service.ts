@@ -217,9 +217,38 @@ const prdForPrompt = (draft: BuilderPrdDocument | null | undefined): string => {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { technicalDesign, ui, ...rest } = draft;
   const text = JSON.stringify(rest);
-  return text.length > PRD_FOR_PROMPT_MAX_CHARS
-    ? `${text.slice(0, PRD_FOR_PROMPT_MAX_CHARS)}…`
-    : text;
+
+  if (text.length <= PRD_FOR_PROMPT_MAX_CHARS) {
+    return text;
+  }
+
+  // It's too long. Create a summary object that is guaranteed to be smaller.
+  const summary: Record<string, any> = {
+    _truncated: 'The full PRD was too long to be included in the prompt.',
+    title: (rest.title || '').slice(0, 1000),
+    summary: (rest.summary || '').slice(0, 2000),
+    problem: (rest.problem || '').slice(0, 5000),
+    goals: (rest.goals || '').slice(0, 2000),
+  };
+
+  if (rest.requirements?.length) {
+    summary.requirements = `[${rest.requirements.length} requirements, omitted for brevity]`;
+  }
+
+  if (rest.assumptions?.length) {
+    summary.assumptions = `[${rest.assumptions.length} assumptions, omitted for brevity]`;
+  }
+
+  // Final check, if the summary object is still too big, return a minimal version
+  const summaryText = JSON.stringify(summary);
+  if (summaryText.length > PRD_FOR_PROMPT_MAX_CHARS) {
+    return JSON.stringify({
+      _truncated: 'The PRD was too long and the summary was also too long.',
+      title: (rest.title || '').slice(0, 1000),
+    });
+  }
+
+  return summaryText;
 };
 
 /**
