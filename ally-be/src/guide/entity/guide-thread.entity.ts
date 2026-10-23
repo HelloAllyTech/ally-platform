@@ -3,13 +3,28 @@ import { BaseWithoutTenantEntity } from 'src/common/entity/base-without-tenant.e
 import { GuideMode, GuideThreadStatus } from '../enum/guide.enum';
 
 /** Pacing counters the Conductor keeps per thread (plan §4.4). */
+/**
+ * The pacing director's memory for one thread (plans/ally-guide/plan.md §4.4).
+ * Counted in learner turns rather than wall-clock time wherever the rule is
+ * about conversation rhythm, so a learner who steps away is not "steered"
+ * on return. Read and written only through `src/guide/conductor/pacing.ts`.
+ */
 export interface GuideThreadPacing {
+  /** Learner turns in this thread so far. */
+  learnerTurns?: number;
+  /** Learner turns since the last progress or item interaction. */
   offSpineTurns?: number;
-  releaseWindowUntilTurn?: number | null;
+  /** ISO time of the last item opened or completed. */
+  lastProgressAt?: string | null;
+  /** Open after a high-tension item: Ally listens, nothing steers. */
+  releaseWindow?: { itemId: string; openedAtTurn: number } | null;
+  /** `learnerTurns` when Ally last bridged back to the course out loud. */
+  lastVerbalSteerTurn?: number | null;
+  /** `learnerTurns` when the learner last said "not now". */
+  declinedAtTurn?: number | null;
+  /** 1.0 talks most; falls toward the floor as competence shows. */
   fadeLevel?: number;
-  lastSteerAt?: string | null;
-  steerDeclinedAt?: string | null;
-  sideQuestsSinceItem?: number;
+  /** ISO time of the learner's first win in this course. */
   firstWinAt?: string | null;
 }
 
