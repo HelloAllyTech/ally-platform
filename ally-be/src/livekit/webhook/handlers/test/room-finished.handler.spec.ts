@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   RoomFinishedHandler,
   RoomFinishedEvent,
@@ -14,6 +15,7 @@ import {
 describe('RoomFinishedHandler', () => {
   let handler: RoomFinishedHandler;
   let scenarioSessionService: jest.Mocked<ScenarioSessionService>;
+  let eventEmitter: { emit: jest.Mock };
   let mockLogger: jest.Mocked<LoggerService>;
 
   const mockScenarioSession: ScenarioSessions = {
@@ -55,6 +57,8 @@ describe('RoomFinishedHandler', () => {
       recordLifecycleEvent: jest.fn(),
     };
 
+    eventEmitter = { emit: jest.fn() };
+
     mockLogger = {
       info: jest.fn(),
       error: jest.fn(),
@@ -69,6 +73,7 @@ describe('RoomFinishedHandler', () => {
           provide: ScenarioSessionService,
           useValue: mockScenarioSessionService,
         },
+        { provide: EventEmitter2, useValue: eventEmitter },
       ],
     }).compile();
 
@@ -131,6 +136,75 @@ describe('RoomFinishedHandler', () => {
         scenarioSessionService.getScenarioSessionByRoomId,
       ).not.toHaveBeenCalled();
       expect(scenarioSessionService.endScenarioSession).not.toHaveBeenCalled();
+    });
+
+    it('does not emit the guide event for roleplay or preview rooms', async () => {
+      scenarioSessionService.getScenarioSessionByRoomId.mockResolvedValue({
+        ...mockScenarioSession,
+        status: ScenarioSessionStatus.ENDED,
+      });
+      scenarioSessionService.endPreviewScenario = jest
+        .fn()
+        .mockResolvedValue(undefined);
+
+      await handler.handle(mockRoomFinishedEvent);
+      await handler.handle({
+        ...mockRoomFinishedEvent,
+        room: { ...mockRoomFinishedEvent.room, name: 'preview-abc' },
+      });
+
+      expect(eventEmitter.emit).not.toHaveBeenCalled();
+    });
+
+    describe('guide rooms', () => {
+      const guideEvent: RoomFinishedEvent = {
+        ...mockRoomFinishedEvent,
+        room: { ...mockRoomFinishedEvent.room, name: 'guide-abc123' },
+      };
+
+      it('skips all roleplay session handling and emits guide.voice.room.finished', async () => {
+        scenarioSessionService.endPreviewScenario = jest.fn();
+
+        await handler.handle(guideEvent);
+
+        expect(eventEmitter.emit).toHaveBeenCalledTimes(1);
+        expect(eventEmitter.emit).toHaveBeenCalledWith(
+          'guide.voice.room.finished',
+          { roomName: 'guide-abc123' },
+        );
+        expect(
+          scenarioSessionService.getScenarioSessionByRoomId,
+        ).not.toHaveBeenCalled();
+        expect(
+          scenarioSessionService.recordLifecycleEvent,
+        ).not.toHaveBeenCalled();
+        expect(
+          scenarioSessionService.endScenarioSession,
+        ).not.toHaveBeenCalled();
+        expect(
+          scenarioSessionService.endPreviewScenario,
+        ).not.toHaveBeenCalled();
+      });
+
+      it('only matches the prefix, so a roleplay room that merely contains "guide-" is still ended', async () => {
+        scenarioSessionService.getScenarioSessionByRoomId.mockResolvedValue(
+          mockScenarioSession,
+        );
+        scenarioSessionService.endScenarioSession.mockResolvedValue({
+          message: 'Scenario session ended successfully',
+        });
+
+        await handler.handle({
+          ...mockRoomFinishedEvent,
+          room: { ...mockRoomFinishedEvent.room, name: 'ss_guide-abc' },
+        });
+
+        expect(eventEmitter.emit).not.toHaveBeenCalled();
+        expect(scenarioSessionService.endScenarioSession).toHaveBeenCalledWith(
+          'session-123',
+          456,
+        );
+      });
     });
 
     it('should handle getScenarioSessionByRoomId error', async () => {

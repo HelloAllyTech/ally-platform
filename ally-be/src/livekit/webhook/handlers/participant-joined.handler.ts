@@ -9,6 +9,7 @@ import { generateAudioStorageKey } from 'src/common/util/audio.util';
 import { ScenarioSharedService } from 'src/learn/service/scenario-shared.service';
 import { convertTimestampNsToDate } from 'src/common/util/date.util';
 import { ScenarioInteractionMode } from 'src/learn/enum/scenario-interaction-mode.enum';
+import { isGuideRoom } from '../../constants/livekit.constants';
 
 export interface ParticipantJoinedEvent {
   event: 'participant_joined';
@@ -81,6 +82,15 @@ export class ParticipantJoinedHandler {
 
   async handle(event: ParticipantJoinedEvent): Promise<void> {
     try {
+      // Guide rooms have their own agent worker. Never run the roleplay path
+      // for them — least of all the fallback dispatch of the roleplay agent.
+      if (isGuideRoom(event.room.name)) {
+        this.logger.debug(
+          `Ignoring participant_joined for guide room ${event.room.name}`,
+        );
+        return;
+      }
+
       this.logger.info(
         `Processing participant_joined event ${JSON.stringify(event)} for ${event.participant.identity} in room ${event.room.name}`,
       );

@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   ScenarioSessionAbandonReason,
   ScenarioSessionStatus,
@@ -6,6 +7,11 @@ import {
 import { ScenarioSessionService } from 'src/learn/service/scenario-session.service';
 import { ScenarioSessionLifecycleEventType } from 'src/learn/entity/scenario-session-lifecycle-event.entity';
 import { LoggerService } from 'src/logger/logger.service';
+import {
+  GUIDE_VOICE_ROOM_FINISHED_EVENT,
+  GuideVoiceRoomFinishedEventParams,
+  isGuideRoom,
+} from '../../constants/livekit.constants';
 
 export interface RoomFinishedEvent {
   event: 'room_finished';
@@ -30,6 +36,7 @@ export class RoomFinishedHandler {
 
   constructor(
     private readonly scenarioSessionService: ScenarioSessionService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async handle(event: RoomFinishedEvent): Promise<void> {
@@ -38,6 +45,15 @@ export class RoomFinishedHandler {
     try {
       if (!event.room?.name) {
         this.logger.warn('Room name is missing in room finished event');
+        return;
+      }
+
+      // Not a roleplay room: skip all scenario-session end handling and hand
+      // the finish to whichever guide module listens.
+      if (isGuideRoom(event.room.name)) {
+        this.eventEmitter.emit(GUIDE_VOICE_ROOM_FINISHED_EVENT, {
+          roomName: event.room.name,
+        } satisfies GuideVoiceRoomFinishedEventParams);
         return;
       }
 
