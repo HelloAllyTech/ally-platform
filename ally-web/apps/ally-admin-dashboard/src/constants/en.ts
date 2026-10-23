@@ -4246,6 +4246,18 @@ export const en = {
       saveFailed: "Couldn't save Builder's settings.",
       saved: "Saved.",
       save: "Save",
+      // The switches at the top save the moment they're flipped. A kill switch
+      // that looks off but is waiting on a Save at the bottom of the page is
+      // worse than no switch.
+      switchesApplyNow:
+        "The switches above take effect as soon as you flip them. Save, at the bottom, covers everything below.",
+      switchApplied: (label: string, on: boolean) => `${label}: ${on ? "on" : "off"}.`,
+      switchFailed: (label: string, on: boolean) =>
+        `Couldn't change ${label.toLowerCase()}. It is still ${on ? "on" : "off"}.`,
+      confirmEnableTitle: "Turn Builder on?",
+      confirmEnableBody:
+        "Sessions whose PRD is ready start dispatching builds straight away, up to the concurrency limit below.",
+      confirmEnableAction: "Turn on",
       // The kill switch sits alone, first, for the same reason WhatsApp's does:
       // it's the control someone reaches for in an incident and shouldn't be
       // buried under thresholds.
