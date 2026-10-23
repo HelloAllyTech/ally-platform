@@ -18,6 +18,7 @@ import {
 } from "@api";
 import { ArrowDown, Dot } from "@assets";
 import {
+  AllyOrgTab,
   OrganizationDetailLoader,
   SimulationsTab,
   PathTab,
@@ -30,6 +31,7 @@ import {
   BadgesTab,
 } from "@components";
 import { en, ROUTES, FeatureToggleKey } from "@constants";
+import { useAllyGuideAccess } from "@hooks";
 import { RootState } from "@store";
 import { Tenant } from "@types";
 import { hasFeature } from "@utils";
@@ -44,6 +46,7 @@ enum TAB_IDS {
   SCRIBE_SETTINGS = "scribeSettings",
   SIMULATION_SETTINGS = "simulationSettings",
   TEXT_HELPLINE = "textHelpline",
+  ALLY = "ally",
 }
 
 const defaultTabs = [
@@ -56,6 +59,7 @@ const defaultTabs = [
   { id: TAB_IDS.SCRIBE_SETTINGS, label: en.userManagement.scribeSettings },
   { id: TAB_IDS.SIMULATION_SETTINGS, label: en.userManagement.simulationSettings },
   { id: TAB_IDS.TEXT_HELPLINE, label: en.userManagement.textHelpline },
+  { id: TAB_IDS.ALLY, label: en.allyConsole.org.tabLabel },
 ];
 
 export const OrganizationDetail: FC = () => {
@@ -66,9 +70,13 @@ export const OrganizationDetail: FC = () => {
   const navigate = useNavigate();
   const features = useSelector((state: RootState) => state.user.features);
   const hasOrgDetailContentAccess = hasFeature(features, FeatureToggleKey.ORG_DETAIL_CONTENT_TABS);
+  // The Ally tab is its own gate: the ally_guide_org toggle AND the Ally guide view permission, the
+  // pair ally-be checks on every org-profile route. Not part of the content-tabs toggle above.
+  const { canViewOrg: canViewAllyTab } = useAllyGuideAccess();
 
   const filteredTabs = useMemo(() => {
     return defaultTabs.filter(tab => {
+      if (tab.id === TAB_IDS.ALLY) return canViewAllyTab;
       // Content-access tabs stay gated, matching Tracks and Cases.
       if (
         tab.id === TAB_IDS.PATH ||
@@ -83,7 +91,7 @@ export const OrganizationDetail: FC = () => {
       }
       return true;
     });
-  }, [hasOrgDetailContentAccess]);
+  }, [hasOrgDetailContentAccess, canViewAllyTab]);
 
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -270,6 +278,8 @@ export const OrganizationDetail: FC = () => {
         return <SimulationsSettings organizationId={id} onUpdateTenant={refetchTenant} />;
       case TAB_IDS.TEXT_HELPLINE:
         return <TextHelplineSettings tenantId={id} />;
+      case TAB_IDS.ALLY:
+        return <AllyOrgTab tenantId={id} />;
       default:
         return null;
     }
