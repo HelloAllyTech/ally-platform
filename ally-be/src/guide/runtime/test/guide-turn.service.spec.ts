@@ -76,6 +76,7 @@ function setup(
     lock?: boolean;
     guided?: boolean;
     scripts?: Script[];
+    voice?: boolean;
     verdict?: SentinelVerdict | null;
     thread?: Record<string, any>;
     historyRows?: any[];
@@ -146,6 +147,7 @@ function setup(
   const traces = { write: jest.fn(async () => undefined) };
   const settings = {
     isGuidedAvailable: jest.fn(async () => options.guided ?? true),
+    switches: jest.fn(async () => ({ voice: options.voice ?? true })),
   };
   const redis = {
     acquireLock: jest.fn(async () => options.lock ?? true),
@@ -590,20 +592,84 @@ describe('GuideTurnService', () => {
     expect(result.failure?.code).toBe('interrupted');
   });
 
-  it('speaks the fixed crisis message on a voice turn', async () => {
+  it('speaks the fixed crisis message on a voice turn, marked as crisis', async () => {
     const t = setup();
-    const spoken: string[] = [];
+    const spoken: Array<[string, string | undefined]> = [];
     await t.service.runVoiceTurn(
       { threadId: 'th1', userId: 1, tenantId: 'org' },
       { clientTurnId: 'v3', text: 'I want to kill myself' },
       {
-        onDelta: (text) => spoken.push(text),
+        onDelta: (text, kind) => spoken.push([text, kind]),
         onCardHint: () => undefined,
         signal: new AbortController().signal,
       },
     );
-    expect(spoken.join('')).toBe(DEFAULT_CRISIS_TEXT);
+    expect(spoken).toEqual([[DEFAULT_CRISIS_TEXT, 'crisis']]);
     expect(t.models.stream).not.toHaveBeenCalled();
+  });
+
+  it('names the turn before anything is spoken', async () => {
+    const t = setup({ scripts: [textPass('Of course.')] });
+    const order: string[] = [];
+    await t.service.runVoiceTurn(
+      { threadId: 'th1', userId: 1, tenantId: 'org' },
+      { clientTurnId: 'v5', text: 'Can we go on?' },
+      {
+        onStart: (turnId) => order.push(`start:${turnId}`),
+        onDelta: (text) => order.push(text),
+        onCardHint: () => undefined,
+        signal: new AbortController().signal,
+      },
+    );
+    expect(order[0]).toBe('start:turn-1');
+    expect(order.slice(1).join('')).toBe('Of course.');
+  });
+
+  it('refuses a spoken turn once voice is switched off, mid-session', async () => {
+    const t = setup({ voice: false });
+    const result = await t.service.runVoiceTurn(
+      { threadId: 'th1', userId: 1, tenantId: 'org' },
+      { clientTurnId: 'v6', text: 'Hello?' },
+      {
+        onDelta: () => undefined,
+        onCardHint: () => undefined,
+        signal: new AbortController().signal,
+      },
+    );
+    expect(result.failure?.code).toBe('guide_disabled');
+    expect(t.turnStore.createOrGet).not.toHaveBeenCalled();
+    expect(t.models.stream).not.toHaveBeenCalled();
+  });
+
+  it('keeps what was spoken when the learner talks over a reply mid-stream', async () => {
+    const t = setup({
+      scripts: [textPass('Silence gives the caller room to go on.')],
+    });
+    const controller = new AbortController();
+    let heard = '';
+    const result = await t.service.runVoiceTurn(
+      { threadId: 'th1', userId: 1, tenantId: 'org' },
+      { clientTurnId: 'v7', text: 'What does the article say?' },
+      {
+        onDelta: (text) => {
+          heard += text;
+          if (heard.split(' ').length >= 3) controller.abort();
+        },
+        onCardHint: () => undefined,
+        signal: controller.signal,
+      },
+    );
+    expect(result.failure).toBeUndefined();
+    const reply = t.appended.find((row) => row.role === 'ally');
+    expect(reply.content).toBe(heard.trim());
+    expect(reply.metadata).toMatchObject({
+      replyKind: 'interrupted',
+      interrupted: true,
+    });
+    // Replay gets plain text — never half a pass with its thinking.
+    expect(reply.providerBlocks).toEqual([
+      { role: 'assistant', content: [{ type: 'text', text: heard.trim() }] },
+    ]);
   });
 
   it('tells the next turn what the learner heard of an interrupted reply', async () => {

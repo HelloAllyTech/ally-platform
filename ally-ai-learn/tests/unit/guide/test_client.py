@@ -44,7 +44,9 @@ async def test_get_session_reads_the_session_and_sends_the_service_key():
     )
     request = recorder.requests[0]
     assert request.method == "GET"
-    assert request.url.raw_path == b"/api/v1/guide/voice/sessions/tok%2Fen%2B%3D"
+    assert request.url.raw_path == b"/api/v1/guide/voice/session"
+    # The token travels in a header, never the path (paths reach access logs).
+    assert request.headers["x-guide-voice-session"] == "tok/en+="
     assert request.headers["x-api-key"] == "svc-key"
 
 
@@ -179,4 +181,5 @@ async def test_end_session_posts_and_never_raises():
     await client.end_session("vt")
 
     assert recorder.requests[0].method == "POST"
-    assert recorder.requests[0].url.path == "/api/v1/guide/voice/sessions/vt/ended"
+    assert recorder.requests[0].url.path == "/api/v1/guide/voice/session/ended"
+    assert recorder.requests[0].headers["x-guide-voice-session"] == "vt"

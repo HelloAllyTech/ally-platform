@@ -357,9 +357,17 @@ export interface GuideVoiceTurnRequest {
   spokenChars?: number | null;
 }
 
+/** First line of every voice turn stream: the turn's id, so a barge-in mid-stream can still name the turn it cut off. */
+export interface GuideVoiceFrameStart {
+  type: 'start';
+  turnId: string;
+}
+
 export interface GuideVoiceFrameDelta {
   type: 'delta';
   text: string;
+  /** "crisis" on the fixed crisis message (plan §6.3 step 4): the worker speaks it slowly and keeps the session open. Absent on ordinary replies. */
+  kind?: 'crisis';
 }
 
 /** A short speakable line when a card appears on screen ('I've put the article on your right'). */
@@ -382,11 +390,12 @@ export interface GuideVoiceFrameError {
 
 /** One NDJSON line of the voice turn response stream. */
 export type GuideVoiceFrame =
+  | GuideVoiceFrameStart
   | GuideVoiceFrameDelta
   | GuideVoiceFrameCardHint
   | GuideVoiceFrameDone
   | GuideVoiceFrameError;
-export const GUIDE_VOICE_FRAME_TYPES = ['delta', 'card_hint', 'done', 'error'] as const;
+export const GUIDE_VOICE_FRAME_TYPES = ['start', 'delta', 'card_hint', 'done', 'error'] as const;
 
 /** Whether the guided experience is available for a course, for this caller (plan §9.1). */
 export interface GuideAvailability {

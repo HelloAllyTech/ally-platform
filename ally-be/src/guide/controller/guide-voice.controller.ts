@@ -2,20 +2,55 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   HttpCode,
-  Param,
+  HttpException,
   Post,
   Req,
   Res,
   UseGuards,
 } from '@nestjs/common';
-import { ApiOperation, ApiSecurity, ApiTags } from '@nestjs/swagger';
+import { ApiHeader, ApiOperation, ApiSecurity, ApiTags } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 import { ApiAuthGuard } from 'src/auth/guards/api-auth.guard';
-import { GuideVoiceFrame } from '../contract/generated/guide-contract';
+import { ErrorCode } from 'src/exception/error-code.enum';
+import {
+  GuideFailureCode,
+  GuideVoiceFrame,
+} from '../contract/generated/guide-contract';
 import { GuideVoiceTurnDto } from '../dto/guide.dto';
 import { GuideTurnService } from '../runtime/guide-turn.service';
 import { GuideVoiceService } from '../voice/guide-voice.service';
+
+/**
+ * The voice-session token travels in this header, never the URL path:
+ * paths end up in access logs.
+ */
+export const GUIDE_VOICE_SESSION_HEADER = 'x-guide-voice-session';
+
+const FAILURE_BY_ERROR_CODE: Partial<Record<string, GuideFailureCode>> = {
+  [ErrorCode.GUIDE_DISABLED]: 'guide_disabled',
+  [ErrorCode.GUIDE_NO_ACCESS]: 'no_access',
+  [ErrorCode.GUIDE_MESSAGE_TOO_LONG]: 'message_too_long',
+};
+
+/**
+ * A refusal thrown once the stream is open becomes an error frame with the
+ * code the worker acts on (say the voice-off line, ask for a shorter turn),
+ * not a blanket internal_error.
+ */
+export function voiceFailureCode(error: unknown): GuideFailureCode {
+  if (error instanceof HttpException) {
+    const body = error.getResponse() as { errorCode?: string } | string;
+    const code =
+      typeof body === 'object' && body?.errorCode
+        ? FAILURE_BY_ERROR_CODE[body.errorCode]
+        : undefined;
+    if (code) return code;
+    if (error.getStatus() === 429) return 'rate_limited';
+  }
+  return 'internal_error';
+}
 
 /**
  * The guide voice worker's API (plans/ally-guide/plan.md §7.9, §9.1). Two
@@ -32,9 +67,10 @@ export class GuideVoiceController {
     private readonly turns: GuideTurnService,
   ) {}
 
-  @Get('sessions/:token')
+  @Get('session')
+  @ApiHeader({ name: GUIDE_VOICE_SESSION_HEADER, required: true })
   @ApiOperation({ summary: 'What a voice session is for (no learner details)' })
-  async session(@Param('token') token: string) {
+  async session(@Headers(GUIDE_VOICE_SESSION_HEADER) token: string) {
     const session = await this.voice.resolve(token);
     return {
       threadId: session.threadId,
@@ -74,7 +110,9 @@ export class GuideVoiceController {
 
     try {
       const result = await this.turns.runVoiceTurn(session, dto, {
-        onDelta: (text) => write({ type: 'delta', text }),
+        onStart: (turnId) => write({ type: 'start', turnId }),
+        onDelta: (text, kind) =>
+          write(kind ? { type: 'delta', text, kind } : { type: 'delta', text }),
         onCardHint: (text) => text && write({ type: 'card_hint', text }),
         signal: bargeIn.signal,
       });
@@ -100,7 +138,7 @@ export class GuideVoiceController {
     } catch (error) {
       write({
         type: 'error',
-        code: 'internal_error',
+        code: voiceFailureCode(error),
         message: error instanceof Error ? error.message : 'Voice turn failed',
       });
     } finally {
@@ -108,13 +146,14 @@ export class GuideVoiceController {
     }
   }
 
-  @Post('sessions/:token/ended')
+  @Post('session/ended')
   @HttpCode(200)
+  @ApiHeader({ name: GUIDE_VOICE_SESSION_HEADER, required: true })
   @ApiOperation({
     summary: 'The voice session is over; its token stops working',
   })
-  async ended(@Param('token') token: string) {
-    await this.voice.end(token);
+  async ended(@Headers(GUIDE_VOICE_SESSION_HEADER) token: string) {
+    await this.voice.end(token ?? '');
     return { ended: true };
   }
 }

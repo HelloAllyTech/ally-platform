@@ -157,7 +157,14 @@ export interface GuideTurnInput {
   } | null;
 }
 
-type ReplyKind = 'model' | 'crisis' | 'urgent_real_case' | 'refusal' | 'empty';
+type ReplyKind =
+  | 'model'
+  | 'crisis'
+  | 'urgent_real_case'
+  | 'refusal'
+  | 'empty'
+  /** A spoken reply the learner talked over mid-stream: what they heard. */
+  | 'interrupted';
 
 export interface GuideTurnContext extends HarnessTurnContext {
   threadId: string;
@@ -219,6 +226,10 @@ export interface GuideTurnContext extends HarnessTurnContext {
   restarted: boolean;
   /** Set for a turn a platform event started (no learner words). */
   platformEvent: string | null;
+  /** The learner spoke over this turn's reply while it streamed. */
+  bargedIn?: boolean;
+  /** Reply text already sent to the learner (screen or speaker). */
+  releasedText?: string;
   /** turn.started has gone out: the client is waiting for this turn's end. */
   announced?: boolean;
   /** Platform events folded into this turn; consumed if it succeeds. */
@@ -236,7 +247,10 @@ export interface GuideTurnContext extends HarnessTurnContext {
 }
 
 export interface GuideVoiceSink {
-  onDelta(text: string): void;
+  /** The turn exists: its id goes out first, so a barge-in can name it. */
+  onStart?(turnId: string): void;
+  /** `crisis` marks the fixed crisis message, spoken slowly (plan §6.3). */
+  onDelta(text: string, kind?: 'crisis'): void;
   onCardHint(text: string): void;
   signal: AbortSignal;
 }
@@ -356,6 +370,20 @@ export class GuideTurnService {
       username: '',
     };
     const thread = await this.threads.getOwned(session.threadId, user);
+    // The voice switch is read on every turn, not only when the session
+    // opened: flipping it ends open sessions at their next turn (plan E-9).
+    if (!(await this.settings.switches()).voice) {
+      return {
+        turnId: '',
+        messageId: null,
+        duplicate: false,
+        failure: {
+          stage: 'admit',
+          code: 'guide_disabled',
+          message: 'Voice is switched off for Ally.',
+        },
+      };
+    }
     const { turn, created } = await this.turnStore.createOrGet({
       agentKey: ALLY_GUIDE_AGENT_KEY,
       threadId: thread.id,
@@ -364,6 +392,7 @@ export class GuideTurnService {
       channel: AgentChannel.VOICE,
       tenantId: thread.tenantId ?? null,
     });
+    if (created) sink.onStart?.(turn.id);
     if (!created) {
       return {
         turnId: turn.id,
@@ -1026,8 +1055,11 @@ export class GuideTurnService {
     for (let attempt = 0; attempt < 2; attempt++) {
       pending = null;
       const controller = new AbortController();
-      // A voice barge-in ends the turn; nothing more is spoken or stored.
-      const onBargeIn = () => controller.abort('barge-in');
+      // A voice barge-in ends the turn; what was already spoken is kept.
+      const onBargeIn = () => {
+        ctx.bargedIn = true;
+        controller.abort('barge-in');
+      };
       ctx.voice?.signal.addEventListener('abort', onBargeIn, { once: true });
       if (ctx.voice?.signal.aborted) controller.abort('barge-in');
       const hardTimeout = setTimeout(
@@ -1128,6 +1160,7 @@ export class GuideTurnService {
           },
         });
       } finally {
+        ctx.releasedText = gate.releasedText;
         clearTimeout(hardTimeout);
         if (deadline) clearTimeout(deadline);
         ctx.voice?.signal.removeEventListener('abort', onBargeIn);
@@ -1160,6 +1193,23 @@ export class GuideTurnService {
         urgentRealCaseText(ctx.orgProfile),
         [ctx.learnerMessage!],
       );
+      return;
+    }
+    if (output.aborted && ctx.bargedIn && ctx.releasedText?.trim()) {
+      // The learner heard part of this reply and spoke over it. Keep what
+      // was sent as plain text — no half pass, no thinking — so the next
+      // turn's interruptedTurnId/spokenChars can trim it to what they heard
+      // and the model sees it (plan §11 F-2). Tools that already ran stay
+      // visible as their cards.
+      ctx.replyKind = 'interrupted';
+      ctx.replyText = ctx.releasedText.trim();
+      ctx.learnerRendered = [
+        ctx.learnerMessage!,
+        { role: 'system', content: ctx.situation! },
+      ];
+      ctx.replyBlocks = [
+        { role: 'assistant', content: [{ type: 'text', text: ctx.replyText }] },
+      ];
       return;
     }
     if (output.aborted) {
@@ -1247,7 +1297,7 @@ export class GuideTurnService {
     }
     ctx.crisis = { ...copy, lines };
     // Voice stays open and the fixed message is spoken (plan §6.3 step 4).
-    ctx.voice?.onDelta(copy.text);
+    ctx.voice?.onDelta(copy.text, 'crisis');
     ctx.mode = GuideMode.CRISIS;
     ctx.replyKind = 'crisis';
     ctx.replyText = copy.text;
@@ -1427,7 +1477,7 @@ export class GuideTurnService {
       kind:
         ctx.replyKind === 'crisis'
           ? GuideMessageKind.CRISIS_FIXED
-          : ctx.replyKind === 'model'
+          : ctx.replyKind === 'model' || ctx.replyKind === 'interrupted'
             ? GuideMessageKind.CHAT
             : GuideMessageKind.FIXED,
       content: ctx.replyText ?? null,
@@ -1440,7 +1490,11 @@ export class GuideTurnService {
       })),
       metadata: {
         replyKind: ctx.replyKind,
-        model: ctx.replyKind === 'model' ? ctx.model : null,
+        ...(ctx.replyKind === 'interrupted' ? { interrupted: true } : {}),
+        model:
+          ctx.replyKind === 'model' || ctx.replyKind === 'interrupted'
+            ? ctx.model
+            : null,
         tier: ctx.tier,
         releaseId: ctx.releaseId,
         stopReason: ctx.output?.stopReason ?? null,

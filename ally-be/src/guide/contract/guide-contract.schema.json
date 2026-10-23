@@ -1048,6 +1048,21 @@
         }
       }
     },
+    "GuideVoiceFrameStart": {
+      "description": "First line of every voice turn stream: the turn's id, so a barge-in mid-stream can still name the turn it cut off.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "turnId"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "start"
+        },
+        "turnId": {
+          "type": "string"
+        }
+      }
+    },
     "GuideVoiceFrameDelta": {
       "type": "object",
       "additionalProperties": false,
@@ -1059,6 +1074,11 @@
         },
         "text": {
           "type": "string"
+        },
+        "kind": {
+          "description": "\"crisis\" on the fixed crisis message (plan §6.3 step 4): the worker speaks it slowly and keeps the session open. Absent on ordinary replies.",
+          "type": "string",
+          "enum": ["crisis"]
         }
       }
     },
@@ -1114,6 +1134,9 @@
     "GuideVoiceFrame": {
       "description": "One NDJSON line of the voice turn response stream.",
       "oneOf": [
+        {
+          "$ref": "#/$defs/GuideVoiceFrameStart"
+        },
         {
           "$ref": "#/$defs/GuideVoiceFrameDelta"
         },

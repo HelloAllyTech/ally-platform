@@ -1,16 +1,10 @@
 """Speaking the fixed crisis message slowly (plan §6.3 step 4).
 
-ally-be sends the crisis message as ordinary ``delta`` frames: the voice
-contract has no marker for it. So the worker recognises it by its text — the
-code-default copy in ally-be's ``src/guide/safety/fixed-responses.ts``, mirrored
-below and held to it by a test that reads that file.
-
-That covers every crisis today, because no clinically approved copy exists
-yet. It will NOT recognise approved copy once rows land in
-``guide_crisis_responses`` (per tenant and language, edited in the Ally
-Console): that message is still spoken, and the session still stays open, but
-at the normal pace. The durable fix is a marker in the contract; until then
-this is the honest best effort.
+ally-be marks the crisis message with ``kind: "crisis"`` on its ``delta``
+frame, whatever the copy — the code default or clinically approved copy per
+tenant and language. The text match below is a fallback for the code-default
+copy (mirrored from ally-be's ``src/guide/safety/fixed-responses.ts`` and held
+to it by a test that reads that file).
 
 Pacing is provider-agnostic: a pause between sentences, plus a slower
 speaking rate on voices that expose one (Google, Ally's default).

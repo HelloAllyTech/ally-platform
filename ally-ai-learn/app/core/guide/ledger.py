@@ -14,8 +14,9 @@ How each reply ends decides what is sent:
   reply, so they are counted out.
 * **Spoken over before audio started** — the same, with ``spokenChars`` 0.
 * **Spoken over while still streaming** — the worker closed the stream, which
-  cancels the turn in ally-be; no reply was stored and no ``turnId`` was ever
-  received, so there is nothing to mark.
+  cancels the turn in ally-be. ally-be keeps what it had already sent as the
+  turn's reply, and the ``start`` frame gave the ``turnId`` before any audio,
+  so this is reported the same way.
 
 LiveKit reports what was heard as the interrupted assistant message it adds to
 the chat context: the transcript synchronised with audio playout, i.e. the
@@ -112,7 +113,8 @@ class SpokenReplyLedger:
         if self._current is not None and text:
             self._current.segments.append((text, False))
 
-    def note_done(self, turn_id: str) -> None:
+    def note_turn(self, turn_id: str) -> None:
+        """The reply's turn id, from the ``start`` frame (or ``done``)."""
         if self._current is not None and turn_id:
             self._current.turn_id = turn_id
 

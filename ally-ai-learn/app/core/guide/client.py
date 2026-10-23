@@ -15,7 +15,6 @@ cancelling the task iterating it) closes the connection.
 from __future__ import annotations
 
 from typing import Any, AsyncIterator, Dict, Optional
-from urllib.parse import quote
 
 import httpx
 
@@ -28,6 +27,8 @@ from app.core.logger import get_logger
 logger = get_logger(__name__)
 
 GUIDE_VOICE_API_PREFIX = "/api/v1/guide/voice"
+# Carries the voice-session token on session lookups and the end call.
+GUIDE_VOICE_SESSION_HEADER = "x-guide-voice-session"
 
 #: ally-be's HTTP errorCodes (uppercase) mapped to the frame failure codes the
 #: worker acts on. Only refusals that can reach the worker are listed.
@@ -95,14 +96,19 @@ class GuideBackendClient:
         await self._http.aclose()
 
     @staticmethod
-    def _session_path(token: str, suffix: str = "") -> str:
-        return f"{GUIDE_VOICE_API_PREFIX}/sessions/{quote(token, safe='')}{suffix}"
+    def _session_headers(token: str) -> dict:
+        # In a header, not the path: paths end up in access logs.
+        return {GUIDE_VOICE_SESSION_HEADER: token}
 
     async def get_session(self, token: str) -> GuideVoiceSessionInfo:
         """What the session is for. Raises GuideSessionEnded on 401."""
         try:
             # Short: the learner waits in silence while this resolves.
-            response = await self._http.get(self._session_path(token), timeout=5.0)
+            response = await self._http.get(
+                f"{GUIDE_VOICE_API_PREFIX}/session",
+                headers=self._session_headers(token),
+                timeout=5.0,
+            )
         except httpx.HTTPError as exc:
             raise GuideBackendError(
                 f"voice session lookup failed: {type(exc).__name__}", code="transport"
@@ -128,7 +134,9 @@ class GuideBackendClient:
         """Tell ally-be the session is over. Best-effort; never raises."""
         try:
             response = await self._http.post(
-                self._session_path(token, "/ended"), timeout=5.0
+                f"{GUIDE_VOICE_API_PREFIX}/session/ended",
+                headers=self._session_headers(token),
+                timeout=5.0,
             )
             if response.status_code >= 400:
                 logger.warning(

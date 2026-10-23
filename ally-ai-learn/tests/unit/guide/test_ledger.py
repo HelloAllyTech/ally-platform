@@ -11,7 +11,7 @@ def _reply(ledger, *segments, turn_id="t1"):
         else:
             ledger.note_other_text(text)
     if turn_id:
-        ledger.note_done(turn_id)
+        ledger.note_turn(turn_id)
 
 
 def test_a_fixed_line_spoken_later_is_not_taken_for_the_reply():

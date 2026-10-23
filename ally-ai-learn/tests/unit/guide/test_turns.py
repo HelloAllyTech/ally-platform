@@ -26,6 +26,10 @@ def hint(text):
     return {"type": "card_hint", "text": text}
 
 
+def start(turn_id):
+    return {"type": "start", "turnId": turn_id}
+
+
 def done(turn_id):
     return {"type": "done", "turnId": turn_id, "messageId": f"m-{turn_id}"}
 
@@ -153,6 +157,22 @@ async def test_barge_in_mid_stream_closes_the_stream_and_marks_nothing():
     await h.say("wait")
     assert "interruptedTurnId" not in h.sent()
     assert "spokenChars" not in h.sent()
+
+
+async def test_barge_in_mid_stream_after_start_reports_what_was_heard():
+    # ally-be names the turn first and keeps what it sent when the stream is
+    # closed, so a cut-off reply is marked like any other.
+    h = Harness([start("t1"), delta("Well, "), HANG], [delta("Sure."), done("t2")])
+
+    reply = h.turns.speak("tell me more")
+    assert await reply.__anext__() == "Well, "
+    await reply.aclose()
+
+    h.ledger.on_assistant_message("Well,", interrupted=True)
+    await h.say("wait")
+    sent = h.sent()
+    assert sent["interruptedTurnId"] == "t1"
+    assert sent["spokenChars"] == len("Well,")
 
 
 async def test_barge_in_by_task_cancellation_closes_the_stream():
@@ -330,6 +350,21 @@ async def test_crisis_message_is_fenced_into_its_own_paced_segment():
 
     await h.say("I'm safe now")
     assert h.delivery.crisis is False
+
+
+async def test_crisis_marker_fences_approved_copy_the_worker_has_never_seen():
+    approved = "We are worried about you. Please call the helpline now."
+    h = Harness(
+        [start("t1"), {"type": "delta", "text": approved, "kind": "crisis"}, done("t1")]
+    )
+
+    spoken = await h.say()
+
+    assert isinstance(spoken[0], FlushSentinel)
+    assert spoken[1] == approved
+    assert isinstance(spoken[2], FlushSentinel)
+    assert h.delivery.crisis is True
+    assert h.left == []
 
 
 async def test_late_crisis_counts_only_the_crisis_text_as_the_reply():

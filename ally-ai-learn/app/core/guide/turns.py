@@ -47,6 +47,7 @@ from app.core.guide.contract import (
     GuideVoiceFrameDelta,
     GuideVoiceFrameDone,
     GuideVoiceFrameError,
+    GuideVoiceFrameStart,
     GuideVoiceTurnRequest,
 )
 from app.core.guide.crisis import DeliveryState, is_fixed_crisis_text
@@ -173,11 +174,18 @@ class GuideVoiceTurns:
                             continue
                         if first_frame_ms is None:
                             first_frame_ms = (time.monotonic() - started) * 1000
+                        if isinstance(frame, GuideVoiceFrameStart):
+                            # Known before any audio: a barge-in mid-stream
+                            # can name the turn, whose spoken part ally-be keeps.
+                            self._ledger.note_turn(frame.turn_id)
+                            continue
                         if isinstance(frame, GuideVoiceFrameDelta):
                             if not frame.text:
                                 continue
                             outcome = "streaming"
-                            if is_fixed_crisis_text(frame.text):
+                            if frame.kind == "crisis" or is_fixed_crisis_text(
+                                frame.text
+                            ):
                                 # Fence the crisis message into its own TTS
                                 # segment so the TTS node can pace it.
                                 self._delivery.crisis = True
@@ -200,7 +208,7 @@ class GuideVoiceTurns:
                             spoken += hint
                             yield hint
                         elif isinstance(frame, GuideVoiceFrameDone):
-                            self._ledger.note_done(frame.turn_id)
+                            self._ledger.note_turn(frame.turn_id)
                             outcome = "done"
                         elif isinstance(frame, GuideVoiceFrameError):
                             outcome = frame.code

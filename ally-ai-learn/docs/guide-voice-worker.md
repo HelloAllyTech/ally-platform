@@ -36,22 +36,25 @@ learner ear ◄─ TTS ◄─────────────┘            
 ## ally-be API
 
 All under `{CORE_SERVICE_BASE_URL}/api/v1/guide/voice`, with `x-api-key: CORE_SERVICE_API_KEY`.
-The dispatch's `voiceSessionToken` binds every call to one thread, learner and organisation.
+The dispatch's `voiceSessionToken` binds every call to one thread, learner and organisation. It
+travels in the `x-guide-voice-session` header (or the turn body), never the URL path, which
+reaches access logs.
 
 | Call | Used for |
 |---|---|
-| `GET /sessions/:token` | At startup: thread, room, language, turn mode. 401 → the session is over |
+| `GET /session` | At startup: thread, room, language, turn mode. 401 → the session is over |
 | `POST /turns` | One utterance. Streams NDJSON; closing the connection cancels the turn (barge-in) |
-| `POST /sessions/:token/ended` | On every way out, so the token stops working |
+| `POST /session/ended` | On every way out, so the token stops working |
 
 ## What the learner hears
 
 | ally-be says | Ally says |
 |---|---|
-| `delta` | The text, as it arrives |
+| `start` | Nothing: it names the turn before any audio, for barge-in |
+| `delta` | The text, as it arrives (`kind: "crisis"` — see Crisis) |
 | `card_hint` | The hint, in line |
 | `error: turn_in_progress` | Nothing (retried twice first, with a fresh `clientTurnId`) |
-| `error: guide_disabled` | "Voice is off for now. You can keep going by typing." — then leaves |
+| `error: guide_disabled` | "Voice is off for now. You can keep going by typing." — then leaves. ally-be checks the voice switch on every turn, so flipping it ends open sessions |
 | 401 (startup or any turn) | "This voice session has ended. You can keep going by typing." — then leaves |
 | any other error, or unreachable | "Sorry, I lost that. Could you say it again?" |
 | nothing for 8 s | "This one's taking me a moment…" (once; `GUIDE_SLOW_TURN_LINE_AFTER_S`) |
@@ -62,12 +65,14 @@ language until translated (`app/core/guide/lines.py`, same policy as `app/core/f
 
 ## Barge-in
 
-Hands-free: speaking over Ally interrupts her (LiveKit's own interruption handling). If ally-be
-is still streaming, the worker closes the stream and ally-be cancels the turn; nothing was
-stored, so nothing is reported. If ally-be had finished (its `done` frame carried the `turnId`),
-the next turn sends `interruptedTurnId` and `spokenChars` — the characters of that reply's own
-text the learner heard, taken from LiveKit's playout-synchronised transcript, card hints
-excluded. A reply cut off before any audio reports `spokenChars: 0`.
+Hands-free: speaking over Ally interrupts her (LiveKit's own interruption handling). Every turn
+stream opens with a `start` frame carrying the `turnId`. If ally-be is still streaming, the
+worker closes the stream: ally-be cancels the turn but keeps what it had already sent as the
+turn's reply (plain text, marked interrupted). Either way the next turn sends
+`interruptedTurnId` and `spokenChars` — the characters of that reply's own text the learner
+heard, taken from LiveKit's playout-synchronised transcript, card hints excluded — and ally-be
+tells the model what was really heard. A reply cut off before any audio reports
+`spokenChars: 0`.
 
 ## Push-to-talk
 
@@ -98,13 +103,12 @@ and Ally would change voice between replies.
 
 ## Crisis
 
-ally-be sends the fixed crisis message as ordinary `delta` frames. The worker recognises the
-code-default copy (mirrored in `app/core/guide/crisis.py`, held to ally-be by a test) and speaks
-it a sentence at a time, at `GUIDE_CRISIS_SPEAKING_RATE` where the voice supports a rate, with
+ally-be marks the fixed crisis message with `kind: "crisis"` on its `delta` frame, whatever the
+copy (code default or clinically approved per tenant and language). The worker also still
+recognises the code-default copy by text (mirrored in `app/core/guide/crisis.py`, held to ally-be
+by a test) as a fallback. It speaks the message a sentence at a time, at `GUIDE_CRISIS_SPEAKING_RATE` where the voice supports a rate, with
 `GUIDE_CRISIS_SENTENCE_PAUSE_S` between sentences. The session stays open. There is no filler or
 back-channel layer in this worker at all, so nothing is ever spoken inside the message.
-**Limit:** approved copy edited per tenant or language in the Ally Console is not recognised, and
-is spoken at the normal pace, until ally-be marks crisis frames in the contract.
 
 ## Captions, usage, latency
 

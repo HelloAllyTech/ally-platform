@@ -382,9 +382,17 @@ class GuideVoiceTurnRequest(_GuideModel):
     spoken_chars: Optional[int] = Field(default=None, alias="spokenChars")
 
 
+class GuideVoiceFrameStart(_GuideModel):
+    """First line of every voice turn stream: the turn's id, so a barge-in mid-stream can still name the turn it cut off."""
+
+    type: Literal["start"]
+    turn_id: str = Field(alias="turnId")
+
+
 class GuideVoiceFrameDelta(_GuideModel):
     type: Literal["delta"]
     text: str
+    kind: Optional[Literal["crisis"]] = None
 
 
 class GuideVoiceFrameCardHint(_GuideModel):
@@ -407,7 +415,7 @@ class GuideVoiceFrameError(_GuideModel):
 
 
 GuideVoiceFrame = Annotated[
-    Union[GuideVoiceFrameDelta, GuideVoiceFrameCardHint, GuideVoiceFrameDone, GuideVoiceFrameError],
+    Union[GuideVoiceFrameStart, GuideVoiceFrameDelta, GuideVoiceFrameCardHint, GuideVoiceFrameDone, GuideVoiceFrameError],
     Field(discriminator="type"),
 ]
 

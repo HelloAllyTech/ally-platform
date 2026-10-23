@@ -1,4 +1,6 @@
 import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import { voiceFailureCode } from '../../controller/guide-voice.controller';
+import { guideDisabled, guideMessageTooLong } from '../../guide-errors';
 import { GuideVoiceService } from '../guide-voice.service';
 
 function setup(switches: { voice?: boolean; enabled?: boolean } = {}) {
@@ -97,5 +99,15 @@ describe('GuideVoiceService', () => {
     await expect(t.service.resolve(token)).rejects.toBeInstanceOf(
       UnauthorizedException,
     );
+  });
+});
+
+describe('voiceFailureCode', () => {
+  it('maps a refusal to the code the worker acts on', () => {
+    expect(voiceFailureCode(guideMessageTooLong(2000))).toBe(
+      'message_too_long',
+    );
+    expect(voiceFailureCode(guideDisabled())).toBe('guide_disabled');
+    expect(voiceFailureCode(new Error('boom'))).toBe('internal_error');
   });
 });
