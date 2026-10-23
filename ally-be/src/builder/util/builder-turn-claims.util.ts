@@ -44,6 +44,9 @@ const CLAIMS_READY = new RegExp(
     String.raw`technical design (?:can|will) (?:now )?be (?:drafted|written|started|created)`,
     String.raw`next step is (?:for |to (?:draft|write|start) )?(?:a |the )?technical design`,
     String.raw`(?:move|moving|go|proceed) (?:on )?to (?:a |the )?technical design`,
+    String.raw`good to go`,
+    String.raw`in place (?:to (?:start )?build(?:ing)?|for the build)`,
+    String.raw`ready to (?:start|begin) (?:the )?build(?:ing)?`,
   ]
     .map((pattern) => String.raw`\b${pattern}\b`)
     .join('|'),
@@ -62,20 +65,45 @@ const NOT_A_CLAIM =
  * A sentence that opens on a condition ("Once R3 has an owner, you can start
  * the build"), on a purpose ("To start the build, …"), or is a question
  * ("Shall I mark it build-ready?") states nothing about the PRD as it is.
- * "When you're ready" is the exception — it is how "it's ready" is usually
- * said — and "after" is left out: "After the fixes, the PRD is ready" is a
- * claim.
+ * "After" is left out: "After the fixes, the PRD is ready" is a claim.
  */
 const CONDITIONAL_OPENING =
-  /^\W*(?:once|if|unless|until|as soon as|to|when(?!\s+you(?:['’]re|\s+are)\s+(?:ready|happy|satisfied|set)))\b/i;
+  /^\W*(?:once|if|unless|until|as soon as|to|when(?:ever)?)\b/i;
+/** The same conditions trailing the claim: "…start the build once R3 has an owner." */
+const TRAILING_CONDITION =
+  /\b(?:once|if|unless|until|as soon as|when(?:ever)?)\b/i;
 const QUESTION_OPENING =
   /^\W*(?:is|are|shall|should|do|does|can|could|would|will|may)\b/i;
+
+/**
+ * A condition that is only the admin's sign-off — "if you're happy with it",
+ * "once you've reviewed it", "when you are", "if everything looks good" — is
+ * the claim, not an exception to it: nothing is left but their say-so. It is
+ * also the cheapest rewording after a send-back, so it must not get through.
+ * Confirming something ("once you confirm A2") is a real blocker and is not
+ * in this list.
+ */
+const ADMIN_SIGN_OFF = new RegExp(
+  [
+    String.raw`you(?:['’]re|\s+are)\s+(?:\w+\s+){0,2}(?:happy|satisfied|ok|okay|ready|set|good|fine|comfortable)\b`,
+    String.raw`you(?:['’]re|\s+are)(?=\s*(?:[.!?,;]|$))`,
+    String.raw`you(?:['’]ve|\s+have)?\s+(?:\w+\s+)?(?:review|reviewed|read|checked|looked|approve|approved|agree|agreed)\b`,
+    String.raw`you(?:['’]d|\s+would)?\s+(?:like|want|wish)\b`,
+    String.raw`(?:this|it|everything|that|all|all of (?:this|it)|the (?:PRD|plan))\s+(?:\w+\s+)?looks?\s+(?:right|good|fine|ok|okay|correct)\b`,
+  ]
+    .map((pattern) => `^\\s*(?:${pattern})`)
+    .join('|'),
+  'i',
+);
+
+/** An invitation to start the build stays a claim even as a question. */
+const INVITES_START = /^(?:start|kick off|begin|run) (?:the|your) build$/i;
 
 /** Where the sentence holding `index` starts and ends. */
 function sentenceAround(
   value: string,
   index: number,
-): { opening: string; closing: string } {
+): { opening: string; rest: string; closing: string } {
   let start = 0;
   for (const end of value.slice(0, index).matchAll(/[.!?]["')\]]*\s+|\n/g)) {
     start = (end.index ?? 0) + end[0].length;
@@ -84,8 +112,14 @@ function sentenceAround(
   const close = rest.search(/[.!?](?:\s|$)|\n/);
   return {
     opening: value.slice(start, index),
+    rest: close === -1 ? rest : rest.slice(0, close),
     closing: close === -1 ? '' : rest[close],
   };
+}
+
+/** The sentence is conditional on something other than the admin's sign-off. */
+function realCondition(after: string): boolean {
+  return !ADMIN_SIGN_OFF.test(after);
 }
 
 export function claimsPrdReady(text: string | null | undefined): boolean {
@@ -94,9 +128,24 @@ export function claimsPrdReady(text: string | null | undefined): boolean {
     const index = match.index ?? 0;
     const before = value.slice(Math.max(0, index - 30), index);
     if (NOT_A_CLAIM.test(before)) continue;
-    const { opening, closing } = sentenceAround(value, index);
-    if (CONDITIONAL_OPENING.test(opening)) continue;
-    if (closing === '?' && QUESTION_OPENING.test(opening)) continue;
+    const { opening, rest, closing } = sentenceAround(value, index);
+    const leading = CONDITIONAL_OPENING.exec(opening);
+    if (leading && realCondition(opening.slice(leading[0].length))) continue;
+    const tail = rest.slice(match[0].length);
+    const trailing = TRAILING_CONDITION.exec(tail);
+    if (
+      trailing &&
+      realCondition(tail.slice((trailing.index ?? 0) + trailing[0].length))
+    ) {
+      continue;
+    }
+    if (
+      closing === '?' &&
+      QUESTION_OPENING.test(opening) &&
+      !INVITES_START.test(match[0])
+    ) {
+      continue;
+    }
     return true;
   }
   return false;

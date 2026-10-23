@@ -308,6 +308,24 @@ describe('reply claims', () => {
     ],
     ['To start the build, R3 needs an owner.', false],
     ['When R3 has an owner, the build can start.', false],
+    // Review of ally-platform#2: a condition that is only the admin's
+    // sign-off is the claim, and the cheapest rewording after a send-back.
+    ["If you're happy with it, you can start the build.", true],
+    ['If this looks right, you can start the build.', true],
+    ['If everything looks good, the PRD is ready to build.', true],
+    ['Once you have reviewed it, you can start the build.', true],
+    ['The PRD is ready to build when you are.', true],
+    ["You can start the build now if you'd like.", true],
+    ['Go ahead and start the build.', true],
+    ['The PRD is good to go.', true],
+    ['Everything is in place to start building.', true],
+    ['Would you like to start the build now?', true],
+    // ...while a condition that is real work stays an exception, leading or
+    // trailing.
+    ['Once you confirm A2, you can start the build.', false],
+    ['You can start the build once R3 has an owner.', false],
+    ["We'll be good to go once you confirm the toggle.", false],
+    ['If you set an owner for R3, the PRD is ready.', false],
   ])('claimsPrdReady(%p) is %p', (text, expected) => {
     expect(claimsPrdReady(text)).toBe(expected);
   });
