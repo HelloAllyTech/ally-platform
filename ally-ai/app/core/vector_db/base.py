@@ -1,0 +1,363 @@
+from abc import ABC, abstractmethod
+from typing import Any, Dict, Generic, List, Optional, TypeVar
+
+T = TypeVar("T")
+QueryResult = TypeVar("QueryResult")
+
+
+class VectorDB(Generic[T], ABC):
+    """
+    Abstract base class for vector-based databases.
+
+    This class defines the structure for vector-based databases and requires
+    subclasses to implement the similarity_search method.
+    """
+
+    def __init__(self, client: T) -> None:
+        """
+        Initialize the vector database interface.
+
+        Parameters:
+            client (T): The underlying client or connection to the database.
+        """
+        self.client = client
+
+    @abstractmethod
+    async def similarity_search(
+        self, vector: List[float], top_k: int = 1
+    ) -> QueryResult:
+        """
+        Perform a similarity search given a vector.
+
+        Parameters:
+            vector (List[float]): The input vector to compare against the database.
+            top_k (int, optional): The number of top results to return. Defaults to 1.
+
+        Returns:
+            List[Any]: A list of search results, with the length of the list
+            not exceeding top_k.
+
+        Raises:
+            VectorDBSearchFailedException: If the search operation fails.
+        """
+        pass
+
+    @abstractmethod
+    async def fetch_relevant_conversations(
+        self, query: str, top_k: int = 1
+    ) -> QueryResult:
+        """
+        Fetches the most relevant conversations from the database for the given query.
+
+        Parameters:
+            query (str): The query to search for.
+            top_k (int): The number of top conversations to return.
+
+        Returns:
+            list: A list of the most relevant conversations.
+
+        Raises:
+            VectorDBFetchFailedException: If the fetch operation fails.
+        """
+        pass
+
+    @abstractmethod
+    async def create_document(
+        self,
+        collection_name: str,
+        document_data: Dict[str, Any],
+        vector: List[float],
+        document_id: str,
+    ) -> str:
+        """
+        Create a new document in the vector database.
+
+        Parameters:
+            collection_name (str): Name of the collection to store the document in.
+            document_data (Dict[str, Any]): Data to be stored in the document.
+            vector (List[float]): The embedding vector for the document.
+            document_id (str): UUID to use as the document ID.
+
+        Returns:
+            str: The ID of the created document.
+
+        Raises:
+            VectorDBInsertFailedException: If the document insertion fails.
+        """
+        pass
+
+    @abstractmethod
+    async def create_documents_bulk(
+        self,
+        collection_name: str,
+        documents: List[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """
+        Insert MANY documents in one round trip, each with a caller-supplied UUID and
+        vector.
+
+        Exists because create_document() is one object per request, and a chunked corpus
+        writes hundreds at a time — a 300-page PDF is roughly 500 chunks, i.e. 500
+        sequential round trips through the concurrency semaphore. That is slow enough to
+        matter and fragile enough that a transient failure halfway leaves the caller
+        guessing how far it got.
+
+        Reports PER-OBJECT outcomes instead of raising on the first problem, for the
+        same reason the roadmap bulk-upsert does: a batch endpoint that reports overall
+        success while silently dropping objects gives the caller no way to retry only
+        what failed, and an unsearchable chunk is invisible until someone asks the
+        question it would have answered.
+
+        Parameters:
+            collection_name (str): Collection to write into.
+            documents (List[Dict[str, Any]]): One dict per object, each
+                {"id": str, "properties": Dict[str, Any], "vector": List[float]}.
+
+        Returns:
+            Dict[str, Any]: {"succeeded": List[str], "failed": List[{"id", "error"}]} —
+            ids that were written, and ids that were not with the reason.
+
+        Raises:
+            VectorDBInsertFailedException: Only if the whole request could not be
+                issued.
+        """
+        pass
+
+    @abstractmethod
+    async def delete_by_filter(
+        self,
+        collection_name: str,
+        filters: Dict[str, Any],
+    ) -> int:
+        """
+        Delete every object matching simple property equality filters, returning the
+        count.
+
+        Needed because delete_document() is keyed by a single UUID, and the caller that
+        owns a document does not necessarily hold the ids of its chunks — after a
+        re-chunk it holds the NEW ids and needs the old generation gone. Enumerating
+        first would be a read per page plus a delete per object, and any page missed
+        would leave orphaned vectors that still occupy top-k slots a relevant passage
+        needed.
+
+        Parameters:
+            collection_name (str): Collection to delete from.
+            filters (Dict[str, Any]): Property equality filters, ANDed together. Must be
+                non-empty
+                — an empty filter would match the entire collection.
+
+        Returns:
+            int: Number of objects deleted. Zero is a legitimate result (nothing
+                matched).
+
+        Raises:
+            ValueError: If `filters` is empty, rather than silently emptying the
+                collection.
+            VectorDBDeleteFailedException: If the delete operation fails.
+        """
+        pass
+
+    @abstractmethod
+    async def get_document_by_id(
+        self, collection_name: str, document_id: str, include_vector: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Get a document by its ID from the vector database.
+
+        Parameters:
+            collection_name (str): Name of the collection to retrieve the document from.
+            document_id (str): ID of the document to retrieve.
+            include_vector (bool): Whether to include the vector in the response.
+
+        Returns:
+            Dict[str, Any]: The document data.
+
+        Raises:
+            DocumentNotFoundException: If the document is not found.
+        """
+        pass
+
+    @abstractmethod
+    async def update_properties_by_filter(
+        self,
+        collection_name: str,
+        filters: Dict[str, Any],
+        properties: Dict[str, Any],
+    ) -> int:
+        """
+        Merge `properties` into every object matching property equality filters,
+        returning the count.
+
+        Distinct from update_document() in two ways that both matter. It is keyed by a
+        FILTER, because the caller that owns a document does not hold the ids of its
+        chunks; and it carries NO vector, because the fields it exists to change are
+        metadata about an object rather than anything the object's embedding is derived
+        from. Re-embedding to change a flag would spend an embedding call per passage to
+        rewrite a boolean.
+
+        Weaviate has no update-by-filter primitive, so an implementation is expected to
+        page ids in and update them one by one. Callers should treat this as a
+        housekeeping operation, not a request-path one.
+
+        Parameters:
+            collection_name (str): Collection to update.
+            filters (Dict[str, Any]): Property equality filters, ANDed together. Must be
+                non-empty — an empty filter would rewrite the entire collection.
+            properties (Dict[str, Any]): Fields to merge into each matched object. Must
+                be non-empty.
+
+        Returns:
+            int: Number of objects updated. Zero is a legitimate result (nothing
+                matched).
+
+        Raises:
+            ValueError: If `filters` or `properties` is empty.
+            VectorDBUpdateFailedException: If the update fails.
+        """
+        pass
+
+    @abstractmethod
+    async def update_document(
+        self,
+        collection_name: str,
+        document_id: str,
+        document_data: Dict[str, Any],
+        vector: List[float],
+    ) -> None:
+        """
+        Update an existing document in the vector database.
+
+        Parameters:
+            collection_name (str): Name of the collection containing the document.
+            document_id (str): ID of the document to update.
+            document_data (Dict[str, Any]): Updated data for the document.
+            vector (List[float]): Updated embedding vector.
+
+        Raises:
+            VectorDBUpdateFailedException: If the document update fails.
+        """
+        pass
+
+    @abstractmethod
+    async def delete_document(self, collection_name: str, document_id: str) -> None:
+        """
+        Delete a document from the vector database.
+
+        Parameters:
+            collection_name (str): Name of the collection containing the document.
+            document_id (str): ID of the document to delete.
+
+        Raises:
+            DocumentNotFoundException: If the document is not found.
+            VectorDBDeleteFailedException: If the document deletion fails.
+        """
+        pass
+
+    @abstractmethod
+    async def search_documents(
+        self,
+        collection_name: str,
+        query: str,
+        limit: int = 10,
+        filters: Optional[Dict[str, Any]] = None,
+        include_vector: bool = False,
+    ) -> Dict[str, Any]:
+        """
+        Search for documents based on semantic similarity to the query.
+
+        Parameters:
+            collection_name (str): Name of the collection to search in.
+            query (str): The search query for semantic similarity.
+            limit (int): Maximum number of results to return.
+            filters (Optional[Dict[str, Any]]): Dictionary of filters to apply.
+            include_vector (bool): Whether to include vectors in the response.
+
+        Returns:
+            Dict[str, Any]: Search results containing documents and pagination info.
+
+        Raises:
+            VectorDBSearchFailedException: If the search operation fails.
+        """
+        pass
+
+    @abstractmethod
+    async def list_document_ids(
+        self,
+        collection_name: str,
+        limit: int = 200,
+        after: Optional[str] = None,
+    ) -> List[str]:
+        """
+        One page of object UUIDs in a collection, ids only.
+
+        Exists so a caller that owns the system of record can RECONCILE against this
+        index — specifically, find vectors whose source row no longer exists. Every
+        other read here is keyed by an id the caller already has, which cannot surface
+        an object the caller has forgotten about.
+
+        Cursor-paginated rather than offset-paginated: offset paging over a collection
+        that is being written to can skip or repeat objects, and a reconciliation sweep
+        that silently skips an id would fail to report drift.
+
+        Parameters:
+            collection_name (str): Collection to enumerate.
+            limit (int): Maximum ids to return in this page.
+            after (Optional[str]): Cursor — the last id from the previous page, or None
+                to start.
+
+        Returns:
+            List[str]: Up to `limit` object UUIDs. Fewer than `limit` means the end was
+            reached.
+
+        Raises:
+            VectorDBSearchFailedException: If the listing fails.
+        """
+        pass
+
+    @abstractmethod
+    async def near_vector_search(
+        self,
+        collection_name: str,
+        vector: List[float],
+        limit: int = 10,
+        min_similarity: float = 0.0,
+        filters: Optional[Dict[str, Any]] = None,
+        any_of: Optional[List[Dict[str, Any]]] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Similarity search from a CALLER-SUPPLIED vector, returning a cosine similarity
+        per hit.
+
+        Distinct from search_documents(), which takes a query STRING, embeds it
+        internally, and is shaped around reference-document semantics (its own distance
+        threshold from settings plus a category aggregation). This primitive is the
+        plain building block: you bring the vector and the threshold, you get ids,
+        properties and similarity back.
+
+        Parameters:
+            collection_name (str): Collection to search.
+            vector (List[float]): The query embedding.
+            limit (int): Maximum hits to return.
+            min_similarity (float): Minimum cosine SIMILARITY (not distance), 0..1.
+            filters (Optional[Dict[str, Any]]): Simple property equality filters,
+                ANDed together.
+            any_of (Optional[List[Dict[str, Any]]]): A disjunction, ANDed onto
+                `filters`.
+                Each entry is one condition: ``{"property": name, "equal": value}`` or
+                ``{"property": name, "contains_any": [values]}``. Exists because an
+                access rule is naturally an OR — "available to everyone, OR to my
+                organisation" — and expressing that as a post-filter over a fixed top-k
+                starves recall rather than restricting it.
+
+                An EMPTY LIST means "match nothing" and must return no hits. That is the
+                fail-closed case and it is deliberately distinct from ``None``, which
+                means no disjunction was requested: a caller that computed an empty
+                audience must not be silently served the whole collection.
+
+        Returns:
+            List[Dict[str, Any]]: One dict per hit: {"id", "similarity", **properties}.
+
+        Raises:
+            VectorDBSearchFailedException: If the search fails.
+        """
+        pass

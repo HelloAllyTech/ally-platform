@@ -1,0 +1,1790 @@
+import asyncio
+import json
+import random
+import re
+import time
+from typing import Any, Dict, List, Optional, Type, Union, cast
+
+import openai
+from langchain_core.messages import BaseMessage
+from langchain_core.tools import tool
+from langchain_openai import ChatOpenAI
+from pydantic import create_model
+
+from app.core.config import settings
+from app.core.embeddings.base import BaseEmbeddingService
+from app.core.llm_usage.tasks import LLMTask
+from app.core.phi_events import PHIEvents
+from app.core.phi_logger import PHILogEvent, phi_logger
+from app.core.text_generations.base import BaseTextGenerationService
+from app.core.text_generations.structured_output_models import (
+    CounselorMessageAnalysis,
+    ScenarioEvaluation,
+    ScenarioEvaluationWithMemory,
+    StructuredDiarization,
+    StructuredIdentifyUsers,
+    StructuredSummaryNote,
+    SupervisorNoteRepair,
+)
+from app.core.text_generations.supervisor_note_sections import missing_note_sections
+from app.exceptions.custom_exceptions import (
+    ContentEnhancementFailedException,
+    IdentifyUserFailedException,
+    LLMInvocationFailedException,
+    NudgeGenerationFailedException,
+    SummaryNoteFailedException,
+)
+from app.prompts.resolver import load_and_format, load_template
+from app.schemas.common import ChatMessage
+from app.schemas.conversation import IdentifyResponse, Nudge
+from app.schemas.summary import (
+    ContentEnhance,
+    DynamicSummaryNoteResponse,
+    SummaryNoteAndTagsResponse,
+    Tag,
+)
+from app.utils.affirmation_counter import count_affirmations
+from app.utils.client_positivity_lift_calculator import calculate_client_positivity_lift
+from app.utils.common import (
+    build_id_mapping,
+    filter_emotional_movement,
+    remap_note_references,
+)
+from app.utils.counselor_interruption_calculator import (
+    calculate_counselor_interruptions,
+)
+from app.utils.language_detector import detect_languages
+from app.utils.logger import get_logger
+from app.utils.rate_limiter import rate_limiter
+from app.utils.reflective_listening_calculator import calculate_reflective_listening
+from app.utils.silence_calculator import calculate_silence_by_counselor
+from app.utils.structured_model_converter import structured_output_model_to_rest
+from app.utils.utterance_duration_calculator import (
+    calculate_avg_client_utterance_duration,
+)
+
+# Static prompt constants are bypassed for dynamic runtime loading with overrides.
+
+
+logger = get_logger(__name__)
+
+SCRIBE_SESSION_MODE_DICTATION = "DICTATION"
+
+# Known ISO 639-1 language codes -> human-readable names, used to make the
+# output-language directive clearer to the model. Falls back to the raw code.
+_LANGUAGE_NAMES = {
+    "en": "English",
+    "hi": "Hindi",
+    "mr": "Marathi",
+    "ta": "Tamil",
+    "kn": "Kannada",
+}
+
+
+# The supervisor note carries its sections as machine keys (`## [what_worked]`)
+# rather than as written headings, so the app can render each heading in the
+# learner's own language. They are therefore the one part of the note that must
+# survive the output-language directive untranslated — see supervisor_note.txt.
+# `closing` is a structural marker with no visible heading: it keeps the
+# invitation to reply out of the "try this next" section.
+_DEBRIEF_SECTION_KEYS = ("what_worked", "what_it_cost", "try_next", "closing")
+
+
+def _wants_translated_feedback(language_code: Optional[str]) -> bool:
+    """Return True when feedback text should be written in a non-English language.
+
+    Accepts ISO 639-1 codes ("hi") and BCP-47 tags ("hi-IN", "hi_IN"). Returns
+    False for None, empty, or any English variant ("en", "en-US").
+    """
+    if not language_code:
+        return False
+    primary = language_code.replace("_", "-").split("-")[0].strip().lower()
+    return bool(primary) and primary != "en"
+
+
+def _language_directive(language_code: str) -> str:
+    """Build the output-language directive appended to the evaluation prompt."""
+    primary = language_code.replace("_", "-").split("-")[0].strip().lower()
+    language_name = _LANGUAGE_NAMES.get(primary, language_code)
+    return (
+        "\n\n---\n\n"
+        "OUTPUT LANGUAGE: Write all human-readable feedback text — every string "
+        'value in "positives", in each "areas_of_growth" item\'s "improvement" '
+        'and "recommendation" fields, and the whole of "supervisor_note" — in the '
+        f"language identified by the code '{language_code}' ({language_name}), so "
+        "the learner can read their debrief and their strengths directly. Keep the "
+        "JSON keys and structure exactly as specified (in English). Preserve any "
+        "direct quotes pulled from the conversation verbatim in their original "
+        "language, and leave [[msg:ID]] anchors exactly as they are.\n"
+        'The section markers inside "supervisor_note" are machine keys, not '
+        "text for the learner: write "
+        + ", ".join(f"`## [{key}]`" for key in _DEBRIEF_SECTION_KEYS)
+        + " exactly as they are, in English, with the brackets. The app "
+        "replaces each one with a heading already translated into the "
+        "learner's language, so a translated key cannot be matched and its "
+        "section is lost. Everything BELOW each marker is prose and must be "
+        "translated."
+    )
+
+
+# Worker type drives the register, depth and expectations of the supervisor
+# note — never the skill scores, which stay on one fixed standard so they remain
+# comparable across an organisation. Each register lives in its own template so
+# it can be tuned independently from the dashboard.
+_WORKER_TYPE_TEMPLATES = {
+    "LAY": "shared/worker_type_lay",
+    "EARLY_PROFESSIONAL": "shared/worker_type_early_professional",
+    "EXPERIENCED_PROFESSIONAL": "shared/worker_type_experienced_professional",
+}
+DEFAULT_WORKER_TYPE = "LAY"
+
+
+def _build_supervisor_note_section(
+    prompts: Optional[Dict[str, Any]] = None,
+    worker_type: Optional[str] = None,
+    learner_name: Optional[str] = None,
+    supervisor_memory: Optional[str] = None,
+    live_notes: Optional[List[str]] = None,
+) -> str:
+    """Build the supervisor-note instruction block injected into the evaluation prompt.
+
+    An unknown or missing worker type falls back to the lay register: plain
+    language is the safe wrong answer, since an experienced clinician reading
+    slightly simple feedback costs far less than a volunteer reading clinical
+    jargon they can't act on.
+    """
+    resolved_type = (worker_type or DEFAULT_WORKER_TYPE).strip().upper()
+    template_path = _WORKER_TYPE_TEMPLATES.get(resolved_type)
+    if template_path is None:
+        logger.warning(
+            "_build_supervisor_note_section: unknown worker_type=%r, "
+            "falling back to %s",
+            worker_type,
+            DEFAULT_WORKER_TYPE,
+        )
+        template_path = _WORKER_TYPE_TEMPLATES[DEFAULT_WORKER_TYPE]
+
+    return load_and_format(
+        "shared/supervisor_note",
+        prompts=prompts,
+        WORKER_TYPE_GUIDANCE=load_template(template_path, prompts=prompts),
+        # "there" keeps the greeting grammatical when we have no name; the
+        # template tells the model to open without a name in that case.
+        LEARNER_NAME=(learner_name or "").strip() or "there",
+        SUPERVISOR_MEMORY=(
+            supervisor_memory.strip()
+            if supervisor_memory is not None
+            else "No previous sessions with this learner yet."
+        ),
+        LIVE_NOTES=_format_live_notes(live_notes),
+    )
+
+
+def _build_scenario_behaviours_section(
+    prompts: Optional[Dict[str, Any]] = None,
+    helpful_behaviours: Optional[List[str]] = None,
+    unhelpful_behaviours: Optional[List[str]] = None,
+) -> str:
+    """Build the scenario-specific helpful/unhelpful behaviour guidance block.
+
+    Empty when the scenario carries neither list — the evaluation then falls
+    back to the fixed skill_coverage rubric alone, as before.
+    """
+    if not helpful_behaviours and not unhelpful_behaviours:
+        return ""
+
+    def _bullet_list(heading: str, behaviours: Optional[List[str]]) -> str:
+        if not behaviours:
+            return ""
+        items = "\n".join(f"- {b}" for b in behaviours if b and b.strip())
+        return f"{heading}\n{items}" if items else ""
+
+    return load_and_format(
+        "shared/scenario_behaviours",
+        prompts=prompts,
+        HELPFUL_BEHAVIOURS_LIST=_bullet_list(
+            "Helpful behaviours for this scenario:", helpful_behaviours
+        ),
+        UNHELPFUL_BEHAVIOURS_LIST=_bullet_list(
+            "Unhelpful behaviours for this scenario:", unhelpful_behaviours
+        ),
+    )
+
+
+def _format_live_notes(live_notes: Optional[List[str]]) -> str:
+    """Render the hints already sent to the learner mid-session as a list.
+
+    Most sessions have none — live supervisor notes are opt-in per scenario — so
+    the empty case has to read as a plain fact rather than a missing value, or
+    the model starts referring to advice it never gave.
+    """
+    cleaned = [note.strip() for note in (live_notes or []) if note and note.strip()]
+    if not cleaned:
+        return "You gave no live notes during this session."
+    return "\n".join(f"- {note}" for note in cleaned)
+
+
+def _structured_summary_template_path(session_mode: Optional[str]) -> str:
+    """Pick prompt template for post-call structured summary (scribe vs dictation)."""
+    if session_mode and str(session_mode).upper() == SCRIBE_SESSION_MODE_DICTATION:
+        return "summary/dictation_summary"
+    return "summary/summary"
+
+
+# Constants for chunking
+MAX_WORDS_PER_CHUNK = (
+    2000  # Conservative limit based on word count (roughly equivalent to 3000 tokens)
+)
+CHUNK_OVERLAP_WORDS = (
+    300  # Overlap between chunks to maintain context (roughly equivalent to 500 tokens)
+)
+
+# Unlike diarization (which is chunked), the structured summary feeds the WHOLE
+# transcript into a single prompt. A very long session (e.g. an hour+) can blow
+# past the model's usable input budget, so the summary fails every time and the
+# auto-retries never help — a session-length-dependent "summary not generated".
+# When the transcript is larger than this many words we first condense it
+# (map step) so the structured-summary prompt stays bounded. Set high enough
+# that normal sessions are untouched.
+MAX_SUMMARY_INPUT_WORDS = 8000
+# Word size of each chunk fed to the condense (map) step.
+SUMMARY_CONDENSE_CHUNK_WORDS = 2000
+
+_TIMESTAMP_REGEX = re.compile(r"\[\d{1,2}:\d{2}(:\d{2})?\]")
+
+
+@tool
+def generate_dynamic_summary(
+    fields: dict[str, Union[str, int]],
+) -> dict[str, Union[str, int]]:
+    """Generate a dynamic summary with the given fields."""
+    try:
+        known_fields: dict = {}
+        unknown_fields: dict = {}
+        for key, value in fields.items():
+            field = StructuredSummaryNote.model_fields.get(key)
+            if field:
+                if field.annotation == int:
+                    known_fields[key] = int(value)
+                elif field.annotation == List[str]:
+                    known_fields[key] = (
+                        value.split(",") if isinstance(value, str) else value
+                    )
+                else:
+                    known_fields[key] = value
+            else:
+                unknown_fields[key] = value
+
+        _ = StructuredSummaryNote(**known_fields)
+        return {**known_fields, **unknown_fields}
+    except Exception as e:
+        logger.error(f"Validation failed: {type(e).__name__}")
+        return {}
+
+
+def split_text_by_length(text: str, max_words: int = MAX_WORDS_PER_CHUNK) -> List[str]:
+    """
+    Split transcription text into chunks while preserving timing information.
+
+    This function intelligently splits transcription text to avoid exceeding word limits
+    while maintaining context and preserving timestamp information. It uses word
+    counting
+    for simpler and more predictable chunk sizing.
+
+    Word Counting Strategy:
+    - Uses simple word splitting for fast and predictable chunk sizing
+    - Processes text line-by-line to maintain natural boundaries
+    - Preserves timestamp information and speaker identification
+    - Adds overlap between chunks to maintain conversation context
+
+    Chunking Strategy:
+    1. Split text into lines (preserving timestamps and speaker info)
+    2. Group lines until approaching max_words limit
+    3. Create overlap between chunks using timestamp-containing lines
+    4. Ensure no chunk exceeds the word limit
+
+    Args:
+        text (str): Raw transcription text with timestamps and speaker information
+        max_words (int): Maximum words per chunk (default: MAX_WORDS_PER_CHUNK)
+
+    Returns:
+        List[str]: List of text chunks, each within the word limit
+
+    Example:
+        Input: "[00:00:01] Speaker 0: Hello\n[00:00:03] Speaker 1: Hi there"
+        Output: ["[00:00:01] Speaker 0: Hello\n[00:00:03] Speaker 1: Hi there"]
+
+    Word Count Examples:
+        - "[00:00:01] Speaker 0: Hello" → 4 words
+        - "[00:00:05] Speaker 1: How are you today?" → 7 words
+    """
+    lines = text.splitlines()
+    chunks = []
+    current_chunk = []
+    current_word_count = 0
+
+    def count_words(text: str) -> int:
+        """
+        Count words in text using simple whitespace splitting.
+
+        This provides fast and predictable word counts for chunk sizing.
+
+        Args:
+            text (str): Text to count words for
+
+        Returns:
+            int: Word count
+        """
+        return len(text.split())
+
+    # Process each line individually to maintain natural boundaries
+    for line in lines:
+        line_word_count = count_words(line)
+
+        # If adding this line would exceed the limit and we have content, start a
+        # new chunk
+        if current_word_count + line_word_count > max_words and current_chunk:
+            chunks.append("\n".join(current_chunk))
+            current_chunk = []
+            current_word_count = 0
+
+        current_chunk.append(line)
+        current_word_count += line_word_count
+
+    # Add the last chunk if it has content
+    if current_chunk:
+        chunks.append("\n".join(current_chunk))
+
+    # Add overlap between chunks to maintain conversation context
+    if len(chunks) > 1:
+        for i in range(len(chunks) - 1):
+            # Add some lines from the end of current chunk to the beginning of next
+            # chunk
+            current_lines = chunks[i].splitlines()
+            next_lines = chunks[i + 1].splitlines()
+
+            # Take last few lines from current chunk (if they contain timestamps)
+            # This helps maintain context between chunks
+            overlap_lines = []
+            for line in reversed(current_lines[-3:]):  # Last 3 lines
+                if _TIMESTAMP_REGEX.search(line):  # Likely contains timestamp
+                    overlap_lines.insert(0, line)
+                if count_words("\n".join(overlap_lines)) > CHUNK_OVERLAP_WORDS:
+                    break
+
+            if overlap_lines:
+                chunks[i + 1] = "\n".join(overlap_lines + next_lines)
+
+    return chunks
+
+
+class OpenAITextGenerationService(BaseTextGenerationService[ChatOpenAI]):
+    """Text generation service using OpenAI models."""
+
+    # Bounded retry for transient OpenAI errors in _invoke_llm.
+    _LLM_MAX_ATTEMPTS = 4
+    _LLM_BACKOFF_BASE_SECONDS = 1.0
+    _LLM_BACKOFF_JITTER_SECONDS = 0.5
+
+    def __init__(
+        self, client: ChatOpenAI, embedding_service: BaseEmbeddingService
+    ) -> None:
+        """
+        Initialize the OpenAITextGenerator with a client and embedding service.
+
+        Parameters:
+            client (ChatOpenAI): The OpenAI chat client to use.
+            embedding_service (BaseEmbeddingService): The embedding service
+            for reflective listening calculation.
+        """
+        # Store the embedding service
+        self.embedding_service = embedding_service
+        # Initialize semaphore for rate limiting at class level
+        self.semaphore = asyncio.Semaphore(settings.LLM.MAX_CONCURRENT_LLM_CALLS)
+
+        # Initialize the base class with the client
+        super().__init__(client)
+
+    def _client_for(
+        self,
+        internal_path: str,
+        prompts: Optional[dict] = None,
+    ):
+        """Resolve the LLM client for a prompt: a per-(model, temperature)
+        client when the prompt carries an override, else the default client.
+        Keeps the no-override path identical to today."""
+        from app.core.text_generations.openai_text_generation_client import (
+            OpenAITextGenerationClient,
+        )
+        from app.prompts.resolver import get_backend_llm_overrides
+
+        provider, model, temperature = get_backend_llm_overrides(internal_path, prompts)
+        if provider is None and model is None and temperature is None:
+            return self.model
+        return OpenAITextGenerationClient.get_or_create_client(
+            model=model, temperature=temperature, provider=provider
+        )
+
+    async def _invoke_llm(
+        self,
+        messages: List[BaseMessage],
+        output_class: Optional[Type] = None,
+        llm_override: Optional[Any] = None,
+        **kwargs,
+    ) -> Union[Any, str]:
+        """
+        Invoke the LLM asynchronously with optional structured output.
+
+        Parameters:
+            messages (List[BaseMessage] | str):
+                - A list of messages (`List[BaseMessage]`) for conversational input.
+                - A raw string (`str`) if a single message is provided.
+            output_class (Optional[type[T]]):
+                - An optional Pydantic model or class to structure the output.
+                - If provided, the response will be parsed into an instance of this
+                  class.
+            **kwargs:
+                - Additional keyword arguments.
+
+        Returns:
+            T | str:
+                - If `output_class` is provided, returns an instance of
+                `output_class` (T).
+                - Otherwise, returns the raw response content as a string.
+        """
+
+        logger.debug(
+            "_invoke_llm: waiting for rate_limiter (output_class=%s)",
+            output_class.__name__ if output_class else None,
+        )
+        await rate_limiter.acquire()
+
+        async with self.semaphore:
+            # Use the per-prompt override client when provided, else the
+            # process-default model from the base class.
+            llm = llm_override if llm_override is not None else self.model
+            # Captured before with_structured_output wraps it, so usage below
+            # is attributed to the model actually invoked, not self.model.
+            _invoked_llm = llm
+
+            # Bind structured output class with the llm if passed by user
+            if output_class:
+                llm = llm.with_structured_output(output_class)
+
+            logger.info(
+                "_invoke_llm: calling llm.ainvoke (output_class=%s)",
+                output_class.__name__ if output_class else None,
+            )
+            # Best-effort token-usage capture: a callback aggregates usage even
+            # when with_structured_output drops the raw AIMessage. Guarded so a
+            # missing handler degrades to no capture (never breaks the call).
+            _usage_cb = None
+            try:
+                from app.core.llm_usage.extract import make_usage_callback
+
+                _usage_cb = make_usage_callback()
+            except Exception:
+                _usage_cb = None
+            # Transient OpenAI failures (rate limits, dropped connections,
+            # transient 5xx) spike precisely when several Scribe sessions are
+            # processed concurrently — each fans out many diarization/summary
+            # calls. Previously the first 429 became a hard failure and flipped
+            # the chat to FAILED. Retry these with exponential backoff + jitter
+            # before giving up; non-transient errors fail fast.
+            response = None
+            for attempt in range(1, self._LLM_MAX_ATTEMPTS + 1):
+                try:
+                    if _usage_cb is not None:
+                        response = await llm.ainvoke(
+                            messages, config={"callbacks": [_usage_cb]}
+                        )
+                    else:
+                        response = await llm.ainvoke(messages)
+                    logger.info(
+                        "_invoke_llm: llm.ainvoke returned "
+                        "(response_type=%s, response_is_none=%s, attempt=%s)",
+                        type(response).__name__,
+                        response is None,
+                        attempt,
+                    )
+                    break
+                except (
+                    openai.RateLimitError,
+                    openai.APIConnectionError,
+                    openai.APITimeoutError,
+                    openai.InternalServerError,
+                ) as e:
+                    if attempt >= self._LLM_MAX_ATTEMPTS:
+                        logger.exception(
+                            "_invoke_llm: transient %s persisted after %s "
+                            "attempts: %s",
+                            type(e).__name__,
+                            attempt,
+                            str(e),
+                        )
+                        # Preserve the original per-type, user-facing wording
+                        # (just annotated with the attempt count).
+                        if isinstance(e, openai.RateLimitError):
+                            detail = "OpenAI API rate limit exceeded"
+                        else:
+                            detail = "OpenAI API error"
+                        raise LLMInvocationFailedException(
+                            f"{detail} after {attempt} attempts. "
+                            "Please try again later."
+                        ) from e
+                    backoff = self._LLM_BACKOFF_BASE_SECONDS * (2 ** (attempt - 1))
+                    backoff += random.uniform(0, self._LLM_BACKOFF_JITTER_SECONDS)
+                    logger.warning(
+                        "_invoke_llm: transient %s on attempt %s/%s; retrying "
+                        "in %.2fs",
+                        type(e).__name__,
+                        attempt,
+                        self._LLM_MAX_ATTEMPTS,
+                        backoff,
+                    )
+                    await asyncio.sleep(backoff)
+
+                except Exception as e:
+                    # The `LengthFinishReasonError` from LangChain indicates a
+                    # truncated response; the vanilla error is opaque and gets
+                    # wrapped in a generic LLMInvocationFailedException that
+                    # loses the "why". Catch it by name (it's not exported)
+                    # and raise a clearer error that ally-be can show an admin.
+                    if type(e).__name__ == "LengthFinishReasonError":
+                        logger.warning(
+                            "_invoke_llm: model output was too long and could "
+                            "not be parsed (output_class=%s): %s",
+                            output_class.__name__ if output_class else None,
+                            str(e),
+                        )
+                        raise LLMInvocationFailedException(
+                            "The model output was too long and could not be parsed."
+                        ) from e
+
+                    logger.exception(
+                        "_invoke_llm: unexpected %s during llm.ainvoke "
+                        "(output_class=%s): %s",
+                        type(e).__name__,
+                        output_class.__name__ if output_class else None,
+                        str(e),
+                    )
+                    raise LLMInvocationFailedException(
+                        f"LLM invocation failed: {type(e).__name__}"
+                    ) from e
+
+            # Best-effort token-usage emission (never affects the result).
+            try:
+                _task = kwargs.get("task")
+                if _task:
+                    from app.core.llm_usage.emitter import emit_llm_usage
+                    from app.core.llm_usage.extract import (
+                        extract_usage_details,
+                        extract_usage_from_aimessage,
+                        normalize_callback_usage,
+                    )
+                    from app.core.llm_usage.tasks import resolve_model_name
+
+                    _cb_usage = (
+                        normalize_callback_usage(_usage_cb) if _usage_cb else None
+                    )
+                    _usage = _cb_usage or extract_usage_from_aimessage(response)
+                    # Cache hits and reasoning, read from the same source as
+                    # the counts above so the two always describe one call.
+                    _cached, _usage_meta = extract_usage_details(
+                        _usage_cb if _cb_usage else None, response
+                    )
+                    emit_llm_usage(
+                        provider="openai",
+                        model=resolve_model_name(_invoked_llm),
+                        task=_task,
+                        usage=_usage,
+                        room_id=kwargs.get("room_id"),
+                        scenario_id=kwargs.get("scenario_id"),
+                        scenario_session_id=kwargs.get("scenario_session_id"),
+                        cached_tokens=_cached,
+                        metadata=_usage_meta,
+                    )
+            except Exception:
+                # Never affects the result, but logged so a bug in this
+                # extraction (as opposed to the emitter's own send failures,
+                # which it logs itself) doesn't vanish with zero trace.
+                logger.debug("LLM usage emit skipped (best-effort)", exc_info=True)
+
+            return response if output_class else response.content
+
+    async def generate_nudge(
+        self,
+        conversation: str,
+        chat_history: str,
+        suggestion: str,
+        prompts: Optional[Dict[str, Any]] = None,
+        **kwargs,
+    ) -> str:
+        """
+        Generate a nudge using the OpenAI language model.
+
+        This method formats a prompt with the provided conversation context, chat
+        history, and suggestion, then invokes the language model to generate a nudge.
+        The response is cast to a NudgeOutput object from which the nudge text is
+        extracted and returned.
+
+        Parameters:
+            conversation (str): The current conversation context.
+            chat_history (str): A string representation of the chat history to
+            provide context.
+            suggestion (str): A suggestion or prompt to guide the nudge generation.
+            **kwargs: Additional keyword arguments to be passed to the underlying
+            language model invocation.
+
+        Returns:
+            str: The generated nudge extracted from the language model's response.
+
+        Raises:
+            NudgeGenerationFailedException: If the OpenAI API rate
+            limit is exceeded or an API connection error occurs.
+        """
+        logger.info("Generating nudge using OpenAI")
+        try:
+            template = load_template("nudge/nudge", prompts=prompts)
+            response = cast(
+                Nudge,
+                await self._invoke_llm(
+                    template.format(
+                        conversation=conversation,
+                        chat_history=chat_history,
+                        suggestion=suggestion,
+                    ),
+                    Nudge,
+                    task=LLMTask.NUDGE.value,
+                    llm_override=self._client_for("nudge/nudge", prompts),
+                    **kwargs,
+                ),
+            )
+
+        except LLMInvocationFailedException as e:
+            raise NudgeGenerationFailedException("Failed to invoke LLM.") from e
+
+        logger.info("Nudge generated successfully")
+
+        return response.nudge
+
+    async def generate_summary_notes(
+        self,
+        chat_history: List[ChatMessage],
+        keys: Optional[List[str]] = None,
+        chat_id: Optional[str] = None,
+        prompts: Optional[Dict[str, Any]] = None,
+        session_mode: Optional[str] = None,
+        key_descriptions: Optional[Dict[str, str]] = None,
+        **kwargs,
+    ) -> Union[SummaryNoteAndTagsResponse, DynamicSummaryNoteResponse]:
+        start_time = time.time()
+
+        try:
+            logger.info("Generating summary notes using OpenAI")
+            chat_history_str = self._chat_history_to_str(chat_history)
+
+            if keys:
+                result = await self._generate_dynamic_summary(
+                    chat_history,
+                    chat_history_str,
+                    keys,
+                    prompts=prompts,
+                    key_descriptions=key_descriptions,
+                    **kwargs,
+                )
+            else:
+                result = await self._generate_structured_summary(
+                    chat_history,
+                    chat_history_str,
+                    prompts=prompts,
+                    session_mode=session_mode,
+                    **kwargs,
+                )
+
+            # Calculate processing time
+            processing_time_ms = int((time.time() - start_time) * 1000)
+
+            # Log successful completion
+            await phi_logger.log(
+                PHILogEvent(
+                    event_type=PHIEvents.DATA_MODIFIED,
+                    chat_id=chat_id,
+                    audit_id=None,  # Will be set by external service
+                    details={
+                        "message": "Summary generation completed using OpenAI",
+                        "component": "OpenAITextGenerationService",
+                        "processing_time_ms": processing_time_ms,
+                        "result_type": type(result).__name__,
+                    },
+                )
+            )
+
+            return result
+
+        except Exception as e:
+            processing_time_ms = int((time.time() - start_time) * 1000)
+
+            # Log error
+            await phi_logger.log(
+                PHILogEvent(
+                    event_type=PHIEvents.SYSTEM_ERROR,
+                    chat_id=chat_id,
+                    audit_id=None,  # Will be set by external service
+                    details={
+                        "error": f"Failed to generate summary: {type(e).__name__}",
+                        "component": "OpenAITextGenerationService",
+                        "method": "generate_summary_notes",
+                        "exception_type": type(e).__name__,
+                        "chat_history_count": len(chat_history),
+                        "processing_time_ms": processing_time_ms,
+                        "summary_type": "dynamic" if keys else "structured",
+                        "keys_provided": keys is not None,
+                    },
+                )
+            )
+
+            logger.exception(f"Failed to generate summary: {type(e).__name__}")
+            raise SummaryNoteFailedException("Failed to generate summary") from e
+
+    async def _generate_dynamic_summary(
+        self,
+        chat_history,
+        chat_history_str,
+        keys,
+        prompts: Optional[Dict[str, Any]] = None,
+        key_descriptions: Optional[Dict[str, str]] = None,
+        **kwargs,
+    ):
+        precomputed = await self._calculate_metrics(
+            chat_history, chat_history_str, keys, prompts=prompts
+        )
+
+        key_descriptions_str = self._get_key_descriptions(
+            keys, extra_descriptions=key_descriptions
+        )
+        if not key_descriptions_str:
+            return DynamicSummaryNoteResponse(fields=precomputed)
+
+        template = load_template("summary/dynamic_summary", prompts=prompts)
+        prompt = template.format(
+            chat_history=chat_history_str, key_descriptions=key_descriptions_str
+        )
+        # Honor the summary prompt's per-prompt model/temperature override
+        # (falls back to the default client when none is set).
+        dynamic_summary_client = self._client_for("summary/dynamic_summary", prompts)
+        model = dynamic_summary_client.bind_tools([generate_dynamic_summary])
+        response = await model.ainvoke(prompt)
+
+        # Best-effort token-usage emission (bind_tools returns an AIMessage).
+        try:
+            from app.core.llm_usage.emitter import emit_llm_usage
+            from app.core.llm_usage.extract import (
+                extract_usage_details,
+                extract_usage_from_aimessage,
+            )
+            from app.core.llm_usage.tasks import LLMTask, resolve_model_name
+
+            cached, usage_meta = extract_usage_details(response=response)
+            emit_llm_usage(
+                provider="openai",
+                model=resolve_model_name(dynamic_summary_client),
+                task=LLMTask.DYNAMIC_SUMMARY.value,
+                usage=extract_usage_from_aimessage(response),
+                cached_tokens=cached,
+                metadata=usage_meta,
+            )
+        except Exception:
+            # Never affects the result, but logged so a bug in this
+            # extraction (as opposed to the emitter's own send failures,
+            # which it logs itself) doesn't vanish with zero trace.
+            logger.debug("LLM usage emit skipped (best-effort)", exc_info=True)
+
+        tool_fields = self._extract_tool_fields(response)
+        merged = {**tool_fields, **precomputed}
+        return DynamicSummaryNoteResponse(fields=merged)
+
+    async def _condense_for_summary(
+        self, chat_history_str: str, llm_override: Optional[Any] = None
+    ) -> str:
+        """
+        Bound the transcript fed to the structured-summary prompt.
+
+        Returns the transcript unchanged when it is within
+        MAX_SUMMARY_INPUT_WORDS. For longer transcripts it runs a map step:
+        each chunk is condensed to a concise plain-text summary (in parallel),
+        and the partials are concatenated. The structured summary then runs on
+        this condensed text, so a long session no longer overflows the prompt
+        and fails every time. Metrics are computed separately on the FULL
+        transcript, so this only affects what the summariser model reads.
+
+        A chunk whose condensation fails falls back to a truncated slice of the
+        raw chunk, so one flaky LLM call can't sink the whole summary.
+        """
+        if len(chat_history_str.split()) <= MAX_SUMMARY_INPUT_WORDS:
+            return chat_history_str
+
+        chunks = split_text_by_length(chat_history_str, SUMMARY_CONDENSE_CHUNK_WORDS)
+        logger.info(
+            "Transcript exceeds %s words; condensing %s chunks before summary",
+            MAX_SUMMARY_INPUT_WORDS,
+            len(chunks),
+        )
+
+        async def condense_chunk(chunk: str, index: int) -> str:
+            prompt = (
+                "Condense the following part of a counselling session "
+                "transcript into a concise summary. Preserve who said what, "
+                "key topics, decisions, risks, emotional shifts, and any "
+                "clinically relevant details. Do not add information that is "
+                "not present. Output plain text only.\n\n"
+                f"TRANSCRIPT PART {index + 1}/{len(chunks)}:\n{chunk}"
+            )
+            try:
+                result = await self._invoke_llm(
+                    prompt, task=LLMTask.SUMMARY.value, llm_override=llm_override
+                )
+                return result if isinstance(result, str) else str(result)
+            except Exception as e:
+                # Don't let one failed chunk fail the whole summary — fall back
+                # to a truncated raw slice so the structured summary still has
+                # this section's content (bounded).
+                logger.warning(
+                    "Condense chunk %s failed (%s); using truncated raw text",
+                    index + 1,
+                    type(e).__name__,
+                )
+                words = chunk.split()
+                return " ".join(words[:SUMMARY_CONDENSE_CHUNK_WORDS])
+
+        partials = await asyncio.gather(
+            *[condense_chunk(c, i) for i, c in enumerate(chunks)]
+        )
+        condensed = "\n\n".join(partials)
+        logger.info(
+            "Condensed transcript from %s to ~%s words for summary",
+            len(chat_history_str.split()),
+            len(condensed.split()),
+        )
+        return condensed
+
+    async def _generate_structured_summary(
+        self,
+        chat_history,
+        chat_history_str,
+        prompts: Optional[Dict[str, Any]] = None,
+        session_mode: Optional[str] = None,
+        **kwargs,
+    ):
+        """Optimized structured summary with parallel processing."""
+        # Resolve the summary prompt's per-prompt client once and use it for both
+        # the condense (map) step and the final structured-summary call, so a
+        # per-prompt model/temperature override applies to the whole summary.
+        summary_client = self._client_for(
+            _structured_summary_template_path(session_mode), prompts
+        )
+
+        # Bound the transcript the summariser reads (long sessions otherwise
+        # overflow the prompt and fail every time). Metrics below still use the
+        # FULL chat_history / chat_history_str.
+        summary_input_str = await self._condense_for_summary(
+            chat_history_str, llm_override=summary_client
+        )
+
+        # Start LLM call and metric calculation in parallel
+        template = load_template(
+            _structured_summary_template_path(session_mode), prompts=prompts
+        )
+        llm_task = self._invoke_llm(
+            template.format(chat_history=summary_input_str),
+            StructuredSummaryNote,
+            task=LLMTask.SUMMARY.value,
+            llm_override=summary_client,
+            **kwargs,
+        )
+
+        metrics_task = self._calculate_metrics(
+            chat_history, chat_history_str, prompts=prompts
+        )
+
+        # Run both in parallel
+        response, metrics = await asyncio.gather(llm_task, metrics_task)
+
+        response = structured_output_model_to_rest(response)
+
+        # Add metrics to response
+        for key, value in metrics.items():
+            setattr(response, key, value)
+
+        return response
+
+    def _chat_history_to_str(self, chat_history: List[ChatMessage]) -> str:
+        return "\n".join([f"{msg.role}: {msg.content}" for msg in chat_history])
+
+    async def _calculate_metrics(
+        self,
+        chat_history,
+        chat_history_str,
+        keys: Optional[List[str]] = None,
+        prompts: Optional[Dict[str, Any]] = None,
+    ) -> dict[str, Any]:
+        """
+        Calculate metrics:
+        - If keys=None → calculate all available metrics
+        - If keys provided → calculate only those
+        """
+
+        # Simple metrics
+        simple_dispatch = {
+            "languages": (lambda: detect_languages(chat_history_str)),
+            "reflective_listening": (
+                lambda: calculate_reflective_listening(
+                    chat_history, self.embedding_service
+                )
+            ),
+            "avg_client_utterance_duration": (
+                lambda: calculate_avg_client_utterance_duration(chat_history)
+            ),
+            "silence_by_counselor": (
+                lambda: calculate_silence_by_counselor(chat_history)
+            ),
+            "client_positivity_lift": (
+                lambda: calculate_client_positivity_lift(chat_history)
+            ),
+            "counselor_interruptions": (
+                lambda: calculate_counselor_interruptions(chat_history)
+            ),
+            "affirmations": (lambda: count_affirmations(chat_history)),
+        }
+
+        counselor_analysis_keys = {
+            "reflective_questions_asked",
+            "open_ended_questions_asked",
+            "back_channel_cues",
+        }
+
+        # Determine which keys to process
+        keys_to_process = (
+            list(simple_dispatch.keys()) + list(counselor_analysis_keys)
+            if keys is None
+            else keys
+        )
+        results = {}
+        counselor_analysis = None
+
+        for key in keys_to_process:
+            if key in simple_dispatch:
+                fn = simple_dispatch[key]
+                # Offload the dispatch to a worker thread so any sync CPU work
+                # (language detection, affirmation counting, etc.) does not
+                # block the event loop. For async metric fns, `to_thread` just
+                # returns the coroutine cheaply and we await it on the loop.
+                value = await asyncio.to_thread(fn)
+                if asyncio.iscoroutine(value):
+                    value = await value
+                results[key] = value
+
+            elif key in counselor_analysis_keys:
+                if counselor_analysis is None:
+                    counselor_analysis = await self.analyze_counselor_messages(
+                        chat_history, prompts=prompts
+                    )
+                results[key] = counselor_analysis.get(key, 0)
+
+        return results
+
+    def _extract_tool_fields(self, response) -> dict[str, Any]:
+        # LangChain exposes parsed tool calls on AIMessage.tool_calls (each entry
+        # already has parsed `args`). Older LangChain versions only populated
+        # additional_kwargs["tool_calls"] (with stringified `arguments`). Try
+        # the modern surface first, then fall back to the legacy one.
+        tool_calls = getattr(response, "tool_calls", None)
+        if tool_calls:
+            for tc in tool_calls:
+                if tc.get("name") == "generate_dynamic_summary":
+                    args = tc.get("args") or {}
+                    return args.get("fields", {})
+
+        legacy = getattr(response, "additional_kwargs", {}).get("tool_calls")
+        if legacy:
+            tool_call = legacy[0]
+            if tool_call["function"]["name"] == "generate_dynamic_summary":
+                fields = json.loads(tool_call["function"]["arguments"])
+                return fields.get("fields", {})
+
+        return {}
+
+    def _get_key_descriptions(
+        self,
+        keys: list[str],
+        extra_descriptions: Optional[Dict[str, str]] = None,
+    ) -> str:
+        descriptions = []
+        for key in keys:
+            field = StructuredSummaryNote.model_fields.get(key)
+            if field and field.description:
+                descriptions.append(f"- {key}: {field.description}")
+            elif extra_descriptions and key in extra_descriptions:
+                descriptions.append(f"- {key}: {extra_descriptions[key]}")
+        return "\n".join(descriptions)
+
+    async def enhance_content(
+        self,
+        content: str,
+        prompts: Optional[Dict[str, Any]] = None,
+        **kwargs,
+    ) -> str:
+        """
+        Enhance the content by generating a summary and tags.
+
+        Parameters:
+            content (str): The content to enhance.
+            **kwargs: Additional keyword arguments to be passed to the
+            underlying language model invocation.
+
+        Returns:
+            str: The enhanced content.
+
+        Raises:
+            ContentEnhancementFailedException: If the content enhancement fails.
+        """
+        logger.info("Enhancing content using OpenAI")
+        try:
+            template = load_template("notes/content_enhance", prompts=prompts)
+            response = cast(
+                ContentEnhance,
+                await self._invoke_llm(
+                    template.format(content=content),
+                    ContentEnhance,
+                    task=LLMTask.CONTENT_ENHANCE.value,
+                    llm_override=self._client_for("notes/content_enhance", prompts),
+                    **kwargs,
+                ),
+            )
+
+        except LLMInvocationFailedException as e:
+            raise ContentEnhancementFailedException("Failed to invoke LLM.") from e
+
+        logger.info("Content enhanced successfully")
+        return response.enhanced_content
+
+    async def identify_user(
+        self,
+        chat_history: List[ChatMessage],
+        prompts: Optional[Dict[str, Any]] = None,
+        **kwargs,
+    ) -> IdentifyResponse:
+        """
+        Identify whether speaker0 and speaker1 are client or counselor based on
+        chat history.
+
+        This method analyzes the chat history to determine the roles of both speakers.
+        The chat history should be a list of ChatMessage objects with role and content.
+
+        Args:
+            chat_history (List[ChatMessage]): List of messages with role and content
+            **kwargs: Additional arguments to pass to the LLM
+
+        Returns:
+            IdentifyResponse: Object containing the identified roles for
+            speaker0 and speaker1
+        """
+        logger.info("Identifying users using OpenAI")
+
+        # Format chat history for the prompt
+        formatted_conversations = "\n".join(
+            [f"{msg.role}: {msg.content}" for msg in chat_history]
+        )
+
+        try:
+            template = load_template("user/identify_user", prompts=prompts)
+            response = cast(
+                StructuredIdentifyUsers,
+                await self._invoke_llm(
+                    template.format(conversations=formatted_conversations),
+                    StructuredIdentifyUsers,
+                    task=LLMTask.USER_IDENTIFICATION.value,
+                    llm_override=self._client_for("user/identify_user", prompts),
+                    **kwargs,
+                ),
+            )
+        except LLMInvocationFailedException as e:
+            raise IdentifyUserFailedException("Failed to invoke LLM.") from e
+
+        logger.info("Users identified successfully")
+        return IdentifyResponse(speaker0=response.speaker0, speaker1=response.speaker1)
+
+    async def get_tag_positivity_ratings(
+        self,
+        tags: List[str],
+        prompts: Optional[Dict[str, Any]] = None,
+        **kwargs,
+    ) -> List[Dict]:
+        """
+        Get positivity ratings for a list of tags.
+
+        Parameters:
+            tags (List[str]): List of tags to get positivity ratings for.
+            **kwargs: Additional keyword arguments to be passed to the
+            underlying language model invocation.
+
+        Returns:
+            List[Dict]: List of tags with their positivity ratings.
+
+        Raises:
+            Exception: If the positivity rating generation fails.
+        """
+        logger.info("Getting positivity ratings for tags using OpenAI")
+
+        # Format tags for the prompt
+        formatted_tags = "\n".join(tags)
+
+        try:
+            # Using a list of Tag objects as the structured output
+            TagList = create_model("TagList", tags=(List[Tag], ...))
+
+            template = load_template("tags/positivity_rating", prompts=prompts)
+            response = cast(
+                TagList,
+                await self._invoke_llm(
+                    template.format(tags=formatted_tags),
+                    TagList,
+                    task=LLMTask.TAG_POSITIVITY.value,
+                    llm_override=self._client_for("tags/positivity_rating", prompts),
+                    **kwargs,
+                ),
+            )
+
+            # Convert to list of dictionaries
+            return [
+                {"tag": tag.tag, "positivity_rating": tag.positivity_rating}
+                for tag in response.tags
+            ]
+
+        except LLMInvocationFailedException as e:
+            logger.exception(f"Failed to get positivity ratings: {type(e).__name__}")
+            raise Exception("Failed to get positivity ratings for tags.") from e
+
+        except Exception as e:
+            logger.exception(
+                f"Unexpected error getting positivity ratings: {type(e).__name__}"
+            )
+            raise Exception(
+                "An unexpected error occurred while getting positivity ratings."
+            ) from e
+
+    async def diarize_from_transcription(
+        self, transcription: str, prompts: Optional[Dict[str, Any]] = None, **kwargs
+    ) -> StructuredDiarization:
+        """
+        Diarize a raw transcription string into structured messages with speaker roles.
+
+        This method takes a raw transcription text with timestamps and uses
+        OpenAI's structured output
+        to parse it into an array of messages with role, content,
+        start_time and end_time fields.
+        For large transcriptions, it splits the text into chunks
+        and processes them in parallel.
+
+        Chunking Strategy:
+        - Uses split_text_by_length() to intelligently split large transcriptions
+        - Each chunk is limited to MAX_WORDS_PER_CHUNK (2000 words) to avoid OpenAI
+        limits
+        - Chunks are processed in parallel using asyncio.gather() for efficiency
+        - Results are combined in original order to maintain conversation flow
+        - Overlap between chunks preserves context and timing information
+
+        Processing Flow:
+        1. Split transcription into manageable chunks using accurate word counting
+        2. If single chunk: process directly
+        3. If multiple chunks: process all chunks in parallel
+        4. Combine results maintaining original order
+        5. Return structured diarization with all messages
+
+        Token Management:
+        - Conservative chunk size (2000 words) to avoid hitting OpenAI's 16,384
+        limit
+        - Overlap mechanism ensures context preservation between chunks
+
+        Parameters:
+            transcription (str): Raw transcription text with timestamps
+            from audio
+            **kwargs: Additional keyword arguments to be passed to the
+            underlying language model invocation.
+
+        Returns:
+            StructuredDiarization: Object containing array of messages with
+            role, content, start_time and end_time
+
+        Raises:
+            LLMInvocationFailedException: If the OpenAI API call fails or chunk
+            processing fails
+
+        Example:
+            Input: "[00:00:01] Speaker 0: Hello\n[00:00:03] Speaker 1: Hi there"
+            Output: StructuredDiarization with messages containing:
+                - role: "Speaker 0", content: "Hello", start_time: "00:00:01",
+                end_time: "00:00:02"
+                - role: "Speaker 1", content: "Hi there", start_time: "00:00:03",
+                end_time: "00:00:05"
+        """
+        logger.info("Diarizing transcription using OpenAI structured output")
+
+        # Split transcription into manageable chunks using accurate word counting
+        chunks = split_text_by_length(transcription, MAX_WORDS_PER_CHUNK)
+        logger.info(f"Split transcription into {len(chunks)} chunks for processing")
+
+        if len(chunks) == 1:
+            # Single chunk - process directly
+            logger.info("Processing single chunk")
+            try:
+                template = load_template("audio/diarization", prompts=prompts)
+                result = await self._invoke_llm(
+                    template.format(transcription=chunks[0]),
+                    StructuredDiarization,
+                    task=LLMTask.DIARIZATION.value,
+                    llm_override=self._client_for("audio/diarization", prompts),
+                    **kwargs,
+                )
+                logger.info("Diarization completed successfully")
+                return result
+            except Exception as e:
+                logger.error(f"Failed to diarize single chunk: {type(e).__name__}")
+                raise LLMInvocationFailedException(
+                    "Failed to diarize transcription."
+                ) from e
+
+        # Multiple chunks - process in parallel for efficiency
+        logger.info(f"Processing {len(chunks)} chunks in parallel")
+
+        async def process_chunk(
+            chunk_text: str, index: int, prompts: Optional[Dict[str, Any]] = None
+        ):
+            """
+            Process a single chunk of transcription.
+
+            This function is called for each chunk in parallel to maximize efficiency.
+            Each chunk is processed independently and returns a StructuredDiarization
+            object.
+
+            Args:
+                chunk_text (str): The text chunk to process
+                index (int): Index of the chunk for logging purposes
+
+            Returns:
+                StructuredDiarization: Diarization result for this chunk
+
+            Raises:
+                LLMInvocationFailedException: If the chunk processing fails
+            """
+            try:
+                logger.debug(
+                    f"Processing chunk {index + 1}/{len(chunks)} "
+                    f"(length: {len(chunk_text)} chars)"
+                )
+                template = load_template("audio/diarization", prompts=prompts)
+                result = await self._invoke_llm(
+                    template.format(transcription=chunk_text),
+                    StructuredDiarization,
+                    task=LLMTask.DIARIZATION.value,
+                    llm_override=self._client_for("audio/diarization", prompts),
+                    **kwargs,
+                )
+                logger.debug(
+                    f"Chunk {index + 1} completed with {len(result.messages)} messages"
+                )
+                return result
+            except Exception as e:
+                logger.error(f"Chunk {index + 1} failed to diarize: {type(e).__name__}")
+                raise LLMInvocationFailedException(f"Chunk {index + 1} failed") from e
+
+        try:
+            # Process all chunks in parallel using asyncio.gather
+            # This maximizes efficiency by processing all chunks simultaneously
+            results: List[StructuredDiarization] = await asyncio.gather(
+                *[
+                    process_chunk(chunk, i, prompts=prompts)
+                    for i, chunk in enumerate(chunks)
+                ],
+                return_exceptions=True,
+            )
+
+            # Check for any exceptions in chunk processing
+            failed_chunks = []
+            for i, result in enumerate(results):
+                if isinstance(result, Exception):
+                    failed_chunks.append(i + 1)
+                    logger.error(f"Chunk {i + 1} failed: {type(result).__name__}")
+
+            if failed_chunks:
+                raise LLMInvocationFailedException(
+                    f"Failed to process chunks: {failed_chunks}"
+                )
+
+            # Combine messages from all chunks in original order
+            # This maintains the conversation flow and timing sequence
+            combined_messages = []
+            total_messages = 0
+
+            for i, result in enumerate(results):
+                if isinstance(result, StructuredDiarization):
+                    chunk_messages = result.messages
+                    combined_messages.extend(chunk_messages)
+                    total_messages += len(chunk_messages)
+                    logger.debug(
+                        f"Added {len(chunk_messages)} messages from chunk {i + 1}"
+                    )
+
+            logger.info(
+                f"All chunks diarized and merged successfully. "
+                f"Total messages: {total_messages}"
+            )
+            return StructuredDiarization(messages=combined_messages)
+
+        except Exception as e:
+            logger.error(f"Failed during parallel diarization: {type(e).__name__}")
+            raise LLMInvocationFailedException(
+                "Failed to diarize transcription."
+            ) from e
+
+    async def analyze_counselor_messages(
+        self,
+        chat_history: List[ChatMessage],
+        prompts: Optional[Dict[str, Any]] = None,
+        **kwargs,
+    ) -> Dict[str, int]:
+        """
+        Analyze counselor messages to extract counts of:
+          - Reflective questions
+          - Open-ended questions
+          - Back-channel cues
+
+        Runs per-message analysis in parallel (asyncio.gather).
+        """
+
+        # Extract counselor messages
+        counselor_messages = [
+            msg.content for msg in chat_history if msg.role.lower() == "counselor"
+        ]
+
+        if not counselor_messages:
+            return {
+                "reflective_questions_asked": 0,
+                "open_ended_questions_asked": 0,
+                "back_channel_cues": 0,
+            }
+
+        async def analyze_single_message(message: str, index: int) -> Dict[str, int]:
+            """Analyze one counselor message and return counts as dict."""
+
+            try:
+                template = load_template("analysis/counselor_analysis", prompts=prompts)
+                prompt = template.format(message=message)
+                response = await self._invoke_llm(
+                    prompt,
+                    output_class=CounselorMessageAnalysis,
+                    task=LLMTask.COUNSELOR_ANALYSIS.value,
+                    llm_override=self._client_for(
+                        "analysis/counselor_analysis", prompts
+                    ),
+                )
+
+                return {
+                    "reflective_questions_asked": len(response.reflective),
+                    "open_ended_questions_asked": len(response.open_ended),
+                    "back_channel_cues": len(response.back_channel),
+                }
+
+            except Exception as e:
+                logger.warning(
+                    f"Failed to analyze message {index + 1}: {type(e).__name__}"
+                )
+                return {
+                    "reflective_questions_asked": 0,
+                    "open_ended_questions_asked": 0,
+                    "back_channel_cues": 0,
+                }
+
+        # Run all analyses in parallel
+        tasks = [
+            analyze_single_message(msg, i) for i, msg in enumerate(counselor_messages)
+        ]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Aggregate results
+        totals = {
+            "reflective_questions_asked": 0,
+            "open_ended_questions_asked": 0,
+            "back_channel_cues": 0,
+        }
+
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                logger.warning(
+                    f"Task {i + 1} failed with exception: {type(result).__name__}"
+                )
+                continue
+            totals["reflective_questions_asked"] += result["reflective_questions_asked"]
+            totals["open_ended_questions_asked"] += result["open_ended_questions_asked"]
+            totals["back_channel_cues"] += result["back_channel_cues"]
+
+        return totals
+
+    async def _ensure_note_sections(
+        self,
+        note: str,
+        prompts: Optional[Dict[str, Any]] = None,
+        llm_override: Optional[Any] = None,
+        task: Optional[str] = None,
+        **kwargs,
+    ) -> str:
+        """Return the note with the app's section markers, repairing it once.
+
+        The app shows a note without ``## [what_worked]`` and its siblings as
+        one unbroken paragraph. Until 2026-10-16 nothing checked, so a model
+        that drifted (or a prompt variant that crowded the markers out) reached
+        the learner as a wall of text. A note missing any labelled marker gets
+        one rearranging call that keeps its words; if that call fails, or still
+        lacks a marker, the original note stands — a paragraph is a worse
+        debrief than sections, but never worse than none.
+        """
+        missing = missing_note_sections(note)
+        if not missing:
+            return note
+        logger.info(
+            "[DEBRIEF_SECTIONS] supervisor note missing %s; repairing once",
+            ",".join(missing),
+        )
+        try:
+            repaired = cast(
+                SupervisorNoteRepair,
+                await self._invoke_llm(
+                    load_and_format(
+                        "shared/supervisor_note_repair",
+                        prompts=prompts,
+                        MISSING_SECTIONS=", ".join(f"## [{key}]" for key in missing),
+                        NOTE=note,
+                    ),
+                    SupervisorNoteRepair,
+                    task=task or LLMTask.SCENARIO_EVALUATION.value,
+                    llm_override=llm_override,
+                    **kwargs,
+                ),
+            )
+        except Exception as error:  # noqa: BLE001 — the debrief must not fail here
+            logger.warning(
+                "[DEBRIEF_SECTIONS] repair failed, keeping the original note: %s",
+                type(error).__name__,
+            )
+            return note
+        fixed = (getattr(repaired, "supervisor_note", None) or "").strip()
+        still_missing = missing_note_sections(fixed)
+        if not fixed or still_missing:
+            logger.warning(
+                "[DEBRIEF_SECTIONS] repair still missing %s, keeping the original note",
+                ",".join(still_missing) or "everything",
+            )
+            return note
+        logger.info("[DEBRIEF_SECTIONS] supervisor note repaired")
+        return fixed
+
+    async def generate_scenario_evaluation(
+        self,
+        chat_history: List[ChatMessage],
+        need_memory: bool = False,
+        previous_memory: Optional[str] = None,
+        memory_prompt: Optional[str] = None,
+        prompts: Optional[Dict[str, Any]] = None,
+        language_code: Optional[str] = None,
+        worker_type: Optional[str] = None,
+        learner_name: Optional[str] = None,
+        supervisor_memory: Optional[str] = None,
+        helpful_behaviours: Optional[List[str]] = None,
+        unhelpful_behaviours: Optional[List[str]] = None,
+        live_notes: Optional[List[str]] = None,
+        usage_task: Optional[str] = None,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """
+        Generate scenario evaluation.
+
+        Uses a single LLM call. Returns improvements, positives,
+        emotional_movement, skill_coverage, supervisor_note and memory_update.
+        When need_memory is True, also returns session_glimpse and cumulative_memory.
+
+        Parameters:
+            chat_history (List[ChatMessage]): List of chat messages/exchanges
+            need_memory (bool): Whether to also generate memory fields
+            previous_memory (Optional[str]): Previous memory to build upon
+            memory_prompt (Optional[str]): Custom instructions for memory generation
+            language_code (Optional[str]): Preferred output language (ISO 639-1 /
+                BCP 47) for the human-readable feedback text. When unset or English,
+                the prompt is left unchanged.
+            worker_type (Optional[str]): The learner's worker type — one of LAY,
+                EARLY_PROFESSIONAL, EXPERIENCED_PROFESSIONAL. Sets the register,
+                depth and expectations of the supervisor note. Unset or unknown
+                falls back to LAY. Never affects skill_coverage scoring.
+            learner_name (Optional[str]): The learner's first name, so the
+                supervisor note can address them directly.
+            supervisor_memory (Optional[str]): What the supervisor carries forward
+                about THIS LEARNER from previous debriefs. Distinct from
+                previous_memory, which is about the client and the case.
+            live_notes (Optional[List[str]]): Coaching hints the supervisor
+                already sent this learner DURING the session, in order. Empty
+                for most sessions — live notes are opt-in per scenario.
+            usage_task (Optional[str]): The llm_usage task this call is filed
+                under. ally-be sends `scenario_evaluation_language` when it
+                re-runs the debrief to regenerate feedback in another
+                language; None means `scenario_evaluation`. Cost accounting
+                only — the evaluation itself is identical.
+            **kwargs: Additional arguments for LLM invocation
+
+        Returns:
+            Dict[str, Any]: Dictionary with improvements, positives,
+                emotional_movement, skill_coverage, supervisor_note and
+                memory_update.
+                When need_memory=True, also includes session_glimpse and
+                cumulative_memory.
+
+        Raises:
+            LLMInvocationFailedException: If LLM invocation fails
+        """
+        logger.info(
+            "OpenAI.generate_scenario_evaluation: starting "
+            "(chat_history_len=%d, need_memory=%s, has_previous_memory=%s, "
+            "has_memory_prompt=%s, has_prompt_overrides=%s, worker_type=%s, "
+            "has_learner_name=%s, has_supervisor_memory=%s, "
+            "helpful_behaviours_count=%d, unhelpful_behaviours_count=%d, "
+            "live_notes=%d)",
+            len(chat_history),
+            need_memory,
+            previous_memory is not None,
+            memory_prompt is not None,
+            prompts is not None,
+            worker_type,
+            bool(learner_name),
+            bool(supervisor_memory),
+            len(helpful_behaviours or []),
+            len(unhelpful_behaviours or []),
+            len(live_notes or []),
+        )
+
+        # Map UUIDs to compact keys to reduce token usage
+        uuid_to_key, key_to_uuid = build_id_mapping(chat_history)
+        logger.debug(
+            "OpenAI.generate_scenario_evaluation: id mapping built (count=%d)",
+            len(uuid_to_key),
+        )
+
+        # Convert chat history to string format using keys
+        chat_history_str = "\n".join(
+            [
+                f"[ID: {uuid_to_key[msg.id]}] ({msg.role}): {msg.content}"
+                for msg in chat_history
+            ]
+        )
+
+        # Track the client's keys so emotional_movement can be validated against
+        # them. The counselor's used to be tracked too, for message tags; those
+        # were deprecated with the annotated transcript.
+        client_keys: list[str] = [
+            uuid_to_key[msg.id]
+            for msg in chat_history
+            if msg.role and msg.role.lower() in ("client", "assistant")
+        ]
+
+        try:
+            supervisor_note_section = _build_supervisor_note_section(
+                prompts=prompts,
+                worker_type=worker_type,
+                learner_name=learner_name,
+                supervisor_memory=supervisor_memory,
+                live_notes=live_notes,
+            )
+            scenario_behaviours_section = _build_scenario_behaviours_section(
+                prompts=prompts,
+                helpful_behaviours=helpful_behaviours,
+                unhelpful_behaviours=unhelpful_behaviours,
+            )
+
+            # Select prompt and response model based on memory requirement
+            if need_memory:
+                custom_prompt_section = (
+                    f"Additional Instructions:\n{memory_prompt}"
+                    if memory_prompt
+                    else ""
+                )
+                formatted_prompt = load_and_format(
+                    "scenario/scenario_evaluation_with_memory",
+                    prompts=prompts,
+                    chat_history=chat_history_str,
+                    previous_summary=(
+                        previous_memory or "No previous summary available."
+                    ),
+                    custom_prompt_section=custom_prompt_section,
+                    SUPERVISOR_NOTE_SECTION=supervisor_note_section,
+                    SCENARIO_BEHAVIOUR_GUIDANCE=scenario_behaviours_section,
+                    SKILL_COVERAGE_DESCRIPTIONS=load_template(
+                        "shared/skill_coverage", prompts=prompts
+                    ),
+                )
+                response_model = ScenarioEvaluationWithMemory
+                logger.info(
+                    "OpenAI.generate_scenario_evaluation: prompt loaded "
+                    "(template=scenario/scenario_evaluation_with_memory, "
+                    "prompt_chars=%d)",
+                    len(formatted_prompt) if isinstance(formatted_prompt, str) else -1,
+                )
+            else:
+                formatted_prompt = load_and_format(
+                    "scenario/scenario_evaluation",
+                    prompts=prompts,
+                    chat_history=chat_history_str,
+                    SUPERVISOR_NOTE_SECTION=supervisor_note_section,
+                    SCENARIO_BEHAVIOUR_GUIDANCE=scenario_behaviours_section,
+                    SKILL_COVERAGE_DESCRIPTIONS=load_template(
+                        "shared/skill_coverage", prompts=prompts
+                    ),
+                )
+                response_model = ScenarioEvaluation
+                logger.info(
+                    "OpenAI.generate_scenario_evaluation: prompt loaded "
+                    "(template=scenario/scenario_evaluation, prompt_chars=%d)",
+                    len(formatted_prompt) if isinstance(formatted_prompt, str) else -1,
+                )
+
+            # Append an output-language directive when the learner's preferred
+            # language is non-English. Done in code (not the .txt template) so it
+            # applies even when a dashboard-override prompt is used. English / None
+            # leaves the prompt byte-for-byte unchanged.
+            if _wants_translated_feedback(language_code) and isinstance(
+                formatted_prompt, str
+            ):
+                formatted_prompt = formatted_prompt + _language_directive(
+                    cast(str, language_code)
+                )
+                logger.info(
+                    "OpenAI.generate_scenario_evaluation: appended output-language "
+                    "directive (language_code=%s, prompt_chars=%d)",
+                    language_code,
+                    len(formatted_prompt),
+                )
+
+            logger.info(
+                "OpenAI.generate_scenario_evaluation: invoking LLM "
+                "(response_model=%s)",
+                response_model.__name__,
+            )
+            evaluation_llm = self._client_for(
+                (
+                    "scenario/scenario_evaluation_with_memory"
+                    if need_memory
+                    else "scenario/scenario_evaluation"
+                ),
+                prompts,
+            )
+            response = cast(
+                response_model,
+                await self._invoke_llm(
+                    formatted_prompt,
+                    response_model,
+                    task=usage_task or LLMTask.SCENARIO_EVALUATION.value,
+                    llm_override=evaluation_llm,
+                    **kwargs,
+                ),
+            )
+
+            logger.info(
+                "OpenAI.generate_scenario_evaluation: LLM returned "
+                "(response_type=%s, response_is_none=%s)",
+                type(response).__name__,
+                response is None,
+            )
+
+            # Build result: validate keys and remap back to UUIDs
+            # Convert areas_of_growth to dict format and populate
+            # deprecated improvements
+            areas_of_growth_list = [
+                {
+                    "improvement": item.improvement,
+                    "recommendation": item.recommendation,
+                }
+                for item in response.areas_of_growth
+            ]
+
+            # For backward compatibility: extract just the improvement strings
+            improvements_list = [item.improvement for item in response.areas_of_growth]
+
+            result: Dict[str, Any] = {
+                "challenge_description": response.challenge_description,
+                "areas_of_growth": areas_of_growth_list,
+                # Deprecated, for backward compatibility
+                "improvements": improvements_list,
+                "positives": response.positives,
+                "emotional_movement": filter_emotional_movement(
+                    response.emotional_movement,
+                    client_keys,
+                    key_to_uuid,
+                ),
+                "skill_coverage": [
+                    {
+                        "category": item.category.value,
+                        "percentage": int(item.percentage),
+                    }
+                    for item in response.skill_coverage
+                ],
+                # The note's [[msg:...]] anchors come back holding compact keys;
+                # clients need real UUIDs to link them to transcript messages.
+                "supervisor_note": remap_note_references(
+                    await self._ensure_note_sections(
+                        response.supervisor_note,
+                        prompts=prompts,
+                        llm_override=evaluation_llm,
+                        task=usage_task or LLMTask.SCENARIO_EVALUATION.value,
+                        **kwargs,
+                    ),
+                    key_to_uuid,
+                ),
+                "memory_update": {
+                    "focus_areas": response.memory_update.focus_areas,
+                    "trajectory": response.memory_update.trajectory,
+                    "next_time": response.memory_update.next_time,
+                },
+            }
+
+            if need_memory:
+                result["session_glimpse"] = response.session_glimpse
+                result["cumulative_memory"] = response.cumulative_memory
+
+            logger.info(
+                "OpenAI.generate_scenario_evaluation: post-processing complete "
+                "(areas_of_growth=%d, positives=%d, "
+                "emotional_movement=%d, skill_coverage=%d, has_memory=%s, "
+                "supervisor_note_chars=%d, focus_areas=%d)",
+                len(result.get("areas_of_growth", [])),
+                len(result.get("positives", [])),
+                len(result.get("emotional_movement", [])),
+                len(result.get("skill_coverage", [])),
+                need_memory,
+                len(result.get("supervisor_note") or ""),
+                len(result.get("memory_update", {}).get("focus_areas", [])),
+            )
+            return result
+
+        except LLMInvocationFailedException as e:
+            logger.exception(
+                "OpenAI.generate_scenario_evaluation: LLMInvocationFailedException: %s",
+                str(e),
+            )
+            raise LLMInvocationFailedException(
+                "Failed to generate scenario evaluation"
+            ) from e
+
+        except Exception as e:
+            logger.exception(
+                "OpenAI.generate_scenario_evaluation: unexpected %s during "
+                "post-processing or prompt loading: %s",
+                type(e).__name__,
+                str(e),
+            )
+            raise

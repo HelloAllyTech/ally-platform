@@ -1,0 +1,72 @@
+from enum import Enum
+from typing import Any
+
+
+class LLMTask(str, Enum):
+    """Task labels for token-usage analytics. Must match ally-be's LlmTask enum."""
+
+    NUDGE = "nudge"
+    SUMMARY = "summary"
+    DYNAMIC_SUMMARY = "dynamic_summary"
+    SCENARIO_EVALUATION = "scenario_evaluation"
+    # The same debrief call re-run by ally-be to regenerate a session's
+    # feedback in another language, on demand, after the original debrief.
+    # Separate so a session's second (and third...) debrief reads as what it
+    # is rather than inflating the cost of the debrief itself. ally-be picks
+    # the label per request via ScenarioEvaluationRequest.usage_task.
+    SCENARIO_EVALUATION_LANGUAGE = "scenario_evaluation_language"
+    COUNSELOR_ANALYSIS = "counselor_analysis"
+    USER_IDENTIFICATION = "user_identification"
+    CONTENT_ENHANCE = "content_enhance"
+    TAG_POSITIVITY = "tag_positivity"
+    DIARIZATION = "diarization"
+    EMBEDDING = "embedding"
+    DRIFT_JUDGE = "drift_judge"
+    # Backfill-only: the same rubric with the response constrained to the
+    # added labels. Separate from DRIFT_JUDGE so the saving is measurable
+    # rather than asserted.
+    DRIFT_JUDGE_LABELS = "drift_judge_labels"
+    LANGUAGE_JUDGE = "language_judge"
+    # Thinking-filler judge. Deliberately its own label rather than folded into
+    # LANGUAGE_JUDGE: it runs on a different cadence over a different slice, so
+    # sharing a label would make both lines unreadable. Needs the matching value
+    # in ally-be's LlmTask enum, or these rows arrive unlabelled.
+    FILLER_JUDGE = "filler_judge"
+    FEEDBACK_GROUNDEDNESS_JUDGE = "feedback_groundedness_judge"
+    # RAG-quality judge: one call per retrieval, labelling each returned
+    # passage's relevance and the set's sufficiency. Priced separately because
+    # its volume tracks retrievals rather than sessions.
+    RAG_QUALITY_JUDGE = "rag_quality_judge"
+    RECALL_QUALITY_JUDGE = "recall_quality_judge"
+    # Analytics Agent: one planning call (question -> SQL) and one narration
+    # call (rows -> answer) per question, priced separately because the
+    # planner carries the whole schema catalogue and the narrator the rows.
+    ANALYTICS_AGENT_PLAN = "analytics_agent_plan"
+    ANALYTICS_AGENT_ANSWER = "analytics_agent_answer"
+    # WhatsApp Q&A bot. Two labels, not one: answering a question can involve both calls
+    # and their cost shapes differ by an order of magnitude — the answer call carries
+    # the retrieved passages on the admin-selected model, the translate call is a short
+    # mechanical transform on a cheap one. Merged, cost-per-question would be
+    # unattributable.
+    #
+    # No embedding label yet. The corpus and query embeddings are real cost, but
+    # emitting them needs an 'embedding' branch in emitter._has_quantity plus matching
+    # handling in ally-be's consumer (see the note in KnowledgeChunkService). Adding an
+    # enum member here before ally-be has the matching one would be exactly the drift
+    # this enum's docstring warns against.
+    WHATSAPP_RAG_ANSWER = "whatsapp_rag_answer"
+    WHATSAPP_QUERY_TRANSLATE = "whatsapp_query_translate"
+    WHATSAPP_CRISIS_CLASSIFY = "whatsapp_crisis_classify"
+    # Text helpline copilot. Two labels because they differ in volume and shape: the
+    # risk classifier runs on every talker message with a tiny output, the turn call
+    # runs once per (debounced) talker turn and writes the suggestions. Must have the
+    # matching members in ally-be's LlmTask enum, or these rows arrive unlabelled.
+    HELPLINE_RISK_CLASSIFY = "helpline_risk_classify"
+    HELPLINE_COPILOT_TURN = "helpline_copilot_turn"
+
+
+def resolve_model_name(model: Any) -> str:
+    """Best-effort model id from a LangChain chat model (ChatOpenAI etc.)."""
+    return (
+        getattr(model, "model_name", None) or getattr(model, "model", None) or "unknown"
+    )

@@ -1,0 +1,299 @@
+"""Schemas for the conversation drift judge (see drift-metrics-spec.md).
+
+The judge LLM emits ONLY the per-turn array (``LiveJudgeOutput``). The session
+rollup (drifted? / first-drift turn / attribution mix) is computed
+deterministically in code from those per-turn rows — never asked of the LLM —
+so the headline numbers are reproducible and don't depend on the model's
+arithmetic.
+"""
+
+from __future__ import annotations
+
+from typing import List, Literal, Optional
+
+from pydantic import BaseModel, Field
+
+# Anchored ordinal — calibrate against hand labels on the LEVEL, not a number.
+CoherenceLevel = Literal[
+    "fully_coherent",
+    "minor_disfluency",
+    "degrading",
+    "mostly_incoherent",
+    "gibberish",
+]
+TopicLabel = Literal["on_topic", "tangent", "off_topic", "gibberish"]
+GarbleLevel = Literal["none", "partial", "severe"]
+SttErrorType = Literal[
+    "entity_swap",
+    "phonetic_garble",
+    "wrong_language",
+    "number_format",
+    "code_mix_fail",
+    "truncation",
+    "none",
+]
+LlmFailureMode = Literal[
+    "hallucination",
+    "context_lockin",
+    "wrong_language_reply",
+    "repetition",
+    "role_slip",
+    "wrong_intent",
+    "none",
+]
+RootAttribution = Literal[
+    "stt_direct",
+    "stt_cascade",
+    "llm_direct",
+    "context_lockin",
+    "none",
+]
+
+# Coherence levels at or below this rank count as a drift turn (when not
+# in-character). fully_coherent=4 … gibberish=0; "degrading" = 2.
+COHERENCE_RANK = {
+    "fully_coherent": 4,
+    "minor_disfluency": 3,
+    "degrading": 2,
+    "mostly_incoherent": 1,
+    "gibberish": 0,
+}
+COHERENCE_DRIFT_CUTOFF = 2  # <= degrading
+
+
+class PerTurnJudgment(BaseModel):
+    """One AI-client turn, judged. This is the LLM's structured output unit."""
+
+    turn_index: int = Field(description="Index of the AI-client turn being judged.")
+    coherence: CoherenceLevel
+    topic_label: TopicLabel
+    in_character: bool = Field(
+        description="True if odd output is realistic in-character distress, not drift."
+    )
+    counselor_utterance_garbled: GarbleLevel = Field(
+        description="STT quality of the counselor (human) utterance this turn replies "
+        "to."
+    )
+    stt_error_type: SttErrorType = Field(
+        description="Sub-type of STT garble, or 'none' if not garbled."
+    )
+    ai_reply_failure_mode: LlmFailureMode = Field(
+        description="How the AI reply failed, or 'none' if clean."
+    )
+    root_attribution: RootAttribution = Field(
+        description="Root cause, considering the prior ~3 turns; 'none' if not a drift "
+        "turn."
+    )
+
+    # ---- v2 labels ------------------------------------------------------
+    #
+    # Added for the Weak Performing Metrics dashboard. Every one is a boolean
+    # or a count — never a score, rating or rate. Anything derived (per-100
+    # rates, session rollups, over-compliance thresholds) is computed in SQL
+    # from these, so re-weighting never requires re-judging 17k turns.
+    #
+    # Optional with defaults so a v1 row read back through this model still
+    # validates, and so a judge that omits one degrades to "not observed"
+    # rather than failing the whole session.
+    role_inversion: Optional[bool] = Field(
+        default=None,
+        description=(
+            "True if the AI asked the counselor about the COUNSELOR "
+            "(their views, feelings, experience) or gave them advice — i.e. "
+            "acted as the counselor. A client asking for help ('what should I "
+            "do?') is NOT role inversion."
+        ),
+    )
+    offered_solution: Optional[bool] = Field(
+        default=None,
+        description=(
+            "True if the AI proposed a solution or coping plan for its OWN "
+            "problem, unprompted, rather than letting the counselor work "
+            "toward it."
+        ),
+    )
+    solutions_offered: Optional[int] = Field(
+        default=None,
+        description=(
+            "How many DISTINCT solutions the AI proposed for its own problem "
+            "this turn. 0 when none. A real client offers at most one or two; "
+            "the acceptable ceiling is a product decision applied downstream, "
+            "not a judgement made here."
+        ),
+    )
+    introduced_new_information: Optional[bool] = Field(
+        default=None,
+        description=(
+            "True if this turn added anything the client had not already said "
+            "— a new detail, feeling, event or objection. False when it only "
+            "restates earlier content, however differently worded."
+        ),
+    )
+    stuck_is_appropriate: Optional[bool] = Field(
+        default=None,
+        description=(
+            "Only meaningful when introduced_new_information is False. True if "
+            "holding the same position was CORRECT portrayal given the brief "
+            "and what the counselor just did (a resistant client should not "
+            "yield to a weak intervention); False if the client should have "
+            "moved and did not. Set null when the turn did advance."
+        ),
+    )
+    resistance_briefed: Optional[bool] = Field(
+        default=None,
+        description=(
+            "True if the persona/scenario brief calls for resistance, denial "
+            "or reluctance. Judged from the brief, not from this turn — it is "
+            "the same answer for every turn in a session, and it is what makes "
+            "over-compliance readable as a failure rather than a style."
+        ),
+    )
+
+    reasoning: str = Field(description="One sentence justifying the labels.")
+
+
+class JudgeOutput(BaseModel):
+    """A per-turn array, wrapped — the lenient read-back shape.
+
+    NOT what the live judge asks Gemini for: see ``LiveJudgeOutput``.
+    """
+
+    per_turn: List[PerTurnJudgment]
+
+
+class LiveTurnJudgment(PerTurnJudgment):
+    """One turn as the LIVE judge is REQUIRED to answer it.
+
+    Same lesson as :class:`LeanTurnLabels`, applied to the path that judges new
+    sessions. Gemini marks a field required only when ``response_schema`` says
+    so, and with every v2 label Optional it returned them only where they fired
+    — the omission that made the lean backfill read role inversion as 100%.
+    Prose in the rubric did not prevent that and cannot; the schema can.
+
+    ``PerTurnJudgment`` stays lenient because it is also how a stored v1 row is
+    read back, and those rows legitimately carry nulls in the v2 columns. So the
+    tightening lives here, on the model handed to the model.
+
+    ``stuck_is_appropriate`` stays optional, inherited unchanged: the rubric
+    defines it only for a turn that did NOT advance, and forcing a value on an
+    advancing turn would invent a judgement.
+    """
+
+    role_inversion: bool = Field(
+        description="Answer for EVERY turn. False, never omitted, when absent."
+    )
+    offered_solution: bool = Field(
+        description="Answer for EVERY turn. False, never omitted, when absent."
+    )
+    solutions_offered: int = Field(
+        description="Answer for EVERY turn. 0, never omitted, when none."
+    )
+    resistance_briefed: bool = Field(
+        description=(
+            "Answer for EVERY turn. Read from the BRIEF, so it is the same "
+            "answer on every turn of a session."
+        )
+    )
+    introduced_new_information: bool = Field(
+        description="Answer for EVERY turn. False, never omitted, when absent."
+    )
+
+
+class LiveJudgeOutput(BaseModel):
+    """Exactly what the live judge LLM returns."""
+
+    per_turn: List[LiveTurnJudgment]
+
+
+class AttributionMix(BaseModel):
+    stt_direct: int = 0
+    stt_cascade: int = 0
+    llm_direct: int = 0
+    context_lockin: int = 0
+
+
+class SessionRollup(BaseModel):
+    """Computed in code from per-turn rows — NOT emitted by the LLM."""
+
+    drifted: bool
+    first_drift_turn: Optional[int] = None
+    attribution_mix: AttributionMix
+
+
+class DriftJudgmentResult(BaseModel):
+    per_turn: List[PerTurnJudgment]
+    session: SessionRollup
+
+
+class LeanTurnLabels(BaseModel):
+    """The v2-only labels, for topping up turns already judged under v1.
+
+    The five unconditional labels are REQUIRED, and that is the whole lesson of
+    the first attempt. When they were Optional, the model read the instruction
+    "omit reasoning on clean turns" as licence to omit any label whose answer
+    was no: over 155 production turns it emitted `role_inversion` on 2, and both
+    were true. The rate counts only turns carrying the label, so the dashboard
+    would have read role inversion as 100%.
+
+    Optional typing was meant to stop a declined label becoming a false
+    negative. It did the opposite — absence and false collapsed into the same
+    thing, from the other direction. So the schema now compels an answer per
+    turn rather than trusting prose to ask for one; Gemini enforces required
+    fields through `response_schema`, which wording cannot.
+
+    `stuck_is_appropriate` stays optional because it is genuinely conditional:
+    the rubric defines it only for a turn that did NOT advance, and forcing a
+    value on an advancing turn would invent a judgement the rubric never asked
+    for.
+
+    Deliberately NOT a subclass of PerTurnJudgment: inheriting would drag in
+    coherence, topic_label and the rest as required fields, which is exactly
+    the output this exists to avoid paying for.
+    """
+
+    turn_index: int = Field(description="Index of the AI-client turn judged.")
+
+    role_inversion: bool = Field(
+        description="Answer for EVERY turn. False, never omitted, when absent."
+    )
+    offered_solution: bool = Field(
+        description="Answer for EVERY turn. False, never omitted, when absent."
+    )
+    solutions_offered: int = Field(
+        description="Answer for EVERY turn. 0, never omitted, when none."
+    )
+    resistance_briefed: bool = Field(
+        description=(
+            "Answer for EVERY turn. Read from the BRIEF, so it is the same "
+            "answer on every turn of a session."
+        )
+    )
+    introduced_new_information: bool = Field(
+        description="Answer for EVERY turn. False, never omitted, when absent."
+    )
+
+    stuck_is_appropriate: Optional[bool] = Field(
+        default=None,
+        description=(
+            "ONLY when introduced_new_information is false: true if holding "
+            "position was correct portrayal, false if the client should have "
+            "moved. Null when the turn advanced — the rubric defines no answer "
+            "there, and inventing one would corrupt the stasis rate."
+        ),
+    )
+
+    reasoning: Optional[str] = Field(
+        default=None,
+        description=(
+            "One short sentence, ONLY on a turn where a label actually fires. "
+            "Null on clean turns: justifying 'nothing happened' on every turn "
+            "is the largest avoidable cost in a backfill and is read by nobody. "
+            "This is the ONLY field that may be omitted."
+        ),
+    )
+
+
+class LeanJudgeOutput(BaseModel):
+    """Exactly what the lean judge LLM returns."""
+
+    per_turn: List[LeanTurnLabels]

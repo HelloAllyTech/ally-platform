@@ -1,0 +1,1117 @@
+"""Tests for WeaviateDB service."""
+
+from unittest.mock import ANY, AsyncMock, MagicMock
+from uuid import uuid4
+
+import pytest
+import httpx
+from weaviate.exceptions import (
+    AuthenticationFailedException,
+    WeaviateConnectionError,
+    WeaviateInsertManyAllFailedError,
+    UnexpectedStatusCodeError,
+)
+
+from app.core.vector_db.weaviate import WeaviateDB, _build_property_filter
+from app.exceptions.custom_exceptions import (
+    DocumentNotFoundException,
+    EmbeddingFailedException,
+    VectorDBDeleteFailedException,
+    VectorDBFetchFailedException,
+    VectorDBInsertFailedException,
+    VectorDBSearchFailedException,
+    VectorDBUpdateFailedException,
+)
+
+
+class TestWeaviateDB:
+    """Test cases for WeaviateDB service."""
+
+    @pytest.fixture
+    def mock_client(self):
+        """Mock Weaviate client."""
+        client = MagicMock()
+        client.collections = MagicMock()
+        return client
+
+    @pytest.fixture
+    def mock_embedding_service(self):
+        """Mock embedding service."""
+        return AsyncMock()
+
+    @pytest.fixture
+    def weaviate_db(self, mock_client, mock_embedding_service):
+        """Create WeaviateDB instance for testing."""
+        return WeaviateDB(mock_client, mock_embedding_service)
+
+    @pytest.fixture
+    def mock_collection(self):
+        """Mock Weaviate collection."""
+        collection = MagicMock()
+        collection.query = MagicMock()
+        collection.query.near_vector = AsyncMock()
+        collection.query.fetch_objects = AsyncMock()
+        collection.data = MagicMock()
+        collection.data.insert = AsyncMock()
+        collection.data.update = AsyncMock()
+        collection.data.delete_by_id = AsyncMock()
+        collection.aggregate = MagicMock()
+        collection.aggregate.near_vector = AsyncMock()
+        return collection
+
+    @pytest.mark.asyncio
+    async def test_similarity_search_success(self, weaviate_db, mock_collection):
+        """Test successful similarity search."""
+        # Setup mocks
+        vector = [0.1, 0.2, 0.3]
+        top_k = 5
+        mock_result = MagicMock()
+        mock_collection.query.near_vector = AsyncMock(return_value=mock_result)
+        weaviate_db.client.collections.get.return_value = mock_collection
+
+        # Execute
+        result = await weaviate_db.similarity_search(vector, top_k)
+
+        # Assert
+        assert result == mock_result
+        mock_collection.query.near_vector.assert_called_once_with(
+            near_vector=vector,
+            limit=top_k,
+            return_metadata=ANY,  # wvc.query.MetadataQuery(certainty=True)
+        )
+
+    @pytest.mark.asyncio
+    async def test_similarity_search_connection_error(
+        self, weaviate_db, mock_collection
+    ):
+        """Test similarity search with connection error."""
+        # Setup mocks
+        vector = [0.1, 0.2, 0.3]
+        mock_collection.query.near_vector.side_effect = WeaviateConnectionError(
+            "Connection failed"
+        )
+        weaviate_db.client.collections.get.return_value = mock_collection
+
+        # Execute and assert
+        with pytest.raises(
+            VectorDBSearchFailedException, match="Weaviate connection error"
+        ):
+            await weaviate_db.similarity_search(vector)
+
+    @pytest.mark.asyncio
+    async def test_similarity_search_authentication_error(
+        self, weaviate_db, mock_collection
+    ):
+        """Test similarity search with authentication error."""
+        # Setup mocks
+        vector = [0.1, 0.2, 0.3]
+        mock_collection.query.near_vector.side_effect = AuthenticationFailedException(
+            "Auth failed"
+        )
+        weaviate_db.client.collections.get.return_value = mock_collection
+
+        # Execute and assert
+        with pytest.raises(
+            VectorDBSearchFailedException, match="Weaviate authentication failed"
+        ):
+            await weaviate_db.similarity_search(vector)
+
+    @pytest.mark.asyncio
+    async def test_fetch_relevant_conversations_success(
+        self, weaviate_db, mock_collection
+    ):
+        """Test successful fetch relevant conversations."""
+        # Setup mocks
+        query = "test query"
+        vector = [0.1, 0.2, 0.3]
+        mock_result = MagicMock()
+
+        weaviate_db.embedding_service.embed.return_value = vector
+        mock_collection.query.near_vector.return_value = mock_result
+        weaviate_db.client.collections.get.return_value = mock_collection
+
+        # Execute
+        result = await weaviate_db.fetch_relevant_conversations(query)
+
+        # Assert
+        assert result == mock_result
+        weaviate_db.embedding_service.embed.assert_called_once_with(query)
+
+    @pytest.mark.asyncio
+    async def test_fetch_relevant_conversations_embedding_error(self, weaviate_db):
+        """Test fetch relevant conversations with embedding error."""
+        # Setup mocks
+        query = "test query"
+        weaviate_db.embedding_service.embed.side_effect = EmbeddingFailedException(
+            "Embedding failed"
+        )
+
+        # Execute and assert
+        with pytest.raises(VectorDBFetchFailedException, match="Embedding failed"):
+            await weaviate_db.fetch_relevant_conversations(query)
+
+    @pytest.mark.asyncio
+    async def test_create_document_success(self, weaviate_db, mock_collection):
+        """Test successful document creation."""
+        # Setup mocks
+        collection_name = "test_collection"
+        document_data = {"content": "test content"}
+        vector = [0.1, 0.2, 0.3]
+        document_id = str(uuid4())
+        mock_result_id = uuid4()
+
+        mock_collection.data.insert.return_value = mock_result_id
+        weaviate_db.client.collections.get.return_value = mock_collection
+
+        # Execute
+        result = await weaviate_db.create_document(
+            collection_name, document_data, vector, document_id
+        )
+
+        # Assert
+        assert result == str(mock_result_id)
+        mock_collection.data.insert.assert_called_once_with(
+            properties=document_data, vector=vector, uuid=document_id
+        )
+
+    @pytest.mark.asyncio
+    async def test_create_document_failure(self, weaviate_db, mock_collection):
+        """Test document creation failure."""
+        # Setup mocks
+        collection_name = "test_collection"
+        document_data = {"content": "test content"}
+        vector = [0.1, 0.2, 0.3]
+        document_id = str(uuid4())
+
+        mock_collection.data.insert.side_effect = Exception("Insert failed")
+        weaviate_db.client.collections.get.return_value = mock_collection
+
+        # Execute and assert
+        with pytest.raises(
+            VectorDBInsertFailedException, match="Failed to create document"
+        ):
+            await weaviate_db.create_document(
+                collection_name, document_data, vector, document_id
+            )
+
+    @pytest.mark.asyncio
+    async def test_create_document_unexpected_status_code_error(
+        self, weaviate_db, mock_collection, caplog
+    ):
+        """Test document creation failure due to UnexpectedStatusCodeError."""
+        # Setup mocks
+        collection_name = "test_collection"
+        document_data = {"content": "test content"}
+        vector = [0.1, 0.2, 0.3]
+        document_id = str(uuid4())
+
+        mock_response = httpx.Response(
+            500, json={"error": "Internal Server Error"}
+        )
+        mock_collection.data.insert.side_effect = UnexpectedStatusCodeError(
+            "Invalid status code", mock_response
+        )
+        weaviate_db.client.collections.get.return_value = mock_collection
+
+        # Execute and assert
+        with pytest.raises(
+            VectorDBInsertFailedException, match="Failed to create document"
+        ):
+            await weaviate_db.create_document(
+                collection_name, document_data, vector, document_id
+            )
+        assert "Failed to create document due to unexpected status code" in caplog.text
+
+    @pytest.mark.asyncio
+    async def test_get_document_by_id_success(self, weaviate_db, mock_collection):
+        """Test successful document retrieval by ID."""
+        # Setup mocks
+        collection_name = "test_collection"
+        document_id = str(uuid4())
+
+        mock_obj = MagicMock()
+        mock_obj.uuid = document_id
+        mock_obj.properties = {"content": "test content"}
+        mock_obj.vector = [0.1, 0.2, 0.3]
+
+        mock_result = MagicMock()
+        mock_result.objects = [mock_obj]
+        mock_collection.query.fetch_objects.return_value = mock_result
+        weaviate_db.client.collections.get.return_value = mock_collection
+
+        # Execute
+        result = await weaviate_db.get_document_by_id(collection_name, document_id)
+
+        # Assert
+        expected = {
+            "id": document_id,
+            "content": "test content",
+            "vector": [0.1, 0.2, 0.3],
+        }
+        assert result == expected
+
+    @pytest.mark.asyncio
+    async def test_get_document_by_id_not_found(self, weaviate_db, mock_collection):
+        """Test document retrieval when document not found."""
+        # Setup mocks
+        collection_name = "test_collection"
+        document_id = str(uuid4())
+
+        mock_result = MagicMock()
+        mock_result.objects = []
+        mock_collection.query.fetch_objects.return_value = mock_result
+        weaviate_db.client.collections.get.return_value = mock_collection
+
+        # Execute and assert
+        with pytest.raises(
+            DocumentNotFoundException, match=f"Document with ID {document_id} not found"
+        ):
+            await weaviate_db.get_document_by_id(collection_name, document_id)
+
+    @pytest.mark.asyncio
+    async def test_get_document_by_id_without_vector(
+        self, weaviate_db, mock_collection
+    ):
+        """Test document retrieval without vector."""
+        # Setup mocks
+        collection_name = "test_collection"
+        document_id = str(uuid4())
+
+        mock_obj = MagicMock()
+        mock_obj.uuid = document_id
+        mock_obj.properties = {"content": "test content"}
+        mock_obj.vector = None
+
+        mock_result = MagicMock()
+        mock_result.objects = [mock_obj]
+        mock_collection.query.fetch_objects.return_value = mock_result
+        weaviate_db.client.collections.get.return_value = mock_collection
+
+        # Execute
+        result = await weaviate_db.get_document_by_id(
+            collection_name, document_id, include_vector=False
+        )
+
+        # Assert
+        expected = {"id": document_id, "content": "test content"}
+        assert result == expected
+
+    @pytest.mark.asyncio
+    async def test_get_document_by_id_exception(self, weaviate_db, mock_collection):
+        """Test document retrieval with general exception."""
+        # Setup mocks
+        collection_name = "test_collection"
+        document_id = str(uuid4())
+
+        mock_collection.query.fetch_objects.side_effect = Exception("Query failed")
+        weaviate_db.client.collections.get.return_value = mock_collection
+
+        # Execute and assert
+        with pytest.raises(
+            DocumentNotFoundException, match=f"Document with ID {document_id} not found"
+        ):
+            await weaviate_db.get_document_by_id(collection_name, document_id)
+
+    @pytest.mark.asyncio
+    async def test_update_document_success(self, weaviate_db, mock_collection):
+        """Test successful document update."""
+        # Setup mocks
+        collection_name = "test_collection"
+        document_id = str(uuid4())
+        document_data = {"content": "updated content"}
+        vector = [0.4, 0.5, 0.6]
+
+        mock_collection.data.update.return_value = None
+        weaviate_db.client.collections.get.return_value = mock_collection
+
+        # Execute (should not raise exception)
+        await weaviate_db.update_document(
+            collection_name, document_id, document_data, vector
+        )
+
+        # Assert
+        mock_collection.data.update.assert_called_once_with(
+            uuid=document_id, properties=document_data, vector=vector
+        )
+
+    @pytest.mark.asyncio
+    async def test_update_document_failure(self, weaviate_db, mock_collection):
+        """Test document update failure."""
+        # Setup mocks
+        collection_name = "test_collection"
+        document_id = str(uuid4())
+        document_data = {"content": "updated content"}
+        vector = [0.4, 0.5, 0.6]
+
+        mock_collection.data.update.side_effect = Exception("Update failed")
+        weaviate_db.client.collections.get.return_value = mock_collection
+
+        # Execute and assert
+        with pytest.raises(
+            VectorDBUpdateFailedException, match="Failed to update document"
+        ):
+            await weaviate_db.update_document(
+                collection_name, document_id, document_data, vector
+            )
+
+    @pytest.mark.asyncio
+    async def test_list_document_ids_returns_ids_only(
+        self, weaviate_db, mock_collection
+    ):
+        """Ids only, and the cursor is passed straight through to fetch_objects."""
+        ids = [str(uuid4()) for _ in range(3)]
+        result = MagicMock()
+        result.objects = [MagicMock(uuid=i) for i in ids]
+        mock_collection.query.fetch_objects.return_value = result
+        weaviate_db.client.collections.get.return_value = mock_collection
+
+        got = await weaviate_db.list_document_ids(
+            "test_collection", limit=3, after=ids[0]
+        )
+
+        assert got == ids
+        # return_properties=[] keeps a whole-collection sweep to ids on the wire.
+        mock_collection.query.fetch_objects.assert_called_once_with(
+            limit=3, after=ids[0], return_properties=[]
+        )
+
+    @pytest.mark.asyncio
+    async def test_list_document_ids_starts_without_a_cursor(
+        self, weaviate_db, mock_collection
+    ):
+        """The first page passes after=None rather than omitting the argument."""
+        result = MagicMock()
+        result.objects = []
+        mock_collection.query.fetch_objects.return_value = result
+        weaviate_db.client.collections.get.return_value = mock_collection
+
+        assert await weaviate_db.list_document_ids("test_collection") == []
+        mock_collection.query.fetch_objects.assert_called_once_with(
+            limit=200, after=None, return_properties=[]
+        )
+
+    @pytest.mark.asyncio
+    async def test_list_document_ids_failure(self, weaviate_db, mock_collection):
+        """A listing failure must RAISE, never return a short list.
+
+        A reconciliation sweep deletes on the basis of absence, so a silently truncated
+        page would make live objects look orphaned.
+        """
+        mock_collection.query.fetch_objects.side_effect = Exception("Listing failed")
+        weaviate_db.client.collections.get.return_value = mock_collection
+
+        with pytest.raises(
+            VectorDBSearchFailedException, match="Failed to list document ids"
+        ):
+            await weaviate_db.list_document_ids("test_collection")
+
+    @pytest.mark.asyncio
+    async def test_delete_document_success(self, weaviate_db, mock_collection):
+        """Test successful document deletion."""
+        # Setup mocks
+        collection_name = "test_collection"
+        document_id = str(uuid4())
+
+        mock_collection.data.delete_by_id.return_value = None
+        weaviate_db.client.collections.get.return_value = mock_collection
+
+        # Execute (should not raise exception)
+        await weaviate_db.delete_document(collection_name, document_id)
+
+        # Assert
+        mock_collection.data.delete_by_id.assert_called_once_with(document_id)
+
+    @pytest.mark.asyncio
+    async def test_delete_document_failure(self, weaviate_db, mock_collection):
+        """Test document deletion failure."""
+        # Setup mocks
+        collection_name = "test_collection"
+        document_id = str(uuid4())
+
+        mock_collection.data.delete_by_id.side_effect = Exception("Delete failed")
+        weaviate_db.client.collections.get.return_value = mock_collection
+
+        # Execute and assert
+        with pytest.raises(
+            VectorDBDeleteFailedException, match="Failed to delete document"
+        ):
+            await weaviate_db.delete_document(collection_name, document_id)
+
+    @pytest.mark.asyncio
+    async def test_search_documents_success(self, weaviate_db, mock_collection):
+        """Test successful document search."""
+        # Setup mocks
+        collection_name = "test_collection"
+        query = "test query"
+        vector = [0.1, 0.2, 0.3]
+
+        # Mock aggregation results
+        mock_total_agg_result = MagicMock()
+        mock_total_agg_result.total_count = 5
+        mock_group = MagicMock()
+        mock_group.grouped_by.value = "category1"
+        mock_group.total_count = 5
+        mock_cat_agg_result = MagicMock()
+        mock_cat_agg_result.groups = [mock_group]
+        mock_collection.aggregate.near_vector.side_effect = [
+            mock_total_agg_result,
+            mock_cat_agg_result,
+        ]
+
+        # Mock search result
+        mock_obj = MagicMock()
+        mock_obj.uuid = str(uuid4())
+        mock_obj.properties = {"content": "test content", "category": "category1"}
+        mock_obj.vector = [0.1, 0.2, 0.3]
+        mock_obj.metadata = MagicMock()
+        mock_obj.metadata.distance = 0.2
+
+        mock_result = MagicMock()
+        mock_result.objects = [mock_obj]
+        mock_collection.query.near_vector.return_value = mock_result
+
+        weaviate_db.embedding_service.embed.return_value = vector
+        weaviate_db.client.collections.get.return_value = mock_collection
+
+        # Execute
+        result = await weaviate_db.search_documents(collection_name, query)
+
+        # Assert
+        assert "documents" in result
+        assert "total" in result
+        assert "categories" in result
+        assert result["total"] == 5
+        assert result["categories"]["category1"] == 5
+        assert len(result["documents"]) == 1
+        assert result["documents"][0]["score"] == 0.8  # 1.0 - 0.2
+
+    @pytest.mark.asyncio
+    async def test_search_documents_with_filters(self, weaviate_db, mock_collection):
+        """Test document search with filters."""
+        # Setup mocks
+        collection_name = "test_collection"
+        query = "test query"
+        vector = [0.1, 0.2, 0.3]
+        filters = {"category": "test_category", "id": str(uuid4())}
+
+        # Mock aggregation results
+        mock_total_agg_result = MagicMock()
+        mock_total_agg_result.total_count = 0
+        mock_cat_agg_result = MagicMock()
+        mock_cat_agg_result.groups = []
+        mock_collection.aggregate.near_vector.side_effect = [
+            mock_total_agg_result,
+            mock_cat_agg_result,
+        ]
+
+        # Mock search result
+        mock_result = MagicMock()
+        mock_result.objects = []
+        mock_collection.query.near_vector.return_value = mock_result
+
+        weaviate_db.embedding_service.embed.return_value = vector
+        weaviate_db.client.collections.get.return_value = mock_collection
+
+        # Execute
+        result = await weaviate_db.search_documents(
+            collection_name, query, filters=filters
+        )
+
+        # Assert
+        assert "documents" in result
+        assert "total" in result
+        assert "categories" in result
+
+    @pytest.mark.asyncio
+    async def test_search_documents_with_list_filters(
+        self, weaviate_db, mock_collection
+    ):
+        """Test document search with list filters."""
+        # Setup mocks
+        collection_name = "test_collection"
+        query = "test query"
+        vector = [0.1, 0.2, 0.3]
+        filters = {"tags": ["tag1", "tag2"]}
+
+        # Mock aggregation results
+        mock_total_agg_result = MagicMock()
+        mock_total_agg_result.total_count = 0
+        mock_cat_agg_result = MagicMock()
+        mock_cat_agg_result.groups = []
+        mock_collection.aggregate.near_vector.side_effect = [
+            mock_total_agg_result,
+            mock_cat_agg_result,
+        ]
+
+        # Mock search result
+        mock_result = MagicMock()
+        mock_result.objects = []
+        mock_collection.query.near_vector.return_value = mock_result
+
+        weaviate_db.embedding_service.embed.return_value = vector
+        weaviate_db.client.collections.get.return_value = mock_collection
+
+        # Execute
+        result = await weaviate_db.search_documents(
+            collection_name, query, filters=filters
+        )
+
+        # Assert
+        assert "documents" in result
+        assert "total" in result
+        assert "categories" in result
+
+    @pytest.mark.asyncio
+    async def test_search_documents_failure(self, weaviate_db, mock_collection):
+        """Test document search failure."""
+        # Setup mocks
+        collection_name = "test_collection"
+        query = "test query"
+
+        weaviate_db.embedding_service.embed.side_effect = Exception("Embedding failed")
+        weaviate_db.client.collections.get.return_value = mock_collection
+
+        # Execute and assert
+        with pytest.raises(
+            VectorDBSearchFailedException, match="Failed to search documents"
+        ):
+            await weaviate_db.search_documents(collection_name, query)
+
+    @pytest.mark.asyncio
+    async def test_search_documents_with_include_vector(
+        self, weaviate_db, mock_collection
+    ):
+        """Test document search with vector included."""
+        # Setup mocks
+        collection_name = "test_collection"
+        query = "test query"
+        vector = [0.1, 0.2, 0.3]
+
+        # Mock aggregation results
+        mock_total_agg_result = MagicMock()
+        mock_total_agg_result.total_count = 0
+        mock_cat_agg_result = MagicMock()
+        mock_cat_agg_result.groups = []
+        mock_collection.aggregate.near_vector.side_effect = [
+            mock_total_agg_result,
+            mock_cat_agg_result,
+        ]
+
+        # Mock search result
+        mock_obj = MagicMock()
+        mock_obj.uuid = str(uuid4())
+        mock_obj.properties = {"content": "test content"}
+        mock_obj.vector = [0.1, 0.2, 0.3]
+        mock_obj.metadata = None
+
+        mock_result = MagicMock()
+        mock_result.objects = [mock_obj]
+        mock_collection.query.near_vector.return_value = mock_result
+
+        weaviate_db.embedding_service.embed.return_value = vector
+        weaviate_db.client.collections.get.return_value = mock_collection
+
+        # Execute
+        result = await weaviate_db.search_documents(
+            collection_name, query, include_vector=True
+        )
+
+        # Assert
+        assert "documents" in result
+        assert len(result["documents"]) == 1
+        assert "vector" in result["documents"][0]
+        assert result["documents"][0]["score"] is None  # No metadata
+
+    # ---- create_documents_bulk ----
+
+    @staticmethod
+    def _bulk_doc(doc_id, vector=(0.1, 0.2)):
+        return {
+            "id": str(doc_id),
+            "properties": {"text": "passage"},
+            "vector": list(vector),
+        }
+
+    @pytest.mark.asyncio
+    async def test_create_documents_bulk_success(self, weaviate_db, mock_collection):
+        """All objects written; ids come back as succeeded."""
+        ids = [str(uuid4()), str(uuid4())]
+        mock_collection.data.insert_many = AsyncMock(return_value=MagicMock(errors={}))
+        weaviate_db.client.collections.get.return_value = mock_collection
+
+        result = await weaviate_db.create_documents_bulk(
+            "KnowledgeChunk", [self._bulk_doc(i) for i in ids]
+        )
+
+        assert result == {"succeeded": ids, "failed": []}
+        # One round trip for the whole batch, which is the entire point of the method.
+        mock_collection.data.insert_many.assert_awaited_once()
+        submitted = mock_collection.data.insert_many.call_args.args[0]
+        assert [str(o.uuid) for o in submitted] == ids
+
+    @pytest.mark.asyncio
+    async def test_create_documents_bulk_maps_errors_by_index_to_ids(
+        self, weaviate_db, mock_collection
+    ):
+        """insert_many keys `errors` by BATCH POSITION, not by id.
+
+        Ignoring that mapping is silent data loss: the caller reasons in chunk ids, so a
+        positional error it cannot translate would be reported against the wrong chunk
+        or dropped entirely.
+        """
+        ids = [str(uuid4()), str(uuid4()), str(uuid4())]
+        mock_collection.data.insert_many = AsyncMock(
+            return_value=MagicMock(errors={1: MagicMock(message="invalid property")})
+        )
+        weaviate_db.client.collections.get.return_value = mock_collection
+
+        result = await weaviate_db.create_documents_bulk(
+            "KnowledgeChunk", [self._bulk_doc(i) for i in ids]
+        )
+
+        assert result["succeeded"] == [ids[0], ids[2]]
+        assert result["failed"] == [{"id": ids[1], "error": "invalid property"}]
+
+    @pytest.mark.asyncio
+    async def test_create_documents_bulk_rejects_missing_vector(
+        self, weaviate_db, mock_collection
+    ):
+        """An object with no vector is refused before the request.
+
+        These collections have vectorizer_config=none, so Weaviate will not generate
+        one: the object would be accepted, stored, and then never returned by any
+        similarity search. That is invisible until someone asks the question the chunk
+        would have answered.
+        """
+        good_id, bad_id = str(uuid4()), str(uuid4())
+        mock_collection.data.insert_many = AsyncMock(return_value=MagicMock(errors={}))
+        weaviate_db.client.collections.get.return_value = mock_collection
+
+        result = await weaviate_db.create_documents_bulk(
+            "KnowledgeChunk",
+            [
+                self._bulk_doc(good_id),
+                {"id": bad_id, "properties": {"text": "x"}, "vector": []},
+            ],
+        )
+
+        assert result["succeeded"] == [good_id]
+        assert len(result["failed"]) == 1
+        assert result["failed"][0]["id"] == bad_id
+        assert "vector" in result["failed"][0]["error"]
+        # The valid object is still written — one bad chunk must not fail its batch.
+        submitted = mock_collection.data.insert_many.call_args.args[0]
+        assert [str(o.uuid) for o in submitted] == [good_id]
+
+    @pytest.mark.asyncio
+    async def test_create_documents_bulk_all_vectorless_skips_the_call(
+        self, weaviate_db, mock_collection
+    ):
+        mock_collection.data.insert_many = AsyncMock()
+        weaviate_db.client.collections.get.return_value = mock_collection
+
+        result = await weaviate_db.create_documents_bulk(
+            "KnowledgeChunk",
+            [{"id": str(uuid4()), "properties": {}, "vector": []}],
+        )
+
+        assert result["succeeded"] == []
+        assert len(result["failed"]) == 1
+        mock_collection.data.insert_many.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_create_documents_bulk_all_failed_reports_per_object(
+        self, weaviate_db, mock_collection
+    ):
+        """The client RAISES when every object fails, instead of returning errors.
+
+        Left uncaught that would turn a per-object result into one whole-request
+        exception, and the caller's per-chunk retry bookkeeping would silently lose the
+        batch.
+        """
+        ids = [str(uuid4()), str(uuid4())]
+        mock_collection.data.insert_many = AsyncMock(
+            side_effect=WeaviateInsertManyAllFailedError("connection lost")
+        )
+        weaviate_db.client.collections.get.return_value = mock_collection
+
+        result = await weaviate_db.create_documents_bulk(
+            "KnowledgeChunk", [self._bulk_doc(i) for i in ids]
+        )
+
+        assert result["succeeded"] == []
+        assert {f["id"] for f in result["failed"]} == set(ids)
+
+    @pytest.mark.asyncio
+    async def test_create_documents_bulk_empty_input(self, weaviate_db):
+        assert await weaviate_db.create_documents_bulk("KnowledgeChunk", []) == {
+            "succeeded": [],
+            "failed": [],
+        }
+
+    @pytest.mark.asyncio
+    async def test_create_documents_bulk_request_failure_raises(
+        self, weaviate_db, mock_collection
+    ):
+        mock_collection.data.insert_many = AsyncMock(side_effect=Exception("boom"))
+        weaviate_db.client.collections.get.return_value = mock_collection
+
+        with pytest.raises(VectorDBInsertFailedException):
+            await weaviate_db.create_documents_bulk(
+                "KnowledgeChunk", [self._bulk_doc(uuid4())]
+            )
+
+    # ---- delete_by_filter ----
+
+    @pytest.mark.asyncio
+    async def test_delete_by_filter_returns_count(self, weaviate_db, mock_collection):
+        mock_collection.data.delete_many = AsyncMock(
+            return_value=MagicMock(successful=5, failed=0)
+        )
+        weaviate_db.client.collections.get.return_value = mock_collection
+
+        deleted = await weaviate_db.delete_by_filter(
+            "KnowledgeChunk", {"document_id": "doc-1"}
+        )
+
+        assert deleted == 5
+        mock_collection.data.delete_many.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_delete_by_filter_refuses_empty_filter(
+        self, weaviate_db, mock_collection
+    ):
+        """An empty filter matches everything, so it raises before touching Weaviate.
+
+        A caller that passed an accidentally-empty dict — a None id stringified away,
+        say — deserves an exception, not a successful-looking wipe of the corpus.
+        """
+        mock_collection.data.delete_many = AsyncMock()
+        weaviate_db.client.collections.get.return_value = mock_collection
+
+        for empty in ({}, None, {"document_id": None}):
+            with pytest.raises(ValueError):
+                await weaviate_db.delete_by_filter("KnowledgeChunk", empty)
+
+        mock_collection.data.delete_many.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_delete_by_filter_failure_raises(self, weaviate_db, mock_collection):
+        mock_collection.data.delete_many = AsyncMock(side_effect=Exception("boom"))
+        weaviate_db.client.collections.get.return_value = mock_collection
+
+        with pytest.raises(VectorDBDeleteFailedException):
+            await weaviate_db.delete_by_filter(
+                "KnowledgeChunk", {"document_id": "doc-1"}
+            )
+
+    @pytest.mark.asyncio
+    async def test_search_documents_total_is_correct_if_uncategorized_docs_exist(
+        self, weaviate_db, mock_collection
+    ):
+        """The total is taken from a grouped aggregation, which omits uncategorized
+        documents. This test confirms that the total is correct after the fix."""
+        collection_name = "test_collection"
+        query = "test query"
+        vector = [0.1, 0.2, 0.3]
+        weaviate_db.embedding_service.embed.return_value = vector
+
+        # Mock aggregation results
+        # 1. For total count (ungrouped)
+        mock_total_agg_result = MagicMock()
+        mock_total_agg_result.total_count = 3
+        # 2. For category breakdown (grouped)
+        mock_group_categorized = MagicMock()
+        mock_group_categorized.grouped_by.value = "category1"
+        mock_group_categorized.total_count = 2
+        mock_cat_agg_result = MagicMock()
+        mock_cat_agg_result.groups = [mock_group_categorized]
+
+        mock_collection.aggregate.near_vector.side_effect = [
+            mock_total_agg_result,
+            mock_cat_agg_result,
+        ]
+
+        # Mock search result with three documents, one uncategorized
+        doc1_id, doc2_id, doc3_id = str(uuid4()), str(uuid4()), str(uuid4())
+        mock_obj1 = MagicMock(
+            uuid=doc1_id,
+            properties={"content": "categorized 1", "category": "category1"},
+            metadata=MagicMock(distance=0.2),
+        )
+        mock_obj2 = MagicMock(
+            uuid=doc2_id,
+            properties={"content": "categorized 2", "category": "category1"},
+            metadata=MagicMock(distance=0.3),
+        )
+        mock_obj3 = MagicMock(
+            uuid=doc3_id,
+            properties={"content": "uncategorized"},
+            metadata=MagicMock(distance=0.4),
+        )
+        mock_result = MagicMock()
+        mock_result.objects = [mock_obj1, mock_obj2, mock_obj3]
+        mock_collection.query.near_vector.return_value = mock_result
+
+        weaviate_db.client.collections.get.return_value = mock_collection
+
+        # Execute
+        result = await weaviate_db.search_documents(collection_name, query)
+
+        # Assert: total is now 3
+        assert len(result["documents"]) == 3
+        assert result["total"] == 3
+        assert result["categories"] == {"category1": 2}
+
+
+class TestBuildPropertyFilter:
+    """The filter builder behind near_vector_search.
+
+    Its job is that a scope narrows the search instead of being applied to the search's
+    output. A restriction handed to the engine returns the best allowed matches; the
+    same restriction applied afterwards returns whichever allowed matches happened to
+    survive a global ranking, which for a shared collection is routinely none.
+    """
+
+    def test_returns_none_for_nothing_to_filter(self):
+        assert _build_property_filter(None) is None
+        assert _build_property_filter({}) is None
+        assert _build_property_filter({"language": None}) is None
+
+    def test_single_value_is_property_equality(self):
+        built = _build_property_filter({"language": "ml"})
+        assert built.target == "language"
+        assert built.value == "ml"
+
+    def test_list_value_becomes_an_or_of_equalities(self):
+        """OR of equalities, matching the primitive delete_by_filter already trusts for
+        exact document_id matching, rather than a second notion of equality."""
+        built = _build_property_filter({"document_id": ["a", "b"]})
+        assert [(f.target, f.value) for f in built.filters] == [
+            ("document_id", "a"),
+            ("document_id", "b"),
+        ]
+
+    def test_empty_list_raises_rather_than_widening(self):
+        """The leak guard. Dropping an empty scope would search everything."""
+        with pytest.raises(ValueError, match="empty set of allowed values"):
+            _build_property_filter({"document_id": []})
+
+    def test_multiple_properties_are_all_required(self):
+        built = _build_property_filter({"language": "ta", "document_id": ["a", "b"]})
+        language, documents = built.filters
+        assert (language.target, language.value) == ("language", "ta")
+        assert [(f.target, f.value) for f in documents.filters] == [
+            ("document_id", "a"),
+            ("document_id", "b"),
+        ]
+
+
+class TestWeaviateAudienceFiltering:
+    """
+    The `any_of` disjunction and the filtered property update that back per-organisation
+    document targeting.
+
+    The behaviour under test in every case is the fail-closed one. An access filter that
+    degrades into "no filter" does not raise, log or look wrong — it just answers from
+    material the caller was never entitled to, which is the one failure this layer must
+    make structurally impossible.
+    """
+
+    @pytest.fixture
+    def mock_client(self):
+        client = MagicMock()
+        client.collections = MagicMock()
+        return client
+
+    @pytest.fixture
+    def weaviate_db(self, mock_client):
+        return WeaviateDB(mock_client, AsyncMock())
+
+    @pytest.fixture
+    def mock_collection(self, mock_client):
+        collection = MagicMock()
+        collection.query = MagicMock()
+        collection.query.near_vector = AsyncMock()
+        collection.query.fetch_objects = AsyncMock()
+        collection.data = MagicMock()
+        collection.data.update = AsyncMock()
+        mock_client.collections.get.return_value = collection
+        return collection
+
+    @pytest.mark.asyncio
+    async def test_empty_any_of_returns_nothing_without_querying(
+        self, weaviate_db, mock_collection
+    ):
+        """
+        An empty disjunction means "match nothing" and is answered before any I/O.
+
+        This is THE guard. A caller that computed an audience nothing can satisfy must
+        not fall through to an unfiltered search, and answering it here means no code
+        path exists in which an empty audience reaches Weaviate as an absent filter.
+        """
+        hits = await weaviate_db.near_vector_search(
+            collection_name="KnowledgeChunk", vector=[0.1], any_of=[]
+        )
+
+        assert hits == []
+        mock_collection.query.near_vector.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_none_any_of_still_searches_unfiltered(
+        self, weaviate_db, mock_collection
+    ):
+        """`None` is the distinct 'nothing requested' case and must still search."""
+        mock_collection.query.near_vector.return_value = MagicMock(objects=[])
+
+        await weaviate_db.near_vector_search(
+            collection_name="KnowledgeChunk", vector=[0.1], any_of=None
+        )
+
+        assert mock_collection.query.near_vector.await_count == 1
+        assert mock_collection.query.near_vector.call_args.kwargs["filters"] is None
+
+    @pytest.mark.asyncio
+    async def test_any_of_is_combined_with_equality_filters(
+        self, weaviate_db, mock_collection
+    ):
+        """A language filter and an audience must AND, not replace one another."""
+        mock_collection.query.near_vector.return_value = MagicMock(objects=[])
+
+        await weaviate_db.near_vector_search(
+            collection_name="KnowledgeChunk",
+            vector=[0.1],
+            filters={"language": "en"},
+            any_of=[
+                {"property": "is_global", "equal": True},
+                {"property": "tenant_ids", "contains_any": ["t-1"]},
+            ],
+        )
+
+        assert mock_collection.query.near_vector.call_args.kwargs["filters"] is not None
+
+    def test_unknown_condition_operator_raises_rather_than_matching_everything(
+        self, weaviate_db
+    ):
+        with pytest.raises(ValueError):
+            weaviate_db._build_condition({"property": "tenant_ids", "like": "t-%"})
+
+    def test_condition_without_a_property_raises(self, weaviate_db):
+        with pytest.raises(ValueError):
+            weaviate_db._build_condition({"equal": True})
+
+    def test_contains_any_with_no_values_raises(self, weaviate_db):
+        """
+        Refused at the condition level rather than passed through.
+
+        `contains_any([])` matches nothing, so it would behave correctly — but it
+        arrives here only from a caller that meant to name some organisations and
+        computed none, and the readable way to say "match nothing" is an empty `any_of`.
+        """
+        with pytest.raises(ValueError):
+            weaviate_db._build_condition({"property": "tenant_ids", "contains_any": []})
+
+    @pytest.mark.asyncio
+    async def test_update_properties_by_filter_collects_then_updates(
+        self, weaviate_db, mock_collection
+    ):
+        first, second = uuid4(), uuid4()
+        mock_collection.query.fetch_objects.side_effect = [
+            MagicMock(objects=[MagicMock(uuid=first), MagicMock(uuid=second)]),
+        ]
+
+        updated = await weaviate_db.update_properties_by_filter(
+            "KnowledgeChunk",
+            {"document_id": "doc-1"},
+            {"is_global": True, "tenant_ids": []},
+        )
+
+        assert updated == 2
+        # No vector is passed: the audience is metadata about the object, not something
+        # its embedding is derived from, so re-embedding to change it would be waste.
+        for call in mock_collection.data.update.call_args_list:
+            assert "vector" not in call.kwargs
+            assert call.kwargs["properties"] == {"is_global": True, "tenant_ids": []}
+
+    @pytest.mark.asyncio
+    async def test_update_properties_by_filter_never_uses_the_cursor(
+        self, weaviate_db, mock_collection
+    ):
+        """
+        Paged by `offset`, never by `after`.
+
+        The cursor is the one paging mode that cannot be joined to a filter, and every
+        call here is filtered by definition — so a cursor would either error or, worse,
+        quietly page over something other than the matching set.
+        """
+        mock_collection.query.fetch_objects.side_effect = [
+            MagicMock(objects=[MagicMock(uuid=uuid4())]),
+        ]
+
+        await weaviate_db.update_properties_by_filter(
+            "KnowledgeChunk", {"document_id": "doc-1"}, {"is_global": True}
+        )
+
+        kwargs = mock_collection.query.fetch_objects.call_args.kwargs
+        assert kwargs["offset"] == 0
+        assert "after" not in kwargs
+        assert kwargs["filters"] is not None
+
+    @pytest.mark.asyncio
+    async def test_update_properties_by_filter_reads_every_page_before_writing(
+        self, weaviate_db, mock_collection
+    ):
+        """
+        A full page means there may be more, so the read continues before any write.
+
+        Writing between pages would walk a set being mutated underneath the sweep, and
+        an object skipped that way silently keeps the audience it used to have.
+        """
+        weaviate_db.UPDATE_PAGE_SIZE = 2
+        page_one = [MagicMock(uuid=uuid4()), MagicMock(uuid=uuid4())]
+        page_two = [MagicMock(uuid=uuid4())]
+        mock_collection.query.fetch_objects.side_effect = [
+            MagicMock(objects=page_one),
+            MagicMock(objects=page_two),
+        ]
+
+        updated = await weaviate_db.update_properties_by_filter(
+            "KnowledgeChunk", {"document_id": "doc-1"}, {"is_global": True}
+        )
+
+        assert updated == 3
+        assert (
+            mock_collection.query.fetch_objects.call_args_list[1].kwargs["offset"] == 2
+        )
+
+    @pytest.mark.asyncio
+    async def test_update_properties_by_filter_refuses_an_empty_filter(
+        self, weaviate_db, mock_collection
+    ):
+        """An empty filter would rewrite the audience of every chunk in the corpus."""
+        with pytest.raises(ValueError):
+            await weaviate_db.update_properties_by_filter(
+                "KnowledgeChunk", {}, {"is_global": True}
+            )
+
+        mock_collection.data.update.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_update_properties_by_filter_refuses_an_empty_payload(
+        self, weaviate_db
+    ):
+        with pytest.raises(ValueError):
+            await weaviate_db.update_properties_by_filter(
+                "KnowledgeChunk", {"document_id": "doc-1"}, {}
+            )
+
+    @pytest.mark.asyncio
+    async def test_update_properties_by_filter_wraps_failures(
+        self, weaviate_db, mock_collection
+    ):
+        mock_collection.query.fetch_objects.side_effect = RuntimeError("boom")
+
+        with pytest.raises(VectorDBUpdateFailedException):
+            await weaviate_db.update_properties_by_filter(
+                "KnowledgeChunk", {"document_id": "doc-1"}, {"is_global": True}
+            )

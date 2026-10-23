@@ -1,0 +1,84 @@
+"""Feedback-groundedness judge — a stateless transform.
+
+Same contract as the drift and language judges: ally-be owns the data, selects
+the sessions, builds the transcript and claim list from its own database, and
+persists the result. This service only judges.
+
+The response echoes the model and rubric version actually used, so the caller
+stamps the stored rows with what ran rather than hard-coding our config.
+"""
+
+from typing import List, Optional
+
+from fastapi import APIRouter, HTTPException, status
+from pydantic import BaseModel, Field
+
+from app.core.config import settings
+from app.core.feedback_groundedness.judge import judge_feedback
+from app.core.feedback_groundedness.schemas import ClaimJudgment
+from app.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
+router = APIRouter()
+
+
+class GroundednessRequest(BaseModel):
+    # Whole-session transcript, same shape the drift judge takes.
+    transcript: List[dict] = Field(default_factory=list)
+    # Each: {claim_index, kind: "positive"|"improvement", text}
+    claims: List[dict] = Field(default_factory=list)
+    language: str = "en"
+    rubric: Optional[str] = None
+    # The session whose feedback is being judged. Attribution only — carried
+    # onto the call's llm_usage row so judge cost can be tied to a session.
+    # Optional, so a caller that predates it is judged exactly as before.
+    scenario_session_id: Optional[str] = None
+
+
+class GroundednessResponse(BaseModel):
+    judge_model: str
+    judge_prompt_version: str
+    claims: List[ClaimJudgment]
+
+
+@router.post("/judge", response_model=GroundednessResponse)
+async def judge(req: GroundednessRequest) -> GroundednessResponse:
+    """Judge one session's feedback claims against its transcript."""
+    if not req.transcript:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="empty transcript"
+        )
+    if not req.claims:
+        # Not an error: a session can legitimately have feedback with no
+        # checkable claims. Returning an empty list lets the caller record
+        # "judged, nothing to check" rather than retrying forever.
+        # No judge ran, so report the configured model — the honest answer to
+        # "what would have judged this". `judge_model` from the call below is
+        # not in scope here.
+        return GroundednessResponse(
+            judge_model=settings.FEEDBACK_GROUNDEDNESS_JUDGE.MODEL,
+            judge_prompt_version=settings.FEEDBACK_GROUNDEDNESS_JUDGE.PROMPT_VERSION,
+            claims=[],
+        )
+
+    try:
+        claims, judge_model = await judge_feedback(
+            req.transcript,
+            req.claims,  # type: ignore[arg-type]
+            req.language,
+            rubric=req.rubric,
+            scenario_session_id=req.scenario_session_id,
+        )
+    except Exception as exc:  # noqa: BLE001 - surface as 500, keep caller decoupled
+        logger.exception("[groundedness] judge failed")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="groundedness judge failed",
+        ) from exc
+
+    return GroundednessResponse(
+        judge_model=judge_model,
+        judge_prompt_version=settings.FEEDBACK_GROUNDEDNESS_JUDGE.PROMPT_VERSION,
+        claims=claims,
+    )

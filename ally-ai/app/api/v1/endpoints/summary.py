@@ -1,0 +1,215 @@
+from typing import Union
+
+from fastapi import APIRouter, HTTPException, status
+from fastapi.params import Depends
+
+from app.core.dependencies import get_summary_service
+from app.core.summaries.summary_service import SummaryService
+from app.exceptions.custom_exceptions import (
+    CounselorTrainingAnalysisFailedException,
+    SummarizationFailedException,
+)
+from app.schemas.summary import (
+    ContentEnhanceRequest,
+    ContentEnhanceResponse,
+    DynamicSummaryNoteResponse,
+    ScenarioEvaluationRequest,
+    ScenarioEvaluationResponse,
+    SummaryNoteAndTagsRequest,
+    SummaryNoteAndTagsResponse,
+    TagPositivityRatingRequest,
+    TagPositivityRatingResponse,
+)
+from app.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
+router = APIRouter()
+
+
+@router.post(
+    "/note",
+    tags=["note", "summary"],
+    response_model=Union[SummaryNoteAndTagsResponse, DynamicSummaryNoteResponse],
+)
+async def create_note_and_tags(
+    request: SummaryNoteAndTagsRequest,
+    summary_service: SummaryService = Depends(get_summary_service),
+):
+    """
+    Summarizes the conversation based on chat history.
+    """
+    try:
+        summary_note_and_tags_response = (
+            await summary_service.generate_summary_and_tags(
+                request.chat_history,
+                keys=request.keys,
+                key_descriptions=request.key_descriptions,
+                prompts=request.prompts,
+            )
+        )
+        return summary_note_and_tags_response
+    except SummarizationFailedException:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Summary generation failed",
+        )
+    except Exception as e:
+        logger.exception(f"Unexpected error: {type(e).__name__}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Something went wrong. Please try again later.",
+        )
+
+
+@router.post(
+    "/enhance", tags=["enhance", "summary"], response_model=ContentEnhanceResponse
+)
+async def enhance(
+    request: ContentEnhanceRequest,
+    summary_service: SummaryService = Depends(get_summary_service),
+):
+    """
+    Enhances the content
+    """
+    try:
+        enhanced_content = await summary_service.enhance_content(
+            request.content, prompts=request.prompts
+        )
+        return ContentEnhanceResponse(enhanced_content=enhanced_content)
+    except SummarizationFailedException:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Content enhancement failed",
+        )
+    except Exception as e:
+        logger.exception(f"Unexpected error: {type(e).__name__}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Something went wrong. Please try again later.",
+        )
+
+
+@router.post(
+    "/tag-positivity-ratings",
+    tags=["tags", "summary"],
+    response_model=TagPositivityRatingResponse,
+)
+async def get_tag_positivity_ratings(
+    request: TagPositivityRatingRequest,
+    summary_service: SummaryService = Depends(get_summary_service),
+):
+    """
+    Get positivity ratings for a list of tags.
+    """
+    try:
+        tags = await summary_service.get_tag_positivity_ratings(
+            request.tags, prompts=request.prompts
+        )
+        return TagPositivityRatingResponse(tags=tags)
+    except SummarizationFailedException:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Tag positivity rating generation failed",
+        )
+    except Exception as e:
+        logger.exception(f"Unexpected error: {type(e).__name__}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Something went wrong. Please try again later.",
+        )
+
+
+@router.post(
+    "/scenario/evaluate",
+    tags=["simulation", "analysis"],
+    response_model=ScenarioEvaluationResponse,
+)
+async def generate_scenario_evaluation(
+    request: ScenarioEvaluationRequest,
+    summary_service: SummaryService = Depends(get_summary_service),
+):
+    """
+    Generates comprehensive scenario evaluation based on chat history.
+
+    Analyzes conversation performance to identify improvement areas and positives
+    based on clinical counseling competencies.
+
+    Requires:
+    - chat_history: List of messages with unique IDs
+
+    Always returns:
+    - improvements: Areas needing development
+    - positives: Demonstrated strengths
+    - supervisor_note: Markdown debrief note written to the learner, in the
+      voice of Ally as their training supervisor. Its register and depth follow
+      the optional worker_type (LAY / EARLY_PROFESSIONAL /
+      EXPERIENCED_PROFESSIONAL, defaulting to LAY).
+    - memory_update: What the supervisor carries into the learner's next debrief
+
+    When need_memory=True, additionally returns:
+    - session_glimpse: Brief overview of the current session
+    - cumulative_memory: Comprehensive cumulative narrative across sessions
+    """
+    logger.info(
+        "scenario/evaluate received (chat_history_len=%d, need_memory=%s, "
+        "has_previous_memory=%s, has_memory_prompt=%s, has_prompt_overrides=%s)",
+        len(request.chat_history),
+        request.need_memory,
+        request.previous_memory is not None,
+        request.memory_prompt is not None,
+        request.prompts is not None,
+    )
+    try:
+        evaluation_response = await summary_service.generate_scenario_evaluation(
+            chat_history=request.chat_history,
+            need_memory=request.need_memory,
+            previous_memory=request.previous_memory,
+            memory_prompt=request.memory_prompt,
+            prompts=request.prompts,
+            language_code=request.language_code,
+            worker_type=request.worker_type,
+            learner_name=request.learner_name,
+            supervisor_memory=request.supervisor_memory,
+            helpful_behaviours=request.helpful_behaviours,
+            unhelpful_behaviours=request.unhelpful_behaviours,
+            live_notes=request.live_notes,
+            room_id=request.room_id,
+            scenario_session_id=request.scenario_session_id,
+            usage_task=request.usage_task,
+        )
+
+        logger.info(
+            "scenario/evaluate succeeded (keys=%s)",
+            (
+                list(evaluation_response.keys())
+                if isinstance(evaluation_response, dict)
+                else "non-dict"
+            ),
+        )
+        return ScenarioEvaluationResponse(**evaluation_response)
+    except CounselorTrainingAnalysisFailedException:
+        logger.exception(
+            "scenario/evaluate failed: CounselorTrainingAnalysisFailedException "
+            "(chat_history_len=%d, need_memory=%s, has_previous_memory=%s)",
+            len(request.chat_history),
+            request.need_memory,
+            request.previous_memory is not None,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Counselor training analysis generation failed",
+        )
+    except Exception as e:
+        logger.exception(
+            "scenario/evaluate unexpected error %s "
+            "(chat_history_len=%d, need_memory=%s, has_previous_memory=%s)",
+            type(e).__name__,
+            len(request.chat_history),
+            request.need_memory,
+            request.previous_memory is not None,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Something went wrong. Please try again later.",
+        )
