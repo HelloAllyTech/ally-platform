@@ -215,6 +215,10 @@ export const baseAPI = createApi({
     TAG_TYPES.BUILDER_EVAL_SUITES,
     TAG_TYPES.COURSE_COPILOT_SESSIONS,
     TAG_TYPES.COURSE_COPILOT_SESSION,
+    TAG_TYPES.ALLY_GUIDE_SETTINGS,
+    TAG_TYPES.ALLY_GUIDE_RELEASES,
+    TAG_TYPES.ALLY_GUIDE_CRISIS_RESPONSES,
+    TAG_TYPES.ALLY_GUIDE_ORG_PROFILE,
     // These four were used in providesTags/invalidatesTags but never declared
     // here, so RTK Query silently ignored them and the invalidation never
     // fired — saving a voice or a config left the list showing stale data

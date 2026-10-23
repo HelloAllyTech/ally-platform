@@ -115,6 +115,7 @@ export const SIDEBAR_ITEMS = {
   BUG_HUNTER: "bug-hunter",
   BUILDER: "builder",
   COURSE_COPILOT: "course-copilot",
+  ALLY_GUIDE: "ally-guide",
   COMPONENT_LIBRARY: "component-library",
 };
 

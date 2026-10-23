@@ -783,6 +783,24 @@ export const ApiEndpoints = {
     ITEM: (id: string) => `/v1/public-roadmap/items/${id}`,
     ORDER: "/v1/public-roadmap/items/order",
   },
+  // The Ally Console (ally-be src/guide, `GuideAdminController`). Every route is under one prefix.
+  ALLY_GUIDE: {
+    SETTINGS: "/v1/guide/admin/settings",
+    OVERVIEW: "/v1/guide/admin/overview",
+    THREADS: "/v1/guide/admin/threads",
+    THREAD_TRACES: (threadId: string) => `/v1/guide/admin/threads/${threadId}/traces`,
+    THREAD_TRANSCRIPT: (threadId: string) => `/v1/guide/admin/threads/${threadId}/transcript`,
+    TURN_TRACE: (turnId: string) => `/v1/guide/admin/turns/${turnId}/trace`,
+    TURN_PAYLOAD: (turnId: string) => `/v1/guide/admin/turns/${turnId}/payload`,
+    RELEASES: "/v1/guide/admin/releases",
+    RELEASE_BY_ID: (id: string) => `/v1/guide/admin/releases/${id}`,
+    RELEASE_PROMOTE: (id: string) => `/v1/guide/admin/releases/${id}/promote`,
+    RELEASE_ROLLBACK: "/v1/guide/admin/releases/rollback",
+    CRISIS_RESPONSES: "/v1/guide/admin/crisis-responses",
+    CRISIS_RESPONSE_BY_ID: (id: string) => `/v1/guide/admin/crisis-responses/${id}`,
+    ORG_PROFILE: "/v1/guide/admin/org-profile",
+    ORG_CRISIS_RESPONSES: "/v1/guide/admin/org-crisis-responses",
+  },
   // Text helpline org settings (platform admin only; EDIT_GLOBAL_SETTINGS).
   HELPLINE_ADMIN: {
     SETTINGS: "/v1/helpline/admin/settings",
@@ -851,6 +869,8 @@ export const ROUTES = {
   // Optional `?trackId=` binds the session to an existing course (EDIT mode).
   COURSE_COPILOT_NEW: "/course-copilot/new",
   COURSE_COPILOT_SESSION: (id: string) => `/course-copilot/${id}`,
+  // The Ally Console (ally guide admin). `?tab=` picks the tab; `?thread=` opens the Turn Inspector.
+  ALLY_CONSOLE: "/ally",
   // Evaluator micro-app (public routes; evaluator email+password auth)
   EVALUATE: "/evaluate",
   EVALUATE_RECORDS: "/evaluate/records",
@@ -1047,6 +1067,11 @@ export const TAG_TYPES = {
   // Course Copilot. Also registered in baseApi.ts's `tagTypes`.
   COURSE_COPILOT_SESSIONS: "courseCopilotSessions",
   COURSE_COPILOT_SESSION: "courseCopilotSession",
+  // Ally Console. Also registered in baseApi.ts's `tagTypes` — an unregistered tag is silently ignored.
+  ALLY_GUIDE_SETTINGS: "allyGuideSettings",
+  ALLY_GUIDE_RELEASES: "allyGuideReleases",
+  ALLY_GUIDE_CRISIS_RESPONSES: "allyGuideCrisisResponses",
+  ALLY_GUIDE_ORG_PROFILE: "allyGuideOrgProfile",
   AI_LAB_SKILLS: "aiLabSkills",
   AI_LAB_VARIABLES: "aiLabVariables",
   AI_LAB_VALUES: "aiLabValues",

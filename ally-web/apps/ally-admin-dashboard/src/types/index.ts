@@ -42,3 +42,4 @@ export * from "./helpline";
 export * from "./skillExperiments";
 export * from "./courseCopilot";
 export * from "./agentChat";
+export * from "./allyGuide";
