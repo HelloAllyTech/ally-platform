@@ -560,10 +560,14 @@ export class BuilderEvalService {
     fixtures: BuilderEvalFixture[],
   ): Promise<BuilderEvalSuite | null> {
     const since = new Date(Date.now() - BUILDER_EVAL_BASELINE_MAX_AGE_MS);
-    const lastEdited = fixtures.reduce(
-      (latest, fixture) => Math.max(latest, fixture.updatedAt?.getTime() ?? 0),
-      0,
+    const editedAt = (fixture: BuilderEvalFixture | null) =>
+      fixture?.updatedAt?.getTime() ?? 0;
+    const lastEditedFixture = fixtures.reduce<BuilderEvalFixture | null>(
+      (latest, fixture) =>
+        editedAt(fixture) > editedAt(latest) ? fixture : latest,
+      null,
     );
+    const lastEdited = editedAt(lastEditedFixture);
     const recent = await this.suites.find({
       where: {
         trigger: In(['baseline', 'manual']),
@@ -576,17 +580,29 @@ export class BuilderEvalService {
     // Same loop as the candidate, and nothing else overridden: a baseline
     // from the other loop would credit (or blame) the prompt for the loop.
     const loop = loopOf(suite.overrides);
-    const reusable = recent.find(
+    const comparable = recent.filter(
       (candidate) =>
         (candidate.completedAt ?? new Date(0)) >= since &&
-        (candidate.createdAt?.getTime() ?? 0) >= lastEdited &&
         !candidate.overrides?.prompts &&
         !candidate.overrides?.llmConfig &&
         loopOf(candidate.overrides) === loop &&
         !!candidate.summary &&
         suite.fixtureIds.every((id) => candidate.fixtureIds.includes(id)),
     );
+    const reusable = comparable.find(
+      (candidate) => (candidate.createdAt?.getTime() ?? 0) >= lastEdited,
+    );
     if (reusable) return reusable;
+    // Say why a baseline that would otherwise have been reused was not: a
+    // fresh one costs a full suite, and the reason is not on any page.
+    if (comparable.length && lastEditedFixture) {
+      const skipped = comparable[0];
+      this.logger.info(
+        `[BUILDER_EVAL] baseline ${skipped.id} (started ${skipped.createdAt?.toISOString()}) ` +
+          `not reused for ${suite.id}: fixture "${lastEditedFixture.name}" (${lastEditedFixture.id}) ` +
+          `was edited at ${lastEditedFixture.updatedAt.toISOString()}, after it started`,
+      );
+    }
 
     const baseline = await this.startSuite({
       trigger: 'baseline',

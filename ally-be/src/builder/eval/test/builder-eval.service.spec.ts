@@ -424,6 +424,7 @@ describe('BuilderEvalService', () => {
           createdAt: new Date('2026-10-23T07:00:00Z'),
         },
       ]);
+      const info = jest.spyOn((service as any).logger, 'info');
 
       await (service as any).resolveBaseline(gate(true), [
         { ...fixture('debrief'), updatedAt: edited },
@@ -431,6 +432,13 @@ describe('BuilderEvalService', () => {
 
       expect(startSuite).toHaveBeenCalledWith(
         expect.objectContaining({ trigger: 'baseline' }),
+      );
+      // A fresh baseline costs a full suite, so the log says which edit forced it.
+      expect(info).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'baseline before-edit (started 2026-10-23T07:00:00.000Z) not reused for gate-1: ' +
+            'fixture "debrief" (debrief) was edited at 2026-10-23T08:00:00.000Z',
+        ),
       );
     });
 
