@@ -2,10 +2,14 @@
 title: infra — Infrastructure & Dev Environment
 tags: [repo, infra, ansible, terraform, docker, devops]
 summary: The infra repo provisions Ally's Hetzner baremetal, Incus containers, and AWS services via Ansible + Terraform, holds the shell scripts developers use to bootstrap repos and run the local stack, and defines how operators get SSH and VPN access to the fleet.
-last_reconciled: 2026-08-09
+last_reconciled: 2026-10-23
 ---
 
 # infra — Infrastructure & Dev Environment
+
+> [!IMPORTANT]
+> **Standalone Repository (Kept Outside `ally-platform` Monorepo):**
+> While Ally's application services (`ally-be`, `ally-web`, `ally-ai`, `ally-ai-learn`, `ally-mobile`) and documentation (`helloallytech.github.io`) live together in the unified **`HelloAllyTech/ally-platform`** monorepo, **`HelloAllyTech/infra` is intentionally kept outside the monorepo as a separate, private Git repository** because it contains deployment host inventories and Ansible Vault secrets. In a local workspace, `infra/` can sit inside the `ally-platform` root directory (where `/infra/` is `.gitignore`d by `ally-platform`) or alongside it.
 
 ## Purpose
 

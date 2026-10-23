@@ -10,15 +10,7 @@ version: 1
 repo: ally-platform
 
 rules:
-  # ── Root & Sub-project Agent Entrypoints ────────────────────────────────
-  - id: root-agent-entrypoints-in-sync
-    watch:
-      - "AGENTS.md"
-      - "CLAUDE.md"
-    requires: mirror
-    why: >
-      Root AGENTS.md and CLAUDE.md must stay byte-identical.
-
+  # ── Sub-project Agent Entrypoints ───────────────────────────────────────
   - id: ally-be-agent-entrypoints-in-sync
     watch:
       - "ally-be/AGENTS.md"

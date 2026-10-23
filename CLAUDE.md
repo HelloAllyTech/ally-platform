@@ -20,7 +20,7 @@ Ally is a HIPAA-compliant platform for training mental health counselors through
 | `ally-ai-learn` | FastAPI + LiveKit + LangGraph + Python | Voice-based training agent: simulated client conversations with real-time event detection | 8000 (API) + LiveKit worker |
 | `ally-web` | Nx monorepo: Next.js + 2x Vite+React apps | Landing page (3000), Helpline dashboard (8080), Admin dashboard (8081) | 3000/8080/8081 |
 | `ally-mobile` | React Native + TypeScript | iOS/Android app for counselors: live sessions, reviews, simulations | N/A |
-| `infra` | Ansible + Terraform + Docker | Infrastructure: Hetzner baremetal, AWS (ECR/SQS/S3/CloudWatch), Incus containers | N/A |
+| `infra` *(standalone repo)* | Ansible + Terraform + Docker | Infrastructure: Hetzner baremetal, AWS (ECR/SQS/S3/CloudWatch), Incus containers (`HelloAllyTech/infra`, kept outside `ally-platform` monorepo to isolate Ansible Vault secrets; `/infra/` is `.gitignore`d) | N/A |
 | `helloallytech.github.io` | Jekyll | Developer hub / docs site on GitHub Pages | 4000 |
 
 ## Architecture & Data Flow
