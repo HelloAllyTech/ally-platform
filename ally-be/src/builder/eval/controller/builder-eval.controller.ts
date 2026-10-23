@@ -8,7 +8,9 @@ import {
   Patch,
   Post,
   Query,
+  UseGuards,
 } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -18,7 +20,8 @@ import {
 import { CurrentUser } from 'src/auth/decorators/user.decorator';
 import { TokenUser } from 'src/auth/type/auth.types';
 import { RequireFeatureToggle } from 'src/auth/decorators/feature-toggle.decorator';
-import { AuthPermissions } from 'src/auth/decorators/auth-permissions.decorator';
+import { RequirePermissions } from 'src/auth/decorators/permissions.decorator';
+import { PermissionsGuard } from 'src/auth/guards/permissions.guard';
 import { FeatureToggleKey } from 'src/authorization/constants/admin-feature-toggle.constants';
 import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
 import { BUILDER_EVAL_GATED_PROMPT_CODES } from '../../constants/builder-eval-gate.constants';
@@ -53,7 +56,8 @@ export class BuilderEvalController {
   ) {}
 
   @Get('gated-prompts')
-  @AuthPermissions([PERMISSIONS.EDIT_PROMPT])
+  @UseGuards(AuthGuard('jwt'), PermissionsGuard)
+  @RequirePermissions([PERMISSIONS.EDIT_PROMPT])
   @ApiOperation({
     summary: 'Prompt codes whose edits go live only through the eval gate',
   })
