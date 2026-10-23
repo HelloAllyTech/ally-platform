@@ -10,6 +10,7 @@ import {
   ChartPreference,
   ChartPreferencesResponse,
   CoachingLoopResponse,
+  LearnerFeedbackResponse,
   CodingAgentCostResponse,
   CohortRetentionResponse,
   CompetencyMapResponse,
@@ -160,6 +161,17 @@ const windowParams = ({
 });
 
 type AnalyticsRangeQuery = AnalyticsWindowQuery;
+
+/** The Ratings & comments feed: the window plus the feed's own filters. */
+export type LearnerFeedbackQuery = AnalyticsWindowQuery & {
+  /** Stars to keep; empty or absent keeps all. */
+  ratings?: number[];
+  /** Default true on the server: only ratings with a written comment. */
+  commentsOnly?: boolean;
+  search?: string;
+  limit?: number;
+  offset?: number;
+};
 
 type VoiceLatencyQuery = AnalyticsWindowQuery & {
   language?: string;
@@ -1058,6 +1070,20 @@ export const analyticsAPI = baseAPI.injectEndpoints({
         params: windowParams(q),
       }),
     }),
+    getLearnerFeedback: builder.query<LearnerFeedbackResponse, LearnerFeedbackQuery>({
+      query: ({ ratings, commentsOnly, search, limit, offset, ...window }) => ({
+        url: ApiEndpoints.ANALYTICS.LEARNER_FEEDBACK,
+        method: HttpMethod.GET,
+        params: {
+          ...windowParams(window),
+          ...(ratings?.length ? { ratings: ratings.join(",") } : {}),
+          ...(commentsOnly === undefined ? {} : { commentsOnly: String(commentsOnly) }),
+          ...(search ? { search } : {}),
+          ...(limit ? { limit: String(limit) } : {}),
+          ...(offset ? { offset: String(offset) } : {}),
+        },
+      }),
+    }),
     // One row per customer org. All-time totals plus a fixed trailing 12-week
     // trend, so "fading" is visible without a window picker.
     getOrgHealth: builder.query<OrgHealthResponse, AllTimeAnalyticsQuery>({
@@ -1233,6 +1259,7 @@ export const {
   useGetCompetencyMapQuery,
   useGetTrackDropoffQuery,
   useGetCoachingLoopQuery,
+  useGetLearnerFeedbackQuery,
   useGetOrgHealthQuery,
   useGetOrgSessionDistributionQuery,
   useGetLearnerKpisQuery,

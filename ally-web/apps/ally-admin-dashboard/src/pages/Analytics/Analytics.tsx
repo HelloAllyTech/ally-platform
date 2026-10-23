@@ -35,6 +35,7 @@ import { HighlightsTab } from "./tabs/HighlightsTab";
 import { LanguageQualityTab } from "./tabs/LanguageQualityTab";
 import { LatencyTab } from "./tabs/LatencyTab";
 import { ProductManagementTab } from "./tabs/ProductManagementTab";
+import { RatingsCommentsTab } from "./tabs/RatingsCommentsTab";
 import { RetrievalQualityTab } from "./tabs/RetrievalQualityTab";
 import { ScribeTab } from "./tabs/ScribeTab";
 import { SuggestionsTab } from "./tabs/suggestions/SuggestionsTab";
@@ -121,6 +122,22 @@ const TABS: TabDef[] = [
     label: "Actor quality metrics",
     uses: { language: true, range: true },
     render: f => <WeakPerformingMetricsTab {...f} />,
+  },
+  {
+    // Learners' own words about their roleplays. Every other surface reduces
+    // the post-session rating to a number; this one lists the comments, which
+    // is where the reasons are. Beside Actor quality metrics because most low
+    // ratings turn out to be about the same things those metrics measure.
+    //
+    // Takes the range picker (a feed is read "what came in lately"), not the
+    // language picker: comments are written in whatever language the learner
+    // chose, and the language shows on each row instead. Open to an admin
+    // restricted to some organisations, narrowed to the page's organisation.
+    id: "ratings-comments",
+    label: "Ratings & comments",
+    uses: { language: false, range: true },
+    orgScoped: true,
+    render: f => <RatingsCommentsTab {...f} />,
   },
   {
     id: "latency",
