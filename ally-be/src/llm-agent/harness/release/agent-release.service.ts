@@ -1,0 +1,256 @@
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { DataSource } from 'typeorm';
+import { LoggerService } from 'src/logger/logger.service';
+import { AgentRelease } from 'src/llm-agent/entity/agent-release.entity';
+import { AgentReleaseAudit } from 'src/llm-agent/entity/agent-release-audit.entity';
+import {
+  AgentReleaseAuditAction,
+  AgentReleaseAuthorKind,
+  AgentReleaseStatus,
+} from '../enum/harness.enum';
+import { canonicalHash } from './canonical-hash.util';
+
+/** How long a GA lookup is reused; a promotion or rollback clears it at once. */
+export const RELEASE_CACHE_MS = 30_000;
+
+const PG_UNIQUE_VIOLATION = '23505';
+
+/**
+ * Releases (plans/ally-guide/plan.md §7.4): immutable, versioned behaviour
+ * bundles with exactly one GA per agent. v1 of the pipeline is manual —
+ * draft → promote → GA, with one-step rollback; evaluation, shadow and canary
+ * stages arrive with milestone M4 and slot in before `promote`.
+ */
+@Injectable()
+export class AgentReleaseService {
+  private readonly logger = LoggerService.getInstance(AgentReleaseService.name);
+  private readonly gaCache = new Map<
+    string,
+    { release: AgentRelease | null; readAt: number }
+  >();
+
+  constructor(private readonly dataSource: DataSource) {}
+
+  private get releases() {
+    return this.dataSource.getRepository(AgentRelease);
+  }
+
+  private get audit() {
+    return this.dataSource.getRepository(AgentReleaseAudit);
+  }
+
+  /** The release every new epoch uses, or null if the agent has none. */
+  async getGa(agentKey: string): Promise<AgentRelease | null> {
+    const cached = this.gaCache.get(agentKey);
+    if (cached && Date.now() - cached.readAt < RELEASE_CACHE_MS) {
+      return cached.release;
+    }
+    const release = await this.releases.findOne({
+      where: { agentKey, status: AgentReleaseStatus.GA },
+    });
+    this.gaCache.set(agentKey, { release, readAt: Date.now() });
+    return release;
+  }
+
+  async getById(id: string): Promise<AgentRelease> {
+    const release = await this.releases.findOne({ where: { id } });
+    if (!release) throw new NotFoundException('Release not found');
+    return release;
+  }
+
+  list(agentKey: string): Promise<AgentRelease[]> {
+    return this.releases.find({
+      where: { agentKey },
+      order: { version: 'DESC' },
+    });
+  }
+
+  /**
+   * Make sure an agent has a GA release, creating version 1 from the bundle in
+   * code if it has none. Idempotent and race-safe: two instances booting at
+   * once collide on the unique (agentKey, version), and the loser re-reads.
+   */
+  async ensureSeed(
+    agentKey: string,
+    bundle: Record<string, unknown>,
+  ): Promise<AgentRelease | null> {
+    const existingGa = await this.releases.findOne({
+      where: { agentKey, status: AgentReleaseStatus.GA },
+    });
+    if (existingGa) return existingGa;
+    const anyRelease = await this.releases.count({ where: { agentKey } });
+    if (anyRelease > 0) {
+      // Releases exist but none is GA — an operator retired it. Never
+      // resurrect behaviour silently; the agent stays without a GA.
+      this.logger.warn(
+        `${agentKey} has releases but no GA one; not seeding over them`,
+      );
+      return null;
+    }
+    try {
+      return await this.dataSource.transaction(async (manager) => {
+        const release = await manager.getRepository(AgentRelease).save(
+          manager.getRepository(AgentRelease).create({
+            agentKey,
+            version: 1,
+            status: AgentReleaseStatus.GA,
+            bundle,
+            contentHash: canonicalHash(bundle),
+            authorKind: AgentReleaseAuthorKind.SEED,
+            notes: 'Seeded from the bundle in code on first boot.',
+            promotedAt: new Date(),
+          }),
+        );
+        await manager.getRepository(AgentReleaseAudit).save({
+          agentKey,
+          releaseId: release.id,
+          action: AgentReleaseAuditAction.CREATED,
+          actorKind: AgentReleaseAuthorKind.SEED,
+          detail: { version: 1, status: AgentReleaseStatus.GA },
+        });
+        this.gaCache.delete(agentKey);
+        return release;
+      });
+    } catch (error) {
+      if ((error as { code?: string })?.code === PG_UNIQUE_VIOLATION) {
+        const winner = await this.releases.findOne({
+          where: { agentKey, status: AgentReleaseStatus.GA },
+        });
+        if (winner) return winner;
+      }
+      throw error;
+    }
+  }
+
+  /** A new DRAFT version. Its bundle is fixed from here on. */
+  async createDraft(
+    agentKey: string,
+    bundle: Record<string, unknown>,
+    userId: number,
+    notes?: string,
+  ): Promise<AgentRelease> {
+    return this.dataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(AgentRelease);
+      const latest = await repo.findOne({
+        where: { agentKey },
+        order: { version: 'DESC' },
+      });
+      const release = await repo.save(
+        repo.create({
+          agentKey,
+          version: (latest?.version ?? 0) + 1,
+          status: AgentReleaseStatus.DRAFT,
+          bundle,
+          contentHash: canonicalHash(bundle),
+          parentReleaseId: latest?.id ?? null,
+          authorKind: AgentReleaseAuthorKind.HUMAN,
+          createdBy: userId,
+          notes: notes ?? null,
+        }),
+      );
+      await manager.getRepository(AgentReleaseAudit).save({
+        agentKey,
+        releaseId: release.id,
+        action: AgentReleaseAuditAction.CREATED,
+        actorKind: AgentReleaseAuthorKind.HUMAN,
+        actorUserId: userId,
+        detail: { version: release.version, contentHash: release.contentHash },
+      });
+      return release;
+    });
+  }
+
+  /**
+   * Make `releaseId` the GA release. The previous GA is retired (it stays
+   * available as a rollback target). Used for both promotion and rollback;
+   * `action` records which it was.
+   */
+  async makeGa(
+    releaseId: string,
+    userId: number,
+    action:
+      | AgentReleaseAuditAction.PROMOTED
+      | AgentReleaseAuditAction.ROLLED_BACK
+      | AgentReleaseAuditAction.EMERGENCY_ROLLBACK = AgentReleaseAuditAction.PROMOTED,
+    reason?: string,
+  ): Promise<AgentRelease> {
+    const promoted = await this.dataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(AgentRelease);
+      const target = await repo.findOne({ where: { id: releaseId } });
+      if (!target) throw new NotFoundException('Release not found');
+      if (target.status === AgentReleaseStatus.GA) return target;
+      const current = await repo.findOne({
+        where: { agentKey: target.agentKey, status: AgentReleaseStatus.GA },
+      });
+      if (current) {
+        await repo.update(current.id, {
+          status: AgentReleaseStatus.RETIRED,
+          retiredAt: new Date(),
+        });
+      }
+      await repo.update(target.id, {
+        status: AgentReleaseStatus.GA,
+        promotedAt: new Date(),
+        retiredAt: null,
+      });
+      await manager.getRepository(AgentReleaseAudit).save({
+        agentKey: target.agentKey,
+        releaseId: target.id,
+        action,
+        actorKind: AgentReleaseAuthorKind.HUMAN,
+        actorUserId: userId,
+        detail: {
+          fromReleaseId: current?.id ?? null,
+          fromVersion: current?.version ?? null,
+          toVersion: target.version,
+          reason: reason ?? null,
+        },
+      });
+      return { ...target, status: AgentReleaseStatus.GA } as AgentRelease;
+    });
+    this.gaCache.delete(promoted.agentKey);
+    this.logger.info(
+      `${promoted.agentKey} release v${promoted.version} is now GA (${action}) by user ${userId}`,
+    );
+    return promoted;
+  }
+
+  /** Roll back to the GA release before the current one. */
+  async rollback(
+    agentKey: string,
+    userId: number,
+    emergency: boolean,
+    reason?: string,
+  ): Promise<AgentRelease> {
+    const audit = await this.audit.find({
+      where: { agentKey },
+      order: { createdAt: 'DESC' },
+      take: 50,
+    });
+    const lastChange = audit.find((row) =>
+      [
+        AgentReleaseAuditAction.PROMOTED,
+        AgentReleaseAuditAction.ROLLED_BACK,
+        AgentReleaseAuditAction.EMERGENCY_ROLLBACK,
+      ].includes(row.action),
+    );
+    const previousId = lastChange?.detail?.fromReleaseId as string | undefined;
+    if (!previousId) {
+      throw new BadRequestException(
+        'There is no earlier GA release to roll back to.',
+      );
+    }
+    return this.makeGa(
+      previousId,
+      userId,
+      emergency
+        ? AgentReleaseAuditAction.EMERGENCY_ROLLBACK
+        : AgentReleaseAuditAction.ROLLED_BACK,
+      reason,
+    );
+  }
+}

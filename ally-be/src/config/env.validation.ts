@@ -102,6 +102,8 @@ export const validationSchema = Joi.object({
   LEARN_MEDIA_PUBLIC_S3_BUCKET: Joi.string().required(),
 
   ASSETS_S3_BUCKET: Joi.string().required(),
+  // Private bucket for agent turn-trace payloads; falls back to the audio bucket.
+  AGENT_TRACE_S3_BUCKET: Joi.string().optional(),
 
   SCENARIO_PATH_ITEM_MIN_DURATION_FOR_COMPLETION: Joi.string().optional(),
 

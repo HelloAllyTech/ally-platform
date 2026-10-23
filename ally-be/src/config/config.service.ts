@@ -547,6 +547,10 @@ export class AppConfigService {
         'LEARN_MEDIA_PUBLIC_S3_BUCKET',
       ),
       assetsBucket: this.configService.get<string>('ASSETS_S3_BUCKET'),
+      // Private bucket for agent turn-trace payloads (rendered prompts, tool
+      // I/O). Unset → the trace service falls back to the private audio
+      // bucket; never a public one.
+      agentTraceBucket: this.configService.get<string>('AGENT_TRACE_S3_BUCKET'),
     };
   }
 

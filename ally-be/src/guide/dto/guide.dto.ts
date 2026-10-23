@@ -1,0 +1,83 @@
+import { Type } from 'class-transformer';
+import {
+  IsArray,
+  IsBoolean,
+  IsIn,
+  IsNumber,
+  IsOptional,
+  IsString,
+  MaxLength,
+  ValidateNested,
+} from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+/** Context attached by "Ask about this" (contract GuideAnchor). */
+export class GuideAnchorDto {
+  @IsString()
+  itemId!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  quote?: string | null;
+
+  @IsOptional()
+  @IsNumber()
+  timestampSec?: number | null;
+
+  @IsOptional()
+  @IsString()
+  storyQuoteId?: string | null;
+}
+
+/** POST /v1/guide/threads/:id/turns (contract GuideTurnRequest). */
+export class GuideTurnRequestDto {
+  @ApiProperty({
+    description: 'Client-generated id; a resend returns the same turn.',
+  })
+  @IsString()
+  @MaxLength(64)
+  clientTurnId!: string;
+
+  @ApiProperty()
+  @IsString()
+  // Length is enforced in the service so the error carries `message_too_long`.
+  text!: string;
+
+  @ApiPropertyOptional({ type: GuideAnchorDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => GuideAnchorDto)
+  anchor?: GuideAnchorDto;
+
+  @ApiPropertyOptional({ enum: ['start', 'continue', 'locked_peek'] })
+  @IsOptional()
+  @IsIn(['start', 'continue', 'locked_peek'])
+  intent?: 'start' | 'continue' | 'locked_peek' | null;
+}
+
+/** PUT /v1/guide/admin/settings — any subset of the kill switches. */
+export class UpdateGuideSwitchesDto {
+  @IsOptional() @IsBoolean() enabled?: boolean;
+  @IsOptional() @IsBoolean() anonymousChat?: boolean;
+  @IsOptional() @IsBoolean() voice?: boolean;
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  disabledCapabilities?: string[];
+  @IsOptional() @IsArray() @IsString({ each: true }) disabledTenants?: string[];
+  @IsOptional() @IsArray() @IsString({ each: true }) disabledCourses?: string[];
+}
+
+export class GuideRollbackDto {
+  @ApiProperty({
+    description: 'A safety rollback moves every thread at its next turn.',
+  })
+  @IsBoolean()
+  emergency!: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string;
+}

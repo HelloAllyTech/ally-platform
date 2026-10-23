@@ -1,0 +1,35 @@
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { AwsModule } from 'src/aws/aws.module';
+import { AgentConfigOverride } from '../entity/agent-config-override.entity';
+import { AgentCostLedger } from '../entity/agent-cost-ledger.entity';
+import { AgentReleaseAudit } from '../entity/agent-release-audit.entity';
+import { AgentRelease } from '../entity/agent-release.entity';
+import { AgentTurnTrace } from '../entity/agent-turn-trace.entity';
+import { AgentTurn } from '../entity/agent-turn.entity';
+import { AgentReleaseService } from './release/agent-release.service';
+import { AgentTraceService } from './trace/agent-trace.service';
+import { AgentTurnStoreService } from './turn/agent-turn-store.service';
+
+/**
+ * The reusable agent harness (plans/ally-guide/plan.md §7): releases, the
+ * turn state machine and product traces. Generic across agents; the Ally
+ * guide is its first consumer. The stage runner (`runHarnessStages`) is a
+ * plain function and needs no provider.
+ */
+@Module({
+  imports: [
+    TypeOrmModule.forFeature([
+      AgentRelease,
+      AgentReleaseAudit,
+      AgentConfigOverride,
+      AgentTurn,
+      AgentTurnTrace,
+      AgentCostLedger,
+    ]),
+    AwsModule,
+  ],
+  providers: [AgentReleaseService, AgentTurnStoreService, AgentTraceService],
+  exports: [AgentReleaseService, AgentTurnStoreService, AgentTraceService],
+})
+export class AgentHarnessModule {}
