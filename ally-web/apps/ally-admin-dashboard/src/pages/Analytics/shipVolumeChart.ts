@@ -92,6 +92,10 @@ export const SHIP_VOLUME_REPO_COLOURS: ColorScale = {
   "ally-mobile": PALETTE.orange,
   infra: PALETTE.green,
   "helloallytech.github.io": PALETTE.gold,
+  // Since the 2026-10-23 monorepo move: work that belongs to no single repo
+  // above (root CI and scripts, changes spanning several services). Grey,
+  // because it is shared rather than another product.
+  "ally-platform": PALETTE.gray,
 };
 
 /**

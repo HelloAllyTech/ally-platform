@@ -3,6 +3,12 @@ import axios from 'axios';
 
 import { AppConfigService } from 'src/config/config.service';
 import { RedisService } from 'src/redis/service/redis.service';
+import { CodeActivityService } from 'src/changelog/service/code-activity.service';
+
+/** No monorepo configured in these tests: weeks come from code_frequency alone. */
+const codeActivity = {
+  dailyByRepo: jest.fn().mockResolvedValue({ byRepo: {}, incomplete: false }),
+};
 
 import { SHIP_VOLUME_REPOS } from '../../constants/ship-volume.constants';
 import {
@@ -47,6 +53,7 @@ describe('ShipVolumeAnalyticsService', () => {
           useValue: { githubToken: 'token', githubOrg: 'HelloAllyTech' },
         },
         { provide: RedisService, useValue: redis },
+        { provide: CodeActivityService, useValue: codeActivity },
       ],
     }).compile();
 
@@ -248,6 +255,7 @@ describe('ShipVolumeAnalyticsService', () => {
           useValue: { githubToken: '', githubOrg: 'HelloAllyTech' },
         },
         { provide: RedisService, useValue: redis },
+        { provide: CodeActivityService, useValue: codeActivity },
       ],
     }).compile();
 

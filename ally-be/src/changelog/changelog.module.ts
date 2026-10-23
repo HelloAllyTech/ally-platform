@@ -15,6 +15,6 @@ import { CodeActivityService } from './service/code-activity.service';
   providers: [ChangelogSourceService, ChangelogService, CodeActivityService],
   // ChangelogSourceService is exported for product updates, which read the
   // same file as their input.
-  exports: [ChangelogService, ChangelogSourceService],
+  exports: [ChangelogService, ChangelogSourceService, CodeActivityService],
 })
 export class ChangelogModule {}

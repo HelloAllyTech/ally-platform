@@ -1,6 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import axios from 'axios';
 
+import { CodeActivityService } from 'src/changelog/service/code-activity.service';
+import {
+  MONOREPO_CUTOVER,
+  MONOREPO_SHARED_BUCKET,
+} from 'src/changelog/constants/code-activity.constants';
 import { AppConfigService } from 'src/config/config.service';
 import { LoggerService } from 'src/logger/logger.service';
 import { RedisService } from 'src/redis/service/redis.service';
@@ -79,13 +84,14 @@ export class ShipVolumeAnalyticsService {
   constructor(
     private readonly configService: AppConfigService,
     private readonly redisService: RedisService,
+    private readonly codeActivity: CodeActivityService,
   ) {}
 
   async getShipVolume(
     query: ShipVolumeQueryDto = {},
   ): Promise<ShipVolumeResponseDto> {
     const now = new Date();
-    const series = await this.loadAllRepos();
+    const series = await this.withMonorepoWeeks(await this.loadAllRepos(), now);
 
     const weeksRequested =
       query.span === 'all'
@@ -183,6 +189,74 @@ export class ShipVolumeAnalyticsService {
       scoping: { tenantId: null, unscopedSections: [] },
       computedAt: new Date().toISOString(),
     };
+  }
+
+  /**
+   * The weeks from the monorepo cutover's week on, from commits rather than
+   * GitHub's weekly statistics.
+   *
+   * Since 2026-10-23 the services are folders of one monorepo, and
+   * `/stats/code_frequency` cannot be cut by folder. Worse, the monorepo holds
+   * the whole imported history of the old repos at its original dates, so its
+   * weekly statistics would count every past week twice — and GitHub refuses
+   * the call outright past 10,000 commits. So from the cutover's week every
+   * repo's weeks are rebuilt from the per-commit daily totals the changelog
+   * heatmap already keeps (CodeActivityService.dailyByRepo): the moved repos
+   * up to the cutover, the monorepo's commits after it, attributed to the
+   * repo whose folder they touched, and `ally-platform` for root files and
+   * cross-service commits. Earlier weeks keep GitHub's statistics.
+   */
+  private async withMonorepoWeeks(
+    series: RepoSeries[],
+    now: Date,
+  ): Promise<RepoSeries[]> {
+    if (!this.configService.githubMonorepo) return series;
+
+    const cutoverWeek = sundayOf(Date.parse(MONOREPO_CUTOVER));
+    const cutoverWeekStart = isoDate(new Date(cutoverWeek));
+    const { byRepo, incomplete } = await this.codeActivity.dailyByRepo(
+      monthsBetween(cutoverWeekStart, isoDate(now)),
+      now.getTime(),
+    );
+
+    const rebuilt = new Map<string, Map<number, [number, number]>>();
+    for (const [repo, days] of Object.entries(byRepo)) {
+      for (const [date, [added, deleted]] of Object.entries(days)) {
+        if (date < cutoverWeekStart) continue;
+        const ts = sundayOf(Date.parse(`${date}T00:00:00Z`)) / 1000;
+        const weeks = rebuilt.get(repo) ?? new Map<number, [number, number]>();
+        const cell = weeks.get(ts) ?? [0, 0];
+        cell[0] += added;
+        cell[1] += deleted;
+        weeks.set(ts, cell);
+        rebuilt.set(repo, weeks);
+      }
+    }
+
+    const result: RepoSeries[] = series.map((entry) => ({
+      ...entry,
+      weeks: entry.weeks.filter(([ts]) => ts * 1000 < cutoverWeek),
+    }));
+    for (const [repo, weeks] of rebuilt) {
+      let entry = result.find((candidate) => candidate.repo === repo);
+      if (!entry) {
+        entry = { repo, weeks: [] };
+        result.push(entry);
+      }
+      for (const [ts, [added, deleted]] of weeks) {
+        entry.weeks.push([ts, added, -deleted]);
+      }
+    }
+    if (incomplete) {
+      // A repo-month of commits could not be read: the weeks since the
+      // cutover are short by it, and the chart says so like any missing repo.
+      result.push({
+        repo: MONOREPO_SHARED_BUCKET,
+        weeks: [],
+        problem: { reason: 'unreachable', servedFromCache: false },
+      });
+    }
+    return result;
   }
 
   /**
@@ -363,6 +437,29 @@ export const weeksSinceFirstChange = (
     now.getUTCDate() - now.getUTCDay(),
   );
   return Math.max(1, Math.round((currentSunday - first * 1000) / WEEK_MS) + 1);
+};
+
+/** The Sunday 00:00 UTC that starts the week `ms` falls in, as epoch ms (GitHub's week anchor). */
+const sundayOf = (ms: number): number => {
+  const date = new Date(ms);
+  return Date.UTC(
+    date.getUTCFullYear(),
+    date.getUTCMonth(),
+    date.getUTCDate() - date.getUTCDay(),
+  );
+};
+
+/** Every `yyyy-mm` from `from`'s month to `until`'s, inclusive. */
+const monthsBetween = (from: string, until: string): string[] => {
+  const months: string[] = [];
+  for (
+    let [year, month] = from.slice(0, 7).split('-').map(Number);
+    `${year}-${String(month).padStart(2, '0')}` <= until.slice(0, 7);
+    month === 12 ? ((year += 1), (month = 1)) : (month += 1)
+  ) {
+    months.push(`${year}-${String(month).padStart(2, '0')}`);
+  }
+  return months;
 };
 
 export const buildWeekAxis = (now: Date, weeks: number): string[] => {

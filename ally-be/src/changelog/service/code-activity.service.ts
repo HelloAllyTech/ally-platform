@@ -3,6 +3,7 @@ import axios from 'axios';
 
 import { isoDate } from 'src/analytics/util/analytics-window.util';
 import { AppConfigService } from 'src/config/config.service';
+import { MONOREPO_SERVICES } from 'src/github/service/github-actions.service';
 import { LoggerService } from 'src/logger/logger.service';
 import { RedisService } from 'src/redis/service/redis.service';
 
@@ -15,7 +16,11 @@ import {
   CODE_ACTIVITY_MAX_PAGES_PER_MONTH,
   CODE_ACTIVITY_REPOS,
   CODE_ACTIVITY_SETTLE_MS,
+  MONOREPO_CUTOVER,
+  MONOREPO_SHARED_BUCKET,
+  MOVED_TO_MONOREPO,
   codeActivityCacheKey,
+  monorepoActivityCacheKey,
 } from '../constants/code-activity.constants';
 import {
   CodeActivityDayDto,
@@ -31,7 +36,35 @@ export interface MonthBlock {
   days: DailyTotals;
 }
 
+/** `date -> bucket -> [added, deleted]` for the monorepo's one month (see monorepoMonth). */
+export type BucketedDailyTotals = Record<
+  string,
+  Record<string, [number, number]>
+>;
+
+interface BucketedMonthBlock {
+  fetchedAt: number;
+  days: BucketedDailyTotals;
+}
+
+/** Daily totals per repo — a legacy repo, or a monorepo bucket named after the repo it continues. */
+export interface DailyByRepo {
+  byRepo: Record<string, DailyTotals>;
+  /** A repo-month could be neither fetched nor recovered from cache. */
+  incomplete: boolean;
+}
+
+/**
+ * The folders whose monorepo commits continue a repo's series: the five
+ * services, and the wiki source (its own repo now only mirrors this folder).
+ */
+const MONOREPO_ATTRIBUTION_FOLDERS: readonly string[] = [
+  ...MONOREPO_SERVICES,
+  'helloallytech.github.io',
+];
+
 interface HistoryNode {
+  oid: string;
   committedDate: string;
   additions: number;
   deletions: number;
@@ -44,6 +77,10 @@ interface HistoryPage {
 }
 
 const GITHUB_GRAPHQL = 'https://api.github.com/graphql';
+/** The last second a repo that moved is read for (GraphQL `until` is inclusive). */
+const JUST_BEFORE_CUTOVER = new Date(Date.parse(MONOREPO_CUTOVER) - 1000)
+  .toISOString()
+  .replace('.000', '');
 const REQUEST_TIMEOUT_MS = 30_000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -54,14 +91,22 @@ const HISTORY_QUERY = `
     $since: GitTimestamp!
     $until: GitTimestamp!
     $after: String
+    $path: String
   ) {
     repository(owner: $owner, name: $name) {
       defaultBranchRef {
         target {
           ... on Commit {
-            history(first: 100, since: $since, until: $until, after: $after) {
+            history(
+              first: 100
+              since: $since
+              until: $until
+              after: $after
+              path: $path
+            ) {
               pageInfo { hasNextPage endCursor }
               nodes {
+                oid
                 committedDate
                 additions
                 deletions
@@ -146,19 +191,13 @@ export class CodeActivityService {
     const axis = dateRange(from, until);
     const months = [...new Set(axis.map((date) => date.slice(0, 7)))];
 
-    const blocks = await Promise.all(
-      CODE_ACTIVITY_REPOS.flatMap((repo) =>
-        months.map((month) => this.loadMonth(repo, month, now.getTime())),
-      ),
+    const { byRepo, incomplete } = await this.dailyByRepo(
+      months,
+      now.getTime(),
     );
 
     const totals = new Map<string, [number, number]>();
-    let incomplete = false;
-    for (const days of blocks) {
-      if (!days) {
-        incomplete = true;
-        continue;
-      }
+    for (const days of Object.values(byRepo)) {
       for (const [date, [added, deleted]] of Object.entries(days)) {
         const cell = totals.get(date) ?? [0, 0];
         cell[0] += added;
@@ -191,6 +230,212 @@ export class CodeActivityService {
   }
 
   /**
+   * Daily changed lines per repo for whole UTC months — the heatmap's source,
+   * and the admin ship-volume chart's from the week of the monorepo cutover.
+   *
+   * Each repo is read on its side of `MONOREPO_CUTOVER`: the repos that moved
+   * up to it, the monorepo after it, `infra` throughout. The monorepo's
+   * commits continue the series of the repo whose folder they touched (see
+   * monorepoMonth), so a reader sees one unbroken history per repo, plus
+   * `ally-platform` for work that belongs to no single one.
+   */
+  async dailyByRepo(months: string[], now = Date.now()): Promise<DailyByRepo> {
+    const byRepo: Record<string, DailyTotals> = {};
+    const add = (
+      repo: string,
+      date: string,
+      [added, deleted]: [number, number],
+    ) => {
+      const days = (byRepo[repo] ??= {});
+      const cell = (days[date] ??= [0, 0]);
+      cell[0] += added;
+      cell[1] += deleted;
+    };
+
+    const [legacy, monorepo] = await Promise.all([
+      Promise.all(
+        CODE_ACTIVITY_REPOS.flatMap((repo) =>
+          months.map(async (month) => ({
+            repo,
+            days: await this.loadMonth(repo, month, now),
+          })),
+        ),
+      ),
+      this.configService.githubMonorepo
+        ? Promise.all(months.map((month) => this.monorepoMonth(month, now)))
+        : Promise.resolve([] as (BucketedDailyTotals | null)[]),
+    ]);
+
+    let incomplete = false;
+    for (const { repo, days } of legacy) {
+      if (!days) {
+        incomplete = true;
+        continue;
+      }
+      for (const [date, cell] of Object.entries(days)) add(repo, date, cell);
+    }
+    for (const days of monorepo) {
+      if (!days) {
+        incomplete = true;
+        continue;
+      }
+      for (const [date, buckets] of Object.entries(days)) {
+        for (const [bucket, cell] of Object.entries(buckets)) {
+          add(bucket, date, cell);
+        }
+      }
+    }
+    return { byRepo, incomplete };
+  }
+
+  /**
+   * The monorepo's own work in one UTC month, per day and per bucket.
+   *
+   * Only commits after `MONOREPO_CUTOVER` count: before it, the monorepo's
+   * history is the imported history of the old repos, already counted there.
+   * Merge commits are skipped, as everywhere here.
+   *
+   * GitHub's line counts are per COMMIT, and `history(path:)` only selects
+   * commits — a commit touching `ally-be/` and `ally-web/` carries its whole
+   * diff in both lists. So every commit is counted once, from the unfiltered
+   * history, and attributed by which folders' histories list it: exactly one
+   * folder → that repo's series; none (root files: CI, scripts) or several →
+   * `MONOREPO_SHARED_BUCKET`. Cached and refreshed like a repo-month.
+   */
+  async monorepoMonth(
+    month: string,
+    now = Date.now(),
+  ): Promise<BucketedDailyTotals | null> {
+    const monorepo = this.configService.githubMonorepo;
+    const { until } = monthBounds(month);
+    if (!monorepo || until < MONOREPO_CUTOVER) return {};
+
+    const key = monorepoActivityCacheKey(month);
+    const cached = (await this.readCache(key)) as BucketedMonthBlock | null;
+    if (cached && isFresh(cached as unknown as MonthBlock, month, now)) {
+      return cached.days;
+    }
+    if (!this.configService.githubToken) return cached?.days ?? null;
+
+    const refresh = this.single(key, async () => {
+      const days = await this.fetchMonorepoMonth(monorepo, month);
+      const block: BucketedMonthBlock = { fetchedAt: Date.now(), days };
+      await this.writeCache(key, block as unknown as MonthBlock);
+      return block;
+    });
+    if (cached) {
+      void refresh;
+      return cached.days;
+    }
+    return ((await refresh) as BucketedMonthBlock | null)?.days ?? null;
+  }
+
+  private async fetchMonorepoMonth(
+    monorepo: string,
+    month: string,
+  ): Promise<BucketedDailyTotals> {
+    const bounds = monthBounds(month);
+    const since =
+      bounds.since > MONOREPO_CUTOVER ? bounds.since : MONOREPO_CUTOVER;
+
+    const [commits, ...folderOids] = await Promise.all([
+      this.fetchHistory(monorepo, since, bounds.until, null),
+      ...MONOREPO_ATTRIBUTION_FOLDERS.map((folder) =>
+        this.fetchHistory(monorepo, since, bounds.until, `${folder}/`),
+      ),
+    ]);
+    const folderOf = new Map<string, string[]>();
+    MONOREPO_ATTRIBUTION_FOLDERS.forEach((folder, index) => {
+      for (const node of folderOids[index]) {
+        folderOf.set(node.oid, [...(folderOf.get(node.oid) ?? []), folder]);
+      }
+    });
+
+    const days: BucketedDailyTotals = {};
+    for (const node of commits) {
+      if (node.parents.totalCount > 1) continue;
+      const date = isoDate(new Date(node.committedDate));
+      if (!date.startsWith(month)) continue;
+      const folders = folderOf.get(node.oid) ?? [];
+      const bucket = folders.length === 1 ? folders[0] : MONOREPO_SHARED_BUCKET;
+      const cell = ((days[date] ??= {})[bucket] ??= [0, 0]);
+      cell[0] += node.additions;
+      cell[1] += node.deletions;
+    }
+    return days;
+  }
+
+  /** Every commit in a window of one repo's default branch (optionally under a path). */
+  private async fetchHistory(
+    repo: string,
+    since: string,
+    until: string,
+    path: string | null,
+  ): Promise<HistoryNode[]> {
+    const nodes: HistoryNode[] = [];
+    let after: string | null = null;
+    for (let page = 0; page < CODE_ACTIVITY_MAX_PAGES_PER_MONTH; page++) {
+      const history = await this.fetchHistoryPage(
+        repo,
+        since,
+        until,
+        after,
+        path,
+      );
+      if (!history) return nodes;
+      nodes.push(...history.nodes);
+      if (!history.pageInfo.hasNextPage) return nodes;
+      after = history.pageInfo.endCursor;
+    }
+    throw new Error(
+      `more than ${CODE_ACTIVITY_MAX_PAGES_PER_MONTH} pages of history — refusing a truncated month`,
+    );
+  }
+
+  /** Single-flight: concurrent readers of one cache key share one fetch. Never rejects. */
+  private single(
+    key: string,
+    work: () => Promise<MonthBlock | BucketedMonthBlock>,
+  ): Promise<MonthBlock | BucketedMonthBlock | null> {
+    const existing = this.inflight.get(key);
+    if (existing) return existing as Promise<MonthBlock | null>;
+    const pending = work()
+      .catch((error: unknown) => {
+        this.logger.error(
+          `code-activity: could not read ${key}: ${
+            (error as Error)?.message ?? String(error)
+          }`,
+        );
+        return null;
+      })
+      .finally(() => this.inflight.delete(key));
+    this.inflight.set(key, pending as Promise<MonthBlock | null>);
+    return pending;
+  }
+
+  /**
+   * The window of a month a repo is read for: the whole month, or — for a
+   * repo that moved into the monorepo — only up to the cutover, and nothing
+   * at all after it.
+   */
+  private legacyWindow(
+    repo: string,
+    month: string,
+  ): { since: string; until: string } | null {
+    const bounds = monthBounds(month);
+    if (
+      !this.configService.githubMonorepo ||
+      !MOVED_TO_MONOREPO.includes(repo)
+    ) {
+      return bounds;
+    }
+    if (bounds.since >= MONOREPO_CUTOVER) return null;
+    return bounds.until < MONOREPO_CUTOVER
+      ? bounds
+      : { since: bounds.since, until: JUST_BEFORE_CUTOVER };
+  }
+
+  /**
    * One repo's daily totals for one month, from cache where it is fresh
    * enough, or `null` when there is nothing to serve.
    */
@@ -199,6 +444,9 @@ export class CodeActivityService {
     month: string,
     now: number,
   ): Promise<DailyTotals | null> {
+    // A repo that moved into the monorepo has nothing after the cutover; its
+    // work there is the monorepo's (monorepoMonth).
+    if (!this.legacyWindow(repo, month)) return {};
     const key = codeActivityCacheKey(repo, month);
     const cached = await this.readCache(key);
 
@@ -254,8 +502,10 @@ export class CodeActivityService {
   }
 
   private async fetchMonth(repo: string, month: string): Promise<DailyTotals> {
-    const { since, until } = monthBounds(month);
+    const window = this.legacyWindow(repo, month);
     const days: DailyTotals = {};
+    if (!window) return days;
+    const { since, until } = window;
     let after: string | null = null;
 
     for (let page = 0; page < CODE_ACTIVITY_MAX_PAGES_PER_MONTH; page++) {
@@ -289,13 +539,14 @@ export class CodeActivityService {
     since: string,
     until: string,
     after: string | null,
+    path: string | null = null,
   ): Promise<HistoryPage | null> {
     const org = this.configService.githubOrg;
     const { data } = await axios.post(
       GITHUB_GRAPHQL,
       {
         query: HISTORY_QUERY,
-        variables: { owner: org, name: repo, since, until, after },
+        variables: { owner: org, name: repo, since, until, after, path },
       },
       {
         headers: {

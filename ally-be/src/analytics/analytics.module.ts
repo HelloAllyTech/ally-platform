@@ -28,6 +28,7 @@ import { RoleplayVolumeAnalyticsRepository } from './repository/roleplay-volume-
 // than learner activity, so it is neither tenant-scoped nor windowed.
 import { RoadmapDeliveryAnalyticsService } from './service/roadmap-delivery-analytics.service';
 import { ShipVolumeAnalyticsService } from './service/ship-volume-analytics.service';
+import { ChangelogModule } from 'src/changelog/changelog.module';
 import { RoadmapDeliveryAnalyticsRepository } from './repository/roadmap-delivery-analytics.repository';
 // Testing-tab endpoints: candidates for the leadership Highlights tab, kept on a
 // separate admin tab until they have proved they change a decision.
@@ -175,6 +176,8 @@ import { TenantModule } from 'src/tenant/tenant.module';
 @Module({
   imports: [
     AppConfigModule,
+    // CodeActivityService: the ship-volume chart's weeks since the monorepo cutover.
+    ChangelogModule,
     UserModule,
     TypeOrmModule.forFeature([
       Dashboard,
