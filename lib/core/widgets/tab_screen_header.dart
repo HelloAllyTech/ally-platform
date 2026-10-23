@@ -105,7 +105,7 @@ class TabScreenHeader extends StatelessWidget {
           // which the busiest screens already use for credits/badge counts.
           ProgressHeaderWidget(isOnProgressScreen: hideProgressWidget),
           if (trailing != null) const SizedBox(width: 12),
-          ?trailing,
+          if (trailing != null) Flexible(child: trailing!),
         ],
       ),
     );

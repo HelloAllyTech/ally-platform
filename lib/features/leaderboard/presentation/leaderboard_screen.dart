@@ -106,10 +106,14 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
     required bool showRankColumn,
     required bool isHighlighted,
   }) {
+    // An explicit Row with the same column widths _TableHeaderRow uses
+    // (rank 32+8, duration 90, gap 16, badges 50), not a ListTile — a
+    // ListTile's leading/title/trailing sizing is content-driven and
+    // doesn't guarantee the data actually lines up under the header's
+    // fixed column boundaries above it.
     return Container(
       height: _kRowHeight,
       margin: isHighlighted ? const EdgeInsets.symmetric(horizontal: 8) : null,
-      padding: isHighlighted ? const EdgeInsets.only(left: 5) : null,
       decoration: isHighlighted
           ? BoxDecoration(
               color: AppColors.blue50,
@@ -117,41 +121,52 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
               borderRadius: BorderRadius.circular(8),
             )
           : null,
-      child: ListTile(
-        leading: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (showRankColumn) ...[
-              _RankBadge(rank: entry.rank),
-              const SizedBox(width: 8),
-            ],
-            CircleAvatar(
-              backgroundImage: entry.profileImageUrl.isNotEmpty
-                  ? NetworkImage(entry.profileImageUrl)
-                  : null,
-              child: entry.profileImageUrl.isEmpty
-                  ? Text(
-                      entry.name.isNotEmpty ? entry.name[0].toUpperCase() : '?',
-                    )
-                  : null,
-            ),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: [
+          if (showRankColumn) ...[
+            SizedBox(width: 32, child: _RankBadge(rank: entry.rank)),
+            const SizedBox(width: 8),
           ],
-        ),
-        title: Text(entry.name),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(_formatDuration(entry.minutesPlayed)),
-            const SizedBox(width: 16),
-            SvgPicture.asset(
-              'assets/icons/badgeIcon.svg',
-              width: 14,
-              height: 14,
+          CircleAvatar(
+            backgroundImage: entry.profileImageUrl.isNotEmpty
+                ? NetworkImage(entry.profileImageUrl)
+                : null,
+            child: entry.profileImageUrl.isEmpty
+                ? Text(entry.name.isNotEmpty ? entry.name[0].toUpperCase() : '?')
+                : null,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(entry.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+          ),
+          SizedBox(
+            width: 90,
+            child: Text(
+              _formatDuration(entry.minutesPlayed),
+              textAlign: TextAlign.right,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(width: 4),
-            Text('${entry.badgeCount}'),
-          ],
-        ),
+          ),
+          const SizedBox(width: 16),
+          SizedBox(
+            width: 50,
+            child: Row(
+              children: [
+                SvgPicture.asset('assets/icons/badgeIcon.svg', width: 14, height: 14),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    '${entry.badgeCount}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -353,10 +368,40 @@ class _TableHeaderRow extends ConsumerWidget {
             SizedBox(width: 32, child: Text(ref.t('community.table.rank'), style: style)),
             const SizedBox(width: 8),
           ],
-          Expanded(child: Text(ref.t('community.table.user'), style: style)),
-          Text(ref.t('community.table.totalDuration'), style: style),
+          Expanded(
+            child: Text(
+              ref.t('community.table.user'),
+              style: style,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          // Bounded + ellipsized, matching RN's own fixed-width
+          // durationColumnHeader (88)/badgesColumnHeader (60) — an
+          // unbounded `Text` here measured wider than the available row
+          // width once real fonts were loaded (confirmed via a direct
+          // screenshot render: this row threw a real RenderFlex overflow
+          // at ordinary phone widths, not just a narrow edge case).
+          SizedBox(
+            width: 90,
+            child: Text(
+              ref.t('community.table.totalDuration'),
+              style: style,
+              textAlign: TextAlign.right,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
           const SizedBox(width: 16),
-          Text(ref.t('community.table.badges'), style: style),
+          SizedBox(
+            width: 50,
+            child: Text(
+              ref.t('community.table.badges'),
+              style: style,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
     );

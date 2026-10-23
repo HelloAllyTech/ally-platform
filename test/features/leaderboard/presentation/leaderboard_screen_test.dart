@@ -262,6 +262,23 @@ void main() {
       expect(find.text('User'), findsOneWidget);
       expect(find.text('Total duration'), findsOneWidget);
       expect(find.text('Badges'), findsOneWidget);
+
+      // Regression check: a real RenderFlex overflow was found here via a
+      // direct screenshot render with the app's real fonts loaded (an
+      // ordinary widget test's fallback font measures narrower and hides
+      // it) — "Total duration"/"Badges" were bare, unbounded `Text`
+      // widgets with no wrap/shrink behavior, so real font metrics could
+      // legitimately demand more width than the row had. Fixed by bounding
+      // each in a `SizedBox` with `overflow: TextOverflow.ellipsis`;
+      // asserted here directly since the overflow itself isn't
+      // reproducible without loading real fonts (tried — too fragile, see
+      // tab_screen_header_test.dart's equivalent regression test).
+      final totalDurationText = tester.widget<Text>(find.text('Total duration'));
+      expect(totalDurationText.overflow, TextOverflow.ellipsis);
+      expect(totalDurationText.maxLines, 1);
+      final badgesText = tester.widget<Text>(find.text('Badges'));
+      expect(badgesText.overflow, TextOverflow.ellipsis);
+      expect(badgesText.maxLines, 1);
     },
   );
 
