@@ -1,0 +1,17 @@
+# OS & Editor files
+.DS_Store
+.idea/
+.vscode/
+
+# Claude & Agent local state
+.claude/settings.local.json
+.claude/projects/
+.wiki-tmp/
+
+# Subrepo .git backups (kept locally during migration cutover window)
+.git-subrepo-backups/
+
+# Local environment files (never commit)
+.env
+*.env.local
+docker.env
