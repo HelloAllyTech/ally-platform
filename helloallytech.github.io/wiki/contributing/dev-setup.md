@@ -21,7 +21,7 @@ This guide gets you from zero to a running Ally development environment. For rep
    cd ally
    git clone git@github.com:HelloAllyTech/infra.git infra
    ```
-   *(Alternatively, running `./bootstrap.sh` from a standalone `infra` checkout detects or clones `ally-platform` automatically.)*
+   *(Alternatively, running `infra/bootstrap.sh` from a standalone `infra` checkout detects or clones `ally-platform` automatically.)*
 
    Working from a fork? Use `bootstrap-contributor.sh` (inside `infra/`) instead: it clones your forks and sets `origin` to the fork and `upstream` to the official repo.
 
