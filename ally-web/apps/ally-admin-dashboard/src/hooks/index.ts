@@ -5,6 +5,7 @@ import { useCanCurateCharacterCorpus } from "./useCanCurateCharacterCorpus";
 import { useCanUseCourseCopilot } from "./useCanUseCourseCopilot";
 import { useCanViewComponentLibrary } from "./useCanViewComponentLibrary";
 import { useClickOutside } from "./useClickOutside";
+import { useContentAuthoring } from "./useContentAuthoring";
 import { useCourseCopilotSocket } from "./useCourseCopilotSocket";
 import { useCourseCopilotStream } from "./useCourseCopilotStream";
 import { useCreatePortal } from "./useCreatePortal";
@@ -52,6 +53,7 @@ export {
   useCanCurateCharacterCorpus,
   useCanViewComponentLibrary,
   useCanUseCourseCopilot,
+  useContentAuthoring,
   useCourseCopilotStream,
   useCourseCopilotSocket,
   useImageGenerationJob,

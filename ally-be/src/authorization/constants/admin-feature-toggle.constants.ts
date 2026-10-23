@@ -234,7 +234,7 @@ export const FEATURE_TOGGLES: FeatureToggleDefinition[] = [
     key: FeatureToggleKey.CONTENT_MANAGEMENT,
     label: 'Content Management',
     description:
-      'Create and edit library content in Simulation Studio — simulations, tracks, cases and courses.',
+      'Open Simulation Studio (the Roleplays tab). What this admin sees and may create there is set by See All Content and the Create Roleplays / Cases / Courses toggles.',
     legacyGrants: ALL_ADMIN_TIERS,
   },
   {

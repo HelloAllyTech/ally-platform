@@ -31,6 +31,12 @@ interface HeaderProps {
    * desktop width and swallowed their clicks.
    */
   actionsFooter?: ReactNode;
+  /**
+   * The admin may open this item but not change it (a Create toggle is off).
+   * Save and Publish are replaced by this notice, which says why and who to
+   * ask; ally-be refuses the writes regardless.
+   */
+  viewOnly?: { title: string; subtitle: string };
 }
 
 export const Header: FC<HeaderProps> = ({
@@ -45,6 +51,7 @@ export const Header: FC<HeaderProps> = ({
   type,
   extraActions,
   actionsFooter,
+  viewOnly,
 }) => {
   const handleSaveDraft = async () => {
     const response = await onSaveDraft();
@@ -91,34 +98,44 @@ export const Header: FC<HeaderProps> = ({
       </div>
       <div className="flex flex-wrap md:flex-nowrap gap-y-2 items-center justify-between w-full px-0 md:px-2 pb-2 md:h-[80px] relative">
         <h1 className="text-xl md:text-2xl text-typography-900 md:whitespace-nowrap">{title}</h1>
-        <div className="flex flex-col items-start md:items-end gap-1">
-          <div className="flex items-center gap-3">
-            {extraActions}
-            <Button
-              variant={ButtonVariant.TEXT}
-              onClick={handleSaveDraft}
-              className="px-4 py-1 h-[36px] text-typography-900"
-            >
-              {en.simulation.save}
-            </Button>
-            {showPreview &&
-              (isValid ? (
-                previewButton
-              ) : (
-                <Tooltip label={en.simulation.previewTooltipMessage} align="top">
-                  <span>{previewButton}</span>
-                </Tooltip>
-              ))}
-            {isValid ? (
-              publishButton
-            ) : (
-              <Tooltip label={en.simulation.publishTooltipMessage} align="top">
-                <span>{publishButton}</span>
-              </Tooltip>
-            )}
+        {viewOnly ? (
+          <div
+            role="status"
+            className="max-w-md rounded border border-border-light bg-background-secondary px-3 py-2 text-sm"
+          >
+            <p className="font-semibold text-typography-900">{viewOnly.title}</p>
+            <p className="text-typography-700">{viewOnly.subtitle}</p>
           </div>
-          {actionsFooter}
-        </div>
+        ) : (
+          <div className="flex flex-col items-start md:items-end gap-1">
+            <div className="flex items-center gap-3">
+              {extraActions}
+              <Button
+                variant={ButtonVariant.TEXT}
+                onClick={handleSaveDraft}
+                className="px-4 py-1 h-[36px] text-typography-900"
+              >
+                {en.simulation.save}
+              </Button>
+              {showPreview &&
+                (isValid ? (
+                  previewButton
+                ) : (
+                  <Tooltip label={en.simulation.previewTooltipMessage} align="top">
+                    <span>{previewButton}</span>
+                  </Tooltip>
+                ))}
+              {isValid ? (
+                publishButton
+              ) : (
+                <Tooltip label={en.simulation.publishTooltipMessage} align="top">
+                  <span>{publishButton}</span>
+                </Tooltip>
+              )}
+            </div>
+            {actionsFooter}
+          </div>
+        )}
       </div>
     </>
   );

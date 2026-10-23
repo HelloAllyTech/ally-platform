@@ -16,7 +16,7 @@ import { WandStars, WarningAlt } from "@assets";
 import { ActionConfirmationPopup, Button, Header } from "@components";
 import { ButtonVariant } from "@components/types";
 import { DEFAULT_TRACK_FORM_VALUES, ROUTES, TRACK_ENTITY_LABEL, en } from "@constants";
-import { useCanUseCourseCopilot } from "@hooks";
+import { useCanUseCourseCopilot, useContentAuthoring } from "@hooks";
 import {
   CompletionCriteria,
   SimulationStatus,
@@ -57,6 +57,11 @@ export const CreateTrack: FC = () => {
 
   const [trackId, setTrackId] = useState<string | null>(id ?? null);
   const canUseCourseCopilot = useCanUseCourseCopilot();
+  // Create Courses off: an existing course opens read-only — the outline and
+  // every editor render, nothing saves (ally-be refuses the write anyway). New
+  // courses are blocked at the route.
+  const { canAuthorCourses } = useContentAuthoring();
+  const isViewOnly = Boolean(id) && !canAuthorCourses;
   const [selection, setSelection] = useState<TrackSelection>("settings");
   const [showDiscardPopup, setShowDiscardPopup] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -255,7 +260,8 @@ export const CreateTrack: FC = () => {
   };
 
   const handleBack = () => {
-    if (isDirty) setShowDiscardPopup(true);
+    // A view-only admin has nothing to save, and the popup's "Save and exit" would fail.
+    if (isDirty && !isViewOnly) setShowDiscardPopup(true);
     else navigate(-1);
   };
 
@@ -386,9 +392,25 @@ export const CreateTrack: FC = () => {
           type="Track"
           extraActions={askCopilotButton}
           actionsFooter={publishIssues}
+          viewOnly={
+            isViewOnly
+              ? {
+                  title: en.contentAccess.viewOnlyBannerTitle,
+                  subtitle: en.contentAccess.viewOnlyBannerSubtitle(
+                    en.contentAccess.courses,
+                    en.contentAccess.createCoursesToggle,
+                  ),
+                }
+              : undefined
+          }
         />
 
-        <div className="flex flex-col lg:flex-row lg:h-[calc(100vh-140px)]">
+        {/* `disabled` reaches every native control below; the rail's drag-reorder
+            is not a control, so its handlers are no-ops instead. */}
+        <fieldset
+          disabled={isViewOnly}
+          className="m-0 min-w-0 border-0 p-0 flex flex-col lg:flex-row lg:h-[calc(100vh-140px)]"
+        >
           <TrackOutlineRail
             sections={sections}
             selection={selection}
@@ -402,13 +424,13 @@ export const CreateTrack: FC = () => {
             onAddItem={handleAddItem}
             onAddItemFromTemplate={handleAddItemFromTemplate}
             onDeleteSection={handleDeleteSection}
-            onReorderSections={handleReorderSections}
-            onReorderItems={handleReorderItems}
+            onReorderSections={isViewOnly ? () => undefined : handleReorderSections}
+            onReorderItems={isViewOnly ? () => undefined : handleReorderItems}
           />
           <div className="flex-1 min-w-0 lg:overflow-y-auto custom-scrollbar py-4 lg:p-6">
             {renderCanvas()}
           </div>
-        </div>
+        </fieldset>
 
         <ActionConfirmationPopup
           isOpen={showDiscardPopup}

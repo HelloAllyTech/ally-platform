@@ -52,7 +52,7 @@ import {
   SIMULATION_CATEGORY,
   TooltipLocation,
 } from "@constants";
-import { useDebounce, useScenarioTranslationsSocket } from "@hooks";
+import { useContentAuthoring, useDebounce, useScenarioTranslationsSocket } from "@hooks";
 import { selectUploadsInProgress } from "@reducer/reportUploadReducer";
 import {
   ScenarioTranslationStatus,
@@ -162,6 +162,8 @@ export interface CreateSimulationProps {
 }
 
 export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }) => {
+  // Create Roleplays off: view mode is all this admin gets, so it offers no Edit.
+  const { canAuthorRoleplays } = useContentAuthoring();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const [simulationId, setSimulationId] = useState<string | undefined>(id);
@@ -1497,13 +1499,15 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
             </Button>
           )}
           {viewMode ? (
-            <Button
-              variant={ButtonVariant.PRIMARY}
-              onClick={() => simulationId && navigate(ROUTES.EDIT_SIMULATION(simulationId))}
-              className="transition-colors h-[40px] pr-[20px]"
-            >
-              {en.simulation.edit}
-            </Button>
+            canAuthorRoleplays && (
+              <Button
+                variant={ButtonVariant.PRIMARY}
+                onClick={() => simulationId && navigate(ROUTES.EDIT_SIMULATION(simulationId))}
+                className="transition-colors h-[40px] pr-[20px]"
+              >
+                {en.simulation.edit}
+              </Button>
+            )
           ) : (
             <AppTooltip location={TooltipLocation.PUBLISH_SIMULATION_VERSION}>
               <Button

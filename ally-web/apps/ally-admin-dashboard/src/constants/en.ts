@@ -217,6 +217,24 @@ export const en = {
     redirectingToLogin: "Redirecting to login page...",
     redirectingToDashboard: "Redirecting to dashboard...",
   },
+  // Per-admin content toggles (Create Roleplays / Cases / Courses). A type whose
+  // toggle is off is view-only; the copy names the toggle to ask for, matching
+  // ally-be's refusal (ContentAccessService).
+  contentAccess: {
+    view: "View",
+    viewOnlyEmptyTitle: (plural: string) => `No ${plural} to show`,
+    viewOnlyEmptySubtitle: (plural: string, toggleLabel: string) =>
+      `You can view ${plural} but not create them. Ask whoever manages admin access to turn on ${toggleLabel} for you.`,
+    viewOnlyBannerTitle: "View only",
+    viewOnlyBannerSubtitle: (plural: string, toggleLabel: string) =>
+      `You can open ${plural} but not change them. Ask whoever manages admin access to turn on ${toggleLabel} for you.`,
+    roleplays: "roleplays",
+    cases: "cases",
+    courses: "courses",
+    createRoleplaysToggle: "Create Roleplays",
+    createCasesToggle: "Create Cases",
+    createCoursesToggle: "Create Courses",
+  },
   simulation: {
     untitledRoleplay: "Untitled Roleplay",
     previewMode: {

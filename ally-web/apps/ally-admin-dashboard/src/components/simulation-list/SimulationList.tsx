@@ -34,6 +34,11 @@ interface SimulationListProps {
   onCreateSimulation?: () => void;
   currentUser?: any;
   isSuperAdmin?: boolean;
+  /**
+   * Create Roleplays is off for this admin: rows offer View (every status,
+   * drafts included) and Preview, and nothing that writes.
+   */
+  readOnly?: boolean;
 }
 
 export const SimulationList: React.FC<SimulationListProps> = ({
@@ -52,6 +57,7 @@ export const SimulationList: React.FC<SimulationListProps> = ({
   onDuplicate,
   currentUser,
   isSuperAdmin,
+  readOnly = false,
 }) => {
   // Handle loading state
   if (isLoading && !isNonEmptyArray(simulations)) {
@@ -64,6 +70,17 @@ export const SimulationList: React.FC<SimulationListProps> = ({
   }
 
   // Handle empty state without data
+  if (!isNonEmptyArray(simulations) && readOnly) {
+    return (
+      <EmptyState
+        title={en.contentAccess.viewOnlyEmptyTitle(en.contentAccess.roleplays)}
+        subtitle={en.contentAccess.viewOnlyEmptySubtitle(
+          en.contentAccess.roleplays,
+          en.contentAccess.createRoleplaysToggle,
+        )}
+      />
+    );
+  }
   if (!isNonEmptyArray(simulations)) {
     return (
       <div className="flex font-primary items-center justify-center min-h-[60vh]">
@@ -97,6 +114,7 @@ export const SimulationList: React.FC<SimulationListProps> = ({
       : onUnarchive?.(simulation);
 
   const isCreatorOrSuperAdmin = (simulation: Simulation) => {
+    if (readOnly) return false;
     if (isSuperAdmin) return true;
     const createdBy = simulation.createdByUserId;
     return createdBy === currentUser?.id;
@@ -201,7 +219,8 @@ export const SimulationList: React.FC<SimulationListProps> = ({
       icon: <Eye />,
       tooltip: en.simulation.viewDetails,
       onClick: simulation => onView?.(simulation),
-      show: simulation => simulation.status !== SimulationStatus.DRAFT,
+      // A read-only admin has no Edit to open a draft with, so View covers it.
+      show: simulation => readOnly || simulation.status !== SimulationStatus.DRAFT,
     },
     {
       icon: <Edit />,
@@ -231,6 +250,7 @@ export const SimulationList: React.FC<SimulationListProps> = ({
       icon: <Copy />,
       tooltip: en.simulation.duplicate,
       onClick: simulation => onDuplicate?.(simulation),
+      show: () => !readOnly,
     },
     {
       icon: <Unarchive />,

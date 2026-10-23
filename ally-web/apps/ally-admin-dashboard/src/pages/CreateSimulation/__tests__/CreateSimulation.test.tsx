@@ -123,6 +123,11 @@ vi.mock("@hooks", () => ({
   useDebounce: (fn: any) => fn, // Return the function immediately without debouncing
   useScenarioTranslationsSocket: () => undefined,
   useUser: () => ({ user: { email: "test@example.com" } }),
+  useContentAuthoring: () => ({
+    canAuthorRoleplays: true,
+    canAuthorCases: true,
+    canAuthorCourses: true,
+  }),
 }));
 
 // Mock components

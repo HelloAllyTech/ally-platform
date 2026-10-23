@@ -35,6 +35,14 @@ interface PrivateLayoutProps {
    */
   requiredFeature?: string | string[];
   /**
+   * Feature-toggle keys the route needs on top of `requiredFeature` — every
+   * one of them, where `requiredFeature`'s list is any-of. For a page behind
+   * two independent toggles, e.g. New Roleplay: Simulation Studio at all
+   * (CONTENT_MANAGEMENT) AND Create Roleplays. Not satisfied by the org
+   * toggle path.
+   */
+  alsoRequiredFeatures?: string[];
+  /**
    * Second grant path, alongside `requiredFeature`: the caller's ORG has the
    * feature switched on. Per-user feature toggles only exist for platform
    * admins, so this is how a tenant's own admins reach a surface built for
@@ -57,6 +65,7 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
   isPreview,
   requiredPermissions = [],
   requiredFeature,
+  alsoRequiredFeatures,
   requiredOrgToggle,
   allowedEmails,
 }) => {
@@ -142,6 +151,9 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
       : [requiredFeature];
     hasRequiredFeature = requiredFeatureKeys.some(key => hasFeature(features, key));
   }
+  const hasAlsoRequiredFeatures =
+    !alsoRequiredFeatures?.length ||
+    (!isFeaturesLoading && alsoRequiredFeatures.every(key => hasFeature(features, key)));
 
   // Org-toggle gating. Fails CLOSED while loading and on a fetch error, same as
   // the per-user toggles above — the feature check is the escape hatch for a
@@ -161,7 +173,11 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
     );
   }
 
-  const hasAccess = hasPermission && (hasRequiredFeature || hasOrgToggle) && hasAllowedEmail;
+  const hasAccess =
+    hasPermission &&
+    (hasRequiredFeature || hasOrgToggle) &&
+    hasAlsoRequiredFeatures &&
+    hasAllowedEmail;
 
   // Every gate used to read as identical generic copy on AccessDenied. Order
   // matters here roughly by how "fixable by the viewer" each cause is: an
@@ -193,7 +209,10 @@ export const PrivateLayout: React.FC<PrivateLayoutProps> = ({
     neither a permission nor a feature is reachable regardless, and a blip on an endpoint it
     never consults must not block it.
   */
-  const routeIsGated = requiredPermissions.length > 0 || Boolean(requiredFeature);
+  const routeIsGated =
+    requiredPermissions.length > 0 ||
+    Boolean(requiredFeature) ||
+    Boolean(alsoRequiredFeatures?.length);
   const entitlementsLoading =
     routeIsGated &&
     (isUserLoading ||

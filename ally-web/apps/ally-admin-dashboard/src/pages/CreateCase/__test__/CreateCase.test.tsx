@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { afterEach, describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockNavigate = vi.fn();
 const mockUseParams = vi.fn(() => ({}));
@@ -19,8 +19,17 @@ vi.mock("@api", () => ({
 import * as api from "@api";
 import { CreateCase } from "../CreateCase";
 
+const { mockContentAuthoring } = vi.hoisted(() => ({
+  mockContentAuthoring: vi.fn(() => ({
+    canAuthorRoleplays: true,
+    canAuthorCases: true,
+    canAuthorCourses: true,
+  })),
+}));
+
 vi.mock("@hooks", () => ({
   useDebounce: (fn: (...args: any[]) => any) => fn,
+  useContentAuthoring: mockContentAuthoring,
 }));
 
 vi.mock("@assets", () => ({
@@ -33,9 +42,10 @@ vi.mock("@ally-ui-mono/ui-shared", () => ({
 }));
 
 vi.mock("@components", () => ({
-  Header: ({ title, onBack, onPublish, onSaveDraft, isValid }: any) => (
+  Header: ({ title, onBack, onPublish, onSaveDraft, isValid, viewOnly }: any) => (
     <div data-testid="header">
       <h1>{title}</h1>
+      {viewOnly && <p data-testid="header-view-only">{viewOnly.subtitle}</p>}
       <button onClick={onBack} data-testid="header-back">
         Back
       </button>
@@ -135,6 +145,13 @@ vi.mock("@constants", () => {
   ];
   return {
     en: {
+      contentAccess: {
+        viewOnlyBannerTitle: "View only",
+        viewOnlyBannerSubtitle: (plural: string, toggleLabel: string) =>
+          `You can open ${plural} but not change them. Ask whoever manages admin access to turn on ${toggleLabel} for you.`,
+        cases: "cases",
+        createCasesToggle: "Create Cases",
+      },
       simulation: {
         addSimulation: "Add simulation",
         viewOnly: "View only",
@@ -228,6 +245,40 @@ describe("CreateCase", () => {
     mockUseParams.mockReturnValue({ id: "case-123" });
     render(<CreateCase />);
     expect(screen.getByRole("heading", { name: "Edit Case" })).toBeInTheDocument();
+  });
+
+  describe("with Create Cases off (view-only)", () => {
+    beforeEach(() => {
+      mockContentAuthoring.mockReturnValue({
+        canAuthorRoleplays: true,
+        canAuthorCases: false,
+        canAuthorCourses: true,
+      });
+    });
+    afterEach(() => {
+      mockContentAuthoring.mockReturnValue({
+        canAuthorRoleplays: true,
+        canAuthorCases: true,
+        canAuthorCourses: true,
+      });
+    });
+
+    it("opens an existing case read-only and says who to ask", () => {
+      mockUseParams.mockReturnValue({ id: "case-123" });
+      render(<CreateCase />);
+
+      expect(screen.getByTestId("header-view-only")).toHaveTextContent(
+        "Ask whoever manages admin access to turn on Create Cases for you.",
+      );
+      expect(mockGetScenarioCaseById).toHaveBeenCalledWith("case-123");
+    });
+
+    it("disables every field of the form", () => {
+      mockUseParams.mockReturnValue({ id: "case-123" });
+      const { container } = render(<CreateCase />);
+
+      expect(container.querySelector("fieldset")).toBeDisabled();
+    });
   });
 
   it("fetches case by id when caseId is set", () => {

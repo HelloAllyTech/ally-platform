@@ -85,13 +85,20 @@ export const UserManagement: FC = () => {
   });
   const superAdminTierCount = platformAdminsForCount?.count ?? 0;
 
-  const requestedTab = (searchParams.get("tab") as TabType) || TabType.USERS;
+  // The Users toggle switches off the Users and Organizations sub-tabs. The
+  // page itself stays reachable to an admin with Admin User Management, for
+  // the Ally admins list, so that is where they land instead.
+  const canSeeUsersAndOrgs = hasFeature(features, FeatureToggleKey.USERS);
+  const fallbackTab = canSeeUsersAndOrgs ? TabType.USERS : TabType.SUPER_ADMINS;
+  const requestedTab = (searchParams.get("tab") as TabType) || fallbackTab;
   // The Ally admins tab is gated; a deep link to it from anyone else falls
   // back to Users (the backing endpoints would 403 anyway).
   const activeTab =
     (requestedTab === TabType.SUPER_ADMINS && !canManagePlatformAdmins) ||
-    (requestedTab === TabType.PHONE_MAPPINGS && !canManagePhoneMappings)
-      ? TabType.USERS
+    (requestedTab === TabType.PHONE_MAPPINGS && !canManagePhoneMappings) ||
+    ((requestedTab === TabType.USERS || requestedTab === TabType.ORGANIZATIONS) &&
+      !canSeeUsersAndOrgs)
+      ? fallbackTab
       : requestedTab;
 
   // Organization management hook
@@ -181,8 +188,16 @@ export const UserManagement: FC = () => {
   ) : null;
 
   const TABS = [
-    { id: TabType.USERS, label: en.userManagement.users, count: usersCount },
-    { id: TabType.ORGANIZATIONS, label: en.userManagement.organizations, count: tenantsCount },
+    ...(canSeeUsersAndOrgs
+      ? [
+          { id: TabType.USERS, label: en.userManagement.users, count: usersCount },
+          {
+            id: TabType.ORGANIZATIONS,
+            label: en.userManagement.organizations,
+            count: tenantsCount,
+          },
+        ]
+      : []),
     ...(canManagePlatformAdmins
       ? [{ id: TabType.SUPER_ADMINS, label: en.superAdmins.title, count: superAdminTierCount }]
       : []),

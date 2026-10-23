@@ -14,6 +14,7 @@ const {
   mockUseUser,
   mockFeatures,
   mockCanUseCourseCopilot,
+  mockContentAuthoring,
 } = vi.hoisted(() => ({
   mockUseSimulations: vi.fn(),
   mockUseSimulationPathways: vi.fn(),
@@ -22,6 +23,11 @@ const {
   mockUseUser: vi.fn(),
   mockFeatures: vi.fn<[], string[]>(),
   mockCanUseCourseCopilot: vi.fn<() => boolean>(),
+  mockContentAuthoring: vi.fn(() => ({
+    canAuthorRoleplays: true,
+    canAuthorCases: true,
+    canAuthorCourses: true,
+  })),
 }));
 
 // Mock the custom hooks
@@ -32,6 +38,7 @@ vi.mock("@hooks", () => ({
   useTracks: mockUseTracks,
   useUser: mockUseUser,
   useCanUseCourseCopilot: mockCanUseCourseCopilot,
+  useContentAuthoring: mockContentAuthoring,
 }));
 
 // The content gate reads `state.user.features` off the store. Mocking
@@ -99,6 +106,7 @@ vi.mock("@components", async importOriginal => {
       footer,
       currentUser,
       isSuperAdmin,
+      readOnly,
     }: any) => {
       // Handle loading state
       if (isLoading && simulations.length === 0) {
@@ -136,7 +144,7 @@ vi.mock("@components", async importOriginal => {
       };
 
       return (
-        <div data-testid="simulation-list">
+        <div data-testid="simulation-list" data-read-only={String(Boolean(readOnly))}>
           {simulations.map((simulation: any) => (
             <div key={simulation.id} data-testid={`simulation-${simulation.id}`}>
               <h3>{simulation.title}</h3>
@@ -202,6 +210,7 @@ vi.mock("@components", async importOriginal => {
       onUnpublishPathway,
       onCreatePathway,
       footer,
+      readOnly,
     }: any) => {
       // Handle loading state
       if (isLoading && pathways.length === 0) {
@@ -237,7 +246,7 @@ vi.mock("@components", async importOriginal => {
       }
 
       return (
-        <div data-testid="pathway-list">
+        <div data-testid="pathway-list" data-read-only={String(Boolean(readOnly))}>
           {pathways.map((pathway: any) => (
             <div key={pathway.id} data-testid={`pathway-${pathway.id}`}>
               <h3>{pathway.title}</h3>
@@ -520,6 +529,11 @@ describe("SimulationStudio", () => {
     mockUseUser.mockReturnValue(defaultUserHookReturn);
     mockFeatures.mockReturnValue(["content_management"]);
     mockCanUseCourseCopilot.mockReturnValue(false);
+    mockContentAuthoring.mockReturnValue({
+      canAuthorRoleplays: true,
+      canAuthorCases: true,
+      canAuthorCourses: true,
+    });
   });
 
   const renderComponent = (initialEntries = ["/"]) => {
@@ -902,6 +916,55 @@ describe("SimulationStudio", () => {
       fireEvent.click(screen.getByTestId("close-options"));
 
       expect(screen.queryByTestId("options-popup")).not.toBeInTheDocument();
+    });
+  });
+
+  // Create Roleplays / Cases / Courses: a type whose toggle is off is view-only.
+  describe("Content authoring toggles", () => {
+    const authoring = (overrides: Record<string, boolean>) =>
+      mockContentAuthoring.mockReturnValue({
+        canAuthorRoleplays: true,
+        canAuthorCases: true,
+        canAuthorCourses: true,
+        ...overrides,
+      });
+
+    it("offers only the types the admin may create", () => {
+      authoring({ canAuthorRoleplays: false, canAuthorCourses: false });
+      renderComponent();
+      fireEvent.click(screen.getByText("Create"));
+
+      expect(screen.queryByTestId("option-New simulation")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("option-New Course")).not.toBeInTheDocument();
+      expect(screen.getByTestId("option-New Case")).toBeInTheDocument();
+    });
+
+    it("drops the Create button when there is nothing left to create", () => {
+      authoring({ canAuthorRoleplays: false, canAuthorCases: false, canAuthorCourses: false });
+      renderComponent();
+
+      expect(screen.queryByText("Create")).not.toBeInTheDocument();
+    });
+
+    it("lists roleplays read-only when Create Roleplays is off", () => {
+      authoring({ canAuthorRoleplays: false });
+      renderComponent();
+
+      expect(screen.getByTestId("simulation-list")).toHaveAttribute("data-read-only", "true");
+    });
+
+    it("lists cases read-only, with no empty-state create, when Create Cases is off", () => {
+      authoring({ canAuthorCases: false });
+      mockUseSimulationCases.mockReturnValue({ ...defaultCasesHookReturn, cases: [] });
+      renderComponent(["/?tab=cases"]);
+
+      expect(screen.queryByTestId("create-pathway-button")).not.toBeInTheDocument();
+    });
+
+    it("keeps the roleplay list writable for an admin who may author it", () => {
+      renderComponent();
+
+      expect(screen.getByTestId("simulation-list")).toHaveAttribute("data-read-only", "false");
     });
   });
 

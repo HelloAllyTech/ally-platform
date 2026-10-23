@@ -21,9 +21,19 @@ vi.mock("@api", () => ({
   useGetCharacterLibraryEnabledQuery: vi.fn(() => ({ data: false, isLoading: false })),
   // Feature-gated tabs can be the landing tab, so this screen fetches the
   // per-user toggles. Default to content_management on, matching the backfill
-  // every platform admin gets.
+  // every platform admin gets, plus the per-tab toggles ally-be grants by default.
   useGetFeatureTogglesQuery: vi.fn(() => ({
-    data: ["content_management"],
+    data: [
+      "content_management",
+      "events",
+      "scenario_voices",
+      "prompts",
+      "translations",
+      "blog",
+      "product_updates",
+      "product_roadmap",
+      "users",
+    ],
     isLoading: false,
   })),
   baseAPI: {
