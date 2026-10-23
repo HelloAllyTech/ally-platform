@@ -17,6 +17,7 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { RequireFeatureToggle } from 'src/auth/decorators/feature-toggle.decorator';
+import { AuthPermissions } from 'src/auth/decorators/auth-permissions.decorator';
 import { FeatureToggleKey } from 'src/authorization/constants/admin-feature-toggle.constants';
 import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
 import { CurrentUser } from 'src/auth/decorators/user.decorator';
@@ -53,9 +54,10 @@ export class CompetencyClusterController {
     type: String,
     description: 'Filter by name',
   })
-  @RequireFeatureToggle(FeatureToggleKey.COMPETENCIES, {
-    permissions: [PERMISSIONS.EDIT_SCENARIO],
-  })
+  // Read by the roleplay builder's competency picker, so — like the competency
+  // list — authoring opens it (see CompetencyController). Changing clusters is
+  // managing the shared library and keeps the toggle.
+  @AuthPermissions([PERMISSIONS.EDIT_SCENARIO])
   @Get()
   async getClusters(
     @Query('name') name?: string,

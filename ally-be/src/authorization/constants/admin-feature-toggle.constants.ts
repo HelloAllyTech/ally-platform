@@ -211,7 +211,8 @@ export const FEATURE_TOGGLES: FeatureToggleDefinition[] = [
   {
     key: FeatureToggleKey.COMPETENCIES,
     label: 'Competencies',
-    description: 'Manage the competency taxonomy used by evaluations.',
+    description:
+      'The Competencies tab: create and edit the shared competency library and its clusters. Picking competencies for a roleplay or a course does not need it.',
     legacyGrants: SUPER_ADMIN_TIER,
   },
   {
