@@ -15,6 +15,7 @@ import {
   checklistsEqual,
   cleanChecklist,
   expectationOf,
+  expectsNothingToBuild,
   interviewContextOf,
   MAX_FIXTURE_NAME,
   MAX_FIXTURE_NOTES,
@@ -141,6 +142,16 @@ const FixtureForm: React.FC<FixtureFormProps> = ({ fixture, onClose }) => {
               ))}
             </ol>
           </details>
+        </section>
+      )}
+
+      {isInterview && (
+        <section className="flex flex-col gap-1">
+          <h3 className="text-sm font-semibold text-typography-900">{strings.outcomeHeading}</h3>
+          <p className="text-sm text-typography-700">
+            {expectsNothingToBuild(fixture) ? strings.outcomeNothingToBuild : strings.outcomePrd}
+          </p>
+          <p className="text-xs text-typography-600">{strings.outcomeReadOnly}</p>
         </section>
       )}
 

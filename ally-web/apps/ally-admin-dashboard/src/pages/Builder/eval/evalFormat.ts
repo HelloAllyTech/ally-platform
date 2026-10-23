@@ -4,6 +4,7 @@ import type {
   BuilderEvalFixtureKind,
   BuilderEvalGates,
   BuilderEvalInterviewPayload,
+  BuilderEvalMetrics,
   BuilderEvalPrdReviewPayload,
   BuilderEvalRun,
   BuilderEvalSuite,
@@ -90,6 +91,15 @@ export const expectationOf = (
   };
 };
 
+/**
+ * For an `interview` fixture: whether a correct interview ends with Builder
+ * concluding the request is already met, rather than with a ready PRD.
+ */
+export const expectsNothingToBuild = (fixture: BuilderEvalFixture): boolean =>
+  fixture.kind === "interview" &&
+  (fixture.payload as Partial<BuilderEvalInterviewPayload> | null)?.expectedOutcome ===
+    "nothing_to_build";
+
 /** "C7": one past the highest numbered id in the list, and never one that is already taken. */
 export const nextChecklistId = (items: BuilderEvalChecklistItem[]): string => {
   const taken = new Set(items.map(item => item.id));
@@ -131,6 +141,8 @@ export interface FixtureRow {
   kind: BuilderEvalFixtureKind;
   /** Interview fixtures only; a PRD-review fixture has an expectation, not a checklist. */
   checklistSize: number | null;
+  /** A correct interview ends with nothing to build, not a ready PRD. */
+  expectsNothingToBuild: boolean;
   active: boolean;
   note: string;
 }
@@ -141,6 +153,7 @@ export const fixtureRows = (fixtures: BuilderEvalFixture[] | undefined): Fixture
     name: fixture.name,
     kind: fixture.kind,
     checklistSize: fixture.kind === "interview" ? checklistOf(fixture).length : null,
+    expectsNothingToBuild: expectsNothingToBuild(fixture),
     active: fixture.active !== false,
     note: shortNote(fixture.notes),
   }));
@@ -371,9 +384,39 @@ export interface RunGroup {
   /** From the suite's own summary (the name it ran under), then the live list, then the id. */
   name: string | null;
   kind: BuilderEvalFixtureKind | null;
+  /**
+   * The runs were held to "nothing to build". What a run recorded wins over the live fixture,
+   * which may have changed since; the live fixture answers for runs scored before it was recorded.
+   */
+  expectsNothingToBuild: boolean;
   runs: BuilderEvalRun[];
   passed: number;
 }
+
+export interface OutcomeNote {
+  key: "nothingAsExpected" | "plannedBuild" | "didNotConclude" | "nothingButPrdExpected";
+  /** The run did not end the way its fixture expects. */
+  failing: boolean;
+}
+
+/**
+ * One line for a run's header on how its interview ended, against what the fixture expects —
+ * or null where today's header already says it: a PRD fixture that reached ready or did not, and
+ * any run from before the outcome was recorded. The one PRD-fixture case worth a line is Builder
+ * concluding there is nothing to build: that is why the run failed, and it is not an interview
+ * that went wrong.
+ */
+export const outcomeNote = (metrics: BuilderEvalMetrics | null | undefined): OutcomeNote | null => {
+  const outcome = metrics?.outcome;
+  if (!outcome) return null;
+  if (metrics?.expectedOutcome === "nothing_to_build") {
+    if (outcome === "nothing_to_build") return { key: "nothingAsExpected", failing: false };
+    return outcome === "prd_ready"
+      ? { key: "plannedBuild", failing: true }
+      : { key: "didNotConclude", failing: true };
+  }
+  return outcome === "nothing_to_build" ? { key: "nothingButPrdExpected", failing: true } : null;
+};
 
 /** A suite's runs gathered under their fixture, in the order the fixtures first appear. */
 export const groupRunsByFixture = (
@@ -398,6 +441,7 @@ export const groupRunsByFixture = (
         fixtureId: run.fixtureId,
         name: fromSummary?.name ?? live?.name ?? null,
         kind: fromSummary?.kind ?? live?.kind ?? null,
+        expectsNothingToBuild: live ? expectsNothingToBuild(live) : false,
         runs: [],
         passed: 0,
       };
@@ -406,10 +450,16 @@ export const groupRunsByFixture = (
     group.runs.push(run);
     if (run.status === "passed") group.passed += 1;
   }
-  return [...groups.values()].map(group => ({
-    ...group,
-    runs: [...group.runs].sort((a, b) => a.repetition - b.repetition),
-  }));
+  return [...groups.values()].map(group => {
+    const recorded = group.runs.find(run => run.metrics?.expectedOutcome)?.metrics?.expectedOutcome;
+    return {
+      ...group,
+      expectsNothingToBuild: recorded
+        ? recorded === "nothing_to_build"
+        : group.expectsNothingToBuild,
+      runs: [...group.runs].sort((a, b) => a.repetition - b.repetition),
+    };
+  });
 };
 
 /* ── Download ───────────────────────────────────────────────────────────── */

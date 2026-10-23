@@ -25,6 +25,7 @@ import {
   gateEntries,
   gateViolationCount,
   groupRunsByFixture,
+  outcomeNote,
   RUN_STATUS_TAG_TYPE,
   SUITE_STATUS_TAG_TYPE,
   SUITE_TRIGGER_TAG_TYPE,
@@ -66,6 +67,7 @@ const RunCard: React.FC<RunCardProps> = ({ run, kind, checklistText }) => {
   const judgeItems = asArray<NonNullable<BuilderEvalRun["judge"]>["items"][number]>(judge?.items);
   const critic = run.critic;
   const correctedItems = asArray<string>(metrics?.correctedItems);
+  const outcome = isReview ? null : outcomeNote(metrics);
 
   return (
     <li className="flex flex-col gap-2 border border-neutral-200 p-3">
@@ -82,6 +84,13 @@ const RunCard: React.FC<RunCardProps> = ({ run, kind, checklistText }) => {
         {!isReview && metrics && (
           <span className="text-xs text-typography-600">
             {strings.turns(metrics.turns)} · {strings.corrections(metrics.corrections)}
+          </span>
+        )}
+        {outcome && (
+          <span
+            className={`text-xs ${outcome.failing ? "text-destructive-600" : "text-typography-600"}`}
+          >
+            {strings.outcomeNote[outcome.key]}
           </span>
         )}
         {isReview && critic && (
@@ -182,6 +191,12 @@ const RunCard: React.FC<RunCardProps> = ({ run, kind, checklistText }) => {
                         )
                   }
                 />
+                {metrics.outcome && (
+                  <Stat
+                    label={strings.metric.outcome}
+                    value={strings.outcome[metrics.outcome] ?? metrics.outcome}
+                  />
+                )}
                 <Stat
                   label={strings.metric.toolCalls}
                   value={strings.toolCalls(metrics.toolCalls, metrics.toolFailures)}
@@ -499,6 +514,11 @@ const SuiteBody: React.FC<{
                 <h4 className="min-w-0 flex-1 truncate text-sm font-semibold text-typography-900">
                   {group.name ?? strings.deletedFixture}
                 </h4>
+                {group.expectsNothingToBuild && (
+                  <Tag type="cool-gray" size="sm" className="shrink-0">
+                    {strings.expectsNothingToBuild}
+                  </Tag>
+                )}
                 <span className="shrink-0 text-xs text-typography-600">
                   {strings.fixturePassed(group.passed, group.runs.length)}
                 </span>

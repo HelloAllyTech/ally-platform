@@ -1,7 +1,9 @@
 import { BuilderMessageRole } from '../../enum/builder.enum';
 import {
   computeEvalGates,
+  expectedOutcomeOf,
   gateViolations,
+  interviewOutcome,
 } from '../util/builder-eval-scoring.util';
 
 const ready = (rows: Record<string, boolean> = {}) => ({
@@ -239,5 +241,92 @@ describe('computeEvalGates', () => {
     const older = { ...computeEvalGates([], [], ready()) };
     delete older.falseReadyClaims;
     expect(gateViolations(older)).toBe(0);
+  });
+});
+
+describe('interviewOutcome', () => {
+  // Suite 5d24dd95, a "simulation edit versions" run: the brief named the
+  // daily auto-version job, the admin confirmed, and Builder emptied the
+  // requirements and said no build was needed.
+  const concluded = {
+    existingBehaviour:
+      'A daily job already saves an automatic version of every edited draft (src/learn/service/scenario-version.service.ts).',
+    requirements: [],
+  } as any;
+
+  it('reads nothing to build from a PRD that says what exists and plans nothing', () => {
+    expect(
+      interviewOutcome({
+        readyReached: false,
+        draft: concluded,
+        endedWithoutAsking: true,
+      }),
+    ).toBe('nothing_to_build');
+  });
+
+  it('is a ready PRD whenever the PRD reached ready', () => {
+    expect(
+      interviewOutcome({
+        readyReached: true,
+        draft: concluded,
+        endedWithoutAsking: true,
+      }),
+    ).toBe('prd_ready');
+  });
+
+  // One "Builder notifications bell" run in that suite said no new work was
+  // needed over four requirements: pressing Build would have built them.
+  it('is neither while the PRD still plans requirements, whatever the reply says', () => {
+    expect(
+      interviewOutcome({
+        readyReached: false,
+        draft: {
+          ...concluded,
+          requirements: [
+            {
+              id: 'R1',
+              title: 'Popover',
+              description: '',
+              acceptanceCriteria: [],
+            },
+          ],
+        },
+        endedWithoutAsking: true,
+      }),
+    ).toBe('neither');
+  });
+
+  it('is neither when the replay stopped on a question, or before saying what exists', () => {
+    expect(
+      interviewOutcome({
+        readyReached: false,
+        draft: concluded,
+        endedWithoutAsking: false,
+      }),
+    ).toBe('neither');
+    expect(
+      interviewOutcome({
+        readyReached: false,
+        draft: { ...concluded, existingBehaviour: '  ' },
+        endedWithoutAsking: true,
+      }),
+    ).toBe('neither');
+    expect(
+      interviewOutcome({
+        readyReached: false,
+        draft: null,
+        endedWithoutAsking: true,
+      }),
+    ).toBe('neither');
+  });
+
+  it("reads a fixture's expectation, defaulting to a ready PRD", () => {
+    expect(expectedOutcomeOf({ expectedOutcome: 'nothing_to_build' })).toBe(
+      'nothing_to_build',
+    );
+    expect(expectedOutcomeOf({})).toBe('prd_ready');
+    expect(expectedOutcomeOf({ expectedOutcome: 'prd_ready' })).toBe(
+      'prd_ready',
+    );
   });
 });

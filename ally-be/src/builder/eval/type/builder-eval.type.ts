@@ -48,7 +48,28 @@ export interface BuilderEvalInterviewPayload {
   pins?: Record<string, string>;
   /** Turns before the replay gives up. Default BUILDER_EVAL_MAX_TURNS. */
   maxTurns?: number;
+  /**
+   * How a correct interview ends. Absent means `prd_ready`, which is what
+   * every fixture meant before this existed. `nothing_to_build` is for a
+   * request the platform already meets — a replay of a session whose work has
+   * since shipped, or a real re-request of shipped work — where the right end
+   * is Builder saying so and planning nothing, not a PRD that rebuilds it.
+   */
+  expectedOutcome?: BuilderEvalExpectedOutcome;
 }
+
+/** How a correct interview ends, as a fixture declares it. */
+export type BuilderEvalExpectedOutcome = 'prd_ready' | 'nothing_to_build';
+
+/**
+ * How an interview replay ended. `prd_ready`: the PRD reached ready.
+ * `nothing_to_build`: Builder concluded the request is already met — its PRD
+ * says what exists, plans no requirement, and its last reply asked nothing.
+ * `neither`: the replay stopped short of both.
+ */
+export type BuilderEvalInterviewOutcome =
+  | BuilderEvalExpectedOutcome
+  | 'neither';
 
 export interface BuilderEvalPrdReviewPayload {
   /** The PRD under review — a seeded defect, or a clean control. */
@@ -161,6 +182,13 @@ export interface BuilderEvalMetrics {
   /** Which checklist items each correction was about. */
   correctedItems: string[];
   readyReached: boolean;
+  /** How the replay ended; absent on runs from before it was recorded. */
+  outcome?: BuilderEvalInterviewOutcome;
+  /**
+   * How the fixture said a correct interview ends, as it stood when the run
+   * was scored — so a run reads against the expectation it was held to.
+   */
+  expectedOutcome?: BuilderEvalExpectedOutcome;
   /**
    * The readiness score of the final PRD: the share of its "is this written"
    * rows that pass. 100 is not ready — open questions, assumptions, review

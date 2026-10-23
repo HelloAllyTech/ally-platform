@@ -126,6 +126,67 @@ describe('BuilderEvalFixtureService', () => {
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
+    describe('the expected outcome', () => {
+      const interview = (extra: Record<string, unknown> = {}) =>
+        ({
+          openingMessage: 'Version simulations every 24 hours.',
+          adminScript: [],
+          checklist: [],
+          ...extra,
+        }) as any;
+
+      it('keeps "nothing to build" and stores nothing for the default', async () => {
+        const { service, repository } = build();
+
+        await service.importFixtures(
+          [
+            {
+              name: 'versions (shipped)',
+              kind: 'interview',
+              payload: interview({ expectedOutcome: 'nothing_to_build' }),
+            },
+            {
+              name: 'versions',
+              kind: 'interview',
+              payload: interview({ expectedOutcome: 'prd_ready' }),
+            },
+          ],
+          7,
+        );
+
+        const saved = repository.save.mock.calls.map(([row]) => row.payload);
+        expect(saved[0].expectedOutcome).toBe('nothing_to_build');
+        // An export from before the field existed, or one that spells out the
+        // default, stores the same payload as it always did.
+        expect(saved[1]).not.toHaveProperty('expectedOutcome');
+      });
+
+      it('imports an export from before the field existed unchanged', async () => {
+        const { service, repository } = build();
+        const old = interview({ recordedPrd: null });
+
+        await service.importFixtures(
+          [{ name: 'bell', kind: 'interview', payload: old }],
+          7,
+        );
+
+        expect(repository.save.mock.calls[0][0].payload).toEqual(old);
+      });
+
+      it('refuses an expectation it does not know, rather than read it as a PRD', async () => {
+        await expect(
+          build().service.create(
+            {
+              name: 'versions',
+              kind: 'interview',
+              payload: interview({ expectedOutcome: 'nothing-to-build' }),
+            },
+            7,
+          ),
+        ).rejects.toBeInstanceOf(BadRequestException);
+      });
+    });
+
     it('requires a seeded-defect fixture to say whether the critic should block', async () => {
       await expect(
         build().service.create(
