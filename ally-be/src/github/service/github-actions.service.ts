@@ -12,6 +12,8 @@ export interface WorkflowRun {
   /** Null until `status` is `completed`. */
   conclusion: string | null;
   createdAt: Date;
+  /** The run's title — Bug Hunter's workflows put the finding or run id in it (`run-name`). */
+  displayTitle?: string | null;
 }
 
 /** A successful run with both ends of it — when it started and when it finished. */
@@ -75,6 +77,8 @@ export interface PullRequestInfo {
    * branch deletion when this is set.
    */
   headIsFork: boolean;
+  /** The base repository is archived: the PR is frozen and can never merge (the 2026-10-23 monorepo cutover). */
+  baseRepoArchived: boolean;
   /** Lines added and removed, and files changed, as GitHub counts them. Null when GitHub did not say. */
   additions: number | null;
   deletions: number | null;
@@ -185,6 +189,21 @@ export interface PullRequestFeedback {
  * `dispatchedAt` at dispatch time and why the reconcile task, not the
  * dispatching request, is what resolves a run id.
  */
+/**
+ * The services that live as folders in the monorepo since the 2026-10-23
+ * cutover. A GitHub call naming one of these is addressed to the monorepo.
+ */
+export const MONOREPO_SERVICES = [
+  'ally-be',
+  'ally-web',
+  'ally-ai',
+  'ally-ai-learn',
+  'ally-mobile',
+] as const;
+
+export const isMonorepoService = (repo: string): boolean =>
+  (MONOREPO_SERVICES as readonly string[]).includes(repo);
+
 @Injectable()
 export class GithubActionsService {
   private readonly logger = LoggerService.getInstance(
@@ -243,8 +262,32 @@ export class GithubActionsService {
     };
   }
 
+  /**
+   * The repository a call is addressed to. Since the 2026-10-23 cutover the
+   * five services live as folders in one monorepo and their own repos are
+   * archived, so a SERVICE name ("ally-be") resolves to the monorepo. A full
+   * "owner/name" passes through untouched: that is how a pull request from
+   * an archived repo (ally-be #704) is still read from the repo it lives in,
+   * rather than mistaken for ally-platform #704.
+   */
+  fullRepo(repo: string): string {
+    if (repo.includes('/')) return repo;
+    const mono = this.configService.githubMonorepo;
+    const name = mono && isMonorepoService(repo) ? mono : repo;
+    return `${this.configService.githubOrg}/${name}`;
+  }
+
+  /** The folder a service occupies in the monorepo, or null when the call is not about one service there. */
+  servicePath(repo: string): string | null {
+    return !repo.includes('/') &&
+      this.configService.githubMonorepo &&
+      isMonorepoService(repo)
+      ? `${repo}/`
+      : null;
+  }
+
   private url(repo: string, path: string): string {
-    return `https://api.github.com/repos/${this.configService.githubOrg}/${repo}/${path}`;
+    return `https://api.github.com/repos/${this.fullRepo(repo)}/${path}`;
   }
 
   /**
@@ -297,6 +340,12 @@ export class GithubActionsService {
      * the dispatch event never found one.
      */
     event?: string;
+    /**
+     * Only runs whose title contains this. Bug Hunter's workflows put the
+     * finding or run id in `run-name`, which is what tells one service's run
+     * from another's now that every service shares one workflow file.
+     */
+    titleIncludes?: string;
   }): Promise<WorkflowRun | null> {
     this.requireConfigured();
     try {
@@ -311,6 +360,11 @@ export class GithubActionsService {
       const candidates = (data?.workflow_runs ?? [])
         .map((run: any) => this.toWorkflowRun(run))
         .filter((run: WorkflowRun) => run.createdAt >= params.since)
+        .filter(
+          (run: WorkflowRun) =>
+            !params.titleIncludes ||
+            (run.displayTitle ?? '').includes(params.titleIncludes),
+        )
         // A workflow whose job condition is false still records a run, as
         // `skipped`: `builder.yml` does so for every comment and every other
         // label in the repo. Those are not the run anyone is looking for.
@@ -411,6 +465,7 @@ export class GithubActionsService {
           ? String(data.mergeable_state)
           : null,
         headRef: data?.head?.ref ? String(data.head.ref) : null,
+        baseRepoArchived: Boolean(data?.base?.repo?.archived),
         headIsFork: Boolean(
           data?.head?.repo?.full_name &&
           data?.base?.repo?.full_name &&
@@ -528,7 +583,7 @@ export class GithubActionsService {
         params: { state: 'open', per_page: 100 },
       });
       this.noteAuthOutcome();
-      return (data ?? []).map((pr: any) => ({
+      const all: PullRequestFromList[] = (data ?? []).map((pr: any) => ({
         htmlUrl: pr?.html_url ? String(pr.html_url) : '',
         headRef: pr?.head?.ref ? String(pr.head.ref) : null,
         number: typeof pr?.number === 'number' ? pr.number : null,
@@ -540,6 +595,18 @@ export class GithubActionsService {
         draft: Boolean(pr?.draft),
         updatedAt: pr?.updated_at ? new Date(pr.updated_at) : null,
       }));
+      // In the monorepo every service would see every open PR. Keep the ones
+      // whose changed files sit mostly in this service's folder.
+      const path = this.servicePath(repo);
+      if (!path) return all;
+      const mine: PullRequestFromList[] = [];
+      for (const pr of all) {
+        if (pr.number == null) continue;
+        if ((await this.serviceOfPullRequest(pr.number, pr.headSha)) === repo) {
+          mine.push(pr);
+        }
+      }
+      return mine;
     } catch (error) {
       this.noteAuthOutcome(error);
       this.logger.warn(
@@ -549,6 +616,39 @@ export class GithubActionsService {
       );
       return null;
     }
+  }
+
+  /** Which service a monorepo PR belongs to, by commit — a PR's files only change when its head does. */
+  private readonly prServiceCache = new Map<string, string | null>();
+
+  /**
+   * The service whose folder holds most of a monorepo pull request's changed
+   * files, or null when none does (root files only, or unreadable). Cached
+   * per head commit.
+   */
+  async serviceOfPullRequest(
+    number: number,
+    headSha: string | null,
+  ): Promise<string | null> {
+    const key = `${number}@${headSha ?? ''}`;
+    if (headSha && this.prServiceCache.has(key)) {
+      return this.prServiceCache.get(key) ?? null;
+    }
+    const mono = this.configService.githubMonorepo;
+    if (!mono) return null;
+    const { files } = await this.listPullRequestFiles(mono, number);
+    const counts = new Map<string, number>();
+    for (const file of files) {
+      const top = file.split('/')[0];
+      if (isMonorepoService(top)) counts.set(top, (counts.get(top) ?? 0) + 1);
+    }
+    const service =
+      [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+    if (headSha) {
+      if (this.prServiceCache.size > 500) this.prServiceCache.clear();
+      this.prServiceCache.set(key, service);
+    }
+    return service;
   }
 
   /**
@@ -884,9 +984,16 @@ export class GithubActionsService {
   ): Promise<{ sha: string; message: string; authorLogin: string | null }[]> {
     this.requireConfigured();
     try {
+      const path = this.servicePath(repo);
       const { data } = await axios.get(this.url(repo, 'commits'), {
         headers: this.headers,
-        params: { sha: 'master', since: since.toISOString(), per_page: 100 },
+        // In the monorepo, only the commits that touch this service's folder.
+        params: {
+          sha: 'master',
+          since: since.toISOString(),
+          per_page: 100,
+          ...(path ? { path } : {}),
+        },
         timeout: 20_000,
       });
       this.noteAuthOutcome();
@@ -904,9 +1011,15 @@ export class GithubActionsService {
   async hasCommitsSince(repo: string, since: Date): Promise<boolean> {
     this.requireConfigured();
     try {
+      const path = this.servicePath(repo);
       const { data } = await axios.get(this.url(repo, 'commits'), {
         headers: this.headers,
-        params: { sha: 'master', since: since.toISOString(), per_page: 1 },
+        params: {
+          sha: 'master',
+          since: since.toISOString(),
+          per_page: 1,
+          ...(path ? { path } : {}),
+        },
         timeout: 15_000,
       });
       return Array.isArray(data) && data.length > 0;
@@ -1654,6 +1767,7 @@ export class GithubActionsService {
       status: run.status,
       conclusion: run.conclusion ?? null,
       createdAt: new Date(run.created_at),
+      displayTitle: run.display_title ?? null,
     };
   }
 

@@ -304,7 +304,7 @@ describe('BugHunterPolicyService', () => {
     it('allows a small, unguarded sweep fix under the cap in a repo the bot may merge to', async () => {
       await expect(merging()).resolves.toBeUndefined();
       expect(github.listPullRequestFiles).toHaveBeenCalledWith(
-        'ally-ai-learn',
+        'HelloAllyTech/ally-ai-learn',
         42,
       );
     });
@@ -391,7 +391,7 @@ describe('BugHunterPolicyService', () => {
       await expect(merging()).resolves.toBeUndefined();
       // Four files is over the sweep's trivial limit and under the self-merge ceiling.
       expect(github.listPullRequestFiles).toHaveBeenCalledWith(
-        'ally-ai-learn',
+        'HelloAllyTech/ally-ai-learn',
         42,
       );
       expect(findingRepository.count).not.toHaveBeenCalled();

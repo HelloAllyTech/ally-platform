@@ -15,6 +15,7 @@ import {
   sensesForRepo,
   BugHunterSense,
 } from '../type/bug-hunter-finder.type';
+import { renderWorkspace } from './bug-hunter-toolbox';
 
 /**
  * Trims one line of the known-non-bugs block.
@@ -230,7 +231,7 @@ export function buildSweepPrompt(ctx: SweepPromptContext): string {
       'code_review',
       deep
         ? `CODE REVIEW (deep). Read broadly across the codebase for correctness bugs a careful reviewer would flag. proven=false.`
-        : `CODE REVIEW (diff-scoped). Read ONLY files changed by "git log --since='1 day ago'" — or the last 20 commits if that range is empty. Do not read the whole repo; this bounds the cost. proven=false.`,
+        : `CODE REVIEW (diff-scoped). Read ONLY files changed by "git log --since='1 day ago' -- ." (the trailing "-- ." keeps it to this service's folder; the monorepo's history holds every service) — or the last 20 commits that touch this folder ("git log -20 -- .") if that range is empty. Do not read the whole repo; this bounds the cost. proven=false.`,
     ],
     [
       'production_log',
@@ -253,6 +254,7 @@ export function buildSweepPrompt(ctx: SweepPromptContext): string {
   const repoMenu = sensesForRepo(repo);
   return [
     `You are running a repo-wide bug sweep on the "${repo}" repo, checked out at master in your current working directory. Read this repo's CLAUDE.md before you change anything. Bug Hunter is in ${mode.toUpperCase()} mode.`,
+    renderWorkspace(repo),
     ``,
     `HOW YOU ARE RUNNING — read this before you plan anything:`,
     `You are a single non-interactive process on a throwaway CI runner. The moment you end your turn the process exits and the runner is destroyed. There is no "later" for you: nothing re-invokes you, no background task ever notifies you, and any work not already pushed to GitHub or reported to Bug Hunter is lost with the machine. So NEVER start a long command in the background and end your turn intending to pick it up when it finishes — that silently throws away the rest of the sweep. Run long commands in the FOREGROUND and wait for them, however many minutes they take; ${BUG_HUNT_SWEEP_JOB_TIMEOUT_MINUTES} minutes is the real budget for everything below, and a single command is allowed to spend a large part of it. The full suite in Phase 1 and each commit in Phase 3 are the slowest, and both are meant to be — a commit here may fire a pre-commit hook that re-runs lint and the whole suite, which is expected and is NOT a hang.`,

@@ -56,3 +56,61 @@ export function describePersonOnlyPaths(hits: PersonOnlyPath[]): string {
     .join(', ')
     .concat(hits.length > 8 ? `, and ${hits.length - 8} more` : '');
 }
+
+const MONOREPO_FOLDERS = [
+  'ally-be',
+  'ally-web',
+  'ally-ai',
+  'ally-ai-learn',
+  'ally-mobile',
+  'helloallytech.github.io',
+];
+
+/**
+ * A monorepo PR's files as its own service sees them, plus the files that sit
+ * in ANOTHER service's folder.
+ *
+ * Since the 2026-10-23 cutover a fix PR's paths read "ally-be/src/…", so every
+ * rule above that anchors at the repo root (".claude/", a migration, a locale
+ * file) would stop matching. Stripping the finding's own folder keeps them
+ * meaning what they meant; root files (".github/…") are left as they are.
+ * A file in another service's folder is out of this fix's scope — a change
+ * there is a cross-repo plan step, never a side effect.
+ */
+export function scopeFilesToService(
+  files: readonly string[],
+  service: string | null | undefined,
+): { files: string[]; outside: string[] } {
+  if (!service) return { files: [...files], outside: [] };
+  const own = `${service}/`;
+  const scoped: string[] = [];
+  const outside: string[] = [];
+  for (const file of files) {
+    if (file.startsWith(own)) {
+      scoped.push(file.slice(own.length));
+      continue;
+    }
+    const top = file.split('/')[0];
+    if (file.includes('/') && MONOREPO_FOLDERS.includes(top)) {
+      outside.push(file);
+      continue;
+    }
+    scoped.push(file);
+  }
+  return { files: scoped, outside };
+}
+
+/** Person-only hits for a monorepo PR: the rules above on the service's own paths, plus every file in another service's folder. */
+export function personOnlyPathsForService(
+  files: readonly string[],
+  service: string | null | undefined,
+): PersonOnlyPath[] {
+  const { files: scoped, outside } = scopeFilesToService(files, service);
+  return [
+    ...personOnlyPaths(scoped),
+    ...outside.map((file) => ({
+      file,
+      why: "another service's folder",
+    })),
+  ];
+}

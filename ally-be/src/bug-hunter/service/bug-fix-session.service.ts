@@ -60,7 +60,7 @@ import { BugCaseBudgetService } from './bug-case-budget.service';
 import { BugFixPlanService } from './bug-fix-plan.service';
 import { BugFixVerdict } from '../type/bug-fix-verdict.type';
 import { repoForFault } from '../constants/bug-hunter-repair';
-import { repoFromPrUrl } from './bug-hunter-policy.service';
+import { prRepoOf, repoFromPrUrl } from './bug-hunter-policy.service';
 import { RoadmapOpportunityStage } from 'src/product-roadmap/enum/roadmap-opportunity.enum';
 import {
   FixRetry,
@@ -258,6 +258,9 @@ export class BugFixSessionService {
         repo: finding.repo,
         workflow: BUG_FIX_SESSION_WORKFLOW_FILE,
         since: finding.dispatchedAt,
+        // One workflow serves every service in the monorepo: match this
+        // finding's run by the id the workflow puts in its run-name.
+        titleIncludes: finding.id,
       });
       if (run) runId = run.id;
     }
@@ -678,7 +681,7 @@ export class BugFixSessionService {
       throw new ForbiddenException(chainRefusal(chain));
     }
 
-    const pr = await this.github.getPullRequest(finding.repo, prNumber);
+    const pr = await this.github.getPullRequest(prRepoOf(finding), prNumber);
     if (!pr) {
       throw new BadRequestException(
         `Could not read ${finding.prUrl} from GitHub. Try again, or merge it there.`,
@@ -692,7 +695,7 @@ export class BugFixSessionService {
         status: BugFindingStatus.MERGED,
       });
       await this.releaseLinkedRoadmapOpportunity(finding);
-      await this.deleteMergedBranch(finding.repo, pr);
+      await this.deleteMergedBranch(prRepoOf(finding), pr);
       return this.bugFindingService.getOne(finding.id);
     }
     if (pr.state === 'closed') {
@@ -706,7 +709,7 @@ export class BugFixSessionService {
     // and `pending` are also refused: a merge is the one action here that
     // cannot be undone from this tab.
     const rollup = pr.headSha
-      ? await this.github.getCheckRollup(finding.repo, pr.headSha)
+      ? await this.github.getCheckRollup(prRepoOf(finding), pr.headSha)
       : null;
     if (!rollup) {
       throw new BadRequestException(
@@ -730,7 +733,7 @@ export class BugFixSessionService {
     }
 
     const result = await this.github.mergePullRequest(
-      finding.repo,
+      prRepoOf(finding),
       prNumber,
       `fix: ${finding.title.slice(0, 120)} (#${prNumber})`,
     );
@@ -751,7 +754,7 @@ export class BugFixSessionService {
     finding.status = BugFindingStatus.MERGED;
     await this.releaseLinkedRoadmapOpportunity(finding);
     await this.checkForAndRecordReversals(finding, decidedAt);
-    const branch = await this.deleteMergedBranch(finding.repo, pr);
+    const branch = await this.deleteMergedBranch(prRepoOf(finding), pr);
     await this.bugHunterService.appendFindingEvent({
       findingId: finding.id,
       repo: finding.repo,
@@ -789,7 +792,7 @@ export class BugFixSessionService {
         `Could not read a PR number out of ${finding.prUrl}.`,
       );
     }
-    const pr = await this.github.getPullRequest(finding.repo, prNumber);
+    const pr = await this.github.getPullRequest(prRepoOf(finding), prNumber);
     if (!pr) {
       throw new BadRequestException(
         `Could not read ${finding.prUrl} from GitHub.`,
@@ -800,7 +803,7 @@ export class BugFixSessionService {
         status: BugFindingStatus.MERGED,
       });
       await this.releaseLinkedRoadmapOpportunity(finding);
-      await this.deleteMergedBranch(finding.repo, pr);
+      await this.deleteMergedBranch(prRepoOf(finding), pr);
       return this.bugFindingService.getOne(finding.id);
     }
     if (pr.state === 'closed') {
@@ -814,7 +817,7 @@ export class BugFixSessionService {
       );
     }
     const rollup = pr.headSha
-      ? await this.github.getCheckRollup(finding.repo, pr.headSha)
+      ? await this.github.getCheckRollup(prRepoOf(finding), pr.headSha)
       : null;
     if (!rollup || rollup.state !== 'success') {
       throw new ForbiddenException(
@@ -822,7 +825,7 @@ export class BugFixSessionService {
       );
     }
     const result = await this.github.mergePullRequest(
-      finding.repo,
+      prRepoOf(finding),
       prNumber,
       `fix: ${finding.title.slice(0, 120)} (#${prNumber})`,
     );
@@ -839,7 +842,7 @@ export class BugFixSessionService {
     finding.status = BugFindingStatus.MERGED;
     await this.releaseLinkedRoadmapOpportunity(finding);
     await this.checkForAndRecordReversals(finding, decidedAt);
-    const branch = await this.deleteMergedBranch(finding.repo, pr);
+    const branch = await this.deleteMergedBranch(prRepoOf(finding), pr);
     await this.bugHunterService.appendFindingEvent({
       findingId: finding.id,
       repo: finding.repo,
@@ -1146,7 +1149,7 @@ export class BugFixSessionService {
       });
       await this.bugHunterService.appendFindingEvent({
         findingId: step.id,
-        repo: prRepo,
+        repo: step.repo ?? prRepo,
         stage: BugHuntEventStage.MERGED,
         summary: `${step.prUrl} is merged, so this step is merged (it read ${step.status}).`,
         payload: { prUrl: step.prUrl, healedFrom: step.status },
@@ -1322,6 +1325,7 @@ export class BugFixSessionService {
             repo: finding.repo,
             workflow: BUG_FIX_SESSION_WORKFLOW_FILE,
             since: finding.dispatchedAt,
+            titleIncludes: finding.id,
           });
           if (run) {
             await this.findingRepository.update(finding.id, {
@@ -1385,6 +1389,7 @@ export class BugFixSessionService {
             repo: finding.repo,
             workflow: BUG_FIX_SESSION_WORKFLOW_FILE,
             since: finding.dispatchedAt,
+            titleIncludes: finding.id,
           });
           if (found) {
             runId = found.id;
@@ -1511,6 +1516,10 @@ export class BugFixSessionService {
         if (!pr.merged) {
           if (pr.state === 'closed') {
             await this.markPrClosedWithoutMerge(finding, pr.closedAt);
+          } else if (pr.baseRepoArchived) {
+            // A PR on a repo archived by the 2026-10-23 monorepo cutover can
+            // never merge. Free the bug so it is fixed again in ally-platform.
+            await this.markPrClosedWithoutMerge(finding, null, 'archived');
           }
           continue;
         }
@@ -1527,7 +1536,7 @@ export class BugFixSessionService {
         const branch = await this.deleteMergedBranch(prRepo, pr);
         await this.bugHunterService.appendFindingEvent({
           findingId: finding.id,
-          repo: prRepo,
+          repo: finding.repo ?? prRepo,
           stage: BugHuntEventStage.MERGED,
           summary: `${finding.prUrl} was merged.`,
           payload: { prUrl: finding.prUrl, mergedAt: pr.mergedAt, ...branch },
@@ -1554,9 +1563,9 @@ export class BugFixSessionService {
     if (!finding.repo || !finding.prUrl) return;
     const prNumber = BugFixSessionService.prNumberFrom(finding.prUrl);
     if (!prNumber) return;
-    const pr = await this.github.getPullRequest(finding.repo, prNumber);
+    const pr = await this.github.getPullRequest(prRepoOf(finding), prNumber);
     if (!pr?.merged) return;
-    await this.deleteMergedBranch(finding.repo, pr);
+    await this.deleteMergedBranch(prRepoOf(finding), pr);
   }
 
   /**
@@ -1599,6 +1608,7 @@ export class BugFixSessionService {
   private async markPrClosedWithoutMerge(
     finding: BugFinding,
     closedAt: Date | null,
+    why: 'closed' | 'archived' = 'closed',
   ): Promise<void> {
     const when = closedAt ?? new Date();
     await this.findingRepository.update(finding.id, {
@@ -1610,8 +1620,16 @@ export class BugFixSessionService {
       findingId: finding.id,
       repo: finding.repo!,
       stage: BugHuntEventStage.CANCELLED,
-      summary: `${finding.prUrl} was closed on GitHub without being merged. The bug is still open — start a fresh fix session if it still needs fixing.`,
-      payload: { prUrl: finding.prUrl, closedAt: when, closedOnGitHub: true },
+      summary:
+        why === 'archived'
+          ? `${finding.prUrl} is on a repository archived when the services moved into ally-platform, so it can never merge. The bug is still open — "Put me on it" fixes it again in ally-platform.`
+          : `${finding.prUrl} was closed on GitHub without being merged. The bug is still open — start a fresh fix session if it still needs fixing.`,
+      payload: {
+        prUrl: finding.prUrl,
+        closedAt: when,
+        closedOnGitHub: why === 'closed',
+        repoArchived: why === 'archived',
+      },
     });
   }
 
@@ -1760,7 +1778,10 @@ export class BugFixSessionService {
           ? BugFixSessionService.prNumberFrom(finding.prUrl)
           : null;
         if (!prNumber) continue;
-        const pr = await this.github.getPullRequest(finding.repo, prNumber);
+        const pr = await this.github.getPullRequest(
+          prRepoOf(finding),
+          prNumber,
+        );
         if (!pr?.merged || !pr.mergedAt) continue;
 
         const run = await this.github.findSuccessfulRunSince({

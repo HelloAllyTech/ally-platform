@@ -14,7 +14,7 @@ import {
 } from './bug-fix-session.constants';
 import { repoCommands, verifyCommandsList } from './bug-hunt-repos.constants';
 import { BUG_FIX_STUDY_VALUE_HOMES } from '../type/bug-fix-study.type';
-import { renderToolbox } from './bug-hunter-toolbox';
+import { renderToolbox, renderWorkspace } from './bug-hunter-toolbox';
 import { renderRepairBrief, repairableDataFault } from './bug-hunter-repair';
 import {
   BUG_HUNT_ESCALATION_ANSWER_TIMEOUT_MS,
@@ -230,6 +230,7 @@ export function buildFixSessionPrompt({
 
   return [
     `You are fixing ONE confirmed bug in the "${repo}" repo, checked out at master in your current working directory, at an admin's explicit request. This bug is already known to be real — do not re-litigate whether it is worth fixing. Read this repo's CLAUDE.md before you change anything.`,
+    renderWorkspace(repo),
     ``,
     `## The bug`,
     `Title: ${finding.title}`,
