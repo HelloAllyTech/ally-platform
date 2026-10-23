@@ -27,6 +27,7 @@ CallLogItem _log({int id = 42, String status = 'SUCCESS'}) => CallLogItem(
 SimulationLogItem _simLog({int id = 7}) => SimulationLogItem(
       id: id,
       startedAt: '2026-01-02T10:00:00Z',
+      endedAt: '2026-01-02T10:10:00Z',
       status: 'SUCCESS',
       scenarioTitle: 'Difficult client',
       score: 80,
@@ -88,6 +89,8 @@ void main() {
       ],
     );
 
+    expect(find.textContaining('Session'), findsOneWidget);
+    expect(find.textContaining('Logs'), findsOneWidget);
     expect(find.text('Real call logs'), findsNothing);
     expect(find.text('Role play'), findsNothing);
     expect(find.text('Walk-in #1'), findsOneWidget);
@@ -125,10 +128,10 @@ void main() {
     await tester.tap(find.text('Role play'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Difficult client'), findsOneWidget);
+    expect(find.textContaining('Difficult client'), findsOneWidget);
     expect(find.text('Walk-in #1'), findsNothing);
 
-    await tester.tap(find.text('Difficult client'));
+    await tester.tap(find.textContaining('Difficult client'));
     await tester.pumpAndSettle();
     expect(find.text('Feedback for 7'), findsOneWidget);
   });

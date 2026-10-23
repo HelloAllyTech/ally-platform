@@ -70,6 +70,7 @@ class SimulationLogItem {
   SimulationLogItem({
     required this.id,
     required this.startedAt,
+    required this.endedAt,
     required this.status,
     required this.scenarioTitle,
     required this.score,
@@ -80,6 +81,7 @@ class SimulationLogItem {
     return SimulationLogItem(
       id: (json['id'] as num).toInt(),
       startedAt: json['startedAt'] as String,
+      endedAt: json['endedAt'] as String? ?? '',
       status: json['status'] as String? ?? '',
       scenarioTitle: scenario?['title'] as String? ?? json['scenarioTitle'] as String?,
       score: (json['score'] as num?)?.toDouble(),
@@ -88,6 +90,7 @@ class SimulationLogItem {
 
   final int id;
   final String startedAt;
+  final String endedAt;
   final String status;
   final String? scenarioTitle;
   final double? score;

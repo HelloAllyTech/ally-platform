@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/localization/translate_ref.dart';
@@ -16,7 +17,31 @@ import '../../../core/widgets/status_badge.dart';
 import '../../../core/widgets/tab_screen_header.dart';
 import '../data/call_log_repository.dart';
 import 'call_log_filter_sheet.dart';
-import 'call_tag_chip.dart';
+import 'call_log_row.dart';
+
+/// `formatDate`/`formatTime`/`calculateDuration` from ally-mobile (React
+/// Native)'s `src/utils/date.ts`, ported exactly: local time, "MMM d" dates,
+/// 12-hour clock times, and a plain "X mins Y secs" duration string (only
+/// the "Duration:"/"Session points:" labels around it are translated, same
+/// as the real component).
+String _formatDate(String iso) => DateFormat('MMM d').format(DateTime.parse(iso).toLocal());
+
+String _formatDateTimeLine(String iso) {
+  final date = DateTime.parse(iso).toLocal();
+  return '${DateFormat('MMM d').format(date)} • ${DateFormat('h:mm a').format(date)}';
+}
+
+String? _durationText(WidgetRef ref, String startedAt, String endedAt) {
+  if (endedAt.isEmpty) return null;
+  final start = DateTime.tryParse(startedAt);
+  final end = DateTime.tryParse(endedAt);
+  if (start == null || end == null) return null;
+  final ms = end.difference(start).inMilliseconds;
+  if (ms < 0) return null;
+  final minutes = ms ~/ 60000;
+  final seconds = (ms % 60000) ~/ 1000;
+  return '${ref.t('common.duration')}: $minutes mins $seconds secs';
+}
 
 enum _LogTab { real, simulation }
 
@@ -166,8 +191,11 @@ class _CallLogScreenState extends ConsumerState<CallLogScreen> {
           Column(
             children: [
               TabScreenHeader(
-                title: _isViewingArchive ? ref.t('calls.menu.archives') : ref.t('calls.title'),
-                subtitle: _isViewingArchive ? null : ref.t('nav.tabs.sessions'),
+                title: _isViewingArchive
+                    ? ref.t('calls.menu.archives')
+                    : ref.t('calls.header.title'),
+                subtitle: _isViewingArchive ? null : ref.t('calls.header.subtitle'),
+                italicSubtitle: true,
                 leading: _isViewingArchive
                     ? IconButton(
                         icon: const Icon(Icons.arrow_back),
@@ -333,29 +361,17 @@ class _RealLogsList extends ConsumerWidget {
           separatorBuilder: (_, _) => const Divider(height: 1),
           itemBuilder: (context, index) {
             final log = logs[index];
-            final row = ListTile(
-              leading: SvgPicture.asset('assets/icons/call.svg', width: 24, height: 24),
-              title: Text(log.sessionName ?? ref.t('calls.sessionNumber', {'id': log.id})),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(log.startedAt),
-                  if (log.tags.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Wrap(
-                        children: [for (final tag in log.tags) CallTagChip(tag: tag)],
-                      ),
-                    ),
-                ],
-              ),
-              isThreeLine: log.tags.isNotEmpty,
-              trailing: StatusBadge(
-                status: chatSummaryStatusFromString(log.status),
-                noAudioLabel: ref.t('calls.status.noAudio'),
-              ),
+            final row = CallLogRow(
+              title: log.sessionName ?? ref.t('calls.sessionNumber', {'id': log.id}),
+              status: chatSummaryStatusFromString(log.status),
+              dateLine: _formatDateTimeLine(log.startedAt),
+              durationText: _durationText(ref, log.startedAt, log.endedAt),
+              scoreText: log.score != null
+                  ? '${ref.t('calls.table.sessionScore')}: ${log.score!.round()}'
+                  : null,
+              tags: log.tags,
               enabled: canViewDetails,
-              onTap: canViewDetails ? () => context.push('/call-log/${log.id}', extra: log) : null,
+              onTap: () => context.push('/call-log/${log.id}', extra: log),
             );
 
             if (!canArchive) return row;
@@ -424,18 +440,22 @@ class _SimulationLogsList extends ConsumerWidget {
           separatorBuilder: (_, _) => const Divider(height: 1),
           itemBuilder: (context, index) {
             final log = logs[index];
-            return ListTile(
-              leading: SvgPicture.asset('assets/icons/call.svg', width: 24, height: 24),
-              title: Text(log.scenarioTitle ?? ref.t('calls.sessionNumber', {'id': log.id})),
-              subtitle: Text(log.startedAt),
-              trailing: StatusBadge(
-                status: chatSummaryStatusFromString(log.status),
-                noAudioLabel: ref.t('calls.status.noAudio'),
-              ),
-              enabled: canViewDetails,
-              onTap: canViewDetails
-                  ? () => context.push('/simulations/feedback/${log.id}')
+            // RN's `logTitle` fallback chain (summaryName/sessionName/chatId)
+            // never resolves for a simulation row — none of those fields
+            // exist on a scenario session — so the title row always falls
+            // through to the bare `ID-{id}` label; the scenario's own title
+            // shows in the *subtitle* line instead (`{title} • {date}`),
+            // confirmed directly from `CallLogItem.tsx`.
+            return CallLogRow(
+              title: ref.t('calls.sessionNumber', {'id': log.id}),
+              status: chatSummaryStatusFromString(log.status),
+              dateLine: '${log.scenarioTitle ?? ''} • ${_formatDate(log.startedAt)}',
+              durationText: _durationText(ref, log.startedAt, log.endedAt),
+              scoreText: log.score != null
+                  ? '${ref.t('calls.table.sessionScore')}: ${log.score!.round()}'
                   : null,
+              enabled: canViewDetails,
+              onTap: () => context.push('/simulations/feedback/${log.id}'),
             );
           },
         );
