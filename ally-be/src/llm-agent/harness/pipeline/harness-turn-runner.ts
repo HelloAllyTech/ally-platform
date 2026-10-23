@@ -17,7 +17,21 @@
  *
  * Hooks observe; they never change the outcome. A hook that throws is logged
  * through `onHookError` and ignored, because telemetry must not break a turn.
+ *
+ * The turn is an OpenTelemetry `invoke_agent <agentKey>` span (GenAI
+ * conventions) with one child span per stage, continuing the request's trace
+ * when `traceCarrier` holds its `traceparent`. Spans carry ids and outcomes
+ * only — see src/observability/tracing.ts.
  */
+import { SpanStatusCode } from '@opentelemetry/api';
+import {
+  AGENT_ATTR,
+  GEN_AI,
+  TraceCarrier,
+  parentContext,
+  setSpanAttributes,
+  withSpan,
+} from 'src/observability/tracing';
 
 export type HarnessStageOutcome = 'ok' | 'stopped' | 'error' | 'skipped';
 
@@ -40,6 +54,10 @@ export interface HarnessTurnContext {
   timings: HarnessStageTiming[];
   failure?: HarnessTurnFailure;
   stoppedAt?: string;
+  /** The thread or session, as `gen_ai.conversation.id`. */
+  conversationId?: string;
+  /** The originating request's W3C trace context, if it sent one. */
+  traceCarrier?: TraceCarrier | null;
 }
 
 export type HarnessStageResult = void | 'stop';
@@ -86,6 +104,35 @@ export async function runHarnessStages<C extends HarnessTurnContext>(
   hooks: ReadonlyArray<HarnessHooks<C>> = [],
   options: HarnessRunOptions = {},
 ): Promise<HarnessTurnOutcome> {
+  return withSpan(
+    `invoke_agent ${ctx.agentKey}`,
+    {
+      [GEN_AI.OPERATION_NAME]: 'invoke_agent',
+      [GEN_AI.AGENT_NAME]: ctx.agentKey,
+      [GEN_AI.CONVERSATION_ID]: ctx.conversationId,
+      [AGENT_ATTR.TURN_ID]: ctx.turnId,
+    },
+    async (turnSpan) => {
+      const outcome = await runStages(ctx, stages, hooks, options);
+      setSpanAttributes(turnSpan, {
+        [AGENT_ATTR.OUTCOME]: outcome,
+        [AGENT_ATTR.ERROR_TYPE]: ctx.failure?.code,
+      });
+      if (outcome === 'failed') {
+        turnSpan.setStatus({ code: SpanStatusCode.ERROR });
+      }
+      return outcome;
+    },
+    parentContext(ctx.traceCarrier),
+  );
+}
+
+async function runStages<C extends HarnessTurnContext>(
+  ctx: C,
+  stages: ReadonlyArray<HarnessStage<C>>,
+  hooks: ReadonlyArray<HarnessHooks<C>>,
+  options: HarnessRunOptions,
+): Promise<HarnessTurnOutcome> {
   const now = options.now ?? Date.now;
   const callHooks = async (
     name: 'before' | 'after' | 'onError',
@@ -122,7 +169,15 @@ export async function runHarnessStages<C extends HarnessTurnContext>(
     await callHooks('before', stage.name);
     let stageOutcome: HarnessStageOutcome = 'ok';
     try {
-      const result = await stage.run(ctx);
+      const result = await withSpan(
+        `agent.stage ${stage.name}`,
+        {
+          [AGENT_ATTR.STAGE]: stage.name,
+          [AGENT_ATTR.TURN_ID]: ctx.turnId,
+          [GEN_AI.AGENT_NAME]: ctx.agentKey,
+        },
+        async () => stage.run(ctx),
+      );
       if (result === 'stop' && outcome === 'completed') {
         stageOutcome = 'stopped';
         outcome = 'stopped';

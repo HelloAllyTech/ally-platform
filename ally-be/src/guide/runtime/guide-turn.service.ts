@@ -16,6 +16,7 @@ import {
 import { AgentReleaseService } from 'src/llm-agent/harness/release/agent-release.service';
 import { AgentTraceService } from 'src/llm-agent/harness/trace/agent-trace.service';
 import { AgentTurnStoreService } from 'src/llm-agent/harness/turn/agent-turn-store.service';
+import { TraceCarrier } from 'src/observability/tracing';
 import { GuideThread } from '../entity/guide-thread.entity';
 import { GuideMessageKind, GuideMessageRole } from '../enum/guide.enum';
 import {
@@ -86,6 +87,7 @@ export class GuideTurnService {
     thread: GuideThread,
     user: TokenUser,
     input: { clientTurnId: string; text: string; intent?: string | null },
+    traceCarrier?: TraceCarrier,
   ): Promise<{ turnId: string }> {
     const text = (input.text ?? '').trim();
     if (text.length > GUIDE_DEFAULT_POLICY.safety.messageMaxChars) {
@@ -108,6 +110,8 @@ export class GuideTurnService {
         turnId: turn.id,
         agentKey: ALLY_GUIDE_AGENT_KEY,
         timings: [],
+        conversationId: thread.id,
+        traceCarrier: traceCarrier ?? null,
         threadId: thread.id,
         userId: user.id,
         tenantId: user.tenantId,

@@ -80,9 +80,11 @@ export class GuideLearnerController {
     @Param('threadId', ParseUUIDPipe) threadId: string,
     @Body() dto: GuideTurnRequestDto,
     @CurrentUser() user: TokenUser,
+    @Headers('traceparent') traceparent?: string,
+    @Headers('tracestate') tracestate?: string,
   ) {
     const thread = await this.threads.getOwned(threadId, user);
-    return this.turns.accept(thread, user, dto);
+    return this.turns.accept(thread, user, dto, { traceparent, tracestate });
   }
 
   @Get('threads/:threadId/messages')
