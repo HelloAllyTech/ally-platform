@@ -565,6 +565,8 @@ describe('BugFixSessionService', () => {
         repo: 'ally-be',
         workflow: 'bug-fix-session.yml',
         since: DISPATCHED_AT,
+        // One workflow serves every service: the run is matched by finding id.
+        titleIncludes: 'finding-1',
       });
       expect(github.cancelRun).toHaveBeenCalledWith('ally-be', '123');
       expect(findingRepository.update).toHaveBeenCalledWith(
@@ -928,11 +930,57 @@ describe('BugFixSessionService', () => {
 
       await service.reconcile();
 
-      expect(github.getPullRequest).toHaveBeenCalledWith('ally-be', 686);
+      expect(github.getPullRequest).toHaveBeenCalledWith(
+        'HelloAllyTech/ally-be',
+        686,
+      );
       expect(github.getPullRequest).not.toHaveBeenCalledWith('ally-web', 686);
+      expect(github.getPullRequest).not.toHaveBeenCalledWith(
+        'HelloAllyTech/ally-web',
+        686,
+      );
       expect(findingRepository.update).toHaveBeenCalledWith('finding-1', {
         status: BugFindingStatus.MERGED,
       });
+    });
+
+    it('frees a bug whose PR sits on a repo archived by the monorepo cutover, saying why (2026-10-23)', async () => {
+      findingRepository.find.mockImplementation(({ where }: any) =>
+        where.status === BugFindingStatus.PR_OPENED
+          ? [
+              findingRow({
+                status: BugFindingStatus.PR_OPENED,
+                repo: 'ally-be',
+                prUrl: 'https://github.com/HelloAllyTech/ally-be/pull/704',
+              }),
+            ]
+          : [],
+      );
+      github.getPullRequest.mockResolvedValue({
+        merged: false,
+        state: 'open',
+        baseRepoArchived: true,
+        htmlUrl: 'https://github.com/HelloAllyTech/ally-be/pull/704',
+      });
+
+      await service.reconcile();
+
+      expect(github.getPullRequest).toHaveBeenCalledWith(
+        'HelloAllyTech/ally-be',
+        704,
+      );
+      expect(findingRepository.update).toHaveBeenCalledWith(
+        'finding-1',
+        expect.objectContaining({ status: BugFindingStatus.CANCELLED }),
+      );
+      expect(bugHunterService.appendFindingEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          summary: expect.stringContaining(
+            'archived when the services moved into ally-platform',
+          ),
+          payload: expect.objectContaining({ repoArchived: true }),
+        }),
+      );
     });
 
     it('flips a PR_OPENED finding to MERGED once GitHub reports it merged — the human-review-merge case', async () => {
@@ -955,7 +1003,10 @@ describe('BugFixSessionService', () => {
 
       await service.reconcile();
 
-      expect(github.getPullRequest).toHaveBeenCalledWith('ally-web', 842);
+      expect(github.getPullRequest).toHaveBeenCalledWith(
+        'helloallytech/ally-web',
+        842,
+      );
       expect(findingRepository.update).toHaveBeenCalledWith('finding-1', {
         status: BugFindingStatus.MERGED,
       });
@@ -990,7 +1041,7 @@ describe('BugFixSessionService', () => {
       await service.reconcile();
 
       expect(github.deleteBranch).toHaveBeenCalledWith(
-        'ally-web',
+        'helloallytech/ally-web',
         'bughunter/fix-tooltip-overflow',
       );
       expect(bugHunterService.appendFindingEvent).toHaveBeenCalledWith(
@@ -1930,7 +1981,10 @@ describe('BugFixSessionService — coordinated multi-repo fixes', () => {
 
       await service.reconcile();
 
-      expect(github.getPullRequest).toHaveBeenCalledWith('ally-be', 686);
+      expect(github.getPullRequest).toHaveBeenCalledWith(
+        'HelloAllyTech/ally-be',
+        686,
+      );
       expect(findingRepository.update).toHaveBeenCalledWith('step-0', {
         status: BugFindingStatus.MERGED,
       });

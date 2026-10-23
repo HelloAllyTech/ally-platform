@@ -48,3 +48,11 @@ export function renderToolbox({
     ``,
   ];
 }
+
+/**
+ * Where a run is, said the same way in every brief. Since the 2026-10-23
+ * cutover the five services are folders of one repository (ally-platform);
+ * the workflows start the engine inside the service's folder.
+ */
+export const renderWorkspace = (repo: string): string =>
+  `WHERE YOU ARE: the ally-platform monorepo is checked out at master, and your working directory is its "${repo}/" folder — the "${repo}" service. "this repo" below means this folder: run its commands from here, read its CLAUDE.md, and stage files by their path from here ("git add src/x.ts"). The other services are folders beside it (../ally-be, ../ally-web, …), also linked at ${BUG_HUNTER_SIBLINGS_DIR}/<service>: read them, never edit them — a change outside "${repo}/" fails the PR's path check unless it is a step of a cross-service plan. Git commands and "gh" work from here as usual; branches and pull requests are on ally-platform.`;

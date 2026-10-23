@@ -1,6 +1,8 @@
 import {
   describePersonOnlyPaths,
   personOnlyPaths,
+  personOnlyPathsForService,
+  scopeFilesToService,
 } from '../bug-person-only-paths.util';
 
 describe('personOnlyPaths', () => {
@@ -54,5 +56,46 @@ describe('personOnlyPaths', () => {
     );
     expect(describePersonOnlyPaths(many)).toMatch(/, and 2 more$/);
     expect(personOnlyPaths(['src/a.ts'])).toEqual([]);
+  });
+});
+
+describe('person-only paths in the monorepo (2026-10-23)', () => {
+  it("strips the service's own folder so the root-anchored rules still match", () => {
+    expect(
+      scopeFilesToService(
+        [
+          'ally-be/src/a.ts',
+          'ally-be/.claude/agents/x.md',
+          '.github/workflows/t.yml',
+          'ally-web/apps/y.tsx',
+        ],
+        'ally-be',
+      ),
+    ).toEqual({
+      files: ['src/a.ts', '.claude/agents/x.md', '.github/workflows/t.yml'],
+      outside: ['ally-web/apps/y.tsx'],
+    });
+  });
+
+  it("refuses a migration, an agent file, a root workflow, and anything in another service's folder", () => {
+    const hits = personOnlyPathsForService(
+      [
+        'ally-be/src/database/migrations/1-x.ts',
+        'ally-be/.claude/agents/bug-verifier.md',
+        '.github/workflows/bug-fix-session.yml',
+        'ally-web/apps/ally-admin-dashboard/src/x.tsx',
+        'ally-be/src/ok.ts',
+      ],
+      'ally-be',
+    ).map((h) => h.why);
+    expect(hits).toEqual(
+      expect.arrayContaining([
+        'a database migration',
+        'Bug Hunter agent files',
+        'workflows and CI',
+        "another service's folder",
+      ]),
+    );
+    expect(hits).toHaveLength(4);
   });
 });

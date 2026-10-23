@@ -17,7 +17,7 @@ import { BugHuntRunStatus, BugHuntTrigger } from '../enum/bug-hunt-run.enum';
 import { BugFindingRepository } from '../repository/bug-finding.repository';
 import {
   describePersonOnlyPaths,
-  personOnlyPaths,
+  personOnlyPathsForService,
 } from '../util/bug-person-only-paths.util';
 import {
   BugFixVerdict,
@@ -36,6 +36,7 @@ import { BugHunterNotificationService } from './bug-hunter-notification.service'
 import {
   BugHunterPolicyService,
   prNumberFrom,
+  prRepoOf,
 } from './bug-hunter-policy.service';
 import { BugHunterModelSettingsService } from './bug-hunter-model-settings.service';
 import { BugFixSessionService } from './bug-fix-session.service';
@@ -134,7 +135,7 @@ export class BugVerifyFixService {
       const prNumber = prNumberFrom(finding.prUrl);
       if (!prNumber) return null;
 
-      const pr = await this.github.getPullRequest(finding.repo, prNumber);
+      const pr = await this.github.getPullRequest(prRepoOf(finding), prNumber);
       const headSha = pr?.headSha ?? null;
       const existing = latestVerdictFor(
         finding.metadata?.fixVerdicts,
@@ -366,11 +367,14 @@ export class BugVerifyFixService {
     if (!finding.repo || !prNumber) return verdict;
     let listing: { files: string[]; truncated: boolean };
     try {
-      listing = await this.github.listPullRequestFiles(finding.repo, prNumber);
+      listing = await this.github.listPullRequestFiles(
+        prRepoOf(finding),
+        prNumber,
+      );
     } catch {
       return verdict;
     }
-    const hits = personOnlyPaths(listing.files);
+    const hits = personOnlyPathsForService(listing.files, finding.repo);
     if (!hits.length) return verdict;
     return withServerChecks(verdict, [
       {
@@ -478,7 +482,7 @@ export class BugVerifyFixService {
     ].filter((l) => l !== '');
     try {
       await this.github.createIssueComment(
-        finding.repo,
+        prRepoOf(finding),
         prNumber,
         lines.join('\n'),
       );

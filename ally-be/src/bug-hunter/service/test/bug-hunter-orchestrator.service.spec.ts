@@ -550,7 +550,7 @@ describe('BugHunterOrchestratorService', () => {
       });
       await service.reconcileOpenPullRequests();
       expect(github.getCheckRollup).toHaveBeenCalledWith(
-        'ally-web',
+        'HelloAllyTech/ally-web',
         'feed5678abc',
       );
       expect(fixSession.retry).toHaveBeenCalledWith(
@@ -641,7 +641,7 @@ describe('BugHunterOrchestratorService', () => {
       });
       await service.reconcileOpenPullRequests();
       expect(github.updatePullRequestBranch).toHaveBeenCalledWith(
-        'ally-web',
+        'HelloAllyTech/ally-web',
         812,
         'h1',
       );

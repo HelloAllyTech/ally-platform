@@ -48,6 +48,16 @@ export class AppConfigService {
   }
 
   /**
+   * The repository every Ally service now lives in, one folder per service
+   * (ally-be/, ally-web/, …). Since the 2026-10-23 cutover the five service
+   * repos are archived; a GitHub call naming a service goes here instead.
+   * Set it empty to address services as their own repos again.
+   */
+  get githubMonorepo(): string {
+    return this.configService.get<string>('GITHUB_MONOREPO', 'ally-platform');
+  }
+
+  /**
    * Auth token for the ally-mobile GitHub Actions / Contents API calls behind
    * the super-duper-admin Mobile Releases page. Deliberately separate from
    * `githubToken` (Bug Hunter/Builder's write-scoped dispatch token) — this

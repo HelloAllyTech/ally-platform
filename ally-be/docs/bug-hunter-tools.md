@@ -14,7 +14,7 @@ locating the fault" (`constants/bug-hunter-toolbox.ts`).
 |---|---|---|
 | Public probes | `productionProbes` in `constants/bug-hunter-probes.constants.ts` | Unauthenticated GETs, what a browser sees |
 | Data and log probes | `GET pipeline/probes/:name` → `BugHunterProbeService`; catalogue `PIPELINE_PROBES` | Fixed queries only, `READ ONLY` transaction, 5 s statement timeout, always rolled back; answers are ids, counts and authored text; every call is a `probe` lookup on the run |
-| Sibling repos | `/tmp/siblings/<repo>` on every fix and sweep runner (workflow step "Check out the other Ally repos, read-only") | Shallow clone, `.git` removed (no token left on disk), write permission dropped, outside the workspace so it is never committed or linted |
+| Sibling services | `/tmp/siblings/<service>` on every fix and sweep runner (workflow step "Link the other services, read-only"), linking the other folders of the ally-platform checkout | Read-only by protocol; a PR that changes another service's folder fails the path check (`personOnlyPathsForService`) unless it is a plan step |
 | Log search | the `recent-errors` probe | Backend services only, window capped at 24 h, PII redacted |
 
 Probes today: `scenario-translations`, `tooltip-translations`,
@@ -65,3 +65,28 @@ notification. D5 starts a repair session in the repo that owns the fault
 a dry run by default and tests, never run against production. The PR never
 merges itself (`assertMayMerge`); a person reviews it, merges it and runs it.
 `config` faults, and data no fixable repo owns, still go to a person.
+
+
+## In the monorepo (2026-10-23)
+
+The five services moved into `HelloAllyTech/ally-platform`, one folder each,
+and their own repos were archived. Bug Hunter still works per service:
+findings, the scoreboard, the notebook and feature cards are keyed by service
+name. Only the GitHub layer changed.
+
+- `GithubActionsService.fullRepo` sends a call naming a service to the
+  monorepo (`GITHUB_MONOREPO`, default `ally-platform`). A full `owner/name`
+  passes through, which is how a PR on an archived repo is still read where it
+  lives (`repoFromPrUrl`, `prRepoOf`).
+- Commits are filtered to the service's folder (the quiet-night skip, the
+  revert watch); open PRs are assigned to the service holding most of their
+  files (`serviceOfPullRequest`); a fix session's run is found by the finding
+  id the workflow puts in its `run-name`.
+- Path rules strip the service's folder before matching, and a file in
+  another service's folder is out of scope (`scopeFilesToService`).
+- A PR on an archived repo frees its bug (the PR reconcile cancels it with
+  the reason), and the open-PR pass leaves it alone.
+- The workflows run the engine inside the service folder with that service's
+  runtime; the nightly sweep runs one job per service.
+- Migration `1980000000000` cleared the feature map; the next map run
+  rewrites it from the monorepo.

@@ -135,6 +135,16 @@ describe('buildFixSessionPrompt', () => {
     expect(prompt).not.toMatch(/touches a guarded path \(migrations/);
   });
 
+  it('says the session is in the monorepo folder of its service (2026-10-23)', () => {
+    const prompt = build({}, 'ally-web');
+    expect(prompt).toContain(
+      'the ally-platform monorepo is checked out at master, and your working directory is its "ally-web/" folder',
+    );
+    expect(prompt).toContain(
+      'a change outside "ally-web/" fails the PR\'s path check',
+    );
+  });
+
   it('renders the toolbox before the protocol', () => {
     const prompt = build();
     expect(

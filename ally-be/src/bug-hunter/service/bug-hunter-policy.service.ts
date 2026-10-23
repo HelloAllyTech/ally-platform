@@ -32,7 +32,7 @@ import {
 } from '../type/bug-finding-verdict.type';
 import {
   describePersonOnlyPaths,
-  personOnlyPaths,
+  personOnlyPathsForService,
 } from '../util/bug-person-only-paths.util';
 
 /** The PATCH fields the policy reads. Kept narrow so the DTO can grow without this file noticing. */
@@ -82,11 +82,25 @@ const FIX_ALREADY_EXISTS: BugFindingStatus[] = [
   BugFindingStatus.COORDINATING,
 ];
 
-/** The repo a GitHub pull-request URL belongs to, e.g. ".../HelloAllyTech/ally-be/pull/686" → "ally-be". */
-export const repoFromPrUrl = (url: string | null | undefined): string | null =>
-  url
-    ? (/github\.com\/[^/]+\/([^/]+)\/pull\/\d+/.exec(url)?.[1] ?? null)
-    : null;
+/**
+ * The repository a pull request lives in, as "owner/name", from its URL. Full
+ * names on purpose: since the 2026-10-23 monorepo cutover a service name
+ * ("ally-be") is routed to ally-platform, so a PR on an archived service repo
+ * must be addressed by its full name or it would be read as the monorepo PR
+ * with the same number.
+ */
+export const repoFromPrUrl = (
+  url: string | null | undefined,
+): string | null => {
+  const m = url ? /github\.com\/([^/]+)\/([^/]+)\/pull\/\d+/.exec(url) : null;
+  return m ? `${m[1]}/${m[2]}` : null;
+};
+
+/** Where a finding's PR lives: the repo in its PR URL, else the finding's service. */
+export const prRepoOf = (finding: {
+  prUrl?: string | null;
+  repo?: string | null;
+}): string => repoFromPrUrl(finding.prUrl) ?? finding.repo ?? '';
 
 @Injectable()
 export class BugHunterPolicyService {
@@ -319,7 +333,10 @@ export class BugHunterPolicyService {
     const repo = finding.repo ?? '';
     let listing: { files: string[]; truncated: boolean };
     try {
-      listing = await this.github.listPullRequestFiles(repo, prNumber);
+      listing = await this.github.listPullRequestFiles(
+        prRepoOf(finding),
+        prNumber,
+      );
     } catch (error) {
       this.logger.warn(
         `Bug Hunter policy: could not list PR #${prNumber} on ${repo}: ${
@@ -335,7 +352,7 @@ export class BugHunterPolicyService {
         'The pull request changes more files than can be listed; that is not a fix that merges itself. Leave the PR open.',
       );
     }
-    const hits = personOnlyPaths(listing.files);
+    const hits = personOnlyPathsForService(listing.files, finding.repo);
     if (hits.length) {
       throw new ForbiddenException(
         `This PR touches files a person has to merge: ${describePersonOnlyPaths(hits)}. Leave the PR open for review.`,
@@ -390,7 +407,7 @@ export class BugHunterPolicyService {
     let listing: { files: string[]; truncated: boolean };
     try {
       listing = await this.github.listPullRequestFiles(
-        finding.repo ?? '',
+        prRepoOf(finding),
         prNumber,
       );
     } catch (error) {
