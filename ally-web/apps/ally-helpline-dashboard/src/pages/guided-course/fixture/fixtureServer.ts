@@ -24,6 +24,7 @@ import type { GuideBootstrapWire } from "../contract/bootstrap";
 import type {
   GuideAtmosphere,
   GuideCard,
+  GuideCrisisState,
   GuideEvent,
   GuideMode,
   GuideTurnRequest,
@@ -52,6 +53,7 @@ export class GuideFixtureServer {
   private log: GuideEvent[] = [];
   private listeners = new Set<Listener>();
   private mode: GuideMode = "NORMAL";
+  private crisis: GuideCrisisState | null = null;
   private atmosphere: GuideAtmosphere = "bright";
   private cards = new Map<string, GuideCard & { seq: number }>();
   private done = new Set<string>();
@@ -199,17 +201,20 @@ export class GuideFixtureServer {
       this.mode = "CRISIS";
       this.atmosphere = "still";
       this.durable("mode.changed", { mode: "CRISIS", atmosphere: "still" });
-      this.durable("crisis.response", {
+      this.crisis = {
         messageId: `fx-crisis-${turnId}`,
         text: FIXTURE_CRISIS_TEXT,
         language: "en",
         lines: [],
-      });
+      };
+      this.durable("crisis.response", this.crisis);
       this.ephemeral("turn.completed", { turnId });
       return;
     }
     if (this.mode === "CRISIS") {
-      // After "I'm safe right now" the Sentinel moves the thread to CARE.
+      // "I'm safe right now" (intent `safe_now`) moves the thread to CARE; any
+      // other words would go to the Sentinel, which the fixture doesn't model.
+      this.crisis = null;
       this.mode = "CARE";
       this.atmosphere = "hushed";
       this.durable("mode.changed", { mode: "CARE", atmosphere: "hushed" });
@@ -494,6 +499,7 @@ export class GuideFixtureServer {
         preferClassic: false,
       },
       nextStep: this.nextStepData(),
+      ...(this.mode === "CRISIS" && this.crisis ? { crisis: this.crisis } : {}),
     };
   }
 

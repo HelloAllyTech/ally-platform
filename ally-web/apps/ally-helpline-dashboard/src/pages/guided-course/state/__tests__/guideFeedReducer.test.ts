@@ -137,6 +137,7 @@ const bootstrap = (overrides: Partial<JourneyBootstrap> = {}): JourneyBootstrap 
   cards: [],
   prefs: { guidance: "walk" },
   nextStep: null,
+  crisis: null,
   complete: true,
   ...overrides,
 });
@@ -305,6 +306,24 @@ describe("guideFeedReducer", () => {
     expect(state.progress).toEqual({ currentItemId: "i2", completedItems: 1, totalItems: 4 });
     // Anything at or below 5 is already in the bootstrap.
     expect(fold([ev.ally(4, "m4", "dup")], state).entries).toHaveLength(3);
+  });
+
+  it("restores the crisis card from bootstrap on a reload during CRISIS", () => {
+    const state = guideFeedReducer(initialFeedState, {
+      type: "hydrate",
+      bootstrap: bootstrap({
+        thread: { id: "t1", mode: "CRISIS", atmosphere: "still", lastEventSeq: 9 },
+        crisis: {
+          messageId: "c9",
+          text: "fixed message",
+          language: "en",
+          lines: [{ name: "Tele-MANAS", phone: "14416" }],
+        },
+      }),
+    });
+    expect(state.mode).toBe("CRISIS");
+    expect(state.crisis).toMatchObject({ messageId: "c9", text: "fixed message" });
+    expect(state.crisis?.lines[0].phone).toBe("14416");
   });
 
   it("hydrates an incomplete bootstrap empty so the stream replays from 0", () => {

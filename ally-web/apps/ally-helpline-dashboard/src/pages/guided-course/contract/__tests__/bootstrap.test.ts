@@ -48,7 +48,19 @@ describe("fromBootstrapWire (contract fixtures)", () => {
       presentation: "theatre",
     });
     expect(view.prefs.guidance).toBe("walk");
+    expect(view.crisis).toBeNull();
     expect(view.complete).toBe(true);
+  });
+
+  it("carries the crisis state while the thread is in CRISIS", () => {
+    const crisis = {
+      messageId: "c1",
+      text: "fixed",
+      language: "en",
+      lines: [{ name: "Tele-MANAS", phone: "14416" }],
+    };
+    const view = fromBootstrapWire("tr-1", { ...full, crisis });
+    expect(view.crisis).toEqual(crisis);
   });
 
   it("reads the switched-off shape: no access, course, Spine or thread", () => {

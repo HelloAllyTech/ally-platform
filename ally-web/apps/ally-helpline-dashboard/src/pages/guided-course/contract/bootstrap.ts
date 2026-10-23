@@ -16,7 +16,14 @@ import { TrackAccessDenialReason, TrackDetail, TrackItemStatus, TrackItemType } 
 
 import { ITEM_TYPE_FACTS, ItemTension } from "../cards/itemTypes";
 
-import type { GuideAtmosphere, GuideBootstrap, GuideCard, GuideItemType, GuideMode } from "./wire";
+import type {
+  GuideAtmosphere,
+  GuideBootstrap,
+  GuideCard,
+  GuideCrisisState,
+  GuideItemType,
+  GuideMode,
+} from "./wire";
 
 /** The wire shape, generated from ally-be's schema. */
 export type GuideBootstrapWire = GuideBootstrap;
@@ -118,6 +125,8 @@ export interface JourneyBootstrap {
   cards: JourneyCard[];
   prefs: { guidance: GuidanceLevel };
   nextStep: JourneyNextStep | null;
+  /** While the thread is in CRISIS: the fixed message and lines, so the card survives a reload. */
+  crisis: GuideCrisisState | null;
   /**
    * Whether `messages` and `cards` already describe the thread up to
    * `thread.lastEventSeq`. False for the composed fallback, which has no
@@ -217,6 +226,7 @@ export const fromBootstrapWire = (trackId: string, wire: GuideBootstrapWire): Jo
           minutes: wire.nextStep.minutes ?? null,
         }
       : null,
+    crisis: wire.crisis ?? null,
     complete: true,
   };
 };
@@ -301,6 +311,7 @@ export const composeBootstrap = ({
       }),
     })),
     progress: null,
+    crisis: null,
     messages: [],
     cards: [],
     prefs: { guidance: asGuidance(guidance) },

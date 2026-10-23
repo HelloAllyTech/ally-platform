@@ -125,6 +125,17 @@ describe("GuidedCourse against the fixture stream", () => {
     await waitFor(() =>
       expect(screen.getByTestId("journey-shell")).toHaveAttribute("data-atmosphere", "hushed"),
     );
+    // An intent, not words: nothing the learner didn't type shows as theirs.
+    const fixture = (
+      window as unknown as { __guideFixture: { requests: Array<{ path: string; body: any }> } }
+    ).__guideFixture;
+    expect(fixture.requests.filter(r => r.path.endsWith("/turns")).at(-1)?.body).toMatchObject({
+      text: "",
+      intent: "safe_now",
+    });
+    expect(
+      screen.queryByText("I'm safe right now", { selector: "[data-testid^=learner-] *" }),
+    ).not.toBeInTheDocument();
     expect(await screen.findByTestId("support-chip")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Breathe with me" })).toBeInTheDocument();
   });
@@ -226,5 +237,19 @@ describe("GuidedCourse against the fixture stream", () => {
       },
       { timeout: 2000 },
     );
+  });
+  it("a reload during a crisis brings the crisis card straight back", async () => {
+    const first = renderJourney();
+    await screen.findByTestId("journey-shell", {}, { timeout: 3000 });
+    send("crisis-demo");
+    await screen.findByTestId("crisis-card");
+    first.unmount();
+
+    renderJourney();
+    const card = await screen.findByTestId("crisis-card", {}, { timeout: 3000 });
+    expect(within(card).getByTestId("crisis-message")).toHaveTextContent(
+      "I'm really glad you told me.",
+    );
+    expect(screen.getByTestId("journey-shell")).toHaveAttribute("data-atmosphere", "still");
   });
 });

@@ -234,6 +234,15 @@ const hydrate = (bootstrap: JourneyBootstrap): GuideFeedState => {
     atmosphere: thread?.atmosphere ?? "bright",
     nextStep: bootstrap.nextStep,
     progress: bootstrap.progress,
+    // A reload during a crisis brings the pinned card straight back.
+    crisis: bootstrap.crisis
+      ? {
+          messageId: bootstrap.crisis.messageId,
+          text: bootstrap.crisis.text,
+          language: bootstrap.crisis.language,
+          lines: bootstrap.crisis.lines,
+        }
+      : null,
   };
   if (!bootstrap.complete) {
     // Nothing trustworthy to show yet: the stream replays from seq 0.

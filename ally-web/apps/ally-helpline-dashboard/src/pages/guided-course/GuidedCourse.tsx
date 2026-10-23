@@ -393,10 +393,9 @@ export const GuidedCourse: FC<{ trackId: string; fixture?: boolean }> = ({
                   helpRequested={helpRequested}
                   onSafe={() => {
                     actions.chooseSafe();
-                    actions.submitTurn({
-                      text: safetyCopyFor(crisisLanguage).safeNow,
-                      source: "crisis",
-                    });
+                    // An intent, not words: the server moves the thread to CARE and
+                    // records a content-free signal (no Sentinel reading of button text).
+                    actions.submitTurn({ text: "", intent: "safe_now", source: "crisis" });
                   }}
                   onNeedHelp={actions.chooseNeedHelp}
                 />
