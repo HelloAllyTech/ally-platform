@@ -93,8 +93,12 @@ import {
 import { GuideCrisisService } from '../safety/guide-crisis.service';
 import { GuideSentinelService } from '../safety/guide-sentinel.service';
 import { SentinelTurn } from '../prompts/sentinel.prompt';
-import { urgentRealCaseText } from '../safety/fixed-responses';
 import {
+  DEFAULT_CRISIS_STAY_TEXT,
+  urgentRealCaseText,
+} from '../safety/fixed-responses';
+import {
+  CLEAR_VERDICT,
   SentinelOverlay,
   SentinelVerdict,
   isLearnerCrisis,
@@ -680,6 +684,35 @@ export class GuideTurnService {
         })
       : Promise.resolve(null);
 
+    // In CRISIS the model stays silent until the Sentinel has read the new
+    // message (plan §6.3 step 5): wait for the verdict before generating.
+    let verdictApplied = false;
+    if (ctx.mode === GuideMode.CRISIS && ctx.text) {
+      const verdict = await verdictPromise;
+      if (verdict) ctx.verdict = verdict;
+      if (verdict && isLearnerCrisis(verdict)) {
+        await this.respondWithCrisis(ctx, verdict.source);
+        return;
+      }
+      if (verdict?.overlay === 'real_case_urgent') {
+        await this.respondWithFixed(
+          ctx,
+          'urgent_real_case',
+          urgentRealCaseText(ctx.orgProfile),
+          [ctx.learnerMessage!],
+        );
+        return;
+      }
+      const change = nextMode(ctx.mode, verdict ?? CLEAR_VERDICT);
+      ctx.mode = change.mode;
+      ctx.overlay =
+        verdict?.overlay === 'real_case' || verdict?.overlay === 'pii'
+          ? verdict.overlay
+          : 'none';
+      this.refreshSituation(ctx);
+      verdictApplied = true;
+    }
+
     let pending: 'crisis' | 'urgent' | 'restart' | null = null;
     for (let attempt = 0; attempt < 2; attempt++) {
       pending = null;
@@ -738,7 +771,7 @@ export class GuideTurnService {
       // The first attempt waits for the verdict up to the deadline; a restart
       // already has it.
       let deadline: NodeJS.Timeout | undefined;
-      if (attempt === 0) {
+      if (attempt === 0 && !verdictApplied) {
         deadline = setTimeout(() => {
           if (!ctx.verdict) void gate.release();
         }, policy.safety.sentinelDeadlineMs);
@@ -787,35 +820,12 @@ export class GuideTurnService {
 
       // A verdict still outstanding is awaited now: the reply may have
       // finished first, and a late crisis still gets the fixed response.
-      if (attempt === 0 && !ctx.verdict && ctx.text) {
+      if (attempt === 0 && !verdictApplied && !ctx.verdict && ctx.text) {
         await verdictPromise.then(decide);
       }
       if (pending === 'restart') {
         ctx.restarted = true;
-        ctx.situationInput = {
-          ...ctx.situationInput!,
-          mode: ctx.mode,
-          overlay: ctx.overlay,
-          steer: decideSteer({
-            mode: ctx.mode,
-            pacing: ctx.pacing,
-            spine: ctx.course!.spine,
-            policy,
-            now: Date.now(),
-            learnerReady: ctx.intent === 'start' || ctx.intent === 'continue',
-          }),
-          atmosphere: atmosphereOf({
-            mode: ctx.mode,
-            releaseWindowOpen: releaseWindowOpen(
-              ctx.pacing,
-              policy.releaseWindowMaxTurns,
-            ),
-            spine: ctx.course!.spine,
-          }),
-        };
-        ctx.steer = ctx.situationInput.steer;
-        ctx.atmosphere = ctx.situationInput.atmosphere;
-        ctx.situation = renderSituationReport(ctx.situationInput);
+        this.refreshSituation(ctx);
         ctx.presented = [];
         continue;
       }
@@ -874,6 +884,38 @@ export class GuideTurnService {
     }
   }
 
+  /** Re-derive steer, atmosphere and the report after the mode or overlay moved. */
+  private refreshSituation(ctx: GuideTurnContext): void {
+    const policy = ctx.bundle!.policy;
+    const spine = ctx.course!.spine;
+    const steer = decideSteer({
+      mode: ctx.mode,
+      pacing: ctx.pacing,
+      spine,
+      policy,
+      now: Date.now(),
+      learnerReady: ctx.intent === 'start' || ctx.intent === 'continue',
+    });
+    const atmosphere = atmosphereOf({
+      mode: ctx.mode,
+      releaseWindowOpen: releaseWindowOpen(
+        ctx.pacing,
+        policy.releaseWindowMaxTurns,
+      ),
+      spine,
+    });
+    ctx.steer = steer;
+    ctx.atmosphere = atmosphere;
+    ctx.situationInput = {
+      ...ctx.situationInput!,
+      mode: ctx.mode,
+      overlay: ctx.overlay,
+      steer,
+      atmosphere,
+    };
+    ctx.situation = renderSituationReport(ctx.situationInput);
+  }
+
   private async respondWithCrisis(
     ctx: GuideTurnContext,
     source: string,
@@ -881,6 +923,11 @@ export class GuideTurnService {
     const language = ctx.course?.languageCode ?? 'en';
     const copy = await this.crisis.responseText(ctx.tenantId, language);
     const lines = this.crisis.lines(ctx.orgProfile, language);
+    // Already in crisis: stay with the learner rather than repeat the whole
+    // response (plan §6.3 step 5); the lines are shown again either way.
+    if (ctx.thread?.mode === GuideMode.CRISIS) {
+      copy.text = DEFAULT_CRISIS_STAY_TEXT;
+    }
     ctx.crisis = { ...copy, lines };
     ctx.mode = GuideMode.CRISIS;
     ctx.replyKind = 'crisis';
@@ -1161,6 +1208,23 @@ export class GuideTurnService {
     const durationMs = Date.now() - ctx.startedAt;
     const failed = Boolean(ctx.failure);
     await this.presence(ctx, 'idle', null);
+    await this.turnStore
+      .finish(ctx.turnId, {
+        status: failed ? AgentTurnStatus.FAILED : AgentTurnStatus.COMPLETED,
+        errorCode: ctx.failure?.code ?? null,
+        ttftMs: ctx.ttftMs,
+        durationMs,
+        costUsd: ctx.usd,
+      })
+      .catch((error) =>
+        this.logger.warn(`Turn finish write failed: ${String(error)}`),
+      );
+    // Unlock before announcing the end: a learner who presses Continue the
+    // moment a reply finishes must not be told Ally is still replying.
+    if (ctx.locked) {
+      await this.redis.releaseLock(ctx.lockKey);
+      ctx.locked = false;
+    }
     await this.bus
       .emitEphemeral(
         ctx.threadId,
@@ -1175,17 +1239,6 @@ export class GuideTurnService {
         ctx.lastSeq,
       )
       .catch(() => undefined);
-    await this.turnStore
-      .finish(ctx.turnId, {
-        status: failed ? AgentTurnStatus.FAILED : AgentTurnStatus.COMPLETED,
-        errorCode: ctx.failure?.code ?? null,
-        ttftMs: ctx.ttftMs,
-        durationMs,
-        costUsd: ctx.usd,
-      })
-      .catch((error) =>
-        this.logger.warn(`Turn finish write failed: ${String(error)}`),
-      );
     const usage = ctx.output?.usage ?? [];
     const sum = (
       key:
@@ -1263,10 +1316,6 @@ export class GuideTurnService {
           }
         : undefined,
     });
-    if (ctx.locked) {
-      await this.redis.releaseLock(ctx.lockKey);
-      ctx.locked = false;
-    }
   }
 }
 

@@ -10,7 +10,10 @@ import { GUIDE_DEFAULT_BUNDLE } from '../../release/guide-release.bundle';
 import { CLEAR_VERDICT, SentinelVerdict } from '../../safety/sentinel';
 import { matchFirstPersonRisk } from 'src/common/safety/first-person-risk.matcher';
 import { keywordVerdict } from '../../safety/sentinel';
-import { DEFAULT_CRISIS_TEXT } from '../../safety/fixed-responses';
+import {
+  DEFAULT_CRISIS_STAY_TEXT,
+  DEFAULT_CRISIS_TEXT,
+} from '../../safety/fixed-responses';
 import {
   GUIDE_REFUSAL_TEXT,
   GuideTurnInput,
@@ -232,6 +235,7 @@ function setup(
   return {
     service,
     run,
+    bus,
     events,
     threads,
     appended,
@@ -243,6 +247,22 @@ function setup(
     sentinel,
     crisis,
     tools,
+  };
+}
+
+async function continuingThread(mode: GuideMode) {
+  const probe = await setup().run();
+  return {
+    mode,
+    epoch: 1,
+    lastLearnerActivityAt: new Date(),
+    epochSnapshot: {
+      releaseId: 'rel-1',
+      tier: 'premium',
+      startedAt: new Date().toISOString(),
+      startSeq: 1,
+      layerHashes: probe.system!.hashes,
+    },
   };
 }
 
@@ -387,6 +407,44 @@ describe('GuideTurnService', () => {
       .join('');
     expect(deltas).toBe('That sounds like a lot to carry.');
     expect(t.threads.saveState.mock.calls[0][1].mode).toBe(GuideMode.CARE);
+  });
+
+  it('in CRISIS, waits for the Sentinel and generates once, in CARE', async () => {
+    const t = setup({
+      thread: await continuingThread(GuideMode.CRISIS),
+      scripts: [textPass('I am glad you are safe.')],
+    });
+    const ctx = await t.run({ text: "I'm safe now, thank you" });
+    expect(ctx.mode).toBe(GuideMode.CARE);
+    expect(ctx.restarted).toBe(false);
+    expect(t.requests).toHaveLength(1);
+    expect(t.requests[0].request.messages[1].content).toContain('CARE');
+  });
+
+  it('stays with the learner on a repeated crisis instead of repeating it all', async () => {
+    const t = setup({ thread: await continuingThread(GuideMode.CRISIS) });
+    const ctx = await t.run({ text: 'I want to die' });
+    expect(ctx.replyKind).toBe('crisis');
+    expect(ctx.replyText).toBe(DEFAULT_CRISIS_STAY_TEXT);
+    expect(t.models.stream).not.toHaveBeenCalled();
+    expect(
+      t.events.find((e) => e.type === 'crisis.response')?.data.lines,
+    ).toHaveLength(1);
+  });
+
+  it('releases the lock before announcing the turn is over', async () => {
+    const t = setup();
+    const order: string[] = [];
+    t.redis.releaseLock.mockImplementation(async () => {
+      order.push('unlock');
+    });
+    const emit = t.bus.emitEphemeral.getMockImplementation()!;
+    t.bus.emitEphemeral.mockImplementation(async (...args: any[]) => {
+      if (args[1] === 'turn.completed') order.push('completed');
+      return (emit as any)(...args);
+    });
+    await t.run();
+    expect(order).toEqual(['unlock', 'completed']);
   });
 
   it('replaces a refusal with kind fixed copy', async () => {
