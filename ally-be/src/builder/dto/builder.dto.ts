@@ -515,3 +515,49 @@ export class BuilderResearchDto {
   @IsIn(['technical_plan', 'draft_prd'])
   mode?: 'technical_plan' | 'draft_prd';
 }
+
+export class BuilderSessionSummaryDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty()
+  title!: string;
+
+  @ApiProperty()
+  slug!: string;
+
+  @ApiProperty({ enum: BuilderSessionStatus })
+  status!: BuilderSessionStatus;
+
+  @ApiProperty()
+  repos?: string[] | null;
+
+  @ApiProperty()
+  totalCostUsd!: string;
+
+  @ApiProperty()
+  runnerMinutes!: number;
+
+  @ApiProperty()
+  createdAt!: Date;
+
+  @ApiProperty()
+  updatedAt!: Date;
+
+  @ApiProperty()
+  archivedAt?: Date | null;
+
+  @ApiProperty()
+  createdBy!: number;
+
+  @ApiProperty()
+  createdByName!: string | null;
+}
+
+export class PaginatedBuilderSessionSummaryDto {
+  @ApiProperty({ type: [BuilderSessionSummaryDto] })
+  sessions!: BuilderSessionSummaryDto[];
+
+  @ApiProperty()
+  totalCount!: number;
+}

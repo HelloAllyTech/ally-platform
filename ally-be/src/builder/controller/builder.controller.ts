@@ -15,6 +15,9 @@ import {
   ApiOperation,
   ApiSecurity,
   ApiTags,
+  ApiExtraModels,
+  ApiOkResponse,
+  getSchemaPath,
 } from '@nestjs/swagger';
 import { Response } from 'express';
 import { CurrentUser } from 'src/auth/decorators/user.decorator';
@@ -60,6 +63,8 @@ import {
   ListBuilderLessonsQueryDto,
   UpdateBuilderLessonDto,
   BuilderResearchDto,
+  BuilderSessionSummaryDto,
+  PaginatedBuilderSessionSummaryDto,
 } from '../dto/builder.dto';
 import {
   BUILDER_EVENT_PAGE_SIZE,
@@ -81,6 +86,7 @@ import { BUILDER_REPOS } from '../constants/builder-repos.constants';
 @ApiTags('Builder')
 @ApiBearerAuth()
 @ApiSecurity('access-token')
+@ApiExtraModels(PaginatedBuilderSessionSummaryDto, BuilderSessionSummaryDto)
 @Controller({ path: 'builder', version: '1' })
 export class BuilderController {
   private readonly logger = LoggerService.getInstance(BuilderController.name);
@@ -129,6 +135,21 @@ export class BuilderController {
   @ApiOperation({
     summary:
       'List Builder sessions (shared across Builder users), newest first',
+  })
+  @ApiOkResponse({
+    description:
+      'Returns an array of sessions, or a paginated object for archived sessions.',
+    schema: {
+      oneOf: [
+        {
+          $ref: getSchemaPath(PaginatedBuilderSessionSummaryDto),
+        },
+        {
+          type: 'array',
+          items: { $ref: getSchemaPath(BuilderSessionSummaryDto) },
+        },
+      ],
+    },
   })
   listSessions(
     @Query() query: ListBuilderSessionsQueryDto,
