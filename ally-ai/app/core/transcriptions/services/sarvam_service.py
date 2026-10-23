@@ -36,6 +36,10 @@ class SarvamTranscriptionService:
         """Initialize the Sarvam transcription service."""
         self.client = AsyncSarvamAI(api_subscription_key=settings.SARVAM.API_KEY)
 
+    async def aclose(self):
+        """Close the underlying Sarvam client."""
+        await self.client.aclose()
+
     async def transcribe_audio_from_url(
         self,
         audio_url: str,

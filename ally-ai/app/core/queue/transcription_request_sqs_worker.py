@@ -271,6 +271,8 @@ async def main():
             getattr(selected_transcription_service, "aclose")
         ):
             await selected_transcription_service.aclose()
+        if "ally_core_service" in locals():
+            await AllyCoreClient.close(AllyCoreClient.get_client())
         await SQSQueueClient.close_client()
         logger.info("SQS client cleanup completed")
 

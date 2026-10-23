@@ -43,6 +43,10 @@ class DeepgramTranscriptionService:
         """
         self.deepgram = DeepgramClient(settings.DEEPGRAM.API_KEY)
 
+    async def aclose(self):
+        """Close the underlying Deepgram client."""
+        await self.deepgram.aclose()
+
     async def transcribe_audio_from_url(
         self,
         audio_url: str,

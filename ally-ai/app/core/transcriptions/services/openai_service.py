@@ -54,6 +54,13 @@ class OpenAITranscriptionService:
             organization=settings.OPENAI.ORGANIZATION_ID,
         )
 
+    async def aclose(self):
+        """Close the underlying OpenAI client."""
+        if hasattr(self.client, "aclose"):
+            # The modern (v1+) client has aclose; the legacy one is a plain object
+            # with no transport to shut down.
+            await self.client.aclose()
+
     async def transcribe_audio_from_url(
         self,
         audio_url: str,

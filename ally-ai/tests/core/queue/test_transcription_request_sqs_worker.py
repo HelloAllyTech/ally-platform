@@ -4,6 +4,7 @@ import asyncio
 from types import SimpleNamespace
 
 import pytest
+from unittest.mock import AsyncMock
 
 import app.core.queue.transcription_request_sqs_worker as transcription_request_sqs_worker_mod  # noqa: E501
 from app.core.queue.transcription_request_handler import TranscriptionServiceProvider
@@ -78,13 +79,24 @@ class TestTranscriptionRequestSQSWorker:
                 pass
 
         class FakeAllyCoreClient:
+            created = False
+            closed = False
+            _client = None
+
             @classmethod
             async def create_client(cls):
                 cls.created = True
+                cls.closed = False
+                cls._client = AsyncMock()
 
             @classmethod
             def get_client(cls):
-                return "ally-core-client"
+                return cls._client
+
+            @classmethod
+            async def close(cls, client):
+                cls.closed = True
+                await client.aclose()
 
         class FakeAllyCoreService:
             def __init__(self, client):
@@ -94,13 +106,29 @@ class TestTranscriptionRequestSQSWorker:
             def __init__(cls):
                 return None
 
+            async def aclose(self):
+                pass
+
         class FakeSarvamTranscriptionService:
             def __init__(cls):
                 return None
 
+            async def aclose(self):
+                pass
+
+        class FakeGeminiTranscriptionService:
+            def __init__(cls):
+                return None
+
+            async def aclose(self):
+                pass
+
         class FakeOpenAITranscriptionService:
             def __init__(cls):
                 return None
+
+            async def aclose(self):
+                pass
 
         class FakeEmbeddingClient:
             @classmethod
@@ -186,6 +214,7 @@ class TestTranscriptionRequestSQSWorker:
             DeepgramTranscriptionService=FakeDeepgramTranscriptionService,
             OpenAITranscriptionService=FakeOpenAITranscriptionService,
             SarvamTranscriptionService=FakeSarvamTranscriptionService,
+            GeminiTranscriptionService=FakeGeminiTranscriptionService,
         )
 
     @pytest.fixture
@@ -246,6 +275,12 @@ class TestTranscriptionRequestSQSWorker:
 
         monkeypatch.setattr(
             transcription_request_sqs_worker,
+            "GeminiTranscriptionService",
+            fakes.GeminiTranscriptionService,
+        )
+
+        monkeypatch.setattr(
+            transcription_request_sqs_worker,
             "OpenAITranscriptionService",
             fakes.OpenAITranscriptionService,
         )
@@ -269,6 +304,7 @@ class TestTranscriptionRequestSQSWorker:
         # Assert queue client lifecycle
         assert fakes.QueueClient.created is True
         assert fakes.QueueClient.closed is True
+        assert fakes.AllyCoreClient.closed is True
 
     @pytest.mark.asyncio
     async def test_main_handles_keyboard_interrupt(
@@ -294,6 +330,7 @@ class TestTranscriptionRequestSQSWorker:
 
         # Always closes client in finally
         assert fakes.QueueClient.closed is True
+        assert fakes.AllyCoreClient.closed is True
 
     @pytest.mark.asyncio
     async def test_main_propagates_unexpected_error_but_cleans_up(
@@ -318,6 +355,7 @@ class TestTranscriptionRequestSQSWorker:
 
         # Cleanup still happens
         assert fakes.QueueClient.closed is True
+        assert fakes.AllyCoreClient.closed is True
 
     @pytest.mark.asyncio
     async def test_main_wires_dependencies_and_arguments(
