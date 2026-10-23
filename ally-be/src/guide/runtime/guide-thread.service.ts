@@ -71,10 +71,8 @@ export class GuideThreadService {
    * (an enrolled learner keeps access; anyone else needs the course assigned
    * to their org and group).
    */
-  async getOrCreateForUser(
-    trackId: string,
-    user: TokenUser,
-  ): Promise<GuideThread> {
+  /** The guide is on for this learner's course and they may open it. */
+  async assertCanOpen(trackId: string, user: TokenUser): Promise<void> {
     if (!(await this.settings.isGuidedAvailable(trackId, user.tenantId))) {
       throw guideDisabled();
     }
@@ -82,6 +80,13 @@ export class GuideThreadService {
     if (!access.hasAccess) {
       throw guideNoAccess();
     }
+  }
+
+  async getOrCreateForUser(
+    trackId: string,
+    user: TokenUser,
+  ): Promise<GuideThread> {
+    await this.assertCanOpen(trackId, user);
     const existing = await this.findActive(trackId, user);
     if (existing) return existing;
     try {
@@ -103,9 +108,49 @@ export class GuideThreadService {
     }
   }
 
+  /** The learner's active thread for a course, if they have one. */
+  findActiveForUser(
+    trackId: string,
+    user: Pick<TokenUser, 'id' | 'tenantId'>,
+  ): Promise<GuideThread | null> {
+    return this.findActive(trackId, user);
+  }
+
+  /**
+   * Leave a platform event for the thread's next turn (the trigger inbox,
+   * plan §7.8). False when this event was already queued for this thread.
+   */
+  async queueTrigger(
+    thread: Pick<GuideThread, 'id' | 'tenantId'>,
+    input: {
+      kind: string;
+      dedupeKey: string;
+      description: string;
+      extra?: Record<string, unknown>;
+    },
+  ): Promise<boolean> {
+    const rows = returningRows<{ id: string }>(
+      await this.dataSource.query(
+        `INSERT INTO "guide_triggers"
+           ("threadId", "kind", "dedupeKey", "payload", "status", "tenant_id")
+         VALUES ($1, $2, $3, $4::jsonb, 'pending', $5)
+         ON CONFLICT ("dedupeKey") DO NOTHING
+         RETURNING "id"`,
+        [
+          thread.id,
+          input.kind,
+          `${thread.id}:${input.dedupeKey}`,
+          JSON.stringify({ description: input.description, ...input.extra }),
+          thread.tenantId ?? null,
+        ],
+      ),
+    );
+    return rows.length > 0;
+  }
+
   private findActive(
     trackId: string,
-    user: TokenUser,
+    user: Pick<TokenUser, 'id' | 'tenantId'>,
   ): Promise<GuideThread | null> {
     return this.threads.findOne({
       where: {

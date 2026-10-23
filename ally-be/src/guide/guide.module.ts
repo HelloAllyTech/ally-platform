@@ -44,6 +44,7 @@ import { GuideTurnService } from './runtime/guide-turn.service';
 import { GuideCrisisService } from './safety/guide-crisis.service';
 import { GuideSentinelService } from './safety/guide-sentinel.service';
 import { GuideSettingsService } from './settings/guide-settings.service';
+import { GuideVisitorService } from './visitor/guide-visitor.service';
 
 /**
  * The Ally guide (plans/ally-guide/plan.md). A leaf module: it reads courses
@@ -84,6 +85,7 @@ import { GuideSettingsService } from './settings/guide-settings.service';
     GuideVoiceController,
   ],
   providers: [
+    GuideVisitorService,
     GlobalSettingsRepository,
     GuideSettingsService,
     GuideEventBusService,

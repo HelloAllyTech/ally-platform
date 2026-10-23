@@ -2269,7 +2269,7 @@ const GUIDE_TASKS: AiTaskEntry[] = [
     task: LlmTask.GUIDE_ORCHESTRATOR,
     runtime: LlmRuntime.ALLY_BE,
     trigger:
-      'A learner sends Ally a message, or presses Continue, Start or Not now',
+      'A learner sends Ally a message, or presses Continue, Start or Not now; a platform event (a completion, a grade, signing in) while they are on the page; or an anonymous visitor writes on a public course link',
     detail:
       "Ally's reply: a streamed tool loop (at most six tool passes, then a closing pass " +
       'with tool_choice none) whose text is held until the Sentinel clears the message. ' +
@@ -2279,7 +2279,9 @@ const GUIDE_TASKS: AiTaskEntry[] = [
       'situation report as a mid-conversation system message. A Sentinel verdict that ' +
       'changes the mode restarts the reply once. Model by budget tier: Opus 5.5 (effort ' +
       'medium) → Sonnet 5.5 past $3 a thread or $1.50 a learner-day → Haiku 5.5 past $6, ' +
-      'switching only at an epoch boundary.',
+      'switching only at an epoch boundary. An anonymous visitor gets the same call with ' +
+      'platform defaults, the public outline and three tools, charged to the visitor and ' +
+      'capped at 12 messages or $0.25 per course per 24 h, under a $25 daily anonymous ceiling.',
     kind: AiTaskKind.COMPLETION,
     provider: 'anthropic',
     defaultModel: 'claude-opus-5-5',

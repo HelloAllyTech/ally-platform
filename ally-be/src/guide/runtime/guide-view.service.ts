@@ -14,6 +14,7 @@ import {
   releaseWindowOpen,
 } from '../conductor/pacing';
 import {
+  GuideAllowance,
   GuideAvailability,
   GuideBootstrap,
   GuideCard as GuideCardEvent,
@@ -97,6 +98,92 @@ export class GuideViewService {
       voice: guided && switches.voice,
       languages: languages.map((language) => language.languageCode),
       reason,
+    };
+  }
+
+  /**
+   * What an anonymous visitor's journey draws (plan §3 stages 1–2, §5.14):
+   * the public outline as a Spine preview, their conversation if they have
+   * started one, and their allowance. Nothing learner-specific exists yet.
+   */
+  async bootstrapForVisitor(
+    trackId: string,
+    visitor: { id: string } | null,
+    allowanceOf: (
+      visitorId: string,
+      policy: GuideReleaseBundle['policy'],
+    ) => Promise<GuideAllowance>,
+  ): Promise<GuideBootstrap> {
+    const availability = await this.availability(trackId, null);
+    const empty: GuideBootstrap = {
+      availability,
+      messages: [],
+      cards: [],
+      prefs: { ...DEFAULT_GUIDE_PREFS },
+    };
+    if (!availability.anonymousChat) return empty;
+    const [course, track, thread, ga] = await Promise.all([
+      this.conductor.loadPublicCourse(trackId),
+      this.tracks.findOne({
+        where: { id: trackId },
+        select: { id: true, coverImageUrl: true },
+      }),
+      visitor
+        ? this.threads.findOne({
+            where: {
+              trackId,
+              visitorId: visitor.id,
+              status: GuideThreadStatus.ACTIVE,
+            },
+          })
+        : null,
+      this.releases.getGa(ALLY_GUIDE_AGENT_KEY),
+    ]);
+    const policy =
+      (ga?.bundle as unknown as GuideReleaseBundle | undefined)?.policy ??
+      GUIDE_DEFAULT_POLICY;
+    const spine = course.spine;
+    const view: GuideBootstrap = {
+      ...empty,
+      access: { hasAccess: false, enrolled: false, reason: null },
+      course: {
+        id: trackId,
+        title: course.title,
+        description: course.description,
+        languageCode: course.languageCode,
+        estimatedMinutes: spine.items.reduce(
+          (sum, item) => sum + item.estimatedMinutes,
+          0,
+        ),
+        coverImageUrl: track?.coverImageUrl ?? null,
+      },
+      spine: spineView(spine),
+      ...(visitor ? { allowance: await allowanceOf(visitor.id, policy) } : {}),
+    };
+    if (!thread) return view;
+    const mode = thread.mode ?? GuideMode.NORMAL;
+    const [messages, cards, crisis] = await Promise.all([
+      this.recentMessages(thread.id),
+      this.presentedCards(thread.id),
+      mode === GuideMode.CRISIS ? this.crisisOnScreen(thread.id) : null,
+    ]);
+    return {
+      ...view,
+      thread: {
+        id: thread.id,
+        trackId,
+        mode,
+        atmosphere: atmosphereOf({
+          mode,
+          releaseWindowOpen: false,
+          spine,
+        }),
+        lastEventSeq: thread.lastEventSeq,
+        languageCode: thread.languageCode ?? null,
+      },
+      messages,
+      cards,
+      ...(crisis ? { crisis } : {}),
     };
   }
 

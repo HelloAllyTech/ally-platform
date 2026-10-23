@@ -15,6 +15,7 @@ import {
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiHeader,
   ApiOperation,
   ApiSecurity,
   ApiTags,
@@ -24,11 +25,7 @@ import { AuthPermissions } from 'src/auth/decorators/auth-permissions.decorator'
 import { CurrentUser } from 'src/auth/decorators/user.decorator';
 import { TokenUser } from 'src/auth/type/auth.types';
 import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
-import { GuideEvent } from '../contract/generated/guide-contract';
-import {
-  atmosphereFor,
-  GUIDE_SSE_PING_INTERVAL_MS,
-} from '../constants/guide.constants';
+import { atmosphereFor } from '../constants/guide.constants';
 import {
   GuideVoiceSessionDto,
   GuideAppointmentDto,
@@ -40,12 +37,16 @@ import { GuideLearnerDataService } from '../learner/guide-learner-data.service';
 import { GuideCardService } from '../runtime/guide-card.service';
 import { GuideViewService } from '../runtime/guide-view.service';
 import { GuideVoiceService } from '../voice/guide-voice.service';
+import { GuideThreadOpened } from '../contract/generated/guide-contract';
+import { GuideThread } from '../entity/guide-thread.entity';
+import {
+  GUIDE_VISITOR_HEADER,
+  GuideVisitorService,
+} from '../visitor/guide-visitor.service';
 import { TrackEnrollmentService } from 'src/track/service/track-enrollment.service';
 import { DataSource } from 'typeorm';
-import {
-  GuideEventBusService,
-  GuideReplayGate,
-} from '../runtime/guide-event-bus.service';
+import { GuideEventBusService } from '../runtime/guide-event-bus.service';
+import { pipeThreadEvents, resumeSeq } from '../runtime/guide-sse';
 import { GuideThreadService } from '../runtime/guide-thread.service';
 import { GuideTurnService } from '../runtime/guide-turn.service';
 
@@ -69,6 +70,7 @@ export class GuideLearnerController {
     private readonly dataSource: DataSource,
     private readonly learnerData: GuideLearnerDataService,
     private readonly voice: GuideVoiceService,
+    private readonly visitors: GuideVisitorService,
   ) {}
 
   @Post('threads/:threadId/voice-session')
@@ -279,17 +281,52 @@ export class GuideLearnerController {
   @ApiOperation({
     summary: "The learner's thread for this course, created on first visit",
   })
+  @ApiHeader({
+    name: GUIDE_VISITOR_HEADER,
+    required: false,
+    description:
+      'Sent once, right after signing in, to claim the visitor conversation (plan §3 stage 3)',
+  })
   async openThread(
     @Param('trackId', ParseUUIDPipe) trackId: string,
     @CurrentUser() user: TokenUser,
-  ) {
-    const thread = await this.threads.getOrCreateForUser(trackId, user);
+    @Headers(GUIDE_VISITOR_HEADER) visitorToken?: string,
+  ): Promise<GuideThreadOpened> {
+    let thread: GuideThread;
+    let claim: GuideThreadOpened['claim'];
+    if (visitorToken) {
+      const result = await this.visitors.claim(visitorToken, user, trackId);
+      thread = result.thread;
+      claim = result.outcome;
+      if (claim !== 'none') {
+        // Ally acknowledges the sign-in and carries on (plan §3 stage 3);
+        // a merge's summary is already waiting in the same inbox.
+        const signedIn = {
+          dedupeKey: `signed_in:${visitorToken.slice(0, 16)}`,
+          description:
+            claim === 'claimed'
+              ? 'The visitor has just signed in: this is now their own conversation, and their organisation and course progress are available. Acknowledge it in a few words, without fuss, and carry on where you were.'
+              : 'The learner has just signed in and come back to their own conversation for this course. Welcome them back in a few words and carry on.',
+        };
+        await this.threads.queueTrigger(thread, {
+          kind: 'signed_in',
+          ...signedIn,
+        });
+        await this.turns.acceptTrigger(thread, user, {
+          dedupeKey: `${thread.id}:${signedIn.dedupeKey}`,
+          description: signedIn.description,
+        });
+      }
+    } else {
+      thread = await this.threads.getOrCreateForUser(trackId, user);
+    }
     return {
       id: thread.id,
       trackId: thread.trackId,
       mode: thread.mode,
       atmosphere: atmosphereFor(thread.mode),
       lastEventSeq: thread.lastEventSeq,
+      ...(claim ? { claim } : {}),
     };
   }
 
@@ -353,74 +390,14 @@ export class GuideLearnerController {
     @Res() res: Response,
   ): Promise<void> {
     const thread = await this.threads.getOwned(threadId, user);
-    const afterSeq = Math.max(
-      0,
-      Number(lastEventId ?? afterSeqQuery ?? 0) || 0,
-    );
-
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache, no-transform');
-    res.setHeader('Connection', 'keep-alive');
-    res.setHeader('X-Accel-Buffering', 'no');
-    res.flushHeaders();
-
-    let closed = false;
-    const gate = new GuideReplayGate(afterSeq);
-    const write = (event: GuideEvent): void => {
-      if (closed || res.writableEnded || !gate.accept(event)) return;
-      const id = event.durable ? `id: ${event.seq}\n` : '';
-      res.write(
-        `event: ${event.type}\n${id}data: ${JSON.stringify(event)}\n\n`,
-      );
-    };
-
-    // Subscribe BEFORE replaying, buffering live events, so nothing published
-    // between the replay query and going live is lost (plan §9.2).
-    const buffered: GuideEvent[] = [];
-    let live = false;
-    const unsubscribe = this.bus.subscribe(threadId, (event) =>
-      live ? write(event) : buffered.push(event),
-    );
-    // While the stream is open the learner counts as present, so a
-    // completion can start a turn instead of waiting for their next message.
-    void this.cards.markPresent(threadId);
-    const heartbeat = setInterval(() => {
-      void this.cards.markPresent(threadId);
-      void this.bus
-        .emitEphemeral(threadId, 'ping', {}, gate.lastSeq)
-        .catch(() => undefined);
-    }, GUIDE_SSE_PING_INTERVAL_MS);
-    req.on('close', () => {
-      closed = true;
-      clearInterval(heartbeat);
-      unsubscribe();
-      void this.cards.markAbsent(threadId);
+    await pipeThreadEvents({
+      bus: this.bus,
+      cards: this.cards,
+      thread,
+      afterSeq: resumeSeq(lastEventId, afterSeqQuery),
+      req,
+      res,
+      presence: true,
     });
-
-    try {
-      await this.bus.ensureSubscribed();
-      write({
-        v: 1,
-        seq: afterSeq,
-        threadId,
-        at: new Date().toISOString(),
-        durable: false,
-        type: 'hello',
-        data: {
-          lastSeq: thread.lastEventSeq,
-          mode: thread.mode,
-          atmosphere: atmosphereFor(thread.mode),
-        },
-      });
-      for (const event of await this.bus.replay(threadId, afterSeq))
-        write(event);
-      live = true;
-      for (const event of buffered.splice(0)) write(event);
-    } catch {
-      closed = true;
-      clearInterval(heartbeat);
-      unsubscribe();
-      res.end();
-    }
   }
 }

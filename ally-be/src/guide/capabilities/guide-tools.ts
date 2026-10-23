@@ -33,6 +33,7 @@ export const GUIDE_TOOL_NAMES = {
   SAVE_TO_NOTEBOOK: 'save_to_notebook',
   RECORD_NOTICING: 'record_noticing',
   CLOSE_SESSION: 'close_session',
+  SUGGEST_SIGN_IN: 'suggest_sign_in',
 } as const;
 
 export const GUIDE_TOOLS: AgentToolDefinition[] = [
@@ -303,3 +304,43 @@ export function checkPresentable(input: {
   }
   return { ok: true, item };
 }
+
+/** Turns between two sign-in suggestions to a visitor. */
+export const SIGN_IN_SUGGESTION_GAP_TURNS = 4;
+
+const SUGGEST_SIGN_IN_TOOL: AgentToolDefinition = {
+  name: GUIDE_TOOL_NAMES.SUGGEST_SIGN_IN,
+  description:
+    'Show the visitor a card to sign in, with one line on why it would help them now. Use it when they want to start an activity, ask to save something or see their progress, or the situation report says their messages are nearly used up — not as your first reply, and not again soon after. ' +
+    'Example: {"reason":"Sign in to open the first article and keep this conversation."}',
+  input_schema: {
+    type: 'object',
+    properties: {
+      reason: {
+        type: 'string',
+        description:
+          'One short line, in your voice, on what signing in lets them do next.',
+      },
+    },
+    required: ['reason'],
+    additionalProperties: false,
+  },
+  strict: true,
+};
+
+/**
+ * What an anonymous visitor's Ally can do (plan §2.3, §7.3 "visibility"):
+ * talk about the public outline, show support resources, and offer sign-in.
+ * Nothing that reads or writes a learner — no Tutor over course content, no
+ * memory, notebook or progress, no presenting activities.
+ */
+export const GUIDE_VISITOR_TOOL_NAMES: ReadonlySet<string> = new Set([
+  GUIDE_TOOL_NAMES.SHOW_COURSE_INFO,
+  GUIDE_TOOL_NAMES.SHOW_WELLBEING_RESOURCES,
+  GUIDE_TOOL_NAMES.SUGGEST_SIGN_IN,
+]);
+
+export const GUIDE_VISITOR_TOOLS: AgentToolDefinition[] = [
+  ...GUIDE_TOOLS.filter((tool) => GUIDE_VISITOR_TOOL_NAMES.has(tool.name)),
+  SUGGEST_SIGN_IN_TOOL,
+];

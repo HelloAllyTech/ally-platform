@@ -31,6 +31,8 @@ import { resolveSupportLines } from '../safety/fixed-responses';
 import {
   CTA_LABEL_BY_TYPE,
   GUIDE_TOOL_NAMES,
+  GUIDE_VISITOR_TOOL_NAMES,
+  SIGN_IN_SUGGESTION_GAP_TURNS,
   PRESENTATION_BY_TYPE,
   PresentReason,
   checkPresentable,
@@ -65,6 +67,8 @@ export interface GuideToolContext {
   /** What the learner has written lately, newest last — notebook text must come from here. */
   learnerTexts: string[];
   epochNumber: number;
+  /** An anonymous visitor's turn: only the visitor tools may run. */
+  anonymous?: boolean;
   /** The platform started this turn (a completion, a grade): the learner said nothing new. */
   platformTurn?: boolean;
   /** When the current epoch began (ISO): cards from before it have scrolled away. */
@@ -220,8 +224,18 @@ export class GuideToolExecutorService {
     input: Record<string, any>,
     ctx: GuideToolContext,
   ): Promise<GuideToolResult> {
+    // A visitor's Ally is offered only the visitor tools; a call to any other
+    // (a model reaching for one it saw earlier) is refused here too.
+    if (ctx.anonymous && !GUIDE_VISITOR_TOOL_NAMES.has(name)) {
+      return fail('Not available before the learner signs in.');
+    }
+    if (!ctx.anonymous && name === GUIDE_TOOL_NAMES.SUGGEST_SIGN_IN) {
+      return fail('The learner is already signed in.');
+    }
     try {
       switch (name) {
+        case GUIDE_TOOL_NAMES.SUGGEST_SIGN_IN:
+          return await this.suggestSignIn(input, ctx);
         case GUIDE_TOOL_NAMES.PRESENT_COURSE_ITEM:
           return await this.presentCourseItem(input, ctx);
         case GUIDE_TOOL_NAMES.SHOW_COURSE_INFO:
@@ -351,6 +365,60 @@ export class GuideToolExecutorService {
       next:
         'The card is on screen. If your reply has not framed it yet, frame it in one ' +
         'sentence; if it already has, add nothing — never repeat what you wrote.',
+    });
+  }
+
+  /**
+   * The sign-in card (plan §3 stage 2, §5.12). Not as the first reply — an
+   * ask before the visitor has had anything of value drives them away
+   * (Stacks: Timing friend invites to First Major Win-State) — and not
+   * again within a few turns.
+   */
+  private async suggestSignIn(
+    input: Record<string, any>,
+    ctx: GuideToolContext,
+  ): Promise<GuideToolResult> {
+    const turn = ctx.pacing.learnerTurns ?? 0;
+    const last = ctx.pacing.signInOfferedAtTurn;
+    if (last != null && turn - last < SIGN_IN_SUGGESTION_GAP_TURNS) {
+      return fail(
+        'You suggested signing in a moment ago; the card is still there. Answer them instead.',
+      );
+    }
+    if (ctx.presented.some((card) => card.kind === GuideCardKind.SIGN_IN)) {
+      return fail('The sign-in card is already on screen.');
+    }
+    const framing = String(input.reason ?? '').slice(0, 140) || null;
+    const saved = await this.cards.save(
+      this.cards.create({
+        threadId: ctx.threadId,
+        kind: GuideCardKind.SIGN_IN,
+        presentation: GuideCardPresentation.INLINE,
+        state: GuideCardState.READY,
+        title: 'Sign in to keep going',
+        payload: { framing },
+        tenantId: null,
+      }),
+    );
+    const card: GuideCardEvent = {
+      cardId: saved.id,
+      kind: GuideCardKind.SIGN_IN,
+      presentation: GuideCardPresentation.INLINE,
+      state: GuideCardState.READY,
+      title: 'Sign in to keep going',
+      framing,
+      cta: { label: 'Sign in', action: 'sign_in' },
+    };
+    const seq = await ctx.emitDurable('card.presented', { card });
+    await this.cards.update(saved.id, {
+      presentedSeq: seq,
+      payload: { ...(saved.payload ?? {}), card } as Record<string, any>,
+    });
+    ctx.presented.push(card);
+    ctx.pacing = { ...ctx.pacing, signInOfferedAtTurn: turn };
+    return ok({
+      shown: true,
+      next: 'The card is on screen. Say in a sentence what signing in lets them do; do not repeat its text.',
     });
   }
 

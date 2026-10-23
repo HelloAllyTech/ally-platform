@@ -32,6 +32,8 @@ export interface GuideThreadPacing {
   closedEpoch?: number | null;
   /** `learnerTurns` when Ally was first told to ask about their possible self. */
   possibleSelfOfferedAtTurn?: number | null;
+  /** A visitor's last sign-in suggestion, by their turn count. */
+  signInOfferedAtTurn?: number | null;
 }
 
 /** What the current epoch's frozen context prefix was built from (plan §7.6). */

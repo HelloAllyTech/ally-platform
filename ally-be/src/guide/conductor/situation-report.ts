@@ -46,6 +46,8 @@ export interface SituationInput {
   platformTurn?: boolean;
   /** The learner pressed Start or Continue: they asked for the next step. */
   continuePressed?: boolean;
+  /** An anonymous visitor (plan §3 stages 1–2): messages left today. */
+  visitor?: { remaining: number; limit: number } | null;
 }
 
 const GUIDANCE_LABEL: Record<GuidanceDial, string> = {
@@ -138,7 +140,22 @@ export function renderSituationReport(input: SituationInput): string {
     );
   }
 
-  if (!spine.enrolled) {
+  if (input.visitor) {
+    lines.push(
+      'VISITOR: not signed in. You know only the course outline above — not its ' +
+        "activities' content — and nothing about them. Answer about the course, " +
+        'its topics and becoming a helper; nothing can be opened until they sign in.',
+    );
+    lines.push(
+      input.continuePressed
+        ? 'They pressed Start: to begin they need to sign in. Call suggest_sign_in.'
+        : 'Offer sign-in with suggest_sign_in only when it helps them: they want to start, ' +
+            'to save or see progress, or their messages are nearly used up. Never press.',
+    );
+    lines.push(
+      `messages left today: ${input.visitor.remaining} of ${input.visitor.limit}.`,
+    );
+  } else if (!spine.enrolled) {
     lines.push('The learner is not enrolled yet; nothing can be presented.');
   } else if (spine.finished) {
     lines.push(

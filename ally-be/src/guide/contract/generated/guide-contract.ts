@@ -277,10 +277,7 @@ export interface GuideEventToolActivity extends GuideEventBase {
 
 export interface GuideEventAllowance extends GuideEventBase {
   type: 'allowance';
-  data: {
-    remaining: number;
-    limit: number;
-  };
+  data: GuideAllowance;
 }
 
 export interface GuideEventTurnCompleted extends GuideEventBase {
@@ -484,6 +481,27 @@ export interface GuidePrefsUpdate {
   preferClassic?: boolean;
 }
 
+/** An anonymous visitor's messages left today on this course (plan Appendix A). The client shows a quiet counter once two or fewer remain, and the sign-in card at zero. */
+export interface GuideAllowance {
+  remaining: number;
+  limit: number;
+}
+
+/** POST /v1/guide/public/visitors — the visitor token. Only its hash is stored; the browser keeps it and sends it as the x-guide-visitor header, and once more when signing in so the conversation is claimed. */
+export interface GuideVisitorCreated {
+  token: string;
+}
+
+/** POST tracks/:trackId/threads (signed in or visitor). `claim` says what happened to a visitor conversation sent along with x-guide-visitor: it became this thread (claimed), was folded into the learner's existing one (merged), or there was none (none). */
+export interface GuideThreadOpened {
+  id: string;
+  trackId: string;
+  mode: GuideMode;
+  atmosphere: GuideAtmosphere;
+  lastEventSeq: number;
+  claim?: 'claimed' | 'merged' | 'none';
+}
+
 export interface GuideThreadView {
   id: string;
   trackId: string;
@@ -529,4 +547,5 @@ export interface GuideBootstrap {
   prefs: GuidePrefs;
   nextStep?: GuideNextStep;
   crisis?: GuideCrisisState;
+  allowance?: GuideAllowance;
 }

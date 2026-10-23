@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { SessionItemStatus } from 'src/common/type/common.type';
 import { Track } from 'src/track/entity/track.entity';
 import { TrackEnrollmentService } from 'src/track/service/track-enrollment.service';
 import { TrackItemType } from 'src/track/type/track.type';
@@ -69,6 +70,61 @@ export class GuideConductorService {
       languageCode: detail.languageCode ?? 'en',
       trainerNotes: guideNotes?.notes ?? null,
       spine,
+    };
+  }
+
+  /**
+   * The course as an anonymous visitor sees it (plan §2.3): the public
+   * outline only — titles, descriptions, types and answer-free counts — and
+   * no progress, so nothing can be presented. 404 unless the course is
+   * published with its share link on, exactly as the public page.
+   */
+  async loadPublicCourse(trackId: string): Promise<CourseContext> {
+    const [outline, track, warnings] = await Promise.all([
+      this.trackEnrollment.getPublicTrackOutline(trackId),
+      this.dataSource.getRepository(Track).findOne({
+        where: { id: trackId },
+        select: { id: true, guideNotes: true },
+      }),
+      this.triggerWarnings(trackId),
+    ]);
+    const guideNotes = (track?.guideNotes ?? null) as TrackGuideNotes | null;
+    let first = true;
+    const view: LearnerTrackView = {
+      id: outline.id,
+      title: outline.title ?? null,
+      enrolled: false,
+      sections: outline.sections.map((section) => ({
+        id: section.id,
+        title: section.title ?? null,
+        order: section.order,
+        items: section.items.map((item) => {
+          // Where they would start, once signed in; the rest is ahead.
+          const status = first
+            ? SessionItemStatus.UNLOCKED
+            : SessionItemStatus.LOCKED;
+          first = false;
+          return {
+            id: item.id,
+            type: item.type,
+            order: item.order,
+            title: item.title ?? null,
+            description: item.description ?? null,
+            status,
+            contentMeta: item.contentMeta as Record<string, unknown> | null,
+          };
+        }),
+      })),
+    };
+    return {
+      title: outline.title ?? '',
+      description: outline.description ?? null,
+      languageCode: outline.languageCode ?? 'en',
+      trainerNotes: guideNotes?.notes ?? null,
+      spine: buildCourseSpine(view, {
+        guideNotes,
+        triggerWarningsByItem: warnings,
+      }),
     };
   }
 

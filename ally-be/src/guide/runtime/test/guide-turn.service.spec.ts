@@ -77,6 +77,7 @@ function setup(
     guided?: boolean;
     scripts?: Script[];
     voice?: boolean;
+    visitorRefusal?: string | null;
     verdict?: SentinelVerdict | null;
     thread?: Record<string, any>;
     historyRows?: any[];
@@ -156,6 +157,7 @@ function setup(
   const ledger = {
     totalForThread: jest.fn(async () => 0),
     totalForUserWithin: jest.fn(async () => 0),
+    totalForVisitorWithin: jest.fn(async () => 0),
   };
   const conductor = {
     loadCourse: jest.fn(async () => ({
@@ -165,6 +167,22 @@ function setup(
       trainerNotes: null,
       spine: SPINE,
     })),
+    loadPublicCourse: jest.fn(async () => ({
+      title: 'Course',
+      description: null,
+      languageCode: 'en',
+      trainerNotes: null,
+      spine: { ...SPINE, enrolled: false },
+    })),
+  };
+  const visitors = {
+    getOwned: jest.fn(async () => thread),
+    assertAnonymousAvailable: jest.fn(async () => undefined),
+    admit: jest.fn(
+      async (): Promise<string | null> => options.visitorRefusal ?? null,
+    ),
+    allowance: jest.fn(async () => ({ remaining: 7, limit: 12 })),
+    touch: jest.fn(async () => undefined),
   };
   const scripts = [...(options.scripts ?? [textPass('Hello there.')])];
   const requests: any[] = [];
@@ -241,6 +259,7 @@ function setup(
     repo({ id: 1, name: 'Asha Rao' }) as never,
     triggers as never,
     learnerData as never,
+    visitors as never,
   );
   const run = async (input: Partial<GuideTurnInput> = {}) => {
     const ctx = service.createContext(
@@ -268,6 +287,9 @@ function setup(
     sentinel,
     crisis,
     tools,
+    visitors,
+    conductor,
+    learnerData,
   };
 }
 
@@ -542,6 +564,14 @@ describe('GuideTurnService', () => {
     expect(seen).not.toContain('turn.failed');
   });
 
+  it('a learner message waits its place behind a turn in flight', async () => {
+    const t = setup({ scripts: [textPass('Here we go.')] });
+    t.redis.acquireLock.mockResolvedValueOnce(false);
+    const ctx = await t.run({ text: 'Can I start now?' });
+    expect(ctx.failure).toBeUndefined();
+    expect(t.redis.acquireLock).toHaveBeenCalledTimes(2);
+  });
+
   it('a trigger turn waits for a turn in flight instead of failing', async () => {
     const t = setup({
       triggers: [
@@ -793,8 +823,75 @@ describe('GuideTurnService', () => {
     expect(t.threads.saveState.mock.calls[0][1]).not.toHaveProperty('epoch');
   });
 
+  const visitorTurn = (
+    t: ReturnType<typeof setup>,
+    text = 'What is this course about?',
+  ) => {
+    const ctx = t.service.createContext(
+      {
+        id: 'th1',
+        trackId: 'tr1',
+        lastEventSeq: 0,
+        mode: GuideMode.NORMAL,
+        pacing: {},
+        epoch: 0,
+      } as never,
+      { id: 0, tenantId: '', username: '' },
+      { clientTurnId: 'vis-1', text },
+      'turn-1',
+    );
+    ctx.visitorId = 'vis-1';
+    return ctx;
+  };
+
+  it('runs a visitor turn on the public outline, with visitor tools only', async () => {
+    const t = setup({
+      scripts: [textPass('It is a short course on listening.')],
+    });
+    const ctx = visitorTurn(t);
+    await t.service.run(ctx);
+    expect(ctx.failure).toBeUndefined();
+    expect(t.conductor.loadPublicCourse).toHaveBeenCalledWith('tr1');
+    expect(t.conductor.loadCourse).not.toHaveBeenCalled();
+    expect(t.learnerData.activeMemories).not.toHaveBeenCalled();
+    const call = t.requests[0];
+    expect(call.request.tools.map((tool: any) => tool.name).sort()).toEqual([
+      'show_course_info',
+      'show_wellbeing_resources',
+      'suggest_sign_in',
+    ]);
+    // Charged to the visitor, never to a learner or an organisation.
+    expect(call.attribution).toMatchObject({
+      visitorId: 'vis-1',
+      userId: null,
+      tenantId: null,
+    });
+    const situation = call.request.messages
+      .filter((m: any) => m.role === 'system')
+      .map((m: any) => m.content)
+      .join('\n');
+    expect(situation).toContain('VISITOR: not signed in');
+    expect(situation).toContain('messages left today: 7 of 12');
+    expect(t.appended.find((row) => row.role === 'learner')).toBeDefined();
+    expect(t.events.find((e) => e.type === 'allowance')?.data).toEqual({
+      remaining: 7,
+      limit: 12,
+    });
+  });
+
+  it('refuses a visitor over their allowance before storing anything', async () => {
+    const t = setup({ visitorRefusal: 'allowance_exhausted' });
+    const ctx = visitorTurn(t);
+    await t.service.run(ctx);
+    expect(ctx.failure?.code).toBe('allowance_exhausted');
+    expect(t.appended).toHaveLength(0);
+    expect(t.models.stream).not.toHaveBeenCalled();
+    expect(types(t.events)).toContain('turn.failed');
+  });
+
   it('refuses a second concurrent turn without touching the lock', async () => {
     const t = setup({ lock: false });
+    t.service.lockWaitMs = 600;
     const ctx = await t.run();
     expect(ctx.failure?.code).toBe('turn_in_progress');
     expect(t.redis.releaseLock).not.toHaveBeenCalled();

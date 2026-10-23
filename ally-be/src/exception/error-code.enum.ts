@@ -134,6 +134,11 @@ export enum ErrorCode {
   GUIDE_NO_ACCESS = 'GUIDE_NO_ACCESS',
   /** 400. The learner's message is over the length limit; nothing was stored. */
   GUIDE_MESSAGE_TOO_LONG = 'GUIDE_MESSAGE_TOO_LONG',
+  /**
+   * 401. An anonymous visitor token is missing, unknown or already spent by
+   * signing in. The client drops it and creates a new visitor.
+   */
+  GUIDE_VISITOR_INVALID = 'GUIDE_VISITOR_INVALID',
 }
 
 /**

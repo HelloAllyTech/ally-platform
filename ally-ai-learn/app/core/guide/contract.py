@@ -311,14 +311,16 @@ class GuideEventToolActivity(GuideEventBase):
     data: GuideEventToolActivityData
 
 
-class GuideEventAllowanceData(_GuideModel):
+class GuideAllowance(_GuideModel):
+    """An anonymous visitor's messages left today on this course (plan Appendix A). The client shows a quiet counter once two or fewer remain, and the sign-in card at zero."""
+
     remaining: int
     limit: int
 
 
 class GuideEventAllowance(GuideEventBase):
     type: Literal["allowance"]
-    data: GuideEventAllowanceData
+    data: GuideAllowance
 
 
 class GuideEventTurnCompletedData(_GuideModel):
@@ -506,6 +508,23 @@ class GuidePrefsUpdate(_GuideModel):
     prefer_classic: Optional[bool] = Field(default=None, alias="preferClassic")
 
 
+class GuideVisitorCreated(_GuideModel):
+    """POST /v1/guide/public/visitors — the visitor token. Only its hash is stored; the browser keeps it and sends it as the x-guide-visitor header, and once more when signing in so the conversation is claimed."""
+
+    token: str
+
+
+class GuideThreadOpened(_GuideModel):
+    """POST tracks/:trackId/threads (signed in or visitor). `claim` says what happened to a visitor conversation sent along with x-guide-visitor: it became this thread (claimed), was folded into the learner's existing one (merged), or there was none (none)."""
+
+    id_: str = Field(alias="id")
+    track_id: str = Field(alias="trackId")
+    mode: GuideMode
+    atmosphere: GuideAtmosphere
+    last_event_seq: int = Field(alias="lastEventSeq")
+    claim: Optional[Literal["claimed", "merged", "none"]] = None
+
+
 class GuideThreadView(_GuideModel):
     id_: str = Field(alias="id")
     track_id: str = Field(alias="trackId")
@@ -551,3 +570,4 @@ class GuideBootstrap(_GuideModel):
     prefs: GuidePrefs
     next_step: Optional[GuideNextStep] = Field(default=None, alias="nextStep")
     crisis: Optional[GuideCrisisState] = None
+    allowance: Optional[GuideAllowance] = None

@@ -27,7 +27,7 @@ import { AgentTurnStoreService } from 'src/llm-agent/harness/turn/agent-turn-sto
 import { AgentRelease } from 'src/llm-agent/entity/agent-release.entity';
 import { AgentMessage } from 'src/llm-agent/type/agent-llm.type';
 import { TraceCarrier } from 'src/observability/tracing';
-import { GUIDE_TOOLS } from '../capabilities/guide-tools';
+import { GUIDE_TOOLS, GUIDE_VISITOR_TOOLS } from '../capabilities/guide-tools';
 import {
   GuideToolContext,
   GuideToolExecutorService,
@@ -113,6 +113,10 @@ import {
   sessionStartMode,
 } from '../safety/sentinel';
 import { GuideSettingsService } from '../settings/guide-settings.service';
+import {
+  GuideVisitorService,
+  VisitorRefusal,
+} from '../visitor/guide-visitor.service';
 import { budgetTier, decideEpoch } from './guide-epoch';
 import { GuideEventBusService } from './guide-event-bus.service';
 import { GuideModelService } from './guide-model.service';
@@ -124,13 +128,36 @@ import { GuideThreadService } from './guide-thread.service';
 export const GUIDE_TURN_LOCK_PREFIX = 'guide-turn';
 export const GUIDE_TURN_LOCK_TTL_SECONDS = 120;
 /**
- * A platform turn waits this long for the thread's lock instead of failing:
- * two events from one action (a quiz graded and its item completed) or a
- * learner message in flight must not surface as an error the learner never
- * caused. It matches the turn's hard timeout (plan §7.8).
+ * A turn waits this long for the thread's lock before failing with
+ * turn_in_progress: turns on one thread are serialised (plan §11 E-1), so a
+ * message sent while Ally reacts to a completion or a sign-in — or two
+ * events from one action — queues behind it rather than surfacing an error
+ * the learner never caused. It matches the turn's hard timeout (plan §7.8).
  */
-export const GUIDE_TRIGGER_LOCK_WAIT_MS = 45_000;
+export const GUIDE_TURN_LOCK_WAIT_MS = 45_000;
 const GUIDE_TRIGGER_LOCK_POLL_MS = 500;
+
+/** What a refused visitor turn says (the client draws the state itself). */
+const VISITOR_REFUSAL_TEXT: Record<VisitorRefusal, string> = {
+  allowance_exhausted: 'Sign in to keep talking with Ally.',
+  anonymous_paused:
+    "I'm taking a short break from new conversations — sign in to keep going.",
+  rate_limited: "Let's slow down a little. I'll be ready in a moment.",
+};
+
+/** The tenant rows are written for: none for a visitor. */
+const tenantOf = (ctx: { visitorId?: string | null; tenantId: string }) =>
+  ctx.visitorId ? null : ctx.tenantId || null;
+
+/** Who a model call is charged to: the learner, or the visitor. */
+const attributionOf = (ctx: GuideTurnContext) => ({
+  threadId: ctx.threadId,
+  turnId: ctx.turnId,
+  userId: ctx.visitorId ? null : ctx.userId,
+  visitorId: ctx.visitorId ?? null,
+  tenantId: tenantOf(ctx),
+  releaseId: ctx.releaseId,
+});
 
 /** Tool-calling passes before the closing pass (plan §7.8 step 3). */
 export const GUIDE_MAX_TOOL_PASSES = 6;
@@ -232,6 +259,16 @@ export interface GuideTurnContext extends HarnessTurnContext {
   restarted: boolean;
   /** Set for a turn a platform event started (no learner words). */
   platformEvent: string | null;
+  /**
+   * An anonymous visitor's turn (plan §3 stages 1–2): `userId` is 0 and
+   * `tenantId` empty, and nothing is written against either — rows carry
+   * null and the visitor id instead.
+   */
+  visitorId?: string | null;
+  /** The visitor's address, hashed, for the per-IP message ceiling. */
+  visitorIpHash?: string | null;
+  /** Messages the visitor has left today, this message counted. */
+  visitorAllowance?: { remaining: number; limit: number } | null;
   /** This turn moved CRISIS to CARE on "I'm safe right now". */
   safeTapped?: boolean;
   /** The learner spoke over this turn's reply while it streamed. */
@@ -280,6 +317,8 @@ export interface GuideVoiceSink {
 @Injectable()
 export class GuideTurnService {
   private readonly logger = LoggerService.getInstance(GuideTurnService.name);
+  /** How long a turn waits for the thread's lock; tests shorten it. */
+  lockWaitMs = GUIDE_TURN_LOCK_WAIT_MS;
   private readonly releaseCache = new Map<string, AgentRelease>();
 
   constructor(
@@ -305,6 +344,7 @@ export class GuideTurnService {
     @InjectRepository(GuideTrigger)
     private readonly triggers: Repository<GuideTrigger>,
     private readonly learnerData: GuideLearnerDataService,
+    private readonly visitors: GuideVisitorService,
   ) {}
 
   /**
@@ -341,6 +381,52 @@ export class GuideTurnService {
       setImmediate(() => {
         this.run(ctx).catch((error) =>
           this.logger.error(`Guide turn ${turn.id} crashed`, error),
+        );
+      });
+    }
+    return { turnId: turn.id };
+  }
+
+  /**
+   * An anonymous visitor's turn on a public course link (plan §3 stages
+   * 1–2). The same pipeline as a learner's, with the visitor's capabilities
+   * only, their allowance checked at admit, and nothing about any learner.
+   */
+  async acceptVisitor(
+    thread: GuideThread,
+    visitor: { id: string; ipHash?: string | null },
+    input: GuideTurnInput,
+    ipHash: string | null,
+  ): Promise<{ turnId: string }> {
+    const text = (input.text ?? '').trim();
+    if (text.length > GUIDE_DEFAULT_POLICY.safety.messageMaxChars) {
+      throw guideMessageTooLong(GUIDE_DEFAULT_POLICY.safety.messageMaxChars);
+    }
+    if (!text && !input.intent) {
+      throw new BadRequestException('A message or an intent is required');
+    }
+    const { turn, created } = await this.turnStore.createOrGet({
+      agentKey: ALLY_GUIDE_AGENT_KEY,
+      threadId: thread.id,
+      clientTurnId: input.clientTurnId,
+      trigger: input.intent
+        ? AgentTurnTrigger.INTENT
+        : AgentTurnTrigger.LEARNER_MESSAGE,
+      channel: AgentChannel.TEXT,
+      tenantId: null,
+    });
+    if (created) {
+      const ctx = this.createContext(
+        thread,
+        { id: 0, tenantId: '', username: '' },
+        input,
+        turn.id,
+      );
+      ctx.visitorId = visitor.id;
+      ctx.visitorIpHash = ipHash ?? visitor.ipHash ?? null;
+      setImmediate(() => {
+        this.run(ctx).catch((error) =>
+          this.logger.error(`Guide visitor turn ${turn.id} crashed`, error),
         );
       });
     }
@@ -524,7 +610,10 @@ export class GuideTurnService {
   async run(ctx: GuideTurnContext): Promise<void> {
     const outcome = await ExecutionManager.runWithContext(
       () => {
-        ExecutionManager.setAuthContext(String(ctx.userId), ctx.tenantId);
+        // A visitor has no learner context: everything it reads is public.
+        if (!ctx.visitorId) {
+          ExecutionManager.setAuthContext(String(ctx.userId), ctx.tenantId);
+        }
         return runHarnessStages(ctx, this.stages(), [], {
           onHookError: () => undefined,
         });
@@ -552,9 +641,7 @@ export class GuideTurnService {
   // ── admit ──────────────────────────────────────────────────────────────
 
   private async admit(ctx: GuideTurnContext): Promise<void> {
-    const waitUntil = ctx.platformEvent
-      ? Date.now() + GUIDE_TRIGGER_LOCK_WAIT_MS
-      : 0;
+    const waitUntil = Date.now() + this.lockWaitMs;
     while (
       !(await this.redis.acquireLock(ctx.lockKey, GUIDE_TURN_LOCK_TTL_SECONDS))
     ) {
@@ -569,11 +656,13 @@ export class GuideTurnService {
       );
     }
     ctx.locked = true;
-    const thread = await this.threads.getOwned(ctx.threadId, {
-      id: ctx.userId,
-      tenantId: ctx.tenantId,
-      username: '',
-    });
+    const thread = ctx.visitorId
+      ? await this.visitors.getOwned(ctx.threadId, ctx.visitorId)
+      : await this.threads.getOwned(ctx.threadId, {
+          id: ctx.userId,
+          tenantId: ctx.tenantId,
+          username: '',
+        });
     ctx.thread = thread;
     ctx.mode = thread.mode ?? GuideMode.NORMAL;
     // "I'm safe right now" on the crisis card: CARE for the rest of the
@@ -585,7 +674,9 @@ export class GuideTurnService {
       ctx.safeTapped = change.changed;
     }
     ctx.pacing = { ...(thread.pacing ?? {}) };
-    if (
+    if (ctx.visitorId) {
+      await this.admitVisitor(ctx, thread);
+    } else if (
       !(await this.settings.isGuidedAvailable(thread.trackId, ctx.tenantId))
     ) {
       throw new HarnessStageError(
@@ -596,6 +687,40 @@ export class GuideTurnService {
     await this.turnStore.transition(ctx.turnId, AgentTurnStatus.ADMITTED, {
       startedAt: new Date(ctx.startedAt),
     });
+  }
+
+  /**
+   * A visitor's turn runs only while anonymous chat is on for the course and
+   * within their allowance, the IP's hour and the platform's day (plan
+   * Appendix A). A refusal stores nothing: the client shows the sign-in card
+   * (allowance_exhausted, anonymous_paused) or slows down (rate_limited).
+   */
+  private async admitVisitor(
+    ctx: GuideTurnContext,
+    thread: GuideThread,
+  ): Promise<void> {
+    try {
+      await this.visitors.assertAnonymousAvailable(thread.trackId);
+    } catch {
+      throw new HarnessStageError(
+        'guide_disabled',
+        'Anonymous chat is switched off.',
+      );
+    }
+    const ga = await this.releases.getGa(ALLY_GUIDE_AGENT_KEY);
+    const policy =
+      (ga?.bundle as unknown as GuideReleaseBundle | undefined)?.policy ??
+      GUIDE_DEFAULT_POLICY;
+    const refusal = await this.visitors.admit({
+      visitor: { id: ctx.visitorId!, ipHash: ctx.visitorIpHash ?? null },
+      trackId: thread.trackId,
+      ipHash: ctx.visitorIpHash ?? null,
+      policy,
+    });
+    if (refusal) {
+      throw new HarnessStageError(refusal, VISITOR_REFUSAL_TEXT[refusal]);
+    }
+    void this.visitors.touch(ctx.visitorId!).catch(() => undefined);
   }
 
   // ── persist.learner ────────────────────────────────────────────────────
@@ -613,7 +738,7 @@ export class GuideTurnService {
       // Not the learner's words: a note the model sees, the learner does not.
       const note = await this.threads.appendMessage(
         ctx.threadId,
-        ctx.tenantId,
+        tenantOf(ctx),
         {
           role: GuideMessageRole.SYSTEM_NOTE,
           content: ctx.platformEvent,
@@ -635,7 +760,7 @@ export class GuideTurnService {
     }
     const message = await this.threads.appendMessage(
       ctx.threadId,
-      ctx.tenantId,
+      tenantOf(ctx),
       {
         role: GuideMessageRole.LEARNER,
         channel:
@@ -684,16 +809,27 @@ export class GuideTurnService {
     const thread = ctx.thread!;
     const now = new Date();
 
+    // A visitor has no preferences, organisation or name: platform
+    // defaults and the public outline only (plan §2.3).
+    const visitor = Boolean(ctx.visitorId);
     const [prefsRow, orgRow, user, course, ga] = await Promise.all([
-      this.prefs.findOne({
-        where: { userId: ctx.userId, tenantId: ctx.tenantId },
-      }),
-      this.orgProfiles.findOne({ where: { tenantId: ctx.tenantId } }),
-      this.users.findOne({
-        where: { id: ctx.userId },
-        select: { id: true, name: true },
-      }),
-      this.conductor.loadCourse(thread.trackId),
+      visitor
+        ? null
+        : this.prefs.findOne({
+            where: { userId: ctx.userId, tenantId: ctx.tenantId },
+          }),
+      visitor
+        ? null
+        : this.orgProfiles.findOne({ where: { tenantId: ctx.tenantId } }),
+      visitor
+        ? null
+        : this.users.findOne({
+            where: { id: ctx.userId },
+            select: { id: true, name: true },
+          }),
+      visitor
+        ? this.conductor.loadPublicCourse(thread.trackId)
+        : this.conductor.loadCourse(thread.trackId),
       this.releases.getGa(ALLY_GUIDE_AGENT_KEY),
     ]);
     if (!ga) {
@@ -705,7 +841,7 @@ export class GuideTurnService {
     ctx.course = course;
     ctx.orgProfile = orgRow?.profile ?? null;
     ctx.guidance = prefsRow?.prefs?.guidance ?? 'walk';
-    ctx.memoryEnabled = prefsRow?.prefs?.memoryEnabled !== false;
+    ctx.memoryEnabled = !visitor && prefsRow?.prefs?.memoryEnabled !== false;
 
     // The release this epoch is pinned to, if the epoch can continue.
     const snapshot = thread.epochSnapshot ?? null;
@@ -717,11 +853,17 @@ export class GuideTurnService {
 
     const [threadUsd, learnerDayUsd, emergencyId] = await Promise.all([
       this.ledger.totalForThread(ALLY_GUIDE_AGENT_KEY, ctx.threadId),
-      this.ledger.totalForUserWithin(
-        ALLY_GUIDE_AGENT_KEY,
-        ctx.userId,
-        24 * 60 * 60 * 1000,
-      ),
+      visitor
+        ? this.ledger.totalForVisitorWithin(
+            ALLY_GUIDE_AGENT_KEY,
+            ctx.visitorId!,
+            24 * 60 * 60 * 1000,
+          )
+        : this.ledger.totalForUserWithin(
+            ALLY_GUIDE_AGENT_KEY,
+            ctx.userId,
+            24 * 60 * 60 * 1000,
+          ),
       this.releases.lastEmergencyRollbackId(ALLY_GUIDE_AGENT_KEY),
     ]);
     const tier = budgetTier({
@@ -808,7 +950,9 @@ export class GuideTurnService {
       ) {
         const start = sessionStartMode({
           current: ctx.mode,
-          lastCrisisAt: await this.crisis.lastCrisisAt(ctx.userId),
+          lastCrisisAt: visitor
+            ? null
+            : await this.crisis.lastCrisisAt(ctx.userId),
           now,
           followupDays: bundle.policy.safety.crisisFollowupDays,
         });
@@ -915,6 +1059,7 @@ export class GuideTurnService {
     const won = Boolean(pacing.firstWinAt) || spine.completed > 0;
     if (
       won &&
+      !ctx.visitorId &&
       ctx.mode === GuideMode.NORMAL &&
       pacing.possibleSelfOfferedAtTurn == null &&
       !(await this.learnerData.hasNotebookKind(
@@ -934,6 +1079,14 @@ export class GuideTurnService {
         possibleSelfOfferedAtTurn: pacing.learnerTurns ?? 0,
       };
       ctx.pacing = pacing;
+    }
+
+    if (ctx.visitorId) {
+      ctx.visitorAllowance = await this.visitors.allowance(
+        ctx.visitorId,
+        thread.trackId,
+        policy,
+      );
     }
 
     // A card for the next step still in view from this sitting: say so, so
@@ -970,6 +1123,7 @@ export class GuideTurnService {
       nextOnScreen,
       platformTurn: Boolean(ctx.platformEvent) && !ctx.text.trim(),
       continuePressed: ctx.intent === 'start' || ctx.intent === 'continue',
+      visitor: ctx.visitorAllowance ?? null,
     };
     ctx.situation = renderSituationReport(ctx.situationInput);
     ctx.learnerMessage = buildLearnerMessage({
@@ -1012,13 +1166,7 @@ export class GuideTurnService {
   private async respond(ctx: GuideTurnContext): Promise<void> {
     const bundle = ctx.bundle!;
     const policy = bundle.policy;
-    const attribution = {
-      threadId: ctx.threadId,
-      turnId: ctx.turnId,
-      userId: ctx.userId,
-      tenantId: ctx.tenantId,
-      releaseId: ctx.releaseId,
-    };
+    const attribution = attributionOf(ctx);
 
     // Layer 1, synchronously: a first-person crisis never reaches a model.
     const keyword = ctx.text ? this.sentinel.keyword(ctx.text) : null;
@@ -1150,7 +1298,7 @@ export class GuideTurnService {
             ctx.learnerMessage!,
             { role: 'system', content: ctx.situation! },
           ],
-          tools: GUIDE_TOOLS,
+          tools: ctx.visitorId ? GUIDE_VISITOR_TOOLS : GUIDE_TOOLS,
           maxTokens: GUIDE_ORCHESTRATOR_MAX_TOKENS,
           maxPasses: GUIDE_MAX_TOOL_PASSES,
           signal: controller.signal,
@@ -1304,7 +1452,7 @@ export class GuideTurnService {
     source: string,
   ): Promise<void> {
     const language = ctx.course?.languageCode ?? 'en';
-    const copy = await this.crisis.responseText(ctx.tenantId, language);
+    const copy = await this.crisis.responseText(tenantOf(ctx), language);
     const lines = this.crisis.lines(ctx.orgProfile, language);
     // Already in crisis: stay with the learner rather than repeat the whole
     // response (plan §6.3 step 5); the lines are shown again either way.
@@ -1326,8 +1474,9 @@ export class GuideTurnService {
     await this.crisis
       .record({
         threadId: ctx.threadId,
-        userId: ctx.userId,
-        tenantId: ctx.tenantId,
+        userId: ctx.visitorId ? null : ctx.userId,
+        visitorId: ctx.visitorId ?? null,
+        tenantId: tenantOf(ctx),
         releaseId: ctx.releaseId,
         language: copy.language,
         source,
@@ -1401,13 +1550,8 @@ export class GuideTurnService {
       trackId: ctx.thread!.trackId,
       bundle: ctx.bundle!,
       tier: ctx.tier,
-      attribution: {
-        threadId: ctx.threadId,
-        turnId: ctx.turnId,
-        userId: ctx.userId,
-        tenantId: ctx.tenantId,
-        releaseId: ctx.releaseId,
-      },
+      attribution: attributionOf(ctx),
+      anonymous: Boolean(ctx.visitorId),
       onCost: (usd) => {
         ctx.usd += usd;
       },
@@ -1478,7 +1622,7 @@ export class GuideTurnService {
 
     // Text the learner already saw before a late crisis cut the reply short.
     if (ctx.replyKind === 'crisis' && ctx.interruptedText?.trim()) {
-      await this.threads.appendMessage(ctx.threadId, ctx.tenantId, {
+      await this.threads.appendMessage(ctx.threadId, tenantOf(ctx), {
         role: GuideMessageRole.ALLY,
         content: ctx.interruptedText.trim(),
         turnId: null,
@@ -1486,38 +1630,43 @@ export class GuideTurnService {
       });
     }
 
-    const reply = await this.threads.appendMessage(ctx.threadId, ctx.tenantId, {
-      id: ctx.replyMessageId,
-      role: GuideMessageRole.ALLY,
-      channel: ctx.channel === 'voice' ? AgentChannel.VOICE : AgentChannel.TEXT,
-      kind:
-        ctx.replyKind === 'crisis'
-          ? GuideMessageKind.CRISIS_FIXED
-          : ctx.replyKind === 'model' || ctx.replyKind === 'interrupted'
-            ? GuideMessageKind.CHAT
-            : GuideMessageKind.FIXED,
-      content: ctx.replyText ?? null,
-      turnId: ctx.turnId,
-      providerBlocks: ctx.replyBlocks as Record<string, any>[],
-      toolCalls: ctx.output?.toolCalls.map((call) => ({
-        name: call.name,
-        input: call.input,
-        isError: call.isError,
-      })),
-      metadata: {
-        replyKind: ctx.replyKind,
-        ...(ctx.replyKind === 'interrupted' ? { interrupted: true } : {}),
-        model:
-          ctx.replyKind === 'model' || ctx.replyKind === 'interrupted'
-            ? ctx.model
-            : null,
-        tier: ctx.tier,
-        releaseId: ctx.releaseId,
-        stopReason: ctx.output?.stopReason ?? null,
-        passes: ctx.output?.passes ?? 0,
-        restarted: ctx.restarted,
+    const reply = await this.threads.appendMessage(
+      ctx.threadId,
+      tenantOf(ctx),
+      {
+        id: ctx.replyMessageId,
+        role: GuideMessageRole.ALLY,
+        channel:
+          ctx.channel === 'voice' ? AgentChannel.VOICE : AgentChannel.TEXT,
+        kind:
+          ctx.replyKind === 'crisis'
+            ? GuideMessageKind.CRISIS_FIXED
+            : ctx.replyKind === 'model' || ctx.replyKind === 'interrupted'
+              ? GuideMessageKind.CHAT
+              : GuideMessageKind.FIXED,
+        content: ctx.replyText ?? null,
+        turnId: ctx.turnId,
+        providerBlocks: ctx.replyBlocks as Record<string, any>[],
+        toolCalls: ctx.output?.toolCalls.map((call) => ({
+          name: call.name,
+          input: call.input,
+          isError: call.isError,
+        })),
+        metadata: {
+          replyKind: ctx.replyKind,
+          ...(ctx.replyKind === 'interrupted' ? { interrupted: true } : {}),
+          model:
+            ctx.replyKind === 'model' || ctx.replyKind === 'interrupted'
+              ? ctx.model
+              : null,
+          tier: ctx.tier,
+          releaseId: ctx.releaseId,
+          stopReason: ctx.output?.stopReason ?? null,
+          passes: ctx.output?.passes ?? 0,
+          restarted: ctx.restarted,
+        },
       },
-    });
+    );
     await this.threads.setRenderedContent(
       ctx.learnerMessageId!,
       ctx.learnerRendered as Record<string, any>[],
@@ -1568,8 +1717,8 @@ export class GuideTurnService {
       await this.crisis
         .recordSafeTap({
           threadId: ctx.threadId,
-          userId: ctx.userId,
-          tenantId: ctx.tenantId,
+          userId: ctx.visitorId ? null : ctx.userId,
+          tenantId: tenantOf(ctx),
           releaseId: ctx.releaseId,
         })
         .catch((error) =>
@@ -1681,6 +1830,17 @@ export class GuideTurnService {
             ctx.lastSeq,
           )
           .catch(() => undefined));
+    // The visitor's counter (plan §5.14: shown once two or fewer are left).
+    if (ctx.visitorAllowance && ctx.announced) {
+      await this.bus
+        .emitEphemeral(
+          ctx.threadId,
+          'allowance',
+          ctx.visitorAllowance,
+          ctx.lastSeq,
+        )
+        .catch(() => undefined);
+    }
     const usage = ctx.output?.usage ?? [];
     const sum = (
       key:
@@ -1694,7 +1854,7 @@ export class GuideTurnService {
       agentKey: ctx.agentKey,
       threadId: ctx.threadId,
       releaseId: ctx.releaseId,
-      tenantId: ctx.tenantId,
+      tenantId: tenantOf(ctx),
       summary: {
         outcome: failed ? 'failed' : 'completed',
         failure: ctx.failure ?? null,
