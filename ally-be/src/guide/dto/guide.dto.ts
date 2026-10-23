@@ -3,10 +3,13 @@ import {
   IsArray,
   IsBoolean,
   IsIn,
+  IsInt,
   IsNumber,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
+  Min,
   ValidateNested,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -232,4 +235,22 @@ export class GuideVoiceSessionDto {
   @IsOptional()
   @IsIn(['en', 'hi', 'mr', 'ta', 'kn'])
   language?: string;
+}
+
+/** POST /v1/guide/admin/baseline — capture a baseline snapshot now. */
+export class GuideBaselineCaptureDto {
+  @ApiPropertyOptional({
+    description: 'Days of enrollments to measure, 7–365 (default 90).',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(7)
+  @Max(365)
+  windowDays?: number;
+
+  @ApiPropertyOptional({ description: 'Why this snapshot was taken.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  note?: string;
 }

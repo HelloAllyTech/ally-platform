@@ -119,6 +119,14 @@ export class EnrollTrackDto {
   @IsOptional()
   @IsString()
   languageCode?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'How the learner reached the course: `public_link` from a shared course link, `in_app` (the default) from inside the app. Measurement only — an unknown value is ignored, never refused.',
+  })
+  @IsOptional()
+  @IsString()
+  entrySource?: string;
 }
 
 export class SetTrackLanguageDto {

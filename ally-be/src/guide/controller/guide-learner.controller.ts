@@ -39,6 +39,7 @@ import { GuideViewService } from '../runtime/guide-view.service';
 import { GuideVoiceService } from '../voice/guide-voice.service';
 import { GuideThreadOpened } from '../contract/generated/guide-contract';
 import { GuideThread } from '../entity/guide-thread.entity';
+import { TrackEntrySource } from '../enum/guide.enum';
 import {
   GUIDE_VISITOR_HEADER,
   GuideVisitorService,
@@ -221,12 +222,11 @@ export class GuideLearnerController {
     @CurrentUser() user: TokenUser,
   ) {
     const thread = await this.threads.getOwned(threadId, user);
-    const result = await this.trackEnrollment.enroll(thread.trackId);
-    // Remember how the learner arrived, without overwriting an earlier answer.
-    await this.dataSource.query(
-      `UPDATE "track_enrollments" SET "entrySource" = 'guided'
-        WHERE "id" = $1 AND "entrySource" IS NULL`,
-      [result.trackEnrollmentId],
+    // An existing enrollment keeps how the learner first arrived.
+    const result = await this.trackEnrollment.enroll(
+      thread.trackId,
+      undefined,
+      TrackEntrySource.GUIDED,
     );
     const bootstrap = await this.view.bootstrap(thread.trackId, user);
     if (bootstrap.spine) {

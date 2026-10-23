@@ -45,6 +45,8 @@ import { GuideCrisisService } from './safety/guide-crisis.service';
 import { GuideSentinelService } from './safety/guide-sentinel.service';
 import { GuideSettingsService } from './settings/guide-settings.service';
 import { GuideVisitorService } from './visitor/guide-visitor.service';
+import { GuideBaselineService } from './measure/guide-baseline.service';
+import { GuideBaselineSnapshot } from './entity/guide-baseline-snapshot.entity';
 
 /**
  * The Ally guide (plans/ally-guide/plan.md). A leaf module: it reads courses
@@ -55,6 +57,7 @@ import { GuideVisitorService } from './visitor/guide-visitor.service';
 @Module({
   imports: [
     TypeOrmModule.forFeature([
+      GuideBaselineSnapshot,
       GuideVisitor,
       GuideThread,
       GuideMessage,
@@ -85,6 +88,7 @@ import { GuideVisitorService } from './visitor/guide-visitor.service';
     GuideVoiceController,
   ],
   providers: [
+    GuideBaselineService,
     GuideVisitorService,
     GlobalSettingsRepository,
     GuideSettingsService,

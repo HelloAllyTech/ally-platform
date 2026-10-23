@@ -26,7 +26,9 @@ import { AgentReleaseService } from 'src/llm-agent/harness/release/agent-release
 import { AgentTraceService } from 'src/llm-agent/harness/trace/agent-trace.service';
 import { AgentTurnStoreService } from 'src/llm-agent/harness/turn/agent-turn-store.service';
 import { GuideAdminService } from '../admin/guide-admin.service';
+import { GuideBaselineService } from '../measure/guide-baseline.service';
 import {
+  GuideBaselineCaptureDto,
   GuideCrisisResponseDto,
   GuideRollbackDto,
   UpdateGuideSwitchesDto,
@@ -55,6 +57,7 @@ export class GuideAdminController {
     private readonly traces: AgentTraceService,
     private readonly turns: AgentTurnStoreService,
     private readonly admin: GuideAdminService,
+    private readonly baseline: GuideBaselineService,
   ) {}
 
   @Get('overview')
@@ -234,6 +237,30 @@ export class GuideAdminController {
   @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE, VIEW)
   getRelease(@Param('releaseId', ParseUUIDPipe) releaseId: string) {
     return this.releases.getById(releaseId);
+  }
+
+  @Post('baseline')
+  @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE, EDIT)
+  @ApiOperation({
+    summary:
+      'Capture the public-course baseline Ally is compared against (plan decision 19)',
+  })
+  captureBaseline(
+    @Body() dto: GuideBaselineCaptureDto,
+    @CurrentUser() user: TokenUser,
+  ) {
+    return this.baseline.capture({
+      windowDays: dto.windowDays ?? 90,
+      userId: user.id,
+      note: dto.note ?? null,
+    });
+  }
+
+  @Get('baseline')
+  @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE, VIEW)
+  @ApiOperation({ summary: 'Baseline snapshots, newest first' })
+  listBaselines(@Query('limit') limit?: string) {
+    return this.baseline.list(Number(limit) || 20);
   }
 
   @Post('releases/:releaseId/promote')
