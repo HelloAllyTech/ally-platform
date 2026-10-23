@@ -100,9 +100,13 @@ settings, or both. The flow:
 1. The fixtures are replayed with the candidate. The candidate is applied inside the sandbox
    only, so nothing live reads it.
 2. The result is compared with a baseline on the live settings. A baseline is reused if it
-   covers the same fixtures, is under 7 days old, overrode no prompt or model, and ran the
-   same interview loop; otherwise one is run alongside on that loop. A baseline from the other
-   loop would credit or blame the prompt for what the loop did.
+   covers the same fixtures, is under 7 days old, overrode no prompt or model, ran the
+   same interview loop, and started after every one of those fixtures was last edited;
+   otherwise one is run alongside on that loop. A baseline from the other loop would credit
+   or blame the prompt for what the loop did, and one from before an edit (`PATCH`, or an
+   import that matched by name) scored a checklist or script that has since changed. To keep
+   old suites readable against the truth they were scored on, re-cut a fixture under a new
+   name and switch the old one off rather than editing it in place.
 3. The candidate passes when nothing got measurably worse:
    - gate violations and corrections did not rise;
    - the checklist score did not fall more than 0.05;

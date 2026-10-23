@@ -406,12 +406,50 @@ describe('BuilderEvalService', () => {
       const validated = completed('validated-1', { validatedTurns: true });
       const { service } = build([legacy, validated]);
 
-      await expect((service as any).resolveBaseline(gate(true))).resolves.toBe(
-        validated,
+      await expect(
+        (service as any).resolveBaseline(gate(true), [fixture('debrief')]),
+      ).resolves.toBe(validated);
+      await expect(
+        (service as any).resolveBaseline(gate(false), [fixture('debrief')]),
+      ).resolves.toBe(legacy);
+    });
+
+    it('never reuses a baseline that started before a fixture was edited', async () => {
+      // The debrief checklist was re-cut an hour after the baseline started:
+      // that baseline scored the old checklist, so a fresh one runs.
+      const edited = new Date('2026-10-23T08:00:00Z');
+      const { service, startSuite } = build([
+        {
+          ...completed('before-edit', { validatedTurns: true }),
+          createdAt: new Date('2026-10-23T07:00:00Z'),
+        },
+      ]);
+
+      await (service as any).resolveBaseline(gate(true), [
+        { ...fixture('debrief'), updatedAt: edited },
+      ]);
+
+      expect(startSuite).toHaveBeenCalledWith(
+        expect.objectContaining({ trigger: 'baseline' }),
       );
-      await expect((service as any).resolveBaseline(gate(false))).resolves.toBe(
-        legacy,
-      );
+    });
+
+    it('reuses a baseline that started after every fixture was last edited', async () => {
+      const after = {
+        ...completed('after-edit', { validatedTurns: true }),
+        createdAt: new Date('2026-10-23T09:00:00Z'),
+      };
+      const { service, startSuite } = build([after]);
+
+      await expect(
+        (service as any).resolveBaseline(gate(true), [
+          {
+            ...fixture('debrief'),
+            updatedAt: new Date('2026-10-23T08:00:00Z'),
+          },
+        ]),
+      ).resolves.toBe(after);
+      expect(startSuite).not.toHaveBeenCalled();
     });
 
     it('never reuses a suite that overrode a prompt or a model', async () => {
@@ -422,7 +460,7 @@ describe('BuilderEvalService', () => {
         }),
       ]);
 
-      await (service as any).resolveBaseline(gate(true));
+      await (service as any).resolveBaseline(gate(true), [fixture('debrief')]);
 
       expect(startSuite).toHaveBeenCalledWith(
         expect.objectContaining({

@@ -431,7 +431,7 @@ export class BuilderEvalService {
       // for a verdict.
       const baselinePromise =
         suite.trigger === 'prompt_gate'
-          ? this.resolveBaseline(suite)
+          ? this.resolveBaseline(suite, fixtures)
           : Promise.resolve(null);
       await this.runQueued(suite, fixtures);
 
@@ -549,11 +549,21 @@ export class BuilderEvalService {
   /**
    * A recent completed run of the same fixtures on the live settings, or a
    * fresh one started now and awaited.
+   *
+   * `fixtures` are the candidate's, as it loaded them. A suite started before
+   * any of them was last edited is never reused: it scored a checklist or an
+   * admin script that has since changed, and comparing against it would
+   * credit (or blame) the prompt for the edit.
    */
   private async resolveBaseline(
     suite: BuilderEvalSuite,
+    fixtures: BuilderEvalFixture[],
   ): Promise<BuilderEvalSuite | null> {
     const since = new Date(Date.now() - BUILDER_EVAL_BASELINE_MAX_AGE_MS);
+    const lastEdited = fixtures.reduce(
+      (latest, fixture) => Math.max(latest, fixture.updatedAt?.getTime() ?? 0),
+      0,
+    );
     const recent = await this.suites.find({
       where: {
         trigger: In(['baseline', 'manual']),
@@ -569,6 +579,7 @@ export class BuilderEvalService {
     const reusable = recent.find(
       (candidate) =>
         (candidate.completedAt ?? new Date(0)) >= since &&
+        (candidate.createdAt?.getTime() ?? 0) >= lastEdited &&
         !candidate.overrides?.prompts &&
         !candidate.overrides?.llmConfig &&
         loopOf(candidate.overrides) === loop &&
