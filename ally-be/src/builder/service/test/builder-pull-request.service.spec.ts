@@ -991,6 +991,39 @@ describe('BuilderPullRequestService', () => {
       );
     });
 
+    /**
+     * listPullRequestFiles answers a GitHub error with an empty, truncated
+     * list rather than throwing. Resolving that to "no targets" would record
+     * the release as checked without checking anything; the row's service
+     * is the floor.
+     */
+    it("falls back to the row's service when the monorepo file listing is truncated", async () => {
+      (service as any).configService = {
+        ...(service as any).configService,
+        githubMonorepo: 'ally-platform',
+        builderHealthUrls: {
+          'ally-be': 'https://api.example/api/health',
+          'ally-web:admin': 'https://admin.example',
+        },
+      };
+      repository.find.mockResolvedValue([
+        released({
+          prUrl: 'https://github.com/HelloAllyTech/ally-platform/pull/5',
+        }),
+      ]);
+      github.listPullRequestFiles.mockResolvedValue({
+        files: [],
+        truncated: true,
+      });
+      fetchMock.mockResolvedValue({ ok: true } as any);
+
+      await service.checkReleaseHealth();
+
+      expect(fetchMock.mock.calls.map(([url]: [string]) => url)).toEqual([
+        'https://api.example/api/health',
+      ]);
+    });
+
     it('holds automatic merges while a recent release is unhealthy', async () => {
       repository.count.mockResolvedValue(1);
 

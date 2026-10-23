@@ -1307,25 +1307,42 @@ export class BuilderPullRequestService {
    * dashboard that went out with it. The files are read again here rather
    * than stored: one listing per released pull request, and the same answer
    * the release itself was given.
+   *
+   * When that listing comes back short — `listPullRequestFiles` never throws,
+   * it answers a GitHub error or a >300-file pull request with an empty or
+   * partial list and `truncated` — the row's service is used instead. An
+   * empty list would resolve to no targets, and "no health URL" is recorded
+   * as checked, so one transient 5xx would have left a released pull request
+   * permanently unverified. The service filter is what every release was
+   * checked with before the move; it may miss a second target, never the
+   * first.
    */
   private async healthUrlsFor(
     pullRequest: BuilderPullRequest,
   ): Promise<string[]> {
     const urls = this.configService.builderHealthUrls;
     const monorepo = this.configService.githubMonorepo;
-    if (!monorepo || repoName(prRepoOf(pullRequest)) !== monorepo) {
-      return Object.entries(urls)
+    const byRowService = (): string[] =>
+      Object.entries(urls)
         .filter(
           ([target]) =>
             target === pullRequest.repo ||
             target.startsWith(`${pullRequest.repo}:`),
         )
         .map(([, url]) => url);
+    if (!monorepo || repoName(prRepoOf(pullRequest)) !== monorepo) {
+      return byRowService();
     }
-    const { files } = await this.github.listPullRequestFiles(
+    const { files, truncated } = await this.github.listPullRequestFiles(
       prRepoOf(pullRequest),
       pullRequest.prNumber,
     );
+    if (truncated) {
+      this.logger.warn(
+        `Builder: could not list the files of ${prRepoOf(pullRequest)}#${pullRequest.prNumber} for its health check; checking its row's service (${pullRequest.repo}) instead.`,
+      );
+      return byRowService();
+    }
     return resolveMonorepoReleaseTargets(files)
       .targets.map((target) => releaseTargetKey(target))
       .filter((key): key is string => !!key && key in urls)
