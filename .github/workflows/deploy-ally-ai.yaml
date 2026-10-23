@@ -51,8 +51,6 @@ jobs:
       ENV: ${{ steps.vars.outputs.ENV }}
       PROJECT_PREFIX: ${{ steps.vars.outputs.PROJECT_PREFIX }}
       PROJECT_REGION: ${{ steps.vars.outputs.PROJECT_REGION }}
-      SUBNETS: ${{ steps.vars.outputs.SUBNETS }}
-      SECURITY_GROUPS: ${{ steps.vars.outputs.SECURITY_GROUPS }}
       ECS_CLUSTER: ${{ steps.set_env.outputs.ECS_CLUSTER }}
       ECS_SERVICE: ${{ steps.set_env.outputs.ECS_SERVICE }}
       ECR_IMAGE: ${{ steps.set_env.outputs.ECR_IMAGE }}
@@ -88,8 +86,6 @@ jobs:
             echo "ECR_REPOSITORY=PRD_ECR_REPOSITORY" >> $GITHUB_OUTPUT
             echo "PROJECT_PREFIX=ally-prd" >> $GITHUB_OUTPUT
             echo "PROJECT_REGION=mb" >> $GITHUB_OUTPUT
-            echo "SUBNETS=${{ secrets.PRD_SUBNETS }}" >> $GITHUB_OUTPUT
-            echo "SECURITY_GROUPS=${{ secrets.PRD_SECURITY_GROUPS }}" >> $GITHUB_OUTPUT
           elif [ $ENV == 'stg' ]
           then
             echo "AWS_ROLE=STG_AWS_ROLE" >> $GITHUB_OUTPUT
@@ -97,8 +93,6 @@ jobs:
             echo "ECR_REPOSITORY=STG_ECR_REPOSITORY" >> $GITHUB_OUTPUT
             echo "PROJECT_PREFIX=life-stg" >> $GITHUB_OUTPUT
             echo "PROJECT_REGION=mb" >> $GITHUB_OUTPUT
-            echo "SUBNETS=${{ secrets.STG_SUBNETS }}" >> $GITHUB_OUTPUT
-            echo "SECURITY_GROUPS=${{ secrets.STG_SECURITY_GROUPS }}" >> $GITHUB_OUTPUT
           elif [ $ENV == 'dev' ]
           then
             echo "AWS_ROLE=DEV_AWS_ROLE" >> $GITHUB_OUTPUT
@@ -106,8 +100,6 @@ jobs:
             echo "ECR_REPOSITORY=DEV_ECR_REPOSITORY" >> $GITHUB_OUTPUT
             echo "PROJECT_PREFIX=ally-dev" >> $GITHUB_OUTPUT
             echo "PROJECT_REGION=sg" >> $GITHUB_OUTPUT
-            echo "SUBNETS=${{ secrets.DEV_SUBNETS }}" >> $GITHUB_OUTPUT
-            echo "SECURITY_GROUPS=${{ secrets.DEV_SECURITY_GROUPS }}" >> $GITHUB_OUTPUT
           else
             echo "Branch not configured!"
             exit 1
@@ -227,8 +219,11 @@ jobs:
           container-name: "${{ needs.prepare-env.outputs.CONTAINER_NAME }}-dbmigrate"
           ecs-cluster: ${{ needs.prepare-env.outputs.ECS_CLUSTER }}
           image: ${{ needs.build.outputs.APP_IMAGE }}
-          subnets: ${{ needs.prepare-env.outputs.SUBNETS }}
-          security-groups: ${{ needs.prepare-env.outputs.SECURITY_GROUPS }}
+          # Read here, not passed from prepare-env: GitHub drops a job output that
+          # contains a secret ("Skip output 'SUBNETS' since it may contain secret"),
+          # which left the migration with subnets= and securityGroups= empty.
+          subnets: ${{ secrets[format('{0}_SUBNETS', needs.prepare-env.outputs.ENV)] }}
+          security-groups: ${{ secrets[format('{0}_SECURITY_GROUPS', needs.prepare-env.outputs.ENV)] }}
 
   deploy:
     # No checkout in this job, so the workflow's service-folder default
