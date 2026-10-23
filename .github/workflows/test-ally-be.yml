@@ -95,6 +95,13 @@ jobs:
         run: npm ci
       - name: Typecheck
         run: npm run typecheck
+      # `nest build` runs the Nest CLI's path-alias compiler hook, which plain
+      # `tsc` does not: a `src/…` re-export in a decorated class crashed it
+      # (be-v1.156.7 and be-v1.157.0 failed at the release's Docker build while
+      # every PR check was green). Build here so that class of break fails the
+      # pull request, not the release.
+      - name: Build (nest build)
+        run: npm run build
 
   actionlint:
     name: Workflow lint
