@@ -25,7 +25,7 @@ The interface is minimal: a single `llm_instance` property that returns the unde
 
 | Provider | Class | Enum | Requires |
 |----------|-------|------|----------|
-| OpenAI | `OpenAILLMClient` | `LLMProvider.OPENAI` | `OPENAI_API_KEY` |
+| OpenAI | `OpenAILLMClient` | `LLMProvider.OPENAI` | `OPENAI_API_KEY` (optional, falls back to Ollama if unset and `OLLAMA_BASE_URL` is reachable) |
 | Gemini | `GeminiLLMClient` | `LLMProvider.GEMINI` | `GOOGLE_API_KEY` |
 | Ollama | `OpenAILLMClient` (with custom base_url) | `LLMProvider.OLLAMA` | Ollama server running |
 | vLLM | `OpenAILLMClient` (with custom base_url) | `LLMProvider.VLLM` | vLLM server running |
