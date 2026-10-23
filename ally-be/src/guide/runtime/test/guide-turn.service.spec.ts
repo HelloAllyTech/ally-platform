@@ -1,14 +1,83 @@
 import { BadRequestException, HttpException } from '@nestjs/common';
+import { SessionItemStatus } from 'src/common/type/common.type';
 import { ErrorCode } from 'src/exception/error-code.enum';
-import {
-  chunkForStreaming,
-  GUIDE_STUB_REPLY,
-  GuideTurnContext,
-  GuideTurnService,
-} from '../guide-turn.service';
 import { AgentTurnStatus } from 'src/llm-agent/harness/enum/harness.enum';
+import { AgentStreamEvent } from 'src/llm-agent/type/agent-llm.type';
+import { TrackItemType } from 'src/track/type/track.type';
+import { buildCourseSpine } from '../../conductor/course-spine';
+import { GuideMode } from '../../enum/guide.enum';
+import { GUIDE_DEFAULT_BUNDLE } from '../../release/guide-release.bundle';
+import { CLEAR_VERDICT, SentinelVerdict } from '../../safety/sentinel';
+import { matchFirstPersonRisk } from 'src/common/safety/first-person-risk.matcher';
+import { keywordVerdict } from '../../safety/sentinel';
+import { DEFAULT_CRISIS_TEXT } from '../../safety/fixed-responses';
+import {
+  GUIDE_REFUSAL_TEXT,
+  GuideTurnInput,
+  GuideTurnService,
+  chunkForStreaming,
+} from '../guide-turn.service';
 
-function setup(overrides: { lock?: boolean; guided?: boolean } = {}) {
+type Script = AgentStreamEvent[];
+
+const textPass = (text: string, extra: any[] = []): Script => [
+  ...text.split(' ').map((word, i) => ({
+    type: 'text_delta' as const,
+    text: (i ? ' ' : '') + word,
+  })),
+  {
+    type: 'final',
+    message: {
+      content: [
+        { type: 'thinking', thinking: '', signature: 'sig' },
+        ...extra,
+        { type: 'text', text },
+      ],
+      stopReason: 'end_turn',
+      usage: { inputTokens: 100, outputTokens: 20 },
+    },
+  } as AgentStreamEvent,
+];
+
+const SPINE = buildCourseSpine({
+  id: 'tr1',
+  title: 'Course',
+  enrolled: true,
+  sections: [
+    {
+      id: 's1',
+      title: 'One',
+      order: 1,
+      items: [
+        {
+          id: 'i1',
+          type: TrackItemType.ARTICLE,
+          order: 1,
+          title: 'Listening',
+          status: SessionItemStatus.UNLOCKED,
+        },
+        {
+          id: 'i2',
+          type: TrackItemType.ROLEPLAY,
+          order: 2,
+          title: 'First call',
+          status: SessionItemStatus.LOCKED,
+        },
+      ],
+    },
+  ],
+});
+
+function setup(
+  options: {
+    lock?: boolean;
+    guided?: boolean;
+    scripts?: Script[];
+    verdict?: SentinelVerdict | null;
+    thread?: Record<string, any>;
+    historyRows?: any[];
+  } = {},
+) {
   const events: Array<{ type: string; durable: boolean; data: any }> = [];
   let seq = 0;
   const bus = {
@@ -21,18 +90,37 @@ function setup(overrides: { lock?: boolean; guided?: boolean } = {}) {
       return { seq };
     }),
   };
-  let messageId = 0;
+  let messageSeq = 0;
+  const appended: any[] = [];
+  const thread = {
+    id: 'th1',
+    trackId: 'tr1',
+    lastEventSeq: 0,
+    mode: GuideMode.NORMAL,
+    pacing: {},
+    epoch: 0,
+    epochSnapshot: null,
+    lastLearnerActivityAt: null,
+    ...options.thread,
+  };
   const threads = {
-    getOwned: jest.fn(async () => ({
-      id: 'th1',
-      trackId: 'tr1',
-      lastEventSeq: 0,
-    })),
-    appendMessage: jest.fn(async (_t: string, _tenant: string, input: any) => ({
-      id: `msg-${++messageId}`,
-      ...input,
-    })),
+    getOwned: jest.fn(async () => thread),
+    appendMessage: jest.fn(async (_t: string, _tenant: string, input: any) => {
+      const row = {
+        id: input.id ?? `msg-${messageSeq + 1}`,
+        seq: ++messageSeq,
+        ...input,
+      };
+      appended.push(row);
+      return row;
+    }),
     touchLearnerActivity: jest.fn(),
+    historyRows: jest.fn(async () => options.historyRows ?? []),
+    recentRows: jest.fn(async () => []),
+    setRenderedContent: jest.fn<Promise<void>, [string, any[], unknown?]>(
+      async () => undefined,
+    ),
+    saveState: jest.fn<Promise<void>, [string, any]>(async () => undefined),
   };
   const turnStore = {
     createOrGet: jest.fn(async () => ({
@@ -42,17 +130,77 @@ function setup(overrides: { lock?: boolean; guided?: boolean } = {}) {
     transition: jest.fn(),
     finish: jest.fn(async () => undefined),
   };
+  const release = { id: 'rel-1', bundle: GUIDE_DEFAULT_BUNDLE };
   const releases = {
-    getGa: jest.fn(async () => ({ id: 'rel-1', bundle: { schemaVersion: 1 } })),
+    getGa: jest.fn(async () => release),
+    getById: jest.fn(async () => release),
+    lastEmergencyRollbackId: jest.fn(async () => null),
   };
   const traces = { write: jest.fn(async () => undefined) };
   const settings = {
-    isGuidedAvailable: jest.fn(async () => overrides.guided ?? true),
+    isGuidedAvailable: jest.fn(async () => options.guided ?? true),
   };
   const redis = {
-    acquireLock: jest.fn(async () => overrides.lock ?? true),
+    acquireLock: jest.fn(async () => options.lock ?? true),
     releaseLock: jest.fn(async () => undefined),
   };
+  const ledger = {
+    totalForThread: jest.fn(async () => 0),
+    totalForUserWithin: jest.fn(async () => 0),
+  };
+  const conductor = {
+    loadCourse: jest.fn(async () => ({
+      title: 'Course',
+      description: null,
+      languageCode: 'en',
+      trainerNotes: null,
+      spine: SPINE,
+    })),
+  };
+  const scripts = [...(options.scripts ?? [textPass('Hello there.')])];
+  const requests: any[] = [];
+  const models = {
+    route: jest.fn(() => ({ provider: 'anthropic', model: 'claude-opus-5-5' })),
+    stream: jest.fn(async function* (call: any) {
+      requests.push(call);
+      const script = scripts.shift() ?? textPass('Fallback.');
+      for (const event of script) {
+        await new Promise((resolve) => setImmediate(resolve));
+        if (call.request.signal?.aborted) {
+          const error = new Error('aborted');
+          error.name = 'AbortError';
+          throw error;
+        }
+        if (event.type === 'final') call.onCost?.(0.01);
+        yield event;
+      }
+    }),
+  };
+  const sentinel = {
+    keyword: jest.fn((text: string) => {
+      const match = matchFirstPersonRisk(text);
+      return match ? keywordVerdict(match, 0) : null;
+    }),
+    assess: jest.fn(async () =>
+      options.verdict === undefined
+        ? { ...CLEAR_VERDICT, source: 'classifier', latencyMs: 5 }
+        : options.verdict,
+    ),
+  };
+  const crisis = {
+    responseText: jest.fn(async () => ({
+      text: DEFAULT_CRISIS_TEXT,
+      language: 'en',
+      approved: false,
+    })),
+    lines: jest.fn(() => [{ name: 'Line', phone: '14416' }]),
+    record: jest.fn(async () => undefined),
+    lastCrisisAt: jest.fn(async () => null),
+  };
+  const tools = {
+    execute: jest.fn(async () => ({ content: '{"ok":true}', isError: false })),
+  };
+  const repo = (value: any) => ({ findOne: jest.fn(async () => value) });
   const service = new GuideTurnService(
     threads as never,
     bus as never,
@@ -61,127 +209,292 @@ function setup(overrides: { lock?: boolean; guided?: boolean } = {}) {
     traces as never,
     settings as never,
     redis as never,
+    ledger as never,
+    conductor as never,
+    models as never,
+    sentinel as never,
+    crisis as never,
+    tools as never,
+    repo(null) as never,
+    repo(null) as never,
+    repo({ id: 1, name: 'Asha Rao' }) as never,
   );
-  const ctx = (): GuideTurnContext => ({
-    turnId: 'turn-1',
-    agentKey: 'ally_guide',
-    timings: [],
-    threadId: 'th1',
-    userId: 1,
-    tenantId: 'org',
-    text: 'Hello Ally',
-    clientTurnId: 'c1',
-    startedAt: Date.now(),
-    lastSeq: 0,
-    releaseId: null,
-    bundle: null,
-    ttftMs: null,
-    lockKey: 'guide-turn:th1',
-    locked: false,
-  });
+  const run = async (input: Partial<GuideTurnInput> = {}) => {
+    const ctx = service.createContext(
+      thread as never,
+      { id: 1, tenantId: 'org', username: 'x' },
+      { clientTurnId: 'c1', text: 'Hello Ally', ...input },
+      'turn-1',
+    );
+    await service.run(ctx);
+    return ctx;
+  };
   return {
     service,
-    ctx,
+    run,
     events,
-    bus,
     threads,
+    appended,
     turnStore,
     traces,
     redis,
-    settings,
+    models,
+    requests,
+    sentinel,
+    crisis,
+    tools,
   };
 }
 
-describe('GuideTurnService (step 1.0 stub turn)', () => {
-  it('streams the stub reply through the full event sequence', async () => {
-    const { service, ctx, events, turnStore, traces, redis } = setup();
+const types = (events: Array<{ type: string }>) => events.map((e) => e.type);
 
-    await service.run(ctx());
+describe('GuideTurnService', () => {
+  it('streams a model reply behind the Sentinel and stores a replayable exchange', async () => {
+    const t = setup();
+    const ctx = await t.run();
 
-    const types = events.map((e) => e.type);
-    expect(types[0]).toBe('learner.message');
-    expect(types[1]).toBe('turn.started');
-    expect(types[2]).toBe('presence');
-    expect(types.filter((t) => t === 'assistant.delta').length).toBeGreaterThan(
-      1,
-    );
-    expect(types.slice(-3)).toEqual([
-      'assistant.message',
-      'presence',
-      'turn.completed',
-    ]);
-
-    const streamed = events
+    expect(ctx.failure).toBeUndefined();
+    expect(ctx.replyKind).toBe('model');
+    const deltas = t.events
       .filter((e) => e.type === 'assistant.delta')
       .map((e) => e.data.text)
       .join('');
-    expect(streamed).toBe(GUIDE_STUB_REPLY);
+    expect(deltas).toBe('Hello there.');
+    expect(types(t.events)).toEqual(
+      expect.arrayContaining([
+        'learner.message',
+        'turn.started',
+        'assistant.message',
+        'next_step',
+        'turn.completed',
+      ]),
+    );
 
-    expect(turnStore.finish).toHaveBeenCalledWith(
+    // The request: frozen system spans, the learner message, then the
+    // situation report as a system message.
+    const request = t.requests[0].request;
+    expect(request.system.map((block: any) => block.cache)).toEqual([
+      '1h',
+      '1h',
+      true,
+    ]);
+    expect(request.messages.map((m: any) => m.role)).toEqual([
+      'user',
+      'system',
+    ]);
+    expect(request.messages[1].content).toContain('<situation_report');
+    expect(request.cacheConversation).toBe(true);
+
+    // History rows: the learner row gets what the model saw, the reply row
+    // what it said — thinking block included.
+    const [, rendered] = t.threads.setRenderedContent.mock.calls[0];
+    expect((rendered as any[]).map((m) => m.role)).toEqual(['user', 'system']);
+    const reply = t.appended.find((row) => row.role === 'ally');
+    expect(reply.providerBlocks[0].content[0]).toEqual({
+      type: 'thinking',
+      thinking: '',
+      signature: 'sig',
+    });
+    expect(reply.content).toBe('Hello there.');
+
+    // A first conversation starts epoch 1, pinned to the GA release.
+    const state = t.threads.saveState.mock.calls[0][1];
+    expect(state.epoch).toBe(1);
+    expect(state.epochSnapshot).toMatchObject({
+      releaseId: 'rel-1',
+      tier: 'premium',
+      reason: 'first conversation',
+      startSeq: 1,
+    });
+    expect(t.turnStore.finish).toHaveBeenCalledWith(
       'turn-1',
       expect.objectContaining({ status: AgentTurnStatus.COMPLETED }),
     );
-    expect(traces.write).toHaveBeenCalledWith(
-      expect.objectContaining({
-        releaseId: 'rel-1',
-        summary: expect.objectContaining({ outcome: 'completed' }),
-      }),
+    expect(t.redis.releaseLock).toHaveBeenCalled();
+  });
+
+  it('answers a first-person crisis with fixed copy and never calls a model', async () => {
+    const t = setup();
+    const ctx = await t.run({ text: 'I want to kill myself' });
+
+    expect(ctx.replyKind).toBe('crisis');
+    expect(t.models.stream).not.toHaveBeenCalled();
+    expect(t.sentinel.assess).not.toHaveBeenCalled();
+    const crisisEvent = t.events.find((e) => e.type === 'crisis.response');
+    expect(crisisEvent?.data).toMatchObject({
+      text: DEFAULT_CRISIS_TEXT,
+      lines: [expect.objectContaining({ phone: '14416' })],
+    });
+    expect(types(t.events)).toContain('mode.changed');
+    expect(types(t.events)).not.toContain('assistant.delta');
+    expect(t.crisis.record).toHaveBeenCalledWith(
+      expect.objectContaining({ source: 'keyword' }),
     );
-    expect(redis.releaseLock).toHaveBeenCalledWith('guide-turn:th1');
+    expect(t.threads.saveState.mock.calls[0][1].mode).toBe(GuideMode.CRISIS);
+    // History: the learner's words and the fixed reply, no situation report.
+    const [, rendered] = t.threads.setRenderedContent.mock.calls[0];
+    expect((rendered as any[]).map((m) => m.role)).toEqual(['user']);
+  });
+
+  it('holds the reply and switches to the crisis flow on a classifier crisis', async () => {
+    const t = setup({
+      verdict: {
+        risk: 'crisis',
+        about: 'self',
+        overlay: 'none',
+        confidence: 0.7,
+        evidence: "can't keep doing this",
+        source: 'classifier',
+        latencyMs: 3,
+      },
+      scripts: [textPass('A generated reply that must never be seen.')],
+    });
+    const ctx = await t.run({ text: "honestly I can't keep doing this" });
+
+    expect(ctx.replyKind).toBe('crisis');
+    expect(types(t.events)).not.toContain('assistant.delta');
+    expect(types(t.events)).toContain('crisis.response');
+    expect(t.crisis.record).toHaveBeenCalledWith(
+      expect.objectContaining({ source: 'classifier' }),
+    );
+  });
+
+  it('restarts once with CARE instructions when the learner is struggling', async () => {
+    const t = setup({
+      verdict: {
+        risk: 'care',
+        about: 'self',
+        overlay: 'none',
+        confidence: 0.8,
+        evidence: 'too close to home',
+        source: 'classifier',
+        latencyMs: 3,
+      },
+      scripts: [
+        textPass('First attempt, discarded.'),
+        textPass('That sounds like a lot to carry.'),
+      ],
+    });
+    const ctx = await t.run({ text: 'that roleplay was too close to home' });
+
+    expect(ctx.restarted).toBe(true);
+    expect(ctx.mode).toBe(GuideMode.CARE);
+    expect(t.requests).toHaveLength(2);
+    expect(t.requests[1].request.messages[1].content).toContain('CARE');
+    const deltas = t.events
+      .filter((e) => e.type === 'assistant.delta')
+      .map((e) => e.data.text)
+      .join('');
+    expect(deltas).toBe('That sounds like a lot to carry.');
+    expect(t.threads.saveState.mock.calls[0][1].mode).toBe(GuideMode.CARE);
+  });
+
+  it('replaces a refusal with kind fixed copy', async () => {
+    const t = setup({
+      scripts: [
+        [
+          {
+            type: 'final',
+            message: {
+              content: [],
+              stopReason: 'refusal',
+              stopDetails: { category: 'bio', explanation: null },
+              usage: { inputTokens: 10, outputTokens: 0 },
+            },
+          },
+        ],
+      ],
+    });
+    const ctx = await t.run();
+    expect(ctx.replyKind).toBe('refusal');
+    expect(t.appended.find((row) => row.role === 'ally').content).toBe(
+      GUIDE_REFUSAL_TEXT,
+    );
+  });
+
+  it('replays the epoch’s history exactly when the conversation continues', async () => {
+    const snapshotHashes = {};
+    const t = setup({
+      thread: {
+        epoch: 1,
+        lastLearnerActivityAt: new Date(),
+        epochSnapshot: {
+          releaseId: 'rel-1',
+          tier: 'premium',
+          startedAt: new Date().toISOString(),
+          startSeq: 1,
+          layerHashes: snapshotHashes,
+        },
+      },
+      historyRows: [
+        {
+          seq: 1,
+          role: 'learner',
+          turnId: 'old',
+          renderedContent: [
+            { role: 'user', content: 'hi' },
+            { role: 'system', content: '<situation_report/>' },
+          ],
+        },
+        {
+          seq: 2,
+          role: 'ally',
+          turnId: 'old',
+          providerBlocks: [{ role: 'assistant', content: 'hello' }],
+        },
+      ],
+    });
+    // Make the snapshot's hashes match the spans this turn will build.
+    const probe = await setup().run();
+    Object.assign(snapshotHashes, probe.system!.hashes);
+
+    const ctx = await t.run();
+    expect(ctx.epoch?.isNew).toBe(false);
+    expect(t.requests[0].request.messages.map((m: any) => m.role)).toEqual([
+      'user',
+      'system',
+      'assistant',
+      'user',
+      'system',
+    ]);
+    expect(t.threads.saveState.mock.calls[0][1]).not.toHaveProperty('epoch');
   });
 
   it('refuses a second concurrent turn without touching the lock', async () => {
-    const { service, ctx, events, redis, threads } = setup({ lock: false });
-
-    await service.run(ctx());
-
-    expect(threads.appendMessage).not.toHaveBeenCalled();
-    expect(events[events.length - 1]).toMatchObject({
-      type: 'turn.failed',
-      data: { code: 'turn_in_progress' },
-    });
-    expect(redis.releaseLock).not.toHaveBeenCalled();
+    const t = setup({ lock: false });
+    const ctx = await t.run();
+    expect(ctx.failure?.code).toBe('turn_in_progress');
+    expect(t.redis.releaseLock).not.toHaveBeenCalled();
+    expect(types(t.events)).toContain('turn.failed');
   });
 
-  it('fails with guide_disabled when the switch is off, and still unlocks and traces', async () => {
-    const { service, ctx, events, redis, traces } = setup({ guided: false });
-
-    await service.run(ctx());
-
-    expect(events[events.length - 1]).toMatchObject({
-      type: 'turn.failed',
-      data: { code: 'guide_disabled' },
-    });
-    expect(redis.releaseLock).toHaveBeenCalled();
-    expect(traces.write).toHaveBeenCalledWith(
-      expect.objectContaining({
-        summary: expect.objectContaining({ outcome: 'failed' }),
-      }),
-    );
+  it('fails with guide_disabled when the switch is off, and still traces', async () => {
+    const t = setup({ guided: false });
+    const ctx = await t.run();
+    expect(ctx.failure?.code).toBe('guide_disabled');
+    expect(t.traces.write).toHaveBeenCalled();
+    expect(t.redis.releaseLock).toHaveBeenCalled();
   });
 
   it('does not run a resent turn twice', async () => {
-    const { service, turnStore } = setup();
-    turnStore.createOrGet.mockResolvedValueOnce({
+    const t = setup();
+    (t.turnStore.createOrGet as jest.Mock).mockResolvedValueOnce({
       turn: { id: 'turn-1' },
       created: false,
-    } as never);
-    const runSpy = jest.spyOn(service, 'run');
-
-    const result = await service.accept(
-      { id: 'th1', tenantId: 'org', lastEventSeq: 3 } as never,
+    });
+    const runSpy = jest.spyOn(t.service, 'run');
+    const result = await t.service.accept(
+      { id: 'th1', tenantId: 'org', lastEventSeq: 0 } as never,
       { id: 1, tenantId: 'org', username: 'x' },
-      { clientTurnId: 'c1', text: 'again' },
+      { clientTurnId: 'c1', text: 'hi' },
     );
-    await new Promise((resolve) => setImmediate(resolve));
-
     expect(result).toEqual({ turnId: 'turn-1' });
     expect(runSpy).not.toHaveBeenCalled();
   });
 
   it('rejects a message longer than the policy allows, with GUIDE_MESSAGE_TOO_LONG', async () => {
-    const { service } = setup();
-    const error = await service
+    const t = setup();
+    const error = await t.service
       .accept(
         { id: 'th1', tenantId: 'org', lastEventSeq: 0 } as never,
         { id: 1, tenantId: 'org', username: 'x' },
@@ -195,15 +508,15 @@ describe('GuideTurnService (step 1.0 stub turn)', () => {
   });
 
   it('rejects a blank message unless a chip intent comes with it', async () => {
-    const { service } = setup();
+    const t = setup();
     const thread = { id: 'th1', tenantId: 'org', lastEventSeq: 0 } as never;
     const user = { id: 1, tenantId: 'org', username: 'x' };
-    jest.spyOn(service, 'run').mockResolvedValue(undefined as never);
+    jest.spyOn(t.service, 'run').mockResolvedValue(undefined as never);
     await expect(
-      service.accept(thread, user, { clientTurnId: 'c1', text: '   ' }),
+      t.service.accept(thread, user, { clientTurnId: 'c1', text: '   ' }),
     ).rejects.toBeInstanceOf(BadRequestException);
     await expect(
-      service.accept(thread, user, {
+      t.service.accept(thread, user, {
         clientTurnId: 'c2',
         text: '',
         intent: 'continue',
@@ -214,9 +527,9 @@ describe('GuideTurnService (step 1.0 stub turn)', () => {
 
 describe('chunkForStreaming', () => {
   it('splits on word boundaries and loses nothing', () => {
-    const text = 'one two three four five six seven eight nine ten';
-    const chunks = chunkForStreaming(text, 10);
+    const text = 'Hi, I am Ally and this is a short sentence to split.';
+    const chunks = chunkForStreaming(text, 12);
     expect(chunks.join('')).toBe(text);
-    expect(chunks.length).toBeGreaterThan(2);
+    expect(chunks.length).toBeGreaterThan(1);
   });
 });

@@ -95,6 +95,9 @@ export class AnthropicAgentProvider implements IAgentLlmProvider {
         // blocks (replayed verbatim) and mid-conversation `system` messages,
         // which the SDK's MessageParam does not type yet.
         messages: request.messages as any,
+        ...(request.tools?.length && request.toolChoice && !jsonTool
+          ? { tool_choice: { type: request.toolChoice } }
+          : {}),
         ...(request.tools?.length
           ? {
               tools: request.tools.map((tool) => ({
@@ -155,9 +158,19 @@ export class AnthropicAgentProvider implements IAgentLlmProvider {
         modelSupportsTemperature(request.model)
           ? { temperature: request.temperature }
           : {}),
-      },
-      ...(request.timeoutMs !== undefined
-        ? [{ timeout: request.timeoutMs }]
+        ...(request.cacheConversation
+          ? { cache_control: { type: 'ephemeral' as const } }
+          : {}),
+      } as any,
+      ...(request.timeoutMs !== undefined || request.signal
+        ? [
+            {
+              ...(request.timeoutMs !== undefined
+                ? { timeout: request.timeoutMs }
+                : {}),
+              ...(request.signal ? { signal: request.signal } : {}),
+            },
+          ]
         : []),
     );
 

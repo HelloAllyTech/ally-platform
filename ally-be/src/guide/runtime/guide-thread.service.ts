@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { Between, DataSource, LessThan } from 'typeorm';
 import { TokenUser } from 'src/auth/type/auth.types';
 import { TrackEnrollmentService } from 'src/track/service/track-enrollment.service';
 import { AgentChannel } from 'src/llm-agent/harness/enum/harness.enum';
@@ -21,6 +21,8 @@ function returningRows<T>(result: unknown): T[] {
 }
 
 export interface AppendMessageInput {
+  /** Pre-assigned, when deltas already named the message while it streamed. */
+  id?: string;
   role: GuideMessageRole;
   kind?: GuideMessageKind;
   channel?: AgentChannel;
@@ -28,7 +30,10 @@ export interface AppendMessageInput {
   turnId?: string | null;
   clientTurnId?: string | null;
   renderedContent?: Record<string, any>[] | null;
+  providerBlocks?: Record<string, any>[] | null;
+  toolCalls?: Record<string, any>[] | null;
   metadata?: Record<string, any> | null;
+  flags?: GuideMessage['flags'];
 }
 
 /**
@@ -131,6 +136,7 @@ export class GuideThreadService {
       const repo = manager.getRepository(GuideMessage);
       return repo.save(
         repo.create({
+          ...(input.id ? { id: input.id } : {}),
           threadId,
           seq: rows[0].lastMessageSeq,
           role: input.role,
@@ -140,11 +146,79 @@ export class GuideThreadService {
           turnId: input.turnId ?? null,
           clientTurnId: input.clientTurnId ?? null,
           renderedContent: input.renderedContent ?? null,
+          providerBlocks: input.providerBlocks ?? null,
+          toolCalls: input.toolCalls ?? null,
           metadata: input.metadata ?? null,
+          flags: input.flags ?? null,
           tenantId: tenantId ?? null,
         }),
       );
     });
+  }
+
+  /**
+   * Record what the model saw for a learner message, once. Written at the end
+   * of a successful turn — the request it ran with is only final then — and
+   * never changed after, because history is replayed byte for byte.
+   */
+  async setRenderedContent(
+    messageId: string,
+    rendered: Record<string, any>[],
+    flags?: GuideMessage['flags'],
+  ): Promise<void> {
+    await this.dataSource
+      .getRepository(GuideMessage)
+      .createQueryBuilder()
+      .update()
+      .set({ renderedContent: rendered, ...(flags ? { flags } : {}) })
+      .where('id = :id AND "renderedContent" IS NULL', { id: messageId })
+      .execute();
+  }
+
+  /** Rows the model's history is replayed from: [fromSeq, beforeSeq). */
+  historyRows(
+    threadId: string,
+    fromSeq: number,
+    beforeSeq: number,
+  ): Promise<GuideMessage[]> {
+    return this.dataSource.getRepository(GuideMessage).find({
+      where: { threadId, seq: Between(fromSeq, beforeSeq - 1) },
+      order: { seq: 'ASC' },
+    });
+  }
+
+  /** The last `limit` rows before `beforeSeq`, oldest first. */
+  async recentRows(
+    threadId: string,
+    beforeSeq: number,
+    limit: number,
+  ): Promise<GuideMessage[]> {
+    const rows = await this.dataSource.getRepository(GuideMessage).find({
+      where: { threadId, seq: LessThan(beforeSeq) },
+      order: { seq: 'DESC' },
+      take: limit,
+    });
+    return rows.reverse();
+  }
+
+  /** Persist the turn's changes to the thread's mode, pacing and epoch. */
+  async saveState(
+    threadId: string,
+    patch: Partial<
+      Pick<
+        GuideThread,
+        | 'mode'
+        | 'modeChangedAt'
+        | 'pacing'
+        | 'epoch'
+        | 'epochSnapshot'
+        | 'releaseId'
+        | 'languageCode'
+      >
+    >,
+  ): Promise<void> {
+    if (Object.keys(patch).length === 0) return;
+    await this.threads.update(threadId, patch as never);
   }
 
   async touchLearnerActivity(threadId: string): Promise<void> {

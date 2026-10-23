@@ -207,6 +207,22 @@ export interface AgentStreamRequest {
    * a stream event so existing consumers of the stream are unaffected.
    */
   onToolUseStart?: (call: { id: string; name: string }) => void;
+  /**
+   * Cache the conversation itself, up to its last block (Anthropic's
+   * top-level automatic `cache_control`), so a long append-only thread reads
+   * its history from cache each turn. Uses one of the four breakpoints the
+   * API allows, after any the system spans set.
+   */
+  cacheConversation?: boolean;
+  /** Abort the request mid-stream (a safety verdict, a learner barge-in). */
+  signal?: AbortSignal;
+  /**
+   * 'none' forbids tool calls on this pass while keeping `tools` in the
+   * request. A closing pass needs exactly that: removing the tools would
+   * change the request's prefix and invalidate earlier thinking blocks,
+   * while `tool_choice` is outside the prefix. Ignored in JSON mode.
+   */
+  toolChoice?: 'auto' | 'none';
 }
 
 /**

@@ -356,7 +356,7 @@ class GuideTurnRequest(_GuideModel):
     client_turn_id: str = Field(alias="clientTurnId")
     text: str
     anchor: Optional[GuideAnchor] = None
-    intent: Optional[Literal["start", "continue", "locked_peek"]] = None
+    intent: Optional[Literal["start", "continue", "locked_peek", "not_now"]] = None
 
 
 class GuideTurnAccepted(_GuideModel):

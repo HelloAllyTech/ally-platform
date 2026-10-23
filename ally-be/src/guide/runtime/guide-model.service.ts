@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { LlmUsageService } from 'src/analytics/service/llm-usage.service';
+import { AppConfigService } from 'src/config/config.service';
 import { LlmTask } from 'src/learn/enum/llm-task.enum';
+import { LoggerService } from 'src/logger/logger.service';
 import { AgentCostLedgerService } from 'src/llm-agent/harness/budget/agent-cost-ledger.service';
 import { AgentLlmProviderFactory } from 'src/llm-agent/service/agent-llm.factory';
 import {
@@ -38,6 +40,8 @@ export interface GuideModelCall {
   /** The AI task registry row id (`GUIDE_AI_TASKS`). */
   aiTaskId: string;
   attribution: GuideCallAttribution;
+  /** Told each call's priced cost once it is recorded. */
+  onCost?: (usd: number) => void;
 }
 
 export interface GuideModelResult {
@@ -59,11 +63,28 @@ export interface GuideModelResult {
  */
 @Injectable()
 export class GuideModelService {
+  private readonly logger = LoggerService.getInstance(GuideModelService.name);
+  private readonly override: GuideModelRoute | null;
+
   constructor(
     private readonly providers: AgentLlmProviderFactory,
     private readonly usage: LlmUsageService,
     private readonly ledger: AgentCostLedgerService,
-  ) {}
+    config: AppConfigService,
+  ) {
+    const override = config.allyGuideModelOverride;
+    this.override = override
+      ? {
+          provider: override.provider as GuideModelRoute['provider'],
+          model: override.model,
+        }
+      : null;
+    if (this.override) {
+      this.logger.warn(
+        `ALLY_GUIDE_MODEL_OVERRIDE: every guide role runs on ${this.override.provider}:${this.override.model} (local only)`,
+      );
+    }
+  }
 
   /** The route for a role, falling back to its text/premium route. */
   route(
@@ -72,6 +93,7 @@ export class GuideModelService {
     channel: GuideChannelRoute = 'text',
     tier: GuideBudgetTier = 'premium',
   ): GuideModelRoute {
+    if (this.override) return this.override;
     const byChannel = bundle.modelRouting[role];
     const route =
       byChannel?.[channel]?.[tier] ??
@@ -95,7 +117,13 @@ export class GuideModelService {
       ...(route.effort ? { effort: route.effort } : {}),
     })) {
       if (event.type === 'final') {
-        await this.account(call, route, event.message, Date.now() - startedAt);
+        const usd = await this.account(
+          call,
+          route,
+          event.message,
+          Date.now() - startedAt,
+        );
+        call.onCost?.(usd);
       }
       yield event;
     }
@@ -117,6 +145,7 @@ export class GuideModelService {
     if (!final) throw new Error(`${call.role} call ended without a result`);
     const latencyMs = Date.now() - startedAt;
     const usd = await this.account(call, route, final, latencyMs);
+    call.onCost?.(usd);
     return { result: final, route, usd, latencyMs };
   }
 

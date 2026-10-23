@@ -332,8 +332,8 @@ export interface GuideTurnRequest {
   clientTurnId: string;
   text: string;
   anchor?: GuideAnchor;
-  /** A structured nudge from the UI instead of free text (Continue chip, locked peek, start). */
-  intent?: 'start' | 'continue' | 'locked_peek' | null;
+  /** A structured nudge from the UI instead of free text: start, the Continue chip, a locked-item peek, or the Not now chip (which starts Ally's steering cooldown). */
+  intent?: 'start' | 'continue' | 'locked_peek' | 'not_now' | null;
 }
 
 export interface GuideTurnAccepted {

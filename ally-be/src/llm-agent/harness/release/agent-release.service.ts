@@ -33,6 +33,11 @@ export class AgentReleaseService {
     { release: AgentRelease | null; readAt: number }
   >();
 
+  private readonly emergencyCache = new Map<
+    string,
+    { id: string | null; readAt: number }
+  >();
+
   constructor(private readonly dataSource: DataSource) {}
 
   private get releases() {
@@ -54,6 +59,27 @@ export class AgentReleaseService {
     });
     this.gaCache.set(agentKey, { release, readAt: Date.now() });
     return release;
+  }
+
+  /**
+   * The agent's latest emergency (safety) rollback, by audit-row id, or null.
+   * A thread whose epoch began before it moves to the GA at its next turn
+   * instead of its next epoch (plan §7.4). Compared by id, not time, so the
+   * check never mixes database time with a process clock. Shares the GA
+   * cache's lifetime.
+   */
+  async lastEmergencyRollbackId(agentKey: string): Promise<string | null> {
+    const cached = this.emergencyCache.get(agentKey);
+    if (cached && Date.now() - cached.readAt < RELEASE_CACHE_MS) {
+      return cached.id;
+    }
+    const row = await this.audit.findOne({
+      where: { agentKey, action: AgentReleaseAuditAction.EMERGENCY_ROLLBACK },
+      order: { createdAt: 'DESC' },
+    });
+    const id = row?.id ?? null;
+    this.emergencyCache.set(agentKey, { id, readAt: Date.now() });
+    return id;
   }
 
   async getById(id: string): Promise<AgentRelease> {
@@ -342,6 +368,7 @@ export class AgentReleaseService {
       return { ...target, status: AgentReleaseStatus.GA } as AgentRelease;
     });
     this.gaCache.delete(promoted.agentKey);
+    this.emergencyCache.delete(promoted.agentKey);
     this.logger.info(
       `${promoted.agentKey} release v${promoted.version} is now GA (${action}) by user ${userId}`,
     );

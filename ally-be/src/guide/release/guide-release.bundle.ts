@@ -1,4 +1,9 @@
 import {
+  ORCHESTRATOR_PROMPT_CODE,
+  ORCHESTRATOR_PROMPT_VERSION,
+  ORCHESTRATOR_SYSTEM_PROMPT,
+} from '../prompts/orchestrator.prompt';
+import {
   SENTINEL_PROMPT_CODE,
   SENTINEL_PROMPT_VERSION,
   SENTINEL_SYSTEM_PROMPT,
@@ -197,6 +202,11 @@ const HAIKU: GuideModelRoute = {
 export const GUIDE_DEFAULT_BUNDLE: GuideReleaseBundle = {
   schemaVersion: 1,
   prompts: {
+    orchestrator: {
+      code: ORCHESTRATOR_PROMPT_CODE,
+      version: ORCHESTRATOR_PROMPT_VERSION,
+      text: ORCHESTRATOR_SYSTEM_PROMPT,
+    },
     sentinel: {
       code: SENTINEL_PROMPT_CODE,
       version: SENTINEL_PROMPT_VERSION,
@@ -224,7 +234,14 @@ export const GUIDE_DEFAULT_BUNDLE: GuideReleaseBundle = {
     summariser: { text: { premium: HAIKU } },
     outreach_writer: { text: { premium: { ...OPUS, effort: 'low' } } },
   },
-  capabilities: {},
+  capabilities: {
+    present_course_item: true,
+    show_course_info: true,
+    get_progress: true,
+    mark_reflection_done: true,
+    show_wellbeing_resources: true,
+    set_guidance: true,
+  },
   skills: {},
   policy: GUIDE_DEFAULT_POLICY,
   lessonSnapshot: [],

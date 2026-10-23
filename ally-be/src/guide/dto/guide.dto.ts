@@ -50,10 +50,12 @@ export class GuideTurnRequestDto {
   @Type(() => GuideAnchorDto)
   anchor?: GuideAnchorDto;
 
-  @ApiPropertyOptional({ enum: ['start', 'continue', 'locked_peek'] })
+  @ApiPropertyOptional({
+    enum: ['start', 'continue', 'locked_peek', 'not_now'],
+  })
   @IsOptional()
-  @IsIn(['start', 'continue', 'locked_peek'])
-  intent?: 'start' | 'continue' | 'locked_peek' | null;
+  @IsIn(['start', 'continue', 'locked_peek', 'not_now'])
+  intent?: 'start' | 'continue' | 'locked_peek' | 'not_now' | null;
 }
 
 /** PUT /v1/guide/admin/settings — any subset of the kill switches. */

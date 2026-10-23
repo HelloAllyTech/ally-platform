@@ -2265,6 +2265,27 @@ const COURSE_COPILOT_TASKS: AiTaskEntry[] = [
  * ──────────────────────────────────────────────────────────────────────────── */
 const GUIDE_TASKS: AiTaskEntry[] = [
   {
+    id: 'guide-orchestrator',
+    task: LlmTask.GUIDE_ORCHESTRATOR,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      'A learner sends Ally a message, or presses Continue, Start or Not now',
+    detail:
+      "Ally's reply: a streamed tool loop (at most six tool passes, then a closing pass " +
+      'with tool_choice none) whose text is held until the Sentinel clears the message. ' +
+      'Context is a frozen per-epoch prefix — persona + safety core (cached 1h), the ' +
+      'organisation layer (1h), the course outline (5m) — then the epoch history replayed ' +
+      'byte for byte with its thinking blocks, the learner message, and a per-turn ' +
+      'situation report as a mid-conversation system message. A Sentinel verdict that ' +
+      'changes the mode restarts the reply once. Model by budget tier: Opus 5.5 (effort ' +
+      'medium) → Sonnet 5.5 past $3 a thread or $1.50 a learner-day → Haiku 5.5 past $6, ' +
+      'switching only at an epoch boundary.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'anthropic',
+    defaultModel: 'claude-opus-5-5',
+    configuredBy: 'ally_guide release modelRouting.orchestrator',
+  },
+  {
     id: 'guide-sentinel',
     task: LlmTask.GUIDE_SENTINEL,
     runtime: LlmRuntime.ALLY_BE,

@@ -1,7 +1,14 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { randomUUID } from 'crypto';
+import { Repository } from 'typeorm';
 import { TokenUser } from 'src/auth/type/auth.types';
+import { ExecutionManager } from 'src/common/execution/execution-manager';
 import { LoggerService } from 'src/logger/logger.service';
 import { RedisService } from 'src/redis/service/redis.service';
+import { User } from 'src/user/entity/user.entity';
+import { LlmTask } from 'src/learn/enum/llm-task.enum';
+import { AgentCostLedgerService } from 'src/llm-agent/harness/budget/agent-cost-ledger.service';
 import {
   AgentChannel,
   AgentTurnStatus,
@@ -16,58 +23,202 @@ import {
 import { AgentReleaseService } from 'src/llm-agent/harness/release/agent-release.service';
 import { AgentTraceService } from 'src/llm-agent/harness/trace/agent-trace.service';
 import { AgentTurnStoreService } from 'src/llm-agent/harness/turn/agent-turn-store.service';
+import { AgentRelease } from 'src/llm-agent/entity/agent-release.entity';
+import { AgentMessage } from 'src/llm-agent/type/agent-llm.type';
 import { TraceCarrier } from 'src/observability/tracing';
-import { GuideThread } from '../entity/guide-thread.entity';
-import { GuideMessageKind, GuideMessageRole } from '../enum/guide.enum';
+import { GUIDE_TOOLS } from '../capabilities/guide-tools';
+import {
+  GuideToolContext,
+  GuideToolExecutorService,
+  TOOL_ACTIVITY,
+} from '../capabilities/guide-tool-executor.service';
+import { CourseSpine, SpineItem } from '../conductor/course-spine';
+import { GuideConductorService } from '../conductor/guide-conductor.service';
+import {
+  FirstWinPlan,
+  GuidanceDial,
+  ProseBudget,
+  SteerDecision,
+  afterDecline,
+  afterLearnerTurn,
+  afterVerbalSteer,
+  atmosphereOf,
+  decideSteer,
+  planFirstWin,
+  proseBudget,
+  releaseWindowOpen,
+} from '../conductor/pacing';
+import {
+  SituationInput,
+  renderSituationReport,
+} from '../conductor/situation-report';
+import { GUIDE_AI_TASKS } from '../constants/guide-ai-tasks.constants';
+import {
+  GuideAtmosphere,
+  GuideCard as GuideCardEvent,
+} from '../contract/generated/guide-contract';
+import {
+  CourseContext,
+  SystemSpans,
+  buildCourseSpan,
+  buildEpochOpener,
+  buildLearnerMessage,
+  buildOrgSpan,
+  buildSystemSpans,
+} from '../context/guide-context';
+import { recentConversation, replayHistory } from '../context/guide-history';
+import { GuideLearnerPrefs } from '../entity/guide-learner-prefs.entity';
+import {
+  GuideOrgProfile,
+  GuideOrgProfileValue,
+  GuideSupportLine,
+} from '../entity/guide-org-profile.entity';
+import {
+  GuideEpochSnapshot,
+  GuideThread,
+  GuideThreadPacing,
+} from '../entity/guide-thread.entity';
+import {
+  GuideMessageKind,
+  GuideMessageRole,
+  GuideMode,
+} from '../enum/guide.enum';
+import { guideMessageTooLong } from '../guide-errors';
 import {
   ALLY_GUIDE_AGENT_KEY,
   GUIDE_DEFAULT_POLICY,
+  GuideBudgetTier,
   GuideReleaseBundle,
 } from '../release/guide-release.bundle';
+import { GuideCrisisService } from '../safety/guide-crisis.service';
+import { GuideSentinelService } from '../safety/guide-sentinel.service';
+import { SentinelTurn } from '../prompts/sentinel.prompt';
+import { urgentRealCaseText } from '../safety/fixed-responses';
+import {
+  SentinelOverlay,
+  SentinelVerdict,
+  isLearnerCrisis,
+  nextMode,
+  sessionStartMode,
+} from '../safety/sentinel';
 import { GuideSettingsService } from '../settings/guide-settings.service';
-import { guideMessageTooLong } from '../guide-errors';
+import { budgetTier, decideEpoch } from './guide-epoch';
 import { GuideEventBusService } from './guide-event-bus.service';
+import { GuideModelService } from './guide-model.service';
+import { ReleaseGate, runOrchestrator } from './guide-orchestrator.runner';
+import { OrchestratorRunOutput } from './guide-orchestrator.runner';
 import { GuideThreadService } from './guide-thread.service';
 
 /** One turn at a time per thread; the lock outlives the hard timeout. */
 export const GUIDE_TURN_LOCK_PREFIX = 'guide-turn';
 export const GUIDE_TURN_LOCK_TTL_SECONDS = 120;
 
-/**
- * The step-1.0 reply: pre-written, never model text. It proves the whole
- * path — admission, transcript, outbox, fan-out, traces — end to end before
- * the orchestrator exists. Step 1.1 replaces the `reply` stage with the
- * Conductor, Sentinel and orchestrator; nothing else in this file changes.
- */
-export const GUIDE_STUB_REPLY =
-  "Hi, I'm Ally. I'm still being set up for this course, so I can't walk it " +
-  "with you just yet — but this is where we'll talk. For now you can keep " +
-  'going in the classic view; your progress carries over.';
+/** Tool-calling passes before the closing pass (plan §7.8 step 3). */
+export const GUIDE_MAX_TOOL_PASSES = 6;
+/** Room for adaptive thinking plus a short reply, per pass. */
+export const GUIDE_ORCHESTRATOR_MAX_TOKENS = 8_000;
+
+/** Fixed copy for a model refusal (plan §5.12): kind, with a way forward. */
+export const GUIDE_REFUSAL_TEXT =
+  "I can't help with that one. Could you put it another way, or shall we " +
+  'carry on with the course?';
+/** Fixed copy when a turn produced neither words nor a card. */
+export const GUIDE_EMPTY_REPLY_TEXT =
+  'Sorry, I lost my train of thought there. Could you say that again?';
+
+export type GuideIntent = 'start' | 'continue' | 'locked_peek' | 'not_now';
+
+export interface GuideTurnInput {
+  clientTurnId: string;
+  text: string;
+  intent?: GuideIntent | null;
+  anchor?: {
+    itemId: string;
+    quote?: string | null;
+    timestampSec?: number | null;
+  } | null;
+}
+
+type ReplyKind = 'model' | 'crisis' | 'urgent_real_case' | 'refusal' | 'empty';
 
 export interface GuideTurnContext extends HarnessTurnContext {
   threadId: string;
   userId: number;
   tenantId: string;
-  text: string;
   clientTurnId: string;
+  text: string;
+  intent: GuideIntent | null;
+  anchor: GuideTurnInput['anchor'];
   startedAt: number;
   lastSeq: number;
-  releaseId: string | null;
-  bundle: GuideReleaseBundle | null;
-  ttftMs: number | null;
   lockKey: string;
   locked: boolean;
-  replyMessageId?: string;
+  ttftMs: number | null;
+  usd: number;
+
+  /** The thread as it was before this turn touched it. */
+  thread?: GuideThread;
+  learnerMessageId?: string;
+  learnerSeq?: number;
+
+  releaseId: string | null;
+  bundle: GuideReleaseBundle | null;
+  tier?: GuideBudgetTier;
+  model?: string;
+  epoch?: { number: number; snapshot: GuideEpochSnapshot; isNew: boolean };
+  mode: GuideMode;
+  pacing: GuideThreadPacing;
+  guidance: GuidanceDial;
+  orgProfile: GuideOrgProfileValue | null;
+  course?: CourseContext;
+  system?: SystemSpans;
+  history: AgentMessage[];
+  learnerMessage?: AgentMessage;
+  recentTurns: SentinelTurn[];
+  steer?: SteerDecision;
+  firstWin?: FirstWinPlan;
+  atmosphere?: GuideAtmosphere;
+  budget?: ProseBudget;
+  situationInput?: SituationInput;
+  situation?: string;
+
+  verdict?: SentinelVerdict;
+  replyKind?: ReplyKind;
+  replyMessageId: string;
+  replyText?: string;
+  replyBlocks?: AgentMessage[];
+  learnerRendered?: AgentMessage[];
+  interruptedText?: string;
+  output?: OrchestratorRunOutput;
+  presented: GuideCardEvent[];
+  crisis?: {
+    text: string;
+    language: string;
+    approved: boolean;
+    lines: GuideSupportLine[];
+  };
+  overlay: SentinelOverlay;
+  restarted: boolean;
 }
 
 /**
  * Accepts a learner turn (`202 {turnId}`) and runs it through the harness
  * pipeline in the background; everything the learner sees arrives on the
  * thread's event stream (plans/ally-guide/plan.md §7.8, §9.1).
+ *
+ *   admit → persist.learner → prepare → respond → persist.reply → finish
+ *
+ * `prepare` is the Conductor's half: course, epoch, release, mode, pacing and
+ * the situation report. `respond` is the model's half, behind the Sentinel:
+ * nothing reaches the learner until it clears the message, a crisis is
+ * answered with fixed copy and never with generated text, and a change of
+ * mode or a real-case overlay restarts the reply once with the right
+ * instructions.
  */
 @Injectable()
 export class GuideTurnService {
   private readonly logger = LoggerService.getInstance(GuideTurnService.name);
+  private readonly releaseCache = new Map<string, AgentRelease>();
 
   constructor(
     private readonly threads: GuideThreadService,
@@ -77,6 +228,18 @@ export class GuideTurnService {
     private readonly traces: AgentTraceService,
     private readonly settings: GuideSettingsService,
     private readonly redis: RedisService,
+    private readonly ledger: AgentCostLedgerService,
+    private readonly conductor: GuideConductorService,
+    private readonly models: GuideModelService,
+    private readonly sentinel: GuideSentinelService,
+    private readonly crisis: GuideCrisisService,
+    private readonly tools: GuideToolExecutorService,
+    @InjectRepository(GuideLearnerPrefs)
+    private readonly prefs: Repository<GuideLearnerPrefs>,
+    @InjectRepository(GuideOrgProfile)
+    private readonly orgProfiles: Repository<GuideOrgProfile>,
+    @InjectRepository(User)
+    private readonly users: Repository<User>,
   ) {}
 
   /**
@@ -86,7 +249,7 @@ export class GuideTurnService {
   async accept(
     thread: GuideThread,
     user: TokenUser,
-    input: { clientTurnId: string; text: string; intent?: string | null },
+    input: GuideTurnInput,
     traceCarrier?: TraceCarrier,
   ): Promise<{ turnId: string }> {
     const text = (input.text ?? '').trim();
@@ -101,30 +264,15 @@ export class GuideTurnService {
       agentKey: ALLY_GUIDE_AGENT_KEY,
       threadId: thread.id,
       clientTurnId: input.clientTurnId,
-      trigger: AgentTurnTrigger.LEARNER_MESSAGE,
+      trigger: input.intent
+        ? AgentTurnTrigger.INTENT
+        : AgentTurnTrigger.LEARNER_MESSAGE,
       channel: AgentChannel.TEXT,
       tenantId: thread.tenantId ?? null,
     });
     if (created) {
-      const ctx: GuideTurnContext = {
-        turnId: turn.id,
-        agentKey: ALLY_GUIDE_AGENT_KEY,
-        timings: [],
-        conversationId: thread.id,
-        traceCarrier: traceCarrier ?? null,
-        threadId: thread.id,
-        userId: user.id,
-        tenantId: user.tenantId,
-        text,
-        clientTurnId: input.clientTurnId,
-        startedAt: Date.now(),
-        lastSeq: thread.lastEventSeq,
-        releaseId: null,
-        bundle: null,
-        ttftMs: null,
-        lockKey: `${GUIDE_TURN_LOCK_PREFIX}:${thread.id}`,
-        locked: false,
-      };
+      const ctx = this.createContext(thread, user, input, turn.id);
+      ctx.traceCarrier = traceCarrier ?? null;
       setImmediate(() => {
         this.run(ctx).catch((error) =>
           this.logger.error(`Guide turn ${turn.id} crashed`, error),
@@ -134,209 +282,991 @@ export class GuideTurnService {
     return { turnId: turn.id };
   }
 
-  /** The pipeline. Exposed for tests; production calls it via `accept`. */
+  /** A turn's starting state. Public for tests; `accept` is the entry point. */
+  createContext(
+    thread: GuideThread,
+    user: TokenUser,
+    input: GuideTurnInput,
+    turnId: string,
+  ): GuideTurnContext {
+    const text = (input.text ?? '').trim();
+    return {
+      turnId,
+      agentKey: ALLY_GUIDE_AGENT_KEY,
+      timings: [],
+      conversationId: thread.id,
+      threadId: thread.id,
+      userId: user.id,
+      tenantId: user.tenantId,
+      clientTurnId: input.clientTurnId,
+      text,
+      intent: input.intent ?? null,
+      anchor: input.anchor ?? null,
+      startedAt: Date.now(),
+      lastSeq: thread.lastEventSeq,
+      lockKey: `${GUIDE_TURN_LOCK_PREFIX}:${thread.id}`,
+      locked: false,
+      ttftMs: null,
+      usd: 0,
+      releaseId: null,
+      bundle: null,
+      mode: thread.mode ?? GuideMode.NORMAL,
+      pacing: thread.pacing ?? {},
+      guidance: 'walk',
+      orgProfile: null,
+      history: [],
+      recentTurns: [],
+      replyMessageId: randomUUID(),
+      presented: [],
+      overlay: 'none',
+      restarted: false,
+    };
+  }
+
+  /**
+   * The pipeline, inside the learner's execution context: the course and
+   * progress reads are the classic services', which resolve the learner
+   * from it, and a turn runs after its HTTP request has already returned.
+   */
   async run(ctx: GuideTurnContext): Promise<void> {
-    const outcome = await runHarnessStages(ctx, this.stages(), [], {
-      onHookError: () => undefined,
-    });
+    const outcome = await ExecutionManager.runWithContext(
+      () => {
+        ExecutionManager.setAuthContext(String(ctx.userId), ctx.tenantId);
+        return runHarnessStages(ctx, this.stages(), [], {
+          onHookError: () => undefined,
+        });
+      },
+      { path: `guide-turn:${ctx.turnId}` },
+    );
     this.logger.info(
       `Guide turn ${ctx.turnId} on thread ${ctx.threadId}: ${outcome}` +
+        (ctx.replyKind ? ` [${ctx.replyKind}]` : '') +
         (ctx.failure ? ` (${ctx.failure.code} at ${ctx.failure.stage})` : ''),
     );
   }
 
   private stages(): HarnessStage<GuideTurnContext>[] {
     return [
-      {
-        name: 'admit',
-        run: async (ctx) => {
-          if (
-            !(await this.redis.acquireLock(
-              ctx.lockKey,
-              GUIDE_TURN_LOCK_TTL_SECONDS,
-            ))
-          ) {
-            throw new HarnessStageError(
-              'turn_in_progress',
-              'Ally is replying in another tab.',
-            );
-          }
-          ctx.locked = true;
-          const thread = await this.threads.getOwned(ctx.threadId, {
-            id: ctx.userId,
-            tenantId: ctx.tenantId,
-            username: '',
-          });
-          if (
-            !(await this.settings.isGuidedAvailable(
-              thread.trackId,
-              ctx.tenantId,
-            ))
-          ) {
-            throw new HarnessStageError(
-              'guide_disabled',
-              'The guide is switched off.',
-            );
-          }
-          const release = await this.releases.getGa(ALLY_GUIDE_AGENT_KEY);
-          ctx.releaseId = release?.id ?? null;
-          ctx.bundle = (release?.bundle as GuideReleaseBundle) ?? null;
-          await this.turnStore.transition(
-            ctx.turnId,
-            AgentTurnStatus.ADMITTED,
-            {
-              startedAt: new Date(ctx.startedAt),
-              releaseId: ctx.releaseId,
-            },
-          );
-        },
-      },
-      {
-        name: 'persist.learner',
-        run: async (ctx) => {
-          const message = await this.threads.appendMessage(
-            ctx.threadId,
-            ctx.tenantId,
-            {
-              role: GuideMessageRole.LEARNER,
-              content: ctx.text,
-              turnId: ctx.turnId,
-              clientTurnId: ctx.clientTurnId,
-            },
-          );
-          await this.threads.touchLearnerActivity(ctx.threadId);
-          const event = await this.bus.appendDurable(
-            ctx.threadId,
-            'learner.message',
-            {
-              messageId: message.id,
-              turnId: ctx.turnId,
-              clientTurnId: ctx.clientTurnId,
-              text: ctx.text,
-              channel: 'text',
-            },
-            ctx.turnId,
-          );
-          ctx.lastSeq = event.seq;
-          await this.bus.emitEphemeral(
-            ctx.threadId,
-            'turn.started',
-            { turnId: ctx.turnId, trigger: 'learner_message' },
-            ctx.lastSeq,
-          );
-        },
-      },
-      {
-        name: 'reply',
-        run: async (ctx) => {
-          await this.turnStore.transition(
-            ctx.turnId,
-            AgentTurnStatus.STREAMING,
-          );
-          await this.bus.emitEphemeral(
-            ctx.threadId,
-            'presence',
-            { state: 'speaking', caption: null },
-            ctx.lastSeq,
-          );
-          const reply = await this.threads.appendMessage(
-            ctx.threadId,
-            ctx.tenantId,
-            {
-              role: GuideMessageRole.ALLY,
-              kind: GuideMessageKind.FIXED,
-              content: GUIDE_STUB_REPLY,
-              turnId: ctx.turnId,
-              metadata: { stub: 'step-1.0' },
-            },
-          );
-          ctx.replyMessageId = reply.id;
-          for (const chunk of chunkForStreaming(GUIDE_STUB_REPLY)) {
-            if (ctx.ttftMs === null) ctx.ttftMs = Date.now() - ctx.startedAt;
-            await this.bus.emitEphemeral(
-              ctx.threadId,
-              'assistant.delta',
-              { turnId: ctx.turnId, messageId: reply.id, text: chunk },
-              ctx.lastSeq,
-            );
-          }
-          const event = await this.bus.appendDurable(
-            ctx.threadId,
-            'assistant.message',
-            {
-              messageId: reply.id,
-              turnId: ctx.turnId,
-              text: GUIDE_STUB_REPLY,
-              channel: 'text',
-            },
-            ctx.turnId,
-          );
-          ctx.lastSeq = event.seq;
-        },
-      },
-      {
-        name: 'finish',
-        always: true,
-        run: async (ctx) => {
-          const durationMs = Date.now() - ctx.startedAt;
-          const failed = Boolean(ctx.failure);
-          await this.bus
-            .emitEphemeral(
-              ctx.threadId,
-              'presence',
-              { state: 'idle', caption: null },
-              ctx.lastSeq,
-            )
-            .catch(() => undefined);
-          await this.bus
-            .emitEphemeral(
-              ctx.threadId,
-              failed ? 'turn.failed' : 'turn.completed',
-              failed
-                ? {
-                    turnId: ctx.turnId,
-                    code: (ctx.failure?.code ?? 'internal_error') as never,
-                    message: ctx.failure?.message ?? '',
-                  }
-                : { turnId: ctx.turnId },
-              ctx.lastSeq,
-            )
-            .catch(() => undefined);
-          await this.turnStore
-            .finish(ctx.turnId, {
-              status: failed
-                ? AgentTurnStatus.FAILED
-                : AgentTurnStatus.COMPLETED,
-              errorCode: ctx.failure?.code ?? null,
-              ttftMs: ctx.ttftMs,
-              durationMs,
-            })
-            .catch((error) =>
-              this.logger.warn(`Turn finish write failed: ${String(error)}`),
-            );
-          await this.traces.write({
-            turnId: ctx.turnId,
-            agentKey: ctx.agentKey,
-            threadId: ctx.threadId,
-            releaseId: ctx.releaseId,
-            tenantId: ctx.tenantId,
-            summary: {
-              outcome: failed ? 'failed' : 'completed',
-              failure: ctx.failure ?? null,
-              stages: ctx.timings,
-              ttftMs: ctx.ttftMs,
-              durationMs,
-              replyKind: 'stub',
-              replyMessageId: ctx.replyMessageId ?? null,
-            },
-          });
-          if (ctx.locked) {
-            await this.redis.releaseLock(ctx.lockKey);
-            ctx.locked = false;
-          }
-        },
-      },
+      { name: 'admit', run: (ctx) => this.admit(ctx) },
+      { name: 'persist.learner', run: (ctx) => this.persistLearner(ctx) },
+      { name: 'prepare', run: (ctx) => this.prepare(ctx) },
+      { name: 'respond', run: (ctx) => this.respond(ctx) },
+      { name: 'persist.reply', run: (ctx) => this.persistReply(ctx) },
+      { name: 'finish', always: true, run: (ctx) => this.finish(ctx) },
     ];
+  }
+
+  // ── admit ──────────────────────────────────────────────────────────────
+
+  private async admit(ctx: GuideTurnContext): Promise<void> {
+    if (
+      !(await this.redis.acquireLock(ctx.lockKey, GUIDE_TURN_LOCK_TTL_SECONDS))
+    ) {
+      throw new HarnessStageError(
+        'turn_in_progress',
+        'Ally is replying in another tab.',
+      );
+    }
+    ctx.locked = true;
+    const thread = await this.threads.getOwned(ctx.threadId, {
+      id: ctx.userId,
+      tenantId: ctx.tenantId,
+      username: '',
+    });
+    ctx.thread = thread;
+    ctx.mode = thread.mode ?? GuideMode.NORMAL;
+    ctx.pacing = { ...(thread.pacing ?? {}) };
+    if (
+      !(await this.settings.isGuidedAvailable(thread.trackId, ctx.tenantId))
+    ) {
+      throw new HarnessStageError(
+        'guide_disabled',
+        'The guide is switched off.',
+      );
+    }
+    await this.turnStore.transition(ctx.turnId, AgentTurnStatus.ADMITTED, {
+      startedAt: new Date(ctx.startedAt),
+    });
+  }
+
+  // ── persist.learner ────────────────────────────────────────────────────
+
+  private async persistLearner(ctx: GuideTurnContext): Promise<void> {
+    const message = await this.threads.appendMessage(
+      ctx.threadId,
+      ctx.tenantId,
+      {
+        role: GuideMessageRole.LEARNER,
+        content: ctx.text || null,
+        turnId: ctx.turnId,
+        clientTurnId: ctx.clientTurnId,
+        metadata:
+          ctx.intent || ctx.anchor
+            ? { intent: ctx.intent, anchor: ctx.anchor ?? null }
+            : null,
+      },
+    );
+    ctx.learnerMessageId = message.id;
+    ctx.learnerSeq = message.seq;
+    await this.threads.touchLearnerActivity(ctx.threadId);
+    const event = await this.bus.appendDurable(
+      ctx.threadId,
+      'learner.message',
+      {
+        messageId: message.id,
+        turnId: ctx.turnId,
+        clientTurnId: ctx.clientTurnId,
+        text: ctx.text,
+        channel: 'text',
+      },
+      ctx.turnId,
+    );
+    ctx.lastSeq = event.seq;
+    await this.bus.emitEphemeral(
+      ctx.threadId,
+      'turn.started',
+      {
+        turnId: ctx.turnId,
+        trigger: ctx.intent ? 'intent' : 'learner_message',
+      },
+      ctx.lastSeq,
+    );
+    await this.presence(ctx, 'thinking', null);
+  }
+
+  // ── prepare (the Conductor) ────────────────────────────────────────────
+
+  private async prepare(ctx: GuideTurnContext): Promise<void> {
+    const thread = ctx.thread!;
+    const now = new Date();
+
+    const [prefsRow, orgRow, user, course, ga] = await Promise.all([
+      this.prefs.findOne({
+        where: { userId: ctx.userId, tenantId: ctx.tenantId },
+      }),
+      this.orgProfiles.findOne({ where: { tenantId: ctx.tenantId } }),
+      this.users.findOne({
+        where: { id: ctx.userId },
+        select: { id: true, name: true },
+      }),
+      this.conductor.loadCourse(thread.trackId),
+      this.releases.getGa(ALLY_GUIDE_AGENT_KEY),
+    ]);
+    if (!ga) {
+      throw new HarnessStageError(
+        'guide_disabled',
+        'Ally has no live release.',
+      );
+    }
+    ctx.course = course;
+    ctx.orgProfile = orgRow?.profile ?? null;
+    ctx.guidance = prefsRow?.prefs?.guidance ?? 'walk';
+
+    // The release this epoch is pinned to, if the epoch can continue.
+    const snapshot = thread.epochSnapshot ?? null;
+    const pinned = snapshot?.releaseId
+      ? await this.releaseById(snapshot.releaseId)
+      : null;
+    const candidate = pinned ?? ga;
+    const candidateBundle = candidate.bundle as unknown as GuideReleaseBundle;
+
+    const [threadUsd, learnerDayUsd, emergencyId] = await Promise.all([
+      this.ledger.totalForThread(ALLY_GUIDE_AGENT_KEY, ctx.threadId),
+      this.ledger.totalForUserWithin(
+        ALLY_GUIDE_AGENT_KEY,
+        ctx.userId,
+        24 * 60 * 60 * 1000,
+      ),
+      this.releases.lastEmergencyRollbackId(ALLY_GUIDE_AGENT_KEY),
+    ]);
+    const tier = budgetTier({
+      threadUsd,
+      learnerDayUsd,
+      limits: candidateBundle.policy.limits,
+    });
+
+    const orgSpan = buildOrgSpan(ctx.orgProfile);
+    const courseSpan = buildCourseSpan(course);
+    const pinnedSpans = buildSystemSpans(candidateBundle, orgSpan, courseSpan);
+    const decision = decideEpoch({
+      snapshot,
+      now,
+      lastLearnerActivityAt: thread.lastLearnerActivityAt ?? null,
+      idleMinutes: candidateBundle.policy.epochIdleMinutes,
+      emergencyRollbackId: emergencyId,
+      tier,
+      spanHashes: pinnedSpans.hashes,
+    });
+
+    let release: AgentRelease;
+    let spans: SystemSpans;
+    let epochOpener: string | null = null;
+    if (decision.continue) {
+      release = candidate;
+      spans = pinnedSpans;
+      const rows = await this.threads.historyRows(
+        ctx.threadId,
+        snapshot!.startSeq ?? 0,
+        ctx.learnerSeq!,
+      );
+      ctx.history = replayHistory(rows);
+      ctx.epoch = { number: thread.epoch, snapshot: snapshot!, isNew: false };
+    } else {
+      release = ga;
+      const bundle = ga.bundle as unknown as GuideReleaseBundle;
+      spans = buildSystemSpans(bundle, orgSpan, courseSpan);
+      const route = this.models.route(bundle, 'orchestrator', 'text', tier);
+      ctx.history = [];
+      ctx.epoch = {
+        number: thread.epoch + 1,
+        isNew: true,
+        snapshot: {
+          releaseId: ga.id,
+          model: route.model,
+          tier,
+          layerHashes: spans.hashes,
+          startedAt: now.toISOString(),
+          reason: decision.reason,
+          startSeq: ctx.learnerSeq,
+          emergencyRollbackId: emergencyId,
+        },
+      };
+      const recent = await this.threads.recentRows(
+        ctx.threadId,
+        ctx.learnerSeq!,
+        12,
+      );
+      epochOpener = buildEpochOpener({
+        firstName: user?.name?.trim().split(/\s+/)[0] || null,
+        guidance: ctx.guidance,
+        recent: recentConversation(recent, 6),
+        reason: decision.reason,
+      });
+      if (
+        decision.reason === 'first conversation' ||
+        decision.reason === 'return after a break'
+      ) {
+        const start = sessionStartMode({
+          current: ctx.mode,
+          lastCrisisAt: await this.crisis.lastCrisisAt(ctx.userId),
+          now,
+          followupDays: bundle.policy.safety.crisisFollowupDays,
+        });
+        ctx.mode = start.mode;
+      }
+    }
+
+    const bundle = release.bundle as unknown as GuideReleaseBundle;
+    ctx.releaseId = release.id;
+    ctx.bundle = bundle;
+    ctx.tier = tier;
+    ctx.model = this.models.route(bundle, 'orchestrator', 'text', tier).model;
+    ctx.system = spans;
+    const policy = bundle.policy;
+
+    // The learner's turn moves the pacing state before anything is decided.
+    let pacing: GuideThreadPacing = { ...ctx.pacing };
+    if (pacing.fadeLevel == null) pacing.fadeLevel = policy.fade.start.lay;
+    const onSpine =
+      Boolean(ctx.anchor) ||
+      ctx.intent === 'start' ||
+      ctx.intent === 'continue' ||
+      ctx.intent === 'locked_peek';
+    pacing = afterLearnerTurn(pacing, onSpine);
+    if (ctx.intent === 'not_now') pacing = afterDecline(pacing);
+    ctx.pacing = pacing;
+
+    const spine = course.spine;
+    const steer = decideSteer({
+      mode: ctx.mode,
+      pacing,
+      spine,
+      policy,
+      now: Date.now(),
+      learnerReady: ctx.intent === 'start' || ctx.intent === 'continue',
+    });
+    const windowOpen = releaseWindowOpen(pacing, policy.releaseWindowMaxTurns);
+    ctx.steer = steer;
+    ctx.firstWin = planFirstWin(spine, pacing);
+    ctx.atmosphere = atmosphereOf({
+      mode: ctx.mode,
+      releaseWindowOpen: windowOpen,
+      spine,
+    });
+    ctx.budget = proseBudget(ctx.guidance, 'text', pacing.fadeLevel, policy);
+
+    const events: string[] = [];
+    if (ctx.epoch.isNew && ctx.mode === GuideMode.CRISIS_FOLLOWUP) {
+      events.push(
+        'This is the first conversation since a hard moment. Open with a brief, ' +
+          'gentle check-in on how they are today, before anything else.',
+      );
+    }
+    ctx.situationInput = {
+      turn: pacing.learnerTurns ?? 1,
+      mode: ctx.mode,
+      atmosphere: ctx.atmosphere,
+      channel: 'text',
+      guidance: ctx.guidance,
+      budget: ctx.budget,
+      steer,
+      spine,
+      firstWin: ctx.firstWin,
+      releaseWindowOpen: windowOpen,
+      overlay: 'none',
+      events,
+    };
+    ctx.situation = renderSituationReport(ctx.situationInput);
+    ctx.learnerMessage = buildLearnerMessage({
+      text: ctx.text,
+      intent: ctx.intent,
+      anchor: ctx.anchor,
+      epochOpener,
+    });
+    const recent = await this.threads.recentRows(
+      ctx.threadId,
+      ctx.learnerSeq!,
+      6,
+    );
+    ctx.recentTurns = recentConversation(recent, 6).map((line) => ({
+      role: line.role,
+      text: line.text,
+    }));
+    await this.turnStore.transition(ctx.turnId, AgentTurnStatus.STREAMING, {
+      releaseId: ctx.releaseId,
+    });
+  }
+
+  private async releaseById(id: string): Promise<AgentRelease | null> {
+    const cached = this.releaseCache.get(id);
+    if (cached) return cached;
+    try {
+      const release = await this.releases.getById(id);
+      this.releaseCache.set(id, release);
+      return release;
+    } catch {
+      return null;
+    }
+  }
+
+  // ── respond (the model, behind the Sentinel) ───────────────────────────
+
+  private async respond(ctx: GuideTurnContext): Promise<void> {
+    const bundle = ctx.bundle!;
+    const policy = bundle.policy;
+    const attribution = {
+      threadId: ctx.threadId,
+      turnId: ctx.turnId,
+      userId: ctx.userId,
+      tenantId: ctx.tenantId,
+      releaseId: ctx.releaseId,
+    };
+
+    // Layer 1, synchronously: a first-person crisis never reaches a model.
+    const keyword = ctx.text ? this.sentinel.keyword(ctx.text) : null;
+    if (keyword) {
+      ctx.verdict = keyword;
+      await this.respondWithCrisis(ctx, 'keyword');
+      return;
+    }
+
+    const verdictPromise: Promise<SentinelVerdict | null> = ctx.text
+      ? this.sentinel.assess({
+          text: ctx.text,
+          recentTurns: ctx.recentTurns,
+          item: this.sentinelItem(ctx.course!.spine),
+          bundle,
+          attribution,
+        })
+      : Promise.resolve(null);
+
+    let pending: 'crisis' | 'urgent' | 'restart' | null = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      pending = null;
+      const controller = new AbortController();
+      const hardTimeout = setTimeout(
+        () => controller.abort('turn timeout'),
+        policy.limits.turnHardTimeoutMs,
+      );
+      const gate = new ReleaseGate(async (text) => {
+        if (ctx.ttftMs === null) {
+          ctx.ttftMs = Date.now() - ctx.startedAt;
+          await this.presence(ctx, 'speaking', null);
+        }
+        await this.bus.emitEphemeral(
+          ctx.threadId,
+          'assistant.delta',
+          { turnId: ctx.turnId, messageId: ctx.replyMessageId, text },
+          ctx.lastSeq,
+        );
+      });
+
+      const decide = async (verdict: SentinelVerdict | null) => {
+        if (verdict) ctx.verdict = verdict;
+        if (!verdict) return gate.release();
+        if (isLearnerCrisis(verdict)) {
+          pending = 'crisis';
+          gate.discard();
+          controller.abort('crisis');
+          return;
+        }
+        if (verdict.overlay === 'real_case_urgent') {
+          pending = 'urgent';
+          gate.discard();
+          controller.abort('urgent real case');
+          return;
+        }
+        const change = nextMode(ctx.mode, verdict);
+        const overlay =
+          verdict.overlay === 'real_case' || verdict.overlay === 'pii'
+            ? verdict.overlay
+            : 'none';
+        const needsNewInstructions = change.changed || overlay !== ctx.overlay;
+        if (needsNewInstructions && !gate.releasedText && attempt === 0) {
+          ctx.mode = change.mode;
+          ctx.overlay = overlay;
+          pending = 'restart';
+          gate.discard();
+          controller.abort('restart with new instructions');
+          return;
+        }
+        // Too late to restart: the reply goes out, the mode applies next turn.
+        if (change.changed) ctx.mode = change.mode;
+        await gate.release();
+      };
+
+      // The first attempt waits for the verdict up to the deadline; a restart
+      // already has it.
+      let deadline: NodeJS.Timeout | undefined;
+      if (attempt === 0) {
+        deadline = setTimeout(() => {
+          if (!ctx.verdict) void gate.release();
+        }, policy.safety.sentinelDeadlineMs);
+        void verdictPromise.then(decide);
+      } else {
+        await gate.release();
+      }
+
+      try {
+        ctx.output = await runOrchestrator({
+          system: ctx.system!.blocks,
+          messages: [
+            ...ctx.history,
+            ctx.learnerMessage!,
+            { role: 'system', content: ctx.situation! },
+          ],
+          tools: GUIDE_TOOLS,
+          maxTokens: GUIDE_ORCHESTRATOR_MAX_TOKENS,
+          maxPasses: GUIDE_MAX_TOOL_PASSES,
+          signal: controller.signal,
+          gate,
+          stream: (request) =>
+            this.models.stream({
+              role: 'orchestrator',
+              bundle,
+              channel: 'text',
+              tier: ctx.tier,
+              task: LlmTask.GUIDE_ORCHESTRATOR,
+              aiTaskId: GUIDE_AI_TASKS.ORCHESTRATOR,
+              attribution,
+              request,
+              onCost: (usd) => {
+                ctx.usd += usd;
+              },
+            }),
+          executeTool: (name, input) =>
+            this.tools.execute(name, input, this.toolContext(ctx)),
+          onToolStart: (name) => {
+            void this.toolActivity(ctx, name);
+          },
+        });
+      } finally {
+        clearTimeout(hardTimeout);
+        if (deadline) clearTimeout(deadline);
+      }
+
+      // A verdict still outstanding is awaited now: the reply may have
+      // finished first, and a late crisis still gets the fixed response.
+      if (attempt === 0 && !ctx.verdict && ctx.text) {
+        await verdictPromise.then(decide);
+      }
+      if (pending === 'restart') {
+        ctx.restarted = true;
+        ctx.situationInput = {
+          ...ctx.situationInput!,
+          mode: ctx.mode,
+          overlay: ctx.overlay,
+          steer: decideSteer({
+            mode: ctx.mode,
+            pacing: ctx.pacing,
+            spine: ctx.course!.spine,
+            policy,
+            now: Date.now(),
+            learnerReady: ctx.intent === 'start' || ctx.intent === 'continue',
+          }),
+          atmosphere: atmosphereOf({
+            mode: ctx.mode,
+            releaseWindowOpen: releaseWindowOpen(
+              ctx.pacing,
+              policy.releaseWindowMaxTurns,
+            ),
+            spine: ctx.course!.spine,
+          }),
+        };
+        ctx.steer = ctx.situationInput.steer;
+        ctx.atmosphere = ctx.situationInput.atmosphere;
+        ctx.situation = renderSituationReport(ctx.situationInput);
+        ctx.presented = [];
+        continue;
+      }
+      break;
+    }
+
+    const output = ctx.output!;
+    if (pending === 'crisis') {
+      ctx.interruptedText = output.aborted ? undefined : output.text;
+      await this.respondWithCrisis(ctx, ctx.verdict?.source ?? 'classifier');
+      return;
+    }
+    if (pending === 'urgent') {
+      await this.respondWithFixed(
+        ctx,
+        'urgent_real_case',
+        urgentRealCaseText(ctx.orgProfile),
+        [ctx.learnerMessage!],
+      );
+      return;
+    }
+    if (output.aborted) {
+      throw new HarnessStageError('interrupted', 'The reply was cut off.');
+    }
+    if (output.refusal) {
+      await this.respondWithFixed(ctx, 'refusal', GUIDE_REFUSAL_TEXT, [
+        ctx.learnerMessage!,
+        { role: 'system', content: ctx.situation! },
+      ]);
+      return;
+    }
+    if (!output.text.trim() && ctx.presented.length === 0) {
+      await this.respondWithFixed(ctx, 'empty', GUIDE_EMPTY_REPLY_TEXT, [
+        ctx.learnerMessage!,
+        { role: 'system', content: ctx.situation! },
+      ]);
+      return;
+    }
+    ctx.replyKind = 'model';
+    ctx.replyText = output.text.trim();
+    ctx.learnerRendered = [
+      ctx.learnerMessage!,
+      { role: 'system', content: ctx.situation! },
+    ];
+    ctx.replyBlocks = output.appended.length
+      ? output.appended
+      : [
+          {
+            role: 'assistant',
+            content: [{ type: 'text', text: ctx.replyText }],
+          },
+        ];
+    if (ctx.steer?.level === 2) ctx.pacing = afterVerbalSteer(ctx.pacing);
+    if (ctx.presented.some((card) => card.kind === 'course_item')) {
+      ctx.pacing = { ...ctx.pacing, offSpineTurns: 0 };
+    }
+  }
+
+  private async respondWithCrisis(
+    ctx: GuideTurnContext,
+    source: string,
+  ): Promise<void> {
+    const language = ctx.course?.languageCode ?? 'en';
+    const copy = await this.crisis.responseText(ctx.tenantId, language);
+    const lines = this.crisis.lines(ctx.orgProfile, language);
+    ctx.crisis = { ...copy, lines };
+    ctx.mode = GuideMode.CRISIS;
+    ctx.replyKind = 'crisis';
+    ctx.replyText = copy.text;
+    // The model's history records the learner's words and the fixed reply —
+    // no situation report, because no model ran for this turn.
+    ctx.learnerRendered = [ctx.learnerMessage!];
+    ctx.replyBlocks = [
+      { role: 'assistant', content: [{ type: 'text', text: copy.text }] },
+    ];
+    await this.crisis
+      .record({
+        threadId: ctx.threadId,
+        userId: ctx.userId,
+        tenantId: ctx.tenantId,
+        releaseId: ctx.releaseId,
+        language: copy.language,
+        source,
+      })
+      .catch((error) => this.logger.error('Crisis record write failed', error));
+  }
+
+  private async respondWithFixed(
+    ctx: GuideTurnContext,
+    kind: ReplyKind,
+    text: string,
+    learnerRendered: AgentMessage[],
+  ): Promise<void> {
+    ctx.replyKind = kind;
+    ctx.replyText = text;
+    ctx.learnerRendered = learnerRendered;
+    ctx.replyBlocks = [
+      { role: 'assistant', content: [{ type: 'text', text }] },
+    ];
+    for (const chunk of chunkForStreaming(text)) {
+      if (ctx.ttftMs === null) {
+        ctx.ttftMs = Date.now() - ctx.startedAt;
+        await this.presence(ctx, 'speaking', null);
+      }
+      await this.bus.emitEphemeral(
+        ctx.threadId,
+        'assistant.delta',
+        { turnId: ctx.turnId, messageId: ctx.replyMessageId, text: chunk },
+        ctx.lastSeq,
+      );
+    }
+  }
+
+  /** The item a message most likely concerns, for the Sentinel's context. */
+  private sentinelItem(spine: CourseSpine) {
+    const recentlyCompleted = [...spine.items]
+      .filter((item) => item.completedAt)
+      .sort(
+        (a, b) => Date.parse(b.completedAt!) - Date.parse(a.completedAt!),
+      )[0];
+    const item: SpineItem | null =
+      recentlyCompleted &&
+      Date.now() - Date.parse(recentlyCompleted.completedAt!) < 30 * 60_000
+        ? recentlyCompleted
+        : spine.current;
+    return item
+      ? {
+          title: item.title,
+          type: item.type,
+          triggerWarnings: item.triggerWarnings,
+        }
+      : null;
+  }
+
+  private toolContext(ctx: GuideTurnContext): GuideToolContext {
+    const tool: GuideToolContext = {
+      threadId: ctx.threadId,
+      turnId: ctx.turnId,
+      userId: ctx.userId,
+      tenantId: ctx.tenantId,
+      courseTitle: ctx.course!.title,
+      courseDescription: ctx.course!.description,
+      language: ctx.course!.languageCode,
+      mode: ctx.mode,
+      spine: ctx.course!.spine,
+      steer: ctx.steer!,
+      orgProfile: ctx.orgProfile,
+      pacing: ctx.pacing,
+      presented: ctx.presented,
+      emitDurable: async (type, data) => {
+        const event = await this.bus.appendDurable(
+          ctx.threadId,
+          type as never,
+          data as never,
+          ctx.turnId,
+        );
+        ctx.lastSeq = event.seq;
+        return event.seq;
+      },
+    };
+    // Tools change pacing through their context; carry it back to the turn.
+    return new Proxy(tool, {
+      set: (target, key, value) => {
+        (target as any)[key] = value;
+        if (key === 'pacing') ctx.pacing = value;
+        return true;
+      },
+    });
+  }
+
+  private async toolActivity(ctx: GuideTurnContext, name: string) {
+    const label = TOOL_ACTIVITY[name];
+    if (!label) return;
+    await this.bus
+      .emitEphemeral(
+        ctx.threadId,
+        'tool.activity',
+        { turnId: ctx.turnId, label },
+        ctx.lastSeq,
+      )
+      .catch(() => undefined);
+  }
+
+  private async presence(
+    ctx: GuideTurnContext,
+    state: 'idle' | 'thinking' | 'speaking',
+    caption: string | null,
+  ): Promise<void> {
+    await this.bus
+      .emitEphemeral(ctx.threadId, 'presence', { state, caption }, ctx.lastSeq)
+      .catch(() => undefined);
+  }
+
+  // ── persist.reply ──────────────────────────────────────────────────────
+
+  private async persistReply(ctx: GuideTurnContext): Promise<void> {
+    const thread = ctx.thread!;
+    const flags = this.flagsFor(ctx);
+
+    // Text the learner already saw before a late crisis cut the reply short.
+    if (ctx.replyKind === 'crisis' && ctx.interruptedText?.trim()) {
+      await this.threads.appendMessage(ctx.threadId, ctx.tenantId, {
+        role: GuideMessageRole.ALLY,
+        content: ctx.interruptedText.trim(),
+        turnId: null,
+        metadata: { interrupted: true, turnId: ctx.turnId },
+      });
+    }
+
+    const reply = await this.threads.appendMessage(ctx.threadId, ctx.tenantId, {
+      id: ctx.replyMessageId,
+      role: GuideMessageRole.ALLY,
+      kind:
+        ctx.replyKind === 'crisis'
+          ? GuideMessageKind.CRISIS_FIXED
+          : ctx.replyKind === 'model'
+            ? GuideMessageKind.CHAT
+            : GuideMessageKind.FIXED,
+      content: ctx.replyText ?? null,
+      turnId: ctx.turnId,
+      providerBlocks: ctx.replyBlocks as Record<string, any>[],
+      toolCalls: ctx.output?.toolCalls.map((call) => ({
+        name: call.name,
+        input: call.input,
+        isError: call.isError,
+      })),
+      metadata: {
+        replyKind: ctx.replyKind,
+        model: ctx.replyKind === 'model' ? ctx.model : null,
+        tier: ctx.tier,
+        releaseId: ctx.releaseId,
+        stopReason: ctx.output?.stopReason ?? null,
+        passes: ctx.output?.passes ?? 0,
+        restarted: ctx.restarted,
+      },
+    });
+    await this.threads.setRenderedContent(
+      ctx.learnerMessageId!,
+      ctx.learnerRendered as Record<string, any>[],
+      flags,
+    );
+
+    if (ctx.replyKind === 'crisis') {
+      const event = await this.bus.appendDurable(
+        ctx.threadId,
+        'crisis.response',
+        {
+          messageId: reply.id,
+          text: ctx.replyText!,
+          language: ctx.crisis!.language,
+          lines: ctx.crisis!.lines.map((line) => ({
+            name: line.name,
+            phone: line.phone,
+            hours: line.hours ?? null,
+            url: line.url ?? null,
+          })),
+        },
+        ctx.turnId,
+      );
+      ctx.lastSeq = event.seq;
+    } else {
+      const event = await this.bus.appendDurable(
+        ctx.threadId,
+        'assistant.message',
+        {
+          messageId: reply.id,
+          turnId: ctx.turnId,
+          text: ctx.replyText ?? '',
+          channel: 'text',
+        },
+        ctx.turnId,
+      );
+      ctx.lastSeq = event.seq;
+    }
+
+    const modeChanged = ctx.mode !== thread.mode;
+    if (modeChanged) {
+      const atmosphere = atmosphereOf({
+        mode: ctx.mode,
+        releaseWindowOpen: releaseWindowOpen(
+          ctx.pacing,
+          ctx.bundle!.policy.releaseWindowMaxTurns,
+        ),
+        spine: ctx.course!.spine,
+      });
+      const event = await this.bus.appendDurable(
+        ctx.threadId,
+        'mode.changed',
+        { mode: ctx.mode, atmosphere },
+        ctx.turnId,
+      );
+      ctx.lastSeq = event.seq;
+    }
+
+    await this.threads.saveState(ctx.threadId, {
+      pacing: ctx.pacing,
+      ...(modeChanged ? { mode: ctx.mode, modeChangedAt: new Date() } : {}),
+      ...(ctx.epoch?.isNew
+        ? {
+            epoch: ctx.epoch.number,
+            epochSnapshot: ctx.epoch.snapshot,
+            releaseId: ctx.releaseId,
+          }
+        : {}),
+    });
+
+    const spine = ctx.course!.spine;
+    const hidden =
+      !ctx.steer?.dockVisible ||
+      ctx.mode === GuideMode.CRISIS ||
+      ctx.mode === GuideMode.CARE;
+    await this.bus.emitEphemeral(
+      ctx.threadId,
+      'next_step',
+      {
+        hidden,
+        itemId: spine.current?.id ?? null,
+        title: spine.current?.title ?? null,
+        minutes: spine.current?.estimatedMinutes ?? null,
+      },
+      ctx.lastSeq,
+    );
+  }
+
+  private flagsFor(ctx: GuideTurnContext) {
+    const verdict = ctx.verdict;
+    if (!verdict) return undefined;
+    const flags = {
+      crisis: ctx.replyKind === 'crisis' || undefined,
+      care: (verdict.risk === 'care' && verdict.about === 'self') || undefined,
+      realCase:
+        verdict.overlay === 'real_case' ||
+        verdict.overlay === 'real_case_urgent' ||
+        undefined,
+      pii: verdict.overlay === 'pii' || undefined,
+    };
+    return Object.values(flags).some(Boolean) ? (flags as never) : undefined;
+  }
+
+  // ── finish ─────────────────────────────────────────────────────────────
+
+  private async finish(ctx: GuideTurnContext): Promise<void> {
+    const durationMs = Date.now() - ctx.startedAt;
+    const failed = Boolean(ctx.failure);
+    await this.presence(ctx, 'idle', null);
+    await this.bus
+      .emitEphemeral(
+        ctx.threadId,
+        failed ? 'turn.failed' : 'turn.completed',
+        failed
+          ? {
+              turnId: ctx.turnId,
+              code: (ctx.failure?.code ?? 'internal_error') as never,
+              message: ctx.failure?.message ?? '',
+            }
+          : { turnId: ctx.turnId },
+        ctx.lastSeq,
+      )
+      .catch(() => undefined);
+    await this.turnStore
+      .finish(ctx.turnId, {
+        status: failed ? AgentTurnStatus.FAILED : AgentTurnStatus.COMPLETED,
+        errorCode: ctx.failure?.code ?? null,
+        ttftMs: ctx.ttftMs,
+        durationMs,
+        costUsd: ctx.usd,
+      })
+      .catch((error) =>
+        this.logger.warn(`Turn finish write failed: ${String(error)}`),
+      );
+    const usage = ctx.output?.usage ?? [];
+    const sum = (
+      key:
+        | 'inputTokens'
+        | 'outputTokens'
+        | 'cachedTokens'
+        | 'cacheCreationTokens',
+    ) => usage.reduce((total, line) => total + (line?.[key] ?? 0), 0);
+    await this.traces.write({
+      turnId: ctx.turnId,
+      agentKey: ctx.agentKey,
+      threadId: ctx.threadId,
+      releaseId: ctx.releaseId,
+      tenantId: ctx.tenantId,
+      summary: {
+        outcome: failed ? 'failed' : 'completed',
+        failure: ctx.failure ?? null,
+        stages: ctx.timings,
+        ttftMs: ctx.ttftMs,
+        durationMs,
+        replyKind: ctx.replyKind ?? null,
+        replyMessageId: ctx.replyKind ? ctx.replyMessageId : null,
+        epoch: ctx.epoch
+          ? {
+              number: ctx.epoch.number,
+              isNew: ctx.epoch.isNew,
+              reason: ctx.epoch.snapshot.reason ?? null,
+              historyMessages: ctx.history.length,
+            }
+          : null,
+        model: ctx.model ?? null,
+        tier: ctx.tier ?? null,
+        modeBefore: ctx.thread?.mode ?? null,
+        modeAfter: ctx.mode,
+        restarted: ctx.restarted,
+        steer: ctx.steer
+          ? { level: ctx.steer.level, reason: ctx.steer.reason }
+          : null,
+        sentinel: ctx.verdict
+          ? {
+              risk: ctx.verdict.risk,
+              about: ctx.verdict.about,
+              overlay: ctx.verdict.overlay,
+              confidence: ctx.verdict.confidence,
+              source: ctx.verdict.source,
+              latencyMs: ctx.verdict.latencyMs,
+            }
+          : null,
+        tools: (ctx.output?.toolCalls ?? []).map((call) => ({
+          name: call.name,
+          isError: call.isError,
+        })),
+        cards: ctx.presented.map((card) => ({
+          kind: card.kind,
+          title: card.title,
+        })),
+        passes: ctx.output?.passes ?? 0,
+        usage: {
+          input: sum('inputTokens'),
+          output: sum('outputTokens'),
+          cacheRead: sum('cachedTokens'),
+          cacheWrite: sum('cacheCreationTokens'),
+        },
+        costUsd: Number(ctx.usd.toFixed(6)),
+        spanHashes: ctx.system?.hashes ?? null,
+      },
+      // The full picture — learner text included — goes to the payload,
+      // which has retention and deletion; the summary row stays content-free.
+      payload: ctx.situation
+        ? {
+            situationReport: ctx.situation,
+            sentinelEvidence: ctx.verdict?.evidence ?? null,
+            toolCalls: ctx.output?.toolCalls ?? [],
+            reply: ctx.replyText ?? null,
+          }
+        : undefined,
+    });
+    if (ctx.locked) {
+      await this.redis.releaseLock(ctx.lockKey);
+      ctx.locked = false;
+    }
   }
 }
 

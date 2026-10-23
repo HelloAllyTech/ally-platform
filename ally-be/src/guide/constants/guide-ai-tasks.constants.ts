@@ -5,5 +5,6 @@
  * to the registry row that documents it.
  */
 export const GUIDE_AI_TASKS = {
+  ORCHESTRATOR: 'guide-orchestrator',
   SENTINEL: 'guide-sentinel',
 } as const;

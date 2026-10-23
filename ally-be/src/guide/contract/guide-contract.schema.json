@@ -656,9 +656,9 @@
         "text": { "type": "string", "maxLength": 2000 },
         "anchor": { "$ref": "#/$defs/GuideAnchor" },
         "intent": {
-          "description": "A structured nudge from the UI instead of free text (Continue chip, locked peek, start).",
+          "description": "A structured nudge from the UI instead of free text: start, the Continue chip, a locked-item peek, or the Not now chip (which starts Ally's steering cooldown).",
           "type": ["string", "null"],
-          "enum": ["start", "continue", "locked_peek", null]
+          "enum": ["start", "continue", "locked_peek", "not_now", null]
         }
       }
     },

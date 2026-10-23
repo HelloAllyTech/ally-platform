@@ -32,9 +32,15 @@ export interface GuideThreadPacing {
 export interface GuideEpochSnapshot {
   releaseId?: string | null;
   model?: string | null;
+  /** Budget tier the epoch's model was chosen for. */
+  tier?: 'premium' | 'degraded' | 'lite';
   layerHashes?: Record<string, string>;
   startedAt?: string;
   reason?: string;
+  /** Seq of the epoch's first learner message: history replays from here. */
+  startSeq?: number;
+  /** The latest emergency rollback when the epoch began (audit id). */
+  emergencyRollbackId?: string | null;
 }
 
 /**

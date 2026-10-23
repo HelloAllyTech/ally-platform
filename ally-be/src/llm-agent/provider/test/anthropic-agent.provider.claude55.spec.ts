@@ -183,4 +183,23 @@ describe('AnthropicAgentProvider — Claude 5.5 request surface', () => {
     );
     expect(started).toEqual([{ id: 'tu_1', name: 'consult_tutor' }]);
   });
+
+  it('caches the conversation with top-level cache_control on request', async () => {
+    const { sent } = await run({ cacheConversation: true });
+    expect(sent.cache_control).toEqual({ type: 'ephemeral' });
+    const plain = await run({});
+    expect(plain.sent).not.toHaveProperty('cache_control');
+  });
+
+  it('sends tool_choice none on a closing pass, keeping the tools', async () => {
+    const tool = {
+      name: 'get_progress',
+      description: 'Read progress',
+      input_schema: { type: 'object', additionalProperties: false },
+      strict: true,
+    };
+    const { sent } = await run({ tools: [tool], toolChoice: 'none' });
+    expect(sent.tool_choice).toEqual({ type: 'none' });
+    expect(sent.tools).toEqual([tool]);
+  });
 });
