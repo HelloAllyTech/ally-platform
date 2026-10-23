@@ -25,6 +25,12 @@ REPO = Path(__file__).resolve().parent.parent
 WIKI = REPO / "wiki"
 SITE = "https://tech.helloally.ai/#/wiki"
 
+# Inside the ally-platform monorepo the code repos are sibling folders, so their copies
+# of the index are written here rather than fanned out by PR. Only copies that already
+# exist are kept current; a standalone checkout of the wiki repo has none.
+MONOREPO = REPO.parent
+ROUTING_COPIES = ["ROUTING.md", "*/ROUTING.md", "*/WIKI-ROUTING.md"]
+
 # Pages that are machinery or archives rather than things to read for a task.
 # Listed so the router can say "don't load this" instead of staying silent.
 NOT_FOR_TASKS = {
@@ -182,10 +188,18 @@ def main() -> int:
     routing = render_routing(pages)
 
     targets = {WIKI / "manifest.json": manifest, WIKI / "ROUTING.md": routing}
+    if (MONOREPO / ".git").exists():
+        for pattern in ROUTING_COPIES:
+            for copy in sorted(MONOREPO.glob(pattern)):
+                if copy.resolve() != (WIKI / "ROUTING.md").resolve():
+                    targets[copy] = routing
+
+    def shown(p: Path) -> str:
+        return p.relative_to(MONOREPO if (MONOREPO / ".git").exists() else REPO).as_posix()
 
     if args.check:
         stale = [
-            p.relative_to(REPO).as_posix()
+            shown(p)
             for p, want in targets.items()
             if not p.exists() or p.read_text(encoding="utf-8") != want
         ]
@@ -198,7 +212,7 @@ def main() -> int:
 
     for path, content in targets.items():
         path.write_text(content, encoding="utf-8")
-        print(f"wrote {path.relative_to(REPO)}")
+        print(f"wrote {shown(path)}")
     return 0
 
 
