@@ -130,7 +130,7 @@ describe('BuilderEvalSandboxFactory', () => {
     await new Promise((resolve) => setImmediate(resolve));
   };
 
-  it('plays a turn entirely in memory, with the candidate prompt and pinned reads', async () => {
+  it("plays a turn entirely in memory, with the candidate prompt, reading today's code", async () => {
     const { factory, requests, llmUsage, githubRead } = build();
     const sandbox = factory.create({
       evalRunId: 'run-1',
@@ -139,7 +139,6 @@ describe('BuilderEvalSandboxFactory', () => {
       overrides: {
         prompts: { builder_interviewer_system: 'CANDIDATE PROMPT' },
       },
-      pins: { 'ally-be': 'abc1234' },
     });
 
     await playOneTurn(sandbox);
@@ -150,11 +149,12 @@ describe('BuilderEvalSandboxFactory', () => {
       'LIVE builder_interviewer_system',
     );
 
-    // Pinned to the fixture's commit.
+    // Today's code: no commit is forced onto the read. Fixture pins were
+    // retired because the sweep and code search can't be pinned with them.
     expect(githubRead.readFile).toHaveBeenCalledWith(
       'ally-be',
       'src/skill-experiment/skill-experiment.module.ts',
-      'abc1234',
+      undefined,
     );
 
     // Everything landed in the sandbox's own stores.

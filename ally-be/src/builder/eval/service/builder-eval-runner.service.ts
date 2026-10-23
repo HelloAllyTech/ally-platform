@@ -297,7 +297,6 @@ export class BuilderEvalRunnerService {
       userId: context.userId,
       handoffContext: payload.handoffContext ?? null,
       overrides: context.overrides,
-      pins: payload.pins,
     });
     const sessionId = sandbox.session.id;
     const maxTurns = Math.max(1, payload.maxTurns ?? BUILDER_EVAL_MAX_TURNS);

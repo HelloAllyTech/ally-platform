@@ -66,8 +66,9 @@ export interface BuilderEvalSandbox {
  * What is real, and why: the model calls (that is what is being tested), the
  * repo knowledge packs, lessons, catalog and platform map (read-only, and the
  * interview's context), and the research tools — GitHub reads, docs search,
- * Stacks, production analytics — which only read. File reads are pinned to the
- * fixture's commits when it has them.
+ * Stacks, production analytics — which only read. They all read today's code:
+ * a replay of a session whose work has since shipped finds it, which is what a
+ * fixture's `expectedOutcome` is for.
  *
  * What is swapped:
  * - the stores, so nothing is written to a builder table;
@@ -107,7 +108,6 @@ export class BuilderEvalSandboxFactory {
     userId: number;
     handoffContext?: string | null;
     overrides?: BuilderEvalOverrides | null;
-    pins?: Record<string, string>;
   }): BuilderEvalSandbox {
     const stores = new SandboxStores();
     const passes: SandboxPass[] = [];
@@ -214,18 +214,6 @@ export class BuilderEvalSandboxFactory {
       },
     }) as AgentLlmProviderFactory;
 
-    const pins = options.pins ?? {};
-    const github = new Proxy(this.githubRead, {
-      get(target, property, receiver) {
-        if (property === 'readFile' || property === 'repoTree') {
-          return (repo: string, path?: string, ref?: string) =>
-            (target as any)[property](repo, path, ref ?? pins[repo]);
-        }
-        const value = Reflect.get(target, property, receiver);
-        return typeof value === 'function' ? value.bind(target) : value;
-      },
-    }) as BuilderGithubReadService;
-
     const llmCompletion = new LlmCompletionService(
       this.resolver,
       realFactory,
@@ -260,7 +248,7 @@ export class BuilderEvalSandboxFactory {
     );
     const tools = new BuilderInterviewToolsService(
       prdService,
-      github,
+      this.githubRead,
       this.stacks,
       this.evidence,
       this.catalog,

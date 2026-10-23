@@ -40,12 +40,6 @@ export interface BuilderEvalInterviewPayload {
   checklist: BuilderEvalChecklistItem[];
   /** The PRD the recorded session ended with, for reference — never scored. */
   recordedPrd?: BuilderPrdDocument | null;
-  /**
-   * The repo commits the session ran against. File reads in the replay are
-   * pinned to these; code search cannot be pinned (GitHub only indexes the
-   * default branch), so a replay can find code newer than the session did.
-   */
-  pins?: Record<string, string>;
   /** Turns before the replay gives up. Default BUILDER_EVAL_MAX_TURNS. */
   maxTurns?: number;
   /**

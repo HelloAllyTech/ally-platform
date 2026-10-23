@@ -107,8 +107,14 @@ function validatePayload(
         `expectedOutcome must be "prd_ready" or "nothing_to_build", not ${JSON.stringify(expected)}.`,
       );
     }
+    // `pins` (repo → commit) was retired on 2026-10-23: it pinned only file
+    // reads, while the discovery sweep, code search, docs search and the
+    // catalog read today's code, so a pinned replay found code by search and
+    // then failed to read it. An export that still carries it imports with
+    // the key dropped rather than refused, so old exports keep working.
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { expectedOutcome, ...rest } = interview;
+    const { expectedOutcome, pins, ...rest } =
+      interview as BuilderEvalInterviewPayload & { pins?: unknown };
     return {
       ...rest,
       adminScript: Array.isArray(interview.adminScript)
@@ -218,7 +224,6 @@ export class BuilderEvalFixtureService {
       name: string;
       checklist?: ChecklistInput;
       notes?: string | null;
-      pins?: Record<string, string>;
       /** False for a fixture a person has yet to review (the corrections loop's). */
       active?: boolean;
     },
@@ -250,7 +255,6 @@ export class BuilderEvalFixtureService {
       name: string;
       checklist?: ChecklistInput;
       notes?: string | null;
-      pins?: Record<string, string>;
       /** False for a fixture a person has yet to review (the corrections loop's). */
       active?: boolean;
     },
@@ -269,7 +273,6 @@ export class BuilderEvalFixtureService {
       handoffContext: exported.handoffContext ?? null,
       checklist: normaliseChecklist(input.checklist),
       recordedPrd: exported.prd ?? null,
-      ...(input.pins ? { pins: input.pins } : {}),
     };
     return this.create(
       {
