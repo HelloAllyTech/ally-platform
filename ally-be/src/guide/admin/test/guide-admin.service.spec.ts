@@ -114,3 +114,94 @@ describe('GuideAdminService.saveCrisisResponse', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 });
+
+describe('GuideAdminService crisis copy scope', () => {
+  function service(rows: any[]) {
+    const crisisResponses = {
+      findOne: jest.fn(
+        async ({ where }: any) =>
+          rows.find(
+            (row) =>
+              row.id === where.id &&
+              row.scope === where.scope &&
+              (where.scope === 'platform'
+                ? row.tenantId === null
+                : row.tenantId === where.tenantId),
+          ) ?? null,
+      ),
+      update: jest.fn(async () => undefined),
+    };
+    return {
+      crisisResponses,
+      service: new GuideAdminService(
+        {} as never,
+        {} as never,
+        {} as never,
+        {} as never,
+        crisisResponses as never,
+      ),
+    };
+  }
+  const rows = [
+    { id: 'p1', scope: 'platform', tenantId: null },
+    { id: 'o1', scope: 'tenant', tenantId: 'org-a' },
+  ];
+
+  it('the platform route never withdraws an organisation’s copy', async () => {
+    const t = service(rows);
+    await expect(t.service.removeCrisisResponse('o1', null)).rejects.toThrow(
+      'not found',
+    );
+    await t.service.removeCrisisResponse('p1', null);
+    expect(t.crisisResponses.update).toHaveBeenCalledWith('p1', {
+      active: false,
+    });
+  });
+
+  it('an organisation withdraws only its own copy', async () => {
+    const t = service(rows);
+    await expect(t.service.removeCrisisResponse('o1', 'org-b')).rejects.toThrow(
+      'not found',
+    );
+    await expect(t.service.removeCrisisResponse('p1', 'org-a')).rejects.toThrow(
+      'not found',
+    );
+    await t.service.removeCrisisResponse('o1', 'org-a');
+    expect(t.crisisResponses.update).toHaveBeenCalledWith('o1', {
+      active: false,
+    });
+  });
+});
+
+describe('GuideAdminService.listThreads', () => {
+  it('pages by (updatedAt, id) so rows sharing a timestamp are never skipped', async () => {
+    const calls: Array<{ sql: string; params: unknown[] }> = [];
+    const dataSource = {
+      query: jest.fn(async (sql: string, params: unknown[]) => {
+        calls.push({ sql, params });
+        return [];
+      }),
+    };
+    const service = new GuideAdminService(
+      dataSource as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+    await service.listThreads({
+      before: '2026-10-23T10:00:00.000000|3f2c1e4a-0000-4000-8000-000000000000',
+      status: 'active',
+    });
+    expect(calls[0].sql).toContain('(th."updatedAt", th."id") <');
+    expect(calls[0].sql).toContain(
+      'ORDER BY th."updatedAt" DESC, th."id" DESC',
+    );
+    expect(calls[0].params).toEqual([
+      25,
+      '2026-10-23T10:00:00.000000',
+      '3f2c1e4a-0000-4000-8000-000000000000',
+      'active',
+    ]);
+  });
+});

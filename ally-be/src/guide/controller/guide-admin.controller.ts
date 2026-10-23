@@ -81,13 +81,26 @@ export class GuideAdminController {
     @Query('before') before?: string,
     @Query('tenantId') tenantId?: string,
     @Query('mode') mode?: string,
+    @Query('status') status?: string,
   ) {
     return this.admin.listThreads({
       limit: Number(limit) || undefined,
       before,
       tenantId,
       mode,
+      status,
     });
+  }
+
+  @Get('threads/:threadId')
+  @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE, VIEW)
+  @ApiOperation({
+    summary: 'One conversation row, for a deep link (no content)',
+  })
+  async thread(@Param('threadId', ParseUUIDPipe) threadId: string) {
+    const [row] = await this.admin.listThreads({ threadId, limit: 1 });
+    if (!row) throw new NotFoundException('Thread not found');
+    return row;
   }
 
   @Get('threads/:threadId/transcript')
@@ -200,7 +213,21 @@ export class GuideAdminController {
       'Withdraw a crisis copy version (falls back to English, then the default)',
   })
   removeCrisisResponse(@Param('id', ParseUUIDPipe) id: string) {
-    return this.admin.removeCrisisResponse(id);
+    return this.admin.removeCrisisResponse(id, null);
+  }
+
+  @Delete('org-crisis-responses/:id')
+  @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE_ORG, EDIT)
+  @OrgScopedRoute()
+  @ApiOperation({
+    summary:
+      "Withdraw a version of an organisation's own crisis copy (falls back to the platform copy)",
+  })
+  removeOrgCrisisResponse(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('tenantId') tenantId: string,
+  ) {
+    return this.admin.removeCrisisResponse(id, tenantId);
   }
 
   @Get('settings')
@@ -232,6 +259,22 @@ export class GuideAdminController {
       delete summary.bundle;
       return summary;
     });
+  }
+
+  @Get('releases/rollback-target')
+  @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE, VIEW)
+  @ApiOperation({
+    summary: 'The release a rollback would land on now, or null',
+  })
+  rollbackTarget() {
+    return this.releases.rollbackTarget(ALLY_GUIDE_AGENT_KEY);
+  }
+
+  @Get('releases/audit')
+  @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE, VIEW)
+  @ApiOperation({ summary: 'Who changed which release, when and why' })
+  releaseAudit(@Query('limit') limit?: string) {
+    return this.admin.releaseAudit(Number(limit) || 50);
   }
 
   @Get('releases/:releaseId')

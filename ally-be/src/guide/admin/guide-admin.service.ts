@@ -207,19 +207,43 @@ export class GuideAdminService {
       .sort((a, b) => (a.arm === 'ga' ? -1 : b.arm === 'ga' ? 1 : 0));
   }
 
-  /** Conversations tab: threads, newest activity first. No content. */
+  /**
+   * Conversations tab: threads, newest activity first. No content.
+   * Page with `before` = the last row's `cursor` (its updatedAt and id, so
+   * rows sharing a timestamp are never skipped); a bare timestamp still
+   * works. Times stay as the column's own text, never through a JS Date.
+   */
   async listThreads(query: {
     limit?: number;
     before?: string;
     tenantId?: string;
     mode?: string;
+    status?: string;
+    threadId?: string;
   }) {
     const limit = Math.min(100, Math.max(1, query.limit ?? 25));
     const params: unknown[] = [limit];
     const where: string[] = [];
     if (query.before) {
-      params.push(new Date(query.before));
-      where.push(`th."updatedAt" < $${params.length}`);
+      const [at, id] = query.before.split('|');
+      params.push(at);
+      const atParam = `$${params.length}::timestamp`;
+      if (id) {
+        params.push(id);
+        where.push(
+          `(th."updatedAt", th."id") < (${atParam}, $${params.length}::uuid)`,
+        );
+      } else {
+        where.push(`th."updatedAt" < ${atParam}`);
+      }
+    }
+    if (query.status) {
+      params.push(query.status);
+      where.push(`th."status" = $${params.length}`);
+    }
+    if (query.threadId) {
+      params.push(query.threadId);
+      where.push(`th."id" = $${params.length}`);
     }
     if (query.tenantId) {
       params.push(query.tenantId);
@@ -231,14 +255,17 @@ export class GuideAdminService {
     }
     const rows = await this.dataSource.query(
       `SELECT th."id", th."trackId", t."title" AS "trackTitle", th."tenant_id" AS "tenantId",
-              th."mode", th."status", th."epoch", th."updatedAt",
+              tn."name" AS "tenantName", th."visitorId" IS NOT NULL AS "visitor",
+              th."mode", th."status", th."epoch", th."updatedAt", th."arm",
+              to_char(th."updatedAt", 'YYYY-MM-DD"T"HH24:MI:SS.US') || '|' || th."id" AS "cursor",
               (SELECT count(*) FROM "agent_turns" a WHERE a."threadId" = th."id") AS turns,
               (SELECT COALESCE(sum(a."costUsd"), 0) FROM "agent_turns" a WHERE a."threadId" = th."id") AS cost,
               (SELECT count(*) FROM "guide_signals" s WHERE s."threadId" = th."id" AND s."kind" = '${CRISIS_SIGNAL_KIND}') AS crises
          FROM "guide_threads" th
          LEFT JOIN "tracks" t ON t."id" = th."trackId"
+         LEFT JOIN "tenants" tn ON tn."id"::text = th."tenant_id"
         ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-        ORDER BY th."updatedAt" DESC
+        ORDER BY th."updatedAt" DESC, th."id" DESC
         LIMIT $1`,
       params,
     );
@@ -247,10 +274,14 @@ export class GuideAdminService {
       trackId: row.trackId,
       trackTitle: row.trackTitle,
       tenantId: row.tenantId,
+      tenantName: row.tenantName ?? null,
+      visitor: Boolean(row.visitor),
       mode: row.mode,
       status: row.status,
       epoch: row.epoch,
+      arm: row.arm ?? null,
       updatedAt: row.updatedAt,
+      cursor: row.cursor,
       turns: num(row.turns),
       costUsd: Number(num(row.cost).toFixed(4)),
       crises: num(row.crises),
@@ -281,11 +312,13 @@ export class GuideAdminService {
 
   async orgProfile(tenantId: string) {
     const row = await this.orgProfiles.findOne({ where: { tenantId } });
+    const names = await this.namesFor([row?.updatedBy]);
     return {
       tenantId,
       version: row?.version ?? 0,
       profile: row?.profile ?? {},
       updatedBy: row?.updatedBy ?? null,
+      updatedByName: row?.updatedBy ? (names.get(row.updatedBy) ?? null) : null,
       updatedAt: (row as any)?.updatedAt ?? null,
     };
   }
@@ -303,8 +336,8 @@ export class GuideAdminService {
     return this.orgProfile(saved.tenantId);
   }
 
-  listCrisisResponses(tenantId: string | null) {
-    return this.crisisResponses.find({
+  async listCrisisResponses(tenantId: string | null) {
+    const rows = await this.crisisResponses.find({
       where: {
         active: true,
         ...(tenantId
@@ -313,6 +346,60 @@ export class GuideAdminService {
       },
       order: { languageCode: 'ASC' },
     });
+    const names = await this.namesFor(rows.map((row) => row.approvedBy));
+    return rows.map((row) => ({
+      ...row,
+      approvedByName: row.approvedBy
+        ? (names.get(row.approvedBy) ?? null)
+        : null,
+    }));
+  }
+
+  /** The release audit trail, newest first, with who did it. */
+  async releaseAudit(limit: number) {
+    const rows: Array<Record<string, any>> = await this.dataSource.query(
+      `SELECT a."id", a."action", a."releaseId", r."version", a."actorKind",
+              a."actorUserId", a."detail", a."createdAt"
+         FROM "agent_release_audit" a
+         LEFT JOIN "agent_releases" r ON r."id" = a."releaseId"
+        WHERE a."agentKey" = $1
+        ORDER BY a."createdAt" DESC
+        LIMIT $2`,
+      [ALLY_GUIDE_AGENT_KEY, Math.min(Math.max(limit, 1), 200)],
+    );
+    const names = await this.namesFor(rows.map((row) => row.actorUserId));
+    return rows.map((row) => ({
+      id: row.id,
+      action: row.action,
+      releaseId: row.releaseId,
+      version: row.version ?? null,
+      actorKind: row.actorKind,
+      actorUserId: row.actorUserId ?? null,
+      actorName: row.actorUserId
+        ? (names.get(Number(row.actorUserId)) ?? null)
+        : null,
+      reason: row.detail?.reason ?? null,
+      detail: row.detail ?? {},
+      createdAt: row.createdAt,
+    }));
+  }
+
+  /** People's display names for ids an admin screen shows (never emails). */
+  private async namesFor(
+    ids: Array<number | null | undefined>,
+  ): Promise<Map<number, string>> {
+    const unique = [...new Set(ids.filter((id): id is number => !!id))];
+    if (!unique.length) return new Map();
+    const rows: Array<{ id: number; name: string | null }> =
+      await this.dataSource.query(
+        `SELECT "id", "name" FROM "users" WHERE "id" = ANY($1::int[])`,
+        [unique],
+      );
+    return new Map(
+      rows
+        .filter((row) => row.name?.trim())
+        .map((row) => [Number(row.id), row.name!.trim()] as const),
+    );
   }
 
   /**
@@ -365,8 +452,18 @@ export class GuideAdminService {
     });
   }
 
-  async removeCrisisResponse(id: string) {
-    const row = await this.crisisResponses.findOne({ where: { id } });
+  /**
+   * Withdraw a version — only within the scope asked for: the platform route
+   * never touches an organisation's approved copy, and an organisation's
+   * route never touches another's or the platform's. Anything else is the
+   * same 404 as a missing id.
+   */
+  async removeCrisisResponse(id: string, tenantId: string | null) {
+    const row = await this.crisisResponses.findOne({
+      where: tenantId
+        ? { id, scope: GuideCrisisScope.TENANT, tenantId }
+        : { id, scope: GuideCrisisScope.PLATFORM, tenantId: IsNull() },
+    });
     if (!row) throw new NotFoundException('Crisis copy not found');
     await this.crisisResponses.update(id, { active: false });
     return { id, active: false };
@@ -405,7 +502,7 @@ export function normaliseOrgProfile(input: unknown): GuideOrgProfileValue {
             `Support line ${i + 1} (${language}) needs a name and a phone number`,
           );
         }
-        if (!/^[+\d][\d\s().-]{2,}$/.test(phone)) {
+        if (!/^[+\d(][\d\s().-]{2,}$/.test(phone)) {
           throw new BadRequestException(`"${phone}" is not a phone number`);
         }
         return {

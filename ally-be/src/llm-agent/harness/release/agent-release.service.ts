@@ -551,6 +551,28 @@ export class AgentReleaseService {
     return stopped;
   }
 
+  /** The GA release before the current one: where a rollback lands now. */
+  async rollbackTarget(
+    agentKey: string,
+  ): Promise<{ releaseId: string; version: number } | null> {
+    const audit = await this.audit.find({
+      where: { agentKey },
+      order: { createdAt: 'DESC' },
+      take: 50,
+    });
+    const lastChange = audit.find((row) =>
+      [
+        AgentReleaseAuditAction.PROMOTED,
+        AgentReleaseAuditAction.ROLLED_BACK,
+        AgentReleaseAuditAction.EMERGENCY_ROLLBACK,
+      ].includes(row.action),
+    );
+    const id = lastChange?.detail?.fromReleaseId as string | undefined;
+    if (!id) return null;
+    const release = await this.releases.findOne({ where: { id } });
+    return release ? { releaseId: release.id, version: release.version } : null;
+  }
+
   /** Roll back to the GA release before the current one. */
   async rollback(
     agentKey: string,
