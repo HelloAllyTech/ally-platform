@@ -274,6 +274,14 @@ export class AppConfigService {
     return match ? { provider: match[1].toLowerCase(), model: match[2] } : null;
   }
 
+  /** Where Ally's alerts are posted (a Slack incoming webhook), or null. */
+  get allyGuideAlertWebhookUrl(): string | null {
+    return (
+      this.configService.get<string>('ALLY_GUIDE_ALERT_WEBHOOK_URL')?.trim() ||
+      null
+    );
+  }
+
   get database() {
     const config = {
       host: this.configService.get<string>('DB_HOST'),

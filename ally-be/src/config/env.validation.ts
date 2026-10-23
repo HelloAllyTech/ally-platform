@@ -106,6 +106,8 @@ export const validationSchema = Joi.object({
   AGENT_TRACE_S3_BUCKET: Joi.string().optional(),
   // Local/development only; see AppConfigService.allyGuideModelOverride.
   ALLY_GUIDE_MODEL_OVERRIDE: Joi.string().optional(),
+  // Incoming-webhook URL for the Ally team's alert channel (plan §7.12, Q8).
+  ALLY_GUIDE_ALERT_WEBHOOK_URL: Joi.string().uri().optional().allow(''),
   LIVEKIT_GUIDE_AGENT_NAME: Joi.string().optional(),
 
   SCENARIO_PATH_ITEM_MIN_DURATION_FOR_COMPLETION: Joi.string().optional(),

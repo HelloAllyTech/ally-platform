@@ -3,6 +3,7 @@ import { DataSource } from 'typeorm';
 import { SessionItemStatus } from 'src/common/type/common.type';
 import { Track } from 'src/track/entity/track.entity';
 import { TrackEnrollmentService } from 'src/track/service/track-enrollment.service';
+import { TrackSharedService } from 'src/track/service/track-shared.service';
 import { TrackItemType } from 'src/track/type/track.type';
 import { TrackGuideNotes } from 'src/track/type/track-guide-notes.type';
 import { CourseContext } from '../context/guide-context';
@@ -47,7 +48,67 @@ export class GuideConductorService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly trackEnrollment: TrackEnrollmentService,
+    private readonly shared: TrackSharedService,
   ) {}
+
+  /**
+   * A course as an imagined learner `completed` items in would see it — for
+   * the Ally Console's Playground (plan §10.5), which has no learner. Built
+   * from the course's own structure, in its own order: the first
+   * `completed` items done, the next one open, the rest locked.
+   */
+  async loadPreviewCourse(
+    trackId: string,
+    completed: number,
+  ): Promise<CourseContext> {
+    const [structure, track, warnings] = await Promise.all([
+      this.shared.getTrackWithStructure(trackId),
+      this.dataSource.getRepository(Track).findOne({
+        where: { id: trackId },
+        select: { id: true, guideNotes: true },
+      }),
+      this.triggerWarnings(trackId),
+    ]);
+    const guideNotes = (track?.guideNotes ?? null) as TrackGuideNotes | null;
+    let index = 0;
+    const view: LearnerTrackView = {
+      id: structure.id,
+      title: structure.title ?? null,
+      enrolled: true,
+      sections: structure.sections.map((section) => ({
+        id: section.id,
+        title: section.title ?? null,
+        order: section.order,
+        items: section.items.map((item: any) => {
+          const position = index++;
+          return {
+            id: item.id,
+            type: item.type,
+            order: item.order,
+            title: item.title ?? null,
+            description: item.description ?? null,
+            status:
+              position < completed
+                ? SessionItemStatus.COMPLETED
+                : position === completed
+                  ? SessionItemStatus.UNLOCKED
+                  : SessionItemStatus.LOCKED,
+            completionCriteria: item.completionCriteria ?? null,
+          };
+        }),
+      })),
+    };
+    return {
+      title: structure.title ?? '',
+      description: structure.description ?? null,
+      languageCode: (structure as any).languageCode ?? 'en',
+      trainerNotes: guideNotes?.notes ?? null,
+      spine: buildCourseSpine(view, {
+        guideNotes,
+        triggerWarningsByItem: warnings,
+      }),
+    };
+  }
 
   /** Must run inside ExecutionManager context for the learner. */
   async loadCourse(trackId: string): Promise<CourseContext> {

@@ -7,6 +7,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUUID,
   Max,
   MaxLength,
   Min,
@@ -269,4 +270,71 @@ export class GuideCanaryStartDto {
   @IsString()
   @MaxLength(500)
   reason?: string;
+}
+
+class GuidePlaygroundTurnDto {
+  @IsIn(['learner', 'ally'])
+  role!: 'learner' | 'ally';
+
+  @IsString()
+  @MaxLength(4000)
+  text!: string;
+}
+
+/** POST /v1/guide/admin/playground — one dry-run turn of any release. */
+export class GuidePlaygroundRunDto {
+  @ApiProperty({ description: 'Any release, a draft included.' })
+  @IsUUID()
+  releaseId!: string;
+
+  @ApiProperty()
+  @IsUUID()
+  trackId!: string;
+
+  @ApiPropertyOptional({
+    description: 'An organisation whose Ally layer to use (default: none)',
+  })
+  @IsOptional()
+  @IsString()
+  tenantId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Items the imagined learner has completed',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(500)
+  progress?: number;
+
+  @IsOptional()
+  @IsIn(['NORMAL', 'CARE', 'CRISIS_FOLLOWUP'])
+  mode?: 'NORMAL' | 'CARE' | 'CRISIS_FOLLOWUP';
+
+  @IsOptional()
+  @IsIn(['lead', 'walk', 'drive'])
+  guidance?: 'lead' | 'walk' | 'drive';
+
+  @IsOptional()
+  @IsIn(['text', 'voice'])
+  channel?: 'text' | 'voice';
+
+  @ApiPropertyOptional({ description: 'Run as an anonymous visitor' })
+  @IsOptional()
+  @IsBoolean()
+  visitor?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => GuidePlaygroundTurnDto)
+  history?: GuidePlaygroundTurnDto[];
+
+  @IsString()
+  @MaxLength(2000)
+  message!: string;
+
+  @IsOptional()
+  @IsIn(['start', 'continue', 'locked_peek', 'not_now', 'safe_now'])
+  intent?: 'start' | 'continue' | 'locked_peek' | 'not_now' | 'safe_now';
 }

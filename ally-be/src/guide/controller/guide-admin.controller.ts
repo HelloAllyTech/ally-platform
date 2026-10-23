@@ -27,9 +27,13 @@ import { AgentTraceService } from 'src/llm-agent/harness/trace/agent-trace.servi
 import { AgentTurnStoreService } from 'src/llm-agent/harness/turn/agent-turn-store.service';
 import { GuideAdminService } from '../admin/guide-admin.service';
 import { GuideBaselineService } from '../measure/guide-baseline.service';
+import { GuidePlaygroundService } from '../admin/guide-playground.service';
+import { GuideAlertService } from '../measure/guide-alert.service';
+import { GuideMode } from '../enum/guide.enum';
 import {
   GuideBaselineCaptureDto,
   GuideCanaryStartDto,
+  GuidePlaygroundRunDto,
   GuideCrisisResponseDto,
   GuideRollbackDto,
   UpdateGuideSwitchesDto,
@@ -59,6 +63,8 @@ export class GuideAdminController {
     private readonly turns: AgentTurnStoreService,
     private readonly admin: GuideAdminService,
     private readonly baseline: GuideBaselineService,
+    private readonly playgroundService: GuidePlaygroundService,
+    private readonly alerts: GuideAlertService,
   ) {}
 
   @Get('overview')
@@ -281,6 +287,45 @@ export class GuideAdminController {
   @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE, VIEW)
   getRelease(@Param('releaseId', ParseUUIDPipe) releaseId: string) {
     return this.releases.getById(releaseId);
+  }
+
+  @Post('playground')
+  @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE, EDIT)
+  @ApiOperation({
+    summary:
+      'One dry-run turn of any release against a course and a scripted conversation (nothing stored)',
+  })
+  playground(@Body() dto: GuidePlaygroundRunDto) {
+    return this.playgroundService.run({
+      ...dto,
+      mode: dto.mode as GuideMode | undefined,
+    });
+  }
+
+  @Get('alerts')
+  @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE, VIEW)
+  @ApiOperation({ summary: 'Alerts that fired, newest first' })
+  listAlerts(@Query('limit') limit?: string) {
+    return this.alerts.list(Number(limit) || 50);
+  }
+
+  @Post('alerts/check')
+  @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE, EDIT)
+  @ApiOperation({
+    summary: 'Run the alert rules now (they also run every 15 minutes)',
+  })
+  checkAlerts() {
+    return this.alerts.check();
+  }
+
+  @Post('alerts/:alertId/ack')
+  @RequireFeatureToggle(FeatureToggleKey.ALLY_GUIDE, EDIT)
+  @ApiOperation({ summary: 'Mark an alert as seen' })
+  acknowledgeAlert(
+    @Param('alertId', ParseUUIDPipe) alertId: string,
+    @CurrentUser() user: TokenUser,
+  ) {
+    return this.alerts.acknowledge(alertId, user.id);
   }
 
   @Post('baseline')

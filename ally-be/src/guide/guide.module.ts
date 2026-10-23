@@ -46,6 +46,9 @@ import { GuideSentinelService } from './safety/guide-sentinel.service';
 import { GuideSettingsService } from './settings/guide-settings.service';
 import { GuideVisitorService } from './visitor/guide-visitor.service';
 import { GuideBaselineService } from './measure/guide-baseline.service';
+import { GuideAlertService } from './measure/guide-alert.service';
+import { GuideAlert } from './entity/guide-alert.entity';
+import { GuidePlaygroundService } from './admin/guide-playground.service';
 import { GuideBaselineSnapshot } from './entity/guide-baseline-snapshot.entity';
 
 /**
@@ -57,6 +60,7 @@ import { GuideBaselineSnapshot } from './entity/guide-baseline-snapshot.entity';
 @Module({
   imports: [
     TypeOrmModule.forFeature([
+      GuideAlert,
       GuideBaselineSnapshot,
       GuideVisitor,
       GuideThread,
@@ -88,7 +92,9 @@ import { GuideBaselineSnapshot } from './entity/guide-baseline-snapshot.entity';
     GuideVoiceController,
   ],
   providers: [
+    GuideAlertService,
     GuideBaselineService,
+    GuidePlaygroundService,
     GuideVisitorService,
     GlobalSettingsRepository,
     GuideSettingsService,

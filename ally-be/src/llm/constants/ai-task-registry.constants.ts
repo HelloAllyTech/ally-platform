@@ -2269,7 +2269,7 @@ const GUIDE_TASKS: AiTaskEntry[] = [
     task: LlmTask.GUIDE_ORCHESTRATOR,
     runtime: LlmRuntime.ALLY_BE,
     trigger:
-      'A learner sends Ally a message, or presses Continue, Start or Not now; a platform event (a completion, a grade, signing in) while they are on the page; or an anonymous visitor writes on a public course link',
+      'A learner sends Ally a message, or presses Continue, Start or Not now; a platform event (a completion, a grade, signing in) while they are on the page; an anonymous visitor writes on a public course link; or an admin runs a turn in the Ally Console Playground (no learner, nothing stored)',
     detail:
       "Ally's reply: a streamed tool loop (at most six tool passes, then a closing pass " +
       'with tool_choice none) whose text is held until the Sentinel clears the message. ' +
@@ -2291,7 +2291,8 @@ const GUIDE_TASKS: AiTaskEntry[] = [
     id: 'guide-sentinel',
     task: LlmTask.GUIDE_SENTINEL,
     runtime: LlmRuntime.ALLY_BE,
-    trigger: 'A learner sends Ally a message',
+    trigger:
+      'A learner or visitor sends Ally a message, or an admin runs a Playground turn',
     detail:
       'The safety classifier: one call per learner message, run concurrently with the ' +
       'reply and held to a deadline (release policy safety.sentinelDeadlineMs, 1.2 s), so it ' +
@@ -2310,7 +2311,7 @@ const GUIDE_TASKS: AiTaskEntry[] = [
     task: LlmTask.GUIDE_TUTOR,
     runtime: LlmRuntime.ALLY_BE,
     trigger:
-      'Ally needs a grounded answer to a learner question about the course',
+      'Ally needs a grounded answer to a learner question about the course (also in Playground turns)',
     detail:
       "The Tutor specialist, called by Ally's consult_tutor tool: one structured call per " +
       'question over the learner-safe text of the items the learner can already open ' +

@@ -255,7 +255,7 @@ export class GuideAdminService {
     }
     const rows = await this.dataSource.query(
       `SELECT th."id", th."trackId", t."title" AS "trackTitle", th."tenant_id" AS "tenantId",
-              tn."name" AS "tenantName", th."visitorId" IS NOT NULL AS "visitor",
+              tn."name" AS "tenantName", th."visitorId" IS NOT NULL AND th."userId" IS NULL AS "visitor",
               th."mode", th."status", th."epoch", th."updatedAt", th."arm",
               to_char(th."updatedAt", 'YYYY-MM-DD"T"HH24:MI:SS.US') || '|' || th."id" AS "cursor",
               (SELECT count(*) FROM "agent_turns" a WHERE a."threadId" = th."id") AS turns,
