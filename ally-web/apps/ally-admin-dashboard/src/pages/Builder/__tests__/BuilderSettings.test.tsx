@@ -146,18 +146,105 @@ describe("BuilderSettings", () => {
     expect(screen.getByText("Loading…")).toBeInTheDocument();
   });
 
-  it("round-trips the kill switch and the budget", async () => {
-    render(<BuilderSettings />);
+  /**
+   * The switches at the top save when flipped. On 2026-10-22 the situation brief
+   * was switched off, an eval suite started, and the suite ran with it ON: the
+   * change was waiting on a Save at the bottom of the page.
+   */
+  describe("the instant switches", () => {
+    it("turns Builder off the moment it is flipped, with no Save", async () => {
+      render(<BuilderSettings />);
 
-    const toggle = screen.getByLabelText("Builder enabled");
-    fireEvent.click(toggle);
+      fireEvent.click(screen.getByLabelText("Builder enabled"));
 
-    fireEvent.click(screen.getByText("Save"));
+      await vi.waitFor(() => expect(updateSettings).toHaveBeenCalledWith({ enabled: false }));
+      expect(toastSuccess).toHaveBeenCalledWith("Builder enabled: off.");
+    });
 
-    await vi.waitFor(() => {
-      expect(updateSettings).toHaveBeenCalledWith(
-        expect.objectContaining({ enabled: false, maxConcurrentBuilds: 3 }),
+    it("asks before turning Builder on, and does nothing if cancelled", async () => {
+      settingsResult = {
+        data: { ...baseSettings, enabled: false },
+        isLoading: false,
+        isError: false,
+      };
+      render(<BuilderSettings />);
+
+      fireEvent.click(screen.getByLabelText("Builder enabled"));
+      expect(screen.getByRole("dialog")).toHaveTextContent("Turn Builder on?");
+      fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+      expect(updateSettings).not.toHaveBeenCalled();
+      expect(screen.getByLabelText("Builder enabled")).not.toBeChecked();
+
+      fireEvent.click(screen.getByLabelText("Builder enabled"));
+      fireEvent.click(screen.getByRole("button", { name: "Turn on" }));
+      await vi.waitFor(() => expect(updateSettings).toHaveBeenCalledWith({ enabled: true }));
+      expect(screen.getByLabelText("Builder enabled")).toBeChecked();
+    });
+
+    it("puts a switch back, and says so, when its save fails", async () => {
+      settingsResult = {
+        data: { ...baseSettings, validatedTurns: true, situationBrief: true },
+        isLoading: false,
+        isError: false,
+      };
+      updateSettings.mockReturnValueOnce({ unwrap: () => Promise.reject(new Error("500")) });
+      render(<BuilderSettings />);
+
+      const brief = screen.getByLabelText("Situation brief before the first question");
+      fireEvent.click(brief);
+
+      await vi.waitFor(() =>
+        expect(toastError).toHaveBeenCalledWith(
+          "Couldn't change situation brief before the first question. It is still on.",
+        ),
       );
+      expect(brief).toBeChecked();
+    });
+
+    it("leaves the switches out of Save, which covers the rest", async () => {
+      settingsResult = {
+        data: { ...baseSettings, validatedTurns: true, situationBrief: true },
+        isLoading: false,
+        isError: false,
+      };
+      render(<BuilderSettings />);
+
+      fireEvent.click(screen.getByText("Save"));
+
+      await vi.waitFor(() => expect(updateSettings).toHaveBeenCalled());
+      const body = updateSettings.mock.calls[0][0];
+      expect(body).toMatchObject({ maxConcurrentBuilds: 3 });
+      expect(body).not.toHaveProperty("enabled");
+      expect(body).not.toHaveProperty("validatedTurns");
+      expect(body).not.toHaveProperty("situationBrief");
+    });
+
+    it("keeps edits still waiting on Save when a flipped switch refetches the settings", async () => {
+      settingsResult = {
+        data: { ...baseSettings, validatedTurns: true, situationBrief: true },
+        isLoading: false,
+        isError: false,
+      };
+      const { rerender } = render(<BuilderSettings />);
+
+      fireEvent.change(screen.getByLabelText("Max concurrent builds"), {
+        target: { value: "7" },
+      });
+      fireEvent.click(screen.getByLabelText("Situation brief before the first question"));
+      await vi.waitFor(() =>
+        expect(updateSettings).toHaveBeenCalledWith({ situationBrief: false }),
+      );
+
+      // The refetch the mutation triggers: the server now has the brief off.
+      settingsResult = {
+        data: { ...baseSettings, validatedTurns: true, situationBrief: false },
+        isLoading: false,
+        isError: false,
+      };
+      rerender(<BuilderSettings />);
+
+      expect(screen.getByLabelText("Situation brief before the first question")).not.toBeChecked();
+      expect(screen.getByLabelText("Max concurrent builds")).toHaveValue("7");
     });
   });
 
@@ -187,12 +274,9 @@ describe("BuilderSettings", () => {
       render(<BuilderSettings />);
 
       fireEvent.click(screen.getByLabelText(label));
-      fireEvent.click(screen.getByText("Save"));
 
       await vi.waitFor(() =>
-        expect(updateSettings).toHaveBeenCalledWith(
-          expect.objectContaining({ validatedTurns: false, enabled: true }),
-        ),
+        expect(updateSettings).toHaveBeenCalledWith({ validatedTurns: false }),
       );
     });
 
@@ -206,13 +290,8 @@ describe("BuilderSettings", () => {
 
       expect(screen.getByLabelText(label)).not.toBeChecked();
       fireEvent.click(screen.getByLabelText(label));
-      fireEvent.click(screen.getByText("Save"));
 
-      await vi.waitFor(() =>
-        expect(updateSettings).toHaveBeenCalledWith(
-          expect.objectContaining({ validatedTurns: true }),
-        ),
-      );
+      await vi.waitFor(() => expect(updateSettings).toHaveBeenCalledWith({ validatedTurns: true }));
     });
 
     it("neither shows nor sends the switch when the server does not report it yet", async () => {
@@ -242,12 +321,9 @@ describe("BuilderSettings", () => {
         screen.getByText(/shows you what already exists to confirm or correct/),
       ).toBeInTheDocument();
       fireEvent.click(screen.getByLabelText(label));
-      fireEvent.click(screen.getByText("Save"));
 
       await vi.waitFor(() =>
-        expect(updateSettings).toHaveBeenCalledWith(
-          expect.objectContaining({ situationBrief: false, validatedTurns: true }),
-        ),
+        expect(updateSettings).toHaveBeenCalledWith({ situationBrief: false }),
       );
     });
 
@@ -448,7 +524,7 @@ describe("BuilderSettings", () => {
 
       await vi.waitFor(() => expect(updateSettings).toHaveBeenCalled());
       const body = updateSettings.mock.calls[0][0];
-      expect(body).toMatchObject({ autonomyLevel: "assist", enabled: true });
+      expect(body).toMatchObject({ autonomyLevel: "assist" });
       expect(body).not.toHaveProperty("autoReviewEnabled");
       expect(body).not.toHaveProperty("autoMergeEnabled");
     });
@@ -577,7 +653,7 @@ describe("BuilderSettings", () => {
 
       await vi.waitFor(() =>
         expect(updateSettings).toHaveBeenCalledWith(
-          expect.objectContaining({ maxPrAutomationUsd: 15, enabled: true }),
+          expect.objectContaining({ maxPrAutomationUsd: 15 }),
         ),
       );
     });
