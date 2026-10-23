@@ -60,14 +60,6 @@ class FixtureCutDto {
   @IsString()
   @MaxLength(2000)
   notes?: string;
-
-  @ApiPropertyOptional({
-    description:
-      'Repo → commit the session ran against; file reads in the replay pin to these',
-  })
-  @IsOptional()
-  @IsObject()
-  pins?: Record<string, string>;
 }
 
 export class CreateEvalFixtureFromSessionDto extends FixtureCutDto {}
