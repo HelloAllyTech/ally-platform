@@ -221,6 +221,20 @@ export class GuideThreadService {
     await this.threads.update(threadId, patch as never);
   }
 
+  /** The course item open on the learner's screen right now, if any. */
+  async openItemCard(
+    threadId: string,
+  ): Promise<{ trackItemId: string } | null> {
+    const rows: Array<{ trackItemId: string }> = await this.dataSource.query(
+      `SELECT "trackItemId" FROM "guide_cards"
+        WHERE "threadId" = $1 AND "state" = 'active' AND "kind" = 'course_item'
+          AND "trackItemId" IS NOT NULL
+        ORDER BY "updatedAt" DESC LIMIT 1`,
+      [threadId],
+    );
+    return rows[0] ?? null;
+  }
+
   async touchLearnerActivity(threadId: string): Promise<void> {
     await this.threads.update(threadId, { lastLearnerActivityAt: new Date() });
   }

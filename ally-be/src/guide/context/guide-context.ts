@@ -205,12 +205,24 @@ export function buildEpochOpener(input: {
   guidance: string;
   recent: ConversationLine[];
   reason: string;
+  /** What Ally remembers about the learner (they can see and delete it). */
+  memories?: Array<{ kind: string; body: string }>;
 }): string {
   const lines = ['<epoch_context>'];
   if (input.firstName) {
     lines.push(`Learner's first name: ${asData(input.firstName)}.`);
   }
   lines.push(`Guidance they asked for: ${input.guidance}.`);
+  if (input.memories?.length) {
+    lines.push(
+      'What you remember about them (from earlier conversations; use it lightly, never recite it):',
+      '<memory>',
+      ...input.memories.map(
+        (memory) => `- (${memory.kind}) ${asData(memory.body)}`,
+      ),
+      '</memory>',
+    );
+  }
   if (input.recent.length) {
     lines.push(
       `The conversation is resuming (${input.reason}). The last messages, oldest first:`,

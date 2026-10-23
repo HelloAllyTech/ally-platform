@@ -2303,6 +2303,25 @@ const GUIDE_TASKS: AiTaskEntry[] = [
     defaultModel: 'claude-haiku-5-5',
     configuredBy: 'ally_guide release modelRouting.sentinel',
   },
+  {
+    id: 'guide-tutor',
+    task: LlmTask.GUIDE_TUTOR,
+    runtime: LlmRuntime.ALLY_BE,
+    trigger:
+      'Ally needs a grounded answer to a learner question about the course',
+    detail:
+      "The Tutor specialist, called by Ally's consult_tutor tool: one structured call per " +
+      'question over the learner-safe text of the items the learner can already open ' +
+      '(article bodies, journal prompts, intros, titles and descriptions — never quiz ' +
+      'questions, interjections or branches, which carry answers), at most 30,000 ' +
+      'characters. Citations whose quote is not really in the passage are dropped, and an ' +
+      'answer left with none is reported as not covered. Same budget tiers as the ' +
+      'orchestrator.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'anthropic',
+    defaultModel: 'claude-opus-5-5',
+    configuredBy: 'ally_guide release modelRouting.tutor',
+  },
 ];
 
 export const AI_TASK_REGISTRY: AiTaskEntry[] = [

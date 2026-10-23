@@ -69,6 +69,7 @@ import {
 import { recentConversation, replayHistory } from '../context/guide-history';
 import { GuideLearnerPrefs } from '../entity/guide-learner-prefs.entity';
 import { GuideTrigger } from '../entity/guide-trigger.entity';
+import { GuideLearnerDataService } from '../learner/guide-learner-data.service';
 import {
   GuideOrgProfile,
   GuideOrgProfileValue,
@@ -83,6 +84,7 @@ import {
   GuideMessageKind,
   GuideMessageRole,
   GuideMode,
+  GuideNotebookKind,
   GuideTriggerStatus,
 } from '../enum/guide.enum';
 import { guideMessageTooLong } from '../guide-errors';
@@ -211,6 +213,9 @@ export interface GuideTurnContext extends HarnessTurnContext {
   pendingTriggers: GuideTrigger[];
   /** An item was completed since the last turn (steer may present next). */
   justCompleted: boolean;
+  memoryEnabled: boolean;
+  /** The course item open on screen, if any. */
+  openItem?: SpineItem | null;
 }
 
 /**
@@ -254,6 +259,7 @@ export class GuideTurnService {
     private readonly users: Repository<User>,
     @InjectRepository(GuideTrigger)
     private readonly triggers: Repository<GuideTrigger>,
+    private readonly learnerData: GuideLearnerDataService,
   ) {}
 
   /**
@@ -337,6 +343,7 @@ export class GuideTurnService {
       platformEvent: null,
       pendingTriggers: [],
       justCompleted: false,
+      memoryEnabled: true,
     };
   }
 
@@ -541,6 +548,7 @@ export class GuideTurnService {
     ctx.course = course;
     ctx.orgProfile = orgRow?.profile ?? null;
     ctx.guidance = prefsRow?.prefs?.guidance ?? 'walk';
+    ctx.memoryEnabled = prefsRow?.prefs?.memoryEnabled !== false;
 
     // The release this epoch is pinned to, if the epoch can continue.
     const snapshot = thread.epochSnapshot ?? null;
@@ -616,11 +624,21 @@ export class GuideTurnService {
         ctx.learnerSeq!,
         12,
       );
+      const memories = ctx.memoryEnabled
+        ? await this.learnerData.activeMemories(
+            { id: ctx.userId, tenantId: ctx.tenantId },
+            bundle.policy.memory.maxNotesInContext,
+          )
+        : [];
       epochOpener = buildEpochOpener({
         firstName: user?.name?.trim().split(/\s+/)[0] || null,
         guidance: ctx.guidance,
         recent: recentConversation(recent, 6),
         reason: decision.reason,
+        memories: memories.map((memory) => ({
+          kind: memory.kind,
+          body: memory.body,
+        })),
       });
       if (
         decision.reason === 'first conversation' ||
@@ -672,6 +690,13 @@ export class GuideTurnService {
     ctx.pacing = pacing;
 
     const spine = course.spine;
+    // What is open on screen: Ally stays quiet over an item, and only points
+    // to material while a quiz is open (plan §6.4).
+    const openCard = await this.threads.openItemCard(ctx.threadId);
+    const openItem = openCard
+      ? (spine.items.find((item) => item.id === openCard.trackItemId) ?? null)
+      : null;
+    ctx.openItem = openItem;
     const steer = decideSteer({
       mode: ctx.mode,
       pacing,
@@ -680,6 +705,7 @@ export class GuideTurnService {
       now: Date.now(),
       learnerReady: ctx.intent === 'start' || ctx.intent === 'continue',
       justCompleted: ctx.justCompleted,
+      itemOpen: Boolean(openItem) && openItem!.state !== 'completed',
     });
     const windowOpen = releaseWindowOpen(pacing, policy.releaseWindowMaxTurns);
     ctx.steer = steer;
@@ -698,6 +724,31 @@ export class GuideTurnService {
           'gentle check-in on how they are today, before anything else.',
       );
     }
+    // After the first win, once: ask what kind of helper they want to become
+    // (plan §3 stage 6) — never before the win, never in a hard moment.
+    const won = Boolean(pacing.firstWinAt) || spine.completed > 0;
+    if (
+      won &&
+      ctx.mode === GuideMode.NORMAL &&
+      pacing.possibleSelfOfferedAtTurn == null &&
+      !(await this.learnerData.hasNotebookKind(
+        { id: ctx.userId, tenantId: ctx.tenantId },
+        thread.trackId,
+        GuideNotebookKind.POSSIBLE_SELF,
+      ))
+    ) {
+      events.push(
+        'They have had a first win. When it fits naturally — not as an interruption — ' +
+          'ask once what kind of helper they want to become. Save their answer with ' +
+          'save_to_notebook (possible_self) and remember (possible_self).',
+      );
+      pacing = {
+        ...pacing,
+        possibleSelfOfferedAtTurn: pacing.learnerTurns ?? 0,
+      };
+      ctx.pacing = pacing;
+    }
+
     ctx.situationInput = {
       turn: pacing.learnerTurns ?? 1,
       mode: ctx.mode,
@@ -711,6 +762,10 @@ export class GuideTurnService {
       releaseWindowOpen: windowOpen,
       overlay: 'none',
       events,
+      openItem: openItem
+        ? { id: openItem.id, title: openItem.title, type: openItem.type }
+        : null,
+      quizOpen: openItem?.type === 'QUIZ' && openItem.state !== 'completed',
     };
     ctx.situation = renderSituationReport(ctx.situationInput);
     ctx.learnerMessage = buildLearnerMessage({
@@ -991,6 +1046,7 @@ export class GuideTurnService {
       now: Date.now(),
       learnerReady: ctx.intent === 'start' || ctx.intent === 'continue',
       justCompleted: ctx.justCompleted,
+      itemOpen: Boolean(ctx.openItem) && ctx.openItem!.state !== 'completed',
     });
     const atmosphere = atmosphereOf({
       mode: ctx.mode,
@@ -1108,6 +1164,29 @@ export class GuideTurnService {
       orgProfile: ctx.orgProfile,
       pacing: ctx.pacing,
       presented: ctx.presented,
+      trackId: ctx.thread!.trackId,
+      bundle: ctx.bundle!,
+      tier: ctx.tier,
+      attribution: {
+        threadId: ctx.threadId,
+        turnId: ctx.turnId,
+        userId: ctx.userId,
+        tenantId: ctx.tenantId,
+        releaseId: ctx.releaseId,
+      },
+      onCost: (usd) => {
+        ctx.usd += usd;
+      },
+      overlay: ctx.overlay,
+      memoryEnabled: ctx.memoryEnabled,
+      learnerTexts: [
+        ...ctx.recentTurns
+          .filter((turn) => turn.role === 'learner')
+          .map((turn) => turn.text),
+        ctx.text,
+      ].filter(Boolean),
+      epochNumber: ctx.epoch?.number ?? 0,
+      learnerMessageId: ctx.learnerMessageId,
       emitDurable: async (type, data) => {
         const event = await this.bus.appendDurable(
           ctx.threadId,

@@ -26,6 +26,12 @@ export interface GuideThreadPacing {
   fadeLevel?: number;
   /** ISO time of the learner's first win in this course. */
   firstWinAt?: string | null;
+  /** Noticing moments saved in an epoch (capped per session). */
+  noticing?: { epoch: number; count: number } | null;
+  /** The epoch whose closing card was shown (once per session). */
+  closedEpoch?: number | null;
+  /** `learnerTurns` when Ally was first told to ask about their possible self. */
+  possibleSelfOfferedAtTurn?: number | null;
 }
 
 /** What the current epoch's frozen context prefix was built from (plan §7.6). */

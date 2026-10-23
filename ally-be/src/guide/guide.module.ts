@@ -8,6 +8,9 @@ import { TrackModule } from 'src/track/track.module';
 import { Track } from 'src/track/entity/track.entity';
 import { User } from 'src/user/entity/user.entity';
 import { GuideToolExecutorService } from './capabilities/guide-tool-executor.service';
+import { GuideTutorService } from './capabilities/specialists/guide-tutor.service';
+import { GuideCourseContentService } from './content/guide-course-content.service';
+import { GuideLearnerDataService } from './learner/guide-learner-data.service';
 import { GuideConductorService } from './conductor/guide-conductor.service';
 import { GuideAdminService } from './admin/guide-admin.service';
 import { GuideAdminController } from './controller/guide-admin.controller';
@@ -91,6 +94,9 @@ import { GuideSettingsService } from './settings/guide-settings.service';
     GuideCardService,
     GuideProgressListener,
     GuideAdminService,
+    GuideTutorService,
+    GuideCourseContentService,
+    GuideLearnerDataService,
   ],
 })
 export class GuideModule {}

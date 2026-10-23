@@ -318,6 +318,7 @@ export enum LlmTask {
   // the model comes from the thread's release (modelRouting), not from env.
   GUIDE_ORCHESTRATOR = 'guide_orchestrator',
   GUIDE_SENTINEL = 'guide_sentinel',
+  GUIDE_TUTOR = 'guide_tutor',
 
   // Fallback for an un-mapped sender task (never drop a usage row).
   UNKNOWN = 'unknown',

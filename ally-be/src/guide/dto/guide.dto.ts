@@ -172,3 +172,16 @@ export class GuideCrisisResponseDto {
   @MaxLength(1500)
   body!: string;
 }
+
+/** PUT /v1/guide/threads/:id/appointment. */
+export class GuideAppointmentDto {
+  @ApiProperty({ description: 'ISO date-time of the reminder.' })
+  @IsString()
+  @MaxLength(40)
+  at!: string;
+
+  @ApiProperty({ description: 'IANA time zone, e.g. Asia/Kolkata.' })
+  @IsString()
+  @MaxLength(64)
+  timezone!: string;
+}

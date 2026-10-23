@@ -125,6 +125,7 @@ function setup(
       async () => undefined,
     ),
     saveState: jest.fn<Promise<void>, [string, any]>(async () => undefined),
+    openItemCard: jest.fn(async () => null),
   };
   const turnStore = {
     createOrGet: jest.fn(async () => ({
@@ -205,6 +206,12 @@ function setup(
     execute: jest.fn(async () => ({ content: '{"ok":true}', isError: false })),
   };
   const repo = (value: any) => ({ findOne: jest.fn(async () => value) });
+  const learnerData = {
+    activeMemories: jest.fn(async () => [
+      { kind: 'goal', body: 'Calmer openings.' },
+    ]),
+    hasNotebookKind: jest.fn(async () => true),
+  };
   const triggers = {
     find: jest.fn(async () => options.triggers ?? []),
     update: jest.fn(async () => undefined),
@@ -227,6 +234,7 @@ function setup(
     repo(null) as never,
     repo({ id: 1, name: 'Asha Rao' }) as never,
     triggers as never,
+    learnerData as never,
   );
   const run = async (input: Partial<GuideTurnInput> = {}) => {
     const ctx = service.createContext(

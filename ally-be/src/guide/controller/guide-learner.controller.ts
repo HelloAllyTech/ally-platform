@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Headers,
   HttpCode,
@@ -29,10 +30,12 @@ import {
   GUIDE_SSE_PING_INTERVAL_MS,
 } from '../constants/guide.constants';
 import {
+  GuideAppointmentDto,
   GuideCardEventDto,
   GuidePrefsUpdateDto,
   GuideTurnRequestDto,
 } from '../dto/guide.dto';
+import { GuideLearnerDataService } from '../learner/guide-learner-data.service';
 import { GuideCardService } from '../runtime/guide-card.service';
 import { GuideViewService } from '../runtime/guide-view.service';
 import { TrackEnrollmentService } from 'src/track/service/track-enrollment.service';
@@ -62,7 +65,117 @@ export class GuideLearnerController {
     private readonly cards: GuideCardService,
     private readonly trackEnrollment: TrackEnrollmentService,
     private readonly dataSource: DataSource,
+    private readonly learnerData: GuideLearnerDataService,
   ) {}
+
+  @Get('memory')
+  @AuthPermissions([PERMISSIONS.VIEW_TRACK])
+  @ApiOperation({
+    summary: 'What Ally remembers about the learner (theirs to see and delete)',
+  })
+  memory(@CurrentUser() user: TokenUser) {
+    return this.learnerData.listMemories(user);
+  }
+
+  @Delete('memory/:memoryId')
+  @AuthPermissions([PERMISSIONS.EDIT_TRACK])
+  @ApiOperation({ summary: 'Forget one thing Ally remembered' })
+  async forgetMemory(
+    @Param('memoryId', ParseUUIDPipe) memoryId: string,
+    @CurrentUser() user: TokenUser,
+  ) {
+    await this.learnerData.forgetMemory(user, memoryId);
+    return { forgotten: 1 };
+  }
+
+  @Delete('memory')
+  @AuthPermissions([PERMISSIONS.EDIT_TRACK])
+  @ApiOperation({ summary: 'Forget everything Ally remembered' })
+  async forgetAllMemory(@CurrentUser() user: TokenUser) {
+    return { forgotten: await this.learnerData.forgetAllMemories(user) };
+  }
+
+  @Get('notebook')
+  @AuthPermissions([PERMISSIONS.VIEW_TRACK])
+  @ApiOperation({
+    summary: "The learner's notebook, optionally for one course",
+  })
+  async notebook(
+    @CurrentUser() user: TokenUser,
+    @Query('trackId') trackId?: string,
+  ) {
+    const rows = await this.learnerData.listNotebook(user, trackId);
+    return rows.map((row) => ({
+      id: row.id,
+      trackId: row.trackId ?? null,
+      kind: row.kind,
+      text: row.text,
+      createdAt: (row as any).createdAt ?? null,
+    }));
+  }
+
+  @Get('notebook/export')
+  @AuthPermissions([PERMISSIONS.VIEW_TRACK])
+  @ApiOperation({ summary: 'The notebook as a Markdown document' })
+  async exportNotebook(
+    @CurrentUser() user: TokenUser,
+    @Res() res: Response,
+    @Query('trackId') trackId?: string,
+  ) {
+    const markdown = await this.learnerData.exportNotebook(user, trackId);
+    res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="notebook.md"');
+    res.send(markdown);
+  }
+
+  @Delete('notebook/:entryId')
+  @AuthPermissions([PERMISSIONS.EDIT_TRACK])
+  @ApiOperation({ summary: 'Delete a notebook entry' })
+  async removeNotebookEntry(
+    @Param('entryId', ParseUUIDPipe) entryId: string,
+    @CurrentUser() user: TokenUser,
+  ) {
+    await this.learnerData.removeFromNotebook(user, entryId);
+    return { removed: 1 };
+  }
+
+  @Get('threads/:threadId/appointment')
+  @AuthPermissions([PERMISSIONS.VIEW_TRACK])
+  @ApiOperation({ summary: 'The time the learner chose to come back, if any' })
+  async appointment(
+    @Param('threadId', ParseUUIDPipe) threadId: string,
+    @CurrentUser() user: TokenUser,
+  ) {
+    const thread = await this.threads.getOwned(threadId, user);
+    return { appointment: await this.learnerData.appointment(thread) };
+  }
+
+  @Put('threads/:threadId/appointment')
+  @AuthPermissions([PERMISSIONS.EDIT_TRACK])
+  @ApiOperation({
+    summary:
+      'Set the time to come back (ISO time + IANA zone); Ally sends one reminder then',
+  })
+  async setAppointment(
+    @Param('threadId', ParseUUIDPipe) threadId: string,
+    @Body() dto: GuideAppointmentDto,
+    @CurrentUser() user: TokenUser,
+  ) {
+    const thread = await this.threads.getOwned(threadId, user);
+    return this.learnerData.setAppointment(thread, user, dto);
+  }
+
+  @Delete('threads/:threadId/appointment')
+  @AuthPermissions([PERMISSIONS.EDIT_TRACK])
+  @ApiOperation({ summary: 'Cancel the reminder' })
+  async cancelAppointment(
+    @Param('threadId', ParseUUIDPipe) threadId: string,
+    @CurrentUser() user: TokenUser,
+  ) {
+    const thread = await this.threads.getOwned(threadId, user);
+    await this.learnerData.cancelAppointment(thread);
+    return { cancelled: true };
+  }
 
   @Get('tracks/:trackId/bootstrap')
   @AuthPermissions([PERMISSIONS.VIEW_TRACK])

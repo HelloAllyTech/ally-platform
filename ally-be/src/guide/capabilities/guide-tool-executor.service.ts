@@ -3,6 +3,14 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { LoggerService } from 'src/logger/logger.service';
 import { CourseSpine } from '../conductor/course-spine';
+import { GuideLearnerDataService } from '../learner/guide-learner-data.service';
+import {
+  GuideBudgetTier,
+  GuideReleaseBundle,
+} from '../release/guide-release.bundle';
+import { GuideCallAttribution } from '../runtime/guide-model.service';
+import { SentinelOverlay } from '../safety/sentinel';
+import { GuideTutorService } from './specialists/guide-tutor.service';
 import { SteerDecision, afterReflection } from '../conductor/pacing';
 import { GuideCard as GuideCardEvent } from '../contract/generated/guide-contract';
 import { itemTypeLabel } from '../context/guide-context';
@@ -14,7 +22,9 @@ import {
   GuideCardKind,
   GuideCardPresentation,
   GuideCardState,
+  GuideMemoryKind,
   GuideMode,
+  GuideNotebookKind,
 } from '../enum/guide.enum';
 import { resolveSupportLines } from '../safety/fixed-responses';
 import {
@@ -43,6 +53,18 @@ export interface GuideToolContext {
   /** Cards presented this turn, in order. */
   presented: GuideCardEvent[];
   emitDurable(type: string, data: Record<string, unknown>): Promise<number>;
+  trackId: string;
+  bundle: GuideReleaseBundle;
+  tier?: GuideBudgetTier;
+  attribution: GuideCallAttribution;
+  onCost?: (usd: number) => void;
+  /** The Sentinel's overlay on this message (real case, identifying details). */
+  overlay: SentinelOverlay;
+  memoryEnabled: boolean;
+  /** What the learner has written lately, newest last — notebook text must come from here. */
+  learnerTexts: string[];
+  epochNumber: number;
+  learnerMessageId?: string;
 }
 
 export interface GuideToolResult {
@@ -67,7 +89,33 @@ export const TOOL_ACTIVITY: Record<string, string> = {
   [GUIDE_TOOL_NAMES.SHOW_COURSE_INFO]: 'Opening the course overview',
   [GUIDE_TOOL_NAMES.GET_PROGRESS]: 'Checking where you are',
   [GUIDE_TOOL_NAMES.SHOW_WELLBEING_RESOURCES]: 'Finding support for you',
+  [GUIDE_TOOL_NAMES.CONSULT_TUTOR]: 'Checking the course material',
 };
+
+const QUIET_MODES = new Set([
+  GuideMode.CARE,
+  GuideMode.CRISIS,
+  GuideMode.CRISIS_FOLLOWUP,
+]);
+
+/** Folded for "did the learner write this?": case, spacing, quotes, punctuation. */
+const fold = (text: string) =>
+  text
+    .toLowerCase()
+    .replace(/[“”"‘’'`]/g, '')
+    .replace(/[^\p{L}\p{M}\p{N}\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+/** True when `text` (at least two words) appears in what the learner wrote. */
+export function isLearnersOwnWords(
+  text: string,
+  learnerTexts: string[],
+): boolean {
+  const needle = fold(text);
+  if (needle.split(' ').filter(Boolean).length < 2) return false;
+  return learnerTexts.some((said) => fold(said).includes(needle));
+}
 
 /**
  * Runs Ally's tools. Every failure is returned to the model as an error
@@ -85,6 +133,8 @@ export class GuideToolExecutorService {
     private readonly cards: Repository<GuideCard>,
     @InjectRepository(GuideLearnerPrefs)
     private readonly prefs: Repository<GuideLearnerPrefs>,
+    private readonly tutor: GuideTutorService,
+    private readonly learnerData: GuideLearnerDataService,
   ) {}
 
   async execute(
@@ -107,6 +157,16 @@ export class GuideToolExecutorService {
           return await this.showWellbeingResources(ctx);
         case GUIDE_TOOL_NAMES.SET_GUIDANCE:
           return await this.setGuidance(input, ctx);
+        case GUIDE_TOOL_NAMES.CONSULT_TUTOR:
+          return await this.consultTutor(input, ctx);
+        case GUIDE_TOOL_NAMES.REMEMBER:
+          return await this.remember(input, ctx);
+        case GUIDE_TOOL_NAMES.SAVE_TO_NOTEBOOK:
+          return await this.saveToNotebook(input, ctx);
+        case GUIDE_TOOL_NAMES.RECORD_NOTICING:
+          return await this.recordNoticing(input, ctx);
+        case GUIDE_TOOL_NAMES.CLOSE_SESSION:
+          return await this.closeSession(input, ctx);
         default:
           return fail(`Unknown tool ${name}.`);
       }
@@ -314,6 +374,190 @@ export class GuideToolExecutorService {
     return ok({
       guidance: level,
       next: 'Takes effect from your next reply.',
+    });
+  }
+
+  private async consultTutor(
+    input: Record<string, any>,
+    ctx: GuideToolContext,
+  ): Promise<GuideToolResult> {
+    const question = String(input.question ?? '').trim();
+    if (!question) return fail('Ask a question.');
+    const answer = await this.tutor.consult({
+      question,
+      trackId: ctx.trackId,
+      spine: ctx.spine,
+      languageCode: ctx.language,
+      bundle: ctx.bundle,
+      tier: ctx.tier,
+      attribution: ctx.attribution,
+      onCost: ctx.onCost,
+    });
+    return ok({
+      covered: answer.covered,
+      answer: answer.answer,
+      sources: answer.citations.map((c) => ({ item: c.title, quote: c.quote })),
+      next: answer.covered
+        ? 'Say it in your own words, briefly, and name where in the course it is covered.'
+        : 'Tell the learner honestly that the course does not cover this.',
+    });
+  }
+
+  private async remember(
+    input: Record<string, any>,
+    ctx: GuideToolContext,
+  ): Promise<GuideToolResult> {
+    if (!ctx.memoryEnabled) {
+      return fail(
+        'The learner has switched memory off. Do not remember anything.',
+      );
+    }
+    if (QUIET_MODES.has(ctx.mode) || ctx.overlay !== 'none') {
+      return fail('Nothing is remembered from this kind of moment.');
+    }
+    const kinds = Object.values(GuideMemoryKind) as string[];
+    if (!kinds.includes(input.kind)) return fail('Unknown kind.');
+    const policy = ctx.bundle.policy.memory;
+    const result = await this.learnerData.remember({
+      owner: { id: ctx.userId, tenantId: ctx.tenantId },
+      kind: input.kind as GuideMemoryKind,
+      body: String(input.note ?? ''),
+      threadId: ctx.threadId,
+      expiryDays: policy.expiryDays,
+      maxChars: policy.noteMaxChars,
+    });
+    if (!result.stored) {
+      return fail(
+        result.reason === 'forgotten_before'
+          ? 'The learner asked you to forget this before. Do not store it again.'
+          : 'Nothing to remember.',
+      );
+    }
+    return ok({ remembered: true, updated: result.updated });
+  }
+
+  private async saveToNotebook(
+    input: Record<string, any>,
+    ctx: GuideToolContext,
+  ): Promise<GuideToolResult> {
+    if (ctx.mode === GuideMode.CRISIS) return fail('Not now.');
+    const allowed = [
+      GuideNotebookKind.POSSIBLE_SELF,
+      GuideNotebookKind.REFLECTION,
+      GuideNotebookKind.REHEARSED_LINE,
+    ] as string[];
+    if (!allowed.includes(input.kind)) return fail('Unknown kind.');
+    const text = String(input.text ?? '').trim();
+    if (!isLearnersOwnWords(text, ctx.learnerTexts)) {
+      return fail(
+        "The notebook holds the learner's own words: copy them exactly from what they wrote.",
+      );
+    }
+    const entry = await this.learnerData.addToNotebook({
+      owner: { id: ctx.userId, tenantId: ctx.tenantId },
+      threadId: ctx.threadId,
+      trackId: ctx.trackId,
+      kind: input.kind as GuideNotebookKind,
+      text,
+      sourceMessageId: ctx.learnerMessageId ?? null,
+    });
+    await ctx.emitDurable('notebook.added', {
+      entryId: entry.id,
+      kind: entry.kind,
+      text: entry.text,
+    });
+    return ok({ saved: true });
+  }
+
+  private async recordNoticing(
+    input: Record<string, any>,
+    ctx: GuideToolContext,
+  ): Promise<GuideToolResult> {
+    if (QUIET_MODES.has(ctx.mode)) return fail('Not in this moment.');
+    const used =
+      ctx.pacing.noticing?.epoch === ctx.epochNumber
+        ? ctx.pacing.noticing.count
+        : 0;
+    if (used >= ctx.bundle.policy.noticingMaxPerSession) {
+      return fail(
+        'Enough noticing for this session. Keep it rare so it means something.',
+      );
+    }
+    const behaviour = String(input.behaviour ?? '').trim();
+    if (behaviour.split(/\s+/).length < 4) {
+      return fail('Name the specific behaviour.');
+    }
+    const evidence = String(input.evidence ?? '').trim();
+    const entry = await this.learnerData.addToNotebook({
+      owner: { id: ctx.userId, tenantId: ctx.tenantId },
+      threadId: ctx.threadId,
+      trackId: ctx.trackId,
+      kind: GuideNotebookKind.NOTICING,
+      text: evidence ? `${behaviour} (${evidence})` : behaviour,
+    });
+    ctx.pacing = {
+      ...ctx.pacing,
+      noticing: { epoch: ctx.epochNumber, count: used + 1 },
+    };
+    await ctx.emitDurable('notebook.added', {
+      entryId: entry.id,
+      kind: entry.kind,
+      text: entry.text,
+    });
+    return ok({ saved: true });
+  }
+
+  private async closeSession(
+    input: Record<string, any>,
+    ctx: GuideToolContext,
+  ): Promise<GuideToolResult> {
+    if (ctx.mode === GuideMode.CRISIS) return fail('Not now.');
+    if (ctx.pacing.closedEpoch === ctx.epochNumber) {
+      return fail('The closing card is already on screen for this session.');
+    }
+    const payload = {
+      noticing: String(input.noticing ?? '').slice(0, 280),
+      watchFor: String(input.watch_for ?? '').slice(0, 280),
+      teaser: String(input.teaser ?? '').slice(0, 200),
+      // The client turns a choice into a time in the learner's zone and
+      // saves it with PUT /v1/guide/threads/:id/appointment.
+      options: [
+        'tomorrow_morning',
+        'after_shift',
+        'this_weekend',
+        'pick_a_time',
+      ],
+    };
+    const saved = await this.cards.save(
+      this.cards.create({
+        threadId: ctx.threadId,
+        kind: GuideCardKind.CLOSING_RITUAL,
+        presentation: GuideCardPresentation.INLINE,
+        state: GuideCardState.READY,
+        title: 'Until next time',
+        payload,
+        tenantId: ctx.tenantId,
+      }),
+    );
+    const card: GuideCardEvent = {
+      cardId: saved.id,
+      kind: GuideCardKind.CLOSING_RITUAL,
+      presentation: GuideCardPresentation.INLINE,
+      state: GuideCardState.READY,
+      title: 'Until next time',
+      framing: null,
+      payload,
+    };
+    const seq = await ctx.emitDurable('card.presented', { card });
+    await this.cards.update(saved.id, {
+      presentedSeq: seq,
+      payload: { ...payload, card } as Record<string, any>,
+    });
+    ctx.presented.push(card);
+    ctx.pacing = { ...ctx.pacing, closedEpoch: ctx.epochNumber };
+    return ok({
+      shown: true,
+      next: 'Say goodbye in a sentence. Do not repeat what is on the card.',
     });
   }
 }

@@ -4,6 +4,11 @@ import {
   ORCHESTRATOR_SYSTEM_PROMPT,
 } from '../prompts/orchestrator.prompt';
 import {
+  TUTOR_PROMPT_CODE,
+  TUTOR_PROMPT_VERSION,
+  TUTOR_SYSTEM_PROMPT,
+} from '../prompts/tutor.prompt';
+import {
   SENTINEL_PROMPT_CODE,
   SENTINEL_PROMPT_VERSION,
   SENTINEL_SYSTEM_PROMPT,
@@ -212,6 +217,11 @@ export const GUIDE_DEFAULT_BUNDLE: GuideReleaseBundle = {
       version: SENTINEL_PROMPT_VERSION,
       text: SENTINEL_SYSTEM_PROMPT,
     },
+    tutor: {
+      code: TUTOR_PROMPT_CODE,
+      version: TUTOR_PROMPT_VERSION,
+      text: TUTOR_SYSTEM_PROMPT,
+    },
   },
   modelRouting: {
     orchestrator: {
@@ -241,6 +251,7 @@ export const GUIDE_DEFAULT_BUNDLE: GuideReleaseBundle = {
     mark_reflection_done: true,
     show_wellbeing_resources: true,
     set_guidance: true,
+    consult_tutor: true,
   },
   skills: {},
   policy: GUIDE_DEFAULT_POLICY,

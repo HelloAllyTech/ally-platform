@@ -28,6 +28,11 @@ export const GUIDE_TOOL_NAMES = {
   MARK_REFLECTION_DONE: 'mark_reflection_done',
   SHOW_WELLBEING_RESOURCES: 'show_wellbeing_resources',
   SET_GUIDANCE: 'set_guidance',
+  CONSULT_TUTOR: 'consult_tutor',
+  REMEMBER: 'remember',
+  SAVE_TO_NOTEBOOK: 'save_to_notebook',
+  RECORD_NOTICING: 'record_noticing',
+  CLOSE_SESSION: 'close_session',
 } as const;
 
 export const GUIDE_TOOLS: AgentToolDefinition[] = [
@@ -98,6 +103,115 @@ export const GUIDE_TOOLS: AgentToolDefinition[] = [
         level: { type: 'string', enum: ['lead', 'walk', 'drive'] },
       },
       required: ['level'],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    name: GUIDE_TOOL_NAMES.CONSULT_TUTOR,
+    description:
+      "Get a grounded answer from the course's own material, with the items it comes from. Use it before answering a question about the course's content, so you never invent what the course says; if the result says not covered, tell the learner the course does not cover it. " +
+      'Example: {"question":"What does the course say about sitting with silence?"}',
+    input_schema: {
+      type: 'object',
+      properties: {
+        question: {
+          type: 'string',
+          description: "The question, in the learner's words where possible.",
+        },
+      },
+      required: ['question'],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    name: GUIDE_TOOL_NAMES.REMEMBER,
+    description:
+      'Remember something about the learner for future conversations: a preference, goal, strength, struggle, context or commitment they shared about THEMSELVES. Never about a client or another person, never anything identifying, and not in a hard moment. The learner can see and delete everything you remember. ' +
+      'Example: {"kind":"goal","note":"Wants to feel calmer opening crisis calls."}',
+    input_schema: {
+      type: 'object',
+      properties: {
+        kind: {
+          type: 'string',
+          enum: [
+            'preference',
+            'goal',
+            'possible_self',
+            'strength',
+            'struggle',
+            'context',
+            'commitment',
+          ],
+        },
+        note: {
+          type: 'string',
+          description: 'One plain sentence, at most 280 characters.',
+        },
+      },
+      required: ['kind', 'note'],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    name: GUIDE_TOOL_NAMES.SAVE_TO_NOTEBOOK,
+    description:
+      "Save the learner's own words to their notebook: the helper they want to become, a reflection, or a line they practised. The text must be their words, copied from what they wrote, not yours. " +
+      'Example: {"kind":"possible_self","text":"Someone people feel safe talking to at 3am."}',
+    input_schema: {
+      type: 'object',
+      properties: {
+        kind: {
+          type: 'string',
+          enum: ['possible_self', 'reflection', 'rehearsed_line'],
+        },
+        text: {
+          type: 'string',
+          description: "The learner's words, copied exactly.",
+        },
+      },
+      required: ['kind', 'text'],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    name: GUIDE_TOOL_NAMES.RECORD_NOTICING,
+    description:
+      'Save a specific moment you noticed — something the learner did well, with what it led to — to their notebook. Rare: at most twice a session, only for something real you can point to. ' +
+      'Example: {"behaviour":"You asked about her plan directly instead of circling it","evidence":"In the roleplay debrief"}',
+    input_schema: {
+      type: 'object',
+      properties: {
+        behaviour: {
+          type: 'string',
+          description: 'What they did, specifically, in one sentence.',
+        },
+        evidence: {
+          type: 'string',
+          description: 'Where you saw it, briefly.',
+        },
+      },
+      required: ['behaviour', 'evidence'],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    name: GUIDE_TOOL_NAMES.CLOSE_SESSION,
+    description:
+      'Show the closing card when the learner is wrapping up for now: one specific thing you noticed today, one thing to watch for next time, and a one-line teaser of what comes next. The card lets them pick when to come back. Use once, when they say they are done for now. ' +
+      'Example: {"noticing":"You stayed with Meera\'s silence instead of filling it.","watch_for":"The moment you want to reassure: try reflecting first.","teaser":"Next: a caller who will not say why they called."}',
+    input_schema: {
+      type: 'object',
+      properties: {
+        noticing: { type: 'string' },
+        watch_for: { type: 'string' },
+        teaser: { type: 'string' },
+      },
+      required: ['noticing', 'watch_for', 'teaser'],
       additionalProperties: false,
     },
     strict: true,
