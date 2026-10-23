@@ -65,7 +65,8 @@ This document helps AI agents (Claude Code, Copilot, etc.) quickly orient themse
 - **Tests**: Jest + React Native Testing Library
 - **Key patterns**: Dual listening modes (microphone + conference), AsyncStorage for tokens, Firebase Crashlytics
 
-### infra (Infrastructure)
+### infra (Infrastructure — Standalone Repo Outside `ally-platform`)
+- **Repository**: `HelloAllyTech/infra` (intentionally kept outside the `ally-platform` monorepo as a separate private repository to isolate deployment inventories and Ansible Vault secrets; `/infra/` is `.gitignore`d at the monorepo root)
 - **Stack**: Ansible 13 + Terraform + Docker Compose
 - **Ansible roles**: `ansible/roles/` (30+ roles)
 - **Playbooks**: `ansible/` - `baremetal.yml`, `ally_core.yml`, `ally_ai.yml`, `ally_learn.yml`, `ally_web.yml`, `ci.yml`

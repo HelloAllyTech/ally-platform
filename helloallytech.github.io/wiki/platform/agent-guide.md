@@ -59,7 +59,8 @@ This page helps AI agents (and developers) quickly orient in the Ally workspace 
 - **Real-time**: Socket.IO + LiveKit React Native; `react-native-live-audio-stream` for recording
 - **Key patterns**: Dual listening modes (microphone + conference), AsyncStorage for tokens, Firebase Crashlytics
 
-### [infra](../repos/infra.md) — Infrastructure
+### [infra](../repos/infra.md) — Infrastructure *(Standalone Repo — Outside `ally-platform`)*
+- **Repository**: `HelloAllyTech/infra` (intentionally kept **outside** the `ally-platform` monorepo as a standalone private repository to isolate deployment inventories and Ansible Vault secrets; `/infra/` is `.gitignore`d at the `ally-platform` root)
 - **Stack**: Ansible 13 + Terraform + Docker Compose
 - **Playbooks**: `ansible/` — `baremetal.yml`, `ally_core.yml`, `ally_ai.yml`, `ally_learn.yml`, `ally_web.yml`, `ci.yml`
 - **Scripts**: `infra/bootstrap.sh` (clone repos), `infra/dev_env.sh` (start dev), `infra/colima.sh`

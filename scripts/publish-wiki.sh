@@ -30,8 +30,8 @@ echo "=== Preparing Ally Developer Wiki (tech.helloally.ai) ==="
 if command -v python3 >/dev/null 2>&1; then
   (
     cd "$WIKI_SRC"
-    python3 scripts/gen-routing.py
     python3 scripts/gen-stats.py --repos "$ROOT_DIR"
+    python3 scripts/gen-routing.py
   )
 fi
 

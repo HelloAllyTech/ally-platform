@@ -2,24 +2,28 @@
 title: Developer Setup
 tags: [contributing, setup, onboarding, environment]
 summary: How to clone all Ally repositories and start the full local development environment.
-last_reconciled: 2026-10-21
+last_reconciled: 2026-10-23
 ---
 
 # Developer Setup
 
 This guide gets you from zero to a running Ally development environment. For repo-specific commands, see each [repo page](../index.md#repositories).
 
+> [!NOTE]
+> **Unified `ally-platform` Monorepo + Standalone `infra` Repo:**
+> All application code (`ally-be`, `ally-web`, `ally-ai`, `ally-ai-learn`, `ally-mobile`) and the developer wiki (`helloallytech.github.io`) live in the unified **`HelloAllyTech/ally-platform`** monorepo. **`HelloAllyTech/infra` is intentionally kept outside the monorepo** as a standalone private repository to isolate infrastructure inventories and Ansible Vault secrets (locally, `infra/` can be cloned directly inside the `ally-platform` root, where `/infra/` is `.gitignore`d).
+
 ## Quick Start
 
-1. **Clone the infrastructure repo** (the easiest way to get everything):
+1. **Clone the `ally-platform` monorepo (and `infra` for local Docker/Colima helper scripts)**:
    ```bash
-   git clone git@github.com:HelloAllyTech/infra.git
-   cd infra
-   ./bootstrap.sh
+   git clone git@github.com:HelloAllyTech/ally-platform.git ally
+   cd ally
+   git clone git@github.com:HelloAllyTech/infra.git infra
    ```
-   `bootstrap.sh` clones the other platform repos next to `infra` — ally-ai, ally-ai-learn, ally-web, ally-be, ally-mobile and this wiki — or updates the ones already there. It fetches every repo and only pulls when the working tree is clean (repos with uncommitted changes are skipped with a warning). It installs nothing; dependencies are set up per repo.
+   *(Alternatively, running `./bootstrap.sh` from a standalone `infra` checkout detects or clones `ally-platform` automatically.)*
 
-   Working from a fork? Use `bootstrap-contributor.sh` (same folder) instead: it clones your forks and sets `origin` to the fork and `upstream` to the official repo.
+   Working from a fork? Use `bootstrap-contributor.sh` (inside `infra/`) instead: it clones your forks and sets `origin` to the fork and `upstream` to the official repo.
 
    Optional: `source infra/ally-env.sh` registers `ally-*` shell aliases for the scripts below (`ally-dev`, `ally-colima`, `ally-checkout`, …); `ally-help` lists them.
 
