@@ -262,8 +262,10 @@ describe('BuilderBuildService', () => {
       const [repo, issue] = github.createIssue.mock.calls[0];
       expect(repo).toBe('ally-be');
       expect(issue.labels).toEqual(['builder']);
-      // ally-be is a public repo: the issue names the run, nothing more.
+      // ally-be is a public repo: the issue names the run, nothing more —
+      // and the service, which one builder.yml now needs to set itself up.
       expect(issue.body).toContain(`<!-- builder-run: ${run.id} -->`);
+      expect(issue.body).toContain('<!-- builder-service: ally-be -->');
       expect(issue.body).not.toContain('confidential');
       expect(issue.title).not.toContain(readySession().title);
       expect(runRepository.update).toHaveBeenCalledWith(
@@ -1105,6 +1107,8 @@ describe('BuilderBuildService', () => {
           spec_run_id: 'build-run-15',
           review_run_id: run!.id,
           builder_pr_id: 'pr-114',
+          // One review workflow serves every service; this picks the runtime.
+          service: 'ally-mobile',
         },
       });
       expect(runRepository.save).toHaveBeenCalledWith(
@@ -1180,6 +1184,12 @@ describe('BuilderBuildService', () => {
 
       await service.cancelRun(reviewRun({ githubRunId: null }) as any, 7);
 
+      // This review's run, by the id in its title — not any review's.
+      expect(github.findRunSince).toHaveBeenCalledWith(
+        expect.objectContaining({
+          titleIncludes: expect.stringMatching(/^run /),
+        }),
+      );
       expect(github.cancelRun).toHaveBeenCalledWith('ally-mobile', '78');
       expect(github.cancelRun).not.toHaveBeenCalledWith(
         'ally-be',
@@ -1320,6 +1330,46 @@ describe('BuilderBuildService', () => {
       );
       expect((github as any).closeIssue).toHaveBeenCalledWith(
         'ally-mobile',
+        113,
+      );
+    });
+
+    /**
+     * Since the 2026-10-23 cutover one builder.yml serves every Builder issue
+     * in the monorepo: "the oldest run since dispatch" there could be another
+     * session's, which this would then cancel.
+     */
+    it('stops a monorepo issue build by its own run, where its issue is', async () => {
+      (github as any).closeIssue = jest.fn().mockResolvedValue(undefined);
+      github.findRunSince.mockResolvedValue({
+        id: '555',
+        status: 'in_progress',
+      });
+
+      await service.cancelRun(
+        {
+          ...run,
+          githubRunId: null,
+          issueNumber: 113,
+          issueUrl: 'https://github.com/HelloAllyTech/ally-platform/issues/113',
+          repos: ['ally-mobile'],
+        } as any,
+        7,
+      );
+
+      expect(github.findRunSince).toHaveBeenCalledWith(
+        expect.objectContaining({
+          repo: 'HelloAllyTech/ally-platform',
+          workflow: 'builder.yml',
+          titleIncludes: '#113 (issues)',
+        }),
+      );
+      expect(github.cancelRun).toHaveBeenCalledWith(
+        'HelloAllyTech/ally-platform',
+        '555',
+      );
+      expect((github as any).closeIssue).toHaveBeenCalledWith(
+        'HelloAllyTech/ally-platform',
         113,
       );
     });

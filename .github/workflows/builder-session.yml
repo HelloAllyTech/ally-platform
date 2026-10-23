@@ -1,4 +1,7 @@
 name: Builder session
+# The run id is in the title: ally-be finds a design run's GitHub run by it
+# (builderRunTitle) rather than by "the oldest run since we dispatched".
+run-name: "Builder ${{ inputs.mode }} · run ${{ inputs.run_id }}"
 
 # One technical-design run for a Builder session: two read-only agent passes
 # (designer, then a cold critic) over every repo the session touches. Builds do
@@ -6,10 +9,10 @@ name: Builder session
 # builder-opencode.yml) — so the coding loop, the test gate and the pull
 # request machinery this file used to host are gone.
 #
-# Hosted here, in ally-be, as the ONLY copy. A multi-repo build belongs to no
-# single target repo, and one copy cannot drift from five others. Target repos
-# are cloned at run time rather than checked out by `actions/checkout`, which
-# cannot loop over a variable list.
+# Hosted here, in the monorepo, as the ONLY copy: one copy cannot drift. The
+# services it designs across are folders of this same repo since the
+# 2026-10-23 cutover; they are cloned once at run time and linked into
+# `repos/` (see "Clone target repos").
 #
 # This file is deliberately thin. Everything about *how* a build works — the
 # protocol, the ordering, the reporting contract — is fetched from ally-be at
@@ -124,15 +127,15 @@ jobs:
           echo "::add-mask::${TOKEN}"
           { echo "BUILDER_GH_TOKEN=${TOKEN}"; echo "GH_TOKEN=${TOKEN}"; } >> "$GITHUB_ENV"
 
-      - name: Check out the protocol (ally-be)
+      - name: Check out the protocol (this repo, for ally-be/scripts/builder)
         uses: actions/checkout@v4
         with:
           path: protocol
           token: ${{ steps.app.outputs.token }}
 
       # Moved out of the workspace, because the agent must not be able to see
-      # it. This is a COMPLETE second copy of ally-be, with paths identical to
-      # `repos/ally-be` — `src/builder/service/builder-metrics.service.ts`
+      # it. This is a COMPLETE second copy of the monorepo, holding every file
+      # `repos/<service>` does — `ally-be/src/builder/service/builder-metrics.service.ts`
       # exists in both. An agent looking for a file by path finds two, and one
       # of them is a decoy: a design that cites `protocol/` paths describes a
       # checkout nothing builds from. (A build run once edited, tested and
@@ -150,19 +153,34 @@ jobs:
           mv protocol "${RUNNER_TEMP}/protocol"
           echo "PROTOCOL=${RUNNER_TEMP}/protocol" >> "$GITHUB_ENV"
 
+      # Since the 2026-10-23 cutover every service is a folder of this monorepo,
+      # and its old repo is archived — cloning that would design against code
+      # frozen at the move. One clone of the monorepo, at today's default branch,
+      # and `repos/<service>` linked to each folder, so the agent's paths are
+      # the same `repos/ally-be/src/...` as before. The clone sits beside
+      # `repos/`, not in it: run-engine.sh treats every `repos/*/` as a target.
+      # A repo that is not a monorepo folder is still cloned on its own.
       - name: Clone target repos
         run: |
           set -euo pipefail
           mkdir -p repos
+          # Blobless: history for `git log`/`blame` while reading, but file
+          # contents fetched on demand. A full clone is minutes of runner time
+          # for blobs nothing reads.
+          git clone --filter=blob:none \
+            "https://x-access-token:${BUILDER_GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            .platform
           for repo in $(echo "$BUILDER_REPOS" | jq -r '.[]'); do
-            echo "::group::clone $repo"
-            # Blobless: history for `git log`/`blame` while reading, but file
-            # contents fetched on demand. A full clone of ally-web is minutes
-            # of runner time for blobs nothing reads.
-            git clone --filter=blob:none \
-              "https://x-access-token:${BUILDER_GH_TOKEN}@github.com/${GITHUB_REPOSITORY_OWNER}/${repo}.git" \
-              "repos/${repo}"
-            echo "::endgroup::"
+            if [ -d ".platform/${repo}" ]; then
+              ln -s "${GITHUB_WORKSPACE}/.platform/${repo}" "repos/${repo}"
+              echo "${repo}: the ${repo}/ folder of ${GITHUB_REPOSITORY}"
+            else
+              echo "::group::clone $repo"
+              git clone --filter=blob:none \
+                "https://x-access-token:${BUILDER_GH_TOKEN}@github.com/${GITHUB_REPOSITORY_OWNER}/${repo}.git" \
+                "repos/${repo}"
+              echo "::endgroup::"
+            fi
           done
 
       # forward-events.mjs, builder-mcp.mjs and the engine itself.

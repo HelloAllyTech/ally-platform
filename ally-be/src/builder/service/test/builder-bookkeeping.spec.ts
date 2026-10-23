@@ -384,6 +384,7 @@ describe('Builder bookkeeping — a failed release that actually shipped', () =>
     Object.assign(service, {
       repository,
       github,
+      configService: { githubMonorepo: 'ally-platform' },
       logger: { info: jest.fn(), warn: jest.fn() },
     });
     return { service: service as any, repository, github };

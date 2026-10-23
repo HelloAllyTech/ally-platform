@@ -1,3 +1,4 @@
+import { Like } from 'typeorm';
 import { BuilderPullRequestService } from '../builder-pull-request.service';
 import {
   BuilderPrFeedbackKind,
@@ -246,7 +247,7 @@ describe('BuilderPullRequestService', () => {
       await service.reconcileOpenPullRequests();
 
       expect(github.createIssueComment).toHaveBeenCalledWith(
-        'ally-be',
+        'o/ally-be',
         12,
         expect.stringMatching(/^\/oc CI failed on this pull request: check\./),
       );
@@ -1046,8 +1047,15 @@ describe('BuilderPullRequestService', () => {
         costUsd: 2.25,
       });
 
+      // Found by the URL it lives at: `repo` in a usage report is the GitHub
+      // repo the workflow ran in, not the service a row records.
       expect(repository.findOne).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { repo: 'ally-web', prNumber: 817 } }),
+        expect.objectContaining({
+          where: {
+            prNumber: 817,
+            prUrl: Like('%/ally-web/pull/817'),
+          },
+        }),
       );
       expect(buildService.recordExternalUsage).toHaveBeenCalledWith(
         'review-run',
@@ -1243,7 +1251,7 @@ describe('BuilderPullRequestService', () => {
 
       await reconcileWith({ headSha: 'head-1' }, ocPr());
       const [repo, number, body] = github.createIssueComment.mock.calls[0];
-      expect([repo, number]).toEqual(['ally-be', 42]);
+      expect([repo, number]).toEqual(['org/ally-be', 42]);
       expect(body).toMatch(/^\/oc /);
       expect(body).toContain('<!-- builder-feedback: pr-1 -->');
       // ally-be, ally-web and ally-ai are public: the finding stays private.
@@ -1811,7 +1819,7 @@ describe('BuilderPullRequestService', () => {
       await cleanReview();
 
       expect(github.approvePullRequest).toHaveBeenCalledWith(
-        'ally-be',
+        'org/ally-be',
         42,
         expect.stringContaining("Builder's review agent"),
       );
@@ -1976,7 +1984,7 @@ describe('BuilderPullRequestService', () => {
       await tick();
 
       expect(github.mergePullRequest).toHaveBeenCalledWith(
-        'ally-be',
+        'org/ally-be',
         42,
         'Add a thing',
       );
@@ -2110,7 +2118,7 @@ describe('BuilderPullRequestService', () => {
       await reconcileWith(dirty, opencodePr());
 
       expect(github.createIssueComment).toHaveBeenCalledWith(
-        'ally-be',
+        'org/ally-be',
         42,
         expect.stringContaining('/oc This pull request conflicts with master'),
       );
@@ -2194,7 +2202,7 @@ describe('BuilderPullRequestService', () => {
       await reconcileWith({ headSha: 'abc1234def', ...behind });
 
       expect(github.updatePullRequestBranch).toHaveBeenCalledWith(
-        'ally-be',
+        'org/ally-be',
         42,
         'abc1234def',
       );
@@ -2221,7 +2229,7 @@ describe('BuilderPullRequestService', () => {
       await reconcileWith({ headSha: 'abc1234def', ...behind });
 
       expect(github.updatePullRequestBranch).toHaveBeenCalledWith(
-        'ally-be',
+        'org/ally-be',
         42,
         'abc1234def',
       );
@@ -2550,6 +2558,170 @@ describe('BuilderPullRequestService', () => {
 
       expect(feedbackRepository.upsertIfNew).toHaveBeenCalledWith(
         expect.objectContaining({ status: BuilderPrFeedbackStatus.PENDING }),
+      );
+    });
+  });
+
+  /**
+   * Since the 2026-10-23 cutover a service name is routed to the monorepo,
+   * whose PR numbers restarted at #1. A stored pull request must be read where
+   * its URL says — `ally-be` + 42 would otherwise be the monorepo's #42, a
+   * different change Builder would merge, approve or comment on.
+   */
+  describe('the monorepo cutover', () => {
+    const MONO = 'https://github.com/HelloAllyTech/ally-platform/pull';
+    const OLD = 'https://github.com/HelloAllyTech/ally-be/pull';
+
+    beforeEach(() => {
+      (service as any).configService = {
+        adminBaseUrl: 'https://admin.example.com',
+        githubMonorepo: 'ally-platform',
+      };
+    });
+
+    it('reads a pre-move pull request from its archived repo, a new one from the monorepo', async () => {
+      await reconcileWith({}, openPr({ prUrl: `${OLD}/42` }));
+      await reconcileWith({}, openPr({ prUrl: `${MONO}/42` }));
+
+      expect(
+        github.getPullRequest.mock.calls.map(([repo]: [string]) => repo),
+      ).toEqual(['HelloAllyTech/ally-be', 'HelloAllyTech/ally-platform']);
+    });
+
+    it('hands a pre-move pull request that can never merge to a person, without calling it closed', async () => {
+      await reconcileWith(
+        { baseRepoArchived: true },
+        openPr({ prUrl: `${OLD}/42` }),
+      );
+
+      expect(repository.update).toHaveBeenCalledWith(
+        { id: 'pr-1' },
+        expect.objectContaining({
+          needsHumanAt: expect.any(Date),
+          needsHumanReason: expect.stringContaining('archived'),
+        }),
+      );
+      expect(repository.update).not.toHaveBeenCalledWith(
+        { id: 'pr-1' },
+        expect.objectContaining({ state: 'closed' }),
+      );
+      expect(github.mergePullRequest).not.toHaveBeenCalled();
+      expect(github.approvePullRequest).not.toHaveBeenCalled();
+    });
+
+    it('refuses to merge a pull request on an archived repo', async () => {
+      repository.findOne.mockResolvedValue(openPr({ prUrl: `${OLD}/42` }));
+      github.getPullRequest.mockResolvedValue({
+        merged: false,
+        state: 'open',
+        headSha: 'abc1234def',
+        baseRepoArchived: true,
+      });
+
+      await expect(
+        service.mergePullRequest('session-1', 'pr-1', 7),
+      ).rejects.toThrow(/archived/);
+      expect(github.mergePullRequest).not.toHaveBeenCalled();
+    });
+
+    it('counts a monorepo usage report against the pull request at that URL', async () => {
+      repository.findOne.mockResolvedValue(null);
+      buildService.recordExternalUsage = jest.fn().mockResolvedValue(null);
+
+      await service.recordUsage({
+        kind: 'fix',
+        repo: 'ally-platform',
+        prNumber: 3,
+        costUsd: 0.5,
+      });
+
+      expect(repository.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { prNumber: 3, prUrl: Like('%/ally-platform/pull/3') },
+        }),
+      );
+    });
+
+    it('releases every service a monorepo pull request touched', async () => {
+      settingsService.get.mockResolvedValue({
+        enabled: true,
+        autoReleaseEnabled: true,
+        maxFixRunsPerPr: 3,
+      });
+      sessionRepository.findOne.mockResolvedValue({ id: 'session-1' });
+      github.listPullRequestFiles.mockResolvedValue({
+        files: [
+          'ally-be/src/a.ts',
+          'ally-web/apps/ally-admin-dashboard/src/b.tsx',
+        ],
+        truncated: false,
+      });
+
+      await reconcileWith(
+        { merged: true, mergedAt: new Date(), state: 'closed' },
+        openPr({ prUrl: `${MONO}/5` }),
+      );
+
+      expect(
+        releaseService.dispatch.mock.calls.map(
+          ([target]: [{ workflow: string }]) => target.workflow,
+        ),
+      ).toEqual([
+        'production-release-ally-be.yaml',
+        'production-release-admin-dashboard.yaml',
+      ]);
+    });
+
+    it('leaves a monorepo pull request that also changes root files for a person', async () => {
+      settingsService.get.mockResolvedValue({
+        enabled: true,
+        autoReleaseEnabled: true,
+        maxFixRunsPerPr: 3,
+      });
+      sessionRepository.findOne.mockResolvedValue({ id: 'session-1' });
+      github.listPullRequestFiles.mockResolvedValue({
+        files: ['ally-be/src/a.ts', '.github/workflows/test-ally-be.yml'],
+        truncated: false,
+      });
+
+      await reconcileWith(
+        { merged: true, mergedAt: new Date(), state: 'closed' },
+        openPr({ prUrl: `${MONO}/5` }),
+      );
+
+      expect(releaseService.dispatch).not.toHaveBeenCalled();
+      expect(repository.update).toHaveBeenCalledWith(
+        { id: 'pr-1' },
+        { releaseState: 'skipped' },
+      );
+    });
+
+    it('follows a monorepo issue build in the monorepo, by its own run', async () => {
+      github.listPullRequests = jest.fn().mockResolvedValue([]);
+      github.findRunSince = jest.fn().mockResolvedValue(null);
+      buildService.listActiveIssueRuns.mockResolvedValue([
+        {
+          id: 'run-9',
+          sessionId: 's1',
+          repos: ['ally-web'],
+          issueNumber: 7,
+          issueUrl: 'https://github.com/HelloAllyTech/ally-platform/issues/7',
+          dispatchedAt: new Date(),
+          cost: null,
+        },
+      ]);
+
+      await service.reconcileOpenPullRequests();
+
+      expect(github.listPullRequests).toHaveBeenCalledWith(
+        'HelloAllyTech/ally-platform',
+      );
+      expect(github.findRunSince).toHaveBeenCalledWith(
+        expect.objectContaining({
+          repo: 'HelloAllyTech/ally-platform',
+          workflow: 'builder.yml',
+          titleIncludes: '#7 (issues)',
+        }),
       );
     });
   });

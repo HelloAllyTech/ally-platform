@@ -9,6 +9,10 @@
 # than the file reads it saves.
 #
 # Usage: refresh-repo-map.sh <repo>
+#
+# With PLATFORM_DIR set to a monorepo checkout, a service is read from its
+# folder there: since the 2026-10-23 cutover its own repo is archived, and a
+# map drawn from it would describe code frozen at the move.
 set -euo pipefail
 
 REPO="${1:?usage: refresh-repo-map.sh <repo>}"
@@ -17,11 +21,18 @@ WORKDIR="$(mktemp -d)"
 trap 'rm -rf "$WORKDIR"' EXIT
 
 # Shallow: this reads the current shape of the repo, not its history.
-git clone --depth 1 --filter=blob:none \
-  "https://x-access-token:${BUILDER_GH_TOKEN}@github.com/${GITHUB_REPOSITORY_OWNER}/${REPO}.git" \
-  "${WORKDIR}/${REPO}"
-
-cd "${WORKDIR}/${REPO}"
+IN_MONOREPO=false
+if [ -n "${PLATFORM_DIR:-}" ] && [ -d "${PLATFORM_DIR}/${REPO}" ]; then
+  IN_MONOREPO=true
+  cd "${PLATFORM_DIR}/${REPO}"
+  # The opencode config below is written into the checkout; take it out again.
+  trap 'rm -f "${PLATFORM_DIR}/${REPO}/opencode.json"; rm -rf "$WORKDIR"' EXIT
+else
+  git clone --depth 1 --filter=blob:none \
+    "https://x-access-token:${BUILDER_GH_TOKEN}@github.com/${GITHUB_REPOSITORY_OWNER}/${REPO}.git" \
+    "${WORKDIR}/${REPO}"
+  cd "${WORKDIR}/${REPO}"
+fi
 COMMIT_SHA="$(git rev-parse HEAD)"
 
 PROMPT=$(cat <<'PROMPT'
@@ -50,6 +61,14 @@ code listings longer than a few lines.
 Output the document only — no preamble, no closing remarks.
 PROMPT
 )
+
+if [ "$IN_MONOREPO" = true ]; then
+  PROMPT="${PROMPT}
+
+This directory is the \`${REPO}/\` folder of a monorepo, and the pack is for it
+alone: describe this folder, not its siblings, and read its history with
+\`git log -- .\` so other services' commits do not count as its direction."
+fi
 
 # The third file that knows anything engine-specific, after install-engine.sh
 # and run-engine.sh. It cannot just call run-engine.sh: that drives the whole
