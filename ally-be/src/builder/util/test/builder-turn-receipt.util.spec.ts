@@ -289,6 +289,13 @@ describe('reply claims', () => {
     ],
     ["When you're happy with it, you can start the build.", true],
     ['The PRD is final.', true],
+    // A rewrite after two send-backs in the live check: discloses the
+    // blocker, then claims ready anyway.
+    [
+      'Aside from this technical constraint, the specification is ready for the next step: drafting the technical design.',
+      true,
+    ],
+    ['Are you ready for the next step?', false],
     [
       "I'm also addressing the review findings to get this ready to build.",
       false,
