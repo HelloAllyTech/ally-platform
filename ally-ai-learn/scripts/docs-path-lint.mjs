@@ -36,7 +36,9 @@
 //   <!-- docs-path-lint: ignore -->    same placement — for an example or a removed file
 //                                      a doc discusses on purpose
 //   .docs-path-lint-ignore             one path per line, `#` comments — for a path that
-//                                      recurs too often to mark each mention
+//                                      recurs too often to mark each mention. One at the
+//                                      root covers every doc; one in a monorepo app
+//                                      directory covers only the docs inside it.
 //
 // Not scanned: node_modules, CHANGELOG*, wiki/log.md (append-only history that is
 // supposed to name files as they were), and any file that announces itself as generated
@@ -158,21 +160,40 @@ function siblingIndex(repo) {
   return siblingIndexes.get(repo);
 }
 
-function loadIgnoreList() {
-  const file = path.join(root, IGNORE_FILE);
-  if (!existsSync(file)) return new Set();
-  const entries = readFileSync(file, "utf8")
-    .split(/\r?\n/)
-    .map(line => line.replace(/(^|\s)#.*$/, "").trim())
-    .filter(Boolean);
-  return new Set(entries);
+// Every tracked ignore file, keyed by its directory ("" for the root). In a monorepo each
+// app keeps its own, and its entries apply only to docs inside that app.
+function loadIgnoreLists() {
+  const lists = new Map();
+  for (const file of trackedFiles(root).filter(f => path.posix.basename(f) === IGNORE_FILE)) {
+    const dir = path.posix.dirname(file);
+    let text;
+    try {
+      text = readFileSync(path.join(root, file), "utf8");
+    } catch {
+      continue;
+    }
+    const entries = text
+      .split(/\r?\n/)
+      .map(line => line.replace(/(^|\s)#.*$/, "").trim())
+      .filter(Boolean);
+    lists.set(dir === "." ? "" : dir, new Set(entries));
+  }
+  return lists;
 }
-const ignoreList = loadIgnoreList();
+const ignoreLists = loadIgnoreLists();
+
+function isIgnored(docFile, candidates) {
+  for (const [dir, entries] of ignoreLists) {
+    if (dir && !docFile.startsWith(`${dir}/`)) continue;
+    if (candidates.some(c => entries.has(c))) return true;
+  }
+  return false;
+}
 
 function isDocScanned(file) {
   if (file.split("/").includes("node_modules")) return false;
   if (/^CHANGELOG/i.test(path.posix.basename(file))) return false;
-  if (file === "wiki/log.md") return false;
+  if (file === "wiki/log.md" || file.endsWith("/wiki/log.md")) return false;
   return true;
 }
 
@@ -269,7 +290,7 @@ for (const file of trackedFiles(root, "*.md").filter(isDocScanned)) {
         skippedCrossRepo += 1;
         continue;
       }
-      if (marked || ignoreList.has(refPath) || ignoreList.has(match[1])) {
+      if (marked || isIgnored(file, [refPath, match[1]])) {
         exempted += 1;
         continue;
       }
@@ -280,17 +301,27 @@ for (const file of trackedFiles(root, "*.md").filter(isDocScanned)) {
 
 // Last filter: a path git ignores (`dist/…`, a cloned `.wiki-tmp/…`) is absent from a clean
 // checkout by design. Done once, in batch, and only for the few that would otherwise fail.
+// A doc inside a monorepo app (`ally-mobile/README.md`) writes paths relative to that app,
+// so the app-prefixed path is checked too.
+function scopedPath(entry) {
+  const top = entry.file.split("/")[0];
+  return entry.file.includes("/") && top !== entry.resolved.split("/")[0]
+    ? `${top}/${entry.resolved}`
+    : null;
+}
+
 function dropGitIgnored(entries) {
   const own = entries.filter(e => !SIBLING_REPOS.includes(e.resolved.split("/")[0]));
   if (!own.length) return entries;
+  const candidates = own.flatMap(e => [e.resolved, scopedPath(e)].filter(Boolean));
   let ignoredOut = "";
   try {
-    ignoredOut = git(root, ["check-ignore", "--stdin", "-z"], own.map(e => e.resolved).join("\0"));
+    ignoredOut = git(root, ["check-ignore", "--stdin", "-z"], candidates.join("\0"));
   } catch (error) {
     ignoredOut = error.stdout || ""; // exit 1 means "none of them are ignored"
   }
   const ignored = new Set(ignoredOut.split("\0").filter(Boolean));
-  return entries.filter(e => !ignored.has(e.resolved));
+  return entries.filter(e => !ignored.has(e.resolved) && !ignored.has(scopedPath(e)));
 }
 
 const findings = dropGitIgnored(broken);
