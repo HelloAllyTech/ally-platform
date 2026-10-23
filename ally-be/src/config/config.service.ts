@@ -58,12 +58,17 @@ export class AppConfigService {
   }
 
   /**
-   * Auth token for the ally-mobile GitHub Actions / Contents API calls behind
-   * the super-duper-admin Mobile Releases page. Deliberately separate from
-   * `githubToken` (Bug Hunter/Builder's write-scoped dispatch token) — this
-   * page only ever reads, so it gets its own, narrower credential. Empty on
-   * environments that haven't set it — MobileReleasesService refuses cleanly
-   * rather than calling GitHub with no auth.
+   * Auth token for the GitHub Actions / Contents API calls behind the
+   * super-duper-admin Mobile Releases page. Deliberately separate from
+   * `githubToken` (Bug Hunter/Builder's dispatch token), so the mobile page
+   * has its own, narrower credential. Since the 2026-10-23 cutover it needs
+   * the monorepo (`githubMonorepo`) — Contents read, and Actions write for the
+   * page's dispatches (scheduled release, Android promotion, iOS submission) —
+   * and read on the archived `githubMobileRepo` for the history from before
+   * the move. A fine-grained token scoped to ally-mobile alone reaches neither
+   * the app nor its workflows any more. Empty on environments that haven't set
+   * it — MobileReleasesService refuses cleanly rather than calling GitHub with
+   * no auth.
    */
   get githubActionsToken(): string {
     return this.configService.get<string>('GITHUB_ACTIONS_TOKEN', '');
@@ -129,6 +134,11 @@ export class AppConfigService {
     };
   }
 
+  /**
+   * The app's own repo, archived at the 2026-10-23 cutover. The app now lives
+   * in the monorepo (`githubMonorepo`) under `ally-mobile/`; this is read only
+   * for what happened before the move — run history and earlier releases.
+   */
   get githubMobileRepo(): string {
     return this.configService.get<string>(
       'GITHUB_MOBILE_REPO',

@@ -171,8 +171,36 @@ export class MobileReleasesService {
     private readonly slackService: SlackService,
   ) {}
 
+  /**
+   * Where the app lives now. Since the 2026-10-23 cutover ally-mobile is the
+   * `ally-mobile/` folder of the monorepo (GITHUB_MONOREPO): its workflows,
+   * its version files and every release from then on are there. With no
+   * monorepo configured, the app's own repo, as before.
+   */
   private get repo(): string {
+    const monorepo = this.configService.githubMonorepo;
+    return monorepo
+      ? `${this.configService.githubOrg}/${monorepo}`
+      : this.legacyRepo;
+  }
+
+  /** The app's folder in `repo`: `ally-mobile/` in the monorepo, '' in its own repo. */
+  private get folder(): string {
+    return this.configService.githubMonorepo ? 'ally-mobile/' : '';
+  }
+
+  /**
+   * The app's own repo (GITHUB_MOBILE_REPO), archived at the cutover. Read
+   * only for what happened before it — run history, and the version bumps
+   * from before the first one in the monorepo — so the release page and the
+   * What's New draft keep their past instead of starting empty on 10-23.
+   */
+  private get legacyRepo(): string {
     return this.configService.githubMobileRepo;
+  }
+
+  private get hasLegacyHistory(): boolean {
+    return this.repo !== this.legacyRepo;
   }
 
   /** Throws when GITHUB_ACTIONS_TOKEN is unset — every caller must refuse cleanly rather than call GitHub with no auth. */
@@ -238,13 +266,47 @@ export class MobileReleasesService {
       );
   }
 
+  /**
+   * One workflow's recent runs. Since the cutover a workflow has runs in two
+   * places — the archived repo before 2026-10-23, the monorepo after — and
+   * the release page shows them as one history. Either side may fail alone
+   * (a workflow GitHub has not registered in the monorepo yet answers 404);
+   * only both failing is an error.
+   */
   private async fetchWorkflowRuns(
+    file: MobileWorkflowFile,
+    headers: Record<string, string>,
+  ): Promise<MobileReleaseRunDto[]> {
+    const repos = this.hasLegacyHistory
+      ? [this.repo, this.legacyRepo]
+      : [this.repo];
+    const settled = await Promise.allSettled(
+      repos.map((repo) => this.fetchWorkflowRunsIn(repo, file, headers)),
+    );
+    const fulfilled = settled.filter(
+      (result): result is PromiseFulfilledResult<MobileReleaseRunDto[]> =>
+        result.status === 'fulfilled',
+    );
+    if (!fulfilled.length) {
+      throw (settled[0] as PromiseRejectedResult).reason;
+    }
+    return fulfilled
+      .flatMap((result) => result.value)
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      )
+      .slice(0, 15);
+  }
+
+  private async fetchWorkflowRunsIn(
+    repo: string,
     file: MobileWorkflowFile,
     headers: Record<string, string>,
   ): Promise<MobileReleaseRunDto[]> {
     try {
       const { data } = await axios.get(
-        `${GITHUB_API}/repos/${this.repo}/actions/workflows/${file}/runs`,
+        `${GITHUB_API}/repos/${repo}/actions/workflows/${file}/runs`,
         { headers, params: { per_page: 15 }, timeout: 15_000 },
       );
       return (data?.workflow_runs ?? []).map((run: any) =>
@@ -253,7 +315,7 @@ export class MobileReleasesService {
     } catch (error) {
       throw this.toReadableError(
         error,
-        `Could not list runs for ${file} in ${this.repo}`,
+        `Could not list runs for ${file} in ${repo}`,
       );
     }
   }
@@ -384,18 +446,96 @@ export class MobileReleasesService {
   private async fetchCommitSubjectsSinceLastRelease(
     headers: Record<string, string>,
   ): Promise<string[]> {
-    const { currentReleaseSha, previousReleaseSha } =
-      await this.fetchReleaseCommitShas(headers);
-    if (!previousReleaseSha) {
+    const [current, previous] = await this.fetchReleasePoints(headers, 2);
+    if (!previous) {
       // No earlier release-point commit exists at all (e.g. the very first
       // release ever) — nothing to diff against, and that's a legitimate
       // "nothing to summarize" rather than an error.
       return [];
     }
+    if (current.repo === previous.repo) {
+      return current.repo === this.repo && this.folder
+        ? this.fetchAppCommitSubjects(current.sha, previous.sha, headers)
+        : this.fetchComparedCommitSubjects(
+            current.repo,
+            previous.sha,
+            current.sha,
+            headers,
+          );
+    }
+    // The first release after the cutover: whatever the archived repo had
+    // after its last release, then what the app gained in the monorepo —
+    // oldest first, like a compare.
+    return [
+      ...(await this.fetchComparedCommitSubjects(
+        previous.repo,
+        previous.sha,
+        'master',
+        headers,
+      )),
+      ...(await this.fetchAppCommitSubjects(current.sha, null, headers)),
+    ];
+  }
 
+  /**
+   * Subjects of the app's own commits from `fromSha` back to (not including)
+   * `stopSha` — or back to the start of the app's history in the monorepo
+   * when there is no stop — oldest first, as a compare lists them.
+   *
+   * A monorepo compare would list every service's commits, and a backend
+   * subject has no business in App Store or Play release notes, so this
+   * walks the commits that touched `ally-mobile/` instead. Merge commits are
+   * skipped: a PR merge repeats work already listed, and the cutover's
+   * import merges are not work at all.
+   */
+  private async fetchAppCommitSubjects(
+    fromSha: string,
+    stopSha: string | null,
+    headers: Record<string, string>,
+  ): Promise<string[]> {
     try {
       const { data } = await axios.get(
-        `${GITHUB_API}/repos/${this.repo}/compare/${previousReleaseSha}...${currentReleaseSha}`,
+        `${GITHUB_API}/repos/${this.repo}/commits`,
+        {
+          headers,
+          params: {
+            sha: fromSha,
+            path: this.folder.replace(/\/$/, ''),
+            per_page: 100,
+          },
+          timeout: 15_000,
+        },
+      );
+      const subjects: string[] = [];
+      for (const commit of (data ?? []) as any[]) {
+        if (stopSha && commit?.sha === stopSha) break;
+        if ((commit?.parents?.length ?? 0) > 1) continue;
+        const subject = String(commit?.commit?.message ?? '')
+          .split('\n')[0]
+          .trim();
+        if (subject && !subject.startsWith('Merge pull request')) {
+          subjects.push(subject);
+        }
+      }
+      return subjects.reverse();
+    } catch (error) {
+      throw this.toReadableError(
+        error,
+        `Could not list the app's commits since ${stopSha ?? 'the cutover'} in ${this.repo}`,
+      );
+    }
+  }
+
+  /** Subjects of `base...head` in a repo that holds nothing but the app. */
+  private async fetchComparedCommitSubjects(
+    repo: string,
+    base: string,
+    head: string,
+    headers: Record<string, string>,
+  ): Promise<string[]> {
+    try {
+      const { data } = await axios.get(
+        `${GITHUB_API}/repos/${repo}/compare/${base}...${head}`,
         { headers, timeout: 15_000 },
       );
       const commits = data?.commits ?? [];
@@ -412,49 +552,68 @@ export class MobileReleasesService {
     } catch (error) {
       throw this.toReadableError(
         error,
-        `Could not compare ${previousReleaseSha}...${currentReleaseSha} for ${this.repo}`,
+        `Could not compare ${base}...${head} for ${repo}`,
       );
     }
   }
 
   /**
-   * SHAs of the two most recent commits that touched android/app/build.gradle
-   * on master — the current release's own version-bump commit, and the one
-   * before it. `previousReleaseSha` is null only when there is no earlier
-   * release-point commit to find (e.g. the very first release ever).
+   * The most recent release points, newest first: commits that changed
+   * android/app/build.gradle on master, i.e. version bumps (automated or,
+   * historically, manual).
+   *
+   * In the monorepo the file is `ally-mobile/android/app/build.gradle`, and
+   * its history there starts at the cutover — the first commits it shows are
+   * the import merges, which bumped nothing. So merge commits are skipped,
+   * and when the monorepo has fewer bumps than asked for, the rest come from
+   * the archived repo's history, where every release before 2026-10-23 is.
    */
-  private async fetchReleaseCommitShas(
+  private async fetchReleasePoints(
     headers: Record<string, string>,
-  ): Promise<{ currentReleaseSha: string; previousReleaseSha: string | null }> {
-    try {
-      const { data } = await axios.get(
-        `${GITHUB_API}/repos/${this.repo}/commits`,
-        {
-          headers,
-          params: {
-            path: 'android/app/build.gradle',
-            sha: 'master',
-            per_page: 2,
+    count: number,
+  ): Promise<{ sha: string; repo: string; at: string | null }[]> {
+    const points: { sha: string; repo: string; at: string | null }[] = [];
+    const sources = this.hasLegacyHistory
+      ? [
+          { repo: this.repo, path: `${this.folder}android/app/build.gradle` },
+          { repo: this.legacyRepo, path: 'android/app/build.gradle' },
+        ]
+      : [{ repo: this.repo, path: 'android/app/build.gradle' }];
+    for (const source of sources) {
+      try {
+        const { data } = await axios.get(
+          `${GITHUB_API}/repos/${source.repo}/commits`,
+          {
+            headers,
+            params: { path: source.path, sha: 'master', per_page: 10 },
+            timeout: 15_000,
           },
-          timeout: 15_000,
-        },
-      );
-      const currentReleaseSha = data?.[0]?.sha;
-      if (!currentReleaseSha) {
-        throw new Error(
-          'No commits found for android/app/build.gradle on master',
+        );
+        for (const commit of (data ?? []) as any[]) {
+          if (!commit?.sha || (commit?.parents?.length ?? 0) > 1) continue;
+          points.push({
+            sha: String(commit.sha),
+            repo: source.repo,
+            at:
+              commit?.commit?.committer?.date ??
+              commit?.commit?.author?.date ??
+              null,
+          });
+          if (points.length >= count) return points;
+        }
+      } catch (error) {
+        throw this.toReadableError(
+          error,
+          `Could not find the release commits for ${source.repo}`,
         );
       }
-      return {
-        currentReleaseSha: String(currentReleaseSha),
-        previousReleaseSha: data?.[1]?.sha ? String(data[1].sha) : null,
-      };
-    } catch (error) {
-      throw this.toReadableError(
-        error,
-        `Could not find the release commits for ${this.repo}`,
+    }
+    if (!points.length) {
+      throw new Error(
+        'No commits found for android/app/build.gradle on master',
       );
     }
+    return points;
   }
 
   /**
@@ -465,9 +624,8 @@ export class MobileReleasesService {
    * gate and the cron cadence, since "are there new commits" and "are
    * tests green" are unknowable in advance.
    *
-   * "Last version bump" is approximated as the most recent commit that
-   * touched android/app/build.gradle on master, which changes whenever a
-   * release actually lands (automated or, historically, manual).
+   * "Last version bump" is the most recent release point (see
+   * fetchReleasePoints), which changes whenever a release actually lands.
    *
    * Returns null (rather than throwing) if that history can't be read, so
    * a GitHub hiccup here never takes down the primary version payload.
@@ -476,29 +634,13 @@ export class MobileReleasesService {
     headers: Record<string, string>,
   ): Promise<string | null> {
     try {
-      const { data } = await axios.get(
-        `${GITHUB_API}/repos/${this.repo}/commits`,
-        {
-          headers,
-          params: {
-            path: 'android/app/build.gradle',
-            sha: 'master',
-            per_page: 1,
-          },
-          timeout: 15_000,
-        },
-      );
-
-      const commit = data?.[0]?.commit;
-      const lastVersionBumpAt: string | undefined =
-        commit?.committer?.date ?? commit?.author?.date;
-      if (!lastVersionBumpAt) {
+      const [lastBump] = await this.fetchReleasePoints(headers, 1);
+      if (!lastBump?.at) {
         return null;
       }
 
       const eligibleAt = new Date(
-        new Date(lastVersionBumpAt).getTime() +
-          CADENCE_GATE_HOURS * MS_PER_HOUR,
+        new Date(lastBump.at).getTime() + CADENCE_GATE_HOURS * MS_PER_HOUR,
       );
       const now = new Date();
       const referencePoint =
@@ -1381,7 +1523,7 @@ export class MobileReleasesService {
   ): Promise<string> {
     try {
       const { data } = await axios.get(
-        `${GITHUB_API}/repos/${this.repo}/contents/${path}`,
+        `${GITHUB_API}/repos/${this.repo}/contents/${this.folder}${path}`,
         { headers, params: { ref: 'master' }, timeout: 15_000 },
       );
       const content = data?.content;
