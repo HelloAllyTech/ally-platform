@@ -167,6 +167,12 @@ export const ApiEndpoints = {
     /** A LiveKit room with the guide's voice worker: `{token, roomName, serverUrl}`. */
     VOICE_SESSION: (threadId: string) => `/v1/guide/threads/${threadId}/voice-session`,
     PREFS: "/v1/guide/prefs",
+    // Anonymous visitors (M2): the visitor token goes in x-guide-visitor.
+    PUBLIC_VISITORS: "/v1/guide/public/visitors",
+    PUBLIC_BOOTSTRAP: (trackId: string) => `/v1/guide/public/tracks/${trackId}/bootstrap`,
+    PUBLIC_THREADS: (trackId: string) => `/v1/guide/public/tracks/${trackId}/threads`,
+    PUBLIC_TURNS: (threadId: string) => `/v1/guide/public/threads/${threadId}/turns`,
+    PUBLIC_EVENTS: (threadId: string) => `/v1/guide/public/threads/${threadId}/events`,
   },
   // Course discussions — the thread beneath a Track 2.0 item.
   COURSE_DISCUSSION: {

@@ -3124,8 +3124,12 @@
       "disclosure": "Ally · AI guide",
       "allyLabel": "Ally",
       "exit": "Back to my courses",
+      "exitVisitor": "Back to the course page",
       "classic": "Classic view",
-      "support": "Support"
+      "support": "Support",
+      "language": "Course language",
+      "signIn": "Sign in",
+      "languageFailed": "I couldn't change the language. Try again in a moment."
     },
     "presence": {
       "thinking": "Thinking…",
@@ -3314,7 +3318,11 @@
     "signIn": {
       "title": "Sign in to save your place",
       "line": "Your organisation gives you access. Use the email they have for you.",
-      "button": "Sign in"
+      "button": "Sign in",
+      "allowanceTitle": "Sign in to keep going",
+      "allowanceLine": "That's as far as we can talk before you sign in. Our conversation stays right here.",
+      "pausedTitle": "I'm taking a short break",
+      "pausedLine": "New conversations are paused for a little while. Sign in and we can keep going."
     },
     "finale": {
       "title": "Where you started, where you are",
@@ -3378,6 +3386,18 @@
       "disabled": "Voice isn't available right now. Let's type.",
       "micTitle": "I can't use your microphone. Let's type for now.",
       "typeInstead": "Type instead"
+    },
+    "visitor": {
+      "allowance_one": "{{count}} message left before sign-in",
+      "allowance_other": "{{count}} messages left before sign-in",
+      "signIn": "Sign in",
+      "claiming": "Bringing our conversation across…",
+      "disclosure": "Ally is an AI guide, not a person.",
+      "howItWorks": "How Ally works and your data",
+      "minutes": "About {{count}} min",
+      "items_one": "{{count}} item",
+      "items_other": "{{count}} items",
+      "outcomes": "What you'll be able to do"
     }
   }
 }

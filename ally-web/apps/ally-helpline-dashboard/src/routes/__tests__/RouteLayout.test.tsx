@@ -16,6 +16,7 @@ vi.mock("@pages", () => ({
   TrackPlayer: () => <div data-testid="track-player-page">Track Player Page</div>,
   TrackProgress: () => <div data-testid="track-progress-page">Track Progress Page</div>,
   CourseLanding: () => <div data-testid="course-landing-page">Course Landing Page</div>,
+  CourseLandingSwitch: () => <div data-testid="course-landing-page">Course Landing Page</div>,
   GuidedCourseGate: () => <div data-testid="guided-course-page">Guided Course Page</div>,
   SuspendedUser: () => <div data-testid="suspended-user-page">Suspended User Page</div>,
   ImpersonateHandler: () => <div data-testid="impersonate-page">Impersonate Page</div>,

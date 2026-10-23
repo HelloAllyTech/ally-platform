@@ -15,7 +15,7 @@
  * - Card state is the server's (`card.updated`). The client only decides
  *   which card's player is open (`activeCardId`), and only one is.
  */
-import type { JourneyBootstrap, JourneyNextStep } from "../contract/bootstrap";
+import type { JourneyBootstrap, JourneyNextStep, JourneyThread } from "../contract/bootstrap";
 import type {
   GuideAnchor,
   GuideAtmosphere,
@@ -152,10 +152,25 @@ export interface GuideFeedState {
   supportPinned: boolean;
   /** The one card whose player is open. */
   activeCardId: string | null;
+  /**
+   * What a visitor wrote when the allowance ran out or anonymous chat paused.
+   * Nothing was stored, so it waits here and goes back into the composer
+   * once they have signed in.
+   */
+  heldText: string | null;
 }
 
+/** Refusals that ask a visitor to sign in; the server stored nothing. */
+export const SIGN_IN_REFUSALS = ["allowance_exhausted", "anonymous_paused"] as const;
+const isSignInRefusal = (code: string): boolean =>
+  (SIGN_IN_REFUSALS as readonly string[]).includes(code);
+
 export type GuideFeedAction =
-  | { type: "hydrate"; bootstrap: JourneyBootstrap }
+  /** `keepQueued`: a re-hydrate (after signing in) keeps what is waiting to be sent. */
+  | { type: "hydrate"; bootstrap: JourneyBootstrap; keepQueued?: boolean }
+  /** A visitor's thread, created with their first message. */
+  | { type: "thread/opened"; thread: JourneyThread }
+  | { type: "held/consumed" }
   | { type: "event"; event: GuideEvent }
   | {
       type: "learner/echo";
@@ -195,6 +210,7 @@ export const initialFeedState: GuideFeedState = {
   crisis: null,
   supportPinned: false,
   activeCardId: null,
+  heldText: null,
 };
 
 const learnerRoleOf = (role: string): MessageEntry["role"] =>
@@ -234,6 +250,7 @@ const hydrate = (bootstrap: JourneyBootstrap): GuideFeedState => {
     atmosphere: thread?.atmosphere ?? "bright",
     nextStep: bootstrap.nextStep,
     progress: bootstrap.progress,
+    allowance: bootstrap.allowance,
     // A reload during a crisis brings the pinned card straight back.
     crisis: bootstrap.crisis
       ? {
@@ -539,14 +556,34 @@ const applyEphemeral = (state: GuideFeedState, event: GuideEvent): GuideFeedStat
     case "turn.failed": {
       const { data } = event;
       const turnId = data.turnId ?? null;
-      // The learner's own message stays, marked so Retry can resend it.
-      const echo = state.entries.find(
-        (e): e is MessageEntry =>
-          isMessage(e) &&
-          e.role === "learner" &&
-          e.status !== "final" &&
-          (turnId === null || e.turnId === turnId),
-      );
+      // The learner's own message stays, marked so Retry can resend it. A
+      // refusal can arrive before the 202 that names the turn: then it is the
+      // latest echo not yet given a turn id.
+      const pending = (e: FeedEntry): e is MessageEntry =>
+        isMessage(e) && e.role === "learner" && e.status !== "final";
+      const echo =
+        state.entries.find(
+          (e): e is MessageEntry => pending(e) && (turnId === null || e.turnId === turnId),
+        ) ??
+        [...state.entries]
+          .reverse()
+          .find((e): e is MessageEntry => pending(e) && e.turnId === null && e.status !== "queued");
+      if (isSignInRefusal(data.code)) {
+        // Nothing was stored: the words leave the feed and wait for sign-in.
+        return {
+          ...state,
+          entries: dropStreaming(state.entries, turnId).filter(entry => entry !== echo),
+          activeTurnId: null,
+          toolActivity: null,
+          presence: { state: "idle", caption: null },
+          heldText: echo?.text.trim() ? echo.text : state.heldText,
+          allowance:
+            data.code === "allowance_exhausted" && state.allowance
+              ? { ...state.allowance, remaining: 0 }
+              : state.allowance,
+          failure: { code: data.code, message: data.message, turnId, clientTurnId: null },
+        };
+      }
       const entries = dropStreaming(state.entries, turnId).map(entry =>
         echo && entry === echo ? { ...echo, status: "failed" as const } : entry,
       );
@@ -574,8 +611,26 @@ export const guideFeedReducer = (
   action: GuideFeedAction,
 ): GuideFeedState => {
   switch (action.type) {
-    case "hydrate":
-      return hydrate(action.bootstrap);
+    case "hydrate": {
+      const next = hydrate(action.bootstrap);
+      if (!action.keepQueued) return next;
+      const queued = queuedEchoes(state);
+      return {
+        ...next,
+        entries: queued.length ? [...next.entries, ...queued] : next.entries,
+        heldText: state.heldText,
+      };
+    }
+    case "thread/opened":
+      return {
+        ...state,
+        threadId: action.thread.id,
+        mode: action.thread.mode,
+        atmosphere: action.thread.atmosphere,
+        lastSeq: Math.max(state.lastSeq, action.thread.lastEventSeq),
+      };
+    case "held/consumed":
+      return { ...state, heldText: null };
     case "event": {
       const { event } = action;
       if (state.threadId && event.threadId !== state.threadId) return state;
@@ -604,7 +659,12 @@ export const guideFeedReducer = (
       const entries = replaceEntry(
         state.entries,
         e => isMessage(e) && e.clientTurnId === action.clientTurnId && e.status !== "final",
-        e => ({ ...(e as MessageEntry), turnId: action.turnId, status: "sending" }),
+        // A failure that raced ahead of the 202 keeps its mark.
+        e => ({
+          ...(e as MessageEntry),
+          turnId: action.turnId,
+          status: (e as MessageEntry).status === "failed" ? "failed" : "sending",
+        }),
       );
       return entries ? { ...state, entries } : state;
     }

@@ -149,6 +149,9 @@ export const ANALYTICS_EVENTS = {
   GUIDED_APPOINTMENT_CHOSEN: "guided_appointment_chosen",
   GUIDED_VOICE_STARTED: "guided_voice_started",
   GUIDED_VOICE_FALLBACK: "guided_voice_fallback",
+  GUIDED_SIGN_IN_STARTED: "guided_sign_in_started",
+  GUIDED_VISITOR_CLAIMED: "guided_visitor_claimed",
+  GUIDED_LANGUAGE_CHANGED: "guided_language_changed",
 
   // Admin
   SIDEBAR_INTERACTION: "sidebar_interaction",
@@ -350,6 +353,8 @@ export const ANALYTICS_PROPS = {
   GUIDED_FAILURE_CODE: "failure_code",
   GUIDED_SLOT: "slot",
   GUIDED_TURN_MODE: "turn_mode",
+  GUIDED_IDENTITY: "identity",
+  GUIDED_CLAIM_OUTCOME: "claim_outcome",
 
   // Sidebar context
   ACTION: "action",

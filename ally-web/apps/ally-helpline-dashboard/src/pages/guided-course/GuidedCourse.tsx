@@ -2,20 +2,27 @@ import { FC, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from
 
 import { useTranslation } from "react-i18next";
 import { Navigate, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 import { useStartGuideVoiceSessionMutation } from "@api";
 import { LoginDialog } from "@components";
-import { buildJourneyRoute, buildTrackItemRoute, buildTrackRoute, ROUTES } from "@constants";
+import { buildJourneyRoute, ROUTES } from "@constants";
 import { ANALYTICS_EVENTS, ANALYTICS_PROPS } from "@constants/analyticsEvents";
 import { useAnalytics } from "@hooks/useAnalytics";
 
 import { ItemPlayerHost } from "./cards/ItemPlayerHost";
 import { itemCardFor } from "./cards/registry";
 import { CrisisCard } from "./cards/special/CrisisCard";
-import { AccessDeniedCard, ResourceCard, SignInCard } from "./cards/special/SpecialCards";
+import {
+  AccessDeniedCard,
+  ResourceCard,
+  SignInCard,
+  SignInReason,
+} from "./cards/special/SpecialCards";
+import { classicRouteFor } from "./classicRoute";
 import { safetyCopyFor } from "./copy/safetyCopy";
 import { JourneyHeader } from "./header/JourneyHeader";
-import { useGuideJourney } from "./hooks/useGuideJourney";
+import { SignInSource, useGuideJourney } from "./hooks/useGuideJourney";
 import { ShelfPanel, Sheet, TheatreHost } from "./layout/Panels";
 import {
   DESKTOP_MIN,
@@ -28,6 +35,8 @@ import { AllyPresence, OrbState } from "./presence/AllyPresence";
 import { BreatheWithMe } from "./presence/BreatheWithMe";
 import { JourneySpine, ProgressThread, SpineList } from "./spine/JourneySpine";
 import {
+  AllowanceNote,
+  ClaimingNote,
   Composer,
   FailureNotice,
   NextStepDock,
@@ -38,7 +47,7 @@ import { Stage } from "./stage/Stage";
 import { dockVisible, ReplyVerb, replyVerbsFor } from "./state/atmosphere";
 import { failureStateFor } from "./state/failureStates";
 import { showOfflineNotice } from "./state/guidedSessionMachine";
-import { lastAllyMessage } from "./state/guideFeedReducer";
+import { lastAllyMessage, SIGN_IN_REFUSALS } from "./state/guideFeedReducer";
 import { useGuideVoice } from "./voice/useGuideVoice";
 import { VoiceButton, VoiceRoom } from "./voice/VoiceRoom";
 
@@ -46,6 +55,9 @@ import type { SpineNode } from "./state/spineModel";
 import "./guided.css";
 
 type SheetName = "spine" | "support" | "breathe" | null;
+
+/** The allowance counter shows once this few messages are left (plan Appendix A). */
+const ALLOWANCE_NOTE_FROM = 2;
 
 /** A full-screen page in the shell's colours, for the states before the journey opens. */
 const StatePage: FC<{ children: ReactNode; testId: string }> = ({ children, testId }) => (
@@ -63,16 +75,34 @@ const StatePage: FC<{ children: ReactNode; testId: string }> = ({ children, test
  * the conversation (Stage), the side panel (Shelf) and full screen (Theatre),
  * under one atmosphere. Everything stateful lives in `useGuideJourney`.
  */
-export const GuidedCourse: FC<{ trackId: string; fixture?: boolean }> = ({
+export const GuidedCourse: FC<{ trackId: string; fixture?: boolean; fixtureVisitor?: boolean }> = ({
   trackId,
   fixture = false,
+  fixtureVisitor = false,
 }) => {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { track } = useAnalytics();
+  const [loginOpen, setLoginOpen] = useState(false);
+  // Signing in happens inside the conversation: a card, then the dialog (plan §5.14).
+  const requestSignIn = useCallback(
+    (source: SignInSource) => {
+      track(ANALYTICS_EVENTS.GUIDED_SIGN_IN_STARTED, {
+        [ANALYTICS_PROPS.COURSE_ID]: trackId,
+        [ANALYTICS_PROPS.SOURCE]: source,
+      });
+      setLoginOpen(true);
+    },
+    [track, trackId],
+  );
   // A roleplay or case leaving for the full-screen simulation lets go of voice (plan §11 F-6).
   const suspendVoice = useRef<(() => void) | null>(null);
-  const journey = useGuideJourney(trackId, { fixture, onLaunch: () => suspendVoice.current?.() });
+  const journey = useGuideJourney(trackId, {
+    fixture,
+    fixtureVisitor,
+    onLaunch: () => suspendVoice.current?.(),
+    onSignInRequired: requestSignIn,
+  });
   const {
     feed,
     session,
@@ -84,11 +114,15 @@ export const GuidedCourse: FC<{ trackId: string; fixture?: boolean }> = ({
     guidance,
     helpRequested,
     minimisedCardId,
+    claiming,
+    claimDenied,
   } = journey;
+  const visitor = journey.identity === "visitor";
 
   // ---------------------------------------------------------------- voice
   const [startVoiceSession] = useStartGuideVoiceSessionMutation();
-  const voiceAvailable = Boolean(bootstrap?.availability.voice);
+  // Voice needs a signed-in learner (plan D1): visitors text.
+  const voiceAvailable = Boolean(bootstrap?.availability.voice) && !visitor;
   const voice = useGuideVoice({
     threadId: feed.threadId,
     enabled: voiceAvailable,
@@ -119,13 +153,14 @@ export const GuidedCourse: FC<{ trackId: string; fixture?: boolean }> = ({
   const [spinePinned, setSpinePinned] = useState(width >= SPINE_PINNED_MIN);
   const [spineOpen, setSpineOpen] = useState(false);
   const [sheet, setSheet] = useState<SheetName>(null);
-  const [loginOpen, setLoginOpen] = useState(false);
   const [composerFocus, setComposerFocus] = useState(0);
 
   const courseTitle = bootstrap?.course.title ?? "";
-  const classicHref = spine.currentItemId
-    ? buildTrackItemRoute(trackId, spine.currentItemId)
-    : buildTrackRoute(trackId);
+  // Before boot settles, a visitor is whoever isn't signed in (the fixture plays a learner).
+  const classicHref = classicRouteFor(trackId, {
+    itemId: spine.currentItemId,
+    visitor: visitor || (fixtureVisitor ? true : fixture ? false : undefined),
+  });
   const goClassic = useCallback(
     (source: "header" | "failure" | "card") => {
       actions.trackClassic(source);
@@ -247,6 +282,34 @@ export const GuidedCourse: FC<{ trackId: string; fixture?: boolean }> = ({
 
   const failure = feed.failure;
   const failureState = failure ? failureStateFor(failure.code) : null;
+
+  // A visitor out of messages, or with anonymous chat paused, gets the sign-in
+  // card where the composer was; nothing they wrote is lost (it comes back).
+  const allowance = feed.allowance;
+  const refusal = failure && (SIGN_IN_REFUSALS as readonly string[]).includes(failure.code);
+  const signInReason: SignInReason | null =
+    !visitor || claimDenied || claiming
+      ? null
+      : refusal && failure?.code === "anonymous_paused"
+        ? "paused"
+        : refusal || allowance?.remaining === 0
+          ? "allowance"
+          : null;
+  const showAllowance =
+    visitor &&
+    !signInReason &&
+    allowance !== null &&
+    allowance.remaining > 0 &&
+    allowance.remaining <= ALLOWANCE_NOTE_FROM;
+
+  const changeLanguage = useCallback(
+    (languageCode: string) => {
+      actions
+        .setCourseLanguage(languageCode)
+        .catch(() => toast.error(t("guide.header.languageFailed")));
+    },
+    [actions, t],
+  );
   const journeyUrl = useMemo(
     () =>
       typeof window === "undefined" ? "" : `${window.location.origin}${buildJourneyRoute(trackId)}`,
@@ -293,13 +356,13 @@ export const GuidedCourse: FC<{ trackId: string; fixture?: boolean }> = ({
       <StatePage testId="journey-signed-out">
         <AllyPresence state="idle" size={64} />
         <p className="g-label text-[var(--g-ally-label)]">{t("guide.header.disclosure")}</p>
-        <SignInCard onSignIn={() => setLoginOpen(true)} />
+        <SignInCard onSignIn={() => requestSignIn("card")} />
         <LoginDialog
           isOpen={loginOpen}
           onClose={() => setLoginOpen(false)}
           onSuccess={() => {
             setLoginOpen(false);
-            actions.retryBoot();
+            actions.signedIn();
           }}
           requireTerms
         />
@@ -365,8 +428,14 @@ export const GuidedCourse: FC<{ trackId: string; fixture?: boolean }> = ({
         showSupport={showSupport && !inCrisis}
         onSupport={() => setSheet("support")}
         onClassic={() => goClassic("header")}
-        onExit={goMyCourses}
+        onExit={visitor ? () => navigate(classicHref) : goMyCourses}
+        exitLabel={visitor ? t("guide.header.exitVisitor") : undefined}
         quiet={inCrisis}
+        languages={bootstrap.availability.languages}
+        language={bootstrap.course.languageCode}
+        // The course language is saved on the enrolment, so a visitor reads the default for now.
+        onLanguageChange={!visitor && journey.enrolled ? changeLanguage : undefined}
+        onSignIn={visitor ? () => requestSignIn("header") : undefined}
       />
       {compact && !inCrisis && <ProgressThread model={spine} onOpen={() => setSheet("spine")} />}
 
@@ -408,7 +477,7 @@ export const GuidedCourse: FC<{ trackId: string; fixture?: boolean }> = ({
               courseTitle={courseTitle}
               compact={compact}
               journeyUrl={journeyUrl}
-              onSignIn={() => setLoginOpen(true)}
+              onSignIn={() => requestSignIn("card")}
               onMyCourses={goMyCourses}
               onFocusComposer={() => setComposerFocus(n => n + 1)}
               muteAnnouncements={voice.active}
@@ -420,13 +489,14 @@ export const GuidedCourse: FC<{ trackId: string; fixture?: boolean }> = ({
               {showOfflineNotice(session) && (
                 <FailureNotice message={t("guide.failure.offline")} action={null} />
               )}
-              {failure && failureState && !inCrisis && (
+              {claiming && <ClaimingNote />}
+              {failure && failureState && !inCrisis && !signInReason && (
                 <FailureNotice
                   message={t(failureState.copyKey)}
                   action={failureState.action}
                   onRetry={() => void actions.retryFailure()}
                   onClassic={() => goClassic("failure")}
-                  onSignIn={() => setLoginOpen(true)}
+                  onSignIn={() => requestSignIn("allowance")}
                   onMyCourses={goMyCourses}
                   onDismiss={actions.dismissFailure}
                 />
@@ -437,16 +507,45 @@ export const GuidedCourse: FC<{ trackId: string; fixture?: boolean }> = ({
               {(voice.active || voice.state.phase === "failed") && (
                 <VoiceRoom voice={voice} compact={compact} />
               )}
-              {showDock && feed.nextStep && !inCrisis && (
-                <NextStepDock nextStep={feed.nextStep} disabled={busy} onContinue={onContinue} />
+              {claimDenied ? (
+                // Signed in, but the course isn't theirs: the conversation stays readable above.
+                <AccessDeniedCard reason={claimDenied.reason} onMyCourses={goMyCourses} />
+              ) : signInReason && !inCrisis ? (
+                <SignInCard
+                  reason={signInReason}
+                  onSignIn={() => requestSignIn(signInReason === "paused" ? "paused" : "allowance")}
+                />
+              ) : (
+                <>
+                  {showDock && feed.nextStep && !inCrisis && (
+                    <NextStepDock
+                      nextStep={feed.nextStep}
+                      disabled={busy}
+                      onContinue={onContinue}
+                    />
+                  )}
+                  {/* A visitor's landing has its own first-move chips; nothing competes. */}
+                  {!inCrisis && !(visitor && feed.entries.length === 0) && (
+                    <ReplyVerbs verbs={verbs} disabled={busy} onVerb={onVerb} />
+                  )}
+                  {showAllowance && allowance && (
+                    <AllowanceNote
+                      remaining={allowance.remaining}
+                      onSignIn={() => requestSignIn("allowance")}
+                    />
+                  )}
+                  <Composer
+                    sendBlocked={busy}
+                    focusToken={composerFocus}
+                    trailing={voiceAvailable ? <VoiceButton voice={voice} /> : null}
+                    prefill={visitor ? null : feed.heldText}
+                    onPrefilled={actions.consumeHeldText}
+                    onSend={text =>
+                      actions.submitTurn({ text, source: inCrisis ? "crisis" : "typed" })
+                    }
+                  />
+                </>
               )}
-              {!inCrisis && <ReplyVerbs verbs={verbs} disabled={busy} onVerb={onVerb} />}
-              <Composer
-                sendBlocked={busy}
-                focusToken={composerFocus}
-                trailing={voiceAvailable ? <VoiceButton voice={voice} /> : null}
-                onSend={text => actions.submitTurn({ text, source: inCrisis ? "crisis" : "typed" })}
-              />
             </div>
           </div>
         </main>
@@ -523,7 +622,7 @@ export const GuidedCourse: FC<{ trackId: string; fixture?: boolean }> = ({
         onClose={() => setLoginOpen(false)}
         onSuccess={() => {
           setLoginOpen(false);
-          actions.retryBoot();
+          actions.signedIn();
         }}
         requireTerms
       />

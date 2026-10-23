@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { readFileSync } from "node:fs";
@@ -18,13 +18,18 @@ vi.mock("../GuidedCourse", () => ({
 
 import { GuidedCourseGate, isFixtureRequested } from "../GuidedCourseGate";
 
+const Landing = () => {
+  const location = useLocation();
+  return <div data-testid="classic-landing">{location.search}</div>;
+};
+
 const renderAt = (url: string) =>
   render(
     <MemoryRouter initialEntries={[url]}>
       <Routes>
         <Route path="/journey/:trackId" element={<GuidedCourseGate />} />
         <Route path="/track/:trackId" element={<div data-testid="classic-course" />} />
-        <Route path="/course/:trackId" element={<div data-testid="classic-landing" />} />
+        <Route path="/course/:trackId" element={<Landing />} />
         <Route path="/learn" element={<div data-testid="learn" />} />
       </Routes>
     </MemoryRouter>,
@@ -79,7 +84,8 @@ describe("GuidedCourseGate", () => {
     localStorage.clear();
     availability.mockReturnValue({ data: { guided: false } });
     renderAt("/journey/c1");
-    expect(screen.getByTestId("classic-landing")).toBeInTheDocument();
+    // With ?view=classic, so /course/:id doesn't send them straight back here.
+    expect(screen.getByTestId("classic-landing")).toHaveTextContent("?view=classic");
   });
 
   it("only development builds honour ?fixture", () => {

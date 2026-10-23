@@ -7,6 +7,8 @@
 import { handleLogout } from "@api/baseAPI";
 import { ApiEndpoints, LOCAL_STORAGE_KEYS } from "@constants";
 
+import { GUIDE_VISITOR_HEADER } from "../visitor/visitorToken";
+
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
 const apiBase = (): string => `${import.meta.env.VITE_API_BASE_URL ?? ""}/api`;
@@ -53,6 +55,11 @@ export interface OpenStreamOptions {
   afterSeq: number;
   signal: AbortSignal;
   fetchImpl?: FetchLike;
+  /**
+   * An anonymous visitor: the public route with `x-guide-visitor`, and no
+   * token refresh (a 401 there means the visit is over, not the session).
+   */
+  visitorToken?: string | null;
 }
 
 export const openGuideStream = async ({
@@ -60,7 +67,20 @@ export const openGuideStream = async ({
   afterSeq,
   signal,
   fetchImpl = (input, init) => fetch(input, init),
+  visitorToken,
 }: OpenStreamOptions): Promise<Response> => {
+  if (visitorToken) {
+    return fetchImpl(`${apiBase()}${ApiEndpoints.GUIDE.PUBLIC_EVENTS(threadId)}`, {
+      method: "GET",
+      headers: {
+        Accept: "text/event-stream",
+        [GUIDE_VISITOR_HEADER]: visitorToken,
+        ...(afterSeq > 0 ? { "Last-Event-ID": String(afterSeq) } : {}),
+      },
+      cache: "no-store",
+      signal,
+    });
+  }
   const url = `${apiBase()}${ApiEndpoints.GUIDE.EVENTS(threadId)}`;
   const request = (token: string | null) =>
     fetchImpl(url, {

@@ -11,11 +11,16 @@
  * word. Phrases in a message trigger the designed states:
  *   crisis-demo · care-demo · fail-demo · slow-demo · provider-demo ·
  *   other-tab-demo · closing-demo · practice-demo · offline (use devtools)
+ *
+ * `?fixture=visitor` plays a signed-out visitor: the landing, an allowance of
+ * four messages (the counter shows at two), the sign-in card when it runs
+ * out, and "paused-demo" for paused anonymous chat.
  */
 import {
   cardForItem,
   FIXTURE_ITEMS,
   FIXTURE_SECTIONS,
+  fixturePublicOutline,
   fixtureStartPayload,
   fixtureTrackDetail,
 } from "./fixtureCourse";
@@ -45,7 +50,19 @@ const FIXTURE_CRISIS_TEXT =
 export interface FixtureOptions {
   /** Multiplies every delay; 0 makes the fixture synchronous-ish for tests. */
   delayScale?: number;
+  /**
+   * A signed-out visitor (M2): anonymous chat on, the public routes, an
+   * allowance, and the claim when they sign in. The thread starts empty so
+   * the landing shows; "paused-demo" pauses anonymous chat.
+   */
+  visitor?: boolean;
+  /** Messages a visitor may send before sign-in (default 4, so the counter shows early). */
+  allowance?: number;
+  /** The visitor signs in to an account that can't take this course (claim refused, 403). */
+  claimDenied?: boolean;
 }
+
+const VISITOR_TOKEN = "fx-visitor-token";
 
 export class GuideFixtureServer {
   readonly threadId = "fx-thread";
@@ -63,11 +80,20 @@ export class GuideFixtureServer {
   private busy = false;
   private turnsByClientId = new Map<string, string>();
   readonly requests: Array<{ method: string; path: string; body: unknown }> = [];
+  /** Visitor mode: whether the visitor has a thread yet, and what's left of the allowance. */
+  private visitor: boolean;
+  private visitorThread = false;
+  private allowance: { remaining: number; limit: number };
 
   constructor(
     readonly trackId: string,
     private readonly options: FixtureOptions = {},
   ) {
+    this.visitor = Boolean(options.visitor);
+    const limit = options.allowance ?? 4;
+    this.allowance = { remaining: limit, limit };
+    // A visitor arrives to an empty thread: the landing is the first screen.
+    if (this.visitor) return;
     this.openScene(FIXTURE_SECTIONS[0].id);
     this.durable("assistant.message", {
       messageId: "fx-m0",
@@ -309,7 +335,8 @@ export class GuideFixtureServer {
       return;
     }
 
-    if (request.intent === "continue" || request.intent === "start") {
+    // A visitor's "Let's start" chip is words, not the start intent.
+    if (request.intent === "continue" || request.intent === "start" || lower === "let's start") {
       const item = this.nextItem();
       if (!item) {
         await this.streamReply(
@@ -370,9 +397,12 @@ export class GuideFixtureServer {
       return json({ turnId }, 202);
     }
     this.busy = true;
+    const visitor = this.visitor;
     setTimeout(() => {
       void this.runTurn(turnId, request).finally(() => {
         this.busy = false;
+        // The visitor's counter, after every turn they take (plan §5.14).
+        if (visitor && this.visitor) this.ephemeral("allowance", { ...this.allowance });
       });
     }, 0);
     return json({ turnId }, 202);
@@ -503,6 +533,98 @@ export class GuideFixtureServer {
     };
   }
 
+  /** `GET /v1/guide/public/tracks/:trackId/bootstrap`: the preview, the visit so far and the allowance. */
+  visitorBootstrap(token: string | null): GuideBootstrapWire {
+    const full = this.bootstrap();
+    const known = token === VISITOR_TOKEN;
+    return {
+      ...full,
+      availability: { ...full.availability, anonymousChat: true, voice: false },
+      access: { hasAccess: false, enrolled: false, reason: null },
+      ...(known && this.visitorThread ? {} : { thread: undefined, messages: [], cards: [] }),
+      spine: full.spine && {
+        ...full.spine,
+        // A preview: the first item is open, the rest wait for sign-in.
+        sections: full.spine.sections.map((section, s) => ({
+          ...section,
+          items: section.items.map((item, i) => ({
+            ...item,
+            state: s === 0 && i === 0 ? ("available" as const) : ("locked" as const),
+          })),
+        })),
+      },
+      nextStep: { hidden: true, itemId: null, title: null, minutes: null },
+      ...(known ? { allowance: { ...this.allowance } } : {}),
+    };
+  }
+
+  private visitorThreadOpened() {
+    if (!this.visitorThread) {
+      this.visitorThread = true;
+      this.openScene(FIXTURE_SECTIONS[0].id);
+    }
+    return json({
+      id: this.threadId,
+      trackId: this.trackId,
+      mode: this.mode,
+      atmosphere: this.atmosphere,
+      lastEventSeq: this.seq,
+    });
+  }
+
+  /** A visitor's turn: refused (nothing stored) when paused or out of messages. */
+  private acceptVisitorTurn(request: GuideTurnRequest): Response {
+    const paused = (request?.text ?? "").toLowerCase().includes("paused-demo");
+    if (paused || this.allowance.remaining <= 0) {
+      this.turnCount += 1;
+      const turnId = `fx-u${this.turnCount}`;
+      setTimeout(
+        () =>
+          this.ephemeral("turn.failed", {
+            turnId,
+            code: paused ? "anonymous_paused" : "allowance_exhausted",
+            message: "",
+          }),
+        0,
+      );
+      return json({ turnId }, 202);
+    }
+    this.allowance = { ...this.allowance, remaining: this.allowance.remaining - 1 };
+    return this.acceptTurn(request);
+  }
+
+  /** Signing in with the visitor token: the conversation becomes the learner's, and Ally says so. */
+  private claim(): Response {
+    if (this.options.claimDenied) {
+      return json(
+        { statusCode: 403, message: "Not your course", errorCode: "GUIDE_NO_ACCESS" },
+        403,
+      );
+    }
+    const had = this.visitor && this.visitorThread;
+    this.visitor = false;
+    if (had) {
+      this.turnCount += 1;
+      const turnId = `fx-u${this.turnCount}`;
+      setTimeout(() => {
+        this.ephemeral("turn.started", { turnId, trigger: "platform_event" });
+        void this.streamReply(
+          turnId,
+          "You're signed in, so this conversation is yours now. Let's carry on where we were.",
+          "…",
+        ).then(() => this.ephemeral("turn.completed", { turnId }));
+      }, 0);
+    }
+    return json({
+      id: this.threadId,
+      trackId: this.trackId,
+      mode: this.mode,
+      atmosphere: this.atmosphere,
+      lastEventSeq: this.seq,
+      claim: had ? "claimed" : "none",
+    });
+  }
+
   /** Builds the SSE body: hello, replay after `afterSeq`, then live events and pings. */
   stream(afterSeq: number, signal?: AbortSignal | null): Response {
     const encoder = new TextEncoder();
@@ -556,6 +678,7 @@ export class GuideFixtureServer {
     method: string,
     bodyText: string | null,
     signal?: AbortSignal | null,
+    headers?: Headers,
   ): Promise<Response | null> {
     const path = new URL(url, "http://fixture.local").pathname.replace(/^.*?\/api\//, "/");
     let body: unknown = null;
@@ -568,17 +691,43 @@ export class GuideFixtureServer {
     let match: RegExpMatchArray | null;
     this.requests.push({ method, path, body });
 
+    const visitorToken = headers?.get("x-guide-visitor") ?? null;
     if (m(/^\/v1\/guide\/public\/availability\//)) {
       return json({
         guided: true,
-        anonymousChat: false,
+        anonymousChat: this.visitor,
         voice: false,
         languages: ["en"],
         reason: null,
       });
     }
+    // Anonymous visitors (M2).
+    if (m(/^\/v1\/guide\/public\/visitors$/) && method === "POST") {
+      return json({ token: VISITOR_TOKEN }, 201);
+    }
+    if (m(/^\/v1\/guide\/public\//) && visitorToken && visitorToken !== VISITOR_TOKEN) {
+      return json(
+        { statusCode: 401, message: "Unknown visitor", errorCode: "GUIDE_VISITOR_INVALID" },
+        401,
+      );
+    }
+    if (m(/^\/v1\/guide\/public\/tracks\/[^/]+\/bootstrap$/)) {
+      return json(this.visitorBootstrap(visitorToken));
+    }
+    if (m(/^\/v1\/guide\/public\/tracks\/[^/]+\/threads$/) && method === "POST") {
+      return this.visitorThreadOpened();
+    }
+    if (m(/^\/v1\/guide\/public\/threads\/[^/]+\/turns$/) && method === "POST") {
+      return this.acceptVisitorTurn(body as GuideTurnRequest);
+    }
+    if (m(/^\/v1\/guide\/public\/threads\/[^/]+\/events$/)) {
+      const lastId = Number(new URL(url, "http://fixture.local").searchParams.get("afterSeq") ?? 0);
+      return this.stream(Number.isFinite(lastId) ? lastId : 0, signal);
+    }
+
     if (m(/^\/v1\/guide\/tracks\/[^/]+\/bootstrap$/)) return json(this.bootstrap());
     if (m(/^\/v1\/guide\/tracks\/[^/]+\/threads$/) && method === "POST") {
+      if (visitorToken) return this.claim();
       return json({
         id: this.threadId,
         trackId: this.trackId,
@@ -609,8 +758,16 @@ export class GuideFixtureServer {
     if (m(/^\/v1\/guide\/prefs$/))
       return json({ guidance: (body as { guidance?: string })?.guidance ?? "walk" });
 
-    if (m(/^\/v1\/learn\/tracks\/[^/]+\/access$/))
-      return json({ hasAccess: true, enrolled: true, reason: null });
+    if ((match = m(/^\/v1\/learn\/tracks\/([^/]+)\/public$/))) {
+      return json(fixturePublicOutline(decodeURIComponent(match[1])));
+    }
+    if (m(/^\/v1\/learn\/tracks\/[^/]+\/access$/)) {
+      return json(
+        this.options.claimDenied
+          ? { hasAccess: false, enrolled: false, reason: "NOT_IN_ORGANIZATION" }
+          : { hasAccess: true, enrolled: true, reason: null },
+      );
+    }
     if ((match = m(/^\/v1\/learn\/tracks\/items\/([^/]+)\/start$/))) {
       const payload = fixtureStartPayload(match[1]);
       return payload ? json(payload) : json({ message: "This fixture can't open that item." }, 400);
@@ -679,6 +836,7 @@ export const installGuideFixture = (trackId: string, options?: FixtureOptions) =
       method,
       bodyText,
       init?.signal ?? request?.signal,
+      headers,
     );
     if (answered) return answered;
     if (localStorage.getItem("accessToken")) return realFetch(input, init);

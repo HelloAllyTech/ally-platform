@@ -172,7 +172,10 @@ export const Composer: FC<{
   focusToken?: number;
   /** Beside the send button: the microphone, when voice is on for the course. */
   trailing?: ReactNode;
-}> = ({ disabled, sendBlocked, onSend, focusToken, trailing }) => {
+  /** Words to put back (what a visitor wrote before signing in); taken once. */
+  prefill?: string | null;
+  onPrefilled?: () => void;
+}> = ({ disabled, sendBlocked, onSend, focusToken, trailing, prefill, onPrefilled }) => {
   const { t } = useTranslation();
   const [text, setText] = useState("");
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -183,6 +186,15 @@ export const Composer: FC<{
   useEffect(() => {
     if (focusToken) ref.current?.focus();
   }, [focusToken]);
+
+  useEffect(() => {
+    if (!prefill) return;
+    setText(prefill);
+    ref.current?.focus();
+    onPrefilled?.();
+    // Taken once, when it arrives.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefill]);
 
   // Grow with the text, up to about six lines.
   useEffect(() => {
@@ -252,5 +264,40 @@ export const Composer: FC<{
         </p>
       )}
     </form>
+  );
+};
+
+/**
+ * A visitor's messages left before sign-in, once two or fewer remain (plan
+ * Appendix A). Quiet on purpose: a fact with the way on beside it, not a
+ * countdown to worry about.
+ */
+export const AllowanceNote: FC<{ remaining: number; onSignIn: () => void }> = ({
+  remaining,
+  onSignIn,
+}) => {
+  const { t } = useTranslation();
+  return (
+    <p className="g-caption flex flex-wrap items-center gap-x-2 px-2" data-testid="allowance-note">
+      <span>{t("guide.visitor.allowance", { count: remaining })}</span>
+      <span aria-hidden="true">·</span>
+      <button
+        type="button"
+        onClick={onSignIn}
+        className="min-h-9 font-primary text-sm text-[var(--g-ink-soft)] underline underline-offset-2 max-md:min-h-11"
+      >
+        {t("guide.visitor.signIn")}
+      </button>
+    </p>
+  );
+};
+
+/** While signing in carries the visitor's conversation over. */
+export const ClaimingNote: FC = () => {
+  const { t } = useTranslation();
+  return (
+    <p className="g-caption px-2" role="status" data-testid="claiming-note">
+      {t("guide.visitor.claiming")}
+    </p>
   );
 };

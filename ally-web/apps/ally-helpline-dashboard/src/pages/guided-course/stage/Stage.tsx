@@ -18,6 +18,7 @@ import {
 import { AllyPresence } from "../presence/AllyPresence";
 import { capTone } from "../state/atmosphere";
 import { firstCardInScene, visibleEntries } from "../state/sceneGrouping";
+import { VisitorLanding } from "../visitor/VisitorLanding";
 
 import type { GuideCard } from "../contract/wire";
 import type { GuideJourney } from "../hooks/useGuideJourney";
@@ -254,7 +255,12 @@ export const Stage: FC<StageProps> = ({
         className="mx-auto flex w-full max-w-[680px] flex-col gap-6 px-4 pb-6 pt-6 sm:px-6"
         style={{ rowGap: "calc(24px * var(--atm-space))" }}
       >
-        {showWelcome && <Welcome journey={journey} courseTitle={courseTitle} />}
+        {showWelcome &&
+          (journey.identity === "visitor" ? (
+            <VisitorLanding journey={journey} trackId={trackId} courseTitle={courseTitle} />
+          ) : (
+            <Welcome journey={journey} courseTitle={courseTitle} />
+          ))}
         <div
           role="log"
           aria-label={t("guide.stage.label")}

@@ -257,3 +257,54 @@ export const fixtureTrackDetail = (trackId: string, doneIds: Set<string>) => ({
     })),
   })),
 });
+
+/**
+ * The course's public outline with a story frame (`GET /v1/learn/tracks/:id/public`),
+ * so the visitor landing shows a story line and first-move replies.
+ */
+export const fixturePublicOutline = (trackId: string) => ({
+  id: trackId,
+  title: "Answering the first call",
+  description: "How to open a call, listen first, and stay with a caller in the hard moments.",
+  coverImageUrl: null,
+  totalItems: FIXTURE_ITEMS.length,
+  simulationsCount: 1,
+  estimatedDurationMinutes: 33,
+  languageCode: "en",
+  sections: [],
+  story: {
+    hook: "Meera has rung off twice before saying a word. Tonight she stays on the line.",
+    question: null,
+    courseLine: null,
+    buttonLabel: null,
+    persona: null,
+    firstMove: {
+      sceneLine: null,
+      personaLine: "“…Hello? I don't really know why I called.”",
+      prompt: "What do you say first?",
+      replies: [
+        {
+          text: "I'm glad you called. Take your time.",
+          label: "I'm glad you called. Take your time.",
+          why: null,
+        },
+        {
+          text: "What's been happening for you today?",
+          label: "What's been happening today?",
+          why: null,
+        },
+        { text: "Can I take your name first?", label: "Can I take your name first?", why: null },
+      ],
+    },
+    arc: null,
+    outcomes: [
+      "Open a call so the caller feels heard",
+      "Reflect what you hear before you advise",
+      "Stay steady when a caller goes quiet",
+    ],
+    howItPlays: null,
+    cast: null,
+    xp: null,
+    contentNotes: null,
+  },
+});

@@ -127,6 +127,8 @@ export interface JourneyBootstrap {
   nextStep: JourneyNextStep | null;
   /** While the thread is in CRISIS: the fixed message and lines, so the card survives a reload. */
   crisis: GuideCrisisState | null;
+  /** A visitor's remaining messages before sign-in (absent for learners). */
+  allowance: { remaining: number; limit: number } | null;
   /**
    * Whether `messages` and `cards` already describe the thread up to
    * `thread.lastEventSeq`. False for the composed fallback, which has no
@@ -227,6 +229,7 @@ export const fromBootstrapWire = (trackId: string, wire: GuideBootstrapWire): Jo
         }
       : null,
     crisis: wire.crisis ?? null,
+    allowance: wire.allowance ?? null,
     complete: true,
   };
 };
@@ -312,6 +315,7 @@ export const composeBootstrap = ({
     })),
     progress: null,
     crisis: null,
+    allowance: null,
     messages: [],
     cards: [],
     prefs: { guidance: asGuidance(guidance) },

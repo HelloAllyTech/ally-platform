@@ -53,21 +53,46 @@ export const AccessDeniedCard: FC<{
   );
 };
 
-/** "Sign in to save your place" (card grammar §5.6). Opens the existing LoginDialog. */
-export const SignInCard: FC<{ onSignIn: () => void }> = ({ onSignIn }) => {
+/**
+ * Why sign-in is being asked for: to save your place (Ally's card, or no
+ * anonymous chat), because the visitor's messages before sign-in are used
+ * up, or because anonymous chat is paused for a while.
+ */
+export type SignInReason = "save" | "allowance" | "paused";
+
+const SIGN_IN_COPY: Record<SignInReason, { title: string; line: string }> = {
+  save: { title: "guide.signIn.title", line: "guide.signIn.line" },
+  allowance: { title: "guide.signIn.allowanceTitle", line: "guide.signIn.allowanceLine" },
+  paused: { title: "guide.signIn.pausedTitle", line: "guide.signIn.pausedLine" },
+};
+
+/**
+ * "Sign in to save your place" (card grammar §5.6). Opens the existing
+ * LoginDialog; the conversation carries over once they are in (plan §3
+ * stage 3).
+ */
+export const SignInCard: FC<{ onSignIn: () => void; reason?: SignInReason }> = ({
+  onSignIn,
+  reason = "save",
+}) => {
   const { t } = useTranslation();
+  const copy = SIGN_IN_COPY[reason];
   return (
     <section
       data-testid="sign-in-card"
+      data-reason={reason}
       aria-labelledby="guide-sign-in-title"
       className="rounded-2xl border border-[var(--g-line)] bg-[var(--g-card)] p-5"
     >
       <h2 id="guide-sign-in-title" className="g-title">
-        {t("guide.signIn.title")}
+        {t(copy.title)}
       </h2>
-      <p className="mt-1 font-secondary text-base text-[var(--g-ink-soft)]">
-        {t("guide.signIn.line")}
-      </p>
+      <p className="mt-1 font-secondary text-base text-[var(--g-ink-soft)]">{t(copy.line)}</p>
+      {reason !== "save" && (
+        <p className="mt-1 font-secondary text-sm text-[var(--g-ink-soft)]">
+          {t("guide.signIn.line")}
+        </p>
+      )}
       <button type="button" onClick={onSignIn} className={`${action} mt-4`}>
         {t("guide.signIn.button")}
       </button>

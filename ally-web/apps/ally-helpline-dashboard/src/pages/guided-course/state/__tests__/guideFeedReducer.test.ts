@@ -138,6 +138,7 @@ const bootstrap = (overrides: Partial<JourneyBootstrap> = {}): JourneyBootstrap 
   prefs: { guidance: "walk" },
   nextStep: null,
   crisis: null,
+  allowance: null,
   complete: true,
   ...overrides,
 });
@@ -369,5 +370,97 @@ describe("guideFeedReducer", () => {
     const state = fold([ev.learner(1, "m1", "q", null), ev.ally(2, "m2", "a")]);
     expect(lastAllyMessage(state)?.id).toBe("m2");
     expect(lastAllyMessage(fold([ev.learner(3, "m3", "again", null)], state))).toBeNull();
+  });
+
+  describe("anonymous visitors (M2)", () => {
+    const echo = (state: GuideFeedState, clientTurnId: string, text: string) =>
+      guideFeedReducer(state, { type: "learner/echo", clientTurnId, text });
+
+    it("takes the visitor's thread when their first message opens it", () => {
+      const state = guideFeedReducer(initialFeedState, {
+        type: "thread/opened",
+        thread: { id: "t9", mode: "NORMAL", atmosphere: "bright", lastEventSeq: 3 },
+      });
+      expect(state).toMatchObject({ threadId: "t9", lastSeq: 3 });
+    });
+
+    it("on a sign-in refusal, drops the words from the feed and holds them for after sign-in", () => {
+      let state = { ...initialFeedState, threadId: "t1", allowance: { remaining: 1, limit: 5 } };
+      state = echo(state, "c1", "One more thing");
+      state = guideFeedReducer(state, {
+        type: "learner/accepted",
+        clientTurnId: "c1",
+        turnId: "u1",
+      });
+      state = fold([ev.failed(0, "allowance_exhausted")], state);
+
+      expect(state.entries).toHaveLength(0);
+      expect(state.heldText).toBe("One more thing");
+      expect(state.allowance).toEqual({ remaining: 0, limit: 5 });
+      expect(state.failure).toMatchObject({ code: "allowance_exhausted", clientTurnId: null });
+
+      state = guideFeedReducer(state, { type: "held/consumed" });
+      expect(state.heldText).toBeNull();
+    });
+
+    it("matches a refusal that beats the 202 to the newest echo without a turn", () => {
+      let state = echo({ ...initialFeedState, threadId: "t1" }, "c1", "Hello?");
+      state = fold([ev.failed(0, "anonymous_paused", "u7")], state);
+      expect(state.entries).toHaveLength(0);
+      expect(state.heldText).toBe("Hello?");
+      // The late 202 finds nothing to update.
+      const after = guideFeedReducer(state, {
+        type: "learner/accepted",
+        clientTurnId: "c1",
+        turnId: "u7",
+      });
+      expect(after.entries).toHaveLength(0);
+    });
+
+    it("a late 202 leaves a failed echo failed", () => {
+      let state = echo({ ...initialFeedState, threadId: "t1" }, "c1", "Hi");
+      state = fold([ev.failed(0, "internal_error", "u1")], state);
+      expect(state.entries[0]).toMatchObject({ status: "failed" });
+      state = guideFeedReducer(state, {
+        type: "learner/accepted",
+        clientTurnId: "c1",
+        turnId: "u1",
+      });
+      expect(state.entries[0]).toMatchObject({ status: "failed", turnId: "u1" });
+    });
+
+    it("a re-hydrate after sign-in keeps what's waiting to be sent, and the held words", () => {
+      let state = guideFeedReducer(initialFeedState, {
+        type: "learner/echo",
+        clientTurnId: "q1",
+        text: "typed while signing in",
+        status: "queued",
+      });
+      state = { ...state, heldText: "held" };
+      const kept = guideFeedReducer(state, {
+        type: "hydrate",
+        bootstrap: bootstrap(),
+        keepQueued: true,
+      });
+      expect(queuedEchoes(kept).map(e => e.text)).toEqual(["typed while signing in"]);
+      expect(kept.heldText).toBe("held");
+
+      const fresh = guideFeedReducer(state, { type: "hydrate", bootstrap: bootstrap() });
+      expect(queuedEchoes(fresh)).toHaveLength(0);
+      expect(fresh.heldText).toBeNull();
+    });
+
+    it("hydrates the allowance and follows the allowance event", () => {
+      let state = guideFeedReducer(initialFeedState, {
+        type: "hydrate",
+        bootstrap: bootstrap({ allowance: { remaining: 3, limit: 5 } }),
+      });
+      expect(state.allowance).toEqual({ remaining: 3, limit: 5 });
+      state = fold(
+        [{ ...base(0, false), type: "allowance", data: { remaining: 2, limit: 5 } } as GuideEvent],
+        state,
+      );
+      expect(state.allowance).toEqual({ remaining: 2, limit: 5 });
+    });
   });
 });

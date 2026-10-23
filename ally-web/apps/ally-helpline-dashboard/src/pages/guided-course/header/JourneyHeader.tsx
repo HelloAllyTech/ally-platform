@@ -60,9 +60,64 @@ export interface JourneyHeaderProps {
   onSupport: () => void;
   onClassic: () => void;
   onExit: () => void;
+  /** What the back button says (a visitor goes back to the course page, not their courses). */
+  exitLabel?: string;
   /** Hidden in the still atmosphere: nothing competes with the crisis card. */
   quiet: boolean;
+  /** Languages the course is published in; the choice is offered when there are two or more. */
+  languages?: string[];
+  language?: string | null;
+  onLanguageChange?: (languageCode: string) => void;
+  /** A visitor can sign in from the menu at any time. */
+  onSignIn?: () => void;
 }
+
+/** A language's own name ("हिन्दी"), so each option reads to the person who needs it. */
+export const languageEndonym = (code: string): string => {
+  try {
+    const name = new Intl.DisplayNames([code], { type: "language" }).of(code);
+    return name ? name.charAt(0).toLocaleUpperCase(code) + name.slice(1) : code;
+  } catch {
+    return code;
+  }
+};
+
+const CourseLanguage: FC<{
+  languages: string[];
+  value: string | null;
+  onChange: (code: string) => void;
+}> = ({ languages, value, onChange }) => {
+  const { t } = useTranslation();
+  const current = value?.split("-")[0] ?? null;
+  return (
+    <fieldset className="mt-3 border-t border-[var(--g-line)] pt-3" data-testid="course-language">
+      <legend className="g-label mb-2 text-[var(--g-ink-soft)]">
+        {t("guide.header.language")}
+      </legend>
+      <div className="flex flex-wrap gap-2">
+        {languages.map(code => {
+          const selected = code === value || code === current;
+          return (
+            <button
+              key={code}
+              type="button"
+              lang={code}
+              aria-pressed={selected}
+              onClick={() => !selected && onChange(code)}
+              className={`min-h-11 rounded-lg border px-3 font-primary text-sm ${
+                selected
+                  ? "border-[var(--g-ink)] font-semibold text-[var(--g-ink)]"
+                  : "border-[var(--g-line)] text-[var(--g-ink-soft)] hover:border-[var(--g-ink-faint)]"
+              }`}
+            >
+              {languageEndonym(code)}
+            </button>
+          );
+        })}
+      </div>
+    </fieldset>
+  );
+};
 
 /**
  * Ally's presence, the AI disclosure, and the learner's controls. The orb
@@ -77,7 +132,12 @@ export const JourneyHeader: FC<JourneyHeaderProps> = ({
   onSupport,
   onClassic,
   onExit,
+  exitLabel,
   quiet,
+  languages = [],
+  language = null,
+  onLanguageChange,
+  onSignIn,
 }) => {
   const { t } = useTranslation();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -114,7 +174,7 @@ export const JourneyHeader: FC<JourneyHeaderProps> = ({
       <button
         type="button"
         onClick={onExit}
-        aria-label={t("guide.header.exit")}
+        aria-label={exitLabel ?? t("guide.header.exit")}
         className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] text-[var(--g-ink-soft)] hover:bg-[var(--g-ground)]"
       >
         <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
@@ -207,6 +267,16 @@ export const JourneyHeader: FC<JourneyHeaderProps> = ({
               buttonRef.current?.focus();
             }}
           />
+          {onLanguageChange && languages.length >= 2 && (
+            <CourseLanguage
+              languages={languages}
+              value={language}
+              onChange={code => {
+                setMenuOpen(false);
+                onLanguageChange(code);
+              }}
+            />
+          )}
           <button
             type="button"
             onClick={onClassic}
@@ -214,6 +284,18 @@ export const JourneyHeader: FC<JourneyHeaderProps> = ({
           >
             {t("guide.header.classic")}
           </button>
+          {onSignIn && (
+            <button
+              type="button"
+              onClick={() => {
+                setMenuOpen(false);
+                onSignIn();
+              }}
+              className="mt-2 min-h-11 w-full rounded-[10px] px-2 text-left font-primary text-sm font-semibold text-[var(--g-ink)] underline underline-offset-2"
+            >
+              {t("guide.header.signIn")}
+            </button>
+          )}
         </div>
       )}
     </header>

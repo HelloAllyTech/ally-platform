@@ -4,6 +4,7 @@ import { persistStore, persistReducer } from "redux-persist";
 import storage from "redux-persist/lib/storage";
 
 import { baseAPI } from "@api/baseAPI";
+import { guideVisitorAPI } from "@api/guideVisitor";
 import { helplineGuestAPI } from "@api/helplineGuest";
 import { ANALYTICS_EVENTS, ANALYTICS_PROPS } from "@constants/analyticsEvents";
 import callsSlice from "@reducer/callsReducer";
@@ -44,6 +45,8 @@ export const store = configureStore({
     // The anonymous talker page's own API (no user logout on 401). Not
     // persisted: only the user slice goes through redux-persist.
     [helplineGuestAPI.reducerPath]: helplineGuestAPI.reducer,
+    // Ally's anonymous visitors: the same no-logout-on-401 reasoning.
+    [guideVisitorAPI.reducerPath]: guideVisitorAPI.reducer,
     user: persistedUserReducer,
     calls: callsSlice.reducer,
     chatHistory: chatHistorySlice.reducer,
@@ -57,6 +60,7 @@ export const store = configureStore({
     })
       .concat(baseAPI.middleware)
       .concat(helplineGuestAPI.middleware)
+      .concat(guideVisitorAPI.middleware)
       .concat(analyticsMiddleware),
 });
 

@@ -12,7 +12,7 @@ export const STREAM_DEAD_AFTER_MS = 45_000;
 export const HIDDEN_RELEASE_AFTER_MS = 45_000;
 
 export type StreamStatus = "connecting" | "open" | "lost";
-export type StreamFatal = "disabled" | "forbidden" | "not_found";
+export type StreamFatal = "disabled" | "forbidden" | "not_found" | "visitor_invalid";
 
 export interface UseGuideEventStreamOptions {
   threadId: string | null;
@@ -23,6 +23,8 @@ export interface UseGuideEventStreamOptions {
   onStatus: (status: StreamStatus) => void;
   /** The server refused the stream for good: leave the guided journey. */
   onFatal: (reason: StreamFatal) => void;
+  /** An anonymous visitor's token: the public stream, reconnected when it changes. */
+  visitorToken?: string | null;
   /** For tests. */
   fetchImpl?: (input: string, init?: RequestInit) => Promise<Response>;
   random?: () => number;
@@ -49,14 +51,17 @@ class FatalStreamError extends Error {
 
 const fatalFor = async (response: Response): Promise<StreamFatal | null> => {
   if (response.status === 404) return "not_found";
-  if (response.status !== 403) return null;
+  if (response.status !== 403 && response.status !== 401) return null;
   let body: unknown = null;
   try {
     body = await response.json();
   } catch {
-    // An empty or non-JSON 403 is still a refusal.
+    // An empty or non-JSON refusal is still a refusal.
   }
-  return errorCodeOf({ data: body }) === "GUIDE_DISABLED" ? "disabled" : "forbidden";
+  const code = errorCodeOf({ data: body });
+  // Only a visitor's stream answers 401 here (a learner's refreshes first).
+  if (response.status === 401) return code === "GUIDE_VISITOR_INVALID" ? "visitor_invalid" : null;
+  return code === "GUIDE_DISABLED" ? "disabled" : "forbidden";
 };
 
 /**
@@ -76,6 +81,7 @@ export const useGuideEventStream = ({
   onEvent,
   onStatus,
   onFatal,
+  visitorToken,
   fetchImpl,
   random,
 }: UseGuideEventStreamOptions): void => {
@@ -133,6 +139,7 @@ export const useGuideEventStream = ({
           afterSeq: callbacks.current.getLastSeq(),
           signal: current.signal,
           fetchImpl: callbacks.current.fetchImpl,
+          visitorToken,
         });
         if (!response.ok || !response.body) {
           const fatal = await fatalFor(response);
@@ -215,5 +222,5 @@ export const useGuideEventStream = ({
       window.removeEventListener("offline", onOffline);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [threadId, enabled]);
+  }, [threadId, enabled, visitorToken]);
 };

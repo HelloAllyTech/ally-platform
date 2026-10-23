@@ -245,6 +245,52 @@ describe("useGuideEventStream", () => {
     expect(handleLogout).not.toHaveBeenCalled();
   });
 
+  it("streams a visitor's thread from the public route with their token, never the JWT", async () => {
+    const server = makeServer();
+    renderHook(() =>
+      useGuideEventStream({
+        threadId: "t1",
+        enabled: true,
+        visitorToken: "visit-1",
+        getLastSeq: () => 0,
+        onEvent: vi.fn(),
+        onStatus: vi.fn(),
+        onFatal: vi.fn(),
+        fetchImpl: server.fetchImpl,
+      }),
+    );
+    await flush();
+    expect(server.streams[0].url).toMatch(/\/api\/v1\/guide\/public\/threads\/t1\/events$/);
+    expect(server.streams[0].headers["x-guide-visitor"]).toBe("visit-1");
+    expect(server.streams[0].headers.Authorization).toBeUndefined();
+  });
+
+  it("a refused visitor token ends the stream (a new visit starts) without refresh or logout", async () => {
+    const server = makeServer();
+    server.statuses.push({ status: 401, body: { errorCode: "GUIDE_VISITOR_INVALID" } });
+    const onFatal = vi.fn();
+    renderHook(() =>
+      useGuideEventStream({
+        threadId: "t1",
+        enabled: true,
+        visitorToken: "spent",
+        getLastSeq: () => 0,
+        onEvent: vi.fn(),
+        onStatus: vi.fn(),
+        onFatal,
+        fetchImpl: server.fetchImpl,
+      }),
+    );
+    await flush();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+    expect(onFatal).toHaveBeenCalledWith("visitor_invalid");
+    expect(server.refreshCalls).toEqual([]);
+    expect(handleLogout).not.toHaveBeenCalled();
+    expect(server.fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
   it("waits while offline and reconnects at once when the network returns", async () => {
     const { server, statuses } = setup();
     await flush();

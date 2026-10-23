@@ -172,4 +172,118 @@ describe("bootJourney", () => {
     expect(outcome.kind).toBe("ready");
     expect(outcome.kind === "ready" && outcome.bootstrap.access.enrolled).toBe(false);
   });
+
+  describe("anonymous visitors (M2)", () => {
+    const visitorWire = {
+      availability: { guided: true, anonymousChat: true, voice: false, languages: ["en"] },
+      access: { hasAccess: false, enrolled: false, reason: null },
+      course: { id: "c1", title: "Course", languageCode: "en", estimatedMinutes: 20 },
+      messages: [],
+      cards: [],
+      allowance: { remaining: 5, limit: 5 },
+    };
+    const visitor = (over: Partial<NonNullable<BootDeps["visitor"]>> = {}) => ({
+      ensureToken: vi.fn().mockResolvedValue("tok"),
+      dropToken: vi.fn(),
+      getBootstrap: vi.fn().mockResolvedValue(visitorWire),
+      ...over,
+    });
+    const signedOut = (v: NonNullable<BootDeps["visitor"]>, anonymousChat = true) =>
+      deps({
+        isSignedIn: () => false,
+        getAvailability: vi.fn().mockResolvedValue({ guided: true, anonymousChat }),
+        visitor: v,
+      });
+
+    it("opens a visitor's journey with their token, the preview and the allowance (no thread yet)", async () => {
+      const v = visitor();
+      const d = signedOut(v);
+      const outcome = await bootJourney("c1", d);
+      expect(outcome).toMatchObject({
+        kind: "ready",
+        identity: "visitor",
+        visitorToken: "tok",
+        bootstrap: { thread: null, allowance: { remaining: 5, limit: 5 } },
+      });
+      expect(v.getBootstrap).toHaveBeenCalledWith("c1", "tok");
+      expect(d.openThread).not.toHaveBeenCalled();
+      expect(d.getBootstrap).not.toHaveBeenCalled();
+    });
+
+    it("asks for sign-in when anonymous chat is off, or this address has too many visits", async () => {
+      expect(await bootJourney("c1", signedOut(visitor(), false))).toEqual({ kind: "signed_out" });
+      const busy = visitor({ ensureToken: vi.fn().mockRejectedValue(httpError(429)) });
+      expect(await bootJourney("c1", signedOut(busy))).toEqual({ kind: "signed_out" });
+    });
+
+    it("drops a refused token and starts a new visit, once", async () => {
+      const getBootstrap = vi
+        .fn()
+        .mockRejectedValueOnce(httpError(401, "GUIDE_VISITOR_INVALID"))
+        .mockResolvedValueOnce(visitorWire);
+      const v = visitor({ getBootstrap });
+      expect(await bootJourney("c1", signedOut(v))).toMatchObject({ kind: "ready" });
+      expect(v.dropToken).toHaveBeenCalledTimes(1);
+      expect(v.ensureToken).toHaveBeenCalledTimes(2);
+
+      const always = visitor({
+        getBootstrap: vi.fn().mockRejectedValue(httpError(401, "GUIDE_VISITOR_INVALID")),
+      });
+      expect(await bootJourney("c1", signedOut(always))).toEqual({ kind: "error" });
+    });
+
+    it("signing in claims the visit once, then boots as the learner", async () => {
+      const claim = {
+        pendingToken: () => "tok",
+        claimThread: vi.fn().mockResolvedValue({ ...thread, claim: "claimed" }),
+        dropToken: vi.fn(),
+      };
+      const d = deps({ claim });
+      const outcome = await bootJourney("c1", d);
+      expect(outcome).toMatchObject({ kind: "ready", identity: "learner", claim: "claimed" });
+      expect(claim.claimThread).toHaveBeenCalledWith("c1", "tok");
+      expect(claim.dropToken).toHaveBeenCalled();
+      // The claim is the thread call: bootstrap comes after it.
+      expect(claim.claimThread.mock.invocationCallOrder[0]).toBeLessThan(
+        (d.getBootstrap as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0],
+      );
+    });
+
+    it("a refused claim keeps the visit and says why", async () => {
+      const claim = {
+        pendingToken: () => "tok",
+        claimThread: vi.fn().mockRejectedValue(httpError(403, "GUIDE_NO_ACCESS")),
+        dropToken: vi.fn(),
+      };
+      const outcome = await bootJourney(
+        "c1",
+        deps({
+          claim,
+          getAccess: vi.fn().mockResolvedValue({
+            hasAccess: false,
+            enrolled: false,
+            reason: TrackAccessDenialReason.NOT_IN_ORGANIZATION,
+          }),
+        }),
+      );
+      expect(outcome).toEqual({
+        kind: "denied",
+        reason: TrackAccessDenialReason.NOT_IN_ORGANIZATION,
+        claimRefused: true,
+      });
+      expect(claim.dropToken).not.toHaveBeenCalled();
+    });
+
+    it("an unknown token is dropped and the learner boots as usual", async () => {
+      const claim = {
+        pendingToken: () => "old",
+        claimThread: vi.fn().mockRejectedValue(httpError(401, "GUIDE_VISITOR_INVALID")),
+        dropToken: vi.fn(),
+      };
+      const outcome = await bootJourney("c1", deps({ claim }));
+      expect(outcome).toMatchObject({ kind: "ready", identity: "learner" });
+      expect(outcome).not.toHaveProperty("claim");
+      expect(claim.dropToken).toHaveBeenCalled();
+    });
+  });
 });

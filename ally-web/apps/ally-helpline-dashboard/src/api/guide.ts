@@ -9,6 +9,7 @@
 import { ApiEndpoints, HttpMethod } from "@constants";
 
 import { baseAPI } from "./baseAPI";
+import { GUIDE_VISITOR_HEADER } from "../pages/guided-course/visitor/visitorToken";
 
 import type { JourneyThread } from "../pages/guided-course/contract/bootstrap";
 import type {
@@ -20,6 +21,7 @@ import type {
   GuidePrefs,
   GuidePrefsUpdate,
   GuideSpine,
+  GuideThreadOpened,
   GuideTurnAccepted,
   GuideTurnRequest,
 } from "../pages/guided-course/contract/wire";
@@ -84,6 +86,22 @@ const guideAPI = baseAPI.injectEndpoints({
         params: languageCode ? { languageCode } : undefined,
       }),
       keepUnusedDataFor: 0,
+    }),
+
+    /**
+     * Signing in from a visit: open the learner's thread with the visitor token
+     * alongside the JWT, so the visitor's conversation is claimed (or merged
+     * into an existing thread). 403 GUIDE_NO_ACCESS leaves the visit as it was.
+     */
+    claimGuideThread: builder.mutation<
+      GuideThreadOpened,
+      { trackId: string; visitorToken: string }
+    >({
+      query: ({ trackId, visitorToken }) => ({
+        url: ApiEndpoints.GUIDE.THREADS(trackId),
+        method: HttpMethod.POST,
+        headers: { [GUIDE_VISITOR_HEADER]: visitorToken },
+      }),
     }),
 
     openGuideThread: builder.mutation<JourneyThread, { trackId: string }>({
@@ -167,6 +185,7 @@ export const {
   useLazyGetGuideAvailabilityQuery,
   useLazyGetGuideBootstrapQuery,
   useOpenGuideThreadMutation,
+  useClaimGuideThreadMutation,
   useEnrollGuideThreadMutation,
   useStartGuideVoiceSessionMutation,
   useSendGuideTurnMutation,

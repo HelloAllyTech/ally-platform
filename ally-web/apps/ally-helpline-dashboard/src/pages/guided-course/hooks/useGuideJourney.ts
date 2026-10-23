@@ -4,23 +4,30 @@ import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 
 import {
+  useClaimGuideThreadMutation,
+  useCreateGuideVisitorMutation,
   useEnrollGuideThreadMutation,
   useEnrollTrackMutation,
   useLazyGetGuideAvailabilityQuery,
   useLazyGetGuideBootstrapQuery,
   useLazyGetLearnTrackDetailQuery,
   useLazyGetTrackAccessQuery,
+  useLazyGetVisitorBootstrapQuery,
   useOpenGuideThreadMutation,
+  useOpenVisitorThreadMutation,
   usePostGuideCardEventMutation,
   usePutGuideAppointmentMutation,
   usePutGuidePrefsMutation,
   useSendGuideTurnMutation,
+  useSendVisitorTurnMutation,
+  useSetTrackLanguageMutation,
 } from "@api";
 import { LOCAL_STORAGE_KEYS } from "@constants";
 import { ANALYTICS_EVENTS, ANALYTICS_PROPS } from "@constants/analyticsEvents";
 import { useAnalytics } from "@hooks/useAnalytics";
+import type { TrackAccessDenialReason } from "@types";
 
-import { bootJourney } from "./bootJourney";
+import { bootJourney, ClaimOutcome, JourneyIdentity } from "./bootJourney";
 import { useGuideEventStream } from "./useGuideEventStream";
 import {
   DEFAULT_GUIDANCE,
@@ -28,6 +35,7 @@ import {
   GUIDANCE_LEVELS,
   GuidanceLevel,
   JourneyBootstrap,
+  JourneyThread,
 } from "../contract/bootstrap";
 import { resolveAtmosphere } from "../state/atmosphere";
 import { errorCodeOf, failureCodeFromHttp, statusOf } from "../state/failureStates";
@@ -43,14 +51,26 @@ import {
   initialFeedState,
   MessageEntry,
   queuedEchoes,
+  SIGN_IN_REFUSALS,
 } from "../state/guideFeedReducer";
 import { buildSpineModel, chapterHasWarnings } from "../state/spineModel";
+import { dropVisitorToken, readVisitorToken, storeVisitorToken } from "../visitor/visitorToken";
 
 import type { AppointmentSlot } from "../cards/special/appointment";
 import type { GuideAnchor, GuideCardEventRequest, GuideTurnRequest } from "../contract/wire";
 
 const GUIDANCE_KEY = "allyGuideGuidance";
 const SPINE_REFRESH_DELAY_MS = 400;
+/** A visitor's first message waits this long at most for the new thread's stream. */
+const STREAM_WAIT_MS = 4000;
+
+const hasAccessToken = (): boolean => {
+  try {
+    return Boolean(localStorage.getItem(LOCAL_STORAGE_KEYS.ACCESS_TOKEN));
+  } catch {
+    return false;
+  }
+};
 
 const readLocalGuidance = (): GuidanceLevel | null => {
   try {
@@ -66,7 +86,15 @@ let turnCounter = 0;
 export const newClientTurnId = (): string =>
   globalThis.crypto?.randomUUID?.() ?? `c-${Date.now().toString(36)}-${(turnCounter += 1)}`;
 
-export type TurnSource = "typed" | "verb" | "dock" | "practice" | "start" | "care" | "crisis";
+export type TurnSource =
+  | "typed"
+  | "verb"
+  | "dock"
+  | "practice"
+  | "start"
+  | "care"
+  | "crisis"
+  | "landing";
 
 export interface SubmitTurnInput {
   text: string;
@@ -79,11 +107,17 @@ export interface SubmitTurnInput {
 /** Sources that stay out of analytics (plan §6.3: nothing about distress leaves the thread). */
 const PRIVATE_SOURCES: TurnSource[] = ["care", "crisis"];
 
+export type SignInSource = "card" | "allowance" | "paused" | "item" | "voice" | "header";
+
 export interface UseGuideJourneyOptions {
   /** Dev-only fixture transport: no sign-in needed. */
   fixture?: boolean;
+  /** Dev-only: the fixture plays a signed-out visitor (anonymous chat). */
+  fixtureVisitor?: boolean;
   /** A roleplay or case is about to leave for the full-screen simulation (voice lets go). */
   onLaunch?: () => void;
+  /** Something only a signed-in learner can do was asked for (a course item, voice). */
+  onSignInRequired?: (source: SignInSource) => void;
 }
 
 /**
@@ -93,7 +127,12 @@ export interface UseGuideJourneyOptions {
  */
 export const useGuideJourney = (
   trackId: string,
-  { fixture = false, onLaunch }: UseGuideJourneyOptions = {},
+  {
+    fixture = false,
+    fixtureVisitor = false,
+    onLaunch,
+    onSignInRequired,
+  }: UseGuideJourneyOptions = {},
 ) => {
   const { i18n } = useTranslation();
   const { track } = useAnalytics();
@@ -110,6 +149,15 @@ export const useGuideJourney = (
   const [helpRequested, setHelpRequested] = useState(false);
   const [enrolled, setEnrolled] = useState(true);
   const [now, setNow] = useState(() => Date.now());
+  // A signed-out visitor (M2) talks through the public routes with their own token.
+  const [identity, setIdentity] = useState<JourneyIdentity>("learner");
+  const [visitorToken, setVisitorToken] = useState<string | null>(null);
+  // Signing in: the visitor conversation is being claimed; sends wait (queued).
+  const [claiming, setClaiming] = useState(false);
+  // Signed in, but the course isn't theirs: the visitor conversation stays readable.
+  const [claimDenied, setClaimDenied] = useState<{ reason: TrackAccessDenialReason | null } | null>(
+    null,
+  );
 
   const feedRef = useRef(feed);
   feedRef.current = feed;
@@ -117,6 +165,14 @@ export const useGuideJourney = (
   sessionRef.current = session;
   const lastRequest = useRef<SubmitTurnInput | null>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
+  const identityRef = useRef(identity);
+  identityRef.current = identity;
+  const visitorTokenRef = useRef(visitorToken);
+  visitorTokenRef.current = visitorToken;
+  const claimingRef = useRef(claiming);
+  claimingRef.current = claiming;
+  const signInRequiredRef = useRef(onSignInRequired);
+  signInRequiredRef.current = onSignInRequired;
 
   const [getBootstrap] = useLazyGetGuideBootstrapQuery();
   const [getAvailability] = useLazyGetGuideAvailabilityQuery();
@@ -129,6 +185,12 @@ export const useGuideJourney = (
   const [putGuideAppointment] = usePutGuideAppointmentMutation();
   const [enrollGuideThread] = useEnrollGuideThreadMutation();
   const [enrollTrack] = useEnrollTrackMutation();
+  const [setTrackLanguage] = useSetTrackLanguageMutation();
+  const [createGuideVisitor] = useCreateGuideVisitorMutation();
+  const [getVisitorBootstrap] = useLazyGetVisitorBootstrapQuery();
+  const [openVisitorThread] = useOpenVisitorThreadMutation();
+  const [sendVisitorTurn] = useSendVisitorTurnMutation();
+  const [claimGuideThread] = useClaimGuideThreadMutation();
 
   /** Enrols through the thread; an older backend without the route uses classic's (the same enrolment). */
   const enrollThread = useCallback(
@@ -150,7 +212,12 @@ export const useGuideJourney = (
     if (spineRefresh.current) clearTimeout(spineRefresh.current);
     spineRefresh.current = setTimeout(() => {
       spineRefresh.current = null;
-      void getBootstrap({ trackId, languageCode: i18n.language })
+      const token = identityRef.current === "visitor" ? visitorTokenRef.current : null;
+      void (
+        token
+          ? getVisitorBootstrap({ trackId, token, languageCode: i18n.language })
+          : getBootstrap({ trackId, languageCode: i18n.language })
+      )
         .unwrap()
         .then(wire => {
           const fresh = fromBootstrapWire(trackId, wire);
@@ -162,7 +229,7 @@ export const useGuideJourney = (
         })
         .catch(() => undefined);
     }, SPINE_REFRESH_DELAY_MS);
-  }, [getBootstrap, trackId, i18n.language]);
+  }, [getBootstrap, getVisitorBootstrap, trackId, i18n.language]);
   useEffect(
     () => () => {
       if (spineRefresh.current) clearTimeout(spineRefresh.current);
@@ -170,14 +237,15 @@ export const useGuideJourney = (
     [],
   );
 
-  const threadId = bootstrap?.thread?.id ?? null;
+  // A visitor's thread arrives with their first message (`thread/opened`).
+  const threadId = feed.threadId;
   const courseProps = useMemo(() => ({ [ANALYTICS_PROPS.COURSE_ID]: trackId }), [trackId]);
 
   // ---------------------------------------------------------------- boot
   useEffect(() => {
     let cancelled = false;
     void bootJourney(trackId, {
-      isSignedIn: () => fixture || Boolean(localStorage.getItem(LOCAL_STORAGE_KEYS.ACCESS_TOKEN)),
+      isSignedIn: () => (fixture && !fixtureVisitor) || hasAccessToken(),
       getBootstrap: id => getBootstrap({ trackId: id, languageCode: i18n.language }).unwrap(),
       getAvailability: id => getAvailability({ trackId: id }).unwrap(),
       getAccess: id => getAccess({ trackId: id }).unwrap(),
@@ -185,17 +253,50 @@ export const useGuideJourney = (
       openThread: id => openThread({ trackId: id }).unwrap(),
       enroll: id => enrollThread(id),
       localGuidance: readLocalGuidance,
+      visitor: {
+        ensureToken: async () => {
+          const stored = readVisitorToken();
+          if (stored) return stored;
+          const { token } = await createGuideVisitor().unwrap();
+          storeVisitorToken(token);
+          return token;
+        },
+        dropToken: dropVisitorToken,
+        getBootstrap: (id, token) =>
+          getVisitorBootstrap({ trackId: id, token, languageCode: i18n.language }).unwrap(),
+      },
+      claim: {
+        pendingToken: readVisitorToken,
+        claimThread: (id, token) => claimGuideThread({ trackId: id, visitorToken: token }).unwrap(),
+        dropToken: dropVisitorToken,
+      },
     }).then(outcome => {
       if (cancelled) return;
+      const wasClaiming = claimingRef.current;
+      setClaiming(false);
       switch (outcome.kind) {
         case "ready":
+          setIdentity(outcome.identity);
+          setVisitorToken(outcome.visitorToken ?? null);
+          setClaimDenied(null);
           setBootstrap(outcome.bootstrap);
-          setGuidanceState(outcome.bootstrap.prefs.guidance);
+          setGuidanceState(
+            outcome.identity === "visitor"
+              ? (readLocalGuidance() ?? outcome.bootstrap.prefs.guidance)
+              : outcome.bootstrap.prefs.guidance,
+          );
           setEnrolled(outcome.bootstrap.access.enrolled);
-          dispatch({ type: "hydrate", bootstrap: outcome.bootstrap });
+          // After signing in, what was typed meanwhile is still waiting to go.
+          dispatch({ type: "hydrate", bootstrap: outcome.bootstrap, keepQueued: wasClaiming });
+          if (outcome.claim) trackClaim(outcome.claim);
           send({ type: "BOOT_OK" });
           break;
         case "denied":
+          if (outcome.claimRefused && wasClaiming && identityRef.current === "visitor") {
+            // The course isn't theirs: the conversation so far stays as it was (plan §11 A-2).
+            setClaimDenied({ reason: outcome.reason });
+            break;
+          }
           send({ type: "BOOT_DENIED", reason: outcome.reason });
           break;
         case "disabled":
@@ -216,14 +317,35 @@ export const useGuideJourney = (
     };
     // The RTK triggers are stable; the language is read once per boot.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trackId, bootAttempt, fixture]);
+  }, [trackId, bootAttempt, fixture, fixtureVisitor]);
 
   const retryBoot = useCallback(() => setBootAttempt(n => n + 1), []);
+
+  /** The visitor token was refused (expired, or already claimed): start a new visit. */
+  const visitorRefused = useCallback(() => {
+    dropVisitorToken();
+    setVisitorToken(null);
+    retryBoot();
+  }, [retryBoot]);
+
+  /**
+   * Back from the LoginDialog. A visitor's conversation is claimed on the way
+   * in (bootJourney sends the token once); until the new bootstrap lands the
+   * feed stays as it is and anything typed waits in the queue.
+   */
+  const signedIn = useCallback(() => {
+    if (identityRef.current === "visitor" && readVisitorToken()) {
+      claimingRef.current = true;
+      setClaiming(true);
+    }
+    retryBoot();
+  }, [retryBoot]);
 
   // -------------------------------------------------------------- stream
   useGuideEventStream({
     threadId,
-    enabled: session.boot === "ready",
+    enabled: session.boot === "ready" && !claiming,
+    visitorToken: identity === "visitor" ? visitorToken : null,
     getLastSeq: () => feedRef.current.lastSeq,
     onEvent: event => {
       dispatch({ type: "event", event });
@@ -240,15 +362,61 @@ export const useGuideJourney = (
               ? "STREAM_OPEN"
               : "STREAM_LOST",
       }),
-    onFatal: reason =>
+    onFatal: reason => {
+      if (reason === "visitor_invalid") {
+        visitorRefused();
+        return;
+      }
       send(
         reason === "disabled"
           ? { type: "BOOT_DISABLED" }
           : reason === "forbidden"
             ? { type: "BOOT_DENIED", reason: null }
             : { type: "BOOT_UNAVAILABLE" },
-      ),
+      );
+    },
   });
+
+  // A visitor's first message waits for their new thread's stream, so the
+  // reply (or a refusal, which only streams) isn't missed.
+  const openWaiters = useRef<Array<() => void>>([]);
+  useEffect(() => {
+    if (session.connection !== "open") return;
+    const waiters = openWaiters.current;
+    openWaiters.current = [];
+    waiters.forEach(resolve => resolve());
+  }, [session.connection]);
+  const streamOpen = useCallback(
+    () =>
+      new Promise<void>(resolve => {
+        openWaiters.current.push(resolve);
+        setTimeout(resolve, STREAM_WAIT_MS);
+      }),
+    [],
+  );
+
+  const visitorThread = useRef<Promise<string> | null>(null);
+  const ensureVisitorThread = useCallback(async (): Promise<string | null> => {
+    if (feedRef.current.threadId) return feedRef.current.threadId;
+    const token = visitorTokenRef.current;
+    if (!token) return null;
+    visitorThread.current ??= (async () => {
+      const opened = await openVisitorThread({ trackId, token }).unwrap();
+      const thread: JourneyThread = {
+        id: opened.id,
+        mode: opened.mode,
+        atmosphere: opened.atmosphere,
+        lastEventSeq: opened.lastEventSeq,
+      };
+      dispatch({ type: "thread/opened", thread });
+      setBootstrap(prev => (prev ? { ...prev, thread } : prev));
+      await streamOpen();
+      return thread.id;
+    })().finally(() => {
+      visitorThread.current = null;
+    });
+    return visitorThread.current;
+  }, [openVisitorThread, trackId, streamOpen]);
 
   useEffect(() => {
     const online = () => send({ type: "NETWORK_ONLINE" });
@@ -274,21 +442,32 @@ export const useGuideJourney = (
   // ---------------------------------------------------------------- turns
   const postTurn = useCallback(
     async (input: SubmitTurnInput, clientTurnId: string) => {
-      if (!threadId) return;
+      const visitor = identityRef.current === "visitor";
+      if (!feedRef.current.threadId && !visitor) return;
       send({ type: "TURN_SUBMITTED", at: Date.now() });
       try {
-        const { turnId } = await sendGuideTurn({
-          threadId,
-          body: {
-            clientTurnId,
-            text: input.text,
-            ...(input.intent ? { intent: input.intent } : {}),
-            ...(input.anchor ? { anchor: input.anchor } : {}),
-          },
-        }).unwrap();
+        const id = visitor ? await ensureVisitorThread() : feedRef.current.threadId;
+        if (!id) throw new Error("no thread");
+        const body: GuideTurnRequest = {
+          clientTurnId,
+          text: input.text,
+          ...(input.intent ? { intent: input.intent } : {}),
+          ...(input.anchor ? { anchor: input.anchor } : {}),
+        };
+        const { turnId } = visitor
+          ? await sendVisitorTurn({
+              threadId: id,
+              token: visitorTokenRef.current ?? "",
+              body,
+            }).unwrap()
+          : await sendGuideTurn({ threadId: id, body }).unwrap();
         dispatch({ type: "learner/accepted", clientTurnId, turnId });
       } catch (error) {
         send({ type: "TURN_REJECTED" });
+        if (visitor && errorCodeOf(error) === "GUIDE_VISITOR_INVALID") {
+          visitorRefused();
+          return;
+        }
         const status = statusOf(error);
         if (status === "FETCH_ERROR") {
           // Never reached the server: keep it and send on reconnect.
@@ -311,15 +490,25 @@ export const useGuideJourney = (
         });
       }
     },
-    [threadId, sendGuideTurn],
+    [ensureVisitorThread, sendGuideTurn, sendVisitorTurn, visitorRefused],
   );
+
+  /** A visitor out of messages (or paused) is asked to sign in instead of sending. */
+  const visitorBlocked = (): boolean =>
+    identityRef.current === "visitor" &&
+    (feedRef.current.allowance?.remaining === 0 ||
+      (SIGN_IN_REFUSALS as readonly string[]).includes(feedRef.current.failure?.code ?? ""));
 
   const submitTurn = useCallback(
     (input: SubmitTurnInput) => {
-      if (!threadId) return;
+      if (!threadId && identityRef.current !== "visitor") return;
+      if (visitorBlocked()) {
+        signInRequiredRef.current?.("allowance");
+        return;
+      }
       lastRequest.current = input;
       const clientTurnId = newClientTurnId();
-      const queue = shouldQueue(sessionRef.current);
+      const queue = shouldQueue(sessionRef.current) || claimingRef.current;
       if (input.text.trim()) {
         dispatch({
           type: "learner/echo",
@@ -344,7 +533,7 @@ export const useGuideJourney = (
 
   // Send what queued while offline, in order, under the ids they were given.
   useEffect(() => {
-    if (session.connection !== "open") return;
+    if (session.connection !== "open" || claiming) return;
     for (const echo of queuedEchoes(feedRef.current)) {
       if (!echo.clientTurnId) continue;
       dispatch({ type: "learner/status", clientTurnId: echo.clientTurnId, status: "sending" });
@@ -353,10 +542,10 @@ export const useGuideJourney = (
         echo.clientTurnId,
       );
     }
-  }, [session.connection, postTurn]);
+  }, [session.connection, postTurn, claiming]);
 
   const enrollIfNeeded = useCallback(async () => {
-    if (enrolled || !threadId) return;
+    if (enrolled || !threadId || identityRef.current === "visitor") return;
     await enrollThread(threadId);
     setEnrolled(true);
   }, [enrolled, threadId, enrollThread]);
@@ -406,7 +595,8 @@ export const useGuideJourney = (
   // ---------------------------------------------------------------- cards
   const postCardEvent = useCallback(
     (cardId: string, body: GuideCardEventRequest) => {
-      if (!threadId) return;
+      // Card events are a learner's; a visitor's cards only lead to sign-in.
+      if (!threadId || identityRef.current === "visitor") return;
       // The verifier, not this call, decides what happened; a failed post is
       // recovered by the server's own progress events.
       void postGuideCardEvent({ threadId, cardId, body })
@@ -420,6 +610,11 @@ export const useGuideJourney = (
     (cardId: string, focusFrom?: HTMLElement | null) => {
       const card = feedRef.current.cards[cardId];
       if (!card) return;
+      // The players need a signed-in learner; a visitor signs in first.
+      if (identityRef.current === "visitor" && card.kind === "course_item") {
+        signInRequiredRef.current?.("item");
+        return;
+      }
       returnFocus.current = focusFrom ?? null;
       setMinimisedCardId(null);
       dispatch({ type: "card/open", cardId });
@@ -497,6 +692,7 @@ export const useGuideJourney = (
         : (bootstrap?.thread?.lastEventSeq ?? 0) === 0
           ? "new"
           : "returning",
+      [ANALYTICS_PROPS.GUIDED_IDENTITY]: identityRef.current,
     });
     if (!returned) return;
     postCardEvent(returned, { type: "returned", outcome });
@@ -515,9 +711,12 @@ export const useGuideJourney = (
       } catch {
         // Private mode: the server copy is enough.
       }
-      void putGuidePrefs({ guidance: level })
-        .unwrap()
-        .catch(() => undefined);
+      // A visitor has no prefs on the server yet: this device remembers it.
+      if (identityRef.current === "learner") {
+        void putGuidePrefs({ guidance: level })
+          .unwrap()
+          .catch(() => undefined);
+      }
       track(ANALYTICS_EVENTS.GUIDED_GUIDANCE_CHANGED, {
         ...courseProps,
         [ANALYTICS_PROPS.GUIDED_LEVEL]: level,
@@ -538,6 +737,24 @@ export const useGuideJourney = (
     [threadId, putGuideAppointment, track, courseProps],
   );
 
+  /**
+   * The course's language, for a signed-in learner (it is saved on the
+   * enrolment, as in classic). The page reloads its view in the new language;
+   * Ally answers in it from the next turn.
+   */
+  const setCourseLanguage = useCallback(
+    async (languageCode: string) => {
+      if (identityRef.current !== "learner") return;
+      await setTrackLanguage({ trackId, languageCode }).unwrap();
+      track(ANALYTICS_EVENTS.GUIDED_LANGUAGE_CHANGED, {
+        ...courseProps,
+        [ANALYTICS_PROPS.LANGUAGE]: languageCode,
+      });
+      retryBoot();
+    },
+    [setTrackLanguage, trackId, track, courseProps, retryBoot],
+  );
+
   // ---------------------------------------------------------------- crisis
   const chooseSafe = useCallback(() => {
     dispatch({ type: "crisis/safe" });
@@ -555,6 +772,13 @@ export const useGuideJourney = (
       });
     }
   }, [failureCode, track, courseProps]);
+
+  function trackClaim(outcome: ClaimOutcome) {
+    track(ANALYTICS_EVENTS.GUIDED_VISITOR_CLAIMED, {
+      ...courseProps,
+      [ANALYTICS_PROPS.GUIDED_CLAIM_OUTCOME]: outcome,
+    });
+  }
 
   const trackClassic = useCallback(
     (source: "header" | "failure" | "card") =>
@@ -595,8 +819,14 @@ export const useGuideJourney = (
     enrolled,
     minimisedCardId,
     helpRequested,
+    identity,
+    claiming,
+    claimDenied,
     actions: {
       retryBoot,
+      signedIn,
+      setCourseLanguage,
+      consumeHeldText: () => dispatch({ type: "held/consumed" }),
       submitTurn,
       startCourse,
       retryFailure,
