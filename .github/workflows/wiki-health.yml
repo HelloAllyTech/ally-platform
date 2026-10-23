@@ -36,15 +36,16 @@ jobs:
         with:
           python-version: "3.12"
 
-      # Counts come from the code, never from prose. Repos that fail to check out are
-      # reported as unavailable in the table rather than silently counted as zero.
-      - name: Check out the code repos for counting
+      # Counts come from the code, never from prose. In the monorepo the code is already
+      # checked out beside the wiki, so the stats read the sibling folders directly.
+      - name: Regenerate platform stats
         if: github.event_name != 'pull_request'
-        run: mkdir -p checkouts
+        working-directory: helloallytech.github.io
+        run: python3 scripts/gen-stats.py --repos ..
 
-      # Read-only for this job; the PR and issue steps below deliberately stay on the
-      # default GITHUB_TOKEN, which cannot reach outside this repo.
-      - name: Mint a read token for the code repos
+      # The App token, not GITHUB_TOKEN, opens the PR below: org policy forbids GitHub
+      # Actions from creating pull requests.
+      - name: Mint a token for this repo
         id: app-token
         if: github.event_name != 'pull_request'
         uses: actions/create-github-app-token@v1
@@ -52,39 +53,7 @@ jobs:
           app-id: ${{ secrets.DOCS_BOT_APP_ID }}
           private-key: ${{ secrets.DOCS_BOT_PRIVATE_KEY }}
           owner: HelloAllyTech
-          repositories: helloallytech.github.io,ally-be,ally-ai,ally-ai-learn,ally-web
-      - uses: actions/checkout@v4
-        if: github.event_name != 'pull_request'
-        continue-on-error: true
-        with:
-          repository: helloallytech/ally-be
-          token: ${{ steps.app-token.outputs.token }}
-          path: checkouts/ally-be
-      - uses: actions/checkout@v4
-        if: github.event_name != 'pull_request'
-        continue-on-error: true
-        with:
-          repository: helloallytech/ally-ai
-          token: ${{ steps.app-token.outputs.token }}
-          path: checkouts/ally-ai
-      - uses: actions/checkout@v4
-        if: github.event_name != 'pull_request'
-        continue-on-error: true
-        with:
-          repository: helloallytech/ally-ai-learn
-          token: ${{ steps.app-token.outputs.token }}
-          path: checkouts/ally-ai-learn
-      - uses: actions/checkout@v4
-        if: github.event_name != 'pull_request'
-        continue-on-error: true
-        with:
-          repository: helloallytech/ally-web
-          token: ${{ steps.app-token.outputs.token }}
-          path: checkouts/ally-web
-
-      - name: Regenerate platform stats
-        if: github.event_name != 'pull_request'
-        run: python3 helloallytech.github.io/scripts/gen-stats.py --repos checkouts
+          repositories: ally-platform
 
       - name: Lint
         id: lint
@@ -111,7 +80,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 helloallytech.github.io/scripts/gen-routing.py
-          if git diff --quiet -- wiki/ROUTING.md wiki/manifest.json wiki/platform/stats.md; then
+          if git diff --quiet -- helloallytech.github.io/wiki/ROUTING.md helloallytech.github.io/wiki/manifest.json helloallytech.github.io/wiki/platform/stats.md ROUTING.md '*/ROUTING.md' '*/WIKI-ROUTING.md'; then
             echo "Generated pages already current."
             exit 0
           fi
@@ -119,7 +88,7 @@ jobs:
           git config user.name  "ally-docs-bot[bot]"
           git config user.email "314168265+ally-docs-bot[bot]@users.noreply.github.com"
           git checkout -b "$BRANCH"
-          git add wiki/ROUTING.md wiki/manifest.json wiki/platform/stats.md
+          git add -- helloallytech.github.io/wiki/ROUTING.md helloallytech.github.io/wiki/manifest.json helloallytech.github.io/wiki/platform/stats.md ROUTING.md '*/ROUTING.md' '*/WIKI-ROUTING.md'
           git commit -m "chore: regenerate wiki routing index and platform stats"
           # The branch name is date-stamped, so a second run on the same day would other-
           # wise be rejected as non-fast-forward. The content is generated; force is safe.

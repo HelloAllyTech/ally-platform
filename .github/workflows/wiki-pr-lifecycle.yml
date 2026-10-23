@@ -8,9 +8,11 @@ name: Wiki PR lifecycle
 #
 # Spec: https://tech.helloally.ai/#/wiki/contributing/docs-system.md
 
+# The hourly schedule is off since the move to ally-platform. The wiki is a folder here
+# now and publish-wiki.yml mirrors it onto helloallytech.github.io with rsync --delete,
+# so a wiki PR merged on that repo is overwritten by the next publish. Run by hand to
+# settle wiki PRs opened before the move.
 on:
-  schedule:
-    - cron: "17 * * * *"
   workflow_dispatch:
     inputs:
       dry-run:
@@ -45,7 +47,7 @@ jobs:
           app-id: ${{ secrets.DOCS_BOT_APP_ID }}
           private-key: ${{ secrets.DOCS_BOT_PRIVATE_KEY }}
           owner: HelloAllyTech
-          repositories: helloallytech.github.io,ally-be,ally-ai,ally-ai-learn,ally-web
+          repositories: helloallytech.github.io,ally-platform
 
       - name: Reconcile wiki PRs against their source PRs
         env:
