@@ -95,6 +95,29 @@ export class AgentTraceService {
     }
   }
 
+  /**
+   * The full trace payload for a turn, or null when none was stored. It holds
+   * learner text, so callers gate it behind the transcripts permission.
+   */
+  async getPayload(turnId: string): Promise<Record<string, unknown> | null> {
+    const trace = await this.getByTurn(turnId);
+    if (!trace?.payloadKey || !this.bucket) return null;
+    try {
+      const buffer = await this.s3Service.getObjectBuffer({
+        bucket: this.bucket,
+        key: trace.payloadKey,
+      });
+      return JSON.parse(buffer.toString('utf8')) as Record<string, unknown>;
+    } catch (error) {
+      this.logger.warn(
+        `Trace payload read failed for turn ${turnId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return null;
+    }
+  }
+
   getByTurn(turnId: string): Promise<AgentTurnTrace | null> {
     return this.traces.findOne({ where: { turnId } });
   }

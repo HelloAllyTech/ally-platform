@@ -158,3 +158,17 @@ export class GuidePrefsUpdateDto {
   @IsBoolean()
   preferClassic?: boolean;
 }
+
+/** PUT …/crisis-responses: fixed crisis copy for one language. */
+export class GuideCrisisResponseDto {
+  @ApiProperty({ enum: ['en', 'hi', 'mr', 'ta', 'kn'] })
+  @IsIn(['en', 'hi', 'mr', 'ta', 'kn'])
+  languageCode!: string;
+
+  @ApiProperty({
+    description: 'Clinically approved text, 40–1,500 characters.',
+  })
+  @IsString()
+  @MaxLength(1500)
+  body!: string;
+}
