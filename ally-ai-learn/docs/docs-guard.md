@@ -1,7 +1,7 @@
 # When your change outdates a doc
 
 CI enforces this. [`.docs-map.yml`](../.docs-map.yml) at the repo root declares which docs
-cover which code, and the [Docs guard workflow](../.github/workflows/docs.yml) runs a shared
+cover which code, and the [Docs guard workflow](../../.github/workflows/docs.yml) runs a shared
 checker — fetched at run time from `helloallytech/.github`, so there is exactly one copy of
 it — on every pull request and on every push to `master`. Touching `app/tts/**` without
 updating `docs/05-tts-providers.md` fails the build.
