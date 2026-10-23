@@ -1,0 +1,134 @@
+# Tests — the PR gate.
+#
+# Until this existed, NO Ally repo ran its tests on a pull request — every
+# repo's suite ran only inside a `workflow_dispatch` deploy pipeline, i.e. on a
+# manual release and nowhere else. Bug Hunter's nightly sweep had quietly become
+# the de-facto CI, and its own fix PRs merged with no check at all.
+#
+# Deliberately its own workflow rather than a `pull_request` trigger on the
+# deploy pipeline, which would ship every PR.
+#
+# NOTE ON ENFORCEMENT: all three jobs are required checks as of 2026-09-21, via
+# the repo ruleset "master: tests, types and lint must pass".
+#
+# Required by the names GitHub reports them under — "Jest", "Typecheck" and
+# "Lint & format", i.e. each job's `name:`, NOT the job ids `test`, `typecheck`
+# and `lint`. (This job was called "TypeScript" until 2026-09-22; renaming it
+# meant editing the ruleset in the same change, which is exactly the coupling
+# the next paragraph warns about.) Requiring a context nothing ever reports does not fail a merge, it
+# blocks it forever waiting for a check that will never arrive, so the strings
+# below and the strings in the ruleset have to move together. Renaming a job
+# here without updating the ruleset wedges master.
+#
+# Repository admins and maintainers are on the ruleset's bypass list, so pushing
+# straight to master still works — this repo is trunk-based and branch
+# protection was deliberately removed on 2026-09-17 for that reason. The gate is
+# aimed at pull requests, Bug Hunter's included: it never merges its own, and a
+# green suite is the signal the human who does merge gets.
+
+# ally-mobile has 358 spec files and, until recently, no CI of any kind — its
+# only workflows were the four App Store / Play Store builds. Bug Hunter can
+# fix bugs here too, but never merges its own PR — this suite going green is
+# the cheapest signal the human who does merge gets, alongside the manual
+# checks a native app still needs (see this repo's CLAUDE.md gotchas: no
+# on-device test runs here).
+#
+
+name: Tests
+
+on:
+  pull_request:
+    branches: [master]
+  # Also on master, so the branch's own health is visible rather than inferred
+  # from whichever PR last ran.
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  # A newer push supersedes the run in flight for the same ref — nobody needs the
+  # result for a commit that has already been replaced.
+  group: tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Jest
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+  lint:
+    name: Lint & format
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Blocking. This was report-only for exactly one PR: lint had never run in
+      # CI here, so its first run surfaced 88 pre-existing problems rather than
+      # anything the introducing change had done. Only ONE of those was an error;
+      # it is now fixed, so the check earns the right to fail the build.
+      #
+      # The remaining ~87 are warnings, and `npm run lint` is a bare `eslint .`
+      # with no --max-warnings, so they do not fail the job. Left as warnings on
+      # purpose: promoting them wholesale would mean touching most of the app in a
+      # formatting PR. Tighten deliberately, a rule at a time, rather than by
+      # flipping a threshold.
+      - name: Lint
+        run: npm run lint
+
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The pre-commit hook has always run this, but CI never did — so a single
+      # `--no-verify` put a type error on master permanently, where it stayed
+      # invisible (this workflow was green throughout) and then blocked the next
+      # person to commit. The guard fired on whoever came along rather than
+      # whoever broke it. That is how master reached 27 errors across 16 files.
+      #
+      # Blocking from the first run, unlike `lint` above: master is clean as of
+      # 37edff9b, so there is no backlog to grandfather in and nothing to fix
+      # before this can earn the right to fail the build.
+      #
+      # Shares the `typecheck` script with the hook rather than repeating the
+      # command, so the two cannot drift into checking different things.
+      - name: Typecheck
+        run: npm run typecheck

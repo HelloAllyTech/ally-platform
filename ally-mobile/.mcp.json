@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "stacks": {
+      "command": "bash",
+      "args": ["-c", "exec node \"${CLAUDE_PROJECT_DIR:-.}/.claude/stacks-bridge.mjs\""]
+    }
+  }
+}

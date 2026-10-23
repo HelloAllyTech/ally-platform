@@ -1,0 +1,217 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`ArticleQuestionCard renders correctly 1`] = `
+<View
+  style={
+    {
+      "backgroundColor": "#ffffff",
+      "borderColor": "#d2d2d2",
+      "borderRadius": 16,
+      "borderWidth": 1,
+      "gap": 10,
+      "marginVertical": 16,
+      "padding": 16,
+    }
+  }
+  testID="article-question-q1"
+>
+  <Text
+    style={
+      {
+        "color": "rgba(0, 0, 0, 0.38)",
+        "fontFamily": "Roboto-Regular",
+        "fontSize": 10,
+        "fontWeight": 500,
+        "letterSpacing": 0.3,
+        "lineHeight": 14,
+        "textTransform": "uppercase",
+      }
+    }
+  >
+    courses.article.question.title
+  </Text>
+  <Text
+    style={
+      {
+        "color": "rgba(0, 0, 0, 0.87)",
+        "fontFamily": "IBMPlexSerif-Medium",
+        "fontSize": 14,
+        "fontWeight": 500,
+        "letterSpacing": 0.2,
+        "lineHeight": 22,
+      }
+    }
+  >
+    Test Question Prompt
+  </Text>
+  <View
+    style={
+      {
+        "gap": 8,
+      }
+    }
+  >
+    <View
+      accessibilityRole="radio"
+      accessibilityState={
+        {
+          "busy": undefined,
+          "checked": false,
+          "disabled": false,
+          "expanded": undefined,
+          "selected": undefined,
+        }
+      }
+      accessibilityValue={
+        {
+          "max": undefined,
+          "min": undefined,
+          "now": undefined,
+          "text": undefined,
+        }
+      }
+      accessible={true}
+      collapsable={false}
+      focusable={true}
+      onClick={[Function]}
+      onResponderGrant={[Function]}
+      onResponderMove={[Function]}
+      onResponderRelease={[Function]}
+      onResponderTerminate={[Function]}
+      onResponderTerminationRequest={[Function]}
+      onStartShouldSetResponder={[Function]}
+      style={
+        {
+          "alignItems": "center",
+          "backgroundColor": "#ffffff",
+          "borderColor": "#d2d2d2",
+          "borderRadius": 12,
+          "borderWidth": 1,
+          "flexDirection": "row",
+          "gap": 10,
+          "opacity": 1,
+          "padding": 12,
+        }
+      }
+      testID="article-question-option-o1"
+    >
+      <View
+        style={
+          [
+            {
+              "alignItems": "center",
+              "borderColor": "#e0e0e0",
+              "borderRadius": 10,
+              "borderWidth": 2,
+              "height": 20,
+              "justifyContent": "center",
+              "width": 20,
+            },
+            false,
+          ]
+        }
+      />
+      <Text
+        style={
+          {
+            "color": "rgba(0, 0, 0, 0.87)",
+            "flex": 1,
+            "fontFamily": "IBMPlexSerif-Regular",
+            "fontSize": 14,
+            "fontWeight": 500,
+            "letterSpacing": 0.2,
+            "lineHeight": 22,
+          }
+        }
+      >
+        Option 1
+      </Text>
+    </View>
+    <View
+      accessibilityRole="radio"
+      accessibilityState={
+        {
+          "busy": undefined,
+          "checked": false,
+          "disabled": false,
+          "expanded": undefined,
+          "selected": undefined,
+        }
+      }
+      accessibilityValue={
+        {
+          "max": undefined,
+          "min": undefined,
+          "now": undefined,
+          "text": undefined,
+        }
+      }
+      accessible={true}
+      collapsable={false}
+      focusable={true}
+      onClick={[Function]}
+      onResponderGrant={[Function]}
+      onResponderMove={[Function]}
+      onResponderRelease={[Function]}
+      onResponderTerminate={[Function]}
+      onResponderTerminationRequest={[Function]}
+      onStartShouldSetResponder={[Function]}
+      style={
+        {
+          "alignItems": "center",
+          "backgroundColor": "#ffffff",
+          "borderColor": "#d2d2d2",
+          "borderRadius": 12,
+          "borderWidth": 1,
+          "flexDirection": "row",
+          "gap": 10,
+          "opacity": 1,
+          "padding": 12,
+        }
+      }
+      testID="article-question-option-o2"
+    >
+      <View
+        style={
+          [
+            {
+              "alignItems": "center",
+              "borderColor": "#e0e0e0",
+              "borderRadius": 10,
+              "borderWidth": 2,
+              "height": 20,
+              "justifyContent": "center",
+              "width": 20,
+            },
+            false,
+          ]
+        }
+      />
+      <Text
+        style={
+          {
+            "color": "rgba(0, 0, 0, 0.87)",
+            "flex": 1,
+            "fontFamily": "IBMPlexSerif-Regular",
+            "fontSize": 14,
+            "fontWeight": 500,
+            "letterSpacing": 0.2,
+            "lineHeight": 22,
+          }
+        }
+      >
+        Option 2
+      </Text>
+    </View>
+  </View>
+  <TouchableOpacity
+    disabled={true}
+    onPress={[Function]}
+    testID="primary-button"
+  >
+    <Text>
+      courses.article.question.submit
+    </Text>
+  </TouchableOpacity>
+</View>
+`;

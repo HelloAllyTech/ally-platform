@@ -1,0 +1,41 @@
+buildscript {
+    ext {
+        buildToolsVersion = "36.0.0"
+        minSdkVersion = 24
+        compileSdkVersion = 36
+        targetSdkVersion = 36
+        ndkVersion = "27.1.12297006"
+        kotlinVersion = "2.0.21"
+    }
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath("com.android.tools.build:gradle:8.10.0")
+        classpath("com.facebook.react:react-native-gradle-plugin")
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin")
+        classpath('com.google.gms:google-services:4.4.3')
+        classpath('com.google.firebase:firebase-crashlytics-gradle:2.9.9')
+    }
+}
+
+apply plugin: "com.facebook.react.rootproject"
+
+// Workaround for AGP bug https://issuetracker.google.com/issues/207403732:
+// configureCMake* tasks aren't reliably ordered after each autolinked
+// library's codegen task, so :app's CMake configure can run before a
+// library's generated JNI sources exist. Remove once the bug is fixed
+// upstream in AGP (or RN ships an equivalent fix for its bundled AGP version).
+gradle.projectsEvaluated {
+    def appProject = project(':app')
+    def cmakeConfigureTasks = appProject.tasks.matching {
+        it.name.startsWith('configureCMakeDebug') || it.name.startsWith('configureCMakeRelWithDebInfo')
+    }
+    rootProject.subprojects.each { subproject ->
+        def codegenTask = subproject.tasks.findByName('generateCodegenArtifactsFromSchema')
+        if (codegenTask != null) {
+            cmakeConfigureTasks.configureEach { it.dependsOn(codegenTask) }
+        }
+    }
+}

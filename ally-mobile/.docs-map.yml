@@ -1,0 +1,47 @@
+# Which documentation covers which code.
+#
+# Read by the shared docs-guard workflow (helloallytech/.github) on every PR, by the
+# pre-push hook on every push to master, and by the weekly wiki reconciler.
+# Spec: https://tech.helloally.ai/#/wiki/contributing/docs-system.md
+#
+# This repo keeps no docs of its own — everything lives in the wiki — so most rules here
+# are `wiki:` rules, satisfied by a `Wiki-PR:` trailer. Deliberately few: a rule nobody can
+# justify is a rule everyone learns to bypass.
+#
+# Escape hatch: the `docs:skip` label on a PR, or a `Docs-Skip: <reason>` trailer in the
+# commit message when you are pushing straight to master.
+
+version: 1
+repo: ally-mobile
+
+rules:
+  - id: repo-page-shape
+    watch:
+      - 'src/navigation/**'
+      - 'src/services/**'
+    requires: wiki:repos/ally-mobile.md
+    why: >
+      Navigation structure and the service layer are what the repo page describes to
+      everyone who never opens this codebase — including the backend engineers deciding
+      whether a change breaks a released build.
+
+  - id: release-process
+    watch:
+      - 'android/app/build.gradle'
+      - 'ios/**/Info.plist'
+    requires:
+      any_of:
+        - README.md
+        - CONTRIBUTING.md
+    why: >
+      Version and build-number handling is the step people get wrong at release time, and
+      a released build that a backend change locks out is the expensive failure here.
+
+  - id: agent-entrypoints-in-sync
+    watch:
+      - 'AGENTS.md'
+      - 'CLAUDE.md'
+    requires: mirror
+    why: >
+      AGENTS.md and CLAUDE.md must stay byte-identical. `mirror` asserts equality rather
+      than requiring a companion edit.

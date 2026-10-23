@@ -1,0 +1,94 @@
+name: Promote Android release to production
+#
+# Manual-only. Takes whatever is currently on the internal track (uploaded by
+# build-android-production.yml) and promotes it to the production track at a staged rollout
+# percentage, without re-uploading a binary. Deliberately never auto-triggered by
+# scheduled-mobile-release.yml — releasing to real users is a distinct, higher-stakes decision
+# that should always be an explicit human click.
+
+on:
+  workflow_dispatch:
+    inputs:
+      rollout_percentage:
+        description: 'Staged rollout percentage (1-100). 100 = full rollout, no staging.'
+        required: false
+        type: string
+        default: '20'
+      whats_new:
+        description: '"What''s New" text for the production listing (optional - leave blank to promote with no release notes)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: promote-android-production
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: master
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install googleapis (CI-only tooling, not an app dependency)
+        run: npm install googleapis --no-save
+
+      - name: Promote to production
+        id: promote
+        env:
+          ANDROID_SERVICE_ACCOUNT_JSON: ${{ secrets.ANDROID_SERVICE_ACCOUNT_JSON }}
+          # Passed as an env var, never interpolated straight into the run: line — this is
+          # admin-typed free text, and ${{ }}-interpolating untrusted input directly into a
+          # shell command is a real injection/quoting risk. Same pattern
+          # submit-ios-app-store-review.yml already uses for its own What's New input (and the
+          # exact bug scheduled-mobile-release.yml's Android dispatch step just got fixed for).
+          WHATS_NEW_TEXT: ${{ inputs.whats_new }}
+        run: node scripts/promote-android-release.mjs "${{ inputs.rollout_percentage }}"
+
+      - name: Notify Slack - Android promoted
+        if: success()
+        uses: tokorom/action-slack-incoming-webhook@main
+        env:
+          INCOMING_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          text: 'Android release promoted to production at ${{ inputs.rollout_percentage }}% rollout.'
+          attachments: |
+            [
+              {
+                "color": "good",
+                "author_name": "${{ github.actor }}",
+                "fields": [
+                  {
+                    "title": "Version code(s)",
+                    "value": "${{ steps.promote.outputs.version_codes }}"
+                  },
+                  {
+                    "title": "Rollout",
+                    "value": "${{ inputs.rollout_percentage }}%"
+                  },
+                  {
+                    "title": "Run",
+                    "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>"
+                  }
+                ]
+              }
+            ]
+
+      - name: Notify Slack - Android promotion failed
+        if: failure()
+        uses: tokorom/action-slack-incoming-webhook@main
+        env:
+          INCOMING_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          text: 'Android production promotion FAILED (triggered by ${{ github.actor }}). <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run logs>'

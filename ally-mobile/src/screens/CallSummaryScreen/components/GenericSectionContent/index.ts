@@ -1,0 +1,1 @@
+export {GenericSectionContent} from './GenericSectionContent';
