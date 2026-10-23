@@ -5,10 +5,15 @@ import { LoggerService } from 'src/logger/logger.service';
 import { AppConfigService } from 'src/config/config.service';
 import { isMonorepoService } from 'src/github/constants/github-repos.constants';
 
+// Relative on purpose: `nest build`'s path-alias hook rewrites a `src/…`
+// re-export into synthesized nodes, and in a file with a decorated class
+// TypeScript's class-alias pass then crashes on them ("Cannot read
+// properties of undefined (reading 'checkJsDirective')"). tsc alone, and so
+// CI's Typecheck, never runs the hook — only the release image build does.
 export {
   MONOREPO_SERVICES,
   isMonorepoService,
-} from 'src/github/constants/github-repos.constants';
+} from '../constants/github-repos.constants';
 
 /** The subset of a GitHub Actions run this module cares about. */
 export interface WorkflowRun {
