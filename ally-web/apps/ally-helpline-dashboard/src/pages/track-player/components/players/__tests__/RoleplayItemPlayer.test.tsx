@@ -248,3 +248,48 @@ describe("RoleplayItemPlayer — language selection", () => {
     });
   });
 });
+
+describe("RoleplayItemPlayer — return-to-track context", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockScenario();
+    mockCatalogLanguages(undefined);
+    sessionStorage.clear();
+  });
+
+  it("stashes exactly the classic context when no guided props are passed", async () => {
+    renderPlayer();
+    fireEvent.click(screen.getByText("Start roleplay"));
+    await waitFor(() => expect(mockStartSimulation).toHaveBeenCalled());
+    expect(sessionStorage.getItem("activeTrackContext")).toBe(
+      JSON.stringify({ trackId: "track-1", itemId: "item-1" }),
+    );
+  });
+
+  it("merges the guided journey's extras and calls onBeforeLaunch before leaving", async () => {
+    const onBeforeLaunch = vi.fn(() => {
+      // The context is stashed after this runs.
+      expect(sessionStorage.getItem("activeTrackContext")).toBeNull();
+    });
+    render(
+      <RoleplayItemPlayer
+        payload={payload}
+        item={buildItem(null)}
+        trackId="track-1"
+        alreadyCompleted={false}
+        trackContextExtras={{ returnTo: "guided", threadId: "thread-1", cardId: "card-1" }}
+        onBeforeLaunch={onBeforeLaunch}
+      />,
+    );
+    fireEvent.click(screen.getByText("Start roleplay"));
+    await waitFor(() => expect(mockStartSimulation).toHaveBeenCalled());
+    expect(onBeforeLaunch).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(sessionStorage.getItem("activeTrackContext") ?? "{}")).toEqual({
+      returnTo: "guided",
+      threadId: "thread-1",
+      cardId: "card-1",
+      trackId: "track-1",
+      itemId: "item-1",
+    });
+  });
+});

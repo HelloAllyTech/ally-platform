@@ -15,6 +15,7 @@
  * - Card state is the server's (`card.updated`). The client only decides
  *   which card's player is open (`activeCardId`), and only one is.
  */
+import type { JourneyBootstrap, JourneyNextStep } from "../contract/bootstrap";
 import type {
   GuideAnchor,
   GuideAtmosphere,
@@ -29,9 +30,7 @@ import type {
   GuideMode,
   GuidePresenceState,
   GuideSceneReceipt,
-} from "@types/generated/guide-contract";
-
-import type { JourneyBootstrap, JourneyNextStep } from "../contract/bootstrap";
+} from "../contract/wire";
 
 export type LearnerEchoStatus = "sending" | "queued" | "failed";
 

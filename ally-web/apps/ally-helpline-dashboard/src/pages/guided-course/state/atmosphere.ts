@@ -4,9 +4,8 @@
  * make it quieter, never louder: a chapter with trigger warnings is hushed
  * even when the thread is NORMAL.
  */
-import type { GuideAtmosphere, GuideMode, GuideTone } from "@types/generated/guide-contract";
-
 import type { GuidanceLevel } from "../contract/bootstrap";
+import type { GuideAtmosphere, GuideMode, GuideTone } from "../contract/wire";
 
 const LOUDNESS: Record<GuideAtmosphere, number> = { bright: 0, hushed: 1, still: 2 };
 

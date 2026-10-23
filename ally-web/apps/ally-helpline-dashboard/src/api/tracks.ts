@@ -262,18 +262,29 @@ const tracksAPI = baseAPI.injectEndpoints({
         method: HttpMethod.POST,
         body: { watchedPct },
       }),
-      onQueryStarted: async ({ itemId, trackId, watchedPct }, { dispatch, queryFulfilled }) => {
-        // Optimistic patch of the item's maxWatchedPct in the cached detail.
-        const patch = dispatch(
-          tracksAPI.util.updateQueryData("getLearnTrackDetail", { trackId }, draft => {
-            for (const section of draft.sections) {
-              for (const item of section.items) {
-                if (item.id === itemId) {
-                  item.maxWatchedPct = Math.max(item.maxWatchedPct ?? 0, watchedPct);
+      onQueryStarted: async (
+        { itemId, trackId, watchedPct },
+        { dispatch, getState, queryFulfilled },
+      ) => {
+        // Optimistic patch of the item's maxWatchedPct in every cached detail
+        // of this track. The detail is cached per `{ trackId, languageCode }`
+        // (the player passes the app language), so patching `{ trackId }`
+        // alone matched no entry and the patch silently did nothing.
+        const cachedArgs = tracksAPI.util
+          .selectCachedArgsForQuery(getState(), "getLearnTrackDetail")
+          .filter(args => args.trackId === trackId);
+        const patches = cachedArgs.map(args =>
+          dispatch(
+            tracksAPI.util.updateQueryData("getLearnTrackDetail", args, draft => {
+              for (const section of draft.sections) {
+                for (const item of section.items) {
+                  if (item.id === itemId) {
+                    item.maxWatchedPct = Math.max(item.maxWatchedPct ?? 0, watchedPct);
+                  }
                 }
               }
-            }
-          }),
+            }),
+          ),
         );
         try {
           const { data } = await queryFulfilled;
@@ -281,7 +292,7 @@ const tracksAPI = baseAPI.injectEndpoints({
             dispatch(baseAPI.util.invalidateTags(ALL_TRACK_TAGS));
           }
         } catch {
-          patch.undo();
+          patches.forEach(patch => patch.undo());
         }
       },
     }),
@@ -421,6 +432,7 @@ const tracksAPI = baseAPI.injectEndpoints({
 export const {
   useGetLearnTracksQuery,
   useGetLearnTrackDetailQuery,
+  useLazyGetLearnTrackDetailQuery,
   useGetPublicTrackOutlineQuery,
   useLazyGetTrackAccessQuery,
   useGetTrackLanguagesQuery,

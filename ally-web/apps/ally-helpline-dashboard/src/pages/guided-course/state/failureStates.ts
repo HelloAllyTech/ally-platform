@@ -5,7 +5,7 @@
  * (Stacks: "Apologetic Language and Resolution Paths in Agent Failures").
  * Ally apologises only when the failure is Ally's.
  */
-import type { GuideFailureCode } from "@types/generated/guide-contract";
+import type { GuideFailureCode } from "../contract/wire";
 
 export type FailureAction =
   /** Send the learner's message again. */

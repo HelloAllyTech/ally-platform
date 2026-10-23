@@ -1,4 +1,4 @@
-import type { GuideCardPresentation, GuideItemType } from "@types/generated/guide-contract";
+import type { GuideCardPresentation, GuideItemType } from "../contract/wire";
 
 /** How intense an item is; sets the pacing defaults and the celebration ceiling. */
 export type ItemTension = "low" | "medium" | "high";

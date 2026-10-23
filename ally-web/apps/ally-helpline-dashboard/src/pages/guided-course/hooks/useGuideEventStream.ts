@@ -1,9 +1,9 @@
 import { useEffect, useRef } from "react";
 
-import { GUIDE_EVENT_TYPES, type GuideEvent } from "@types/generated/guide-contract";
 import { readSseStream, reconnectDelay } from "@utils/sseStream";
 
 import { openGuideStream } from "./guideStreamFetch";
+import { GUIDE_EVENT_TYPES, type GuideEvent } from "../contract/wire";
 import { errorCodeOf } from "../state/failureStates";
 
 /** The server pings every 15 s; 45 s of silence means the stream is dead (plan §7.10). */

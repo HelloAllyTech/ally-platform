@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { GuideEvent } from "@types/generated/guide-contract";
+import type { GuideEvent } from "../../contract/wire";
 import { TrackAccessDenialReason } from "@types";
 
 import {

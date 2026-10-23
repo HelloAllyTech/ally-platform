@@ -1,7 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { GuideEvent } from "@types/generated/guide-contract";
+import type { GuideEvent } from "../../contract/wire";
 import { parseSseFrames, reconnectDelay } from "@utils/sseStream";
 
 vi.mock("@api/baseAPI", () => ({ handleLogout: vi.fn() }));

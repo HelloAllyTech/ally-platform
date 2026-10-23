@@ -1,0 +1,408 @@
+/*
+ * The Ally guide's token layer (plans/ally-guide/design/tokens.md).
+ *
+ * Components read only --g-*, --orb-*, --atm-* and --dur-*; the three
+ * atmospheres redefine them on the shell via [data-atmosphere], so no
+ * component branches on the atmosphere (plan §5.9). Every value resolves from
+ * the app's --color-* triplets in index.css, so a future theme only redefines
+ * those. Contrast for every text pair is computed in tokens.md §3.
+ */
+
+.guide-shell {
+  /* Surfaces and text: bright (default). */
+  --g-ground: rgb(var(--color-background-DEFAULT));
+  --g-rail: rgb(var(--color-background-tertiary));
+  --g-card: rgb(var(--color-background-raised));
+  --g-line: rgb(var(--color-border-DEFAULT));
+  --g-ink: rgb(var(--color-secondary-900));
+  --g-ink-soft: rgb(var(--color-neutral-700));
+  --g-ink-faint: rgb(var(--color-neutral-600));
+  --g-rail-meta: rgb(var(--color-neutral-600));
+  --g-ally-label: rgb(var(--color-ai-700));
+  --g-ally-wash: rgb(var(--color-ai-50));
+  --g-ally-edge: rgb(var(--color-ai-100));
+  --g-learner-bubble: rgb(var(--color-primary-50));
+  --g-learner-edge: rgb(var(--color-primary-100));
+  --g-quote-rule: rgb(var(--color-border-dark));
+  --g-action: rgb(var(--color-secondary-900));
+  --g-on-action: rgb(var(--color-background-DEFAULT));
+  --g-dock: rgb(var(--color-primary-500));
+  --g-dock-hover: rgb(var(--color-primary-600));
+  --g-on-dock: rgb(var(--color-background-raised));
+  --g-progress: rgb(var(--color-primary-500));
+  --g-xp-line: rgb(var(--color-primary-400));
+  --g-node-locked: rgb(var(--color-guide-node-locked));
+  --g-focus: rgb(var(--color-primary-500));
+  --g-scrim: rgb(var(--color-secondary-900) / 0.32);
+
+  /* Theatre: the same wherever it opens; it never opens in still. */
+  --g-theatre-ground: rgb(var(--color-guide-theatre-ground));
+  --g-theatre-ink: rgb(var(--color-background-DEFAULT));
+  --g-theatre-soft: rgb(var(--color-guide-theatre-soft));
+  --g-theatre-ally: rgb(var(--color-ai-200));
+
+  /* Presence (the orb). */
+  --orb-hi: rgb(var(--color-ai-300));
+  --orb-core: rgb(var(--color-ai-500));
+  --orb-rim: rgb(var(--color-ai-600));
+  --orb-halo: rgb(var(--color-ai-200));
+  --orb-sheen: rgb(var(--color-background-raised) / 0.45);
+  --orb-breath: 1.035;
+
+  /* Motion (presence-motion-spec §4). */
+  --dur-ack: 100ms;
+  --dur-quick: 160ms;
+  --dur-base: 240ms;
+  --dur-morph: 280ms;
+  --dur-breath: 10s;
+  --dur-atmos: 1200ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-breath: cubic-bezier(0.37, 0, 0.63, 1);
+  --atm-motion: 1;
+  --atm-travel: 4px;
+  --atm-space: 1;
+  --atm-image-saturate: 1;
+  --atm-rail-opacity: 1;
+
+  background: var(--g-ground);
+  color: var(--g-ink);
+  transition:
+    background-color var(--dur-atmos) var(--ease-in-out),
+    color var(--dur-atmos) var(--ease-in-out);
+}
+
+.guide-shell[data-atmosphere="hushed"] {
+  --g-ground: rgb(var(--color-guide-hushed-ground));
+  --g-rail: rgb(var(--color-guide-hushed-rail));
+  --g-card: rgb(var(--color-guide-hushed-card));
+  --g-line: rgb(var(--color-guide-hushed-line));
+  /* tokens.md §3.2: #6E6656 on the hushed rail is 4.43:1, so rail meta goes darker. */
+  --g-rail-meta: rgb(var(--color-neutral-700));
+  --g-ally-label: rgb(var(--color-guide-hushed-ally-label));
+  --g-ally-wash: rgb(var(--color-guide-hushed-ally-wash));
+  --g-ally-edge: rgb(var(--color-guide-hushed-ally-edge));
+  --g-learner-bubble: rgb(var(--color-guide-hushed-learner-bubble));
+  --g-learner-edge: rgb(var(--color-guide-hushed-learner-edge));
+  --g-action: rgb(var(--color-guide-still-ink-soft));
+  --g-progress: rgb(var(--color-guide-hushed-progress));
+  --g-xp-line: rgb(var(--color-guide-hushed-xp-line));
+  --g-scrim: rgb(var(--color-secondary-900) / 0.4);
+  --orb-breath: 1.031;
+  --atm-motion: 1.25;
+  --atm-travel: 2px;
+  --atm-space: 1.25;
+  --atm-image-saturate: 0.6;
+  --atm-rail-opacity: 0.6;
+}
+
+/* The care colours are kept for CARE so the learner can feel the difference. */
+.guide-shell[data-atmosphere="hushed"][data-mode="care"] {
+  --orb-hi: rgb(var(--color-guide-care-orb-hi));
+  --orb-core: rgb(var(--color-guide-care-orb-core));
+  --orb-rim: rgb(var(--color-guide-care-orb-rim));
+  --orb-halo: rgb(var(--color-guide-care-orb-halo));
+  --orb-sheen: rgb(var(--color-background-raised) / 0.3);
+  --orb-breath: 1.05;
+  --dur-breath: 12s;
+}
+
+/* Still: crisis. High contrast, no motion; it looks the same in any theme. */
+.guide-shell[data-atmosphere="still"] {
+  --g-ground: rgb(var(--color-background-raised));
+  --g-rail: rgb(var(--color-background-raised));
+  --g-card: rgb(var(--color-guide-still-card));
+  --g-line: rgb(var(--color-secondary-900));
+  --g-ink-soft: rgb(var(--color-guide-still-ink-soft));
+  --g-ink-faint: rgb(var(--color-neutral-700));
+  --g-rail-meta: rgb(var(--color-neutral-700));
+  --g-ally-label: rgb(var(--color-secondary-900));
+  --g-learner-bubble: rgb(var(--color-guide-hushed-learner-bubble));
+  --g-learner-edge: rgb(var(--color-guide-hushed-learner-edge));
+  --g-focus: rgb(var(--color-secondary-900));
+  --g-on-action: rgb(var(--color-guide-still-card));
+  --orb-rim: rgb(var(--color-guide-still-orb-rim));
+  --orb-core: rgb(var(--color-guide-still-orb-flat));
+  --orb-hi: rgb(var(--color-guide-still-orb-flat));
+  --orb-halo: transparent;
+  --orb-sheen: transparent;
+  --dur-atmos: 150ms;
+  --atm-motion: 0;
+  --atm-travel: 0px;
+  --atm-space: 1.25;
+}
+
+.guide-shell[data-atmosphere="still"] *,
+.guide-shell[data-atmosphere="still"] *::before,
+.guide-shell[data-atmosphere="still"] *::after {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* Reduced motion: shape and colour only (presence-motion-spec §4). */
+@media (prefers-reduced-motion: reduce) {
+  .guide-shell {
+    --atm-travel: 0px;
+    --dur-atmos: 200ms;
+  }
+  .guide-shell .g-animated,
+  .guide-shell .g-orb *,
+  .guide-shell .g-skeleton {
+    animation: none !important;
+  }
+}
+
+/* ---------------------------------------------------------------- type */
+
+.guide-shell .g-prose {
+  font-family: var(--font-secondary);
+  font-size: 1.125rem;
+  line-height: 1.6;
+  color: var(--g-ink);
+}
+@media (min-width: 768px) {
+  .guide-shell .g-prose {
+    font-size: 1.1875rem;
+    line-height: 1.58;
+  }
+}
+.guide-shell .g-label {
+  font-family: var(--font-primary);
+  font-size: 0.75rem;
+  line-height: 1rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+.guide-shell .g-title {
+  font-family: var(--font-primary);
+  font-weight: 600;
+  font-size: 1.125rem;
+  line-height: 1.5rem;
+  text-wrap: balance;
+}
+@media (min-width: 768px) {
+  .guide-shell .g-title {
+    font-size: 1.25rem;
+    line-height: 1.625rem;
+  }
+}
+.guide-shell .g-caption {
+  font-family: var(--font-primary);
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+  color: var(--g-ink-faint);
+}
+.guide-shell :lang(hi),
+.guide-shell :lang(mr),
+.guide-shell :lang(ta),
+.guide-shell :lang(kn) {
+  line-height: 1.7;
+}
+
+/* ------------------------------------------------------------- focus */
+
+.guide-shell :focus-visible {
+  outline: 2.5px solid var(--g-focus);
+  outline-offset: 3px;
+}
+
+/* --------------------------------------------------------------- orb */
+
+.g-orb {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  width: var(--orb-size, 32px);
+  height: var(--orb-size, 32px);
+}
+.g-orb__halo {
+  position: absolute;
+  inset: -20%;
+  border-radius: 9999px;
+  background: radial-gradient(var(--orb-halo) 0%, transparent 70%);
+  opacity: 0.22;
+}
+.g-orb__core {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: radial-gradient(
+    circle at 32% 28%,
+    var(--orb-hi),
+    var(--orb-core) 60%,
+    var(--orb-rim)
+  );
+  box-shadow: inset 0 0 0 1px var(--orb-rim);
+}
+.g-orb__sheen {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: conic-gradient(transparent, var(--orb-sheen), transparent 40%);
+  opacity: 0;
+}
+.g-orb[data-state="idle"] .g-orb__core {
+  animation: g-orb-breath var(--dur-breath) var(--ease-breath) infinite;
+}
+.g-orb[data-state="idle"] .g-orb__halo {
+  animation: g-orb-halo var(--dur-breath) var(--ease-breath) infinite;
+}
+.g-orb[data-state="listening"] .g-orb__core {
+  transform: scale(1.08);
+  transition: transform 200ms var(--ease-out);
+}
+.g-orb[data-state="listening"] .g-orb__halo {
+  opacity: 0.36;
+  inset: -30%;
+}
+.g-orb[data-state="thinking"] .g-orb__sheen {
+  opacity: 1;
+  animation: g-orb-spin 2.4s linear infinite;
+}
+.g-orb[data-state="thinking"] .g-orb__halo {
+  animation: g-orb-pulse 1.2s var(--ease-breath) infinite alternate;
+}
+.g-orb[data-state="speaking"] .g-orb__core {
+  animation: g-orb-speak 0.9s var(--ease-breath) infinite alternate;
+}
+.g-orb[data-state="still"] .g-orb__core {
+  background: var(--orb-core);
+}
+.g-orb[data-state="still"] .g-orb__halo,
+.g-orb[data-state="still"] .g-orb__sheen {
+  display: none;
+}
+.g-orb[data-state="waiting"] {
+  opacity: 0.6;
+}
+@media (prefers-reduced-motion: reduce) {
+  .g-orb[data-state="listening"] .g-orb__core {
+    transform: none;
+    box-shadow: 0 0 0 2px var(--orb-rim);
+  }
+  .g-orb[data-state="thinking"] .g-orb__core {
+    box-shadow: 0 0 0 2px var(--orb-rim);
+    outline: 2px dashed var(--orb-rim);
+    outline-offset: 2px;
+  }
+  .g-orb[data-state="speaking"] .g-orb__core {
+    box-shadow: 0 0 0 2px var(--orb-rim);
+  }
+}
+
+@keyframes g-orb-breath {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(var(--orb-breath));
+  }
+}
+@keyframes g-orb-halo {
+  0%,
+  100% {
+    opacity: 0.18;
+  }
+  40% {
+    opacity: 0.28;
+  }
+}
+@keyframes g-orb-pulse {
+  from {
+    opacity: 0.2;
+  }
+  to {
+    opacity: 0.32;
+  }
+}
+@keyframes g-orb-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+@keyframes g-orb-speak {
+  from {
+    transform: scale(0.99);
+  }
+  to {
+    transform: scale(1.03);
+  }
+}
+
+/* --------------------------------------------------------- stage blocks */
+
+.g-rise {
+  animation: g-rise calc(var(--dur-quick) * var(--atm-motion)) var(--ease-out) both;
+}
+@keyframes g-rise {
+  from {
+    opacity: 0;
+    transform: translateY(var(--atm-travel));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.g-skeleton {
+  background: linear-gradient(90deg, var(--g-line) 0%, var(--g-card) 50%, var(--g-line) 100%);
+  background-size: 200% 100%;
+  animation: g-shimmer 1.6s linear infinite;
+  border-radius: 6px;
+}
+@keyframes g-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.g-check path {
+  stroke-dasharray: 24;
+  stroke-dashoffset: 0;
+  animation: g-check-draw 300ms var(--ease-out) both;
+}
+@keyframes g-check-draw {
+  from {
+    stroke-dashoffset: 24;
+  }
+}
+
+/* The node bloom on completion (warm and festive only). */
+.g-node[data-bloom="true"]::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: 9999px;
+  border: 2px solid var(--g-progress);
+  animation: g-bloom 300ms var(--ease-out) both;
+}
+@keyframes g-bloom {
+  from {
+    opacity: 0.8;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.4);
+  }
+}
+
+/* Inline players are bounded (plan §10.4 adapter rules). */
+.g-inline-player {
+  height: min(78dvh, 680px);
+}
+
+/* Shelf bodies never scroll: the article player's scroll gate needs that. */
+.g-shelf-body {
+  overflow: hidden;
+}
+
+.g-scrim {
+  background: var(--g-scrim);
+}

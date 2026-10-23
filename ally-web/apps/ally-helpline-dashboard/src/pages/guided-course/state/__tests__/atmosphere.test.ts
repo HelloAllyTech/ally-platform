@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { capTone, dockVisible, proseBudget, replyVerbsFor, resolveAtmosphere } from "../atmosphere";
 import { failureCodeFromHttp, failureStateFor, FAILURE_STATES } from "../failureStates";
-import { GUIDE_FAILURE_CODE_VALUES } from "@types/generated/guide-contract";
+import { GUIDE_FAILURE_CODE_VALUES } from "../../contract/wire";
 
 describe("resolveAtmosphere", () => {
   it("is bright by default", () => {

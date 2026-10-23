@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { GuideCard } from "@types/generated/guide-contract";
+import type { GuideCard } from "../../contract/wire";
 
 import type { JourneySpineSection } from "../../contract/bootstrap";
 import { buildSpineModel, chapterHasWarnings, findNode } from "../spineModel";

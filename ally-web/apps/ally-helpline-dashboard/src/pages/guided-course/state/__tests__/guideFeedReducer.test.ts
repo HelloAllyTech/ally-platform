@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import type { GuideCard, GuideEvent } from "@types/generated/guide-contract";
+import type { GuideCard, GuideEvent } from "../../contract/wire";
 
 import type { JourneyBootstrap } from "../../contract/bootstrap";
 import {
@@ -253,7 +253,7 @@ describe("guideFeedReducer", () => {
       ev.ally(4, "m2", "Between scenes"),
     ]);
     expect(state.scenes.sc1).toMatchObject({ closed: true, title: "Chapter 1" });
-    expect(state.entries.map(e => [e.kind, e.sceneId])).toEqual([
+    expect(state.entries.map(e => [e.kind, "sceneId" in e ? e.sceneId : null])).toEqual([
       ["scene", "sc1"],
       ["message", "sc1"],
       ["receipt", "sc1"],

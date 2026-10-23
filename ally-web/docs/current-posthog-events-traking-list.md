@@ -296,6 +296,23 @@ index is enough to see which ones land.
 | ---------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------- |
 | `COURSE_LANDING_FIRST_MOVE_CHOSEN` | `course_landing_first_move_chosen` | A reply was picked in the page's first move. Sends `course_id` and `reply_index` (0-based) | `pages/course-landing/CourseLanding.tsx` |
 
+### Ally guided journey (`/journey/:trackId`)
+
+Ally's guided course experience (dark launch behind the guide kill switch). The events carry ids,
+types and choices, **never the learner's words**, and nothing is sent about CARE, a crisis or the
+support numbers: those moments stay out of analytics entirely (the server records a minimal crisis
+event for redacted review instead). All fire from `pages/guided-course/hooks/useGuideJourney.ts`.
+
+| Constant                     | Event Name                   | Description                                                                                                                         | Fires at                                       |
+| ---------------------------- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| `GUIDED_JOURNEY_OPENED`      | `guided_journey_opened`      | The journey finished booting. Sends `course_id` and `entry` (`new` for an empty thread, `returning`, or `returned` from a roleplay) | `pages/guided-course/hooks/useGuideJourney.ts` |
+| `GUIDED_MESSAGE_SENT`        | `guided_message_sent`        | The learner sent a turn. Sends `course_id`, `source` (`typed`, `verb`, `dock`, `practice`, `start`) and, for a chip, `verb`         | `pages/guided-course/hooks/useGuideJourney.ts` |
+| `GUIDED_CARD_OPENED`         | `guided_card_opened`         | A course item card was opened. Sends `course_id`, `item_type` and `presentation` (`inline`, `shelf`, `theatre`)                     | `pages/guided-course/hooks/useGuideJourney.ts` |
+| `GUIDED_GUIDANCE_CHANGED`    | `guided_guidance_changed`    | The guidance dial moved. Sends `course_id` and `level` (`lead`, `walk`, `drive`)                                                    | `pages/guided-course/hooks/useGuideJourney.ts` |
+| `GUIDED_CLASSIC_VIEW_OPENED` | `guided_classic_view_opened` | The learner left for the classic course. Sends `course_id` and `source` (`header`, `failure`, `card`)                               | `pages/guided-course/hooks/useGuideJourney.ts` |
+| `GUIDED_FAILURE_SHOWN`       | `guided_failure_shown`       | A designed failure state was shown. Sends `course_id` and `failure_code` (a `GuideFailureCode`)                                     | `pages/guided-course/hooks/useGuideJourney.ts` |
+| `GUIDED_APPOINTMENT_CHOSEN`  | `guided_appointment_chosen`  | A time was picked in "Before you go". Sends `course_id` and `slot` (`tomorrowMorning`, `afterShift`, `weekend`, `custom`) — no time | `pages/guided-course/hooks/useGuideJourney.ts` |
+
 ### Errors (automatic — no component code needed)
 
 | Constant             | Event Name           | Description                                                                                                                                                            | Fires at                      |

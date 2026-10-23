@@ -16,14 +16,10 @@
  *    thread's event log from seq 0 to rebuild them.
  */
 import { TrackAccessDenialReason, TrackDetail, TrackItemStatus, TrackItemType } from "@types";
-import type {
-  GuideAtmosphere,
-  GuideCard,
-  GuideItemType,
-  GuideMode,
-} from "@types/generated/guide-contract";
 
 import { ITEM_TYPE_FACTS, ItemTension } from "../cards/itemTypes";
+
+import type { GuideAtmosphere, GuideCard, GuideItemType, GuideMode } from "./wire";
 
 /** The guidance dial (plan §5.7): Lead me · Walk with me · I'll drive. */
 export type GuidanceLevel = "lead" | "walk" | "drive";

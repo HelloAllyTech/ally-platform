@@ -8,9 +8,8 @@
  * when the server says so (`spine.updated.currentItemId`) or, before any
  * update, when bootstrap marked it available.
  */
-import type { GuideCard, GuideItemType } from "@types/generated/guide-contract";
-
 import type { JourneySpineSection, SpineItemState } from "../contract/bootstrap";
+import type { GuideCard, GuideItemType } from "../contract/wire";
 
 export type SpineNodeState = SpineItemState | "current";
 

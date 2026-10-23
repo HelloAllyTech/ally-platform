@@ -168,6 +168,36 @@
     --color-border-medium: 214 205 190;
     --color-border-dark: 181 172 156;
 
+    /*
+     * Ally guide atmospheres (plans/ally-guide/design/tokens.md). Read only
+     * through the --g-* layer in pages/guided-course/guided.css: hushed is
+     * the quieter room for heavy chapters and CARE, still is the crisis card's
+     * high-contrast room (it stays light in any future theme), care tints the
+     * orb, and the Theatre is the dark full-screen frame.
+     */
+    --color-guide-hushed-ground: 239 237 232; /* #EFEDE8 */
+    --color-guide-hushed-rail: 230 227 220; /* #E6E3DC */
+    --color-guide-hushed-card: 247 246 242; /* #F7F6F2 */
+    --color-guide-hushed-line: 225 221 212; /* #E1DDD4 */
+    --color-guide-hushed-ally-label: 126 91 76; /* #7E5B4C */
+    --color-guide-hushed-ally-wash: 243 238 234; /* #F3EEEA */
+    --color-guide-hushed-ally-edge: 231 221 215; /* #E7DDD7 */
+    --color-guide-hushed-learner-bubble: 238 240 244; /* #EEF0F4 */
+    --color-guide-hushed-learner-edge: 223 227 234; /* #DFE3EA */
+    --color-guide-hushed-progress: 61 90 134; /* #3D5A86 */
+    --color-guide-hushed-xp-line: 100 125 166; /* #647DA6 */
+    --color-guide-still-card: 255 255 255; /* #FFFFFF */
+    --color-guide-still-ink-soft: 58 55 48; /* #3A3730 */
+    --color-guide-still-orb-rim: 122 106 94; /* #7A6A5E */
+    --color-guide-still-orb-flat: 216 194 182; /* #D8C2B6 */
+    --color-guide-care-orb-hi: 232 194 176; /* #E8C2B0 */
+    --color-guide-care-orb-core: 201 143 120; /* #C98F78 */
+    --color-guide-care-orb-rim: 154 101 80; /* #9A6550 */
+    --color-guide-care-orb-halo: 234 211 198; /* #EAD3C6 */
+    --color-guide-node-locked: 130 121 106; /* #82796A */
+    --color-guide-theatre-ground: 30 28 23; /* #1E1C17 */
+    --color-guide-theatre-soft: 184 176 160; /* #B8B0A0 */
+
     /* Ink, as alpha over the warm ground rather than over white. */
     --color-typography-Default: rgba(41, 38, 31, 0.9);
     --color-typography-50: rgba(41, 38, 31, 0.04);

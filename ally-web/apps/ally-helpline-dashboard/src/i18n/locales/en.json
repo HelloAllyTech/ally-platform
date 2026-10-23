@@ -3109,5 +3109,251 @@
       "privacy": "Privacy",
       "terms": "Terms"
     }
+  },
+  "guide": {
+    "common": {
+      "retry": "Try again",
+      "openClassic": "Open the classic view",
+      "myCourses": "Go to my courses",
+      "dismiss": "Dismiss"
+    },
+    "boot": {
+      "loading": "Ally is getting ready…"
+    },
+    "header": {
+      "disclosure": "Ally · AI guide",
+      "allyLabel": "Ally",
+      "exit": "Back to my courses",
+      "classic": "Classic view",
+      "support": "Support"
+    },
+    "presence": {
+      "thinking": "Thinking…",
+      "slow": "This one's taking me a moment…",
+      "label": {
+        "idle": "Ally",
+        "listening": "Ally is listening",
+        "thinking": "Ally is thinking",
+        "speaking": "Ally is replying",
+        "still": "Ally",
+        "waiting": "Ally is waiting. Back to Ally"
+      }
+    },
+    "dial": {
+      "label": "Guidance",
+      "lead": "Lead me",
+      "walk": "Walk with me",
+      "drive": "I'll drive",
+      "leadHint": "More framing before each step, and more optional practice.",
+      "walkHint": "A short frame before each step.",
+      "driveHint": "Ally stays brief and waits for you."
+    },
+    "dock": {
+      "continue": "Continue"
+    },
+    "verbs": {
+      "label": "Quick replies",
+      "tellMore": "Tell me more",
+      "example": "Show an example",
+      "notSure": "I'm not sure",
+      "notNow": "Not now",
+      "tryIt": "Try it",
+      "notWhatIMeant": "That's not what I meant",
+      "breathe": "Breathe with me",
+      "talk": "I'd like to talk",
+      "supportOptions": "Show support options",
+      "backToCourse": "Back to the course"
+    },
+    "composer": {
+      "label": "Message to Ally",
+      "placeholder": "Write to Ally…",
+      "send": "Send",
+      "left": "{{count}} character left",
+      "left_other": "{{count}} characters left",
+      "tooLong": "That's over {{max}} characters. Could you shorten it?"
+    },
+    "message": {
+      "about": "About: “{{quote}}”",
+      "interrupted": "Cut off partway.",
+      "queued": "Will send when you're back online.",
+      "notSent": "Not sent.",
+      "remembered": "Remembered: {{from}}"
+    },
+    "stage": {
+      "label": "Conversation with Ally"
+    },
+    "welcome": {
+      "line": "I'll walk this course with you, one step at a time. You can ask me anything along the way.",
+      "start": "Let's start",
+      "whatWillILearn": "What will I learn?",
+      "howLong": "How long is it?"
+    },
+    "card": {
+      "state": {
+        "ready": "Ready",
+        "open": "Open",
+        "done": "Done",
+        "failed": "Didn't load",
+        "superseded": "Done in the app",
+        "skipped": "Skipped",
+        "pending": "Being graded",
+        "blocked": "No attempts left",
+        "resumable": "Pick up where you left off",
+        "locked": "Locked",
+        "partial": "Partly done",
+        "openBeside": "Open on the right",
+        "openFullScreen": "Open full screen"
+      },
+      "verb": {
+        "read": "Read",
+        "watch": "Watch",
+        "start": "Start",
+        "write": "Write",
+        "sort": "Sort",
+        "openCall": "Open the call",
+        "openCase": "Open the case",
+        "openTranscript": "Open the transcript",
+        "play": "Play"
+      },
+      "opensRight": "Opens on the right",
+      "opensOnTop": "Opens over the conversation",
+      "opensFullScreen": "Opens full screen",
+      "backToIt": "Back to it",
+      "close": "Close",
+      "openAgain": "Open again",
+      "opening": "Opening…",
+      "meta": {
+        "minutes": "{{count}} min",
+        "minutes_other": "{{count}} min"
+      },
+      "receipt": {
+        "read": "Read",
+        "watched": "Watched",
+        "passed": "Passed",
+        "written": "Written · in your notebook",
+        "finished": "Finished",
+        "sorted": "Sorted",
+        "practised": "Practised",
+        "caseComplete": "Case complete",
+        "played": "Played"
+      },
+      "failed": {
+        "article": "This article didn't load. Try again, or open it in the classic view.",
+        "video": "The video won't play here. Try again, or open it in the classic view.",
+        "quiz": "Something went wrong opening this. Try again.",
+        "journal": "Your journal didn't load. Try again; anything you wrote is kept.",
+        "bucketSort": "The cards didn't load. Try again.",
+        "roleplay": "The call couldn't start. Check your microphone, or try again in a moment.",
+        "annotation": "The transcript didn't load. Try again.",
+        "game": "This game couldn't load. You're free to go on; nothing here counts.",
+        "generic": "This didn't load. Try again."
+      }
+    },
+    "scene": {
+      "chapter": "Chapter",
+      "chapterOf": "Chapter {{index}} of {{count}}",
+      "pieces": "{{count}} piece",
+      "pieces_other": "{{count}} pieces",
+      "hasRoleplay": "roleplay",
+      "about": "about {{count}} min",
+      "about_other": "about {{count}} min",
+      "skipIntro": "Skip intro",
+      "contentNote": "This chapter touches on difficult experiences. Take it at your own pace.",
+      "chapterDone": "Chapter {{index}} · done",
+      "done": "{{title}} · done",
+      "expand": "Expand",
+      "collapse": "Collapse",
+      "practices": "{{count}} optional practice",
+      "practices_other": "{{count}} optional practices"
+    },
+    "notebook": {
+      "saved": "Saved to your notebook"
+    },
+    "practice": {
+      "label": "Optional practice",
+      "try": "Type or say it",
+      "skip": "Skip",
+      "footer": "Doesn't count toward the course.",
+      "skipped": "Skipped",
+      "failed": "That one didn't load. Let's skip it."
+    },
+    "courseInfo": {
+      "label": "About this course",
+      "open": "Open"
+    },
+    "closing": {
+      "title": "Before you go",
+      "watchFor": "One thing to watch for next time: {{thing}}.",
+      "when": "When would you like to pick this up?",
+      "slot": {
+        "tomorrowMorning": "Tomorrow morning",
+        "afterShift": "After my shift",
+        "weekend": "This weekend",
+        "custom": "Pick a time",
+        "whenever": "Whenever you're ready"
+      },
+      "whenever": "Whenever you're ready. The course will be here.",
+      "saved": "Saved: {{when}}. One reminder, then nothing.",
+      "addToCalendar": "Add to calendar (.ics)",
+      "change": "Change",
+      "shiftEnds": "When does your shift usually end?",
+      "pickTime": "Pick a day and time",
+      "save": "Save",
+      "failed": "I couldn't save that time. Try again, or just come back whenever suits you.",
+      "teaser": "Next time: {{teaser}}",
+      "next": "Next: {{when}} · Change",
+      "calendarTitle": "Ally: {{course}}"
+    },
+    "denied": {
+      "title": "This course isn't open to you yet",
+      "notAvailable": "This course isn't available right now.",
+      "noOrganization": "Your account isn't linked to an organisation yet, and this course comes through one. Your coordinator can link you.",
+      "notInOrganization": "This course belongs to a different organisation from yours.",
+      "notInGroup": "Your organisation hasn't added you to the group this course is for. Your coordinator can add you."
+    },
+    "signIn": {
+      "title": "Sign in to save your place",
+      "line": "Your organisation gives you access. Use the email they have for you.",
+      "button": "Sign in"
+    },
+    "finale": {
+      "title": "Where you started, where you are",
+      "before": "Before",
+      "now": "Now"
+    },
+    "spine": {
+      "label": "Course map",
+      "done": "Done",
+      "current": "You are here",
+      "available": "Open",
+      "locked": "Locked",
+      "item": "Item",
+      "pin": "Keep open",
+      "unpin": "Hide",
+      "progress": "{{done}} of {{total}} done"
+    },
+    "announce": {
+      "ready": "Ready: {{title}}",
+      "done": "Done: {{title}}"
+    },
+    "panel": {
+      "backToAlly": "Back to Ally"
+    },
+    "failure": {
+      "offline": "I've lost the connection for a moment. Your progress is safe.",
+      "turnFailed": "Something went wrong on my side.",
+      "providerOutage": "Sorry, I'm having trouble thinking right now. You can keep going in the classic view. Your progress carries over.",
+      "rateLimited": "Let's slow down a little. I'll be ready in a moment.",
+      "anotherTab": "I'm replying in another tab.",
+      "cooldown": "Let's take ten minutes. The course will be here.",
+      "allowanceUsed": "Sign in to keep going. Our conversation will still be here.",
+      "anonymousPaused": "I'm taking a short break from new conversations. Sign in to keep going.",
+      "notEnrolled": "Let's get you enrolled first. Try again and the course will start.",
+      "noAccess": "This course isn't open to you right now.",
+      "disabled": "I'm not available for this course right now. The classic view has everything, and your progress carries over.",
+      "tooLong": "That's a bit long for me. Could you keep it under 2,000 characters?",
+      "unavailable": "This course isn't available right now.",
+      "bootFailed": "Something went wrong on my side while opening the course. Try again, or keep going in the classic view."
+    }
   }
 }

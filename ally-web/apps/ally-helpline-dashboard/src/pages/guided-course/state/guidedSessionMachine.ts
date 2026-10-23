@@ -13,7 +13,8 @@
  * should show (plan §5.1, Appendix A).
  */
 import { TrackAccessDenialReason } from "@types";
-import type { GuideEvent, GuideFailureCode } from "@types/generated/guide-contract";
+
+import type { GuideEvent, GuideFailureCode } from "../contract/wire";
 
 export type BootPhase =
   | "loading"

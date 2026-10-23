@@ -27,7 +27,6 @@ import {
   ANALYTICS_EVENTS,
   ANALYTICS_PROPS,
   ROLEPLAY_SUMMARY_TAB,
-  buildTrackRoute,
   REVIEW_PRIVACY_OPTIONS_VALUES,
   ROUTES,
 } from "@constants";
@@ -44,7 +43,7 @@ import {
   ShareForReviewsInput,
   TranscriptFocusRequest,
 } from "@types";
-import { readTrackContext, resolveFeedbackTabs } from "@utils";
+import { readTrackContext, resolveFeedbackTabs, trackHomeRoute } from "@utils";
 
 import { StreakMoment } from "./components";
 import { SimulationTranscriptTab } from "../calls/components";
@@ -384,7 +383,7 @@ export const PostSimulationSummary: FC = () => {
             </button>
             <ArrowRight />
             <button
-              onClick={() => guardExit(() => navigate(buildTrackRoute(trackContext.trackId)))}
+              onClick={() => guardExit(() => navigate(trackHomeRoute(trackContext)))}
               className="text-primary-500 font-medium truncate hover:underline max-md:min-h-11"
             >
               {trackDetail?.title ?? t("common.loading")}

@@ -7,11 +7,6 @@
  * entry and then follows the stream, which is the source of truth.
  */
 import { ApiEndpoints, HttpMethod } from "@constants";
-import type {
-  GuideCardEventRequest,
-  GuideTurnAccepted,
-  GuideTurnRequest,
-} from "@types/generated/guide-contract";
 
 import { baseAPI } from "./baseAPI";
 
@@ -21,6 +16,11 @@ import type {
   JourneyAvailability,
   JourneyThread,
 } from "../pages/guided-course/contract/bootstrap";
+import type {
+  GuideCardEventRequest,
+  GuideTurnAccepted,
+  GuideTurnRequest,
+} from "../pages/guided-course/contract/wire";
 
 export interface GuideMessageRow {
   id: string;
