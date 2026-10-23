@@ -3,6 +3,11 @@
 Complete step-by-step guide for wiring PostHog into the Vite + React + Redux app.
 All code snippets show the **exact diff** against the current codebase.
 
+> **The code has since moved.** It now lives in `libs/ui-shared/src/lib/analytics/` (with
+> `src/utils/analytics.ts` renamed `utils/posthog.ts`), so the admin dashboard can share it. The
+> helpline's `src/…` paths in this guide are one-line re-exports of it today. Read the steps as how
+> the integration was built, and make changes in the shared library.
+
 ---
 
 ## Table of Contents
@@ -980,7 +985,7 @@ component calls track()
 
 ### Adding a new event — checklist
 
-1. Add the name to `ANALYTICS_EVENTS` in `src/constants/analyticsEvents.ts`
+1. Add the name to `ANALYTICS_EVENTS` in `libs/ui-shared/src/lib/analytics/constants/analyticsEvents.ts`
 2. Add any new property keys to `ANALYTICS_PROPS` (same file)
 3. Call `track(ANALYTICS_EVENTS.YOUR_EVENT, { ... })` in the component or hook
 4. Write a test: assert `posthog.capture` was called with the right event name and properties

@@ -1,8 +1,14 @@
 ### The 4-step process
 
+The analytics code lives in `libs/ui-shared/src/lib/analytics/` and is shared by the helpline and
+admin dashboards: import `useAnalytics`, `ANALYTICS_EVENTS` and `ANALYTICS_PROPS` from
+`@ally-ui-mono/ui-shared`. The helpline's old `src/constants/analyticsEvents.ts`,
+`src/hooks/useAnalytics.ts` and `src/utils/analytics.ts` are now one-line re-exports, so don't
+add anything to them.
+
 #### Step 1 — Register the event name
 
-Open `src/constants/analyticsEvents.ts` and add your event to `ANALYTICS_EVENTS`
+Open `libs/ui-shared/src/lib/analytics/constants/analyticsEvents.ts` and add your event to `ANALYTICS_EVENTS`
 under the appropriate comment group:
 
 ```typescript
@@ -106,7 +112,7 @@ describe("notes panel tracking", () => {
 
 ### Full checklist
 
-- [ ] Add event name to `ANALYTICS_EVENTS` in `src/constants/analyticsEvents.ts`
+- [ ] Add event name to `ANALYTICS_EVENTS` in `libs/ui-shared/src/lib/analytics/constants/analyticsEvents.ts`
 - [ ] Add any new property keys to `ANALYTICS_PROPS` (same file, if needed)
 - [ ] Call `track(ANALYTICS_EVENTS.YOUR_EVENT, { ... })` in your component or hook
 - [ ] Write a test asserting `posthog.capture` was called with the correct event and properties
@@ -118,14 +124,14 @@ describe("notes panel tracking", () => {
 
 **Scenario:** Track when a counselor opens the feedback form during a call.
 
-**`src/constants/analyticsEvents.ts`**
+**`libs/ui-shared/src/lib/analytics/constants/analyticsEvents.ts`**
 
 ```typescript
 // Calls
 CALL_FEEDBACK_FORM_OPENED: "call_feedback_form_opened",
 ```
 
-**`src/constants/analyticsEvents.ts` — ANALYTICS_PROPS**
+**`libs/ui-shared/src/lib/analytics/constants/analyticsEvents.ts` — ANALYTICS_PROPS**
 
 ```typescript
 // No new props needed — CALL_ID and CALL_TYPE already exist
