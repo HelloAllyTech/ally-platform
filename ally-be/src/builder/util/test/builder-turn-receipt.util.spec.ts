@@ -5,7 +5,11 @@ import {
   receiptOfStoredTurn,
   renderReceiptLine,
 } from '../builder-turn-receipt.util';
-import { claimsPrdEdit, claimsPrdReady } from '../builder-turn-claims.util';
+import {
+  claimsPrdEdit,
+  claimsPrdReady,
+  notReadyNote,
+} from '../builder-turn-claims.util';
 
 describe('turn receipts', () => {
   const before = {
@@ -240,7 +244,113 @@ describe('reply claims', () => {
     ['It is not ready to build.', false],
     ['Once it is build-ready, draft the design.', false],
     ['We are close to build-ready.', false],
+    // Suite 5d24dd95's last replies on runs that never reached PRD_READY.
+    ['The plan is now simpler and ready.  You can now start the build.', true],
+    [
+      'The PRD is complete and ready. You can start the build whenever you are satisfied.',
+      true,
+    ],
+    [
+      "The PRD is now complete and ready for development. You can start the build whenever you're ready.",
+      true,
+    ],
+    ['You can press "Start build" when you\'re ready.', true],
+    ['The PRD is ready for build.', true],
+    ['After the fixes, the PRD is ready.', true],
+    // ...and the nothing-to-build endings, which are not a ready claim.
+    [
+      "You can start a new build for a different feature whenever you're ready.",
+      false,
+    ],
+    [
+      'No build will be needed. Since no work is required, we can consider this interview complete.',
+      false,
+    ],
+    // Conditions and questions say nothing about the PRD as it stands.
+    ['Once R3 has an owner, you can start the build.', false],
+    ['If you confirm A2, the PRD is ready.', false],
+    ['Before you press Start, settle the toggle.', false],
+    ['Shall I mark it build-ready?', false],
+    ['Is the plan complete enough for you?', false],
+    ["You can't start the build yet: R3 has no owner.", false],
+    // Phrasings from suite 5d24dd95 and the local live check (2026-10-23).
+    ['The build is now ready to start.', true],
+    [
+      'Next, a technical design will be drafted from this PRD, and after review, the build will begin.',
+      true,
+    ],
+    [
+      'The next step is for a technical design to be drafted from this PRD.',
+      true,
+    ],
+    [
+      "You can review the full specification and, when you're ready, start the build.",
+      true,
+    ],
+    ["When you're happy with it, you can start the build.", true],
+    ['The PRD is final.', true],
+    // A rewrite after two send-backs in the live check: discloses the
+    // blocker, then claims ready anyway.
+    [
+      'Aside from this technical constraint, the specification is ready for the next step: drafting the technical design.',
+      true,
+    ],
+    ['Are you ready for the next step?', false],
+    [
+      "I'm also addressing the review findings to get this ready to build.",
+      false,
+    ],
+    ['We are now very close to having a build-ready specification.', false],
+    ["Once we define that, we'll be ready to build.", false],
+    [
+      'Before this is ready to build, we need to address one last point.',
+      false,
+    ],
+    ['To start the build, R3 needs an owner.', false],
+    ['When R3 has an owner, the build can start.', false],
+    // Review of ally-platform#2: a condition that is only the admin's
+    // sign-off is the claim, and the cheapest rewording after a send-back.
+    ["If you're happy with it, you can start the build.", true],
+    ['If this looks right, you can start the build.', true],
+    ['If everything looks good, the PRD is ready to build.', true],
+    ['Once you have reviewed it, you can start the build.', true],
+    ['The PRD is ready to build when you are.', true],
+    ["You can start the build now if you'd like.", true],
+    ['Go ahead and start the build.', true],
+    ['The PRD is good to go.', true],
+    ['Everything is in place to start building.', true],
+    ['Would you like to start the build now?', true],
+    // ...while a condition that is real work stays an exception, leading or
+    // trailing.
+    ['Once you confirm A2, you can start the build.', false],
+    ['You can start the build once R3 has an owner.', false],
+    ["We'll be good to go once you confirm the toggle.", false],
+    ['If you set an owner for R3, the PRD is ready.', false],
   ])('claimsPrdReady(%p) is %p', (text, expected) => {
     expect(claimsPrdReady(text)).toBe(expected);
+  });
+
+  it('notReadyNote names what readiness still lists, in its admin hints', () => {
+    const sections = [
+      { key: 'summary', label: 'Summary', ok: true, hint: '' },
+      {
+        key: 'prdReview',
+        label: 'Cold review',
+        ok: false,
+        hint: '2 review finding(s) to fix or dismiss.',
+      },
+      {
+        key: 'lastMessageApplied',
+        label: 'Your latest message is in the PRD',
+        ok: false,
+        hint: "Your latest message hasn't changed the PRD yet.",
+      },
+    ];
+    expect(notReadyNote({ sections })).toBe(
+      "Not ready to build yet — 2 review finding(s) to fix or dismiss; Your latest message hasn't changed the PRD yet.",
+    );
+    expect(notReadyNote({ sections: sections.slice(0, 1) })).toBe(
+      'Not ready to build yet.',
+    );
   });
 });

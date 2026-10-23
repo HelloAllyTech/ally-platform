@@ -192,4 +192,52 @@ describe('computeEvalGates', () => {
     expect(uncited.evidenceCited).toBe(false);
     expect(gateViolations(inconsistent)).toBe(1);
   });
+
+  /**
+   * Suite 5d24dd95: 9 of 14 not-ready runs ended on "You can start the build"
+   * — and the simulated admin, like a real one, stopped there.
+   */
+  it('counts a ready claim against the readiness of the turn that made it', () => {
+    const reply = (id: string, content: string, metadata = {}) => ({
+      ...assistant(content, []),
+      id,
+      metadata,
+    });
+    const gates = computeEvalGates(
+      [],
+      [
+        // Untrue when said.
+        reply('m1', 'The PRD is complete. You can start the build.'),
+        // True when said: that turn settled ready.
+        reply('m2', 'The PRD is build-ready.'),
+        // Untrue, but the server said what is left under it.
+        reply('m3', 'The PRD is build-ready.\n\nNot ready to build yet.', {
+          readyClaimCorrected: true,
+        }),
+        // Untrue, in the question card rather than the message.
+        reply('m4', 'Two small things.', {
+          questions: [{ prompt: 'The plan is ready — anything to add?' }],
+        }),
+        // Not a claim.
+        reply('m5', 'Two questions are still open.'),
+      ],
+      ready(),
+      new Map([
+        ['m1', false],
+        ['m2', true],
+        ['m3', false],
+        ['m4', false],
+        ['m5', false],
+      ]),
+    );
+
+    expect(gates.falseReadyClaims).toBe(2);
+    expect(gateViolations(gates)).toBe(2);
+  });
+
+  it('scores runs from before the ready-claim gate as clean on it', () => {
+    const older = { ...computeEvalGates([], [], ready()) };
+    delete older.falseReadyClaims;
+    expect(gateViolations(older)).toBe(0);
+  });
 });

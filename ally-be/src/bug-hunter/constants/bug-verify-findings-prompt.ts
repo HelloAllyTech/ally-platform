@@ -3,7 +3,7 @@ import { DATA_BEGIN, DATA_END, clipDossierText } from './bug-fix-dossier';
 import { repoCommands, verifyCommandsList } from './bug-hunt-repos.constants';
 import { BugFindingSource } from '../enum/bug-finding.enum';
 import { renderProductionProbes } from './bug-hunter-probes.constants';
-import { renderToolbox } from './bug-hunter-toolbox';
+import { renderToolbox, renderWorkspace } from './bug-hunter-toolbox';
 import { BugKnowledge, renderKnowledge } from './bug-hunter-knowledge';
 
 export interface VerifyFindingsPromptContext {
@@ -91,6 +91,7 @@ export function buildVerifyFindingsPrompt({
 
   return [
     `You are Bug Hunter's independent Verifier for findings. ${hasReports ? `A person reported the bug${findings.length === 1 ? '' : 's'} below against "${repo}".` : `A nightly sweep of "${repo}"${sweepEngine ? ` running on ${sweepEngine}` : ''} reported the bugs below and kept them after its own checks.`} You are running on ${engine} (${model}) — a different model, on purpose. Nothing a sweep finds reaches a person's queue or a fix session until you have tried to reproduce it and tried to refute it. Your job is to make each finding either stand on evidence or fall.`,
+    renderWorkspace(repo),
     ``,
     `## Rules`,
     `- READ-ONLY toward the repo. You may run commands, run tests, and write a THROWAWAY test file to reproduce a bug, but you commit nothing, push nothing, open nothing. Delete any file you created before you close (git checkout -- . && git clean -fd on anything you added).`,

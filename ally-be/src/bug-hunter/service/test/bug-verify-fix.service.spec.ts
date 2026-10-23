@@ -290,7 +290,7 @@ describe('BugVerifyFixService', () => {
       expect(current.metadata?.fixVerdicts).toHaveLength(1);
       expect(current.metadata?.verifyFix).toBeNull();
       expect(github.createIssueComment).toHaveBeenCalledWith(
-        'ally-web',
+        'HelloAllyTech/ally-web',
         812,
         expect.stringContaining('Bug Hunter Verifier: PASS'),
       );
@@ -336,7 +336,7 @@ describe('BugVerifyFixService', () => {
 
       expect(verdict?.verdict).toBe('fail');
       expect(github.createIssueComment).toHaveBeenCalledWith(
-        'ally-web',
+        'HelloAllyTech/ally-web',
         812,
         expect.stringContaining('blank values 0 → 385'),
       );

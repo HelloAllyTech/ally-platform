@@ -38,6 +38,12 @@ describe('buildSweepPrompt', () => {
     );
   });
 
+  it("reads only this service's commits in the monorepo, and says where it is (2026-10-23)", () => {
+    const p = build({ repo: 'ally-web' });
+    expect(p).toContain(`git log --since='1 day ago' -- .`);
+    expect(p).toContain('your working directory is its "ally-web/" folder');
+  });
+
   it('embeds that repo’s own test and lint commands', () => {
     expect(build({ repo: 'ally-ai' })).toContain('poetry run pytest');
     expect(build({ repo: 'ally-be' })).toContain('npm test');

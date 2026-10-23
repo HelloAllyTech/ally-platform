@@ -33,6 +33,9 @@
 #   ALLY_BE_API_URL    — base URL of ally-be, e.g. https://api.example.com
 
 name: Bug Hunter — Fix Session
+# The finding id is in the title: one workflow serves every service, and ally-be
+# finds a session's run by it.
+run-name: "Bug Hunter — ${{ inputs.mode || 'fix' }} · ${{ inputs.repo }} · ${{ inputs.finding_id }}"
 
 permissions:
   contents: write
@@ -81,11 +84,12 @@ jobs:
     # Generous but bounded: the protocol includes a 20-minute wait for an admin
     # to answer an escalated product question, on top of a full test suite run.
     timeout-minutes: 60
+    env:
+      # The service folder this session works in (ally-be, ally-web, …).
+      SERVICE: ${{ inputs.repo }}
 
     steps:
       - name: Checkout master
-      env:
-        TARGET_REPO: ${{ inputs.repo || 'ally-be' }}
         uses: actions/checkout@v4
         with:
           ref: master
@@ -93,16 +97,39 @@ jobs:
           token: ${{ secrets.BUG_HUNTER_GH_TOKEN }}
 
       - name: Setup Node.js
+        if: env.SERVICE == 'ally-be' || env.SERVICE == 'ally-web' || env.SERVICE == 'ally-mobile'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.SERVICE == 'ally-be' && '24' || '22' }}
+          cache: "npm"
+          cache-dependency-path: ${{ env.SERVICE }}/package-lock.json
+
+      - name: Setup Python
+        if: env.SERVICE == 'ally-ai' || env.SERVICE == 'ally-ai-learn'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        if: env.SERVICE == 'ally-ai' || env.SERVICE == 'ally-ai-learn'
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Setup Node.js for the coding engine
+        if: env.SERVICE == 'ally-ai' || env.SERVICE == 'ally-ai-learn'
         uses: actions/setup-node@v4
         with:
           node-version: "24"
-          cache: "npm"
-          cache-dependency-path: ally-be/package-lock.json
 
       - name: Install dependencies
-        working-directory: ${{ inputs.repo || 'ally-be' }}
+        working-directory: ${{ env.SERVICE }}
+        env:
+          NX_NO_CLOUD: "true"
         run: |
-          if [ -f package-lock.json ]; then npm ci; elif [ -f poetry.lock ]; then pip install poetry && poetry install --no-interaction; fi
+          if [ -f package-lock.json ]; then npm ci; elif [ -f poetry.lock ]; then poetry install --no-interaction --with dev; fi
 
       - name: Configure git identity
         run: |
@@ -180,7 +207,7 @@ jobs:
             }
             mkdir -p ~/.config/opencode/agents
             for agent in bug-verifier bug-escalation; do
-              src=".claude/agents/${agent}.md"
+              src="$SERVICE/.claude/agents/${agent}.md"
               desc=$(awk '/^description:/ { sub(/^description: */, ""); print; exit }' "$src")
               body=$(awk 'BEGIN { n = 0 } /^---$/ && n < 2 { n++; next } n >= 2 { print }' "$src")
               if [ "$agent" = "bug-verifier" ]; then
@@ -221,32 +248,23 @@ jobs:
             exit 1
           fi
 
-      - name: Check out the other Ally repos, read-only
-        env:
-          GH_TOKEN: ${{ secrets.BUG_HUNTER_GH_TOKEN }}
+      - name: Link the other services, read-only
         run: |
           set -uo pipefail
           # The fix belongs where the fault is, and the fault is often in
-          # another repo: on 2026-10-12 a session "fixed" untranslated titles
-          # in the frontend because it could not see that the backend never
-          # generated them. Every other Ally repo is cloned at its default
-          # branch under /tmp/siblings/<repo> for the agent to READ with
-          # shell tools. Outside the workspace so nothing here is ever
-          # committed or linted; .git removed so no token is left on disk;
-          # write permission dropped. A repo that cannot be fetched is a
-          # warning, never a failure: the protocol tells the agent to say so.
+          # another service (2026-10-12: untranslated titles "fixed" in the
+          # frontend while the backend never generated them). Since the
+          # 2026-10-23 monorepo cutover every service is already in this
+          # checkout, at today's master; /tmp/siblings/<service> links to each
+          # one other than the service being worked on, so the protocol's
+          # paths stay the same. They are for READING: a change in another
+          # service's folder fails the PR's path check unless it is a step of
+          # a cross-service plan.
           mkdir -p /tmp/siblings
           for r in ally-be ally-web ally-mobile ally-ai ally-ai-learn; do
-            [ "$r" = "${GITHUB_REPOSITORY##*/}" ] && continue
-            if git clone --quiet --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/HelloAllyTech/$r.git" "/tmp/siblings/$r" 2>/dev/null; then
-              rm -rf "/tmp/siblings/$r/.git"
-              echo "sibling $r ready"
-            else
-              rm -rf "/tmp/siblings/$r"
-              echo "::warning::Could not clone $r; the session continues without it."
-            fi
+            [ "$r" = "$SERVICE" ] && continue
+            ln -s "$GITHUB_WORKSPACE/$r" "/tmp/siblings/$r" && echo "sibling $r linked"
           done
-          chmod -R a-w /tmp/siblings 2>/dev/null || true
 
       - name: Persist credentials to disk for the agent's own shell
         env:
@@ -302,6 +320,9 @@ jobs:
           ALLY_BE_API_KEY: ${{ secrets.ALLY_BE_API_KEY }}
         run: |
           set -uo pipefail
+          # The monorepo holds every service; this one's commands, CLAUDE.md
+          # and paths are relative to its folder.
+          cd "$GITHUB_WORKSPACE/$SERVICE"
 
           # ── Engine supervisor ──────────────────────────────────────────
           # Runs the engine in the background and stops it when EITHER the

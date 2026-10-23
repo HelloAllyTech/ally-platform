@@ -1,5 +1,6 @@
 import { BugHunterFeatureMap } from '../entity/bug-hunter-feature-map.entity';
 import { BUG_FIX_SESSION_REPOS } from './bug-fix-session.constants';
+import { renderWorkspace } from './bug-hunter-toolbox';
 
 export interface FeatureMapPromptContext {
   repo: string;
@@ -58,6 +59,7 @@ export function buildFeatureMapPrompt({
 
   return [
     `You are mapping the "${repo}" repo for Bug Hunter, read-only. Bug Hunter's fix sessions start cold in one repo and have guessed wrong about how a feature works — on 2026-10-12 one "fixed" untranslated simulation titles in the frontend while the backend never generated them. Your cards are what the next study reads first. Do NOT edit, commit or push anything; this run only reads and posts.`,
+    renderWorkspace(repo),
     ``,
     `## What to map`,
     `Values a user sees or changes: a learner, trainer or admin on a screen, in a flow, or in the output of a job. Not utilities, not build tooling. Read this repo's CLAUDE.md and the docs it routes to first.`,

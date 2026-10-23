@@ -501,3 +501,118 @@ describe('GithubActionsService.getPullRequest', () => {
     expect(fork).toMatchObject({ headRef: 'feature', headIsFork: true });
   });
 });
+
+describe('GithubActionsService in the monorepo (2026-10-23 cutover)', () => {
+  let service: GithubActionsService;
+  const configService = {
+    githubToken: 'gh-token',
+    githubOrg: 'HelloAllyTech',
+    githubMonorepo: 'ally-platform',
+  } as unknown as AppConfigService;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    service = new GithubActionsService(configService);
+  });
+
+  it('addresses a service name to the monorepo, and a full owner/name as itself', () => {
+    expect(service.fullRepo('ally-be')).toBe('HelloAllyTech/ally-platform');
+    expect(service.fullRepo('ally-web')).toBe('HelloAllyTech/ally-platform');
+    // A PR on an archived repo is read where it lives, not as ally-platform #<n>.
+    expect(service.fullRepo('HelloAllyTech/ally-be')).toBe(
+      'HelloAllyTech/ally-be',
+    );
+    expect(service.fullRepo('infra')).toBe('HelloAllyTech/infra');
+    expect(service.servicePath('ally-ai-learn')).toBe('ally-ai-learn/');
+    expect(service.servicePath('HelloAllyTech/ally-be')).toBeNull();
+  });
+
+  it("counts only the commits that touch the service's folder", async () => {
+    mockedAxios.get.mockResolvedValue({ data: [{ sha: 'abc' }] });
+    await service.hasCommitsSince('ally-web', new Date('2026-10-23T00:00:00Z'));
+    expect(mockedAxios.get).toHaveBeenCalledWith(
+      'https://api.github.com/repos/HelloAllyTech/ally-platform/commits',
+      expect.objectContaining({
+        params: expect.objectContaining({ path: 'ally-web/', sha: 'master' }),
+      }),
+    );
+  });
+
+  it("finds a session's run by the id in its title, not just the newest run of the shared workflow", async () => {
+    mockedAxios.get.mockResolvedValue({
+      data: {
+        workflow_runs: [
+          {
+            id: 1,
+            html_url: 'u1',
+            status: 'in_progress',
+            conclusion: null,
+            created_at: '2026-10-23T10:00:01Z',
+            display_title: 'Bug Hunter — fix · ally-web · other-finding',
+          },
+          {
+            id: 2,
+            html_url: 'u2',
+            status: 'in_progress',
+            conclusion: null,
+            created_at: '2026-10-23T10:00:02Z',
+            display_title: 'Bug Hunter — fix · ally-be · finding-1',
+          },
+        ],
+      },
+    });
+    const run = await service.findRunSince({
+      repo: 'ally-be',
+      workflow: 'bug-fix-session.yml',
+      since: new Date('2026-10-23T10:00:00Z'),
+      titleIncludes: 'finding-1',
+    });
+    expect(run?.id).toBe('2');
+  });
+
+  it('keeps only the open PRs whose files sit mostly in the service folder', async () => {
+    mockedAxios.get.mockImplementation((url: string) => {
+      if (url.endsWith('/pulls')) {
+        return Promise.resolve({
+          data: [
+            { number: 10, head: { sha: 'a' }, html_url: 'p10' },
+            { number: 11, head: { sha: 'b' }, html_url: 'p11' },
+          ],
+        });
+      }
+      if (url.endsWith('/pulls/10/files')) {
+        return Promise.resolve({
+          data: [
+            { filename: 'ally-be/src/a.ts' },
+            { filename: 'ally-be/src/b.ts' },
+            { filename: 'ally-web/x.ts' },
+          ],
+        });
+      }
+      if (url.endsWith('/pulls/11/files')) {
+        return Promise.resolve({ data: [{ filename: 'ally-web/apps/x.tsx' }] });
+      }
+      return Promise.resolve({ data: [] });
+    });
+    const prs = await service.listPullRequests('ally-be');
+    expect(prs?.map((p) => p.number)).toEqual([10]);
+    expect(await service.serviceOfPullRequest(11, 'b')).toBe('ally-web');
+  });
+
+  it('says when a PR sits on an archived repo', async () => {
+    mockedAxios.get.mockResolvedValue({
+      data: {
+        state: 'open',
+        merged: false,
+        head: { sha: 'h' },
+        base: { repo: { archived: true, full_name: 'HelloAllyTech/ally-be' } },
+      },
+    });
+    const pr = await service.getPullRequest('HelloAllyTech/ally-be', 704);
+    expect(mockedAxios.get).toHaveBeenCalledWith(
+      'https://api.github.com/repos/HelloAllyTech/ally-be/pulls/704',
+      expect.anything(),
+    );
+    expect(pr?.baseRepoArchived).toBe(true);
+  });
+});

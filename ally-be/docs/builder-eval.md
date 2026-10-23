@@ -57,13 +57,20 @@ The **gates** are deterministic counts of failures the interview has really ship
 | `askedBeforeReading` | batches that ended the turn while research results were unread |
 | `unrepairedEditFailures` | PRD edits (`update_prd` or an edit-by-id tool) that failed with no successful edit after them in the turn |
 | `falseUpdateClaims` | turns whose reply claims a PRD change while no edit succeeded |
+| `falseReadyClaims` | replies that told the admin the PRD was ready, or to start the build, while that turn settled not ready — unless the server added what is left beneath them. Absent on runs scored before it existed |
+| `consistent` | the final PRD's test-plan, requirement-home and mobile-twin readiness rows |
+| `evidenceCited` | What already exists rests on files the replay read |
 
 Only a reply that reached the admin counts. With validated turns on, a reply batched with an
 unread lookup or a failed call is sent back to the model instead of shown (its result says
 `delivered: false`), so that batch hid nothing from anyone. `questions` counts questions
 delivered, not `ask_admin` calls made.
-| `consistent` | the final PRD's test-plan, requirement-home and mobile-twin readiness rows |
-| `evidenceCited` | What already exists rests on files the replay read |
+
+`readinessScore` is the share of the final PRD's "is this written" rows that pass, so 100 does
+not mean ready: open questions, unconfirmed assumptions, review findings and the cross-section
+checks only ever block. `readyAtEnd` and `blockersAtEnd` (row key and label) say what held a
+run back. Each transcript turn records `ready`, the readiness that turn settled on, and
+`readyClaimCorrected` when the server had to say what was left under a reply.
 
 A run **passes** when every gate is clean, the simulated admin never corrected Builder, the
 PRD reached ready, and every checklist item is met.
@@ -101,13 +108,15 @@ settings, or both. The flow:
    only, so nothing live reads it.
 2. The result is compared with a baseline on the live settings. A baseline is reused if it
    covers the same fixtures, is under 7 days old, overrode no prompt or model, ran the
-   same interview loop, and started after every one of those fixtures was last edited;
-   otherwise one is run alongside on that loop. A baseline from the other loop would credit
-   or blame the prompt for what the loop did, and one from before an edit (`PATCH`, or an
-   import that matched by name) scored a checklist or script that has since changed; when an
-   edit is why a fresh baseline ran, the verdict names the fixture and when it was edited. To keep
-   old suites readable against the truth they were scored on, re-cut a fixture under a new
-   name and switch the old one off rather than editing it in place.
+   same interview loop, was scored under the current `BUILDER_EVAL_SCORING_VERSION`
+   (recorded in its summary), and started after every one of those fixtures was last edited;
+   otherwise one is run alongside on that loop. A baseline from the other loop, or from before
+   a gate existed, would credit or blame the prompt for what changed around it. Bump the
+   version with any change to what a suite measures. A baseline from before a fixture edit
+   (`PATCH`, or an import that matched by name) scored a checklist or script that has since
+   changed; when an edit is why a fresh baseline ran, the verdict names the fixture and when it
+   was edited. To keep old suites readable against the truth they were scored on, re-cut a
+   fixture under a new name and switch the old one off rather than editing it in place.
 3. The candidate passes when nothing got measurably worse:
    - gate violations and corrections did not rise;
    - the checklist score did not fall more than 0.05;

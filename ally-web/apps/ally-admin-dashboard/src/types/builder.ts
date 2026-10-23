@@ -987,6 +987,8 @@ export interface BuilderEvalGates {
   askedBeforeReading: number;
   unrepairedEditFailures: number;
   falseUpdateClaims: number;
+  /** Replies that told the admin "ready" while readiness said no. Absent on runs scored before it. */
+  falseReadyClaims?: number;
   consistent: boolean;
   evidenceCited: boolean;
 }
@@ -997,7 +999,12 @@ export interface BuilderEvalMetrics {
   corrections: number;
   correctedItems: string[];
   readyReached: boolean;
+  /** Share of the PRD's "is this written" rows that pass — 100 can still be not ready. */
   readinessScore: number;
+  /** Absent on runs from before it was recorded. */
+  readyAtEnd?: boolean;
+  /** The readiness rows the final PRD failed. */
+  blockersAtEnd?: { key: string; label: string }[];
   toolCalls: number;
   toolFailures: number;
   costUsd: number;

@@ -1,6 +1,7 @@
 import { repoCommands, verifyCommandsList } from './bug-hunt-repos.constants';
 import { DATA_BEGIN, DATA_END, clipDossierText } from './bug-fix-dossier';
 import { PrReviewTarget } from '../type/bug-hunter-pr-review.type';
+import { renderWorkspace } from './bug-hunter-toolbox';
 
 export interface PrReviewPromptContext {
   repo: string;
@@ -48,6 +49,7 @@ export function buildPrReviewPrompt({
 
   return [
     `You are Bug Hunter, reviewing pull request #${pr.number} on "${repo}" while it is still open. The PR's head (${pr.headSha.slice(0, 7)}) is checked out in your current working directory; its base is ${pr.baseRef}. Read this repo's CLAUDE.md first.`,
+    renderWorkspace(repo),
     ``,
     `## Rules`,
     `- READ-ONLY toward the repo and SILENT toward the PR. You commit nothing, push nothing, comment nothing. You file findings with Bug Hunter, an independent Verifier judges them, and only a confirmed finding reaches the PR as a review comment, written by Bug Hunter — not by you.`,
@@ -62,7 +64,7 @@ export function buildPrReviewPrompt({
     DATA_END,
     ``,
     `## What to check, in order`,
-    `1. The diff. Run "git diff ${pr.baseRef}...HEAD --stat" then read every hunk ("git diff ${pr.baseRef}...HEAD"). For each hunk ask whether the PR's description requires it. A hunk that changes behaviour or data the description does not mention is a finding (severity low unless it changes data); a rename or reformat is not, unless it hides a behaviour change.`,
+    `1. The diff. Run "git diff ${pr.baseRef}...HEAD --stat -- .." to see every service the PR touches, then read every hunk ("git diff ${pr.baseRef}...HEAD -- .."). Review the hunks in this service's folder; for hunks in another service's folder, note them and judge them only for whether they fit this PR's description. For each hunk ask whether the PR's description requires it. A hunk that changes behaviour or data the description does not mention is a finding (severity low unless it changes data); a rename or reformat is not, unless it hides a behaviour change.`,
     `2. Tests, lint and types. Run ${verifyCommandsList(commands)}. A failure that the base commit does not have (check with "git stash; git checkout ${pr.baseRef}" only if you must; prefer running the single failing test on both) is a PROVEN finding: proven=true, severity high, evidence is the failing output.`,
     `3. Blast radius. For every exported function, class, component or route the diff changes, "git grep -n <symbol>" its callers and read whether the change holds for each. A caller the change breaks is a finding with that caller as the file.`,
     `4. Data files. If the diff touches JSON, YAML, CSV, locale files, seeds, snapshots, migrations or generated files, count what matters before and after (keys, rows, blank values) with a command.${isFrontend ? ' Locale files: "node scripts/i18n-parity.mjs" is the count — run it and quote it.' : ''} A migration without a down, a locale file that loses keys or gains blanks, a seed that changes ids: findings.`,

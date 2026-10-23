@@ -4,7 +4,11 @@ import { GithubActionsService } from 'src/github/service/github-actions.service'
 import { LoggerService } from 'src/logger/logger.service';
 
 import { repoCommands } from '../constants/bug-hunt-repos.constants';
-import { prNumberFrom, repoFromPrUrl } from './bug-hunter-policy.service';
+import {
+  prNumberFrom,
+  prRepoOf,
+  repoFromPrUrl,
+} from './bug-hunter-policy.service';
 import { BUG_HUNT_LOW_CONFIDENCE_THRESHOLD } from '../constants/bug-hunter.constants';
 import { BugFinding } from '../entity/bug-finding.entity';
 import { faultLocationOf, isDataFault } from '../type/bug-finding-verdict.type';
@@ -98,6 +102,9 @@ export class BugHunterOrchestratorService {
         if (!prRepo || !prNumber) continue;
         const pr = await this.github.getPullRequest(prRepo, prNumber);
         if (!pr || pr.merged || pr.state !== 'open' || !pr.headSha) continue;
+        // A PR on a repo archived by the monorepo cutover is frozen: no session
+        // can push to it. The PR reconcile frees its bug instead.
+        if (pr.baseRepoArchived) continue;
 
         if (pr.mergeableState === 'dirty') {
           const seen = finding.metadata?.prConflict as
@@ -267,7 +274,11 @@ export class BugHunterOrchestratorService {
     let excerpts: Record<string, string> = {};
     try {
       excerpts = finding.repo
-        ? await this.github.failedCheckExcerpts(finding.repo, headSha, 1_500)
+        ? await this.github.failedCheckExcerpts(
+            prRepoOf(finding),
+            headSha,
+            1_500,
+          )
         : {};
     } catch (error) {
       this.warn('CI excerpts', finding.id, error);

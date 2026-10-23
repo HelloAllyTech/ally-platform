@@ -5,7 +5,7 @@ import { repoCommands, verifyCommandsList } from './bug-hunt-repos.constants';
 import { BUG_FIX_VERDICT_REQUIRED_CHECKS } from '../type/bug-fix-verdict.type';
 import { renderBugFixStudyLines } from '../type/bug-fix-study.type';
 import { faultLocationOf } from '../type/bug-finding-verdict.type';
-import { renderToolbox } from './bug-hunter-toolbox';
+import { renderToolbox, renderWorkspace } from './bug-hunter-toolbox';
 
 export interface VerifyFixPromptContext {
   finding: BugFinding;
@@ -78,6 +78,7 @@ export function buildVerifyFixPrompt({
 
   return [
     `You are Bug Hunter's Verifier. A fix for one bug has been opened as a pull request in "${repo}" by a fix session${fixEngine ? ` running on ${fixEngine}` : ''}. You are running on ${engine} (${model}) — a different model, on purpose: you are the second opinion. Your job is to decide whether this PR fixes the bug it claims to fix, does nothing else, and is safe to merge. You do not fix anything, and you do not merge anything. You read, run, measure, and report.`,
+    renderWorkspace(repo),
     ``,
     `## Rules`,
     `- READ-ONLY. Do not edit, commit, push, comment on or merge anything. You may check out branches and run commands that produce no commits. If you catch yourself about to change a file, stop.`,

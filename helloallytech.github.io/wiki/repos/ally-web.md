@@ -13,7 +13,7 @@ last_reconciled: 2026-09-22
 
 - A **Helpline Dashboard** (`ally-helpline-dashboard`) for mental health counselors — real-time chat, appointment scheduling, case management, analytics, and LiveKit voice sessions. Roleplays can also run as a **text chat** where the learner's org and the roleplay both allow it: a Voice call / Text chat picker on the scenario page and track player, and the same `SimulationPage` (ui-shared) with the call card swapped for a chat panel that talks over LiveKit text streams.
 - An **Admin Dashboard** (`ally-admin-dashboard`) for super admins — simulation/scenario management, session-event configuration, user/tenant/permission management, LiveKit simulation preview, and simulation-credit monitoring.
-- A **shared UI library** (`libs/ui-shared`) with reusable components, utilities, feature flags, and a logger.
+- A **shared UI library** (`libs/ui-shared`) with reusable components, utilities, feature flags, a logger, and the PostHog analytics layer (`lib/analytics`: `initAnalytics`, `AnalyticsProvider`, `useAnalytics`, the event constants) that both dashboards share.
 
 The applications integrate with the `ally-be` backend (REST + Socket.IO) and with LiveKit for real-time voice/video.
 
@@ -56,7 +56,7 @@ ally-web/
 │   ├── ally-helpline-dashboard/   # Counselor dashboard — Vite+React, port 8080
 │   └── ally-admin-dashboard/      # Admin dashboard — Vite+React, port 8081
 ├── libs/
-│   └── ui-shared/                 # Shared components, feature flags, logger (@ally-ui-mono/ui-shared)
+│   └── ui-shared/                 # Shared components, feature flags, logger, analytics (@ally-ui-mono/ui-shared)
 ├── docs/                          # Guides (PostHog, Colima, prompt meta)
 ├── scripts/                       # docker-switch.sh, i18n-sync.mjs
 ├── compose.yaml / compose.test.yaml
