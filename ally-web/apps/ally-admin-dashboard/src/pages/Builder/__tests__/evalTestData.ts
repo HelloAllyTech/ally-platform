@@ -45,6 +45,7 @@ export const gatesWith = (overrides: Partial<NonNullable<BuilderEvalRun["gates"]
   askedBeforeReading: 0,
   unrepairedEditFailures: 0,
   falseUpdateClaims: 0,
+  falseReadyClaims: 0,
   consistent: true,
   evidenceCited: true,
   ...overrides,
