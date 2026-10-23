@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -156,8 +156,28 @@ export const BuilderSettings: React.FC = () => {
   // Auto is the one level that ships to users unasked, so choosing it — from
   // the selector or the suggestion — goes through a confirmation first.
   const [confirmAuto, setConfirmAuto] = useState<null | "pick" | "apply">(null);
+  // Turning Builder on lets it start writing code, so with no Save in between
+  // it gets a confirmation; turning it off never waits.
+  const [confirmEnable, setConfirmEnable] = useState(false);
+  // Set while an instant switch is saving: the refetch that follows then
+  // updates the switches only, so edits still waiting on Save survive it.
+  const syncSwitchesOnly = useRef(false);
 
   useEffect(() => {
+    if (data && syncSwitchesOnly.current) {
+      syncSwitchesOnly.current = false;
+      setDraft(current =>
+        current
+          ? {
+              ...current,
+              enabled: data.enabled,
+              validatedTurns: data.validatedTurns,
+              situationBrief: data.situationBrief,
+            }
+          : current,
+      );
+      return;
+    }
     if (data) {
       setLevel(
         data.autonomyLevel ??
@@ -218,15 +238,39 @@ export const BuilderSettings: React.FC = () => {
     }
   };
 
+  /**
+   * The three switches at the top save the moment they're flipped. They are
+   * the ones reached for in an incident, and an eval suite stamps whatever is
+   * live when it starts, so a switch that shows off while the server still has
+   * it on (waiting on a Save at the bottom of the page) gives the wrong answer
+   * twice. A failed save puts the switch back where the server has it.
+   */
+  const applySwitch = async (
+    key: "enabled" | "validatedTurns" | "situationBrief",
+    label: string,
+    value: boolean,
+  ) => {
+    if (!draft) return;
+    const previous = Boolean(draft[key]);
+    set(key, value);
+    syncSwitchesOnly.current = true;
+    try {
+      await updateSettings({ [key]: value }).unwrap();
+      toast.success(strings.switchApplied(label, value));
+    } catch {
+      syncSwitchesOnly.current = false;
+      set(key, previous);
+      toast.error(strings.switchFailed(label, previous));
+    }
+  };
+
   const handleSave = async () => {
     if (!draft) return;
     try {
       await updateSettings({
-        enabled: draft.enabled,
-        // Undefined only when the server does not know the field yet (the toggle is not shown
-        // then): left alone, because a server that predates it would reject the unknown key.
-        ...(draft.validatedTurns !== undefined ? { validatedTurns: draft.validatedTurns } : {}),
-        ...(draft.situationBrief !== undefined ? { situationBrief: draft.situationBrief } : {}),
+        // enabled, validatedTurns and situationBrief are not sent: they saved
+        // when flipped (applySwitch), and sending them again could undo a
+        // change made in another tab since this page loaded.
         // A picked level is sent as the level, and the server sets the
         // switches from it; otherwise the switches go as they stand.
         ...(levelPicked && level !== "custom"
@@ -288,7 +332,12 @@ export const BuilderSettings: React.FC = () => {
               labelText={strings.enabledLabel}
               size="sm"
               toggled={draft.enabled}
-              onToggle={(checked: boolean) => set("enabled", checked)}
+              disabled={isSaving}
+              onToggle={(checked: boolean) =>
+                checked
+                  ? setConfirmEnable(true)
+                  : void applySwitch("enabled", strings.enabledLabel, false)
+              }
             />
             <p className="pt-1 text-xs text-typography-500">{strings.enabledHelp}</p>
           </section>
@@ -306,7 +355,10 @@ export const BuilderSettings: React.FC = () => {
                 labelText={strings.validatedTurnsLabel}
                 size="sm"
                 toggled={draft.validatedTurns}
-                onToggle={(checked: boolean) => set("validatedTurns", checked)}
+                disabled={isSaving}
+                onToggle={(checked: boolean) =>
+                  void applySwitch("validatedTurns", strings.validatedTurnsLabel, checked)
+                }
               />
               <p className="pt-1 text-xs text-typography-500">{strings.validatedTurnsHelp}</p>
               {/* The protocol rides on validated turns, so it sits under them and goes grey
@@ -318,14 +370,17 @@ export const BuilderSettings: React.FC = () => {
                     labelText={strings.situationBriefLabel}
                     size="sm"
                     toggled={draft.situationBrief}
-                    disabled={!draft.validatedTurns}
-                    onToggle={(checked: boolean) => set("situationBrief", checked)}
+                    disabled={!draft.validatedTurns || isSaving}
+                    onToggle={(checked: boolean) =>
+                      void applySwitch("situationBrief", strings.situationBriefLabel, checked)
+                    }
                   />
                   <p className="pt-1 text-xs text-typography-500">{strings.situationBriefHelp}</p>
                 </div>
               )}
             </section>
           )}
+          <p className="-mt-3 text-xs text-typography-500">{strings.switchesApplyNow}</p>
 
           {/* One control for how much Builder does on its own, ordered by how
               much it lets go of. Stacks, "Design autonomy sliders to build user
@@ -728,6 +783,20 @@ export const BuilderSettings: React.FC = () => {
           },
         }}
         secondaryButton={{ label: autonomy.cancel, onClick: () => setConfirmAuto(null) }}
+      />
+      <ActionConfirmationPopup
+        isOpen={confirmEnable}
+        onClose={() => setConfirmEnable(false)}
+        title={strings.confirmEnableTitle}
+        description={strings.confirmEnableBody}
+        primaryButton={{
+          label: strings.confirmEnableAction,
+          onClick: () => {
+            setConfirmEnable(false);
+            void applySwitch("enabled", strings.enabledLabel, true);
+          },
+        }}
+        secondaryButton={{ label: autonomy.cancel, onClick: () => setConfirmEnable(false) }}
       />
     </div>
   );
