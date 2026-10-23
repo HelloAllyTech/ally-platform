@@ -388,6 +388,86 @@ describe('DynamicI18nService', () => {
     expect(secondRun).toBeNull();
   });
 
+  it('ciSync replaces a draft that merely echoes the English value when the repo has a real translation', async () => {
+    // Seeding debris found in production 2026-10-22: the hi/mr/ta/kn drafts
+    // held the literal English "Read"/"Unread" for review.filter.* while the
+    // repo bundles had carried real translations since June.
+    await writeJson(path.join(rootDir, '.drafts', 'hi.json'), {
+      review: {
+        filter: { all: 'सभी', read: 'Read', unread: 'Unread' },
+        // A deliberate English-looking translation must survive: repo agrees
+        // with English here, so it is not drift.
+        sort: { ok: 'OK' },
+      },
+    });
+
+    const manifest = await service.ciSync({
+      en: {
+        review: {
+          filter: { all: 'All', read: 'Read', unread: 'Unread' },
+          sort: { ok: 'OK' },
+        },
+      },
+      hi: {
+        review: {
+          filter: { all: 'सभी', read: 'पढ़े हुए', unread: 'अपठित' },
+          sort: { ok: 'OK' },
+        },
+      },
+    });
+
+    expect(manifest).toMatchObject({ currentVersion: 'v1' });
+    const draft = await readJson<{
+      review: {
+        filter: { all: string; read: string; unread: string };
+        sort: { ok: string };
+      };
+    }>(path.join(rootDir, '.drafts', 'hi.json'));
+    expect(draft.review.filter.read).toBe('पढ़े हुए');
+    expect(draft.review.filter.unread).toBe('अपठित');
+    expect(draft.review.filter.all).toBe('सभी');
+    expect(draft.review.sort.ok).toBe('OK');
+
+    // English itself never gets "repaired", and a healed draft is a no-op.
+    const secondRun = await service.ciSync({
+      en: {
+        review: {
+          filter: { all: 'All', read: 'Read', unread: 'Unread' },
+          sort: { ok: 'OK' },
+        },
+      },
+      hi: {
+        review: {
+          filter: { all: 'सभी', read: 'पढ़े हुए', unread: 'अपठित' },
+          sort: { ok: 'OK' },
+        },
+      },
+    });
+    expect(secondRun).toBeNull();
+  });
+
+  it('ciSync repairs English-squatting from a single-language request using the stored en draft', async () => {
+    // The release pipeline posts one language per ci-sync request, so the
+    // English reference must come from the drafts, not the payload.
+    await writeJson(path.join(rootDir, '.drafts', 'en.json'), {
+      review: { filter: { read: 'Read', unread: 'Unread' } },
+    });
+    await writeJson(path.join(rootDir, '.drafts', 'mr.json'), {
+      review: { filter: { read: 'Read', unread: 'Unread' } },
+    });
+
+    const manifest = await service.ciSync({
+      mr: { review: { filter: { read: 'वाचलेले', unread: 'न वाचलेले' } } },
+    });
+
+    expect(manifest).toMatchObject({ currentVersion: 'v1' });
+    const draft = await readJson<{
+      review: { filter: { read: string; unread: string } };
+    }>(path.join(rootDir, '.drafts', 'mr.json'));
+    expect(draft.review.filter.read).toBe('वाचलेले');
+    expect(draft.review.filter.unread).toBe('न वाचलेले');
+  });
+
   it('returns compact i18n audit log entries with resolved user names', async () => {
     const loggedAt = new Date('2026-04-29T04:31:45.000Z');
     auditLogService.listByEventTypes.mockResolvedValue([
