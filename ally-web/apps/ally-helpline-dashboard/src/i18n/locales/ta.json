@@ -62,7 +62,8 @@
     },
     "practiceAgain": "மீண்டும் பயிற்சி செய்",
     "refresh": "புதுப்பி",
-    "play": "இயக்கு"
+    "play": "இயக்கு",
+    "submit": "Submit"
   },
   "carousel": {
     "slides": {
@@ -656,6 +657,25 @@
         "coursesCompleted": "பாடங்கள் முழுமையாக முடிக்கப்பட்டன, மற்றும் அவர்கள் சேர்க்கப்பட்டுள்ள பாடங்களின் பங்காக அதனை அடிக்கோடுகளில் குறிப்பிடப்பட்டுள்ளது. அனைத்து காலத்திலும்."
       }
     },
+    "scenarioAttempts": {
+      "action": "Scenario attempts",
+      "actionTooltip": "Shows scenario quizzes this learner has started but not passed, so you can reopen their attempts after they run out.",
+      "title": "Scenario attempts: {{name}}",
+      "empty": "No scenario quizzes in progress for this learner.",
+      "errorTitle": "Couldn't load scenario attempts",
+      "errorSubtitle": "There was a problem fetching the data.",
+      "attemptsUsed": "{{used}} of {{max}} attempts used",
+      "attemptsUncapped": "{{used}} attempts",
+      "bestScore": "Best score {{score}}",
+      "pausedUntil": "Paused until {{when}}",
+      "inProgress": "In progress",
+      "reopen": "Reopen attempts",
+      "confirm": "Reopen attempts for {{name}}? They can try {{scenario}} again straight away.",
+      "confirmButton": "Reopen attempts",
+      "cancel": "Cancel",
+      "reopenSuccess": "Attempts reopened",
+      "reopenError": "Couldn't reopen attempts. Please try again."
+    },
     "courseUsage": {
       "title": "பாடம் பயன்பாடு",
       "caption": "ஒவ்வொரு பாடத்திற்கும் ஒரு வரி — எ quais பாடங்கள் எடுத்துக்கொள்ளப்படுகிறதென்று மற்றும் கற்றுக்கொள்பவர்கள் எங்கு தடைபடுகிறார்கள் என்பதைப் பாருங்கள்.",
@@ -844,7 +864,13 @@
       },
       "replyPlaceholder": "இந்த அமர்வு பற்றி ஆலிக்கு பதிலளிக்கவும்…",
       "transcriptReferences": "பதிவு குறிப்பு",
-      "replyPrompt": "இது பற்றி ஏதேனும் கேள்வி உள்ளதா? கீழே பதிலளிக்கவும்."
+      "replyPrompt": "இது பற்றி ஏதேனும் கேள்வி உள்ளதா? கீழே பதிலளிக்கவும்.",
+      "feedback": {
+        "question": "இது உதவியாக இருந்ததா?",
+        "thankYou": "உங்கள் கருத்துக்கு நன்றி!",
+        "commentPlaceholder": "உங்களுக்கு எது பிடித்தது அல்லது பிடிக்கவில்லை? (விருப்பத்திற்குரியது)",
+        "saveFailed": "மன்னிக்கவும், உங்கள் கருத்தைச் சேமிக்க முடியவில்லை."
+      }
     }
   },
   "review": {
@@ -1599,6 +1625,159 @@
     "hold": "மூச்சை பிடிக்கவும்",
     "exhale": "மூச்சை வெளியிடவும்"
   },
+  "courseLanding": {
+    "documentTitle": "பாடநெறி",
+    "eyebrow": "பாடநெறி",
+    "summary_one": "{{count}} செயல்பாடு",
+    "summary_other": "{{count}} செயல்பாடுகள்",
+    "summaryWithDuration_one": "{{count}} செயல்பாடு · சுமார் {{minutes}} நிமிடங்கள்",
+    "summaryWithDuration_other": "{{count}} செயல்பாடுகள் · சுமார் {{minutes}} நிமிடங்கள்",
+    "sectionItems_one": "{{count}} செயல்பாடு",
+    "sectionItems_other": "{{count}} செயல்பாடுகள்",
+    "outlineTitle": "இந்தப் பாடநெறியில் என்ன இருக்கிறது",
+    "start": "பாடநெறியைத் தொடங்கு",
+    "loginHint": "தொடங்க நீங்கள் உள்நுழைய வேண்டும்.",
+    "logIn": "உள்நுழை",
+    "goToCourses": "என் பாடநெறிகளுக்குச் செல்",
+    "unavailable": {
+      "title": "இந்தப் பாடநெறி கிடைக்கவில்லை",
+      "body": "இணைப்பு முடக்கப்பட்டிருக்கலாம், அல்லது பாடநெறி இனி வெளியிடப்படவில்லை. இதை உங்களுடன் பகிர்ந்தவரிடம் கேளுங்கள்."
+    },
+    "denied": {
+      "toast": "இந்தப் பாடநெறி உங்கள் கணக்கிற்குக் கிடைக்கவில்லை",
+      "title": "இந்தப் பாடநெறி உங்கள் கணக்கிற்குக் கிடைக்கவில்லை",
+      "body": "இது உங்கள் நிறுவனத்திற்கோ குழுவிற்கோ வழங்கப்படவில்லை. இது உங்களுக்குக் கிடைக்க வேண்டும் என்று நினைத்தால், உங்கள் நிறுவனத்தின் நிர்வாகியிடம் கேளுங்கள்.",
+      "bodyWithEmail": "நீங்கள் {{email}} ஆக உள்நுழைந்துள்ளீர்கள். இந்தப் பாடநெறி உங்கள் நிறுவனத்திற்கோ குழுவிற்கோ வழங்கப்படவில்லை — இது உங்களுக்குக் கிடைக்க வேண்டும் என்று நினைத்தால், உங்கள் நிறுவனத்தின் நிர்வாகியிடம் கேளுங்கள்.",
+      "closedTitle": "இந்தப் பாடநெறி மூடப்பட்டுள்ளது",
+      "closedBody": "இது இனி புதிய கற்பவர்களுக்குத் திறந்திருக்கவில்லை."
+    },
+    "story": {
+      "start": "Take the case",
+      "eyebrow_one": "A case in {{count}} chapter",
+      "eyebrow_other": "A case in {{count}} chapters",
+      "durationMinutes_one": "About {{count}} min",
+      "durationMinutes_other": "About {{count}} min",
+      "durationHours_one": "About {{count}} hour",
+      "durationHours_other": "About {{count}} hours",
+      "roleplayCount_one": "{{count}} roleplay",
+      "roleplayCount_other": "{{count}} roleplays",
+      "sitting": {
+        "short": "5–10 min sittings",
+        "medium": "10–15 min sittings",
+        "long": "15–20 min sittings"
+      },
+      "firstMove": {
+        "eyebrow": "Your first move · a moment from chapter one",
+        "noScore": "No score",
+        "continue": "Continue",
+        "tryAnother": "Try another reply",
+        "loginHint": "Continue opens the login. Nothing you pick here is saved."
+      },
+      "arc": {
+        "eyebrow": "The story",
+        "title_one": "One chapter",
+        "title_other": "{{count}} chapters",
+        "curveLabel": "How the story builds, chapter by chapter, to the hard call",
+        "hardCall": "The hard call",
+        "chapterShort": "Ch. {{number}}",
+        "contentNote": "Content note"
+      },
+      "beats": {
+        "setup": "Setup",
+        "conflict": "Conflict",
+        "challenge": "Challenge",
+        "climax": "Climax",
+        "resolution": "Resolution"
+      },
+      "kinds": {
+        "game": "Game"
+      },
+      "outcomes": {
+        "title": "By the end, you'll be able to"
+      },
+      "howItPlays": {
+        "title": "How it plays",
+        "retry": "Retry any roleplay as often as you like.",
+        "debrief": "Every roleplay ends in a debrief on what you did.",
+        "keep": "Nothing you earn is ever taken away.",
+        "kinds": {
+          "roleplay": {
+            "title_one": "Roleplay",
+            "title_other": "Roleplays",
+            "hint": "Voice practice",
+            "withPersona": "Voice practice with {{name}}"
+          },
+          "case": {
+            "title_one": "Case study",
+            "title_other": "Case studies",
+            "hint": "Linked conversations"
+          },
+          "quiz": {
+            "title_one": "Quick check",
+            "title_other": "Quick checks",
+            "hint": "A few questions each"
+          },
+          "article": {
+            "title_one": "Reading",
+            "title_other": "Readings",
+            "hint": "Short and to the point"
+          },
+          "video": {
+            "title_one": "Video",
+            "title_other": "Videos",
+            "hint": "Watch and notice"
+          },
+          "journal": {
+            "title_one": "Reflection",
+            "title_other": "Reflections",
+            "hint": "In your own words"
+          },
+          "annotation": {
+            "title_one": "Transcript",
+            "title_other": "Transcripts",
+            "hint": "Mark what you notice"
+          },
+          "game": {
+            "title_one": "Game",
+            "title_other": "Games",
+            "hint": "Just for fun"
+          },
+          "scenario": {
+            "title_one": "Scenario",
+            "title_other": "Scenarios",
+            "hint": "Choose, then see what happens"
+          },
+          "bucketSort": {
+            "title_one": "பக்கெட் சார்ட்",
+            "title_other": "பக்கெட் சார்ட்",
+            "hint": "வகைப்படுத்துங்கள், பிறகு ஏன் என்று பாருங்கள்"
+          }
+        }
+      },
+      "cast": {
+        "title": "Who you'll meet",
+        "caller": "{{name}} · the caller"
+      },
+      "xp": {
+        "title": "What you'll earn",
+        "withPractice": "Up to {{xp}} XP for the activities, plus XP for every minute you practise.",
+        "activitiesOnly": "Up to {{xp}} XP for the activities.",
+        "keep": "XP counts towards your level and is never taken away."
+      },
+      "notes": {
+        "title": "Before you start",
+        "includes": "This course includes {{warnings}}.",
+        "warningWithChapters_one": "{{name}} (chapter {{chapters}})",
+        "warningWithChapters_other": "{{name}} (chapters {{chapters}})",
+        "pause": "You can pause or leave any roleplay, and you won't lose anything if you do.",
+        "listAnd": "{{rest}} and {{last}}"
+      },
+      "closing": {
+        "title": "Ready when you are",
+        "body": "Log in with your organisation account to start."
+      }
+    }
+  },
   "tracks2": {
     "breadcrumb": "கற்றுக்கொள்",
     "language": {
@@ -1667,7 +1846,11 @@
       "lines_other": "{{count}} வரிகள்",
       "labels": "{{count}} குறிச்சொல்",
       "labels_other": "{{count}} குறிச்சொற்கள்",
-      "game": "விளையாட்டு · மகிழ்ச்சிக்காக மட்டுமே"
+      "game": "விளையாட்டு · மகிழ்ச்சிக்காக மட்டுமே",
+      "branching": "Scenario quiz",
+      "bucketSort": "பக்கெட் சார்ட்",
+      "sortItems": "{{count}} உருப்படி",
+      "sortItems_other": "{{count}} உருப்படிகள்"
     },
     "continueLearning": {
       "label": "கற்றலைத் தொடர்"
@@ -1834,6 +2017,41 @@
         "notHere_other": "{{count}} தவறாக குறிக்கப்பட்டுள்ளது"
       }
     },
+    "branching": {
+      "sceneHeading": "Scene",
+      "choicesLabel": "Your choices",
+      "youChose": "You chose: {{choice}}",
+      "endingsSeen": "{{seen}} of {{total}} endings seen",
+      "takeaway": "Takeaway",
+      "scoreVsPass": "Your score: {{score}}% (pass mark {{pass}}%)",
+      "passed": "You passed.",
+      "notPassed": "Not quite there yet.",
+      "attemptsLeft": "{{count}} attempt left",
+      "attemptsLeft_other": "{{count}} attempts left",
+      "attemptsExhausted": "You've used all your attempts for now.",
+      "exhaustedHeading": "You've used all your attempts for now",
+      "newRoundIn": "A new round opens in about {{time}}. Your trainer can also open it sooner.",
+      "newRoundReady": "A new round is ready.",
+      "startNewRound": "Start a new round",
+      "startNewRoundFailed": "We couldn't open the new round. Please try again.",
+      "recapHeading": "What you reached",
+      "recapRunLabel": "Attempt {{number}}",
+      "recapScore": "Score: {{score}}%",
+      "backToCourse": "Back to course",
+      "waitHour": "{{count}} hour",
+      "waitHour_other": "{{count}} hours",
+      "waitMinute": "{{count}} minute",
+      "waitMinute_other": "{{count}} minutes",
+      "saving": "Saving your result…",
+      "continueCourse": "Continue course",
+      "tryAgain": "Try again",
+      "playAgain": "Play again",
+      "outcome": {
+        "POSITIVE": "Good outcome",
+        "MIXED": "Mixed outcome",
+        "NEGATIVE": "Difficult outcome"
+      }
+    },
     "game": {
       "frameTitle": "விளையாட்டு",
       "controlsByGame": {
@@ -1958,6 +2176,26 @@
       "deleteModeratorBody": "இது பதிவையும் அதன் அனைத்து பதில்களையும் அனைவருக்குமான முறையில் நீக்குகிறது. இதை திரும்பப் பெற முடியாது.",
       "deleteWithRepliesBody": "உங்கள் பதிவு “[ஆசிரியரால் நீக்கப்பட்டது]” என மாற்றப்படும், எனவே பதில்கள் அவற்றின் சூழ்நிலையை காப்பாற்றும். இதை திரும்பப் பெற முடியாது.",
       "deleteBody": "உங்கள் பதிவு நீக்கப்படும். இதை திரும்பப் பெற முடியாது."
+    },
+    "bucketSort": {
+      "whereDoesItGo": "இது எங்கே சேரும்?",
+      "progress": "{{total}}-இல் {{placed}} வகைப்படுத்தப்பட்டது",
+      "dragHint": "கார்டை ஒரு பக்கெட்டின் மேல் இழுக்கவும், அல்லது பக்கெட்டைத் தட்டவும்.",
+      "bucketAria": "\"{{item}}\"-ஐ {{bucket}}-இல் போடவும்",
+      "correct": "சரி!",
+      "notQuite": "சரியாக இல்லை",
+      "belongsIn": "இது {{bucket}}-இல் சேரும்.",
+      "youChose": "நீங்கள் {{bucket}}-ஐத் தேர்ந்தெடுத்தீர்கள்.",
+      "next": "அடுத்த உருப்படி",
+      "seeResults": "முடிவுகளைப் பார்க்கவும்",
+      "resultsHeading": "அனைத்தும் வகைப்படுத்தப்பட்டது",
+      "firstTry": "முதல் முயற்சியில் {{pct}}% சரி",
+      "best": "இதுவரை சிறந்தது: {{pct}}%",
+      "reviewHeading": "மீண்டும் பார்க்கத் தகுந்தவை",
+      "allRight": "ஒவ்வொரு உருப்படியும் முதல் முறையிலேயே சரியான பக்கெட்டில் சேர்ந்தது.",
+      "practiceAgain": "மீண்டும் வகைப்படுத்துங்கள்",
+      "continue": "தொடரவும்",
+      "yourItem": "வகைப்படுத்த வேண்டிய உருப்படி"
     }
   },
   "errorBoundary": {
@@ -2693,33 +2931,6 @@
       "chatsTitle": "உங்கள் திறந்த உரையாடல்கள்",
       "chatFallback": "உரையாடல்",
       "elsewhere": "உதவி சேவை அணைக்கப்பட்டிருக்கும் வரை இந்தப் பகுதி கிடைக்காது. உங்கள் திறந்த உரையாடல்களை லாபியிலிருந்து முடியுங்கள்."
-    }
-  },
-  "courseLanding": {
-    "documentTitle": "பாடநெறி",
-    "eyebrow": "பாடநெறி",
-    "summary_one": "{{count}} செயல்பாடு",
-    "summary_other": "{{count}} செயல்பாடுகள்",
-    "summaryWithDuration_one": "{{count}} செயல்பாடு · சுமார் {{minutes}} நிமிடங்கள்",
-    "summaryWithDuration_other": "{{count}} செயல்பாடுகள் · சுமார் {{minutes}} நிமிடங்கள்",
-    "sectionItems_one": "{{count}} செயல்பாடு",
-    "sectionItems_other": "{{count}} செயல்பாடுகள்",
-    "outlineTitle": "இந்தப் பாடநெறியில் என்ன இருக்கிறது",
-    "start": "பாடநெறியைத் தொடங்கு",
-    "loginHint": "தொடங்க நீங்கள் உள்நுழைய வேண்டும்.",
-    "logIn": "உள்நுழை",
-    "goToCourses": "என் பாடநெறிகளுக்குச் செல்",
-    "unavailable": {
-      "title": "இந்தப் பாடநெறி கிடைக்கவில்லை",
-      "body": "இணைப்பு முடக்கப்பட்டிருக்கலாம், அல்லது பாடநெறி இனி வெளியிடப்படவில்லை. இதை உங்களுடன் பகிர்ந்தவரிடம் கேளுங்கள்."
-    },
-    "denied": {
-      "toast": "இந்தப் பாடநெறி உங்கள் கணக்கிற்குக் கிடைக்கவில்லை",
-      "title": "இந்தப் பாடநெறி உங்கள் கணக்கிற்குக் கிடைக்கவில்லை",
-      "body": "இது உங்கள் நிறுவனத்திற்கோ குழுவிற்கோ வழங்கப்படவில்லை. இது உங்களுக்குக் கிடைக்க வேண்டும் என்று நினைத்தால், உங்கள் நிறுவனத்தின் நிர்வாகியிடம் கேளுங்கள்.",
-      "bodyWithEmail": "நீங்கள் {{email}} ஆக உள்நுழைந்துள்ளீர்கள். இந்தப் பாடநெறி உங்கள் நிறுவனத்திற்கோ குழுவிற்கோ வழங்கப்படவில்லை — இது உங்களுக்குக் கிடைக்க வேண்டும் என்று நினைத்தால், உங்கள் நிறுவனத்தின் நிர்வாகியிடம் கேளுங்கள்.",
-      "closedTitle": "இந்தப் பாடநெறி மூடப்பட்டுள்ளது",
-      "closedBody": "இது இனி புதிய கற்பவர்களுக்குத் திறந்திருக்கவில்லை."
     }
   },
   "homeV2": {
