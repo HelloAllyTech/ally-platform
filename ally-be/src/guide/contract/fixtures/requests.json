@@ -1,0 +1,17 @@
+{
+  "def": "GuideTurnRequest",
+  "valid": [
+    { "clientTurnId": "c1", "text": "Hello" },
+    { "clientTurnId": "c2", "text": "", "intent": "continue" },
+    {
+      "clientTurnId": "c3",
+      "text": "Why this?",
+      "anchor": { "itemId": "i1", "quote": "Reflecting feelings" }
+    }
+  ],
+  "invalid": [
+    { "text": "missing client turn id" },
+    { "clientTurnId": "c4", "text": "x", "intent": "skip_ahead" },
+    { "clientTurnId": "c5", "text": "x", "anchor": { "quote": "no item" } }
+  ]
+}

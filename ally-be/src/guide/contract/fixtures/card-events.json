@@ -1,0 +1,12 @@
+{
+  "def": "GuideCardEventRequest",
+  "valid": [
+    { "type": "opened" },
+    { "type": "completed_claim" },
+    { "type": "returned", "scenarioSessionId": "s1", "outcome": "aborted" }
+  ],
+  "invalid": [
+    { "type": "completed" },
+    { "type": "returned", "outcome": "passed" }
+  ]
+}

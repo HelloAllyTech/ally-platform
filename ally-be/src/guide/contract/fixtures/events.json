@@ -1,0 +1,349 @@
+{
+  "def": "GuideEvent",
+  "valid": [
+    {
+      "v": 1,
+      "seq": 1,
+      "threadId": "t1",
+      "at": "2026-10-23T10:00:00.000Z",
+      "durable": false,
+      "type": "hello",
+      "data": { "lastSeq": 0, "mode": "NORMAL", "atmosphere": "bright" }
+    },
+    {
+      "v": 1,
+      "seq": 1,
+      "threadId": "t1",
+      "at": "2026-10-23T10:00:01.000Z",
+      "durable": false,
+      "type": "turn.started",
+      "data": { "turnId": "u1", "trigger": "learner_message" }
+    },
+    {
+      "v": 1,
+      "seq": 1,
+      "threadId": "t1",
+      "at": "2026-10-23T10:00:01.100Z",
+      "durable": false,
+      "type": "assistant.delta",
+      "data": { "turnId": "u1", "messageId": "m2", "text": "Hi" }
+    },
+    {
+      "v": 1,
+      "seq": 2,
+      "threadId": "t1",
+      "at": "2026-10-23T10:00:02.000Z",
+      "durable": true,
+      "type": "assistant.message",
+      "data": {
+        "messageId": "m2",
+        "turnId": "u1",
+        "text": "Hi, I'm Ally.",
+        "channel": "text",
+        "memoryRefs": [{ "memoryId": "mem1", "label": "from Tuesday" }]
+      }
+    },
+    {
+      "v": 1,
+      "seq": 3,
+      "threadId": "t1",
+      "at": "2026-10-23T10:00:03.000Z",
+      "durable": true,
+      "type": "learner.message",
+      "data": {
+        "messageId": "m3",
+        "text": "What does this cover?",
+        "channel": "text",
+        "clientTurnId": "c1",
+        "anchor": {
+          "itemId": "i1",
+          "quote": "Reflecting feelings",
+          "timestampSec": null
+        }
+      }
+    },
+    {
+      "v": 1,
+      "seq": 4,
+      "threadId": "t1",
+      "at": "2026-10-23T10:00:04.000Z",
+      "durable": true,
+      "type": "card.presented",
+      "data": {
+        "card": {
+          "cardId": "k1",
+          "kind": "course_item",
+          "presentation": "shelf",
+          "state": "ready",
+          "title": "Reflecting feelings",
+          "framing": "This is the move Meera needs from you.",
+          "tone": "quiet",
+          "meta": { "minutes": 4, "format": "Article" },
+          "cta": { "label": "Open the article", "action": "open" },
+          "trackItem": {
+            "id": "i1",
+            "type": "ARTICLE",
+            "title": "Reflecting feelings",
+            "sectionId": "s1",
+            "sectionTitle": "Chapter 1"
+          },
+          "payload": {}
+        }
+      }
+    },
+    {
+      "v": 1,
+      "seq": 5,
+      "threadId": "t1",
+      "at": "2026-10-23T10:00:05.000Z",
+      "durable": true,
+      "type": "card.updated",
+      "data": { "cardId": "k1", "state": "done" }
+    },
+    {
+      "v": 1,
+      "seq": 6,
+      "threadId": "t1",
+      "at": "2026-10-23T10:00:06.000Z",
+      "durable": true,
+      "type": "spine.updated",
+      "data": { "currentItemId": "i2", "completedItems": 1, "totalItems": 12 }
+    },
+    {
+      "v": 1,
+      "seq": 7,
+      "threadId": "t1",
+      "at": "2026-10-23T10:00:07.000Z",
+      "durable": true,
+      "type": "scene.opened",
+      "data": {
+        "sceneId": "sc1",
+        "sectionId": "s1",
+        "title": "Chapter 1",
+        "stakes": "Meera calls again."
+      }
+    },
+    {
+      "v": 1,
+      "seq": 8,
+      "threadId": "t1",
+      "at": "2026-10-23T10:00:08.000Z",
+      "durable": true,
+      "type": "scene.closed",
+      "data": {
+        "sceneId": "sc1",
+        "sectionId": "s1",
+        "receipt": {
+          "behaviourLabels": ["Stayed with silence"],
+          "sideQuests": 1,
+          "noticing": null
+        }
+      }
+    },
+    {
+      "v": 1,
+      "seq": 9,
+      "threadId": "t1",
+      "at": "2026-10-23T10:00:09.000Z",
+      "durable": true,
+      "type": "mode.changed",
+      "data": { "mode": "CARE", "atmosphere": "hushed" }
+    },
+    {
+      "v": 1,
+      "seq": 10,
+      "threadId": "t1",
+      "at": "2026-10-23T10:00:10.000Z",
+      "durable": true,
+      "type": "crisis.response",
+      "data": {
+        "messageId": "m10",
+        "text": "(fixed crisis copy)",
+        "language": "en",
+        "lines": [
+          {
+            "name": "Tele-MANAS",
+            "phone": "14416",
+            "hours": "24x7",
+            "url": null
+          }
+        ]
+      }
+    },
+    {
+      "v": 1,
+      "seq": 11,
+      "threadId": "t1",
+      "at": "2026-10-23T10:00:11.000Z",
+      "durable": true,
+      "type": "notebook.added",
+      "data": {
+        "entryId": "n1",
+        "kind": "noticing",
+        "text": "You stayed quiet for three seconds."
+      }
+    },
+    {
+      "v": 1,
+      "seq": 12,
+      "threadId": "t1",
+      "at": "2026-10-23T10:00:12.000Z",
+      "durable": true,
+      "type": "milestone",
+      "data": {
+        "kind": "boss_complete",
+        "tone": "warm",
+        "label": "You stayed on the line."
+      }
+    },
+    {
+      "v": 1,
+      "seq": 12,
+      "threadId": "t1",
+      "at": "2026-10-23T10:00:12.100Z",
+      "durable": false,
+      "type": "presence",
+      "data": {
+        "state": "thinking",
+        "caption": "Looking at your last roleplay…"
+      }
+    },
+    {
+      "v": 1,
+      "seq": 12,
+      "threadId": "t1",
+      "at": "2026-10-23T10:00:12.200Z",
+      "durable": false,
+      "type": "shelf.open",
+      "data": { "cardId": "k1", "width": "reading" }
+    },
+    {
+      "v": 1,
+      "seq": 12,
+      "threadId": "t1",
+      "at": "2026-10-23T10:00:12.300Z",
+      "durable": false,
+      "type": "next_step",
+      "data": {
+        "hidden": false,
+        "itemId": "i2",
+        "title": "Meera's second call",
+        "minutes": 8
+      }
+    },
+    {
+      "v": 1,
+      "seq": 12,
+      "threadId": "t1",
+      "at": "2026-10-23T10:00:12.400Z",
+      "durable": false,
+      "type": "tool.activity",
+      "data": { "turnId": "u1", "label": "Looking at your progress" }
+    },
+    {
+      "v": 1,
+      "seq": 12,
+      "threadId": "t1",
+      "at": "2026-10-23T10:00:12.500Z",
+      "durable": false,
+      "type": "allowance",
+      "data": { "remaining": 2, "limit": 12 }
+    },
+    {
+      "v": 1,
+      "seq": 12,
+      "threadId": "t1",
+      "at": "2026-10-23T10:00:12.600Z",
+      "durable": false,
+      "type": "turn.completed",
+      "data": { "turnId": "u1" }
+    },
+    {
+      "v": 1,
+      "seq": 12,
+      "threadId": "t1",
+      "at": "2026-10-23T10:00:12.700Z",
+      "durable": false,
+      "type": "turn.failed",
+      "data": {
+        "turnId": null,
+        "code": "turn_in_progress",
+        "message": "Ally is replying in another tab."
+      }
+    },
+    {
+      "v": 1,
+      "seq": 12,
+      "threadId": "t1",
+      "at": "2026-10-23T10:00:27.000Z",
+      "durable": false,
+      "type": "ping",
+      "data": {}
+    }
+  ],
+  "invalid": [
+    {
+      "v": 1,
+      "seq": 1,
+      "threadId": "t1",
+      "at": "x",
+      "durable": false,
+      "type": "no.such.event",
+      "data": {}
+    },
+    {
+      "v": 2,
+      "seq": 1,
+      "threadId": "t1",
+      "at": "x",
+      "durable": false,
+      "type": "ping",
+      "data": {}
+    },
+    {
+      "v": 1,
+      "seq": 1,
+      "threadId": "t1",
+      "at": "x",
+      "durable": true,
+      "type": "mode.changed",
+      "data": { "mode": "PANIC", "atmosphere": "still" }
+    },
+    {
+      "v": 1,
+      "seq": 1,
+      "threadId": "t1",
+      "at": "x",
+      "durable": true,
+      "type": "assistant.message",
+      "data": { "messageId": "m", "turnId": "u", "text": "hi" }
+    },
+    {
+      "v": 1,
+      "seq": 1,
+      "threadId": "t1",
+      "at": "x",
+      "durable": true,
+      "type": "card.presented",
+      "data": {
+        "card": {
+          "cardId": "k",
+          "kind": "course_item",
+          "presentation": "drawer",
+          "state": "ready",
+          "title": "t"
+        }
+      }
+    },
+    {
+      "v": 1,
+      "seq": 1,
+      "threadId": "t1",
+      "at": "x",
+      "durable": false,
+      "type": "ping",
+      "data": {},
+      "extra": true
+    }
+  ]
+}

@@ -1,0 +1,760 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://helloally.ai/schemas/guide-contract.schema.json",
+  "title": "Ally guide wire contract",
+  "description": "The single source of truth for what crosses the wire between ally-be, the learner app (ally-web) and the guide voice worker (ally-ai-learn). Edit this file, then run `node scripts/guide-contract/codegen.mjs` from ally-be to regenerate the TypeScript and Python copies. Only the JSON Schema subset the generator understands may be used: object (properties / required / additionalProperties), string (enum / const / maxLength), integer, number, boolean, null, array (items), $ref to #/$defs, oneOf of objects discriminated by a `type` const, and the custom `x-extends` keyword (single inheritance between object $defs). Plan: plans/ally-guide/plan.md §9.",
+  "x-contract-version": 1,
+  "$defs": {
+    "GuideMode": {
+      "description": "Safety mode of a thread (plan §6.2). REAL_CASE and PII are per-message overlays, not modes.",
+      "type": "string",
+      "enum": ["NORMAL", "CARE", "CRISIS", "CRISIS_FOLLOWUP"]
+    },
+    "GuideAtmosphere": {
+      "description": "Visual tone of the interface (plan §5.9).",
+      "type": "string",
+      "enum": ["bright", "hushed", "still"]
+    },
+    "GuideChannel": {
+      "description": "How a message reached the thread.",
+      "type": "string",
+      "enum": ["text", "voice", "event"]
+    },
+    "GuideItemType": {
+      "description": "Mirror of the Track 2.0 item types (ally-be TrackItemType).",
+      "type": "string",
+      "enum": [
+        "ROLEPLAY",
+        "CASE",
+        "QUIZ",
+        "ARTICLE",
+        "VIDEO",
+        "JOURNAL",
+        "ANNOTATED_ARTIFACT",
+        "GAME",
+        "BRANCHING_SCENARIO",
+        "BUCKET_SORT"
+      ]
+    },
+    "GuideCardKind": {
+      "type": "string",
+      "enum": [
+        "course_info",
+        "course_item",
+        "micro_activity",
+        "chapter_title",
+        "scene_receipt",
+        "closing_ritual",
+        "finale",
+        "resource",
+        "crisis_resources",
+        "sign_in",
+        "access_denied"
+      ]
+    },
+    "GuideCardPresentation": {
+      "description": "Where a card opens: in the conversation, in the right-hand Shelf, or full screen in the Theatre (plan §5.2). Fixed per item type.",
+      "type": "string",
+      "enum": ["inline", "shelf", "theatre"]
+    },
+    "GuideCardState": {
+      "type": "string",
+      "enum": [
+        "announced",
+        "ready",
+        "active",
+        "done",
+        "failed",
+        "superseded",
+        "dismissed"
+      ]
+    },
+    "GuideTone": {
+      "description": "Celebration intensity, capped by trigger warnings and mode (plan §4.7).",
+      "type": "string",
+      "enum": ["quiet", "warm", "festive"]
+    },
+    "GuidePresenceState": {
+      "type": "string",
+      "enum": ["idle", "thinking", "speaking"]
+    },
+    "GuideFailureCode": {
+      "description": "Why a turn failed (plan §9.3). The client maps each to a designed state in Ally's voice.",
+      "type": "string",
+      "enum": [
+        "turn_in_progress",
+        "guide_disabled",
+        "allowance_exhausted",
+        "anonymous_paused",
+        "not_enrolled",
+        "no_access",
+        "rate_limited",
+        "cooldown",
+        "provider_unavailable",
+        "message_too_long",
+        "interrupted",
+        "internal_error"
+      ]
+    },
+    "GuideTrackItemRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "title"],
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "$ref": "#/$defs/GuideItemType" },
+        "title": { "type": "string" },
+        "sectionId": { "type": ["string", "null"] },
+        "sectionTitle": { "type": ["string", "null"] }
+      }
+    },
+    "GuideCardMeta": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "minutes": { "type": ["integer", "null"] },
+        "format": { "type": ["string", "null"] }
+      }
+    },
+    "GuideCardCta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "action"],
+      "properties": {
+        "label": { "type": "string", "maxLength": 80 },
+        "action": {
+          "type": "string",
+          "enum": ["open", "start", "continue", "sign_in", "call", "dismiss"]
+        }
+      }
+    },
+    "GuideCard": {
+      "description": "One unit in the conversation (plan §5.6). `payload` is learner-safe by construction: it never carries answer keys (plan §6.4).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cardId", "kind", "presentation", "state", "title"],
+      "properties": {
+        "cardId": { "type": "string" },
+        "kind": { "$ref": "#/$defs/GuideCardKind" },
+        "presentation": { "$ref": "#/$defs/GuideCardPresentation" },
+        "state": { "$ref": "#/$defs/GuideCardState" },
+        "title": { "type": "string" },
+        "framing": { "type": ["string", "null"] },
+        "tone": { "$ref": "#/$defs/GuideTone" },
+        "meta": { "$ref": "#/$defs/GuideCardMeta" },
+        "cta": { "$ref": "#/$defs/GuideCardCta" },
+        "trackItem": { "$ref": "#/$defs/GuideTrackItemRef" },
+        "payload": { "type": "object" }
+      }
+    },
+    "GuideMemoryRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["memoryId", "label"],
+      "properties": {
+        "memoryId": { "type": "string" },
+        "label": { "type": "string" }
+      }
+    },
+    "GuideCrisisLine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "phone"],
+      "properties": {
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "hours": { "type": ["string", "null"] },
+        "url": { "type": ["string", "null"] }
+      }
+    },
+    "GuideSceneReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["behaviourLabels", "sideQuests"],
+      "properties": {
+        "behaviourLabels": { "type": "array", "items": { "type": "string" } },
+        "sideQuests": { "type": "integer" },
+        "noticing": { "type": ["string", "null"] }
+      }
+    },
+    "GuideAnchor": {
+      "description": "Context attached to a turn by 'Ask about this' (plan §5.8).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["itemId"],
+      "properties": {
+        "itemId": { "type": "string" },
+        "quote": { "type": ["string", "null"], "maxLength": 1000 },
+        "timestampSec": { "type": ["number", "null"] },
+        "storyQuoteId": { "type": ["string", "null"] }
+      }
+    },
+
+    "GuideEventBase": {
+      "description": "Every SSE event: `event: <type>`, `id: <seq>`, `data: <this JSON>`. `seq` is monotonic per thread; ephemeral events reuse the last durable seq and set `durable: false`.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "seq", "threadId", "at", "durable"],
+      "properties": {
+        "v": { "type": "integer", "const": 1 },
+        "seq": { "type": "integer" },
+        "threadId": { "type": "string" },
+        "at": { "type": "string" },
+        "durable": { "type": "boolean" }
+      }
+    },
+    "GuideEventHello": {
+      "x-extends": "#/$defs/GuideEventBase",
+      "type": "object",
+      "required": ["type", "data"],
+      "properties": {
+        "type": { "type": "string", "const": "hello" },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["lastSeq", "mode", "atmosphere"],
+          "properties": {
+            "lastSeq": { "type": "integer" },
+            "mode": { "$ref": "#/$defs/GuideMode" },
+            "atmosphere": { "$ref": "#/$defs/GuideAtmosphere" }
+          }
+        }
+      }
+    },
+    "GuideEventTurnStarted": {
+      "x-extends": "#/$defs/GuideEventBase",
+      "type": "object",
+      "required": ["type", "data"],
+      "properties": {
+        "type": { "type": "string", "const": "turn.started" },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["turnId", "trigger"],
+          "properties": {
+            "turnId": { "type": "string" },
+            "trigger": {
+              "type": "string",
+              "enum": [
+                "learner_message",
+                "card_event",
+                "platform_event",
+                "resume",
+                "intent"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "GuideEventAssistantDelta": {
+      "x-extends": "#/$defs/GuideEventBase",
+      "type": "object",
+      "required": ["type", "data"],
+      "properties": {
+        "type": { "type": "string", "const": "assistant.delta" },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["turnId", "messageId", "text"],
+          "properties": {
+            "turnId": { "type": "string" },
+            "messageId": { "type": "string" },
+            "text": { "type": "string" }
+          }
+        }
+      }
+    },
+    "GuideEventAssistantMessage": {
+      "x-extends": "#/$defs/GuideEventBase",
+      "type": "object",
+      "required": ["type", "data"],
+      "properties": {
+        "type": { "type": "string", "const": "assistant.message" },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["messageId", "turnId", "text", "channel"],
+          "properties": {
+            "messageId": { "type": "string" },
+            "turnId": { "type": "string" },
+            "text": { "type": "string" },
+            "channel": { "$ref": "#/$defs/GuideChannel" },
+            "interrupted": { "type": "boolean" },
+            "memoryRefs": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/GuideMemoryRef" }
+            }
+          }
+        }
+      }
+    },
+    "GuideEventLearnerMessage": {
+      "x-extends": "#/$defs/GuideEventBase",
+      "type": "object",
+      "required": ["type", "data"],
+      "properties": {
+        "type": { "type": "string", "const": "learner.message" },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["messageId", "text", "channel"],
+          "properties": {
+            "messageId": { "type": "string" },
+            "turnId": { "type": ["string", "null"] },
+            "clientTurnId": { "type": ["string", "null"] },
+            "text": { "type": "string" },
+            "channel": { "$ref": "#/$defs/GuideChannel" },
+            "anchor": { "$ref": "#/$defs/GuideAnchor" }
+          }
+        }
+      }
+    },
+    "GuideEventCardPresented": {
+      "x-extends": "#/$defs/GuideEventBase",
+      "type": "object",
+      "required": ["type", "data"],
+      "properties": {
+        "type": { "type": "string", "const": "card.presented" },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["card"],
+          "properties": { "card": { "$ref": "#/$defs/GuideCard" } }
+        }
+      }
+    },
+    "GuideEventCardUpdated": {
+      "x-extends": "#/$defs/GuideEventBase",
+      "type": "object",
+      "required": ["type", "data"],
+      "properties": {
+        "type": { "type": "string", "const": "card.updated" },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["cardId", "state"],
+          "properties": {
+            "cardId": { "type": "string" },
+            "state": { "$ref": "#/$defs/GuideCardState" },
+            "tone": { "$ref": "#/$defs/GuideTone" },
+            "payload": { "type": "object" }
+          }
+        }
+      }
+    },
+    "GuideEventSpineUpdated": {
+      "x-extends": "#/$defs/GuideEventBase",
+      "type": "object",
+      "required": ["type", "data"],
+      "properties": {
+        "type": { "type": "string", "const": "spine.updated" },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["currentItemId", "completedItems", "totalItems"],
+          "properties": {
+            "currentItemId": { "type": ["string", "null"] },
+            "completedItems": { "type": "integer" },
+            "totalItems": { "type": "integer" }
+          }
+        }
+      }
+    },
+    "GuideEventSceneOpened": {
+      "x-extends": "#/$defs/GuideEventBase",
+      "type": "object",
+      "required": ["type", "data"],
+      "properties": {
+        "type": { "type": "string", "const": "scene.opened" },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["sceneId", "sectionId", "title"],
+          "properties": {
+            "sceneId": { "type": "string" },
+            "sectionId": { "type": "string" },
+            "title": { "type": "string" },
+            "stakes": { "type": ["string", "null"] }
+          }
+        }
+      }
+    },
+    "GuideEventSceneClosed": {
+      "x-extends": "#/$defs/GuideEventBase",
+      "type": "object",
+      "required": ["type", "data"],
+      "properties": {
+        "type": { "type": "string", "const": "scene.closed" },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["sceneId", "sectionId", "receipt"],
+          "properties": {
+            "sceneId": { "type": "string" },
+            "sectionId": { "type": "string" },
+            "receipt": { "$ref": "#/$defs/GuideSceneReceipt" }
+          }
+        }
+      }
+    },
+    "GuideEventModeChanged": {
+      "x-extends": "#/$defs/GuideEventBase",
+      "type": "object",
+      "required": ["type", "data"],
+      "properties": {
+        "type": { "type": "string", "const": "mode.changed" },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "atmosphere"],
+          "properties": {
+            "mode": { "$ref": "#/$defs/GuideMode" },
+            "atmosphere": { "$ref": "#/$defs/GuideAtmosphere" }
+          }
+        }
+      }
+    },
+    "GuideEventCrisisResponse": {
+      "x-extends": "#/$defs/GuideEventBase",
+      "type": "object",
+      "required": ["type", "data"],
+      "properties": {
+        "type": { "type": "string", "const": "crisis.response" },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["messageId", "text", "language", "lines"],
+          "properties": {
+            "messageId": { "type": "string" },
+            "text": { "type": "string" },
+            "language": { "type": "string" },
+            "lines": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/GuideCrisisLine" }
+            }
+          }
+        }
+      }
+    },
+    "GuideEventNotebookAdded": {
+      "x-extends": "#/$defs/GuideEventBase",
+      "type": "object",
+      "required": ["type", "data"],
+      "properties": {
+        "type": { "type": "string", "const": "notebook.added" },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["entryId", "kind", "text"],
+          "properties": {
+            "entryId": { "type": "string" },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "first_move",
+                "possible_self",
+                "journal_line",
+                "rehearsed_line",
+                "reflection",
+                "noticing"
+              ]
+            },
+            "text": { "type": "string" }
+          }
+        }
+      }
+    },
+    "GuideEventMilestone": {
+      "x-extends": "#/$defs/GuideEventBase",
+      "type": "object",
+      "required": ["type", "data"],
+      "properties": {
+        "type": { "type": "string", "const": "milestone" },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "tone", "label"],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": ["boss_complete", "section_complete", "course_complete"]
+            },
+            "tone": { "$ref": "#/$defs/GuideTone" },
+            "label": { "type": "string" }
+          }
+        }
+      }
+    },
+    "GuideEventPresence": {
+      "x-extends": "#/$defs/GuideEventBase",
+      "type": "object",
+      "required": ["type", "data"],
+      "properties": {
+        "type": { "type": "string", "const": "presence" },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["state"],
+          "properties": {
+            "state": { "$ref": "#/$defs/GuidePresenceState" },
+            "caption": { "type": ["string", "null"] }
+          }
+        }
+      }
+    },
+    "GuideEventShelfOpen": {
+      "x-extends": "#/$defs/GuideEventBase",
+      "type": "object",
+      "required": ["type", "data"],
+      "properties": {
+        "type": { "type": "string", "const": "shelf.open" },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["cardId", "width"],
+          "properties": {
+            "cardId": { "type": "string" },
+            "width": { "type": "string", "enum": ["reading", "utility"] }
+          }
+        }
+      }
+    },
+    "GuideEventNextStep": {
+      "x-extends": "#/$defs/GuideEventBase",
+      "type": "object",
+      "required": ["type", "data"],
+      "properties": {
+        "type": { "type": "string", "const": "next_step" },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["hidden"],
+          "properties": {
+            "hidden": { "type": "boolean" },
+            "itemId": { "type": ["string", "null"] },
+            "title": { "type": ["string", "null"] },
+            "minutes": { "type": ["integer", "null"] }
+          }
+        }
+      }
+    },
+    "GuideEventToolActivity": {
+      "x-extends": "#/$defs/GuideEventBase",
+      "type": "object",
+      "required": ["type", "data"],
+      "properties": {
+        "type": { "type": "string", "const": "tool.activity" },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["turnId", "label"],
+          "properties": {
+            "turnId": { "type": "string" },
+            "label": { "type": "string" }
+          }
+        }
+      }
+    },
+    "GuideEventAllowance": {
+      "x-extends": "#/$defs/GuideEventBase",
+      "type": "object",
+      "required": ["type", "data"],
+      "properties": {
+        "type": { "type": "string", "const": "allowance" },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["remaining", "limit"],
+          "properties": {
+            "remaining": { "type": "integer" },
+            "limit": { "type": "integer" }
+          }
+        }
+      }
+    },
+    "GuideEventTurnCompleted": {
+      "x-extends": "#/$defs/GuideEventBase",
+      "type": "object",
+      "required": ["type", "data"],
+      "properties": {
+        "type": { "type": "string", "const": "turn.completed" },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["turnId"],
+          "properties": { "turnId": { "type": "string" } }
+        }
+      }
+    },
+    "GuideEventTurnFailed": {
+      "x-extends": "#/$defs/GuideEventBase",
+      "type": "object",
+      "required": ["type", "data"],
+      "properties": {
+        "type": { "type": "string", "const": "turn.failed" },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["code", "message"],
+          "properties": {
+            "turnId": { "type": ["string", "null"] },
+            "code": { "$ref": "#/$defs/GuideFailureCode" },
+            "message": { "type": "string" }
+          }
+        }
+      }
+    },
+    "GuideEventPing": {
+      "x-extends": "#/$defs/GuideEventBase",
+      "type": "object",
+      "required": ["type", "data"],
+      "properties": {
+        "type": { "type": "string", "const": "ping" },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {}
+        }
+      }
+    },
+    "GuideEvent": {
+      "description": "Every event the thread stream can carry, discriminated by `type`.",
+      "oneOf": [
+        { "$ref": "#/$defs/GuideEventHello" },
+        { "$ref": "#/$defs/GuideEventTurnStarted" },
+        { "$ref": "#/$defs/GuideEventAssistantDelta" },
+        { "$ref": "#/$defs/GuideEventAssistantMessage" },
+        { "$ref": "#/$defs/GuideEventLearnerMessage" },
+        { "$ref": "#/$defs/GuideEventCardPresented" },
+        { "$ref": "#/$defs/GuideEventCardUpdated" },
+        { "$ref": "#/$defs/GuideEventSpineUpdated" },
+        { "$ref": "#/$defs/GuideEventSceneOpened" },
+        { "$ref": "#/$defs/GuideEventSceneClosed" },
+        { "$ref": "#/$defs/GuideEventModeChanged" },
+        { "$ref": "#/$defs/GuideEventCrisisResponse" },
+        { "$ref": "#/$defs/GuideEventNotebookAdded" },
+        { "$ref": "#/$defs/GuideEventMilestone" },
+        { "$ref": "#/$defs/GuideEventPresence" },
+        { "$ref": "#/$defs/GuideEventShelfOpen" },
+        { "$ref": "#/$defs/GuideEventNextStep" },
+        { "$ref": "#/$defs/GuideEventToolActivity" },
+        { "$ref": "#/$defs/GuideEventAllowance" },
+        { "$ref": "#/$defs/GuideEventTurnCompleted" },
+        { "$ref": "#/$defs/GuideEventTurnFailed" },
+        { "$ref": "#/$defs/GuideEventPing" }
+      ]
+    },
+
+    "GuideTurnRequest": {
+      "description": "POST /v1/guide/threads/:id/turns. `clientTurnId` makes the request idempotent.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["clientTurnId", "text"],
+      "properties": {
+        "clientTurnId": { "type": "string", "maxLength": 64 },
+        "text": { "type": "string", "maxLength": 2000 },
+        "anchor": { "$ref": "#/$defs/GuideAnchor" },
+        "intent": {
+          "description": "A structured nudge from the UI instead of free text (Continue chip, locked peek, start).",
+          "type": ["string", "null"],
+          "enum": ["start", "continue", "locked_peek", null]
+        }
+      }
+    },
+    "GuideTurnAccepted": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["turnId"],
+      "properties": { "turnId": { "type": "string" } }
+    },
+    "GuideCardEventRequest": {
+      "description": "POST /v1/guide/threads/:id/cards/:cardId/events. Claims are verified against progress on the server.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "opened",
+            "closed",
+            "completed_claim",
+            "dismissed",
+            "launched",
+            "returned",
+            "reopened"
+          ]
+        },
+        "scenarioSessionId": { "type": ["string", "null"] },
+        "outcome": {
+          "type": ["string", "null"],
+          "enum": ["completed", "aborted", null]
+        }
+      }
+    },
+
+    "GuideVoiceTurnRequest": {
+      "description": "Voice worker → ally-be, POST /v1/guide/voice/turns. Authenticated with the service API key plus `token` (the voice-session token bound to thread, user and tenant).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["token", "clientTurnId", "text"],
+      "properties": {
+        "token": { "type": "string" },
+        "clientTurnId": { "type": "string", "maxLength": 64 },
+        "text": { "type": "string", "maxLength": 2000 },
+        "language": { "type": ["string", "null"] },
+        "interruptedTurnId": { "type": ["string", "null"] },
+        "spokenChars": { "type": ["integer", "null"] }
+      }
+    },
+    "GuideVoiceFrameDelta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "text"],
+      "properties": {
+        "type": { "type": "string", "const": "delta" },
+        "text": { "type": "string" }
+      }
+    },
+    "GuideVoiceFrameCardHint": {
+      "description": "A short speakable line when a card appears on screen ('I've put the article on your right').",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "text"],
+      "properties": {
+        "type": { "type": "string", "const": "card_hint" },
+        "text": { "type": "string" }
+      }
+    },
+    "GuideVoiceFrameDone": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "turnId", "messageId"],
+      "properties": {
+        "type": { "type": "string", "const": "done" },
+        "turnId": { "type": "string" },
+        "messageId": { "type": "string" }
+      }
+    },
+    "GuideVoiceFrameError": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "code", "message"],
+      "properties": {
+        "type": { "type": "string", "const": "error" },
+        "code": { "$ref": "#/$defs/GuideFailureCode" },
+        "message": { "type": "string" }
+      }
+    },
+    "GuideVoiceFrame": {
+      "description": "One NDJSON line of the voice turn response stream.",
+      "oneOf": [
+        { "$ref": "#/$defs/GuideVoiceFrameDelta" },
+        { "$ref": "#/$defs/GuideVoiceFrameCardHint" },
+        { "$ref": "#/$defs/GuideVoiceFrameDone" },
+        { "$ref": "#/$defs/GuideVoiceFrameError" }
+      ]
+    }
+  }
+}
