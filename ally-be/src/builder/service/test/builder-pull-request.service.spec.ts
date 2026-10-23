@@ -477,15 +477,6 @@ describe('BuilderPullRequestService', () => {
       });
     });
 
-    /**
-     * The second guard: a check that IS ours and still cannot be satisfied.
-     *
-     * The docs guard wants a `Wiki-PR:` trailer pointing at a pull request in
-     * a repo the runner cannot clone, so left as PENDING it spends every one
-     * of `maxFixRunsPerPr` attempts changing nothing. These pin that it is
-     * recorded, not acted on — and, more importantly, that the suppression is
-     * per check rather than per commit.
-     */
     it("puts the failing step's output in its own failing check", async () => {
       github.failedCheckExcerpts.mockResolvedValue({
         'unit tests': 'FAIL src/a.spec.ts\n  expected 1, received 2',
@@ -503,102 +494,40 @@ describe('BuilderPullRequestService', () => {
       expect(row.body).toContain('expected 1, received 2');
     });
 
-    describe('a failing check no fix run could satisfy', () => {
-      const docsRed = { state: 'failure', failed: ['docs-guard'], total: 2 };
-
-      it('records it as OBSERVED even though Builder wrote the commit', async () => {
-        await reconcileWith({}, openPr(), docsRed);
-
-        expect(feedbackRepository.upsertIfNew).toHaveBeenCalledWith(
-          expect.objectContaining({
-            kind: BuilderPrFeedbackKind.CI_FAILURE,
-            externalId: 'abc1234def:docs-guard',
-            status: BuilderPrFeedbackStatus.OBSERVED,
-          }),
-        );
+    /**
+     * The docs guard used to be recorded OBSERVED and handed to a person: it
+     * wanted a `Wiki-PR:` trailer pointing at a pull request in a wiki repo
+     * the runner could not clone. In the monorepo the wiki is a folder and
+     * the guard's failure names the page to update in this pull request, so
+     * it is a fix run's work like any other check — with the guard's own
+     * words carried along, which is what tells the run which page.
+     */
+    it('treats a failing docs guard on its own commit as work, with what the guard asked for', async () => {
+      github.failedCheckExcerpts.mockResolvedValue({
+        'docs-guard':
+          '##[error]Changed ally-web/libs/x.ts, but `helloallytech.github.io/wiki/repos/ally-web.md` was not updated.',
       });
 
-      it('says why, so the row does not read as Builder ignoring CI', async () => {
-        await reconcileWith({}, openPr(), docsRed);
-
-        const [row] = feedbackRepository.upsertIfNew.mock.calls.find(
-          ([call]: [any]) => call.kind === BuilderPrFeedbackKind.CI_FAILURE,
-        );
-        expect(row.body).toContain('Wiki-PR');
+      await reconcileWith({}, openPr({ branch: 'opencode/issue9-1' }), {
+        state: 'failure',
+        failed: ['docs-guard'],
+        total: 2,
       });
 
-      it('hands an opencode PR to a person with what the guard asked for', async () => {
-        github.failedCheckExcerpts.mockResolvedValue({
-          'docs-guard':
-            '##[error]Changed libs/x.ts, described by repos/ally-web.md, but no Wiki-PR: trailer.',
-        });
-
-        await reconcileWith(
-          {},
-          openPr({ branch: 'opencode/issue9-1' }),
-          docsRed,
-        );
-
-        const reason = repository.update.mock.calls
-          .map(([, patch]: [any, any]) => patch.needsHumanReason)
-          .find(Boolean);
-        expect(reason).toContain('Needs a docs decision');
-        expect(reason).toContain('repos/ally-web.md');
-      });
-
-      it('does not escalate a docs failure on a builder/* PR', async () => {
-        await reconcileWith({}, openPr(), docsRed);
-
-        expect(repository.update).not.toHaveBeenCalledWith(
-          expect.anything(),
-          expect.objectContaining({ needsHumanReason: expect.any(String) }),
-        );
-      });
-
-      it('matches the name GitHub actually reports, whichever spelling', async () => {
-        // The job id is `docs-guard`; the workflow's own name is "Docs guard".
-        // Which one reaches the checks API is GitHub's business, not ours.
-        await reconcileWith({}, openPr(), {
-          state: 'failure',
-          failed: ['Docs guard'],
-          total: 2,
-        });
-
-        expect(feedbackRepository.upsertIfNew).toHaveBeenCalledWith(
-          expect.objectContaining({
-            status: BuilderPrFeedbackStatus.OBSERVED,
-          }),
-        );
-      });
-
-      it('still counts a real failure on the same commit as work', async () => {
-        // The case that makes this per-check: one push fails the docs guard
-        // AND a test. Suppressing the commit would sink the test failure too.
-        await reconcileWith({}, openPr(), {
-          state: 'failure',
-          failed: ['docs-guard', 'unit tests'],
-          total: 3,
-        });
-
-        const rows = feedbackRepository.upsertIfNew.mock.calls
-          .map(([call]: [any]) => call)
-          .filter(
-            (call: any) => call.kind === BuilderPrFeedbackKind.CI_FAILURE,
-          );
-
-        expect(rows).toEqual(
-          expect.arrayContaining([
-            expect.objectContaining({
-              externalId: 'abc1234def:docs-guard',
-              status: BuilderPrFeedbackStatus.OBSERVED,
-            }),
-            expect.objectContaining({
-              externalId: 'abc1234def:unit tests',
-              status: BuilderPrFeedbackStatus.PENDING,
-            }),
-          ]),
-        );
-      });
+      expect(feedbackRepository.upsertIfNew).toHaveBeenCalledWith(
+        expect.objectContaining({
+          kind: BuilderPrFeedbackKind.CI_FAILURE,
+          externalId: 'abc1234def:docs-guard',
+          status: BuilderPrFeedbackStatus.PENDING,
+          body: expect.stringContaining(
+            'helloallytech.github.io/wiki/repos/ally-web.md',
+          ),
+        }),
+      );
+      expect(repository.update).not.toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ needsHumanReason: expect.any(String) }),
+      );
     });
 
     it('records a human review comment', async () => {
@@ -1017,6 +946,82 @@ describe('BuilderPullRequestService', () => {
         { id: 'pr-1' },
         { releaseHealthCheckedAt: expect.any(Date) },
       );
+    });
+
+    /**
+     * A monorepo pull request shipped as whatever its files resolved to, so
+     * the check covers every one of those targets — not only the service the
+     * row is filed under. Without this a backend-plus-admin release checked
+     * the API and left the dashboard that went out with it unwatched.
+     */
+    it("checks every target a monorepo pull request released, not only its row's service", async () => {
+      (service as any).configService = {
+        ...(service as any).configService,
+        githubMonorepo: 'ally-platform',
+        builderHealthUrls: {
+          'ally-be': 'https://api.example/api/health',
+          'ally-web:admin': 'https://admin.example',
+          'ally-web:helpline': 'https://helpline.example',
+        },
+      };
+      repository.find.mockResolvedValue([
+        released({
+          prUrl: 'https://github.com/HelloAllyTech/ally-platform/pull/5',
+        }),
+      ]);
+      github.listPullRequestFiles.mockResolvedValue({
+        files: [
+          'ally-be/src/a.ts',
+          'ally-web/apps/ally-admin-dashboard/src/b.tsx',
+        ],
+        truncated: false,
+      });
+      fetchMock.mockResolvedValue({ ok: true } as any);
+
+      await service.checkReleaseHealth();
+
+      const checked = fetchMock.mock.calls.map(([url]: [string]) => url);
+      expect(checked).toEqual([
+        'https://api.example/api/health',
+        'https://admin.example',
+      ]);
+      expect(github.listPullRequestFiles).toHaveBeenCalledWith(
+        'HelloAllyTech/ally-platform',
+        42,
+      );
+    });
+
+    /**
+     * listPullRequestFiles answers a GitHub error with an empty, truncated
+     * list rather than throwing. Resolving that to "no targets" would record
+     * the release as checked without checking anything; the row's service
+     * is the floor.
+     */
+    it("falls back to the row's service when the monorepo file listing is truncated", async () => {
+      (service as any).configService = {
+        ...(service as any).configService,
+        githubMonorepo: 'ally-platform',
+        builderHealthUrls: {
+          'ally-be': 'https://api.example/api/health',
+          'ally-web:admin': 'https://admin.example',
+        },
+      };
+      repository.find.mockResolvedValue([
+        released({
+          prUrl: 'https://github.com/HelloAllyTech/ally-platform/pull/5',
+        }),
+      ]);
+      github.listPullRequestFiles.mockResolvedValue({
+        files: [],
+        truncated: true,
+      });
+      fetchMock.mockResolvedValue({ ok: true } as any);
+
+      await service.checkReleaseHealth();
+
+      expect(fetchMock.mock.calls.map(([url]: [string]) => url)).toEqual([
+        'https://api.example/api/health',
+      ]);
     });
 
     it('holds automatic merges while a recent release is unhealthy', async () => {

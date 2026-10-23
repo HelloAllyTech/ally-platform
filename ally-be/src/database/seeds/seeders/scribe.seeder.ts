@@ -37,9 +37,12 @@ import { ReviewStatus } from '../../../review/type/review.type';
 import { getRepo, log } from '../helpers';
 
 // Mirrors CryptoService's AES-256-GCM scheme (src/common/service/crypto.service.ts)
-// so seeded `sessionSummary` values decrypt correctly through the normal read
-// path instead of being silently blanked out by the decrypt failure fallback.
-function encryptSessionSummary(plainText: string): string {
+// so seeded PHI — `sessionSummary` and every message `content` — decrypts
+// through the normal read path. A summary that fails to decrypt is silently
+// blanked; a message that fails is not: MessageService.decryptMessages throws,
+// and GET /chats/counsellor-chat answered 500 for every seeded counsellor until
+// messages were encrypted here too.
+function encryptPhi(plainText: string): string {
   const keyHex = process.env.PHI_DATA_ENCRYPTION_KEY;
   if (!keyHex) return plainText;
   const key = Buffer.from(keyHex, 'hex');
@@ -517,7 +520,7 @@ export async function seedScribeData(
           senderId:
             turn.from === 'counselor' ? counselor.id : ANONYMOUS_CLIENT_ID,
           type: MessageType.TEXT,
-          content: turn.content,
+          content: encryptPhi(turn.content),
           tenantId: tenantUuid,
         }),
       );
@@ -534,9 +537,7 @@ export async function seedScribeData(
           startTime: startedAt,
           endTime: endedAt,
           summary: {
-            sessionSummary: encryptSessionSummary(
-              fixture.summary.sessionSummary,
-            ),
+            sessionSummary: encryptPhi(fixture.summary.sessionSummary),
             keyConcerns: fixture.summary.keyConcerns,
             callQuality: fixture.summary.callQuality,
             tags: fixture.summary.tags.map((tag) => ({ tag })),

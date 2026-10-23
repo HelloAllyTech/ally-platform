@@ -427,12 +427,26 @@ run_agent() {
 # checked. So: snapshot each repo's HEAD before, restore after. `checkout` and
 # `clean` cover an edited tree; resetting to the recorded head covers one that
 # committed.
+#
+# "Is a git work tree" is asked of git, not of the filesystem. Since the
+# 2026-10-23 cutover builder-session.yml links `repos/<service>` to a folder
+# of one monorepo clone, so `repos/ally-be/.git` does not exist — the `.git`
+# is two levels up — and a `[ -d "$dir/.git" ]` test skipped every service,
+# which turned this guard off without a word. `git -C <folder>` finds the
+# enclosing work tree through the link, and every command below is scoped to
+# the folder it runs in (`checkout -- .`, `clean` of the cwd), except `reset
+# --hard`, which unwinds the whole clone — right, since every folder in it is
+# a read-only target of the same pass.
 HEADS_FILE=/tmp/builder-heads.txt
+
+in_work_tree() {
+  git -C "$1" rev-parse --is-inside-work-tree >/dev/null 2>&1
+}
 
 snapshot_heads() {
   : > "$HEADS_FILE"
   for dir in repos/*/; do
-    [ -d "$dir/.git" ] || continue
+    in_work_tree "$dir" || continue
     printf '%s\t%s\n' "$dir" "$(git -C "$dir" rev-parse HEAD 2>/dev/null || echo '')" \
       >> "$HEADS_FILE"
   done
@@ -441,7 +455,7 @@ snapshot_heads() {
 revert_stray_writes() {
   local phase="${1:-a read-only phase}" before now
   for dir in repos/*/; do
-    [ -d "$dir/.git" ] || continue
+    in_work_tree "$dir" || continue
 
     # Commits first: resetting to the recorded head also discards the staged
     # and working-tree changes that came with them.

@@ -9,11 +9,14 @@ describe('renderRepoChecks', () => {
     expect(text).toContain('`npx tsc -b --pretty false`');
   });
 
-  it('carries the docs rule a fix run cannot satisfy later', () => {
+  it('points at the root docs map and has the wiki page edited in the same pull request', () => {
     const text = renderRepoChecks([findBuilderRepo('ally-be')!]);
 
-    expect(text).toContain('.docs-map.yml');
-    expect(text).toContain('Wiki-PR: none');
+    expect(text).toContain('root of this monorepo');
+    expect(text).toContain('helloallytech.github.io/wiki/');
+    expect(text).toContain('same pull request');
+    // The old two-PR flow: a trailer in place of an edit.
+    expect(text).not.toMatch(/`Wiki-PR: none/);
   });
 
   it('is empty without a repo', () => {

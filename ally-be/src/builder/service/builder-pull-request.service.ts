@@ -43,7 +43,6 @@ import {
   BUILDER_OWN_ACTORS,
   BUILDER_RELEASE_TIMEOUT_MS,
   BUILDER_WORKFLOW_REF,
-  isUnfixableCheck,
   BUILDER_RELEASE_SETTLE_MS,
   BUILDER_HEALTH_RETRY_MS,
   BUILDER_UNHEALTHY_HOLD_MS,
@@ -52,6 +51,7 @@ import {
 } from '../constants/builder.constants';
 import {
   ReleaseTargetSet,
+  releaseTargetKey,
   resolveMonorepoReleaseTargets,
   resolveReleaseTargets,
 } from 'src/release/constants/release-targets.constants';
@@ -1257,7 +1257,7 @@ export class BuilderPullRequestService {
       const releasedAt = pullRequest.releasedAt?.getTime() ?? 0;
       if (!releasedAt || Date.now() - releasedAt < BUILDER_RELEASE_SETTLE_MS)
         continue;
-      const urls = this.healthUrlsFor(pullRequest.repo);
+      const urls = await this.healthUrlsFor(pullRequest);
       const failing: string[] = [];
       for (const url of urls) {
         if (!(await this.answersHealthy(url))) failing.push(url);
@@ -1295,12 +1295,58 @@ export class BuilderPullRequestService {
     }
   }
 
-  /** The health URLs for a repo's release targets; empty when none is known. */
-  private healthUrlsFor(repo: string): string[] {
+  /**
+   * The health URLs for what a released pull request shipped as; empty when
+   * none is known.
+   *
+   * A service repo's pull request shipped as that service, so its row's `repo`
+   * names every target to check. A monorepo pull request shipped as whatever
+   * its files resolved to at release time (`releaseTargetsOf`) — a change to
+   * the backend and the admin app released both, and its row still says
+   * `ally-be`, so reading the row alone would check the API and never the
+   * dashboard that went out with it. The files are read again here rather
+   * than stored: one listing per released pull request, and the same answer
+   * the release itself was given.
+   *
+   * When that listing comes back short — `listPullRequestFiles` never throws,
+   * it answers a GitHub error or a >300-file pull request with an empty or
+   * partial list and `truncated` — the row's service is used instead. An
+   * empty list would resolve to no targets, and "no health URL" is recorded
+   * as checked, so one transient 5xx would have left a released pull request
+   * permanently unverified. The service filter is what every release was
+   * checked with before the move; it may miss a second target, never the
+   * first.
+   */
+  private async healthUrlsFor(
+    pullRequest: BuilderPullRequest,
+  ): Promise<string[]> {
     const urls = this.configService.builderHealthUrls;
-    return Object.entries(urls)
-      .filter(([target]) => target === repo || target.startsWith(`${repo}:`))
-      .map(([, url]) => url);
+    const monorepo = this.configService.githubMonorepo;
+    const byRowService = (): string[] =>
+      Object.entries(urls)
+        .filter(
+          ([target]) =>
+            target === pullRequest.repo ||
+            target.startsWith(`${pullRequest.repo}:`),
+        )
+        .map(([, url]) => url);
+    if (!monorepo || repoName(prRepoOf(pullRequest)) !== monorepo) {
+      return byRowService();
+    }
+    const { files, truncated } = await this.github.listPullRequestFiles(
+      prRepoOf(pullRequest),
+      pullRequest.prNumber,
+    );
+    if (truncated) {
+      this.logger.warn(
+        `Builder: could not list the files of ${prRepoOf(pullRequest)}#${pullRequest.prNumber} for its health check; checking its row's service (${pullRequest.repo}) instead.`,
+      );
+      return byRowService();
+    }
+    return resolveMonorepoReleaseTargets(files)
+      .targets.map((target) => releaseTargetKey(target))
+      .filter((key): key is string => !!key && key in urls)
+      .map((key) => urls[key]);
   }
 
   private async answersHealthy(url: string): Promise<boolean> {
@@ -1877,17 +1923,15 @@ export class BuilderPullRequestService {
    * PENDING is the very push we are guarding against. The tick is skipped
    * instead; this is polled, so the next one picks it up.
    *
-   * ## The unfixable-check guard
-   *
-   * A second, independent reason to record rather than act: some checks are
-   * ours and still cannot be satisfied from inside a code repo. The docs guard
-   * wants a `Wiki-PR:` trailer pointing at a pull request in a repo the runner
-   * cannot clone, so a fix run spends an attempt, changes nothing it could
-   * change, and leaves the PR as red as it found it — three times over, up to
-   * `maxFixRunsPerPr`. See `BUILDER_UNFIXABLE_CHECKS`.
-   *
-   * Decided per check, not per commit, because one push routinely fails both:
-   * the docs guard, which we cannot fix, and a real test, which we must.
+   * There used to be a second guard here, for checks that were ours and still
+   * could not be satisfied from inside a code repo: the docs guard wanted a
+   * `Wiki-PR:` trailer pointing at a pull request in a wiki repo the runner
+   * could not clone, so its failure was recorded OBSERVED and handed to a
+   * person. Since the 2026-10-23 cutover the wiki is a folder of the same
+   * monorepo and the root `.docs-map.yml` names its pages as in-tree
+   * `requires:` paths, so the guard's failure says which file to update in
+   * this pull request — which is exactly what a fix run can do. It is now a
+   * failing check like any other, and suppressing it would hide a real one.
    */
   private async ingestFeedback(
     pullRequest: BuilderPullRequest,
@@ -1917,25 +1961,13 @@ export class BuilderPullRequestService {
           : {};
 
         for (const check of rollup.failed) {
-          // Two independent reasons a failure is not ours to act on, and the
-          // check-level one is decided per check rather than per commit: a
-          // push of ours can fail the docs guard AND a real test at once, and
-          // the test half must still earn its fix run.
-          const unfixable = isUnfixableCheck(check);
-          const status =
-            ours && !unfixable
-              ? BuilderPrFeedbackStatus.PENDING
-              : BuilderPrFeedbackStatus.OBSERVED;
+          const status = ours
+            ? BuilderPrFeedbackStatus.PENDING
+            : BuilderPrFeedbackStatus.OBSERVED;
 
           const shortSha = headSha.slice(0, 7);
           let body: string;
-          if (unfixable) {
-            body =
-              `The check "${check}" failed on ${shortSha}. A fix run cannot ` +
-              `satisfy it — it needs a Wiki-PR trailer pointing at a pull ` +
-              `request in the wiki repo, which a build cannot open. Recorded ` +
-              `for a human.`;
-          } else if (!ours) {
+          if (!ours) {
             body =
               `The check "${check}" failed on ${shortSha}, pushed by ` +
               `${headAuthor.login ?? headAuthor.name ?? 'someone else'}. Left for them.`;
@@ -1944,20 +1976,6 @@ export class BuilderPullRequestService {
             if (excerpts[check]) {
               body += `\n\nThe failing step's output:\n\n\`\`\`\n${excerpts[check]}\n\`\`\``;
             }
-          }
-
-          // A docs rule a fix run cannot satisfy is a person's call: say what
-          // the guard asked for, on an opencode PR, instead of recording it for
-          // nobody.
-          if (unfixable && ours && isOpencodeBranch(pullRequest.branch)) {
-            const asked = (excerpts[check] ?? '')
-              .split('\n')
-              .map((line) => line.replace(/^##\[error\]/, '').trim())
-              .find((line) => /wiki|docs/i.test(line));
-            await this.escalate(
-              pullRequest,
-              `Needs a docs decision: ${asked ?? `the "${check}" check failed`}. Add a Wiki-PR: line to the pull request description (a wiki PR link, or "Wiki-PR: none — <reason>"), or the docs:skip label with a reason.`,
-            );
           }
 
           await this.feedbackRepository.upsertIfNew({
